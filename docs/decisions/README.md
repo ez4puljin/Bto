@@ -1,0 +1,82 @@
+# Architecture Decision Records (ADRs)
+
+This folder holds the decisions that shape Tugeel (Түгээл). Every ADR records one decision, the situation that forced it, the options that were weighed, and what the team accepts as a consequence. `docs/architecture.md` describes the resulting system; the ADRs explain *why* it looks that way.
+
+## Rules
+
+1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
+2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0023`.
+4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
+5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
+6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
+7. **Vocabulary.** *module* = one of the 14 code modules of `docs/architecture.md` §4 (`identity`, `catalog`, …); *delivery N* = roadmap step N of `docs/SPEC.md` §9 and `docs/STATUS.md` (1–11). ADR text says "delivery N" for roadmap steps and never numbers code modules.
+
+## Index
+
+| ID | Title | Status | Date |
+|---|---|---|---|
+| [ADR-0001](ADR-0001-typescript-monorepo.md) | TypeScript everywhere in a pnpm-workspaces monorepo, one TypeScript version | Accepted | 2026-10-09 |
+| [ADR-0002](ADR-0002-nestjs-modular-monolith.md) | NestJS 12 modular monolith with two entrypoints | Accepted | 2026-10-09 |
+| [ADR-0003](ADR-0003-postgres-drizzle.md) | PostgreSQL 18 as the only datastore, Drizzle ORM with hand-edited SQL migrations | Accepted | 2026-10-09 |
+| [ADR-0004](ADR-0004-rest-openapi-shared-client.md) | REST + OpenAPI with a generated TypeScript client shared by web and mobile | Accepted | 2026-10-09 |
+| [ADR-0005](ADR-0005-auth-model.md) | Self-hosted auth: JWT + rotating refresh tokens, permission strings, phone identity for customers | Accepted | 2026-10-09 |
+| [ADR-0006](ADR-0006-one-expo-codebase-two-apps.md) | One Expo codebase, two store apps via APP_VARIANT | Accepted | 2026-10-09 |
+| [ADR-0007](ADR-0007-inventory-ledger.md) | Inventory as an append-only ledger with DB-enforced invariants and balance caches | Accepted | 2026-10-09 |
+| [ADR-0008](ADR-0008-base-units-and-factors.md) | Base-unit storage with factor snapshots and a single supersede service | Accepted | 2026-10-09 |
+| [ADR-0009](ADR-0009-pricing-engine.md) | Pricing engine: effective-dated, non-overlapping price rules resolved by a pure function and frozen at SUBMIT | Accepted | 2026-10-09 |
+| [ADR-0010](ADR-0010-money-vat-rounding.md) | Money as NUMERIC MNT with decimal.js, whole-tugrik unit prices, per-line tax split | Accepted | 2026-10-09 |
+| [ADR-0011](ADR-0011-i18n-mongolian-first.md) | i18n from day one: i18next keys, `mn` as the only locale, English codes in the database | Accepted | 2026-10-09 |
+| [ADR-0012](ADR-0012-hosting-do-sgp1-posapi-tailscale.md) | Hosting: DigitalOcean SGP1 droplet + Managed PostgreSQL; PosAPI on an office mini-PC over Tailscale | Accepted | 2026-10-09 |
+| [ADR-0013](ADR-0013-background-jobs-pg-boss.md) | Background jobs with pg-boss, transactional enqueue, separate worker entrypoint | Accepted | 2026-10-09 |
+| [ADR-0014](ADR-0014-file-storage-spaces.md) | File storage on DigitalOcean Spaces via presigned URLs | Accepted | 2026-10-09 |
+| [ADR-0015](ADR-0015-excel-import-pipeline.md) | Excel import as a validated, previewable, idempotent, revertible job pipeline | Accepted | 2026-10-09 |
+| [ADR-0016](ADR-0016-testing-strategy.md) | Testing strategy: isolated real-Postgres integration tests plus a mandatory integrity suite | Accepted | 2026-10-09 |
+| [ADR-0017](ADR-0017-ebarimt-integration.md) | e-Barimt integration via PosAPI 3.0 on the office box, two-phase issue, certification gate | Deferred | 2026-10-09 |
+| [ADR-0018](ADR-0018-payments-qpay.md) | Payments: QPay Merchant v2 as the single QR rail, callback-then-check, Khan Bank statements | Deferred | 2026-10-09 |
+| [ADR-0019](ADR-0019-lot-expiry-readiness.md) | Lot/expiry readiness without implementation | Deferred | 2026-10-09 |
+| [ADR-0020](ADR-0020-offline-deferred.md) | Offline mode deferred; idempotent, document-based mutations now | Deferred | 2026-10-09 |
+| [ADR-0021](ADR-0021-scanning-and-printing.md) | Scanning and printing: keyboard-wedge first, raster receipts by default, browser labels first | Accepted | 2026-10-09 |
+| [ADR-0022](ADR-0022-pos-print-agent.md) | POS print agent: a polling Node service on the supermarket POS PC | Proposed | 2026-10-09 |
+
+## Template
+
+Copy this into `ADR-00NN-short-slug.md`. Keep the file between 40 and 140 lines.
+
+```markdown
+# ADR-00NN: <Title stating the decision, not the topic>
+
+| | |
+|---|---|
+| Status | Proposed / Accepted / Deferred / Superseded by ADR-00NN / Rejected |
+| Date | YYYY-MM-DD |
+| Deciders | Owner, Claude (Claude Code session) |
+
+## Context
+
+What situation forces a decision. Facts about external systems are cited from
+docs/architecture.md §9 or §13; business unknowns are tagged TODO-VERIFY.
+
+## Decision
+
+The decision in the present tense, concrete enough to implement: table and
+column names, service names, limits, error codes.
+
+## Alternatives considered
+
+| Alternative | Why rejected |
+|---|---|
+| ... | ... |
+
+## Consequences
+
+**Positive.** ...
+
+**Negative.** ...
+
+**Follow-ups.** Dated or delivery-bound actions this decision creates.
+
+## Related
+
+ADR-00NN, docs/architecture.md §N, docs/SPEC.md §N.
+```

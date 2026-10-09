@@ -1,0 +1,30 @@
+# dependencies and build output
+node_modules/
+dist/
+build/
+.expo/
+.expo-shared/
+coverage/
+*.tsbuildinfo
+.turbo/
+.pnpm-store/
+tmp/
+
+# logs
+*.log
+
+# secrets and local environment (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# personal Claude Code settings
+CLAUDE.local.md
+.claude/settings.local.json
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
