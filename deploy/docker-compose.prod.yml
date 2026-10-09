@@ -1,0 +1,64 @@
+# Production stack + the edge Caddy that also fronts staging (docs/architecture.md §10.2).
+# On the droplet (/opt/tugeel):  docker compose -f docker-compose.prod.yml --env-file .env up -d
+# Once per droplet:              docker network create tugeel_edge_prod && docker network create tugeel_edge_staging
+name: tugeel-prod
+
+x-app: &app
+  image: ghcr.io/ez4puljin/bto-api:${API_TAG:?API_TAG is required}
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+  env_file: [.env]
+  logging: &logging
+    driver: json-file
+    options: { max-size: '10m', max-file: '5' }
+
+services:
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - '${CADDY_HTTP_PORT:-80}:80'
+      - '${CADDY_HTTPS_PORT:-443}:443'
+      - '${CADDY_HTTPS_PORT:-443}:443/udp'
+    environment:
+      ADMIN_HOST: ${ADMIN_HOST:?ADMIN_HOST is required}
+      API_HOST: ${API_HOST:?API_HOST is required}
+      STAGING_HOST: ${STAGING_HOST:?STAGING_HOST is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge_prod, edge_staging]
+    logging: *logging
+
+  web:
+    image: ghcr.io/ez4puljin/bto-web:${WEB_TAG:?WEB_TAG is required}
+    restart: unless-stopped
+    networks: [edge_prod]
+    logging: *logging
+
+  api:
+    <<: *app
+    # Pool budget per process (docs/architecture.md §10.2): api 6 + pg-boss 2.
+    environment: { ROLE: api, DB_POOL_MAX: '6', PGBOSS_POOL_MAX: '2' }
+    networks: [edge_prod]
+    mem_limit: 768m
+
+  worker:
+    <<: *app
+    # worker 3 + pg-boss 2; no published ports, health on loopback only.
+    environment: { ROLE: worker, DB_POOL_MAX: '3', PGBOSS_POOL_MAX: '2' }
+    networks: [default]
+    mem_limit: 768m
+    depends_on:
+      api: { condition: service_healthy }
+
+networks:
+  edge_prod: { name: tugeel_edge_prod, external: true }
+  edge_staging: { name: tugeel_edge_staging, external: true }
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

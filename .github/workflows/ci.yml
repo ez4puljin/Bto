@@ -1,0 +1,88 @@
+# `pnpm check` is the definition of done (ADR-0001, ADR-0016). ci/rehearse.sh mirrors the "check" job
+# locally (`pnpm ci:rehearse`); keep the two in sync. Runner pinned to ubuntu-24.04 (ADR-0023).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale-provider=icu --icu-locale=und
+        ports: ['15432:5432']
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # The test harness creates the roles with these passwords and refuses non-local hosts.
+      TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@localhost:15432/postgres
+      DATABASE_URL: postgres://app:app_ci_pw@localhost:15432/tugeel
+      MIGRATOR_DATABASE_URL: postgres://migrator:migrator_ci_pw@localhost:15432/tugeel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v6 # version from package.json packageManager / devEngines
+        with:
+          cache: true
+      - run: node --version && pnpm --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: generated files are committed
+        run: |
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.image }}/Dockerfile
+          push: false
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: ghcr.io/ez4puljin/bto-${{ matrix.image }}:ci
+          cache-from: type=gha,scope=bto-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=bto-${{ matrix.image }}
+
+  deploy-config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: compose files and Caddyfile are valid
+        run: |
+          cp deploy/.env.example deploy/.env
+          cp deploy/.env.example deploy/.env.staging
+          docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env config --quiet
+          docker compose -f deploy/docker-compose.staging.yml --env-file deploy/.env.staging config --quiet
+          docker run --rm --env-file deploy/.env.example \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

@@ -1,0 +1,45 @@
+# Rehearses the "check" job of .github/workflows/ci.yml on Linux + Node 26 against the COMMITTED HEAD
+# (a clean clone: LF line endings, no Windows node_modules). Run with `pnpm ci:rehearse`.
+name: tugeel-ci
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=und'
+    tmpfs: [/var/lib/postgresql]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  runner:
+    image: node:26-trixie
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CI: 'true'
+      TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
+      DATABASE_URL: postgres://app:app_ci_pw@postgres:5432/tugeel
+      MIGRATOR_DATABASE_URL: postgres://migrator:migrator_ci_pw@postgres:5432/tugeel
+      REHEARSAL_REF: ${REHEARSAL_REF:-HEAD}
+    volumes:
+      - '..:/src:ro'
+      - 'pnpm-store:/pnpm/store'
+    working_dir: /work
+    command:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - |
+        git config --global --add safe.directory '*'
+        git clone --quiet --no-hardlinks /src /work/repo
+        cd /work/repo
+        git checkout --quiet --detach "$$REHEARSAL_REF"
+        bash ci/rehearse.sh
+volumes:
+  pnpm-store: {}

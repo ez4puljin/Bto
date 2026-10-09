@@ -1,0 +1,55 @@
+# Edge Caddy for production and staging (docs/architecture.md §10.2). Hostnames come from the
+# environment; a value starting with http:// (local test runs) disables automatic HTTPS for that site.
+{
+	email {$ACME_EMAIL}
+}
+
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# camera=(self): the delivery-1 web barcode scanner uses the camera.
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+}
+
+(spa_csp) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+}
+
+# args[0] = api upstream, args[1] = SPA upstream
+(app) {
+	import common
+	@backend path /api/* /health /health/*
+	handle @backend {
+		reverse_proxy {args[0]} {
+			lb_try_duration 10s
+		}
+	}
+	handle {
+		import spa_csp
+		reverse_proxy {args[1]} {
+			lb_try_duration 10s
+		}
+	}
+}
+
+{$ADMIN_HOST} {
+	import app api:3000 web:8080
+}
+
+{$API_HOST} {
+	import common
+	reverse_proxy api:3000 {
+		lb_try_duration 10s
+	}
+}
+
+{$STAGING_HOST} {
+	import app api-staging:3000 web-staging:8080
+	header X-Robots-Tag "noindex, nofollow"
+}

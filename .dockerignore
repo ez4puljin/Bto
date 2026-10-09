@@ -1,0 +1,23 @@
+# Build context = repository root. Never exclude a workspace package.json: --frozen-lockfile needs them all.
+.git
+.github
+.claude
+.vscode
+.idea
+docs
+deploy
+ci
+tools
+**/node_modules
+**/dist
+**/dist-worker
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+**/*.log
+**/.env
+**/.env.*
+!**/.env.example
+.data
+tmp
+CLAUDE.local.md
