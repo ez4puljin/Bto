@@ -1,0 +1,30 @@
+{
+  "app": {
+    "name": "Түгээл"
+  },
+  "nav": {
+    "systemStatus": "Системийн төлөв"
+  },
+  "systemStatus": {
+    "title": "Системийн төлөв",
+    "description": "API, өгөгдлийн сан болон ажлын дарааллын төлөв",
+    "loading": "Ачаалж байна…",
+    "unreachable": "API-д холбогдож чадсангүй",
+    "refresh": "Шинэчлэх",
+    "checkedAt": "Шалгасан: {{time}}",
+    "version": "Хувилбар: {{version}}",
+    "components": {
+      "db": "Өгөгдлийн сан",
+      "pgboss": "Ажлын дараалал"
+    },
+    "state": {
+      "up": "Хэвийн",
+      "down": "Ажиллахгүй байна",
+      "unknown": "Тодорхойгүй"
+    }
+  },
+  "errors": {
+    "notFound": "Хуудас олдсонгүй",
+    "unexpected": "Алдаа гарлаа"
+  }
+}

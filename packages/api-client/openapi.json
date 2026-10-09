@@ -1,0 +1,213 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "Health_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Tugeel API",
+    "description": "",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "type": "string",
+            "description": "ok only when every component is up"
+          },
+          "db": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "pgboss": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "example": "sha-0a1b2c3"
+          }
+        },
+        "required": [
+          "status",
+          "db",
+          "pgboss",
+          "version"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "BAD_REQUEST",
+          "VALIDATION_FAILED",
+          "UNAUTHORIZED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "METHOD_NOT_ALLOWED",
+          "CONFLICT",
+          "PAYLOAD_TOO_LARGE",
+          "UNSUPPORTED_MEDIA_TYPE",
+          "TOO_MANY_REQUESTS",
+          "INTERNAL_ERROR",
+          "SERVICE_UNAVAILABLE",
+          "IDEMPOTENCY_KEY_REQUIRED",
+          "IDEMPOTENCY_KEY_REUSED",
+          "DOC_ALREADY_POSTED",
+          "ALREADY_POSTED",
+          "STOCK_INSUFFICIENT",
+          "BIN_LOCKED_FOR_COUNT",
+          "UNIT_SUPERSEDED",
+          "PRICE_MISSING",
+          "DISCOUNT_OVER_CAP",
+          "CREDIT_BLOCKED",
+          "CREDIT_NEEDS_APPROVAL",
+          "ORDER_STATE_INVALID",
+          "EBARIMT_ATTRIBUTES_MISSING",
+          "TIN_PENDING",
+          "EBARIMT_INDETERMINATE",
+          "PAYMENT_NOT_VERIFIED"
+        ]
+      },
+      "ProblemFieldError": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "example": "quantity"
+          },
+          "constraint": {
+            "type": "string",
+            "example": "isPositive"
+          },
+          "message": {
+            "type": "string",
+            "example": "quantity must be a positive number"
+          }
+        },
+        "required": [
+          "path",
+          "constraint",
+          "message"
+        ]
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "https://tugeel.local/errors/NOT_FOUND"
+          },
+          "title": {
+            "type": "string",
+            "example": "Not found"
+          },
+          "status": {
+            "type": "number",
+            "example": 404
+          },
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "description": "English detail for logs; clients show text chosen by code."
+          },
+          "instance": {
+            "type": "string",
+            "example": "/api/v1/bin-moves/4412"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProblemFieldError"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+/**
+ * Stable machine codes returned in RFC 9457 problem+json responses (`code`).
+ * Clients translate them to Mongolian through i18next; the API never sends user-facing text.
+ * A const object (not a TS enum) keeps the syntax erasable. Add a code in the same change as the
+ * code that throws it, and give it an HTTP status in apps/api/src/common/errors/error-status.ts.
+ */
+export const ErrorCode = {
+  // generic HTTP
+  BAD_REQUEST: 'BAD_REQUEST',
+  VALIDATION_FAILED: 'VALIDATION_FAILED',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  METHOD_NOT_ALLOWED: 'METHOD_NOT_ALLOWED',
+  CONFLICT: 'CONFLICT',
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  // cross-module (docs/architecture.md §6)
+  IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  DOC_ALREADY_POSTED: 'DOC_ALREADY_POSTED',
+  ALREADY_POSTED: 'ALREADY_POSTED',
+  STOCK_INSUFFICIENT: 'STOCK_INSUFFICIENT',
+  BIN_LOCKED_FOR_COUNT: 'BIN_LOCKED_FOR_COUNT',
+  UNIT_SUPERSEDED: 'UNIT_SUPERSEDED',
+  PRICE_MISSING: 'PRICE_MISSING',
+  DISCOUNT_OVER_CAP: 'DISCOUNT_OVER_CAP',
+  CREDIT_BLOCKED: 'CREDIT_BLOCKED',
+  CREDIT_NEEDS_APPROVAL: 'CREDIT_NEEDS_APPROVAL',
+  ORDER_STATE_INVALID: 'ORDER_STATE_INVALID',
+  EBARIMT_ATTRIBUTES_MISSING: 'EBARIMT_ATTRIBUTES_MISSING',
+  TIN_PENDING: 'TIN_PENDING',
+  EBARIMT_INDETERMINATE: 'EBARIMT_INDETERMINATE',
+  PAYMENT_NOT_VERIFIED: 'PAYMENT_NOT_VERIFIED',
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+export const ERROR_CODES: readonly ErrorCode[] = Object.values(ErrorCode);
+
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && (ERROR_CODES as readonly string[]).includes(value);
+}
