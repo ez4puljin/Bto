@@ -20,39 +20,47 @@ Repo `tugeel`, packages `@tugeel/*`. UI is Mongolian only; code, schema, API and
 
 ## Stack and pinned versions
 
-| Package | Version | Verified by |
-|---|---|---|
-| Node.js | 24 LTS (`.nvmrc`); Node 26 only in a dedicated upgrade session after it becomes LTS on 2026-10-28 | research 2026-10-09 |
-| pnpm | 11.x (11.28.5); `nodeLinker: hoisted`, `minimumReleaseAge: 1440` in `pnpm-workspace.yaml`; pnpm 12 later | research 2026-10-09 |
-| TypeScript | `~6.0.x`, ONE version workspace-wide (`pnpm ts:single-version` in CI); TypeScript 7 is never installed; pinned once in the pnpm `catalog:` of `pnpm-workspace.yaml`; every package uses `"typescript": "catalog:"` (ADR-0001) | research 2026-10-09 |
-| NestJS | 12.1.x, CommonJS + Jest template, Express 5 adapter, class-validator DTOs, `@nestjs/swagger` + CLI plugin | research 2026-10-09 |
-| Drizzle ORM / drizzle-kit | 0.45.x / 0.31.x; Drizzle 1.0 is RC and not adopted | research 2026-10-09 |
-| PostgreSQL | 18 (DO Managed SGP1, UTF-8, ICU collation); `postgres:18` container locally and for staging | research 2026-10-09 |
-| React | 19.3.x | research 2026-10-09 |
-| Zod | 4.6.x (`packages/shared` validation, env validation) | research 2026-10-09 |
-| TanStack Query | 5.104.x | research 2026-10-09 |
-| shadcn/ui, Tailwind | shadcn CLI 4.21.x initialised with `-b radix`; Tailwind 4 | research 2026-10-09 |
-| Expo SDK | the stable SDK at delivery-4 kickoff (57 today, 58 in beta); pinned then and recorded in `docs/modules/mobile.md` | research 2026-10-09 |
-| Vite 8, React Router 7, TanStack Table 8 | major decided; exact version from `npm view <pkg> version` on day 1, written here with the date | day-1 `npm view` |
-| pg-boss | major from `npm view pg-boss version` on day 1; paste its docs URL here | day-1 `npm view` |
-| decimal.js, i18next + react-i18next, argon2, nestjs-pino + pino, pdfmake, ExcelJS, `@nestjs/throttler`, openapi-typescript + openapi-fetch, `@point-of-sale/receipt-printer-encoder`, html5-qrcode | exact version from `npm view` on day 1, written here with the date | day-1 `npm view` |
+Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; only TypeScript uses the catalog range):
 
-Pins are exact (`"x.y.z"`) in every `package.json`; only TypeScript keeps `~6.0.x`. Majors change only in dedicated sessions between deliveries.
+| Package | Version | Note |
+|---|---|---|
+| Node.js | 26 (`.nvmrc`, `engines ^26.7.0`); Docker `node:26-trixie-slim`; CI `ubuntu-24.04` | ADR-0023 |
+| pnpm | 11.28.2 (`packageManager` + `devEngines`); `nodeLinker: hoisted`, `minimumReleaseAge: 1440`, `allowBuilds` | install with `npm i -g pnpm@11.28.2` (no corepack) |
+| TypeScript | `~6.0.3` (6.0.3), ONE version workspace-wide via the pnpm `catalog:`; `pnpm ts:single-version` | never `typescript@7` (ADR-0001) |
+| NestJS | core/common/platform-express/testing 12.1.2, cli 12.0.8, schematics 12.0.6, swagger 12.0.2, config 12.0.1 | ESM-only packages, CommonJS app (ADR-0025) |
+| Drizzle ORM / drizzle-kit / pg | 0.45.4 / 0.31.11 / 8.23.1 | Drizzle 1.0 not adopted |
+| pg-boss | 12.37.1 (+ `@opentelemetry/api` 1.9.1); docs https://pgboss.io | schema v45, installed by `db:migrate` (ADR-0024) |
+| PostgreSQL | 18 (UTF-8, ICU `und`); local `postgres:18` on `127.0.0.1:15432` | |
+| zod, decimal.js, dayjs | 4.6.5, 10.6.0, 1.11.23 | `Decimal` only from `@tugeel/shared/money` |
+| nestjs-pino, pino, pino-http | 5.3.1, 10.4.0, 11.0.0 | |
+| jest, ts-jest, supertest | 30.5.2, 29.4.14, 7.3.1 | Jest always via `apps/api/scripts/jest.cjs` (`--experimental-vm-modules`) |
+| eslint, typescript-eslint, eslint-plugin-boundaries | 10.12.0, 8.71.1, 7.2.0 | |
+| vite, @vitejs/plugin-react, vitest | 8.3.4, 6.1.2, 5.0.3 | |
+| react, react-router, @tanstack/react-query | 19.3.0, 7.18.4, 5.104.1 | v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
+| tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
+| i18next, react-i18next, @fontsource-variable/noto-sans | 26.4.2, 17.0.16, 5.3.0 | |
+| openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
+| TanStack Table | not installed yet: 8.21.3 is frozen since 2025-04, 9.x since 2026-08 | decide in the catalog session |
+| Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
+| argon2, pdfmake, ExcelJS, `@nestjs/throttler`, receipt-printer-encoder, html5-qrcode | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
+
+Majors change only in dedicated sessions between deliveries.
 DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process; staging 2 / 2 / 2 (architecture §10.2).
 
-## Commands (exist after delivery 1)
+## Commands
 
 | Command | What it does |
 |---|---|
-| `pnpm install` | install the workspace (Node 24, pnpm 11) |
-| `pnpm dev` | api + worker + web against the local `postgres:18` container (`docker compose up -d` first) |
-| `pnpm check` | typecheck (all packages) + eslint (boundaries + guards) + prettier + `ts:single-version` + jest unit/integration + integrity suite (`--runInBand`) + vitest + `drizzle-kit check` + `gen:api` freshness + web build |
-| `pnpm db:provision` | one-off per environment, run with the admin connection (`doadmin` / local `postgres`): creates roles `app` and `migrator`; required before the first `db:migrate` (architecture §5.3, §10.5) |
-| `pnpm db:generate` / `pnpm db:migrate` | generate SQL from `schema.ts` (then hand-edit CHECK / EXCLUDE / REVOKE / triggers) / apply migrations as role `migrator` |
-| `pnpm gen:api` | export OpenAPI and regenerate `packages/api-client`; CI fails when it is stale |
-| `pnpm test:integrity` | run the integrity suite alone |
+| `docker compose up -d --wait` | local `postgres:18` (ICU) on `127.0.0.1:15432`; needed by `pnpm check` and `pnpm dev` |
+| `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install` |
+| `pnpm db:provision` / `pnpm db:migrate` | roles + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + queues as `migrator` |
+| `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
+| `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173) |
+| `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
+| `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
+| `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
 
-**`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red.
+**`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
 
 ## Conventions (full text in `docs/architecture.md` §6 and §12)
 
@@ -63,7 +71,8 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Audit rows via `AuditService.record(tx, …)` inside the service transaction; document numbers allocated at SUBMIT/POST inside that tx (drafts have no number); a POSTed document is immutable, corrections are reversing documents.
 - Modules import only `modules/<other>/index.ts`; atomic cross-module writes pass the Drizzle `tx` explicitly; side effects are pg-boss jobs enqueued in the same tx; `src/integrations/**` is called only from `jobs/*.job.ts` or `*-flow.service.ts`, between transactions.
 - Errors are RFC 9457 problem+json with a stable `code` and `params`; lists use keyset pagination `{ data, nextCursor }`.
-- ESLint guards that must never be removed or weakened (architecture §3.1, §12): `eslint-plugin-boundaries` module boundaries; `no-restricted-imports` on `stockLedger` outside `inventory/services/stock-posting.service.ts`; `no-restricted-syntax` ban on `Number(` / `parseFloat(` in `apps/api/src/modules/**`; Cyrillic-literal ban (U+0400–U+04FF) in `**/*.tsx`; `eslint-plugin-i18next/no-literal-string` on JSX text; `src/integrations/**` importable only from `jobs/*.job.ts` and `*-flow.service.ts`; from delivery 3, `no-restricted-syntax` rejecting `fetch` / `axios` / `integrations/*` calls lexically inside `db.transaction(...)` callbacks.
+- ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config). From delivery 3: no `fetch` / `axios` / `integrations/*` calls inside `db.transaction(...)`.
+- Workspace packages are CommonJS with a `@tugeel/source` export condition (ADR-0025): the api uses their built `dist`, Vite/Vitest/Jest read the source; `pnpm check` builds them first.
 
 ## ALWAYS
 

@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0024 (decision 2: per-worker databases are cloned from one migrated template) |
 
 ## Context
 

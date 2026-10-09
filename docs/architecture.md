@@ -1,6 +1,6 @@
 # Tugeel (Түгээл) — Architecture
 
-Version 0.1 — 2026-10-09 — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
+Version 0.2 — 2026-10-10 (week-1 scaffold: ADR-0023, ADR-0024, ADR-0025 applied) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
 
 **Read §0, §4 and §12 before every session; read the module's §5 subsection before implementing it.** `TODO-VERIFY` marks business or external unknowns only (register in §13); every tooling choice in this document is decided.
 
@@ -12,22 +12,22 @@ Terminology: *module* = one of the 14 code modules in §4 (`identity`, `catalog`
 
 Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: catalog, multi-warehouse stock with bins and units, customer ordering, picking, zone-based delivery with company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement, reporting, HR/payroll. One owner-developer builds it with Claude Code, delivery by delivery, and maintains it alone.
 
-**The stack in one paragraph.** TypeScript end-to-end on Node.js 24 LTS (moving to Node 26 in a dedicated session after it becomes LTS on 2026-10-28), pnpm 11.x workspaces with `nodeLinker: hoisted` (no Turborepo), **one TypeScript version `~6.0.x` pinned workspace-wide** (Nest CLI 12 requires it; TypeScript 7 is never mixed in), one NestJS 12 modular-monolith API scaffolded from the CommonJS + Jest template on Express 5 with class-validator DTOs + `@nestjs/swagger`, Drizzle ORM 0.45.x with hand-edited SQL migrations on PostgreSQL 18 (DigitalOcean Managed, Singapore), pg-boss for jobs and cron with transactional enqueue (no Redis), decimal.js for all money and quantity arithmetic; a Vite 8 + React 19 single-page admin (React Router 7 library mode, TanStack Query/Table, shadcn/ui on Radix, Tailwind 4, i18next with `mn` as the only locale) that also hosts the supermarket POS screen; ONE Expo codebase built into two store apps via `APP_VARIANT` (`customer`; `staff` with warehouse / sales-rep / driver roles, Android-first, EAS internal distribution + EAS Update) on whichever Expo SDK is stable at delivery-4 kickoff; REST + OpenAPI with a generated openapi-typescript/openapi-fetch client shared by web and mobile; self-hosted JWT auth (argon2id, rotating refresh tokens, permission strings); one DigitalOcean SGP1 droplet running Docker Compose (Caddy, api, worker, plus a staging stack with its own local Postgres container), DO Spaces for files, GitHub Actions CI/CD; the mandatory e-Barimt **PosAPI 3.0 runs on a small Ubuntu mini-PC in the Ulaanbaatar office, reached only over Tailscale** (a second instance at the supermarket in delivery 9); QPay Merchant v2 as the single QR-payment rail (SocialPay is a QPay payer wallet), Khan Bank as the main bank (statement import first, corporate gateway later); keyboard-wedge barcode scanners with camera fallback; browser-printed labels first, raster ESC/POS for every receipt printer because Mongolian Cyrillic is not covered by PC866/CP1251.
+**The stack in one paragraph.** TypeScript end-to-end on Node.js 26 (LTS from 2026-10-28; ADR-0023), pnpm 11.x workspaces with `nodeLinker: hoisted` (no Turborepo), **one TypeScript version `~6.0.x` pinned workspace-wide** (Nest CLI 12 requires it; TypeScript 7 is never mixed in), one NestJS 12 modular-monolith API on the CommonJS + Jest template (NestJS 12 and pg-boss 12 are ESM-only packages loaded through Node `require(esm)`; workspace packages are CommonJS with a `@tugeel/source` export condition, ADR-0025) on Express 5 with class-validator DTOs + `@nestjs/swagger`, Drizzle ORM 0.45.x with hand-edited SQL migrations on PostgreSQL 18 (DigitalOcean Managed, Singapore), pg-boss for jobs and cron with transactional enqueue (no Redis), decimal.js for all money and quantity arithmetic; a Vite 8 + React 19 single-page admin (React Router 7 library mode, TanStack Query/Table, shadcn/ui on Radix, Tailwind 4, i18next with `mn` as the only locale) that also hosts the supermarket POS screen; ONE Expo codebase built into two store apps via `APP_VARIANT` (`customer`; `staff` with warehouse / sales-rep / driver roles, Android-first, EAS internal distribution + EAS Update) on whichever Expo SDK is stable at delivery-4 kickoff; REST + OpenAPI with a generated openapi-typescript/openapi-fetch client shared by web and mobile; self-hosted JWT auth (argon2id, rotating refresh tokens, permission strings); one DigitalOcean SGP1 droplet running Docker Compose (Caddy, api, worker, plus a staging stack with its own local Postgres container), DO Spaces for files, GitHub Actions CI/CD; the mandatory e-Barimt **PosAPI 3.0 runs on a small Ubuntu mini-PC in the Ulaanbaatar office, reached only over Tailscale** (a second instance at the supermarket in delivery 9); QPay Merchant v2 as the single QR-payment rail (SocialPay is a QPay payer wallet), Khan Bank as the main bank (statement import first, corporate gateway later); keyboard-wedge barcode scanners with camera fallback; browser-printed labels first, raster ESC/POS for every receipt printer because Mongolian Cyrillic is not covered by PC866/CP1251.
 
 ### 0.1 Version pins
 
-Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision, exact version confirmed on day 1 with `npm view <pkg> version` and recorded in the `CLAUDE.md` pin table with the date. Never upgrade a major inside a delivery session (§12).
+Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision; exact versions were confirmed on 2026-10-10 and are recorded in the `CLAUDE.md` pin table (Vite 8.3.4, React Router 7.18.4, pg-boss 12.37.1, decimal.js 10.6.0, i18next 26.4.2, nestjs-pino 5.3.1, openapi-typescript 7.13.0 / openapi-fetch 0.17.0; TanStack Table, argon2, pdfmake, ExcelJS, throttler, receipt-printer-encoder and html5-qrcode are pinned when first installed). Never upgrade a major inside a delivery session (§12).
 
 | Verified pins (source-backed) | Pins to confirm on day 1 (`npm view`) |
 |---|---|
-| **Node.js 24 LTS** — Active LTS since 2025-10-28, Maintenance from 2026-10-20, EOL 2028-04-30. **Node 26** becomes LTS 2026-10-28 (EOL 2029-04-30); migrate in a dedicated session between deliveries. Node 22 is maintenance-only (EOL 2027-04-30): do not start on it. | **Vite 8** (Rolldown-based; confirm vitest compatibility) |
+| **Node.js 26** everywhere from day one (ADR-0023, superseding the Node 24 plan of ADR-0001): Active LTS from 2026-10-28, EOL 2029-04-30. Node 24 enters maintenance on 2026-10-20; Node 22 is maintenance-only (EOL 2027-04-30). | **Vite 8** (Rolldown-based; confirm vitest compatibility) |
 | **TypeScript `~6.0.x`** workspace-wide. TS 7.0.2 (2026-07-08, Go compiler) ships no programmatic API; `@nestjs/cli` 12.0.8 depends on `typescript ~6.0.2` and its tsc builder fails fast without the 6.x API. Mixing 7.0.2 and 6.0.3 in one pnpm monorepo broke the swagger plugin (nest-cli #3549). Revisit only when Nest CLI ships native TS 7.1 support. | **React Router 7** (library mode) |
 | **NestJS 12.1.x** (12.0.0 on 2026-08-27; 12.1.2 on 2026-09-28; Express 5.2.1 pinned by `@nestjs/platform-express`). CJS + Jest template; Standard Schema support exists but we keep class-validator DTOs for the swagger CLI plugin. | **TanStack Table 8** |
 | **Drizzle ORM 0.45.x** (`latest` = 0.45.4, 2026-10-08) + **drizzle-kit 0.31.x** (0.31.11). Drizzle 1.0 is still RC (rc.4, 2026-06-27; rc.1 removed RQB v1 and changed the casing API) — do not adopt until `latest` points to 1.0. | **pg-boss** — pin the major that `npm view pg-boss version` reports on day 1; paste its docs URL into `CLAUDE.md` |
 | **Prisma rejected**: `prisma@latest` is 8.0.0-rc.22 (re-architecture: contracts, new query API, ops.json migrations, RCs still renaming APIs); 7.10.0 is the last stable. Not a fit for a hand-tuned SQL ledger. | **decimal.js** |
 | **PostgreSQL 18** (18.6 current minor; supported to 2030-11-14; `uuidv7()`, virtual generated columns, temporal constraints). PG 19 is beta; irrelevant here. | **i18next** + `react-i18next` |
 | **Expo SDK**: 57 is current stable (expo 57.0.27, RN 0.86, React 19.2.3); **SDK 58** is in beta since 2026-09-15 (RN 0.88, Expo Router core rework, Strict TypeScript API). Decision: pin the stable SDK at delivery-4 kickoff, not now. | **argon2** |
-| **pnpm 11.x** (11.28.5 on 2026-10-06; requires Node 22+; `minimumReleaseAge` 1440 min default; settings in `pnpm-workspace.yaml`). pnpm 12 (Rust rewrite, same lockfile) exists but winget/Scoop lagged at launch; adopt 12 in a later upgrade session. pnpm 10 is EOL (last release June 2026). | **nestjs-pino** + `pino` |
+| **pnpm 11.28.2** (`latest-11` dist-tag; 11.28.5 is `next-11`; requires Node 22+; installed with `npm i -g`, no corepack since Node 25; `minimumReleaseAge` 1440 min default; settings in `pnpm-workspace.yaml`). pnpm 12 (Rust rewrite, same lockfile) exists but winget/Scoop lagged at launch; adopt 12 in a later upgrade session. pnpm 10 is EOL (last release June 2026). | **nestjs-pino** + `pino` |
 | **React 19.3.0** (2026-09-09; `latest`, no breaking changes). | **pdfmake** (confirm Noto Sans Cyrillic embedding) |
 | **Zod 4.6.x** (4.6.5, 2026-09-13; Standard Schema). Used in `packages/shared` and for env validation. | **ExcelJS** |
 | **TanStack Query 5.104.x** (5.104.1, 2026-10-02; no React v6). | **@nestjs/throttler** |
@@ -86,14 +86,14 @@ Staging runs on the same droplet as a second Compose stack with its own local `p
 | Layer | Choice (pinned per §0.1) | Why |
 |---|---|---|
 | Language | TypeScript everywhere | One mental model; shared enums, validators and the pricing resolver across API, web and mobile; the largest AI training footprint. |
-| Runtime | Node 24 LTS; Node 26 in a dedicated session after 2026-10-28 | Node 22 is maintenance-only; 24 supported to 2028-04. |
+| Runtime | Node 26 (ADR-0023); Docker `node:26-trixie-slim`; CI `ubuntu-24.04` | LTS to 2029-04; already on the owner's machine; no upgrade session needed. |
 | TypeScript | `~6.0.x` for every package, pinned once in the pnpm `catalog:` of `pnpm-workspace.yaml` (every package declares `"typescript": "catalog:"`), enforced in CI | Nest CLI 12 needs the 6.x programmatic API; one hoisted `typescript` cannot serve two majors. tsconfig written TS-7-ready: `strict`, no `baseUrl`, `moduleResolution: bundler` (web/mobile) / `nodenext` (api), explicit `rootDir`, `types`. |
 | Package manager | pnpm 11.x, `devEngines.packageManager`, settings in `pnpm-workspace.yaml`, `nodeLinker: hoisted`, `minimumReleaseAge: 1440` | Hoisted linker for Expo/Metro; 24-hour release age as supply-chain protection. |
 | Monorepo | pnpm workspaces only; one root `pnpm check` | No Turborepo/Nx until build time hurts. |
 | Backend | NestJS 12.1.x, CJS + Jest template, Express 5 adapter, class-validator/class-transformer DTOs, `@nestjs/swagger` + CLI plugin, nestjs-pino, `@nestjs/config` with Zod-validated env, helmet, `@nestjs/throttler` | The most convention-heavy, best-documented shape; OpenAPI comes from the DTOs for free. Zod stays in `packages/shared` for pure validation and mobile forms. |
 | ORM | Drizzle 0.45.x + drizzle-kit 0.31.x, `pg` driver, SQL migration files committed and hand-edited | SQL-shaped domain (`FOR UPDATE`, upserts with arithmetic, CTEs, `EXCLUDE` constraints, triggers). `drizzle-kit generate` + `migrate` only; `push` is banned (§10.5). |
 | Database | PostgreSQL 18, UTF-8 with ICU collation | One datastore: also queue (pg-boss) and search (pg_trgm). `uuidv7()` where UUIDs are needed. |
-| Jobs | pg-boss (major confirmed day 1), transactional enqueue in the business tx (outbox), `worker.ts` entrypoint | No Redis; jobs commit with the data that triggered them. |
+| Jobs | pg-boss 12.37.1, transactional enqueue in the business tx through pg-boss's `fromDrizzle(tx, sql)` adapter (outbox), `worker.ts` entrypoint; schema installed by `db:migrate` (ADR-0024) | No Redis; jobs commit with the data that triggered them. |
 | Money / quantity | `NUMERIC(14,2)` MNT, `NUMERIC(14,3)` base-unit quantities, `NUMERIC(14,4)` unit costs and `avg_cost`, `NUMERIC(18,6)` factors; Drizzle custom column types `money()`, `qty()`, `cost()` returning `Decimal` (decimal.js), HALF_UP | `Number()` never sees a NUMERIC string because the column type never yields one. |
 | Web admin | Vite 8 + React 19.3, React Router 7 (library mode), TanStack Query 5, TanStack Table 8, shadcn/ui (`-b radix`), Tailwind 4, react-hook-form + zod, i18next (`mn`), bwip-js, dayjs + timezone | Internal SPA behind login; no SSR. The supermarket POS is a screen in this app. |
 | Mobile | One Expo project, `APP_VARIANT=customer|staff`, Expo Router, EAS Build/Update, development builds only (never Expo Go), expo-camera, expo-notifications, expo-secure-store, expo-location; SDK chosen at delivery-4 kickoff | Two store listings, one auth/API/scanner/printing codebase; avoids one SDK upgrade by starting late. |
@@ -116,8 +116,11 @@ tugeel/                       (repo root; packages are @tugeel/*)
                               gen:api, db:provision, db:generate, db:migrate, db:seed, ts:single-version
   pnpm-workspace.yaml         workspaces + pnpm settings (nodeLinker: hoisted, minimumReleaseAge: 1440)
                               + catalog: (typescript ~6.0.x pinned once; packages use "typescript": "catalog:")
-  tsconfig.base.json  eslint.config.js  .prettierrc  .gitattributes (* text=auto eol=lf)  .nvmrc  .gitignore
-  docker-compose.yml          local: postgres:18 only (no mailpit until an email feature exists)
+  tsconfig.base.json  eslint.config.mjs (guards G1-G6)  .prettierrc  .editorconfig  .gitattributes (* text=auto eol=lf)
+  .nvmrc (26)  .gitignore  .dockerignore
+  docker-compose.yml          local: postgres:18 only on 127.0.0.1:15432 (no mailpit until an email feature exists)
+  tools/lint-guards/          node:test self-test proving every ESLint guard fires (+ fixtures/)
+  ci/                         compose.ci.yml + rehearse.sh: the CI check job in Linux Docker (`pnpm ci:rehearse`)
   deploy/
     docker-compose.prod.yml   caddy, api, worker
     docker-compose.staging.yml  api-staging, worker-staging, postgres-staging (local container)
@@ -137,22 +140,27 @@ tugeel/                       (repo root; packages are @tugeel/*)
       src/common/           db/ (drizzle client, tx helper, custom types), config/, errors/ (problem+json),
                             money/ (decimal.js helpers), idempotency/, audit/, pagination/, excel/, storage/, pdf/,
                             jobs/ (pg-boss enqueue(tx, name, payload) helper, ADR-0013)
-      src/db/migrations/*.sql   src/db/seed/
+      src/db/schema.ts (aggregated Drizzle schema)  migrate.ts  provisioning.ts  provision.ts
+      src/db/migrations/0000_foundation.sql …   src/db/seed/
+      src/health/ (/health, worker loopback health)  src/openapi/ (document + export)
+      scripts/jest.cjs (Jest with --experimental-vm-modules)  docker/ (entrypoint.sh, healthcheck.mjs)
       src/modules/<module>/ <module>.module.ts  index.ts (PUBLIC API)  schema.ts  controllers/  services/
                             dto/  jobs/  __tests__/   (no README: docs/modules/<module>.md is the contract)
       src/integrations/     ebarimt/  qpay/  sms/  push/   (thin typed HTTP clients, no business rules)
-      test/                 integration harness (one DB per Jest worker), integrity suite (runInBand)
+      test/harness/         per-worker databases cloned from a migrated template (ADR-0024)
+      test/integration/     *.int-spec.ts        test/integrity/   integrity suite (runInBand)
     web/                    Vite 8 + React 19 SPA: src/app, src/features/<module>, src/components/ui,
                             src/lib/{api,i18n,print,scan}
     mobile/                 Expo (created at delivery 4); app.config.ts reads APP_VARIANT;
                             app/(auth) app/(customer) app/(staff)/(warehouse|sales|driver)
   packages/
-    shared/                 pure TS: enums + state machines, unit conversion, money helpers,
+    shared/                 CommonJS build + @tugeel/source condition (ADR-0025): error codes, Decimal (money),
+                            enums + state machines, unit conversion,
                             pricing resolver (pure), zod schemas, i18n/mn.json, gtin normalisation
     api-client/             generated openapi.json + types + openapi-fetch wrapper
     printing/               (delivery 5/9) raster ESC/POS pipeline, transports, agent/ (POS print agent)
-  scripts/                  one-off TS scripts: db-provision (creates roles app/migrator as the admin user),
-                            real Excel import, rebuild-balances, backup verification
+  scripts/                  repo tooling: ts-single-version, gen-api-check, ci-rehearse; later one-off scripts
+                            (real Excel import, rebuild-balances, backup verification)
 ```
 
 ### 3.1 Boundary rules (ESLint `eslint-plugin-boundaries` + `no-restricted-imports`, enforced in CI)
@@ -163,7 +171,7 @@ tugeel/                       (repo root; packages are @tugeel/*)
 4. `reporting` may `SELECT` from any table; it never writes and nobody imports it.
 5. Cross-module writes that must be atomic are direct service calls inside one Drizzle `tx` passed explicitly; external side effects go through pg-boss jobs enqueued in the same tx. No in-process event emitter.
 6. `src/integrations/**` clients are never called with an open `tx` in scope: they are called only from `jobs/*.job.ts` or from `*-flow.service.ts` orchestrators that run between transactions (§5.9, §12).
-7. One TypeScript version: CI runs `pnpm ls typescript -r --depth 0` and fails if more than one version resolves (`pnpm ts:single-version`).
+7. One TypeScript version: `pnpm ts:single-version` (first step of `pnpm check`) reads `pnpm-lock.yaml` at every depth and fails unless exactly one `6.0.x` resolves and every manifest uses `"typescript": "catalog:"`.
 
 ---
 
@@ -192,7 +200,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 
 | Module | Owns (tables) | Exposes (`index.ts` / REST) | Depends on | Delivery |
 |---|---|---|---|---|
-| identity | users, roles, permissions, role_permissions, user_roles, user_scopes, auth_sessions, password_resets, branches (branch_no, district_code), warehouses (kind WHOLESALE/STORE/VEHICLE/TRANSIT, branch_id), settings (effective-dated VAT / city-tax rates), number_sequences (scope_key, period), audit_log, idempotency_keys, files, print_jobs, print_stations (delivery 9, ADR-0022) | AuthGuard, PermissionsGuard/`@RequirePermission`, `@CurrentUser`, UsersService, OrgService (branches, warehouses, getTransitWarehouse), NumberingService.next(tx, scopeKey, period), AuditService.record(tx, …), IdempotencyInterceptor, StorageService (presign/getUrl), SettingsService, HealthController; job backup.pgdump (weekly). REST /auth/*, /users, /roles, /branches, /warehouses, /settings, /audit, /files, /health | — | 1 |
+| identity | users, roles, permissions, role_permissions, user_roles, user_scopes, auth_sessions, password_resets, branches (branch_no, district_code), warehouses (kind WHOLESALE/STORE/VEHICLE/TRANSIT, branch_id), settings (effective-dated VAT / city-tax rates), number_sequences (scope_key, period), audit_log, idempotency_keys, files, print_jobs, print_stations (delivery 9, ADR-0022) | AuthGuard, PermissionsGuard/`@RequirePermission`, `@CurrentUser`, UsersService, OrgService (branches, warehouses, getTransitWarehouse), NumberingService.next(tx, scopeKey, period), AuditService.record(tx, …), IdempotencyInterceptor, StorageService (presign/getUrl), SettingsService; job backup.pgdump (weekly). REST /auth/*, /users, /roles, /branches, /warehouses, /settings, /audit, /files | — | 1 |
 | catalog | categories, brands, uoms, products (sku, name_mn, search_text, vat_type, city_tax, classification_code NULL, tax_product_code NULL, status, tracks_lots), product_units (factor_to_base, is_base, is_default_sales/purchase, measure_unit NULL, barcode_type NULL, superseded_by, superseded_at), product_barcodes (code, gtin14, unique), product_images | CatalogService.get/getMany/search, UnitConversionService.toBase/fromBase (returns factor snapshot), UnitSupersedeService.supersede(tx, unitId, newFactor), BarcodeService.resolve(code) → {product, unit} (excludes superseded units), TaxService.rates(productId, date), EbarimtReadinessService.report(). REST /products, /categories, /brands, /barcodes/:code, /catalog/ebarimt-readiness | identity | 1 |
 | partners | customers (kind COMPANY/INDIVIDUAL, code, name, reg_no text, tin NULL, tin_source, consumer_no NULL, vat_payer, city_payer, tier_id, credit_limit, payment_term_days, status, credit_hold), customer_tiers, customer_addresses (gps, zone_id NULL — the FK to delivery_zones is added by the delivery module's migration in delivery 5), customer_contacts, customer_users, suppliers, supplier_contacts | CustomersService.get/search/assertActive/creditTerms/forUser/lockForUpdate(tx, id), SuppliersService. REST /customers, /customer-tiers, /suppliers, /auth/customer/* | identity | 1 (minimal), 2 |
 | inventory | bins (type, sellable, pick_sequence, status ACTIVE/COUNTING), product_locations, stock_ledger, bin_stock, warehouse_stock, stock_reservations, goods_receipts(+lines), bin_moves(+lines), transfers(+lines), adjustments(+lines), stocktakes(+lines), stock_snapshot_daily, stock_snapshot_bin_monthly, reconciliation_runs, lots (empty) | StockPostingService.post(tx, doc, movements, options?) (ONLY ledger writer; signature in §5.3), ReservationService.reserve/release/consume, AvailabilityService.available(warehouseId, productIds[]), StockQueryService, ReceiptsService, BinMovesService, TransfersService, AdjustmentsService, StocktakesService, ShortListQuery; jobs inventory.reconcile (nightly, REPEATABLE READ, writes stock_snapshot_daily), inventory.snapshotMonthly, inventory.staleReservations. REST /bins, /stock, /receipts, /bin-moves, /transfers, /adjustments, /stocktakes, /labels, /stock/short-list | identity, catalog, partners (supplier ref) | 1 |
@@ -206,6 +214,8 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 | notifications | push_tokens, templates, notification_log, sms_log | NotificationsService.push/sms/registerToken; jobs notifications.push, notifications.sms. REST /me/devices, /me/notifications | identity, partners | 5–6 |
 | hr | employees, departments, positions, employee_contracts, attendance, leave_requests, payroll_periods, payroll_runs, payslips(+lines), ndsh_rate_tables, pit_bracket_tables (effective-dated) | EmployeesService.byUser, AttendanceService, PayrollService.run/getPayslip. REST /employees, /attendance, /payroll-runs, /payslips | identity (read-only views of sales/delivery for commissions) | 11 |
 | reporting | SQL views + materialized views only (v_stock_valuation, v_short_reservations, mv_sales_daily, mv_ar_aging, …), report_definitions | ReportService.run(code, filters) with Excel export; job reporting.refresh. REST /reports/* | SELECT on all; never writes; never imported | grows per delivery; hardened in 10 |
+
+**Infrastructure outside the 14 modules** (delivery 1, week 1): `src/common/{config,db,errors,jobs,logging}`, `src/health` (`GET /health` for the api, a loopback-only `127.0.0.1:${WORKER_HEALTH_PORT}/health` in the worker for the container healthcheck), `src/openapi`, `src/db` (schema aggregator, `migrate.ts`, `provisioning.ts`, `provision.ts`), and the infrastructure job `system.ping` (proves api enqueue → worker handling).
 
 **Job registry.** The `jobs <module>.<verb>` entries in the "Exposes" column are the canonical pg-boss job registry (ADR-0013 #4): a new job name is added to its owning row before the handler is written in `src/modules/<module>/jobs/`.
 
@@ -272,19 +282,19 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 - Idempotency: `UNIQUE (doc_type, doc_line_id, movement_type, leg)`; `doc_type` + `doc_line_id` are NOT NULL, so no movement exists without a document (D5).
 - Every stock movement belongs to a document with a status machine; put-away and storage↔storage moves use `bin_moves` (code `BM-`), so a web double-submit or a mobile retry cannot post a move twice.
 
-Roles `app` and `migrator` are created once per environment by `scripts/db-provision.ts` (`pnpm db:provision`), run with the admin connection (DigitalOcean `doadmin`; local and staging `postgres`) and documented in `deploy/runbook.md`; migrations run as `migrator`, and a migration cannot create the role it runs as (on Managed PostgreSQL only the admin user may create roles). Migration 0001 creates the extensions, the collation assertion, the ledger guards and the GRANT/REVOKE privileges for those roles; it never creates a role. The guards as they appear in migration 0001 (hand-edited after `drizzle-kit generate`):
+Roles `app` and `migrator` are created once per environment by `pnpm db:provision` (`apps/api/src/db/provision.ts`; `node dist/db/provision.js` in the image), run with the admin connection (DigitalOcean `doadmin`; local and staging `postgres`) and documented in `deploy/runbook.md`; migrations run as `migrator`, and a migration cannot create the role it runs as (on Managed PostgreSQL only the admin user may create roles). The foundation migration `0000_foundation.sql` (ADR-0024) creates the extensions, `assert_unicode_casefold()`, the generic trigger function `forbid_update_delete()` (SQLSTATE 23001) and `ALTER DEFAULT PRIVILEGES FOR ROLE migrator … TO app` (DML on tables, USAGE/SELECT on sequences); it never creates a role or a business table. The ledger guards below are hand-edited into the **inventory module's first migration** (week 3, after `pnpm db:generate --name=inventory`):
 
 ```sql
--- privileges (roles app and migrator already exist: scripts/db-provision.ts)
-GRANT SELECT, INSERT ON stock_ledger TO app;
+-- privileges: default privileges already give app DML on every table migrator creates
 REVOKE UPDATE, DELETE ON stock_ledger FROM app;
 
--- append-only trigger (second line of defence, also protects the migrator)
-CREATE FUNCTION stock_ledger_immutable() RETURNS trigger AS $$
-BEGIN RAISE EXCEPTION 'stock_ledger is append-only'; END $$ LANGUAGE plpgsql;
+-- append-only triggers (second line of defence, also protect the migrator; function from 0000_foundation)
 CREATE TRIGGER stock_ledger_no_update_delete
   BEFORE UPDATE OR DELETE ON stock_ledger
-  FOR EACH ROW EXECUTE FUNCTION stock_ledger_immutable();
+  FOR EACH ROW EXECUTE FUNCTION forbid_update_delete();
+CREATE TRIGGER stock_ledger_no_truncate
+  BEFORE TRUNCATE ON stock_ledger
+  FOR EACH STATEMENT EXECUTE FUNCTION forbid_update_delete();
 
 -- idempotency and document linkage
 ALTER TABLE stock_ledger
@@ -369,7 +379,7 @@ READ COMMITTED, deterministic lock order, no retries. No negative stock, no exce
 
 The supermarket (STORE) therefore carries real cost from day one even though it only receives transfers, and opening stock is valued from the import.
 
-**Snapshots** (D9): `stock_snapshot_daily` at warehouse level (non-zero rows only, written by the nightly reconciliation in the same tx) and `stock_snapshot_bin_monthly` at bin level, both `PARTITION BY RANGE (snapshot_date)` by month from migration 0001; a monthly job creates the next partition and drops partitions older than 13 months. As-of bin stock = last monthly snapshot + ledger delta.
+**Snapshots** (D9): `stock_snapshot_daily` at warehouse level (non-zero rows only, written by the nightly reconciliation in the same tx) and `stock_snapshot_bin_monthly` at bin level, both `PARTITION BY RANGE (snapshot_date)` by month from the inventory module's first migration; a monthly job creates the next partition and drops partitions older than 13 months. As-of bin stock = last monthly snapshot + ledger delta.
 
 **Reconciliation** (D10): nightly job runs `SUM(ledger) EXCEPT balances` and the snapshot write inside one `REPEATABLE READ` transaction so both sides see the same snapshot; a non-empty diff writes `reconciliation_runs`, raises a Sentry alert and a red admin banner. `scripts/rebuild-balances.ts` regenerates caches from the ledger.
 
@@ -377,7 +387,7 @@ The supermarket (STORE) therefore carries real cost from day one even though it 
 
 **Document numbering** (D11, D14, F11): `number_sequences (scope_key, period, last_value)` with a row lock; `NumberingService.next(tx, scopeKey, period)` returns the next value. Document codes: `SO-2026-000123` (scope `SO`, period `2026`), `GR-`, `BM-`, `TR-`, `ADJ-`, `ST-`, `PK-`, `PO-`, `INV-`, `CN-`, `PAY-`, `TRIP-`. Numbers are allocated at SUBMIT (orders) or POST (stock documents, invoices) inside the posting tx; DRAFTs carry only their bigint id, so abandoned drafts never create gaps. e-Barimt `billIdSuffix` uses scope `BILLID:<pos_no>` with period = the Ulaanbaatar calendar date (§5.9).
 
-**Lots**: `lots` table and nullable `lot_id` on ledger, balances, reservations and lines exist from migration 0001; enabling = `product.tracks_lots`, require lot on receipt, FEFO bin choice. No backfill.
+**Lots**: `lots` table and nullable `lot_id` on ledger, balances, reservations and lines exist from the inventory module's first migration; enabling = `product.tracks_lots`, require lot on receipt, FEFO bin choice. No backfill.
 
 ### 5.4 Pricing
 
@@ -558,7 +568,7 @@ The POS checkout screen awaits step 3 (budget 60–90 s with a progress state); 
 }
 ```
 
-  Stable codes used across modules: `IDEMPOTENCY_KEY_REQUIRED`, `DOC_ALREADY_POSTED`, `ALREADY_POSTED`, `STOCK_INSUFFICIENT`, `BIN_LOCKED_FOR_COUNT`, `UNIT_SUPERSEDED`, `PRICE_MISSING`, `DISCOUNT_OVER_CAP`, `CREDIT_BLOCKED`, `CREDIT_NEEDS_APPROVAL`, `ORDER_STATE_INVALID`, `EBARIMT_ATTRIBUTES_MISSING`, `TIN_PENDING`, `EBARIMT_INDETERMINATE`, `PAYMENT_NOT_VERIFIED`. The `params` object carries values for the i18n message; `detail` is English for logs.
+  Stable codes used across modules: `IDEMPOTENCY_KEY_REQUIRED`, `DOC_ALREADY_POSTED`, `ALREADY_POSTED`, `STOCK_INSUFFICIENT`, `BIN_LOCKED_FOR_COUNT`, `UNIT_SUPERSEDED`, `PRICE_MISSING`, `DISCOUNT_OVER_CAP`, `CREDIT_BLOCKED`, `CREDIT_NEEDS_APPROVAL`, `ORDER_STATE_INVALID`, `EBARIMT_ATTRIBUTES_MISSING`, `TIN_PENDING`, `EBARIMT_INDETERMINATE`, `PAYMENT_NOT_VERIFIED`, plus the generic HTTP codes (`BAD_REQUEST`, `VALIDATION_FAILED`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `PAYLOAD_TOO_LARGE`, `TOO_MANY_REQUESTS`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`, `IDEMPOTENCY_KEY_REUSED`, …). The enum is `ErrorCode` in `packages/shared/src/errors/error-codes.ts`; `apps/api/src/common/errors/error-status.ts` maps every code to its HTTP status (a code without a status fails typecheck). The `params` object carries values for the i18n message; `detail` is English for logs; `VALIDATION_FAILED` carries `errors[]` (`path`, `constraint`, `message`); a 500 never exposes the error message.
 - Pagination: keyset (`cursor`, `limit`) on all lists; envelope `{ data, nextCursor }`. Server-side filtering/sorting.
 - Dates: ISO-8601 with offset; `effective_date` and report periods are plain dates in Asia/Ulaanbaatar.
 - Webhooks live under `/api/webhooks/*`, log verbatim, and only enqueue jobs.
@@ -630,13 +640,16 @@ Docker Desktop (WSL2) runs `postgres:18` only; `pnpm dev` runs api, worker, web;
 | production (`deploy/docker-compose.prod.yml`) | caddy, api, worker | DO Managed PostgreSQL 18, database `tugeel` | api `max: 6`; worker `max: 3`; pg-boss `max: 2` per process → 13 of the 1 GiB plan's ~22 backend connections, leaving room for migrations and `psql` |
 | staging (`deploy/docker-compose.staging.yml`) | api-staging, worker-staging, postgres-staging (`postgres:18` container with a volume) | local container, never the managed cluster | api 2, worker 2, pg-boss 2 |
 
-Pool sizes are env-driven (`DB_POOL_MAX`, `PGBOSS_POOL_MAX`) and recorded in `CLAUDE.md`; the deploy runbook states the plan's connection limit as read from the DO console at cluster creation (the ~22 figure is a planning estimate until then). Caddy serves the built SPA and proxies `/api`. Secrets live in `/opt/tugeel/.env` (never in git); 2FA on DO/GitHub/Cloudflare/Tailscale.
+Pool sizes are env-driven (`DB_POOL_MAX`, `PGBOSS_POOL_MAX`) and recorded in `CLAUDE.md`; the deploy runbook states the plan's connection limit as read from the DO console at cluster creation (the ~22 figure is a planning estimate until then). One **edge Caddy** (in the production compose file, joined to the external networks `tugeel_edge_prod` and `tugeel_edge_staging`) terminates TLS for all three hosts and proxies `/api/*` and `/health` to the api of each stack and everything else to that stack's `web` container (`ghcr.io/ez4puljin/bto-web`, a Caddy file server for the built SPA on port 8080); the stacks cannot reach each other. Secrets live in `/opt/tugeel/.env` and `.env.staging` (never in git; the repository is public); 2FA on DO/GitHub/Cloudflare/Tailscale.
 
 Environment variables every process reads (validated by Zod at boot; the process refuses to start on a missing or malformed value):
 
 | Variable | api | worker | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | yes | yes | role `app`; `MIGRATOR_DATABASE_URL` is used only by the entrypoint migration step |
+| `NODE_ENV`, `LOG_LEVEL`, `PORT`, `APP_VERSION` | yes | yes | `APP_VERSION` = image git sha, reported by `/health` |
+| `DATABASE_URL` | yes | yes | role `app` |
+| `MIGRATOR_DATABASE_URL` | entrypoint only | — | role `migrator`; used by `node dist/db/migrate.js`, removed from the environment of the main process |
+| `WORKER_HEALTH_PORT` | — | yes | loopback health endpoint (default 3001) |
 | `DB_POOL_MAX`, `PGBOSS_POOL_MAX` | yes | yes | §10.2 budget |
 | `ROLE` | `api` | `worker` | same image, selects `main.ts` or `worker.ts` |
 | `JWT_SECRET`, `REFRESH_PEPPER` | yes | — | rotated per runbook |
@@ -646,6 +659,8 @@ Environment variables every process reads (validated by Zod at boot; the process
 | `SPACES_*` | yes | yes | presigned uploads, pg_dump target |
 | `STORAGE_DRIVER` | yes | yes | `spaces` (default) or `local` (dev only, writes `.data/storage/`; ADR-0014) |
 | `SENTRY_DSN` | yes | yes | — |
+| `ADMIN_DATABASE_URL` | one-off | — | only for `provision.js`; production: typed at the prompt, never stored |
+| `TEST_ADMIN_DATABASE_URL` | tests | — | Jest harness; local hosts only |
 
 Print-station tokens are not environment variables: each POS PC's token is issued in the admin and stored hashed in `print_stations` (§9.4, ADR-0022, delivery 9); the agent keeps its own copy in its local config file.
 
@@ -653,20 +668,21 @@ Infrastructure is created in Week 0 in this order: domain + Cloudflare DNS → D
 
 ### 10.3 Tailscale from containers (F7)
 
-Primary pattern: `tailscaled` runs on the droplet host; api and worker receive `POSAPI_URL=http://100.x.y.z:7080` (the box's stable tailnet IP; MagicDNS is not relied on inside containers) and reach it through the host's routing. Verified in Week 0 with `docker compose exec api wget -qO- $POSAPI_URL/rest/info`. If the route is not reachable from the bridge network, the documented fallback is a `tailscale` sidecar container with `network_mode: service:tailscale` for api and worker. Both patterns are written in `deploy/runbook.md`; the ACL tags are `tag:server` (droplet), `tag:posapi` (boxes), `tag:dev` (owner's PC).
+Primary pattern: `tailscaled` runs on the droplet host; api and worker receive `POSAPI_URL=http://100.x.y.z:7080` (the box's stable tailnet IP; MagicDNS is not relied on inside containers) and reach it through the host's routing. Verified with `docker compose exec api node -e "fetch(process.env.POSAPI_URL + '/rest/info').then((r) => r.text()).then(console.log)"` (the slim image has no wget). If the route is not reachable from the bridge network, the documented fallback is a `tailscale` sidecar container with `network_mode: service:tailscale` for api and worker. Both patterns are written in `deploy/runbook.md`; the ACL tags are `tag:server` (droplet), `tag:posapi` (boxes), `tag:dev` (owner's PC).
 
 ### 10.4 CI and test isolation (F4, F5, M17)
 
 `pnpm check` on every PR: `tsc --noEmit` (all packages), eslint (boundaries + the rules in §12), prettier check, `ts:single-version`, jest unit + integration (postgres:18 service, full migrations), vitest (web, shared), `drizzle-kit check` (schema vs migrations), `gen:api` staleness, web build.
 
-- **One database per Jest worker**: `globalSetup` creates `${DB}_w${JEST_WORKER_ID}` and migrates it once; tables are truncated between files.
+- **One database per Jest worker** (ADR-0024): `globalSetup` provisions the roles, migrates a template `tugeel_test_<project>_tpl` once and clones `_w1 … _wN` (N = `maxWorkers`); a setup file points each worker at `_w${JEST_WORKER_ID}`; every test file starts by truncating `public` tables and `pgboss.job`. Jest always runs as `node --experimental-vm-modules` (`apps/api/scripts/jest.cjs`) because NestJS 12 and pg-boss 12 are ESM-only (ADR-0025).
+- **Jobs** in `.github/workflows/ci.yml` (runner `ubuntu-24.04`): `check` (`pnpm check` + generated files committed), `images` (both Dockerfiles build), `deploy-config` (`docker compose config` + `caddy validate`). `pnpm ci:rehearse` runs the `check` job in Linux Docker against HEAD before a push.
 - **Integrity suite** (`test/integrity/*`) is its own Jest project run with `--runInBand` and `statement_timeout = 5s` so deadlocks fail fast and loudly: concurrent postings over the same stock, overdraw rejection, idempotent re-post, bin-move net-zero, COUNTING bin rejection, concurrent `reserve()` never oversells, concurrent credit confirmations, supersede keeps barcode/price/default, ledger REVOKE/trigger guard, lottery/qrData never logged, Σ payments = total = Σ sub-receipts. **No `jest.retryTimes`, no retries anywhere in CI.**
 - **Locale assertion**: the managed cluster and the local containers are created with UTF-8 and the ICU collation `und-x-icu`; the harness runs `SELECT lower('ӨҮЁ') = 'өүё'` at startup and fails if false; search still uses the app-maintained `search_text` column.
 - On merge to main: build api + web images → GHCR → SSH `docker compose pull && up -d` on staging → manual approval → production. Migrations run by the api container entrypoint with the `migrator` role.
 
 ### 10.5 Migrations (F9)
 
-`drizzle-kit generate` produces the SQL; the developer hand-edits it for CHECKs, EXCLUDE, REVOKE, triggers, partitions; `drizzle-kit migrate` applies it as role `migrator`. Roles are never created by a migration: `scripts/db-provision.ts` creates `app` and `migrator` once per environment with the admin connection (§5.3). **`drizzle-kit push` is banned** (no `db:push` script exists) because it diffs `schema.ts` against the live database and silently drops hand-written guards; the integrity suite's guard test would catch the loss, but the rule prevents it. Applied migrations are never edited.
+`pnpm db:generate --name=<module>[_<change>]` produces the SQL (`--custom` for SQL-only files; migrations are numbered from `0000_foundation`); the developer hand-edits it for CHECKs, EXCLUDE, REVOKE, triggers, partitions. `pnpm db:migrate` (`apps/api/src/db/migrate.ts`; `node dist/db/migrate.js` in the api entrypoint) applies it as role `migrator` under one advisory lock: drizzle `migrate()`, the pg-boss CLI `migrate`, `app`'s grants on schema `pgboss`, then the queues of the job registry (ADR-0024). `drizzle-kit migrate` is not used. Pending migrations run in one transaction, so `CREATE INDEX CONCURRENTLY` cannot be used in them. Roles are never created by a migration: `pnpm db:provision` creates `app` and `migrator` once per environment with the admin connection (§5.3). **`drizzle-kit push` is banned** (no `db:push` script exists) because it diffs `schema.ts` against the live database and silently drops hand-written guards; the integrity suite's guard test would catch the loss, but the rule prevents it. Applied migrations are never edited.
 
 ### 10.6 Scaling path and cost
 
@@ -678,7 +694,7 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 
 - Sentry on api, worker, web, mobile with `sendDefaultPii: false`; request/response body capture disabled globally and breadcrumbs for the ebarimt client suppressed (M3). pg-boss job failures → Sentry.
 - pino JSON logs (docker logs, 7-day rotation); the ebarimt client logger serializes only the stored summary.
-- `/health` returns `{ db, pgboss, ebarimt: { status, lastSentDate, leftLotteries, version, checkedAt } }`; the `ebarimt.monitor` job refreshes the ebarimt block every 5 minutes from `GET /rest/info`, so the public health endpoint reflects the private box without exposing it (F7). `/health/ebarimt` returns the same block with detail for the admin banner.
+- `/health` returns `{ status: ok|degraded, db: up|down, pgboss: up|down, version }` (HTTP 503 when degraded) from delivery 1; delivery 3 adds `ebarimt: { status, lastSentDate, leftLotteries, version, checkedAt }`; the `ebarimt.monitor` job refreshes the ebarimt block every 5 minutes from `GET /rest/info`, so the public health endpoint reflects the private box without exposing it (F7). `/health/ebarimt` returns the same block with detail for the admin banner.
 - UptimeRobot probes only public endpoints: `https://api.<domain>/health` and the admin; it cannot see the tailnet. DO alerts on CPU, disk and DB connections.
 - Backups: DO daily backups + PITR; weekly `pg_dump` to Spaces (independent of DO's backups) by a worker cron job with a verification script; Spaces versioning on POD photos; quarterly restore drill per `deploy/runbook.md`, performed once on staging in delivery 1.
 - Runbooks: deploy/rollback, restore, rotate secrets, add warehouse/vehicle, e-Barimt outage (sendData backlog, leftLotteries, three-network dependency until the store has its own PosAPI), QPay callback outage, month-end checklist.
@@ -691,7 +707,7 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 - One code module per session (a delivery spans several sessions); `docs/modules/<module>.md` is read at the start and updated at the end. Start every implementation session in plan mode with the module's §5 subsection open.
 - Definition of done: `pnpm check` green, migration + schema in the module, integration tests for every service that touches stock or money, OpenAPI on controllers, admin/mobile screens, module doc and `docs/STATUS.md` updated.
 - Each delivery carries a **25–30% support and maintenance allowance** after its go-live (bug fixes, data cleanup, staff questions); the roadmap durations in `SPEC.md` already include it.
-- Major upgrades (Node 26, pnpm 12, Drizzle 1.0, Expo SDK, TypeScript 7, NestJS ESM) happen only in dedicated sessions **between** deliveries, never inside one (F8); a quarterly dependency day handles minors.
+- Major upgrades (pnpm 12, Drizzle 1.0, Expo SDK, TypeScript 7, NestJS ESM, the next Node LTS) happen only in dedicated sessions **between** deliveries, never inside one (F8); a quarterly dependency day handles minors.
 - When the agent hits a `TODO-VERIFY` item it stops and asks; it never resolves a business unknown by guessing.
 
 **Naming.** snake_case tables/columns, singular module folders, plural table names, `*_id` FKs, `created_at/updated_at timestamptz`; English identifiers and enum values in the DB; Mongolian only in i18n catalogs and user data.
@@ -700,9 +716,9 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 
 **Time.** `timestamptz` (UTC) in the DB; business dates (`effective_date`, report periods, billIdSuffix day, reportMonth windows) in Asia/Ulaanbaatar (UTC+8, no DST) via dayjs + timezone; never `new Date().toISOString().slice(0, 10)` for a business date; `posapi_date` kept verbatim.
 
-**Mongolian Cyrillic.** UI strings are i18next keys in `packages/shared/i18n/mn.json`; ESLint `no-restricted-syntax` rejects string literals and JSX text containing any character of the Cyrillic Unicode block (U+0400–U+04FF) in `**/*.tsx` (test files excluded), and `eslint-plugin-i18next/no-literal-string` additionally rejects any literal JSX text; `search_text` normalisation on import and search; Noto Sans embedded in every PDF; raster printing for receipts.
+**Mongolian Cyrillic.** UI strings are i18next keys in `packages/shared/i18n/mn.json`; ESLint `no-restricted-syntax` rejects string and template literals containing any character of the Cyrillic Unicode block (U+0400–U+04FF) in `**/*.tsx` (test files excluded) and any JSX text containing a letter (Latin or Cyrillic); this selector replaced `eslint-plugin-i18next/no-literal-string`, which skips concise arrow bodies; `search_text` normalisation on import and search; Noto Sans embedded in every PDF; raster printing for receipts.
 
-**Lint guards that exist and must not be deleted (F12):** boundaries plugin (§3.1), `stockLedger` import restriction, `Number(`/`parseFloat(` ban, Cyrillic-literal ban, `src/integrations/**` import restriction to `jobs/` and `*-flow.service.ts` files, `eslint-plugin-i18next/no-literal-string` on JSX text, and `no-restricted-syntax` rejecting `fetch`/`axios`/`integrations/*` client calls lexically inside `db.transaction(...)` callbacks (added in delivery 3, before the ebarimt module).
+**Lint guards that exist and must not be deleted (F12)**, `eslint.config.mjs` G1–G6, each proved by `tools/lint-guards/guards.test.mjs` (`pnpm lint:guards`): G1 boundaries plugin (§3.1, including the `src/integrations/**` import restriction to `jobs/` and `*-flow.service.ts` files), G2 `stockLedger` import restriction, G3 `Number(`/`parseFloat(` ban, G4 Cyrillic-literal ban, G5 literal-JSX-text ban, G6 `linterOptions.noInlineConfig` (an `eslint-disable` comment has no effect; exceptions live in the config), and `no-restricted-syntax` rejecting `fetch`/`axios`/`integrations/*` client calls lexically inside `db.transaction(...)` callbacks (added in delivery 3, before the ebarimt module).
 
 **Testing.**
 - Integration tests against real Postgres for every service that touches money or stock; pure unit tests for unit conversion, GTIN normalisation, the pricing resolver (table-driven), state machines and the tax split.

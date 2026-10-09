@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0023 (decision 2: Node 26 everywhere from day one), ADR-0025 (decision 4: workspace packages are CommonJS with `nodenext`) |
 
 ## Context
 

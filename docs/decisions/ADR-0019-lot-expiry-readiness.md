@@ -5,6 +5,7 @@
 | Status | Deferred (schema readiness in delivery 1; feature in a later session) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0024 ("from migration 0001" = from the inventory module's first migration) |
 
 ## Context
 

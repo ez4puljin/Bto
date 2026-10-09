@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0024 ("migration 0001" = foundation migration `0000_foundation` + guards in the owning module's first migration) |
 
 ## Context
 
