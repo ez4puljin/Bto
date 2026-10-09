@@ -4,3 +4,6 @@
 *.jpg binary
 *.pdf binary
 *.xlsx binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -1,0 +1,9 @@
+# Prettier 3 also reads .gitignore.
+pnpm-lock.yaml
+pnpm-workspace.yaml
+packages/api-client/openapi.json
+packages/api-client/src/generated/
+apps/api/src/db/migrations/
+apps/web/src/components/ui/
+# Markdown is hand-formatted (wide tables in SPEC.md / architecture.md).
+*.md

@@ -1,0 +1,32 @@
+# pnpm 11 reads every non-auth setting from this file; .npmrc would hold auth/registry only.
+packages:
+  - apps/*
+  - packages/*
+
+# Shared pins (ADR-0001, ADR-0025). Every package that uses one of these names writes "catalog:".
+# Keep this block free of comments: scripts/ts-single-version.mjs parses it.
+catalog:
+  typescript: ~6.0.3
+  '@types/node': 26.6.4
+  decimal.js: 10.6.0
+  tsx: 4.23.15
+  vitest: 5.0.3
+  zod: 4.6.5
+
+nodeLinker: hoisted
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+savePrefix: ''
+verifyDepsBeforeRun: error
+strictDepBuilds: true
+
+# Dependencies allowed (true) or refused (false) to run install scripts (pnpm 11 replaces onlyBuiltDependencies).
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  '@parcel/watcher': false
+  '@scarf/scarf': false
+
+peerDependencyRules:
+  allowedVersions:
+    'openapi-typescript@7>typescript': '6'
