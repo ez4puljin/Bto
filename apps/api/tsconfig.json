@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "target": "es2025",
+    "lib": ["es2025"],
+    "types": ["node", "jest"],
+    "strictPropertyInitialization": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "removeComments": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "drizzle.config.ts"]
+}

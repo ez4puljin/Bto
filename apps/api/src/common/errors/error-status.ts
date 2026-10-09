@@ -1,0 +1,36 @@
+import type { ErrorCode } from '@tugeel/shared';
+
+/**
+ * HTTP status for every stable error code. A new code without a status fails typecheck.
+ * Statuses of business codes are provisional until their module session confirms them.
+ */
+export const ERROR_HTTP_STATUS = {
+  BAD_REQUEST: 400,
+  VALIDATION_FAILED: 422,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  METHOD_NOT_ALLOWED: 405,
+  CONFLICT: 409,
+  PAYLOAD_TOO_LARGE: 413,
+  UNSUPPORTED_MEDIA_TYPE: 415,
+  TOO_MANY_REQUESTS: 429,
+  INTERNAL_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
+  IDEMPOTENCY_KEY_REQUIRED: 400,
+  IDEMPOTENCY_KEY_REUSED: 409,
+  DOC_ALREADY_POSTED: 409,
+  ALREADY_POSTED: 409,
+  STOCK_INSUFFICIENT: 409,
+  BIN_LOCKED_FOR_COUNT: 409,
+  UNIT_SUPERSEDED: 409,
+  PRICE_MISSING: 422,
+  DISCOUNT_OVER_CAP: 422,
+  CREDIT_BLOCKED: 409,
+  CREDIT_NEEDS_APPROVAL: 409,
+  ORDER_STATE_INVALID: 409,
+  EBARIMT_ATTRIBUTES_MISSING: 422,
+  TIN_PENDING: 409,
+  EBARIMT_INDETERMINATE: 409,
+  PAYMENT_NOT_VERIFIED: 409,
+} as const satisfies Record<ErrorCode, number>;
