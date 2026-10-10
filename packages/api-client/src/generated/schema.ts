@@ -276,6 +276,118 @@ export interface paths {
         patch: operations["Roles_update"];
         trace?: never;
     };
+    "/api/v1/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Org_branches"];
+        put?: never;
+        post: operations["Org_createBranch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Org_updateBranch"];
+        trace?: never;
+    };
+    "/api/v1/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Org_warehouses"];
+        put?: never;
+        post: operations["Org_createWarehouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/warehouses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Org_updateWarehouse"];
+        trace?: never;
+    };
+    "/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Settings_list"];
+        put?: never;
+        post: operations["Settings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["Settings_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Audit_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -431,10 +543,20 @@ export interface components {
             userAgent: string | null;
             ip: string | null;
         };
+        SessionList: {
+            data: components["schemas"]["Session"][];
+            /** @description Always null: live sessions only */
+            nextCursor: string | null;
+        };
         PermissionInfo: {
             code: components["schemas"]["Permission"];
             /** @description False for codes reserved for the ADMIN role */
             assignable: boolean;
+        };
+        PermissionList: {
+            data: components["schemas"]["PermissionInfo"][];
+            /** @description Always null: the catalog is short */
+            nextCursor: string | null;
         };
         Role: {
             id: number;
@@ -446,6 +568,11 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
             userCount: number;
         };
+        RoleList: {
+            data: components["schemas"]["Role"][];
+            /** @description Always null: the list is short */
+            nextCursor: string | null;
+        };
         RoleCreateRequest: {
             /** @example Агуулахын ахлах */
             name: string;
@@ -454,6 +581,145 @@ export interface components {
         RoleUpdateRequest: {
             name?: string;
             permissions?: components["schemas"]["Permission"][];
+        };
+        Branch: {
+            id: number;
+            code: string;
+            name: string;
+            /** @description e-Barimt branch number (3 digits) */
+            branchNo: string | null;
+            /** @description e-Barimt district code (4 digits) */
+            districtCode: string | null;
+            address: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        BranchList: {
+            data: components["schemas"]["Branch"][];
+            /** @description Always null: the list is short */
+            nextCursor: string | null;
+        };
+        BranchCreateRequest: {
+            /** @example HQ */
+            code: string;
+            /** @example Бөөний төв */
+            name: string;
+            /** @example 001 */
+            branchNo?: string | null;
+            /** @example 2301 */
+            districtCode?: string | null;
+            address?: string | null;
+        };
+        BranchUpdateRequest: {
+            code?: string;
+            name?: string;
+            branchNo?: string | null;
+            districtCode?: string | null;
+            address?: string | null;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        /** @enum {string} */
+        WarehouseKind: "WHOLESALE" | "STORE" | "VEHICLE" | "TRANSIT";
+        Warehouse: {
+            id: number;
+            code: string;
+            name: string;
+            kind: components["schemas"]["WarehouseKind"];
+            /** @description Null only for TRANSIT */
+            branchId: number | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        WarehouseList: {
+            data: components["schemas"]["Warehouse"][];
+            /** @description Always null: the list is short */
+            nextCursor: string | null;
+        };
+        WarehouseCreateRequest: {
+            /** @example WH-1 */
+            code: string;
+            /** @example Төв агуулах */
+            name: string;
+            /** @description Only WHOLESALE and STORE are accepted here */
+            kind: components["schemas"]["WarehouseKind"];
+            branchId: number;
+        };
+        WarehouseUpdateRequest: {
+            code?: string;
+            name?: string;
+            branchId?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        /** @enum {string} */
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours";
+        SettingEntry: {
+            id: number;
+            key: components["schemas"]["SettingKey"];
+            value: string | number | boolean;
+            /**
+             * Format: date
+             * @description Ulaanbaatar business date
+             */
+            effectiveFrom: string;
+            createdBy: number | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SettingView: {
+            key: components["schemas"]["SettingKey"];
+            /** @description Value in force today, or null */
+            current: (string | number | boolean) | null;
+            /** @description Newest first */
+            entries: components["schemas"]["SettingEntry"][];
+        };
+        SettingList: {
+            data: components["schemas"]["SettingView"][];
+            /** @description Always null: one row per key */
+            nextCursor: string | null;
+        };
+        SettingCreateRequest: {
+            key: components["schemas"]["SettingKey"];
+            value: string | number | boolean;
+            /**
+             * Format: date
+             * @example 2026-11-01
+             */
+            effectiveFrom: string;
+        };
+        AuditEntry: {
+            id: number;
+            /** Format: date-time */
+            occurredAt: string;
+            /** @enum {string} */
+            actorKind: "STAFF" | "CUSTOMER" | "SYSTEM";
+            actorId: number | null;
+            actorUsername: string | null;
+            /** @description Job or CLI for system actors */
+            actorLabel: string | null;
+            action: string;
+            entity: string;
+            entityId: string;
+            before: {
+                [key: string]: unknown;
+            } | null;
+            after: {
+                [key: string]: unknown;
+            } | null;
+            requestId: string | null;
+        };
+        AuditPage: {
+            data: components["schemas"]["AuditEntry"][];
+            nextCursor: string | null;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
@@ -935,7 +1201,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Session"][];
+                    "application/json": components["schemas"]["SessionList"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -1020,7 +1286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PermissionInfo"][];
+                    "application/json": components["schemas"]["PermissionList"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -1048,7 +1314,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Role"][];
+                    "application/json": components["schemas"]["RoleList"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -1143,6 +1409,324 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Role"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_branches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BranchList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_createBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Branch"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_updateBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Branch"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_warehouses: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["WarehouseKind"];
+                branchId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_createWarehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Warehouse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Org_updateWarehouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Warehouse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Settings_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Settings_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingEntry"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Settings_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Audit_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                entity?: string;
+                entityId?: string;
+                actorId?: number;
+                /** @description From this Ulaanbaatar date (inclusive) */
+                from?: string;
+                /** @description Up to this Ulaanbaatar date (inclusive) */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
                 };
             };
             /** @description RFC 9457 problem details */

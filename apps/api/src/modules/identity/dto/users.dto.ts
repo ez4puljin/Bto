@@ -159,3 +159,10 @@ export class SessionDto {
   @ApiProperty({ type: String, nullable: true }) userAgent: string | null;
   @ApiProperty({ type: String, nullable: true }) ip: string | null;
 }
+
+@ApiSchema({ name: 'SessionList' })
+export class SessionListDto {
+  @ApiProperty({ type: [SessionDto] }) data: SessionDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: live sessions only' })
+  nextCursor: null;
+}

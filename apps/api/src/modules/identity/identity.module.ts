@@ -1,5 +1,5 @@
 import { Inject, Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AppConfig } from '../../common/config/app-config';
 import { DB } from '../../common/db/db.tokens';
@@ -7,11 +7,14 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
+import { AuditController, OrgController, SettingsController } from './controllers/org.controller';
 import { RolesController } from './controllers/roles.controller';
 import { UsersController } from './controllers/users.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { ensureTransitWarehouse, syncAccessCatalog } from './reference-data';
+import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
 import { AccessService } from './services/access.service';
+import { AuditQueryService } from './services/audit-query.service';
 import { AuditService } from './services/audit.service';
 import { AuthService } from './services/auth.service';
 import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/login-limiter.service';
@@ -72,10 +75,18 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
       }),
     }),
   ],
-  controllers: [AuthController, UsersController, RolesController],
+  controllers: [
+    AuthController,
+    UsersController,
+    RolesController,
+    OrgController,
+    SettingsController,
+    AuditController,
+  ],
   providers: [
     IdentityBootstrap,
     AccessService,
+    AuditQueryService,
     AuthService,
     PasswordHasher,
     LoginLimiter,
@@ -83,6 +94,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     UsersService,
     { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS },
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
   exports: [AccessService, AuthService, PasswordHasher],
 })

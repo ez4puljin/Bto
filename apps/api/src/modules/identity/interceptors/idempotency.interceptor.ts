@@ -1,0 +1,155 @@
+import { createHash } from 'node:crypto';
+import {
+  applyDecorators,
+  type CallHandler,
+  type ExecutionContext,
+  Inject,
+  Injectable,
+  type NestInterceptor,
+  SetMetadata,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { ApiHeader } from '@nestjs/swagger';
+import { and, eq, sql } from 'drizzle-orm';
+import type { Request, Response } from 'express';
+import { catchError, from, mergeMap, type Observable, of, throwError } from 'rxjs';
+import { DB } from '../../../common/db/db.tokens';
+import type { Db } from '../../../common/db/db.types';
+import { AppError } from '../../../common/errors/app-error';
+import type { AuthenticatedRequest } from '../decorators/access.decorators';
+import { idempotencyKeys } from '../schema';
+
+export const IDEMPOTENT_KEY = 'tugeel:idempotent';
+/** Nest's metadata key of @HttpCode (not exported from a public subpath). */
+const HTTP_CODE_METADATA = '__httpCode__';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Marks a document-creating route (ADR-0002 #6, ADR-0004 #5): the client sends a UUID
+ * `Idempotency-Key`; a retry with the same key and body gets the stored response instead of a
+ * second document. Use on authenticated routes only.
+ */
+export const Idempotent = () =>
+  applyDecorators(
+    SetMetadata(IDEMPOTENT_KEY, true),
+    ApiHeader({
+      name: 'Idempotency-Key',
+      required: true,
+      description: 'Client-generated UUID, kept until a response arrives',
+    }),
+  );
+
+/** JSON with sorted object keys, so equal bodies hash equally whatever the key order. */
+export function canonicalJson(value: unknown): string {
+  if (value === undefined) return 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, nested]) => nested !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, nested]) => `${JSON.stringify(key)}:${canonicalJson(nested)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Global interceptor that acts only on @Idempotent() routes (ADR-0027 #11): the key row is claimed
+ * (IN_PROGRESS) before the handler runs and completed with the response after it; a handler error
+ * releases the key. The tiny window between the handler's commit and the completion is accepted.
+ */
+@Injectable()
+export class IdempotencyInterceptor implements NestInterceptor {
+  constructor(
+    private readonly reflector: Reflector,
+    @Inject(DB) private readonly db: Db,
+  ) {}
+
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
+    const handler = context.getHandler();
+    if (!this.reflector.getAllAndOverride<boolean>(IDEMPOTENT_KEY, [handler, context.getClass()])) {
+      return next.handle();
+    }
+    const http = context.switchToHttp();
+    const request = http.getRequest<Request & AuthenticatedRequest>();
+    const response = http.getResponse<Response>();
+    const actor = request.auth;
+    if (!actor) throw new Error('@Idempotent() needs an authenticated route');
+    const key = request.headers['idempotency-key'];
+    if (typeof key !== 'string' || !UUID.test(key)) {
+      throw new AppError('IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key must be a UUID');
+    }
+    const requestHash = createHash('sha256')
+      .update(`${request.method}\n${request.originalUrl}\n${canonicalJson(request.body)}`)
+      .digest('hex');
+    const [claimed] = await this.db
+      .insert(idempotencyKeys)
+      .values({
+        actorKind: 'STAFF',
+        actorId: actor.userId,
+        key,
+        method: request.method,
+        path: request.originalUrl.split('?')[0] ?? request.originalUrl,
+        requestHash,
+        status: 'IN_PROGRESS',
+      })
+      .onConflictDoNothing()
+      .returning({ id: idempotencyKeys.id });
+    if (!claimed) return this.replay(actor.userId, key, requestHash, response);
+    const status =
+      this.reflector.get<number | undefined>(HTTP_CODE_METADATA, handler) ??
+      (request.method === 'POST' ? 201 : 200);
+    return next.handle().pipe(
+      mergeMap((body: unknown) => from(this.complete(claimed.id, status, body))),
+      catchError((error: unknown) =>
+        from(this.release(claimed.id)).pipe(mergeMap(() => throwError(() => error))),
+      ),
+    );
+  }
+
+  private async replay(
+    actorId: number,
+    key: string,
+    requestHash: string,
+    response: Response,
+  ): Promise<Observable<unknown>> {
+    const [existing] = await this.db
+      .select()
+      .from(idempotencyKeys)
+      .where(
+        and(
+          eq(idempotencyKeys.actorKind, 'STAFF'),
+          eq(idempotencyKeys.actorId, actorId),
+          eq(idempotencyKeys.key, key),
+        ),
+      );
+    if (existing && existing.requestHash !== requestHash) {
+      throw new AppError('IDEMPOTENCY_KEY_REUSED', 'the key was used for a different request');
+    }
+    if (!existing || existing.status !== 'COMPLETED' || existing.responseStatus === null) {
+      throw new AppError(
+        'IDEMPOTENCY_KEY_IN_PROGRESS',
+        'the first request with this key is running',
+      );
+    }
+    response.status(existing.responseStatus);
+    response.setHeader('Idempotent-Replayed', 'true');
+    return of(existing.responseBody);
+  }
+
+  private async complete(id: number, status: number, body: unknown): Promise<unknown> {
+    await this.db
+      .update(idempotencyKeys)
+      .set({
+        status: 'COMPLETED',
+        responseStatus: status,
+        responseBody: body === undefined ? null : body,
+        completedAt: sql`now()`,
+      })
+      .where(eq(idempotencyKeys.id, id));
+    return body;
+  }
+
+  private async release(id: number): Promise<void> {
+    await this.db.delete(idempotencyKeys).where(eq(idempotencyKeys.id, id));
+  }
+}

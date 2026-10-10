@@ -1,4 +1,4 @@
-import type { INestApplicationContext, Provider, Type } from '@nestjs/common';
+import type { INestApplicationContext, ModuleMetadata, Provider, Type } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { Client } from 'pg';
@@ -9,6 +9,8 @@ import { WorkerModule } from '../../src/worker.module';
 export interface HttpAppOptions {
   /** Extra controllers next to AppModule: probe routes for guard and interceptor tests. */
   controllers?: Type<unknown>[];
+  /** Extra modules whose exports the probe controllers need. */
+  imports?: ModuleMetadata['imports'];
   /** Extra providers, e.g. a WAREHOUSE_CREATED_HOOK probe. */
   providers?: Provider[];
   /** Provider overrides, e.g. lower throttle limits. */
@@ -18,7 +20,7 @@ export interface HttpAppOptions {
 /** The HTTP api exactly as main.ts configures it, on this worker's test database. */
 export async function createHttpApp(options: HttpAppOptions = {}): Promise<NestExpressApplication> {
   const base = Test.createTestingModule({
-    imports: [AppModule],
+    imports: [AppModule, ...(options.imports ?? [])],
     controllers: options.controllers ?? [],
     providers: options.providers ?? [],
   });

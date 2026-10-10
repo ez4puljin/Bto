@@ -58,3 +58,17 @@ export class PermissionInfoDto {
   @ApiProperty({ enum: PERMISSIONS, enumName: 'Permission' }) code: string;
   @ApiProperty({ description: 'False for codes reserved for the ADMIN role' }) assignable: boolean;
 }
+
+@ApiSchema({ name: 'RoleList' })
+export class RoleListDto {
+  @ApiProperty({ type: [RoleDto] }) data: RoleDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: the list is short' })
+  nextCursor: null;
+}
+
+@ApiSchema({ name: 'PermissionList' })
+export class PermissionListDto {
+  @ApiProperty({ type: [PermissionInfoDto] }) data: PermissionInfoDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Always null: the catalog is short' })
+  nextCursor: null;
+}

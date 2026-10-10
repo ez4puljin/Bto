@@ -18,7 +18,8 @@ import { CurrentUser, RequirePermission } from '../decorators/access.decorators'
 import {
   CreateUserDto,
   PasswordCodeDto,
-  SessionDto,
+  type SessionDto,
+  SessionListDto,
   UpdateUserDto,
   UserDetailDto,
   UserListQueryDto,
@@ -137,9 +138,9 @@ export class UsersController {
 
   @Get(':id/sessions')
   @RequirePermission('identity.users.manage')
-  @ApiOkResponse({ type: [SessionDto] })
-  async sessions(@Param('id', ParseIntPipe) id: number): Promise<SessionDto[]> {
-    return (await this.users.sessions(id)).map(toSessionDto);
+  @ApiOkResponse({ type: SessionListDto })
+  async sessions(@Param('id', ParseIntPipe) id: number): Promise<SessionListDto> {
+    return { data: (await this.users.sessions(id)).map(toSessionDto), nextCursor: null };
   }
 
   @Delete(':id/sessions/:sessionId')

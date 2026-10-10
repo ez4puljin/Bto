@@ -31,7 +31,7 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
     adminToken = (await login(app, admin)).accessToken;
     const roles = await http().get('/api/v1/roles').set(asAdmin()).expect(200);
     systemRoles = new Map(
-      (roles.body as RoleBody[])
+      (roles.body as { data: RoleBody[] }).data
         .filter((role) => role.code)
         .map((role) => [role.code ?? '', role.id]),
     );
@@ -217,7 +217,7 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
         .get(`/api/v1/users/${user.id}/sessions`)
         .set(asAdmin())
         .expect(200);
-      const list = sessions.body as { id: string; ip: string }[];
+      const list = (sessions.body as { data: { id: string; ip: string }[] }).data;
       expect(list).toHaveLength(2);
       const phoneSession = list.find((s) => s.ip.endsWith(phone.ip));
       await http()
@@ -239,9 +239,10 @@ describe('users and roles API (SPEC §5.1, ADR-0027)', () => {
   describe('roles', () => {
     it('lists the catalog with the admin-only codes marked', async () => {
       const response = await http().get('/api/v1/permissions').set(asAdmin()).expect(200);
-      expect(response.body).toEqual(
-        PERMISSIONS.map((code) => ({ code, assignable: isAssignablePermission(code) })),
-      );
+      expect(response.body).toEqual({
+        data: PERMISSIONS.map((code) => ({ code, assignable: isAssignablePermission(code) })),
+        nextCursor: null,
+      });
     });
 
     it('keeps system roles read-only and validates custom roles', async () => {
