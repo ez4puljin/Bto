@@ -1,6 +1,6 @@
 # Tugeel (Түгээл) — Architecture
 
-Version 0.2 — 2026-10-10 (week-1 scaffold: ADR-0023, ADR-0024, ADR-0025 applied) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
+Version 0.3 — 2026-10-10 (week-1 scaffold: ADR-0023, ADR-0024, ADR-0025; local-only development until one go-live: ADR-0026) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
 
 **Read §0, §4 and §12 before every session; read the module's §5 subsection before implementing it.** `TODO-VERIFY` marks business or external unknowns only (register in §13); every tooling choice in this document is decided.
 
@@ -13,6 +13,8 @@ Terminology: *module* = one of the 14 code modules in §4 (`identity`, `catalog`
 Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: catalog, multi-warehouse stock with bins and units, customer ordering, picking, zone-based delivery with company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement, reporting, HR/payroll. One owner-developer builds it with Claude Code, delivery by delivery, and maintains it alone.
 
 **The stack in one paragraph.** TypeScript end-to-end on Node.js 26 (LTS from 2026-10-28; ADR-0023), pnpm 11.x workspaces with `nodeLinker: hoisted` (no Turborepo), **one TypeScript version `~6.0.x` pinned workspace-wide** (Nest CLI 12 requires it; TypeScript 7 is never mixed in), one NestJS 12 modular-monolith API on the CommonJS + Jest template (NestJS 12 and pg-boss 12 are ESM-only packages loaded through Node `require(esm)`; workspace packages are CommonJS with a `@tugeel/source` export condition, ADR-0025) on Express 5 with class-validator DTOs + `@nestjs/swagger`, Drizzle ORM 0.45.x with hand-edited SQL migrations on PostgreSQL 18 (DigitalOcean Managed, Singapore), pg-boss for jobs and cron with transactional enqueue (no Redis), decimal.js for all money and quantity arithmetic; a Vite 8 + React 19 single-page admin (React Router 7 library mode, TanStack Query/Table, shadcn/ui on Radix, Tailwind 4, i18next with `mn` as the only locale) that also hosts the supermarket POS screen; ONE Expo codebase built into two store apps via `APP_VARIANT` (`customer`; `staff` with warehouse / sales-rep / driver roles, Android-first, EAS internal distribution + EAS Update) on whichever Expo SDK is stable at delivery-4 kickoff; REST + OpenAPI with a generated openapi-typescript/openapi-fetch client shared by web and mobile; self-hosted JWT auth (argon2id, rotating refresh tokens, permission strings); one DigitalOcean SGP1 droplet running Docker Compose (Caddy, api, worker, plus a staging stack with its own local Postgres container), DO Spaces for files, GitHub Actions CI/CD; the mandatory e-Barimt **PosAPI 3.0 runs on a small Ubuntu mini-PC in the Ulaanbaatar office, reached only over Tailscale** (a second instance at the supermarket in delivery 9); QPay Merchant v2 as the single QR-payment rail (SocialPay is a QPay payer wallet), Khan Bank as the main bank (statement import first, corporate gateway later); keyboard-wedge barcode scanners with camera fallback; browser-printed labels first, raster ESC/POS for every receipt printer because Mongolian Cyrillic is not covered by PC866/CP1251.
+
+**Environments (ADR-0026).** Until the single go-live after delivery 11, the owner's machine is the only environment: `docker compose` PostgreSQL 18 + `pnpm dev`, with GitHub Actions running `pnpm check` and building both images without pushing them. The DigitalOcean hosting above is the go-live target; it is created in the go-live phase (SPEC §9.4).
 
 ### 0.1 Version pins
 
@@ -77,7 +79,7 @@ One company, one database, one deployable API. The web admin and the two mobile 
    POS PC: print agent (packages/printing) polls API over HTTPS --> Ethernet 80 mm printer :9100
 ```
 
-Staging runs on the same droplet as a second Compose stack with its own local `postgres:18` container; it never touches the managed cluster.
+Staging runs on the same droplet as a second Compose stack with its own local `postgres:18` container; it never touches the managed cluster. Both stacks are created in the go-live phase (ADR-0026); until then everything runs on the owner's machine (§10.1).
 
 ---
 
@@ -99,7 +101,7 @@ Staging runs on the same droplet as a second Compose stack with its own local `p
 | Mobile | One Expo project, `APP_VARIANT=customer|staff`, Expo Router, EAS Build/Update, development builds only (never Expo Go), expo-camera, expo-notifications, expo-secure-store, expo-location; SDK chosen at delivery-4 kickoff | Two store listings, one auth/API/scanner/printing codebase; avoids one SDK upgrade by starting late. |
 | API contract | REST/JSON `/api/v1`, OpenAPI 3 exported by script, `packages/api-client` generated with openapi-typescript + openapi-fetch; CI fails when stale | API drift becomes a compile error the agent can fix. |
 | Auth | `@nestjs/passport` + `@nestjs/jwt`, argon2id, 15-min access JWT, rotating refresh tokens hashed per device, permission strings, branch/warehouse scope | Canonical NestJS pattern; no vendor. |
-| Hosting | DO SGP1: Basic droplet 4 GiB/2 vCPU ($24) with Docker Compose (caddy, api, worker, staging stack), Managed PostgreSQL 1 GiB ($15.15; 2 GiB $30.45 when needed), Spaces ($5), Cloudflare DNS, Tailscale (Starter plan budgeted), Sentry + UptimeRobot free tiers | Flat pricing, managed backups + PITR, ~100–150 ms from UB (measured in Week 0). App Platform rejected: cannot reach the tailnet cleanly. |
+| Hosting | Go-live target, created in the go-live phase (ADR-0026). DO SGP1: Basic droplet 4 GiB/2 vCPU ($24) with Docker Compose (caddy, api, worker, staging stack), Managed PostgreSQL 1 GiB ($15.15; 2 GiB $30.45 when needed), Spaces ($5), Cloudflare DNS, Tailscale (Starter plan budgeted), Sentry + UptimeRobot free tiers | Flat pricing, managed backups + PITR, ~100–150 ms from UB (measured in Week 0). App Platform rejected: cannot reach the tailnet cleanly. |
 | e-Barimt host | Ubuntu amd64 mini-PC in the Ulaanbaatar office running the official PosService 3.0.12 launcher (.deb), bound to the `tailscale0` address, Tailscale ACL-restricted | PosAPI and api.ebarimt.mn are Mongolia-IP-only; PosAPI has no auth and must never be public. |
 | Payments | QPay Merchant v2 behind a `PaymentProvider` interface; bank transfer + statement matching for large invoices; Khan Bank corporate gateway later | One QR covers every bank app and wallet; fee ~1%, no setup fee. |
 | Printing | Browser `@page` labels + bwip-js first; raster ESC/POS everywhere Mongolian text is printed; POS receipts through a tiny print agent on the POS PC | Cyrillic code pages PC866/CP1251 lack Ө/Ү; the API in Singapore cannot open port 9100 on the store LAN. |
@@ -127,7 +129,7 @@ tugeel/                       (repo root; packages are @tugeel/*)
     Caddyfile  .env.example  runbook.md (deploy, rollback, restore drill, rotate secrets, Tailscale pattern)
     ebarimt-box/              mini-PC checklist: Ubuntu, PosService .deb, posapi.ini, tailscale, ACL, health
     pos-agent/                install script + runbook for the POS print agent (delivery 9, ADR-0022)
-  .github/workflows/          ci.yml (pnpm check + postgres:18 service), deploy.yml (GHCR -> SSH compose up)
+  .github/workflows/          ci.yml (pnpm check + postgres:18 service); deploy.yml (GHCR -> SSH compose up) in the go-live phase
   docs/
     SPEC.md (mn)  architecture.md  STATUS.md
     decisions/README.md + ADR-0001..0022
@@ -200,7 +202,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 
 | Module | Owns (tables) | Exposes (`index.ts` / REST) | Depends on | Delivery |
 |---|---|---|---|---|
-| identity | users, roles, permissions, role_permissions, user_roles, user_scopes, auth_sessions, password_resets, branches (branch_no, district_code), warehouses (kind WHOLESALE/STORE/VEHICLE/TRANSIT, branch_id), settings (effective-dated VAT / city-tax rates), number_sequences (scope_key, period), audit_log, idempotency_keys, files, print_jobs, print_stations (delivery 9, ADR-0022) | AuthGuard, PermissionsGuard/`@RequirePermission`, `@CurrentUser`, UsersService, OrgService (branches, warehouses, getTransitWarehouse), NumberingService.next(tx, scopeKey, period), AuditService.record(tx, …), IdempotencyInterceptor, StorageService (presign/getUrl), SettingsService; job backup.pgdump (weekly). REST /auth/*, /users, /roles, /branches, /warehouses, /settings, /audit, /files | — | 1 |
+| identity | users, roles, permissions, role_permissions, user_roles, user_scopes, auth_sessions, password_resets, branches (branch_no, district_code), warehouses (kind WHOLESALE/STORE/VEHICLE/TRANSIT, branch_id), settings (effective-dated VAT / city-tax rates), number_sequences (scope_key, period), audit_log, idempotency_keys, files, print_jobs, print_stations (delivery 9, ADR-0022) | AuthGuard, PermissionsGuard/`@RequirePermission`, `@CurrentUser`, UsersService, OrgService (branches, warehouses, getTransitWarehouse), NumberingService.next(tx, scopeKey, period), AuditService.record(tx, …), IdempotencyInterceptor, StorageService (presign/getUrl), SettingsService; job backup.pgdump (weekly, from the go-live phase: ADR-0026). REST /auth/*, /users, /roles, /branches, /warehouses, /settings, /audit, /files | — | 1 |
 | catalog | categories, brands, uoms, products (sku, name_mn, search_text, vat_type, city_tax, classification_code NULL, tax_product_code NULL, status, tracks_lots), product_units (factor_to_base, is_base, is_default_sales/purchase, measure_unit NULL, barcode_type NULL, superseded_by, superseded_at), product_barcodes (code, gtin14, unique), product_images | CatalogService.get/getMany/search, UnitConversionService.toBase/fromBase (returns factor snapshot), UnitSupersedeService.supersede(tx, unitId, newFactor), BarcodeService.resolve(code) → {product, unit} (excludes superseded units), TaxService.rates(productId, date), EbarimtReadinessService.report(). REST /products, /categories, /brands, /barcodes/:code, /catalog/ebarimt-readiness | identity | 1 |
 | partners | customers (kind COMPANY/INDIVIDUAL, code, name, reg_no text, tin NULL, tin_source, consumer_no NULL, vat_payer, city_payer, tier_id, credit_limit, payment_term_days, status, credit_hold), customer_tiers, customer_addresses (gps, zone_id NULL — the FK to delivery_zones is added by the delivery module's migration in delivery 5), customer_contacts, customer_users, suppliers, supplier_contacts | CustomersService.get/search/assertActive/creditTerms/forUser/lockForUpdate(tx, id), SuppliersService. REST /customers, /customer-tiers, /suppliers, /auth/customer/* | identity | 1 (minimal), 2 |
 | inventory | bins (type, sellable, pick_sequence, status ACTIVE/COUNTING), product_locations, stock_ledger, bin_stock, warehouse_stock, stock_reservations, goods_receipts(+lines), bin_moves(+lines), transfers(+lines), adjustments(+lines), stocktakes(+lines), stock_snapshot_daily, stock_snapshot_bin_monthly, reconciliation_runs, lots (empty) | StockPostingService.post(tx, doc, movements, options?) (ONLY ledger writer; signature in §5.3), ReservationService.reserve/release/consume, AvailabilityService.available(warehouseId, productIds[]), StockQueryService, ReceiptsService, BinMovesService, TransfersService, AdjustmentsService, StocktakesService, ShortListQuery; jobs inventory.reconcile (nightly, REPEATABLE READ, writes stock_snapshot_daily), inventory.snapshotMonthly, inventory.staleReservations. REST /bins, /stock, /receipts, /bin-moves, /transfers, /adjustments, /stocktakes, /labels, /stock/short-list | identity, catalog, partners (supplier ref) | 1 |
@@ -591,7 +593,7 @@ The POS checkout screen awaits step 3 (budget 60–90 s with a progress state); 
 - One Expo project (created at delivery 4); `app.config.ts` reads `APP_VARIANT` → bundle ids, names, icons. `customer` (public listing, iOS + Android) and `staff` (Android-first, EAS internal distribution APK + Play internal track; iOS later). Staff route groups are gated by role at runtime and hidden in the customer variant; API permissions are the real boundary, so bundling both groups is acceptable and build-time exclusion is an optimisation evaluated at delivery-4 kickoff.
 - **SDK**: the current stable Expo SDK at delivery-4 kickoff (expected 58 or 59), recorded in `docs/modules/mobile.md` with the date; any earlier Expo scaffold is disposable (M9, F8). Development builds only, never Expo Go.
 - **`useScanner` hook** (M11): hidden always-focused `TextInput` (`showSoftInputOnFocus={false}`) for keyboard-wedge scanners (Bluetooth HID guns, Android handhelds in keyboard mode; standardise US layout + Enter suffix) with `expo-camera` `CameraView` fallback limited to `ean13, ean8, code128, qr, itf14, upc_a, upc_e`, cooldown after a hit and double-read confirmation; results pass through `packages/shared/gtin.ts` before lookup. Vendor SDKs (DataWedge, Sunmi broadcast) can be added behind the same hook.
-- **Delivery-1 web scanning** (M15): the admin's receiving/stocktake/picking screens have a visible scan box fed by a global keydown burst detector (onScan.js defaults: Enter suffix, min length 4) for USB/Bluetooth HID scanners, plus a browser camera scanner using the `BarcodeDetector` API on Chrome Android with `html5-qrcode` as fallback. Two Bluetooth HID scanners are ordered on day 1 so they arrive before go-live.
+- **Delivery-1 web scanning** (M15): the admin's receiving/stocktake/picking screens have a visible scan box fed by a global keydown burst detector (onScan.js defaults: Enter suffix, min length 4) for USB/Bluetooth HID scanners, plus a browser camera scanner using the `BarcodeDetector` API on Chrome Android with `html5-qrcode` as fallback. Two Bluetooth HID scanners are ordered on day 1 so they arrive for the delivery-1 acceptance.
 - TanStack Query with optimistic UI; `Idempotency-Key` on all mutations; short-lived catalog cache. True offline is out of scope (ADR-0020).
 - EAS Build (owner is on Windows; no Xcode), EAS Update for JS-only fixes. Budget EAS Starter ($19/mo) from the customer-app launch. Org accounts (D-U-N-S, Apple $99/yr, Google $25) and the Expo org start in Week 0.
 
@@ -629,11 +631,11 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 
 ## 10. Environments and deploy
 
-### 10.1 Local (Windows 11)
+### 10.1 Local (Windows 11): the only environment until go-live (ADR-0026)
 
-Docker Desktop (WSL2) runs `postgres:18` only; `pnpm dev` runs api, worker, web; Expo development build on a real Android device (delivery 4+). The staging PosAPI is reached over Tailscale from the office box (the dev machine joins the tailnet). No mailpit and no email feature until a feature needs one (F11).
+Docker Desktop (WSL2) runs `postgres:18` only (`docker-compose.yml`, `127.0.0.1:15432`); `pnpm dev` runs api, worker, web. Expo development builds on a real Android device (delivery 4+) and the POS print agent (delivery 9) reach the API at the machine's LAN address. Every delivery is accepted here with real data imported locally. The staging PosAPI on the office box is reached over Tailscale (the dev machine joins the tailnet as `tag:dev`); QPay runs against its sandbox without callbacks (`payment/check` and the sweep); files use `STORAGE_DRIVER=local` (`.data/storage/`, ADR-0014). `pnpm docker:build` plus the staging stack behind the edge Caddy (`http://staging.localhost:8080`) rehearses the deploy. No mailpit and no email feature until a feature needs one (F11).
 
-### 10.2 Droplet layout and pool budget (F3)
+### 10.2 Droplet layout and pool budget (F3): the go-live target
 
 | Stack | Services | Database | Pool sizes |
 |---|---|---|---|
@@ -664,7 +666,7 @@ Environment variables every process reads (validated by Zod at boot; the process
 
 Print-station tokens are not environment variables: each POS PC's token is issued in the admin and stored hashed in `print_stations` (§9.4, ADR-0022, delivery 9); the agent keeps its own copy in its local config file.
 
-Infrastructure is created in Week 0 in this order: domain + Cloudflare DNS → DO project, SGP1 droplet, Managed PostgreSQL 18 (ICU locale; `pnpm db:provision` as `doadmin` creates roles `app` and `migrator`), Spaces → Tailscale tailnet with tags and ACL → droplet bootstrap (Docker, tailscaled, Caddy) → GitHub repository + Actions secrets → hello deploy of the staging and production stacks over HTTPS → office mini-PC (Ubuntu, PosService staging, tailscale) → RTT measurement from Ulaanbaatar.
+Infrastructure is created in the go-live phase (ADR-0026, SPEC §9.4) in this order: RTT measurement from Ulaanbaatar and a fresh price check → domain + Cloudflare DNS → DO project, SGP1 droplet, Managed PostgreSQL 18 (ICU locale; `pnpm db:provision` as `doadmin` creates roles `app` and `migrator`), Spaces → Tailscale `tag:server` node and ACL (the tailnet, the office box and `tag:dev` exist since delivery 1) → droplet bootstrap (Docker, tailscaled, Caddy) → GitHub Actions secrets + `deploy.yml` → hello deploy of the staging and production stacks over HTTPS → production PosService on the office box and the store box.
 
 ### 10.3 Tailscale from containers (F7)
 
@@ -678,7 +680,7 @@ Primary pattern: `tailscaled` runs on the droplet host; api and worker receive `
 - **Jobs** in `.github/workflows/ci.yml` (runner `ubuntu-24.04`): `check` (`pnpm check` + generated files committed), `images` (both Dockerfiles build), `deploy-config` (`docker compose config` + `caddy validate`). `pnpm ci:rehearse` runs the `check` job in Linux Docker against HEAD before a push.
 - **Integrity suite** (`test/integrity/*`) is its own Jest project run with `--runInBand` and `statement_timeout = 5s` so deadlocks fail fast and loudly: concurrent postings over the same stock, overdraw rejection, idempotent re-post, bin-move net-zero, COUNTING bin rejection, concurrent `reserve()` never oversells, concurrent credit confirmations, supersede keeps barcode/price/default, ledger REVOKE/trigger guard, lottery/qrData never logged, Σ payments = total = Σ sub-receipts. **No `jest.retryTimes`, no retries anywhere in CI.**
 - **Locale assertion**: the managed cluster and the local containers are created with UTF-8 and the ICU collation `und-x-icu`; the harness runs `SELECT lower('ӨҮЁ') = 'өүё'` at startup and fails if false; search still uses the app-maintained `search_text` column.
-- On merge to main: build api + web images → GHCR → SSH `docker compose pull && up -d` on staging → manual approval → production. Migrations run by the api container entrypoint with the `migrator` role.
+- From the go-live phase (ADR-0026), on merge to main: build api + web images → GHCR → SSH `docker compose pull && up -d` on staging → manual approval → production. Migrations run by the api container entrypoint with the `migrator` role. Until then the `images` job builds both images without pushing them.
 
 ### 10.5 Migrations (F9)
 
@@ -696,7 +698,7 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 - pino JSON logs (docker logs, 7-day rotation); the ebarimt client logger serializes only the stored summary.
 - `/health` returns `{ status: ok|degraded, db: up|down, pgboss: up|down, version }` (HTTP 503 when degraded) from delivery 1; delivery 3 adds `ebarimt: { status, lastSentDate, leftLotteries, version, checkedAt }`; the `ebarimt.monitor` job refreshes the ebarimt block every 5 minutes from `GET /rest/info`, so the public health endpoint reflects the private box without exposing it (F7). `/health/ebarimt` returns the same block with detail for the admin banner.
 - UptimeRobot probes only public endpoints: `https://api.<domain>/health` and the admin; it cannot see the tailnet. DO alerts on CPU, disk and DB connections.
-- Backups: DO daily backups + PITR; weekly `pg_dump` to Spaces (independent of DO's backups) by a worker cron job with a verification script; Spaces versioning on POD photos; quarterly restore drill per `deploy/runbook.md`, performed once on staging in delivery 1.
+- Backups: DO daily backups + PITR; weekly `pg_dump` to Spaces (independent of DO's backups) by a worker cron job with a verification script; Spaces versioning on POD photos; quarterly restore drill per `deploy/runbook.md`, performed once on staging in the go-live phase before production data is imported (ADR-0026).
 - Runbooks: deploy/rollback, restore, rotate secrets, add warehouse/vehicle, e-Barimt outage (sendData backlog, leftLotteries, three-network dependency until the store has its own PosAPI), QPay callback outage, month-end checklist.
 
 ---
@@ -706,7 +708,7 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 **Session rules.**
 - One code module per session (a delivery spans several sessions); `docs/modules/<module>.md` is read at the start and updated at the end. Start every implementation session in plan mode with the module's §5 subsection open.
 - Definition of done: `pnpm check` green, migration + schema in the module, integration tests for every service that touches stock or money, OpenAPI on controllers, admin/mobile screens, module doc and `docs/STATUS.md` updated.
-- Each delivery carries a **25–30% support and maintenance allowance** after its go-live (bug fixes, data cleanup, staff questions); the roadmap durations in `SPEC.md` already include it.
+- Each delivery carries a **25–30% support and maintenance allowance** (bug fixes, data cleanup, staff questions); the roadmap durations in `SPEC.md` already include it. Until the single go-live (ADR-0026) it is a reserve for rework and the owner's local acceptance; after go-live it covers support.
 - Major upgrades (pnpm 12, Drizzle 1.0, Expo SDK, TypeScript 7, NestJS ESM, the next Node LTS) happen only in dedicated sessions **between** deliveries, never inside one (F8); a quarterly dependency day handles minors.
 - When the agent hits a `TODO-VERIFY` item it stops and asks; it never resolves a business unknown by guessing.
 
@@ -725,7 +727,7 @@ No code change: resize the droplet; a second `worker` container; Managed PG to 2
 - The integrity suite (§10.4) is mandatory, runs `--runInBand`, and is never skipped, weakened or retried; a failing integrity test is fixed in the service, not in the test.
 - Contract tests against recorded sandbox responses for QPay and PosAPI (fixtures under `test/fixtures/<provider>/`), so provider code can be verified without live credentials; recordings are scrubbed of `lottery` and `qrData` before being committed.
 - Playwright smoke on the admin once sales exists; mobile flows are tested on a real Android device before each EAS internal release.
-- A test that needs the tailnet (`POSAPI_URL` reachable) is tagged `@tailnet` and skipped in CI; it runs from the owner's machine before delivery 3 go-live.
+- A test that needs the tailnet (`POSAPI_URL` reachable) is tagged `@tailnet` and skipped in CI; it runs from the owner's machine before delivery 3 is accepted.
 
 **ALWAYS**
 - Pass the Drizzle `tx` explicitly through service calls that must be atomic; enqueue side effects with pg-boss in the same tx.
@@ -762,7 +764,7 @@ Business and external unknowns only; tooling is decided. Owner = the person who 
 | A1 | Tailscale commercial use requires the paid Starter plan (budgeted per user/month); the personal plan is not relied on. | Cost line only. |
 | A2 | The official PosService .deb launcher self-updates hourly and runtime versions change under us (3.2.48 → 3.2.50 observed); the client tolerates additive response changes and `ebarimt.monitor` records the running version. | A breaking runtime change surfaces as ERROR rows and a health alert. Downgrading the runtime is not possible, which is one more reason the fallback provider exists. |
 | A3 | Scanner, handheld and printer models are chosen after the week-1 hardware test; the printing pipeline is raster so the printer brand does not matter (M14). | Only purchasing timing changes. |
-| A4 | RTT Ulaanbaatar → DO SGP1 is 100–150 ms (measured in Week 0); if it exceeds ~150 ms sustained, the region decision is revisited before delivery 2. | Hosting region change while the codebase is small. |
+| A4 | RTT Ulaanbaatar → DO SGP1 is 100–150 ms (measured in the go-live phase before the droplet is created, ADR-0026); if it exceeds ~150 ms sustained, the region decision is revisited then. | Hosting region change before anything is deployed. |
 | A5 | Company lookups via getTinInfo still work; citizen-registry lookups are treated as unavailable. | Individuals' TINs are always typed or imported manually. |
 
 ### 13.2 TODO-VERIFY register

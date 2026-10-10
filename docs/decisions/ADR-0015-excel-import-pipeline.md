@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0026 (real files are imported locally in delivery 1; the production import uses fresh exports in the go-live phase) |
 
 ## Context
 

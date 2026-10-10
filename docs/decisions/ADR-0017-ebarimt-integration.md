@@ -5,6 +5,7 @@
 | Status | Deferred (principles accepted now; implementation in delivery 3, POS path in delivery 9) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0026 (the week-1 spike runs from the owner's machine over Tailscale; production PosAPI comes with the go-live phase; the gate date is unchanged) |
 
 ## Context
 

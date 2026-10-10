@@ -4,7 +4,7 @@ Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: pr
 multi-warehouse stock with bins on an append-only ledger, customer orders (web, customer app, sales reps), picking,
 zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay
 payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
-reporting, HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone.
+reporting, HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
 Repo `tugeel`, packages `@tugeel/*`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
 ## Start of every session
@@ -81,6 +81,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Lock the customer row before a credit check; lock stock rows in the order documented in architecture §5.3.
 - Write integration tests against real Postgres for every service that touches stock or money; keep the integrity suite green.
 - Keep `docs/modules/<module>.md` current; record every new decision as an ADR (next free number in `docs/decisions/README.md`).
+- Keep `deploy/`, `deploy/.env.example` and architecture §10.2 in step with every runtime-config change (env, ports, volumes): nothing is deployed before the go-live phase, but the CI `images` and `deploy-config` jobs must stay green.
 
 ## NEVER
 

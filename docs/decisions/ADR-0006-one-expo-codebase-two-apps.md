@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0026 (store listings and the EAS Starter plan come with the go-live phase; development builds reach the API on the LAN) |
 
 ## Context
 

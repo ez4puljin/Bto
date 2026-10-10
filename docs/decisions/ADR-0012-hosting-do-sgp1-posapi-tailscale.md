@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0026 (nothing is created before the go-live phase after delivery 11; the Week-0 and week-1 follow-ups below move there) |
 
 ## Context
 

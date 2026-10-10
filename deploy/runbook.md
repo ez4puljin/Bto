@@ -1,6 +1,6 @@
 # Tugeel deploy runbook
 
-Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0012, ADR-0023, ADR-0024). Commands run on the droplet in `/opt/tugeel` unless stated. Never paste secrets into this file or any other file in the repository: it is public.
+Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0012, ADR-0023, ADR-0024). **Nothing here is used before the go-live phase** (ADR-0026: development is local-only and production is deployed once, after delivery 11); until then rehearse locally with `pnpm docker:build` and the staging stack behind the edge Caddy (`http://staging.localhost:8080`). Commands run on the droplet in `/opt/tugeel` unless stated. Never paste secrets into this file or any other file in the repository: it is public.
 
 ## 1. Topology
 
@@ -47,7 +47,7 @@ Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0
 
 ## 4. Routine deploy
 
-Done by `.github/workflows/deploy.yml` (written in the hello-deploy session): build and push both images tagged `sha-<sha>`, then on the droplet `API_TAG=… WEB_TAG=… docker compose … pull && docker compose … up -d --wait` for staging, a manual approval, then production. The api container applies migrations as `migrator` before it serves traffic (ADR-0024).
+Done by `.github/workflows/deploy.yml` (written in the go-live phase, before the hello deploy): build and push both images tagged `sha-<sha>`, then on the droplet `API_TAG=… WEB_TAG=… docker compose … pull && docker compose … up -d --wait` for staging, a manual approval, then production. The api container applies migrations as `migrator` before it serves traffic (ADR-0024).
 
 ## 5. Rollback
 
@@ -57,13 +57,13 @@ Run `up -d` again with the previous `API_TAG`/`WEB_TAG`. Migrations are forward-
 
 Copy the new file to `/opt/tugeel/Caddyfile`, then `docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile`.
 
-## 7. Restore drill (once in delivery 1, then quarterly)
+## 7. Restore drill (once in the go-live phase before production data is imported, then quarterly)
 
-1. Take the latest weekly `pg_dump` from Spaces (job `backup.pgdump`, delivery 1 cut line) or make one: `pg_dump -Fc`.
+1. Take the latest weekly `pg_dump` from Spaces (job `backup.pgdump`, built in the go-live phase) or make one: `pg_dump -Fc`.
 2. In `postgres-staging`: `createdb restore_drill`, `pg_restore -d restore_drill <dump>`.
 3. Run the integrity SQL (row counts, `SELECT assert_unicode_casefold()`), record the duration here, then `dropdb restore_drill`.
 
-## 8. Tailscale from containers (PosAPI, delivery 3)
+## 8. Tailscale from containers (PosAPI, go-live phase)
 
 Primary: `tailscaled` on the host; api/worker get `POSAPI_URL=http://100.x.y.z:7080`. Verify from inside the container (the slim image has no wget):
 `docker compose -f docker-compose.prod.yml exec api node -e "fetch(process.env.POSAPI_URL + '/rest/info').then((r) => r.text()).then(console.log)"`
