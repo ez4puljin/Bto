@@ -3,9 +3,32 @@ import { DB } from '../../common/db/db.tokens';
 import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { IdentityModule } from '../identity';
+import {
+  BrandsController,
+  CategoriesController,
+  UomsController,
+} from './controllers/masters.controller';
+import { ProductsController, ProductUnitsController } from './controllers/products.controller';
 import { syncSystemUoms } from './reference-data';
+import { BarcodeService } from './services/barcode.service';
+import { BrandsService } from './services/brands.service';
+import { CatalogService } from './services/catalog.service';
+import { CategoriesService } from './services/categories.service';
+import { ProductsService } from './services/products.service';
+import { UnitConversionService } from './services/unit-conversion.service';
+import { UnitsService } from './services/units.service';
+import { UomsService } from './services/uoms.service';
 
-const CORE_SERVICES: never[] = [];
+const CORE_SERVICES = [
+  BarcodeService,
+  BrandsService,
+  CatalogService,
+  CategoriesService,
+  ProductsService,
+  UnitConversionService,
+  UnitsService,
+  UomsService,
+];
 
 /** Catalog services every process may use (api, worker jobs, imports). */
 @Module({ imports: [IdentityModule], providers: CORE_SERVICES, exports: CORE_SERVICES })
@@ -24,6 +47,13 @@ export class CatalogBootstrap implements OnApplicationBootstrap {
 /** The HTTP side of the catalog (api only): admin and lookup routes, the boot-time sync. */
 @Module({
   imports: [CatalogModule],
+  controllers: [
+    UomsController,
+    CategoriesController,
+    BrandsController,
+    ProductsController,
+    ProductUnitsController,
+  ],
   providers: [CatalogBootstrap],
 })
 export class CatalogHttpModule {}

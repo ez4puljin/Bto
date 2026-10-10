@@ -1479,6 +1479,1217 @@
           "files"
         ]
       }
+    },
+    "/api/v1/uoms": {
+      "get": {
+        "operationId": "Uoms_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UomList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "operationId": "Uoms_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UomCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uom"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/uoms/{id}": {
+      "patch": {
+        "operationId": "Uoms_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UomUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uom"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "Uoms_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "operationId": "Categories_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "operationId": "Categories_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/categories/{id}": {
+      "patch": {
+        "operationId": "Categories_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "Categories_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/brands": {
+      "get": {
+        "operationId": "Brands_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "operationId": "Brands_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/brands/{id}": {
+      "patch": {
+        "operationId": "Brands_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "Brands_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "operationId": "Products_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Words of the name in either script, a SKU or a barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Includes its subcategories",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "post": {
+        "operationId": "Products_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products/next-sku": {
+      "get": {
+        "operationId": "Products_nextSku",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextSku"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declared before `:id`, so \"next-sku\" never reaches ParseIntPipe.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products/{id}": {
+      "get": {
+        "operationId": "Products_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      },
+      "patch": {
+        "operationId": "Products_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/units": {
+      "post": {
+        "operationId": "ProductUnits_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-units/{id}": {
+      "patch": {
+        "operationId": "ProductUnits_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-units/{id}/supersede": {
+      "post": {
+        "operationId": "ProductUnits_supersede",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitSupersedeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A new factor: the unit is superseded by a new row that takes its flags and barcodes (ADR-0008).",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-units/{id}/retire": {
+      "post": {
+        "operationId": "ProductUnits_retire",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductUnit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-units/{id}/barcodes": {
+      "post": {
+        "operationId": "ProductUnits_addBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BarcodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Barcode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-units/{id}/internal-barcode": {
+      "post": {
+        "operationId": "ProductUnits_internalBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Barcode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-barcodes/{id}/primary": {
+      "post": {
+        "operationId": "ProductUnits_primary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Barcode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-barcodes/{id}": {
+      "delete": {
+        "operationId": "ProductUnits_removeBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
     }
   },
   "info": {
@@ -2778,6 +3989,811 @@
           "expiresAt"
         ]
       },
+      "Uom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "System units only (PCS, BLOCK, BOX, KG)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "fractional": {
+            "type": "boolean",
+            "description": "Quantities of products based on this unit may have decimals"
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default e-Barimt measure unit"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "fractional",
+          "measureUnit"
+        ]
+      },
+      "UomList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uom"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null: the list is short"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "UomCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "fractional": {
+            "type": "boolean"
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "name",
+          "fractional"
+        ]
+      },
+      "UomUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "defaultClassificationCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default БҮНА code (7 digits)"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Products directly in this category"
+          },
+          "childCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "name",
+          "defaultClassificationCode",
+          "productCount",
+          "childCount"
+        ]
+      },
+      "CategoryList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null: the whole tree"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CategoryCreateRequest": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "defaultClassificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CategoryUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null moves it to the root"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "defaultClassificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
+          }
+        }
+      },
+      "Brand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "productCount"
+        ]
+      },
+      "BrandList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Brand"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null: the list is short"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "BrandRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ProductBaseUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "uomId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "uomId",
+          "uomName"
+        ]
+      },
+      "ProductSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/ProductBaseUnit"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "brandId",
+          "status",
+          "vatType",
+          "cityTax",
+          "baseUnit",
+          "thumbUrl"
+        ]
+      },
+      "ProductPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "NextSku": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "example": "10024"
+          }
+        },
+        "required": [
+          "sku"
+        ]
+      },
+      "Barcode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "gtin14": {
+            "type": "string",
+            "nullable": true
+          },
+          "barcodeType": {
+            "enum": [
+              "GS1",
+              "ISBN",
+              "UNDEFINED"
+            ],
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "The barcode e-Barimt lines carry for the unit"
+          },
+          "isInternal": {
+            "type": "boolean",
+            "description": "Issued by the system (EAN-13 prefix 20)"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "gtin14",
+          "barcodeType",
+          "isPrimary",
+          "isInternal"
+        ]
+      },
+      "ProductUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "uomId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "uomCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "fractional": {
+            "type": "boolean",
+            "description": "Whether quantities of the product may have decimals"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24"
+          },
+          "isBase": {
+            "type": "boolean"
+          },
+          "isDefaultSales": {
+            "type": "boolean"
+          },
+          "isDefaultPurchase": {
+            "type": "boolean"
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveMeasureUnit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Own value or the unit-of-measure default"
+          },
+          "supersededBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "supersededAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Set = superseded or retired"
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Barcode"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "uomId",
+          "uomName",
+          "uomCode",
+          "fractional",
+          "factorToBase",
+          "isBase",
+          "isDefaultSales",
+          "isDefaultPurchase",
+          "measureUnit",
+          "effectiveMeasureUnit",
+          "supersededBy",
+          "supersededAt",
+          "barcodes"
+        ]
+      },
+      "ProductImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "thumbUrl",
+          "isPrimary",
+          "sortOrder"
+        ]
+      },
+      "ProductDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "tracksLots": {
+            "type": "boolean"
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg per base unit"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "units": {
+            "description": "Current units first, then superseded or retired ones",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductUnit"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImage"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "brandId",
+          "vatType",
+          "cityTax",
+          "classificationCode",
+          "taxProductCode",
+          "status",
+          "tracksLots",
+          "weightKg",
+          "createdAt",
+          "updatedAt",
+          "units",
+          "images"
+        ]
+      },
+      "UnitRequest": {
+        "type": "object",
+        "properties": {
+          "uomId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Base units in one of this unit"
+          },
+          "isDefaultSales": {
+            "type": "boolean"
+          },
+          "isDefaultPurchase": {
+            "type": "boolean"
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          },
+          "barcodes": {
+            "maxItems": 10,
+            "description": "Barcodes as printed or scanned",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        },
+        "required": [
+          "uomId",
+          "factorToBase"
+        ]
+      },
+      "ProductCreateRequest": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "pattern": "^[0-9]{1,20}$",
+            "description": "Omitted: the next free number"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string",
+            "default": "VAT_ABLE"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "null = not decided yet"
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{3}$"
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,8}(\\.\\d{1,4})?$",
+            "description": "kg per base unit"
+          },
+          "baseUomId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "baseMeasureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          },
+          "baseBarcodes": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "units": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitRequest"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "categoryId",
+          "baseUomId"
+        ]
+      },
+      "ProductUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "pattern": "^[0-9]{1,20}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{3}$"
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,8}(\\.\\d{1,4})?$"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "UnitUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "isDefaultSales": {
+            "type": "boolean"
+          },
+          "isDefaultPurchase": {
+            "type": "boolean"
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          }
+        }
+      },
+      "UnitSupersedeRequest": {
+        "type": "object",
+        "properties": {
+          "factorToBase": {
+            "type": "string",
+            "example": "20",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$"
+          }
+        },
+        "required": [
+          "factorToBase"
+        ]
+      },
+      "BarcodeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -2813,6 +4829,14 @@
           "SETTING_MISSING",
           "FILE_NOT_UPLOADED",
           "FILE_KIND_MISMATCH",
+          "IN_USE",
+          "CATEGORY_CYCLE",
+          "CATEGORY_NOT_EMPTY",
+          "UNIT_FACTOR_INEXACT",
+          "UNIT_BASE_LOCKED",
+          "BARCODE_INVALID",
+          "BARCODE_TAKEN",
+          "BARCODE_AMBIGUOUS",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

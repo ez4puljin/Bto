@@ -8,7 +8,7 @@ import {
   isFileKind,
   matchesMagicBytes,
 } from '@tugeel/shared/files';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -186,6 +186,19 @@ export class StorageService {
   /** The stable URL of a public file (READY files only are served). */
   publicUrl(file: Pick<StoredFile, 'key'>): string {
     return `${PUBLIC_FILES_PATH}/${file.key}`;
+  }
+
+  /** Public URLs of READY files by id, for lists that show images (missing ids are left out). */
+  async publicUrls(
+    fileIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    if (fileIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ id: files.id, key: files.key })
+      .from(files)
+      .where(and(inArray(files.id, [...fileIds]), eq(files.status, 'READY')));
+    return new Map(rows.map((row) => [row.id, this.publicUrl(row)]));
   }
 
   /** The bytes of a READY file of a public kind, or null; used by the public route. */

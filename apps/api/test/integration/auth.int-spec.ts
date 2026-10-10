@@ -292,7 +292,9 @@ describe('authentication (ADR-0027)', () => {
       const user = await seedUser(app);
       const { cookie } = await login(app, user);
       await sql.query(
-        `UPDATE auth_sessions SET expires_at = created_at + interval '1 millisecond' WHERE user_id = $1`,
+        // Well in the past for both clocks: the database container's clock may run ahead of ours.
+        `UPDATE auth_sessions SET created_at = now() - interval '2 hours', expires_at = now() - interval '1 hour'
+          WHERE user_id = $1`,
         [user.id],
       );
       const response = await http()
@@ -422,7 +424,7 @@ describe('authentication (ADR-0027)', () => {
         .send({ username: user.username, code: replaced, newPassword: 'my-own-password-1' })
         .expect(400);
       await sql.query(
-        `UPDATE password_resets SET expires_at = created_at + interval '1 millisecond'
+        `UPDATE password_resets SET created_at = now() - interval '2 hours', expires_at = now() - interval '1 hour'
           WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL`,
         [user.id],
       );

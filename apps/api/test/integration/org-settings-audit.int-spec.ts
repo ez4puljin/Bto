@@ -193,7 +193,8 @@ describe('branches, warehouses, settings, audit and idempotency', () => {
         (response.body as { sessionExpiresAt: string }).sessionExpiresAt,
       );
       expect(sessionEnd - Date.now()).toBeGreaterThan(2 * 3600_000 - 60_000);
-      expect(sessionEnd - Date.now()).toBeLessThanOrEqual(2 * 3600_000);
+      // The end comes from the database clock, which may run a little ahead of ours.
+      expect(sessionEnd - Date.now()).toBeLessThanOrEqual(2 * 3600_000 + 5_000);
     });
   });
 
