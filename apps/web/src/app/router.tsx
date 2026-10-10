@@ -6,6 +6,11 @@ import { RouteErrorBoundary } from '@/app/route-error-boundary';
 import { AccountPage } from '@/features/auth/account-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { SetPasswordPage } from '@/features/auth/set-password-page';
+import { BrandsPage, CategoriesPage, UomsPage } from '@/features/catalog/masters-pages';
+import { ProductCreatePage } from '@/features/catalog/product-create-page';
+import { ProductPage } from '@/features/catalog/product-page';
+import { ProductsPage } from '@/features/catalog/products-page';
+import { ReadinessPage } from '@/features/catalog/readiness-page';
 import { AuditPage } from '@/features/identity/audit-page';
 import { BranchesPage, WarehousesPage } from '@/features/identity/org-pages';
 import { RolesPage } from '@/features/identity/roles-page';
@@ -30,6 +35,27 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/system/status" replace /> },
       { path: 'system/status', element: <SystemStatusPage /> },
       { path: 'account', element: <AccountPage /> },
+      { path: 'catalog/products', element: <ProductsPage /> },
+      {
+        path: 'catalog/products/new',
+        element: (
+          <RequirePermission permission="catalog.products.manage">
+            <ProductCreatePage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'catalog/products/:id', element: <ProductPage /> },
+      { path: 'catalog/categories', element: <CategoriesPage /> },
+      { path: 'catalog/brands', element: <BrandsPage /> },
+      { path: 'catalog/uoms', element: <UomsPage /> },
+      {
+        path: 'catalog/ebarimt',
+        element: (
+          <RequirePermission permission="catalog.ebarimt.manage">
+            <ReadinessPage />
+          </RequirePermission>
+        ),
+      },
       {
         path: 'users',
         element: (
