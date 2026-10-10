@@ -6,7 +6,7 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import type { Actor } from '../auth-context';
-import { branches, warehouses, type WarehouseKind } from '../schema';
+import { branches, TRANSIT_CODE, warehouses, type WarehouseKind } from '../schema';
 import { AuditService } from './audit.service';
 
 export type Branch = typeof branches.$inferSelect;
@@ -36,7 +36,6 @@ export interface WarehousePatch {
 
 /** Kinds an admin may create or edit through the API; VEHICLE comes with vehicles (delivery 5). */
 const ADMIN_KINDS: readonly WarehouseKind[] = ['WHOLESALE', 'STORE'];
-export const TRANSIT_CODE = 'TRANSIT';
 
 /**
  * Called inside the transaction that creates a warehouse. The inventory module provides it in

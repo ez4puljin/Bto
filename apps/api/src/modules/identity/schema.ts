@@ -145,6 +145,8 @@ export const branches = pgTable(
 
 export const WAREHOUSE_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
 export type WarehouseKind = (typeof WAREHOUSE_KINDS)[number];
+/** Code of the single system TRANSIT warehouse; reserved for it. */
+export const TRANSIT_CODE = 'TRANSIT';
 
 export const warehouses = pgTable(
   'warehouses',

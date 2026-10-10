@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { Client } from 'pg';
 import { AppModule } from '../../src/app.module';
-import { configureHttpApp } from '../../src/http-app';
+import { configureHttpApp, HTTP_APP_OPTIONS } from '../../src/http-app';
 import { WorkerModule } from '../../src/worker.module';
 
 export interface HttpAppOptions {
@@ -23,7 +23,7 @@ export async function createHttpApp(options: HttpAppOptions = {}): Promise<NestE
     providers: options.providers ?? [],
   });
   const moduleRef = await (options.override ? options.override(base) : base).compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
+  const app = moduleRef.createNestApplication<NestExpressApplication>(HTTP_APP_OPTIONS);
   configureHttpApp(app);
   await app.init();
   return app;

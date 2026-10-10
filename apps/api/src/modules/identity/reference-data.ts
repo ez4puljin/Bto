@@ -6,8 +6,9 @@ import {
 } from '@tugeel/shared/auth';
 import { and, eq, notInArray, sql } from 'drizzle-orm';
 import type { Tx } from '../../common/db/db.types';
-import { permissions, rolePermissions, roles, warehouses } from './schema';
-import { TRANSIT_CODE, type Warehouse } from './services/org.service';
+import { permissions, rolePermissions, roles, TRANSIT_CODE, warehouses } from './schema';
+
+type Warehouse = typeof warehouses.$inferSelect;
 
 /** Serialises concurrent boots (api replicas, the CLI) while they sync reference rows. */
 const REFERENCE_DATA_LOCK = 72_026_102;

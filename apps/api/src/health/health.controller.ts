@@ -1,11 +1,13 @@
 import { Controller, Get, Header, HttpStatus, Res } from '@nestjs/common';
 import { ApiOkResponse, ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { Public } from '../common/auth/public.decorator';
 import { HealthResponseDto } from './health.dto';
 import { HealthService } from './health.service';
 
 /** Liveness and dependency status: public, cheap, outside /api/v1 (docs/architecture.md §11). */
 @ApiTags('health')
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}

@@ -5,13 +5,14 @@ import { dirname, resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from '../app.module';
-import { configureHttpApp } from '../http-app';
+import { configureHttpApp, HTTP_APP_OPTIONS } from '../http-app';
 import { buildOpenApiDocument } from './openapi';
 
 /** `node dist/openapi/export-openapi.js <out.json>`; runs on `nest build` output (swagger plugin metadata). */
 async function main(): Promise<void> {
   const out = resolve(process.argv[2] ?? 'openapi.json');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    ...HTTP_APP_OPTIONS,
     logger: false,
     abortOnError: false,
   });

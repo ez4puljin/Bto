@@ -18,6 +18,6 @@ tools
 **/.env
 **/.env.*
 !**/.env.example
-.data
+**/.data
 tmp
 CLAUDE.local.md

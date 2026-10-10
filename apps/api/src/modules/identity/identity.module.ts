@@ -1,11 +1,21 @@
 import { Inject, Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
+import { AppConfig } from '../../common/config/app-config';
 import { DB } from '../../common/db/db.tokens';
 import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
+import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
+import { AuthController } from './controllers/auth.controller';
+import { AuthGuard } from './guards/auth.guard';
 import { ensureTransitWarehouse, syncAccessCatalog } from './reference-data';
+import { AccessService } from './services/access.service';
 import { AuditService } from './services/audit.service';
+import { AuthService } from './services/auth.service';
+import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/login-limiter.service';
 import { NumberingService } from './services/numbering.service';
 import { OrgService } from './services/org.service';
+import { PasswordHasher } from './services/password-hasher.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
 
@@ -32,6 +42,42 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   }
 }
 
-/** The HTTP side of identity (api only): boot sync now; guards and controllers from phase 4 on. */
-@Module({ imports: [IdentityModule], providers: [IdentityBootstrap] })
+/**
+ * The HTTP side of identity (api only): the global fail-closed AuthGuard, JWT signing, the login
+ * limiter, the auth routes and the boot-time sync (ADR-0027).
+ */
+@Module({
+  imports: [
+    IdentityModule,
+    JwtModule.registerAsync({
+      inject: [AppConfig],
+      useFactory: (config: AppConfig) => ({
+        secret: config.require('JWT_SECRET'),
+        signOptions: {
+          algorithm: 'HS256',
+          expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
+        },
+        verifyOptions: {
+          algorithms: ['HS256'],
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
+          clockTolerance: 5,
+        },
+      }),
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [
+    IdentityBootstrap,
+    AccessService,
+    AuthService,
+    PasswordHasher,
+    LoginLimiter,
+    { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS },
+    { provide: APP_GUARD, useClass: AuthGuard },
+  ],
+  exports: [AccessService, AuthService, PasswordHasher],
+})
 export class IdentityHttpModule {}

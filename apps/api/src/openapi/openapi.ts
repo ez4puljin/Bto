@@ -11,6 +11,7 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('Tugeel API')
     .setVersion('1.0.0')
+    .addBearerAuth()
     .addGlobalResponse({
       status: 'default',
       description: 'RFC 9457 problem details',

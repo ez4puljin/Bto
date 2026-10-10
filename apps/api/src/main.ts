@@ -4,11 +4,11 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AppConfig } from './common/config/app-config';
-import { configureHttpApp } from './http-app';
+import { configureHttpApp, HTTP_APP_OPTIONS } from './http-app';
 import { buildOpenApiDocument } from './openapi/openapi';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, HTTP_APP_OPTIONS);
   configureHttpApp(app);
   // useProcessExit lets pino flush its transports before the process ends.
   app.enableShutdownHooks(['SIGTERM', 'SIGINT'], { useProcessExit: true });

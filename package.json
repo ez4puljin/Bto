@@ -36,7 +36,8 @@
     "build": "pnpm -r run --if-present build",
     "dev": "pnpm run build:packages && pnpm -r --parallel run \"/^dev(:.+)?$/\"",
     "ci:rehearse": "node scripts/ci-rehearse.mjs",
-    "docker:build": "docker build -f apps/api/Dockerfile -t ghcr.io/ez4puljin/bto-api:local . && docker build -f apps/web/Dockerfile -t ghcr.io/ez4puljin/bto-web:local ."
+    "docker:build": "docker build -f apps/api/Dockerfile -t ghcr.io/ez4puljin/bto-api:local . && docker build -f apps/web/Dockerfile -t ghcr.io/ez4puljin/bto-web:local .",
+    "user:create-admin": "pnpm run build:packages && pnpm --filter @tugeel/api run user:create-admin --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

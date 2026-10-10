@@ -31,7 +31,7 @@ Facts found while planning: `passport` (0.7.0, 2023) and `passport-jwt` (4.0.1, 
 9. **Passwords.**
    - **Hashing.** Passwords are argon2id over NFC-normalised text, at least 8 characters, never equal to the username, with no expiry.
    - **Setup and reset.** An admin never knows or sets a password: the admin issues a one-time code (30 minutes, 5 attempts, HMAC-SHA256 with `AUTH_PEPPER`, one live code per user), and the user sets their own password with it.
-   - **Throttling.** Login and code redemption are throttled per IP and username: 5 attempts per 15 minutes, then a 15-minute block.
+   - **Throttling.** Failed logins and failed code redemptions are counted per IP and username: after 5 failures in a rolling 15 minutes that pair waits until the window frees up (30 failures per IP across usernames), and successful logins are never counted.
    - **Lockout.** After 20 consecutive failures the account locks for 15 minutes, and an admin can unlock it.
    - **Uniform answers.** Wrong password, unknown user and a user without a password get the same 401.
 10. **Explicit actor.** Controllers pass the `AuthContext` from `@CurrentUser()` into services as a parameter, and services pass it to `AuditService.record(tx, actor, entry)`. No async context is used.
