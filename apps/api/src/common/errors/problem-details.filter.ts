@@ -1,6 +1,6 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { PROBLEM_CONTENT_TYPE, toProblem } from './problem-details';
+import { loggableError, PROBLEM_CONTENT_TYPE, toProblem } from './problem-details';
 
 /** Every error leaves the API as application/problem+json (ADR-0004). */
 @Catch()
@@ -20,7 +20,10 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       ...(requestId ? { requestId } : {}),
     });
     if (problem.status >= 500) {
-      this.logger.error({ err: exception, requestId: problem.requestId }, 'request failed');
+      this.logger.error(
+        { ...loggableError(exception), requestId: problem.requestId },
+        'request failed',
+      );
     }
     if (response.headersSent) return;
     response.status(problem.status).type(PROBLEM_CONTENT_TYPE).json(problem);

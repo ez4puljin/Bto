@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import type { ErrorCode } from '@tugeel/shared';
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import { AppError, type FieldError, type ProblemParams } from './app-error';
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
@@ -51,7 +52,50 @@ export function toProblem(error: unknown, context: ProblemContext): ProblemDetai
   if (http) {
     return build(CODE_BY_STATUS[http.status] ?? 'BAD_REQUEST', http.status, context, http.detail);
   }
+  const constraint = constraintViolation(error);
+  if (constraint) {
+    const params = constraint.name ? { constraint: constraint.name } : undefined;
+    return build(constraint.code, constraint.status, context, constraint.detail, params);
+  }
   return build('INTERNAL_ERROR', 500, context, 'Internal server error');
+}
+
+/** PostgreSQL SQLSTATEs that mean "the request conflicts with the data", not a server fault. */
+const CONSTRAINT_CODES: Readonly<Record<string, { code: ErrorCode; status: number }>> = {
+  '23505': { code: 'DUPLICATE_VALUE', status: 409 },
+  '23503': { code: 'CONFLICT', status: 409 },
+  '23514': { code: 'VALIDATION_FAILED', status: 422 },
+};
+
+/**
+ * The PostgreSQL error behind a failed query. Drizzle wraps it in DrizzleQueryError, whose message
+ * contains the bound parameters (password hashes, tokens): only the cause may be logged or mapped.
+ */
+export function databaseErrorOf(error: unknown): { code?: unknown; constraint?: unknown } | null {
+  const cause: unknown = error instanceof DrizzleQueryError ? error.cause : error;
+  if (typeof cause !== 'object' || cause === null) return null;
+  return 'severity' in cause && 'code' in cause ? cause : null;
+}
+
+function constraintViolation(
+  error: unknown,
+): { code: ErrorCode; status: number; name?: string; detail: string } | undefined {
+  const database = databaseErrorOf(error);
+  const sqlState = typeof database?.code === 'string' ? database.code : undefined;
+  const mapped = sqlState ? CONSTRAINT_CODES[sqlState] : undefined;
+  if (!mapped || !database) return undefined;
+  const name = typeof database.constraint === 'string' ? database.constraint : undefined;
+  return {
+    ...mapped,
+    ...(name ? { name } : {}),
+    detail: `constraint ${name ?? 'unknown'} (SQLSTATE ${sqlState ?? ''})`,
+  };
+}
+
+/** What the filter may log for an unexpected error: never a DrizzleQueryError with its params. */
+export function loggableError(error: unknown): { err: unknown; sql?: string } {
+  if (error instanceof DrizzleQueryError) return { err: error.cause, sql: error.query };
+  return { err: error };
 }
 
 function build(

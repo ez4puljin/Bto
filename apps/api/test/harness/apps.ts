@@ -1,4 +1,4 @@
-import type { INestApplicationContext, Type } from '@nestjs/common';
+import type { INestApplicationContext, Provider, Type } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { Client } from 'pg';
@@ -9,6 +9,8 @@ import { WorkerModule } from '../../src/worker.module';
 export interface HttpAppOptions {
   /** Extra controllers next to AppModule: probe routes for guard and interceptor tests. */
   controllers?: Type<unknown>[];
+  /** Extra providers, e.g. a WAREHOUSE_CREATED_HOOK probe. */
+  providers?: Provider[];
   /** Provider overrides, e.g. lower throttle limits. */
   override?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
 }
@@ -18,6 +20,7 @@ export async function createHttpApp(options: HttpAppOptions = {}): Promise<NestE
   const base = Test.createTestingModule({
     imports: [AppModule],
     controllers: options.controllers ?? [],
+    providers: options.providers ?? [],
   });
   const moduleRef = await (options.override ? options.override(base) : base).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });

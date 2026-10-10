@@ -22,3 +22,8 @@ export function businessYear(at: Date = new Date()): string {
 export function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && dayjs.utc(value).format('YYYY-MM-DD') === value;
 }
+
+/** A plain `YYYY-MM-DD` date moved by whole calendar days. */
+export function addDays(date: string, days: number): string {
+  return dayjs.utc(date).add(days, 'day').format('YYYY-MM-DD');
+}

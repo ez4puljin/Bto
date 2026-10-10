@@ -26,6 +26,8 @@ describe('logger redaction', () => {
         response: { body: { lottery: 'L2', qrData: 'qr-2', items: { lottery: 'L3' } } },
         req: { headers: { authorization: 'Bearer secret-token', cookie: 'sid=secret-cookie' } },
         password: 'p4ss',
+        body: { newPassword: 'n3w-pass', currentPassword: 'old-pass', setupCode: 'ABCDE-12345' },
+        user: { passwordHash: '$argon2id$hash', session: { tokenHash: 'tok-hash' } },
       },
       'receipt issued',
     );
@@ -36,6 +38,9 @@ describe('logger redaction', () => {
     expect(text).not.toContain('secret-token');
     expect(text).not.toContain('secret-cookie');
     expect(text).not.toContain('p4ss');
+    for (const secret of ['n3w-pass', 'old-pass', 'ABCDE-12345', '$argon2id$hash', 'tok-hash']) {
+      expect(text).not.toContain(secret);
+    }
     expect(text).toContain('keep-me-1');
   });
 });

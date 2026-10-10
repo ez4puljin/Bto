@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_TZ, businessDate, businessYear, isIsoDate } from './index';
+import { addDays, BUSINESS_TZ, businessDate, businessYear, isIsoDate } from './index';
 
 describe('business dates in Asia/Ulaanbaatar', () => {
   it('uses UTC+8 without daylight saving', () => {
@@ -20,5 +20,10 @@ describe('business dates in Asia/Ulaanbaatar', () => {
     expect(isIsoDate('2026-02-30')).toBe(false);
     expect(isIsoDate('2026-2-3')).toBe(false);
     expect(isIsoDate('2026-10-10T00:00:00Z')).toBe(false);
+  });
+
+  it('moves plain dates by calendar days', () => {
+    expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
   });
 });

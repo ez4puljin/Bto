@@ -9,7 +9,20 @@ const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
  * Defence in depth only: lottery/qrData (ADR-0017) and credentials must never be passed to a logger
  * in the first place. Request headers are never logged (see serializers).
  */
-const SENSITIVE_KEYS = ['lottery', 'qrData', 'password', 'refreshToken', 'accessToken', 'token'];
+const SENSITIVE_KEYS = [
+  'lottery',
+  'qrData',
+  'password',
+  'newPassword',
+  'currentPassword',
+  'passwordHash',
+  'refreshToken',
+  'accessToken',
+  'token',
+  'tokenHash',
+  'codeHash',
+  'setupCode',
+];
 export const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',

@@ -7,7 +7,6 @@ import {
   index,
   inet,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -16,6 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { jsonValue } from '../../common/db/types';
 
 // Tables owned by the identity module (docs/architecture.md §4, docs/modules/identity.md, ADR-0027).
 // Migration 0001_identity adds by hand what drizzle-kit cannot express: the audit_log REVOKE and
@@ -273,7 +273,7 @@ export const settings = pgTable(
   {
     id: id(),
     key: text('key').notNull(),
-    value: jsonb('value').notNull(),
+    value: jsonValue('value').notNull(),
     /** Ulaanbaatar business date from which the value applies. */
     effectiveFrom: date('effective_from', { mode: 'string' }).notNull(),
     createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, {
@@ -315,8 +315,8 @@ export const auditLog = pgTable(
     action: text('action').notNull(),
     entity: text('entity').notNull(),
     entityId: text('entity_id').notNull(),
-    before: jsonb('before'),
-    after: jsonb('after'),
+    before: jsonValue('before'),
+    after: jsonValue('after'),
     requestId: text('request_id'),
   },
   (t) => [
@@ -344,7 +344,7 @@ export const idempotencyKeys = pgTable(
     requestHash: text('request_hash').notNull(),
     status: text('status', { enum: ['IN_PROGRESS', 'COMPLETED'] }).notNull(),
     responseStatus: integer('response_status'),
-    responseBody: jsonb('response_body'),
+    responseBody: jsonValue('response_body'),
     createdAt: createdAt(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },

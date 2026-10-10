@@ -43,3 +43,14 @@ export const qty = decimalColumn(14, 3);
 export const cost = decimalColumn(14, 4);
 /** Unit conversion factors, NUMERIC(18,6). */
 export const factor = decimalColumn(18, 6);
+
+/**
+ * JSONB that round-trips every JSON value. Drizzle's own jsonb() runs JSON.parse a second time on
+ * string results, so a stored JSON string such as "10" would come back as the number 10;
+ * node-postgres has already parsed the column, so this type returns its value untouched.
+ */
+export const jsonValue = customType<{ data: unknown; driverData: unknown }>({
+  dataType: () => 'jsonb',
+  toDriver: (value: unknown): string => JSON.stringify(value),
+  fromDriver: (value: unknown): unknown => value,
+});
