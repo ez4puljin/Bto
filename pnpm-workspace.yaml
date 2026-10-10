@@ -8,6 +8,7 @@ packages:
 catalog:
   typescript: ~6.0.3
   '@types/node': 26.6.4
+  dayjs: 1.11.23
   decimal.js: 10.6.0
   tsx: 4.23.15
   vitest: 5.0.3

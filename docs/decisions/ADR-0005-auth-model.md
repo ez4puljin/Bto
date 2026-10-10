@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0027 (#1: a custom guard on `@nestjs/jwt` instead of passport; the access token carries no permissions or scopes) |
 
 ## Context
 

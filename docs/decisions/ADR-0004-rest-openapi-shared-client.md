@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0027 (#5: idempotency keys are unique per `(actor_kind, actor_id, key)`) |
 
 ## Context
 

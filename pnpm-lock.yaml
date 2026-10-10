@@ -198,6 +198,9 @@ catalogs:
     '@types/node':
       specifier: 26.6.4
       version: 26.6.4
+    dayjs:
+      specifier: 1.11.23
+      version: 1.11.23
     decimal.js:
       specifier: 10.6.0
       version: 10.6.0
@@ -382,7 +385,7 @@ importers:
         specifier: 0.4.0
         version: 0.4.0
       dayjs:
-        specifier: 1.11.23
+        specifier: 'catalog:'
         version: 1.11.23
       i18next:
         specifier: 26.4.2
@@ -470,6 +473,9 @@ importers:
 
   packages/shared:
     dependencies:
+      dayjs:
+        specifier: 'catalog:'
+        version: 1.11.23
       decimal.js:
         specifier: 'catalog:'
         version: 10.6.0

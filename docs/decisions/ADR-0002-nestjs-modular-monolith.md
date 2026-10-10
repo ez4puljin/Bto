@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0027 (#5: the actor reaches `AuditService.record` as an explicit `AuthContext`, not through an async context) |
 
 ## Context
 

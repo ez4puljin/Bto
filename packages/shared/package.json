@@ -22,6 +22,21 @@
       "types": "./dist/errors/index.d.ts",
       "default": "./dist/errors/index.js"
     },
+    "./auth": {
+      "@tugeel/source": "./src/auth/index.ts",
+      "types": "./dist/auth/index.d.ts",
+      "default": "./dist/auth/index.js"
+    },
+    "./settings": {
+      "@tugeel/source": "./src/settings/index.ts",
+      "types": "./dist/settings/index.d.ts",
+      "default": "./dist/settings/index.js"
+    },
+    "./time": {
+      "@tugeel/source": "./src/time/index.ts",
+      "types": "./dist/time/index.d.ts",
+      "default": "./dist/time/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },
@@ -36,6 +51,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "dayjs": "catalog:",
     "decimal.js": "catalog:"
   },
   "devDependencies": {

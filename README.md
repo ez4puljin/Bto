@@ -8,7 +8,7 @@ In-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog
 |---|---|
 | `docs/SPEC.md` (Mongolian) | scope, roles, glossary, user stories and acceptance criteria per module, business rules, first-deliverable cut line, roadmap, open questions |
 | `docs/architecture.md` | stack and version pins, repo layout, module boundaries, domain model, integrations (e-Barimt, QPay, scanners, printers), deploy, conventions for the agent |
-| `docs/decisions/` | ADR-0001 … ADR-0026; index, rules and template in `docs/decisions/README.md` |
+| `docs/decisions/` | ADR-0001 … ADR-0027; index, rules and template in `docs/decisions/README.md` |
 | `docs/STATUS.md` | progress per delivery, Week 0 checklist for the owner, pending decisions, the next-session prompt |
 | `CLAUDE.md` | the contract every Claude Code session reads first: pins, commands, ALWAYS / NEVER, docs map |
 

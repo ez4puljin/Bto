@@ -10,7 +10,8 @@ const common = {
   // Tests run the TypeScript source of workspace packages (ADR-0025); runtime uses the built dist.
   moduleNameMapper: {
     '^@tugeel/shared$': '<rootDir>/../../packages/shared/src/index.ts',
-    '^@tugeel/shared/(money|errors)$': '<rootDir>/../../packages/shared/src/$1/index.ts',
+    '^@tugeel/shared/(money|errors|auth|settings|time)$':
+      '<rootDir>/../../packages/shared/src/$1/index.ts',
   },
 };
 

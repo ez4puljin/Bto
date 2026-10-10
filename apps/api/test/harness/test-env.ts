@@ -67,6 +67,9 @@ export function applyWorkerEnv(project: DbProject): void {
     PGBOSS_POOL_MAX: '2',
     WORKER_HEALTH_PORT: '0',
     APP_VERSION: 'test',
+    JWT_SECRET: 'test-jwt-secret-0123456789abcdefghijklmnop',
+    AUTH_PEPPER: 'test-auth-pepper-0123456789abcdefghijklmnop',
+    COOKIE_SECURE: 'false',
   });
   delete process.env.ROLE;
   if (project === 'integrity') {

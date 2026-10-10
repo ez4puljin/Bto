@@ -1,0 +1,24 @@
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+/** Business dates (effective_date, report periods, billIdSuffix day) are Ulaanbaatar dates, UTC+8. */
+export const BUSINESS_TZ = 'Asia/Ulaanbaatar';
+
+/** The Ulaanbaatar calendar date of an instant as `YYYY-MM-DD`; never derive it from a UTC string. */
+export function businessDate(at: Date = new Date()): string {
+  return dayjs(at).tz(BUSINESS_TZ).format('YYYY-MM-DD');
+}
+
+/** The Ulaanbaatar calendar year of an instant, e.g. the `period` of yearly document numbers. */
+export function businessYear(at: Date = new Date()): string {
+  return dayjs(at).tz(BUSINESS_TZ).format('YYYY');
+}
+
+/** True for a real calendar date written as `YYYY-MM-DD`. */
+export function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && dayjs.utc(value).format('YYYY-MM-DD') === value;
+}

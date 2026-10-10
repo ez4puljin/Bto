@@ -27,17 +27,36 @@ export const EnvSchema = z.object({
   PGBOSS_POOL_MAX: z.coerce.number().int().min(1).max(10),
   /** Image tag or git sha, reported by /health. */
   APP_VERSION: z.string().trim().min(1).default('dev'),
+  /** HS256 key of the 15-minute access tokens (ADR-0027); api only. */
+  JWT_SECRET: z.string().min(32).optional(),
+  /** HMAC key of one-time password codes (ADR-0027); api only. */
+  AUTH_PEPPER: z.string().min(32).optional(),
+  /** `Secure` flag of the refresh cookie; defaults to true only in production (LAN http in dev). */
+  COOKIE_SECURE: z.stringbool().optional(),
 });
 
-export type Env = z.infer<typeof EnvSchema>;
+export type Env = Omit<z.infer<typeof EnvSchema>, 'COOKIE_SECURE'> & { COOKIE_SECURE: boolean };
+
+/** Secrets the api process cannot start without; the worker never signs or checks tokens. */
+const API_SECRETS = ['JWT_SECRET', 'AUTH_PEPPER'] as const;
 
 export function parseEnv(raw: Record<string, unknown>, role: ProcessRole): Env {
   const result = EnvSchema.safeParse(raw);
   if (!result.success) {
     throw new Error(`Invalid environment (${role}):\n${z.prettifyError(result.error)}`);
   }
-  if (result.data.ROLE && result.data.ROLE !== role) {
-    throw new Error(`ROLE=${result.data.ROLE} but this is the ${role} entrypoint`);
+  const data = result.data;
+  if (data.ROLE && data.ROLE !== role) {
+    throw new Error(`ROLE=${data.ROLE} but this is the ${role} entrypoint`);
   }
-  return result.data;
+  if (role === 'api') {
+    for (const key of API_SECRETS) {
+      const value = data[key];
+      if (!value) throw new Error(`Invalid environment (api): ${key} is required`);
+      if (data.NODE_ENV === 'production' && value.startsWith('dev-')) {
+        throw new Error(`Invalid environment (api): ${key} is a development placeholder`);
+      }
+    }
+  }
+  return { ...data, COOKIE_SECURE: data.COOKIE_SECURE ?? data.NODE_ENV === 'production' };
 }

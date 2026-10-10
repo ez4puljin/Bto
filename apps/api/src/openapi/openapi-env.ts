@@ -5,5 +5,7 @@ process.env.LOG_LEVEL = 'silent';
 process.env.DATABASE_URL ??= 'postgres://openapi:openapi@127.0.0.1:1/openapi';
 process.env.DB_POOL_MAX ??= '1';
 process.env.PGBOSS_POOL_MAX ??= '1';
+process.env.JWT_SECRET ??= 'openapi-export-placeholder-0123456789abcdef';
+process.env.AUTH_PEPPER ??= 'openapi-export-placeholder-0123456789abcdef';
 
 export {};
