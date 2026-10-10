@@ -25,6 +25,7 @@ export type ReadinessReport = Schemas['ReadinessReport'];
 export type ReadinessRow = Schemas['ReadinessRow'];
 export type ReadinessGap = ReadinessRow['missing'][number];
 export type AssignRequest = Schemas['ReadinessAssignRequest'];
+export type BarcodeResolution = Schemas['BarcodeResolution'];
 export type VatType = ProductDetail['vatType'];
 export type ProductStatus = ProductDetail['status'];
 
@@ -143,6 +144,15 @@ export function useReadinessProducts(filter: { gap?: ReadinessGap; categoryId?: 
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** Looks a scanned code up (ADR-0029); a mutation because every scan is a new question. */
+export function useBarcodeLookup() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: async (code: string) =>
+      unwrap(await api.GET('/api/v1/barcodes/{code}', { params: { path: { code } } })),
   });
 }
 

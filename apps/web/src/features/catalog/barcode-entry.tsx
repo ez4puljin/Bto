@@ -6,7 +6,7 @@ import { FieldError } from '@/components/field-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { layoutDigit } from '@/lib/barcode-keys';
+import { withLayoutDigit } from '@/lib/barcode-keys';
 import type { ValidationMessage } from '@/lib/forms';
 
 /**
@@ -44,13 +44,8 @@ export function BarcodeEntry(props: {
       void add();
       return;
     }
-    const digit = layoutDigit(event);
-    if (digit === null) return;
-    event.preventDefault();
-    const input = event.currentTarget;
-    const start = input.selectionStart ?? draft.length;
-    const end = input.selectionEnd ?? draft.length;
-    setDraft(`${draft.slice(0, start)}${digit}${draft.slice(end)}`);
+    const typed = withLayoutDigit(event, draft);
+    if (typed !== null) setDraft(typed);
   };
   const errorId = `${props.id}-error`;
   return (

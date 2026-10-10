@@ -507,3 +507,56 @@ describe('e-Barimt readiness', () => {
     expect(calls(fetchMock, 'GET', '/api/v1/catalog/ebarimt-readiness')).toHaveLength(0);
   });
 });
+
+describe('barcode lookup', () => {
+  const resolution: Schemas['BarcodeResolution'] = {
+    product: summary(7, '10023', 'Кока кола 0.5 л'),
+    unit: { id: 71, uomId: 3, uomName: 'хайрцаг', factorToBase: '24', isBase: false },
+    barcode: {
+      id: 710,
+      code: '2000000000015',
+      gtin14: '02000000000015',
+      barcodeType: 'UNDEFINED',
+      isPrimary: true,
+      isInternal: true,
+    },
+  };
+  const lookupRoutes = {
+    'GET /api/v1/barcodes/2000000000015': () => json(resolution),
+  };
+
+  it('shows the product and unit of a typed code, and says when a code is unknown', async () => {
+    const fetchMock = signedIn(WORKER_ME, lookupRoutes);
+    renderApp('/catalog/scan', fetchMock);
+    const user = userEvent.setup();
+    const box = await screen.findByRole('textbox', { name: mn.scan.label });
+    await user.type(box, ' 2000000000015 {Enter}');
+    expect(await screen.findByRole('link', { name: 'Кока кола 0.5 л' })).toHaveAttribute(
+      'href',
+      '/catalog/products/7',
+    );
+    expect(screen.getByText('1 хайрцаг = 24 ш')).toBeInTheDocument();
+    expect(box).toHaveValue('');
+
+    await user.type(box, '4006381333931{Enter}');
+    expect(
+      await screen.findByText(mn.scan.notFound.replace('{{code}}', '4006381333931')),
+    ).toBeInTheDocument();
+    // The earlier scan moves to the recent list.
+    expect(screen.getByRole('heading', { name: mn.scan.recent })).toBeInTheDocument();
+    // No camera in jsdom: the button stays hidden.
+    expect(screen.queryByRole('button', { name: mn.scan.camera })).toBeNull();
+  });
+
+  it('takes a keyboard-wedge scan while nothing is focused', async () => {
+    const fetchMock = signedIn(WORKER_ME, lookupRoutes);
+    renderApp('/catalog/scan', fetchMock);
+    await screen.findByRole('textbox', { name: mn.scan.label });
+    for (const key of '2000000000015') {
+      fireEvent.keyDown(document.body, { key, code: `Digit${key}` });
+    }
+    fireEvent.keyDown(document.body, { key: 'Enter', code: 'Enter' });
+    expect(await screen.findByRole('link', { name: 'Кока кола 0.5 л' })).toBeInTheDocument();
+    expect(calls(fetchMock, 'GET', '/api/v1/barcodes/2000000000015')).toHaveLength(1);
+  });
+});

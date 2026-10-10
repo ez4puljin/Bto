@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0031 (camera fallback: `barcode-detector` with self-hosted ZXing WebAssembly instead of `html5-qrcode`; wedge digits read by physical key) |
 
 ## Context
 

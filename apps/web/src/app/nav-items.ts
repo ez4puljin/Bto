@@ -29,6 +29,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/catalog/categories', label: 'nav.categories' },
       { to: '/catalog/brands', label: 'nav.brands' },
       { to: '/catalog/uoms', label: 'nav.uoms' },
+      { to: '/catalog/scan', label: 'nav.scan' },
       { to: '/catalog/ebarimt', label: 'nav.ebarimt', permission: 'catalog.ebarimt.manage' },
     ],
   },

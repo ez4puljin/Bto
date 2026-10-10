@@ -18,7 +18,7 @@ Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: ca
 
 ### 0.1 Version pins
 
-Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision; exact versions were confirmed on 2026-10-10 and are recorded in the `CLAUDE.md` pin table (Vite 8.3.4, React Router 7.18.4, pg-boss 12.37.1, decimal.js 10.6.0, i18next 26.4.2, nestjs-pino 5.3.1, openapi-typescript 7.13.0 / openapi-fetch 0.17.0; TanStack Table, argon2, pdfmake, ExcelJS, throttler, receipt-printer-encoder and html5-qrcode are pinned when first installed). Never upgrade a major inside a delivery session (§12).
+Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision; exact versions were confirmed on 2026-10-10 and are recorded in the `CLAUDE.md` pin table (Vite 8.3.4, React Router 7.18.4, pg-boss 12.37.1, decimal.js 10.6.0, i18next 26.4.2, nestjs-pino 5.3.1, openapi-typescript 7.13.0 / openapi-fetch 0.17.0; TanStack Table, argon2, pdfmake, ExcelJS, throttler and receipt-printer-encoder are pinned when first installed; the web camera fallback is `barcode-detector` 3.2.2 with `zxing-wasm` 3.1.3, ADR-0031). Never upgrade a major inside a delivery session (§12).
 
 | Verified pins (source-backed) | Pins to confirm on day 1 (`npm view`) |
 |---|---|
@@ -35,7 +35,7 @@ Left column: verified against primary sources on 2026-10-09. Right column: pinne
 | **TanStack Query 5.104.x** (5.104.1, 2026-10-02; no React v6). | **@nestjs/throttler** |
 | **shadcn/ui CLI 4.21.x**; Base UI became the default base in July 2026, Radix remains supported: `npx shadcn init -b radix` (decided; no revisit). Tailwind 4 baseline. | **openapi-typescript** + **openapi-fetch** |
 | **DO Managed PostgreSQL**: Standard 1 GiB $15.15, 2 GiB $30.45, 4 GiB $60.90; from 2026-10-15 (new accounts) / 2026-11-30 (all) Standard clusters cap at 4 GiB and cannot add standby nodes. Droplet 4 GiB / 2 vCPU $24. | **@point-of-sale/receipt-printer-encoder** (raster path) |
-| **EAS**: Free = 15+15 builds/month, EAS Update 1,000 MAU hard cap; Starter $19/mo (3,000 MAU, $0.005 per extra MAU). Budget Starter from the customer-app launch. | **html5-qrcode** (web camera fallback when `BarcodeDetector` is absent) |
+| **EAS**: Free = 15+15 builds/month, EAS Update 1,000 MAU hard cap; Starter $19/mo (3,000 MAU, $0.005 per extra MAU). Budget Starter from the customer-app launch. | **barcode-detector** 3.2.2 with self-hosted `zxing-wasm` 3.1.3 (web camera fallback when `BarcodeDetector` is absent; ADR-0031) |
 
 ---
 
@@ -594,7 +594,7 @@ The POS checkout screen awaits step 3 (budget 60–90 s with a progress state); 
 - One Expo project (created at delivery 4); `app.config.ts` reads `APP_VARIANT` → bundle ids, names, icons. `customer` (public listing, iOS + Android) and `staff` (Android-first, EAS internal distribution APK + Play internal track; iOS later). Staff route groups are gated by role at runtime and hidden in the customer variant; API permissions are the real boundary, so bundling both groups is acceptable and build-time exclusion is an optimisation evaluated at delivery-4 kickoff.
 - **SDK**: the current stable Expo SDK at delivery-4 kickoff (expected 58 or 59), recorded in `docs/modules/mobile.md` with the date; any earlier Expo scaffold is disposable (M9, F8). Development builds only, never Expo Go.
 - **`useScanner` hook** (M11): hidden always-focused `TextInput` (`showSoftInputOnFocus={false}`) for keyboard-wedge scanners (Bluetooth HID guns, Android handhelds in keyboard mode; standardise US layout + Enter suffix) with `expo-camera` `CameraView` fallback limited to `ean13, ean8, code128, qr, itf14, upc_a, upc_e`, cooldown after a hit and double-read confirmation; results pass through `packages/shared/gtin.ts` before lookup. Vendor SDKs (DataWedge, Sunmi broadcast) can be added behind the same hook.
-- **Delivery-1 web scanning** (M15): the admin's receiving/stocktake/picking screens have a visible scan box fed by a global keydown burst detector (onScan.js defaults: Enter suffix, min length 4) for USB/Bluetooth HID scanners, plus a browser camera scanner using the `BarcodeDetector` API on Chrome Android with `html5-qrcode` as fallback. Two Bluetooth HID scanners are ordered on day 1 so they arrive for the delivery-1 acceptance.
+- **Delivery-1 web scanning** (M15): the admin's receiving/stocktake/picking screens have a visible scan box fed by a global keydown burst detector (onScan.js defaults: Enter suffix, min length 4) for USB/Bluetooth HID scanners, plus a browser camera scanner using the `BarcodeDetector` API on Chrome Android with the `barcode-detector` ponyfill (ZXing WebAssembly served from our own build, ADR-0031) as fallback. Number-row keys are read from `event.code`, so scans stay digits when the PC uses the Mongolian keyboard layout. Two Bluetooth HID scanners are ordered on day 1 so they arrive for the delivery-1 acceptance.
 - TanStack Query with optimistic UI; `Idempotency-Key` on all mutations; short-lived catalog cache. True offline is out of scope (ADR-0020).
 - EAS Build (owner is on Windows; no Xcode), EAS Update for JS-only fixes. Budget EAS Starter ($19/mo) from the customer-app launch. Org accounts (D-U-N-S, Apple $99/yr, Google $25) and the Expo org start in Week 0.
 
@@ -616,7 +616,7 @@ Prod `merchant.qpay.mn`, sandbox `merchant-sandbox.qpay.mn` (shared sandbox cred
 
 ### 9.3 Scanners
 
-Keyboard-wedge first everywhere (web global keydown detector; mobile hidden TextInput), camera fallback (web `BarcodeDetector`/html5-qrcode; mobile expo-camera). Standardise US layout + Enter suffix. Week 0/1 purchases: two Bluetooth HID scanners (day 1), one keyboard-wedge Android handheld, one Android POS-style device with built-in printer, one dual-mode (Classic + BLE) 58 mm Bluetooth printer, one Ethernet label printer with documented TSPL/ZPL, one Ethernet 80 mm receipt printer. Specific models are chosen after the week-1 hardware test, not in this document (M14).
+Keyboard-wedge first everywhere (web global keydown detector; mobile hidden TextInput), camera fallback (web `BarcodeDetector` / `barcode-detector` ponyfill, ADR-0031; mobile expo-camera). Standardise US layout + Enter suffix. Week 0/1 purchases: two Bluetooth HID scanners (day 1), one keyboard-wedge Android handheld, one Android POS-style device with built-in printer, one dual-mode (Classic + BLE) 58 mm Bluetooth printer, one Ethernet label printer with documented TSPL/ZPL, one Ethernet 80 mm receipt printer. Specific models are chosen after the week-1 hardware test, not in this document (M14).
 
 ### 9.4 Printers
 

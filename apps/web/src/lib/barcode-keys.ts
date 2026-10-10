@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from 'react';
+
 /** The parts of a KeyboardEvent the digit mapping reads. */
 export interface KeyInfo {
   key: string;
@@ -21,4 +23,18 @@ export function layoutDigit(event: KeyInfo): string | null {
   if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return null;
   const digit = DIGIT_KEY.exec(event.code)?.[1];
   return digit !== undefined && event.key !== digit ? digit : null;
+}
+
+/**
+ * For a barcode input's keydown: the text with the layout digit typed at the caret (the key's own
+ * symbol is suppressed), or null to let the key through unchanged.
+ */
+export function withLayoutDigit(event: KeyboardEvent<HTMLInputElement>, value: string) {
+  const digit = layoutDigit(event);
+  if (digit === null) return null;
+  event.preventDefault();
+  const input = event.currentTarget;
+  const start = input.selectionStart ?? value.length;
+  const end = input.selectionEnd ?? value.length;
+  return `${value.slice(0, start)}${digit}${value.slice(end)}`;
 }
