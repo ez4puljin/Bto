@@ -1,0 +1,359 @@
+import { sql } from 'drizzle-orm';
+import {
+  bigint,
+  boolean,
+  check,
+  date,
+  index,
+  inet,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+// Tables owned by the identity module (docs/architecture.md §4, docs/modules/identity.md, ADR-0027).
+// Migration 0001_identity adds by hand what drizzle-kit cannot express: the audit_log REVOKE and
+// its append-only triggers. Reference rows (permissions, system roles, TRANSIT) are synced by the
+// api at boot, never by a migration.
+
+const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
+const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
+
+export const users = pgTable(
+  'users',
+  {
+    id: id(),
+    username: text('username').notNull(),
+    fullName: text('full_name').notNull(),
+    phone: text('phone'),
+    /** argon2id; NULL until the user redeems a one-time code. */
+    passwordHash: text('password_hash'),
+    status: text('status', { enum: ['ACTIVE', 'DISABLED'] })
+      .notNull()
+      .default('ACTIVE'),
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('users_username_key').on(t.username),
+    check('users_username_format', sql`${t.username} ~ '^[a-z0-9][a-z0-9._-]{2,31}$'`),
+    check('users_full_name_present', sql`length(btrim(${t.fullName})) > 0`),
+    check('users_phone_e164', sql`${t.phone} IS NULL OR ${t.phone} ~ '^[+]976[0-9]{8}$'`),
+    check('users_status', sql`${t.status} IN ('ACTIVE', 'DISABLED')`),
+    check('users_failed_login_count', sql`${t.failedLoginCount} >= 0`),
+  ],
+);
+
+export const permissions = pgTable('permissions', {
+  code: text('code').primaryKey(),
+});
+
+export const roles = pgTable(
+  'roles',
+  {
+    id: id(),
+    /** System roles only (ADMIN, OFFICE, …); custom roles are identified by id and name. */
+    code: text('code'),
+    /** Custom roles only; system roles are labelled through i18n by code. */
+    name: text('name'),
+    isSystem: boolean('is_system').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('roles_code_key').on(t.code),
+    uniqueIndex('roles_name_key')
+      .on(sql`lower(${t.name})`)
+      .where(sql`${t.name} IS NOT NULL`),
+    check(
+      'roles_system_or_custom',
+      sql`(${t.isSystem} AND ${t.code} IS NOT NULL AND ${t.name} IS NULL)
+        OR (NOT ${t.isSystem} AND ${t.code} IS NULL AND length(btrim(${t.name})) > 0)`,
+    ),
+  ],
+);
+
+export const rolePermissions = pgTable(
+  'role_permissions',
+  {
+    roleId: bigint('role_id', { mode: 'number' })
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    permissionCode: text('permission_code')
+      .notNull()
+      .references(() => permissions.code, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.roleId, t.permissionCode] })],
+);
+
+export const userRoles = pgTable(
+  'user_roles',
+  {
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    roleId: bigint('role_id', { mode: 'number' })
+      .notNull()
+      .references(() => roles.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.roleId] }),
+    index('user_roles_role_id_idx').on(t.roleId),
+  ],
+);
+
+export const branches = pgTable(
+  'branches',
+  {
+    id: id(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** e-Barimt branch number (3 digits); required when receipts are issued (delivery 3). */
+    branchNo: text('branch_no'),
+    /** e-Barimt district code (4 digits). */
+    districtCode: text('district_code'),
+    address: text('address'),
+    status: text('status', { enum: ['ACTIVE', 'INACTIVE'] })
+      .notNull()
+      .default('ACTIVE'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('branches_code_key').on(t.code),
+    check('branches_code_format', sql`${t.code} ~ '^[A-Z0-9][A-Z0-9_-]{0,15}$'`),
+    check('branches_name_present', sql`length(btrim(${t.name})) > 0`),
+    check('branches_branch_no', sql`${t.branchNo} IS NULL OR ${t.branchNo} ~ '^[0-9]{3}$'`),
+    check(
+      'branches_district_code',
+      sql`${t.districtCode} IS NULL OR ${t.districtCode} ~ '^[0-9]{4}$'`,
+    ),
+    check('branches_status', sql`${t.status} IN ('ACTIVE', 'INACTIVE')`),
+  ],
+);
+
+export const WAREHOUSE_KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
+export type WarehouseKind = (typeof WAREHOUSE_KINDS)[number];
+
+export const warehouses = pgTable(
+  'warehouses',
+  {
+    id: id(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: WAREHOUSE_KINDS }).notNull(),
+    /** NULL only for the single TRANSIT warehouse. */
+    branchId: bigint('branch_id', { mode: 'number' }).references(() => branches.id),
+    status: text('status', { enum: ['ACTIVE', 'INACTIVE'] })
+      .notNull()
+      .default('ACTIVE'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('warehouses_code_key').on(t.code),
+    uniqueIndex('warehouses_one_transit')
+      .on(t.kind)
+      .where(sql`${t.kind} = 'TRANSIT'`),
+    index('warehouses_branch_id_idx').on(t.branchId),
+    check('warehouses_code_format', sql`${t.code} ~ '^[A-Z0-9][A-Z0-9_-]{0,15}$'`),
+    check('warehouses_name_present', sql`length(btrim(${t.name})) > 0`),
+    check('warehouses_kind', sql`${t.kind} IN ('WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT')`),
+    check(
+      'warehouses_transit_has_no_branch',
+      sql`(${t.kind} = 'TRANSIT') = (${t.branchId} IS NULL)`,
+    ),
+    check('warehouses_status', sql`${t.status} IN ('ACTIVE', 'INACTIVE')`),
+  ],
+);
+
+/** A user with no rows here may write for every warehouse; reads are never scoped (ADR-0027 #7). */
+export const userScopes = pgTable(
+  'user_scopes',
+  {
+    id: id(),
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    branchId: bigint('branch_id', { mode: 'number' }).references(() => branches.id),
+    warehouseId: bigint('warehouse_id', { mode: 'number' }).references(() => warehouses.id),
+  },
+  (t) => [
+    unique('user_scopes_target_key').on(t.userId, t.branchId, t.warehouseId).nullsNotDistinct(),
+    check('user_scopes_one_target', sql`num_nonnulls(${t.branchId}, ${t.warehouseId}) = 1`),
+  ],
+);
+
+export const SESSION_REVOKE_REASONS = [
+  'LOGOUT',
+  'LOGOUT_ALL',
+  'ADMIN',
+  'PASSWORD_CHANGED',
+  'USER_DISABLED',
+  'TOKEN_REUSE',
+] as const;
+export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[number];
+
+/** One row per login (device); the refresh token rotates inside it (ADR-0005, ADR-0027 #8). */
+export const authSessions = pgTable(
+  'auth_sessions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`uuidv7()`),
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** SHA-256 (hex) of the current refresh token. */
+    tokenHash: text('token_hash').notNull(),
+    previousTokenHash: text('previous_token_hash'),
+    rotatedAt: timestamp('rotated_at', { withTimezone: true }),
+    userAgent: text('user_agent'),
+    ip: inet('ip'),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Fixed at login: login time + auth.staff_session_hours; a refresh never moves it. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedReason: text('revoked_reason', { enum: SESSION_REVOKE_REASONS }),
+  },
+  (t) => [
+    index('auth_sessions_user_id_idx').on(t.userId),
+    check(
+      'auth_sessions_revoked_reason',
+      sql`(${t.revokedAt} IS NULL) = (${t.revokedReason} IS NULL)
+        AND (${t.revokedReason} IS NULL OR ${t.revokedReason} IN
+          ('LOGOUT', 'LOGOUT_ALL', 'ADMIN', 'PASSWORD_CHANGED', 'USER_DISABLED', 'TOKEN_REUSE'))`,
+    ),
+    check('auth_sessions_expiry', sql`${t.expiresAt} > ${t.createdAt}`),
+  ],
+);
+
+/** One-time codes an admin issues so a user can set their own password (ADR-0027 #9). */
+export const passwordResets = pgTable(
+  'password_resets',
+  {
+    id: id(),
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** HMAC-SHA256(AUTH_PEPPER, normalised code), hex. */
+    codeHash: text('code_hash').notNull(),
+    createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('password_resets_one_live')
+      .on(t.userId)
+      .where(sql`${t.usedAt} IS NULL AND ${t.revokedAt} IS NULL`),
+    check('password_resets_attempts', sql`${t.attempts} >= 0`),
+  ],
+);
+
+/** Effective-dated settings; a row is never updated (SPEC §5.1, ADR-0010 #7). */
+export const settings = pgTable(
+  'settings',
+  {
+    id: id(),
+    key: text('key').notNull(),
+    value: jsonb('value').notNull(),
+    /** Ulaanbaatar business date from which the value applies. */
+    effectiveFrom: date('effective_from', { mode: 'string' }).notNull(),
+    createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('settings_key_effective_from_key').on(t.key, t.effectiveFrom)],
+);
+
+/** Gap-free document numbers per (scope, period), allocated inside the posting tx (ADR-0002 #7). */
+export const numberSequences = pgTable(
+  'number_sequences',
+  {
+    scopeKey: text('scope_key').notNull(),
+    period: text('period').notNull(),
+    lastValue: bigint('last_value', { mode: 'number' }).notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scopeKey, t.period] }),
+    check('number_sequences_last_value', sql`${t.lastValue} >= 0`),
+  ],
+);
+
+export const AUDIT_ACTOR_KINDS = ['STAFF', 'CUSTOMER', 'SYSTEM'] as const;
+export type AuditActorKind = (typeof AUDIT_ACTOR_KINDS)[number];
+
+/** Append-only (REVOKE + forbid_update_delete triggers in 0001_identity). */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: id(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    actorKind: text('actor_kind', { enum: AUDIT_ACTOR_KINDS }).notNull(),
+    /** users.id for STAFF (customer_users.id from delivery 6); NULL for SYSTEM. */
+    actorId: bigint('actor_id', { mode: 'number' }),
+    /** For SYSTEM actors: the job or CLI that acted. */
+    actorLabel: text('actor_label'),
+    action: text('action').notNull(),
+    entity: text('entity').notNull(),
+    entityId: text('entity_id').notNull(),
+    before: jsonb('before'),
+    after: jsonb('after'),
+    requestId: text('request_id'),
+  },
+  (t) => [
+    index('audit_log_entity_idx').on(t.entity, t.entityId, t.id),
+    index('audit_log_actor_idx').on(t.actorId, t.id),
+    check('audit_log_actor_kind', sql`${t.actorKind} IN ('STAFF', 'CUSTOMER', 'SYSTEM')`),
+    check(
+      'audit_log_actor',
+      sql`(${t.actorKind} = 'SYSTEM' AND ${t.actorId} IS NULL)
+        OR (${t.actorKind} <> 'SYSTEM' AND ${t.actorId} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/** Replay store for `Idempotency-Key` requests (ADR-0002 #6, ADR-0004 #5, ADR-0027 #11). */
+export const idempotencyKeys = pgTable(
+  'idempotency_keys',
+  {
+    id: id(),
+    actorKind: text('actor_kind', { enum: AUDIT_ACTOR_KINDS }).notNull(),
+    actorId: bigint('actor_id', { mode: 'number' }).notNull(),
+    key: uuid('key').notNull(),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    requestHash: text('request_hash').notNull(),
+    status: text('status', { enum: ['IN_PROGRESS', 'COMPLETED'] }).notNull(),
+    responseStatus: integer('response_status'),
+    responseBody: jsonb('response_body'),
+    createdAt: createdAt(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('idempotency_keys_actor_key').on(t.actorKind, t.actorId, t.key),
+    check('idempotency_keys_status', sql`${t.status} IN ('IN_PROGRESS', 'COMPLETED')`),
+    check(
+      'idempotency_keys_completed',
+      sql`(${t.status} = 'COMPLETED') = (${t.responseStatus} IS NOT NULL)`,
+    ),
+  ],
+);

@@ -1,14 +1,25 @@
-import type { INestApplicationContext } from '@nestjs/common';
+import type { INestApplicationContext, Type } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { Client } from 'pg';
 import { AppModule } from '../../src/app.module';
 import { configureHttpApp } from '../../src/http-app';
 import { WorkerModule } from '../../src/worker.module';
 
+export interface HttpAppOptions {
+  /** Extra controllers next to AppModule: probe routes for guard and interceptor tests. */
+  controllers?: Type<unknown>[];
+  /** Provider overrides, e.g. lower throttle limits. */
+  override?: (builder: TestingModuleBuilder) => TestingModuleBuilder;
+}
+
 /** The HTTP api exactly as main.ts configures it, on this worker's test database. */
-export async function createHttpApp(): Promise<NestExpressApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+export async function createHttpApp(options: HttpAppOptions = {}): Promise<NestExpressApplication> {
+  const base = Test.createTestingModule({
+    imports: [AppModule],
+    controllers: options.controllers ?? [],
+  });
+  const moduleRef = await (options.override ? options.override(base) : base).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
   configureHttpApp(app);
   await app.init();
