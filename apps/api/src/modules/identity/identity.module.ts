@@ -7,6 +7,8 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
+import { RolesController } from './controllers/roles.controller';
+import { UsersController } from './controllers/users.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { ensureTransitWarehouse, syncAccessCatalog } from './reference-data';
 import { AccessService } from './services/access.service';
@@ -16,8 +18,10 @@ import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/log
 import { NumberingService } from './services/numbering.service';
 import { OrgService } from './services/org.service';
 import { PasswordHasher } from './services/password-hasher.service';
+import { RolesService } from './services/roles.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
+import { UsersService } from './services/users.service';
 
 const CORE_SERVICES = [AuditService, NumberingService, OrgService, ScopeService, SettingsService];
 
@@ -68,13 +72,15 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UsersController, RolesController],
   providers: [
     IdentityBootstrap,
     AccessService,
     AuthService,
     PasswordHasher,
     LoginLimiter,
+    RolesService,
+    UsersService,
     { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],

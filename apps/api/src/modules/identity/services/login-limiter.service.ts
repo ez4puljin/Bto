@@ -55,6 +55,13 @@ export class LoginLimiter {
     this.failures.delete(this.keys(ip, username).user);
   }
 
+  /** An admin unlock also forgets the user's recent failures from every address. */
+  clearUser(username: string): void {
+    for (const key of [...this.failures.keys()]) {
+      if (key.startsWith('u:') && key.endsWith(`|${username}`)) this.failures.delete(key);
+    }
+  }
+
   private keys(ip: string | null, username: string) {
     const address = ip ?? 'unknown';
     return { user: `u:${address}|${username}`, ip: `i:${address}` };
