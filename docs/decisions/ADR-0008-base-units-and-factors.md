@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0029 (#1: `barcode_type` moves to each barcode, plus a primary barcode per unit) |
 
 ## Context
 

@@ -1519,7 +1519,9 @@
           "identity.org.manage",
           "identity.settings.read",
           "identity.settings.manage",
-          "identity.audit.read"
+          "identity.audit.read",
+          "catalog.products.manage",
+          "catalog.ebarimt.manage"
         ]
       },
       "RoleRef": {

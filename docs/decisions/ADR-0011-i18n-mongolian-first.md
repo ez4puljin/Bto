@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0028 (#4: strict and phonetic search keys, extended look-alike list) |
 
 ## Context
 

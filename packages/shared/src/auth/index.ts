@@ -13,6 +13,8 @@ export const PERMISSIONS = [
   'identity.settings.read',
   'identity.settings.manage',
   'identity.audit.read',
+  'catalog.products.manage',
+  'catalog.ebarimt.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
