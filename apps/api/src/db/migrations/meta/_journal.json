@@ -22,6 +22,13 @@
       "when": 1791660717167,
       "tag": "0002_identity_files",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791661141784,
+      "tag": "0003_catalog",
+      "breakpoints": true
     }
   ]
 }

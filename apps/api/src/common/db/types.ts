@@ -43,6 +43,8 @@ export const qty = decimalColumn(14, 3);
 export const cost = decimalColumn(14, 4);
 /** Unit conversion factors, NUMERIC(18,6). */
 export const factor = decimalColumn(18, 6);
+/** Weights in kilograms, NUMERIC(12,4) (e.g. the net weight of one piece). */
+export const weight = decimalColumn(12, 4);
 
 /**
  * JSONB that round-trips every JSON value. Drizzle's own jsonb() runs JSON.parse a second time on

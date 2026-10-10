@@ -4,30 +4,14 @@ import { parseArgs } from 'node:util';
 import { normalizeUsername, USERNAME_PATTERN } from '@tugeel/shared/auth';
 import { businessDateTime } from '@tugeel/shared/time';
 import { eq, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { loadDotEnvIfPresent } from '../../../common/config/dotenv';
 import { parseEnv } from '../../../common/config/env.schema';
 import type { Db } from '../../../common/db/db.types';
 import { configurePgTypeParsers } from '../../../common/db/pg-types';
 import { inTransaction } from '../../../common/db/transaction';
-import {
-  auditLog,
-  authSessions,
-  branches,
-  files,
-  idempotencyKeys,
-  numberSequences,
-  passwordResets,
-  permissions,
-  rolePermissions,
-  roles,
-  settings,
-  userRoles,
-  userScopes,
-  users,
-  warehouses,
-} from '../../../db/schema';
+import { createDb } from '../../../common/db/db.module';
+import { roles, userRoles, users } from '../../../db/schema';
 import { systemActor } from '../auth-context';
 import { syncAccessCatalog } from '../reference-data';
 import { AuditService } from '../services/audit.service';
@@ -106,26 +90,8 @@ async function main(): Promise<void> {
     max: 1,
     application_name: 'tugeel-cli',
   });
-  // Every table of src/db/schema.ts, listed by name: ESLint G2 forbids `import * as` from it.
-  const schema = {
-    auditLog,
-    authSessions,
-    branches,
-    files,
-    idempotencyKeys,
-    numberSequences,
-    passwordResets,
-    permissions,
-    rolePermissions,
-    roles,
-    settings,
-    userRoles,
-    userScopes,
-    users,
-    warehouses,
-  };
   try {
-    const result = await createAdmin(drizzle({ client: pool, schema }), {
+    const result = await createAdmin(createDb(pool), {
       username,
       fullName,
       pepper: env.AUTH_PEPPER ?? '',

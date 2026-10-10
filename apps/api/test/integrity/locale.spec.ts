@@ -26,6 +26,13 @@ describe('integrity: database locale (ADR-0003)', () => {
     expect(rows[0]).toEqual({ encoding: 'UTF8', provider: 'i' });
   });
 
+  it('splits Cyrillic words into trigrams, so pg_trgm indexes search keys (ADR-0028)', async () => {
+    const { rows } = await app.query<{ count: number }>(
+      `SELECT array_length(show_trgm('кока кола'), 1) AS count`,
+    );
+    expect(rows[0]?.count).toBe(8);
+  });
+
   it('runs the integrity suite with a 5 second statement timeout', async () => {
     const { rows } = await app.query<{ statement_timeout: string }>('SHOW statement_timeout');
     expect(rows[0]?.statement_timeout).toBe('5s');

@@ -16,6 +16,11 @@ import { DB, DB_POOL } from './db.tokens';
 import type { Db } from './db.types';
 import { configurePgTypeParsers } from './pg-types';
 
+/** The Drizzle database over a pool with the whole schema; CLIs use it too (ESLint G2 keeps schema imports here). */
+export function createDb(pool: Pool): Db {
+  return drizzle({ client: pool, schema });
+}
+
 @Injectable()
 class DbLifecycle implements OnModuleInit, OnApplicationShutdown {
   private ended = false;
@@ -62,7 +67,7 @@ class DbLifecycle implements OnModuleInit, OnApplicationShutdown {
     {
       provide: DB,
       inject: [DB_POOL],
-      useFactory: (pool: Pool): Db => drizzle({ client: pool, schema }),
+      useFactory: createDb,
     },
     DbLifecycle,
   ],

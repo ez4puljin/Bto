@@ -1,12 +1,13 @@
 import { Decimal } from '@tugeel/shared/money';
 import { getTableConfig, pgTable } from 'drizzle-orm/pg-core';
-import { cost, factor, money, qty } from './types';
+import { cost, factor, money, qty, weight } from './types';
 
 const probe = pgTable('probe', {
   amount: money('amount'),
   quantity: qty('quantity'),
   unitCost: cost('unit_cost'),
   ratio: factor('ratio'),
+  mass: weight('mass'),
 });
 
 type Mapper = {
@@ -26,6 +27,8 @@ describe('NUMERIC custom column types', () => {
     expect(column('quantity').getSQLType()).toBe('numeric(14, 3)');
     expect(column('unit_cost').getSQLType()).toBe('numeric(14, 4)');
     expect(column('ratio').getSQLType()).toBe('numeric(18, 6)');
+    expect(column('mass').getSQLType()).toBe('numeric(12, 4)');
+    expect(column('mass').mapToDriverValue(new Decimal('0.0125'))).toBe('0.0125');
   });
 
   it('writes fixed-scale strings and reads Decimals back exactly', () => {

@@ -18,3 +18,13 @@ export {
   users,
   warehouses,
 } from '../modules/identity/schema';
+export {
+  brands,
+  categories,
+  internalBarcodeSeq,
+  productBarcodes,
+  productImages,
+  products,
+  productUnits,
+  uoms,
+} from '../modules/catalog/schema';
