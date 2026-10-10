@@ -10,12 +10,16 @@ import {
   UomsController,
 } from './controllers/masters.controller';
 import { ProductsController, ProductUnitsController } from './controllers/products.controller';
+import { ProductImagesController, ReadinessController } from './controllers/readiness.controller';
 import { syncSystemUoms } from './reference-data';
 import { BarcodeService } from './services/barcode.service';
 import { BrandsService } from './services/brands.service';
 import { CatalogService } from './services/catalog.service';
 import { CategoriesService } from './services/categories.service';
+import { EbarimtReadinessService } from './services/ebarimt-readiness.service';
+import { ProductImagesService } from './services/product-images.service';
 import { ProductsService } from './services/products.service';
+import { TaxService } from './services/tax.service';
 import { UnitConversionService } from './services/unit-conversion.service';
 import { UnitsService } from './services/units.service';
 import { UomsService } from './services/uoms.service';
@@ -25,7 +29,10 @@ const CORE_SERVICES = [
   BrandsService,
   CatalogService,
   CategoriesService,
+  EbarimtReadinessService,
+  ProductImagesService,
   ProductsService,
+  TaxService,
   UnitConversionService,
   UnitsService,
   UomsService,
@@ -55,6 +62,8 @@ export class CatalogBootstrap implements OnApplicationBootstrap {
     ProductsController,
     ProductUnitsController,
     BarcodesController,
+    ProductImagesController,
+    ReadinessController,
   ],
   providers: [CatalogBootstrap],
 })

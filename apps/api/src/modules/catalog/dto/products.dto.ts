@@ -359,3 +359,16 @@ export class BarcodeResolutionDto {
   @ApiProperty({ type: ResolvedUnitDto }) unit: ResolvedUnitDto;
   @ApiProperty({ type: BarcodeDto }) barcode: BarcodeDto;
 }
+
+@ApiSchema({ name: 'ProductImageRequest' })
+export class AttachImageDto {
+  @ApiProperty({ description: 'Uploaded file of kind catalog.product_image' })
+  @IsInt()
+  @Min(1)
+  imageFileId: number;
+
+  @ApiProperty({ description: 'Uploaded file of kind catalog.product_thumb' })
+  @IsInt()
+  @Min(1)
+  thumbFileId: number;
+}

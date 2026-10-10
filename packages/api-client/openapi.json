@@ -2736,6 +2736,318 @@
           "catalog"
         ]
       }
+    },
+    "/api/v1/products/{id}/images": {
+      "post": {
+        "operationId": "ProductImages_attach",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductImage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-images/{id}/primary": {
+      "post": {
+        "operationId": "ProductImages_primary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductImage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/product-images/{id}": {
+      "delete": {
+        "operationId": "ProductImages_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/catalog/ebarimt-readiness": {
+      "get": {
+        "operationId": "Readiness_report",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/catalog/ebarimt-readiness/products": {
+      "get": {
+        "operationId": "Readiness_products",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "gap",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "classificationCode",
+                "taxProductCode",
+                "measureUnit",
+                "cityTax"
+              ]
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Includes its subcategories",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/catalog/ebarimt-readiness/assign": {
+      "post": {
+        "operationId": "Readiness_assign",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessAssignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessAssignResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fills empty attributes of a category subtree; `dryRun` counts first.",
+        "tags": [
+          "catalog"
+        ]
+      }
     }
   },
   "info": {
@@ -4887,6 +5199,161 @@
           "barcode"
         ]
       },
+      "ProductImageRequest": {
+        "type": "object",
+        "properties": {
+          "imageFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.product_image"
+          },
+          "thumbFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.product_thumb"
+          }
+        },
+        "required": [
+          "imageFileId",
+          "thumbFileId"
+        ]
+      },
+      "ReadinessMissing": {
+        "type": "object",
+        "properties": {
+          "classificationCode": {
+            "type": "number",
+            "description": "No БҮНА code"
+          },
+          "taxProductCode": {
+            "type": "number",
+            "description": "VAT_FREE / VAT_ZERO without a tax product code"
+          },
+          "measureUnit": {
+            "type": "number",
+            "description": "A current unit without an e-Barimt measure unit"
+          },
+          "cityTax": {
+            "type": "number",
+            "description": "City tax not decided"
+          }
+        },
+        "required": [
+          "classificationCode",
+          "taxProductCode",
+          "measureUnit",
+          "cityTax"
+        ]
+      },
+      "ReadinessReport": {
+        "type": "object",
+        "properties": {
+          "activeProducts": {
+            "type": "number"
+          },
+          "missing": {
+            "$ref": "#/components/schemas/ReadinessMissing"
+          }
+        },
+        "required": [
+          "activeProducts",
+          "missing"
+        ]
+      },
+      "ReadinessRow": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductSummary"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "classificationCode",
+                "taxProductCode",
+                "measureUnit",
+                "cityTax"
+              ]
+            }
+          }
+        },
+        "required": [
+          "product",
+          "missing"
+        ]
+      },
+      "ReadinessPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadinessRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ReadinessAssignRequest": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "includeSubcategories": {
+            "type": "boolean",
+            "default": true
+          },
+          "classificationCode": {
+            "type": "string",
+            "pattern": "^[0-9]{7}$"
+          },
+          "taxProductCode": {
+            "type": "string",
+            "pattern": "^[0-9]{3}$",
+            "description": "Given to VAT_FREE / VAT_ZERO products only"
+          },
+          "cityTax": {
+            "type": "boolean"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Count only, change nothing"
+          }
+        },
+        "required": [
+          "categoryId"
+        ]
+      },
+      "ReadinessAssignResult": {
+        "type": "object",
+        "properties": {
+          "classificationCode": {
+            "type": "number"
+          },
+          "taxProductCode": {
+            "type": "number"
+          },
+          "cityTax": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "classificationCode",
+          "taxProductCode",
+          "cityTax"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -4930,6 +5397,7 @@
           "BARCODE_INVALID",
           "BARCODE_TAKEN",
           "BARCODE_AMBIGUOUS",
+          "TAX_ATTRIBUTES_MISSING",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

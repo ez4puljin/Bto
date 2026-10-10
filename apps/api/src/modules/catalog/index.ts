@@ -5,5 +5,6 @@ export { UNIT_SUPERSEDED_HOOK, type UnitSupersededHook } from './hooks';
 export { BarcodeService, type ResolvedBarcode } from './services/barcode.service';
 export { CatalogService } from './services/catalog.service';
 export type { ProductDetail, ProductSummary, UnitView } from './services/products.service';
+export { type ProductTaxRates, TaxService } from './services/tax.service';
 export { type ConvertedQty, UnitConversionService } from './services/unit-conversion.service';
 export { UnitsService } from './services/units.service';
