@@ -27,3 +27,22 @@ export function unwrap<T>(result: { data?: T; error?: unknown; response: Respons
   }
   return result.data as T;
 }
+
+/** The problem behind a failed TanStack Query call, for <ProblemAlert>. */
+export function problemFromError(error: unknown): ProblemDetails | null {
+  if (!error) return null;
+  return error instanceof ApiProblem ? error.problem : problemOf(error);
+}
+
+/**
+ * Awaits a mutation whose failure the screen already shows from the mutation state
+ * (`problemFromError(mutation.error)`), so an event handler never leaves a rejected promise
+ * behind. Resolves to undefined on failure: use it only for calls that return a body.
+ */
+export async function settle<T>(promise: Promise<T>): Promise<T | undefined> {
+  try {
+    return await promise;
+  } catch {
+    return undefined;
+  }
+}

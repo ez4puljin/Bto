@@ -1,8 +1,8 @@
-// Container HEALTHCHECK: the api serves /health on PORT; the worker serves it on loopback only.
+// Container HEALTHCHECK: the api serves /health on API_PORT; the worker serves it on loopback only.
 const port =
   process.env.ROLE === 'worker'
     ? (process.env.WORKER_HEALTH_PORT ?? '3001')
-    : (process.env.PORT ?? '3000');
+    : (process.env.API_PORT ?? '3000');
 try {
   const response = await fetch(`http://127.0.0.1:${port}/health`, {
     signal: AbortSignal.timeout(4000),

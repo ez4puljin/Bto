@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, BUSINESS_TZ, businessDate, businessYear, isIsoDate } from './index';
+import {
+  addDays,
+  BUSINESS_TZ,
+  businessDate,
+  businessDateTime,
+  businessYear,
+  isIsoDate,
+} from './index';
 
 describe('business dates in Asia/Ulaanbaatar', () => {
   it('uses UTC+8 without daylight saving', () => {
@@ -8,6 +15,10 @@ describe('business dates in Asia/Ulaanbaatar', () => {
     expect(businessDate(new Date('2026-10-10T15:59:59Z'))).toBe('2026-10-10');
     expect(businessDate(new Date('2026-10-10T16:00:00Z'))).toBe('2026-10-11');
     expect(businessDate(new Date('2026-07-01T16:00:00Z'))).toBe('2026-07-02');
+  });
+
+  it('shows instants as Ulaanbaatar wall-clock time', () => {
+    expect(businessDateTime(new Date('2026-10-10T16:30:00Z'))).toBe('2026-10-11 00:30');
   });
 
   it('rolls the year over at Ulaanbaatar midnight', () => {

@@ -2,9 +2,16 @@
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defaultClientConditions, defineConfig } from 'vite';
+import { defaultClientConditions, defineConfig, loadEnv } from 'vite';
 
-const API_ORIGIN = 'http://localhost:3000';
+// The api's local port lives in apps/api/.env (API_PORT), the file the api itself reads. IPv4
+// loopback: the api listens on 0.0.0.0, and another dev server may own [::1] on the same port.
+const apiEnv = loadEnv(
+  'development',
+  fileURLToPath(new URL('../api', import.meta.url)),
+  'API_PORT',
+);
+const API_ORIGIN = `http://127.0.0.1:${apiEnv.API_PORT ?? '3000'}`;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

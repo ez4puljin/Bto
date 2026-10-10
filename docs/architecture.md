@@ -649,7 +649,8 @@ Environment variables every process reads (validated by Zod at boot; the process
 
 | Variable | api | worker | Notes |
 |---|---|---|---|
-| `NODE_ENV`, `LOG_LEVEL`, `PORT`, `APP_VERSION` | yes | yes | `APP_VERSION` = image git sha, reported by `/health` |
+| `NODE_ENV`, `LOG_LEVEL`, `APP_VERSION` | yes | yes | `APP_VERSION` = image git sha, reported by `/health` |
+| `API_PORT` | yes | — | HTTP port, default 3000 (container); local development uses 3300 from `apps/api/.env`, which the Vite proxy also reads. Not `PORT`: dev launchers export `PORT` for the web dev server |
 | `DATABASE_URL` | yes | yes | role `app` |
 | `MIGRATOR_DATABASE_URL` | entrypoint only | — | role `migrator`; used by `node dist/db/migrate.js`, removed from the environment of the main process |
 | `WORKER_HEALTH_PORT` | — | yes | loopback health endpoint (default 3001) |

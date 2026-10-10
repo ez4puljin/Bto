@@ -13,6 +13,11 @@ export function businessDate(at: Date = new Date()): string {
   return dayjs(at).tz(BUSINESS_TZ).format('YYYY-MM-DD');
 }
 
+/** An instant as Ulaanbaatar wall-clock time, `YYYY-MM-DD HH:mm`, for operators (CLI, logs). */
+export function businessDateTime(at: Date): string {
+  return dayjs(at).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm');
+}
+
 /** The Ulaanbaatar calendar year of an instant, e.g. the `period` of yearly document numbers. */
 export function businessYear(at: Date = new Date()): string {
   return dayjs(at).tz(BUSINESS_TZ).format('YYYY');

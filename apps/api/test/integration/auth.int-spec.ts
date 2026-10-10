@@ -385,6 +385,11 @@ describe('authentication (ADR-0027)', () => {
       }).expect(200);
       expect((done.body as { me: { id: number } }).me.id).toBe(user.id);
       expect(refreshCookieOf(done)).not.toBe('');
+      const { rows } = await sql.query<{ signed_in: boolean }>(
+        'SELECT last_login_at IS NOT NULL AS signed_in FROM users WHERE id = $1',
+        [user.id],
+      );
+      expect(rows[0]?.signed_in).toBe(true);
       const again = await setup({
         username: user.username,
         code,

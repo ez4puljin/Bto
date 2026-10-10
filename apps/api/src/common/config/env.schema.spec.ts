@@ -13,7 +13,7 @@ describe('parseEnv', () => {
     const env = parseEnv(base, 'api');
     expect(env).toMatchObject({
       NODE_ENV: 'development',
-      PORT: 3000,
+      API_PORT: 3000,
       WORKER_HEALTH_PORT: 3001,
       LOG_LEVEL: 'info',
       DB_POOL_MAX: 6,

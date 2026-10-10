@@ -71,4 +71,15 @@ Fallback if the bridge network cannot route to the tailnet: a `tailscale` sideca
 
 ## 9. Secrets
 
-All secrets live in `/opt/tugeel/.env*` (chmod 600) and GitHub Actions secrets. Rotation procedure: TODO (delivery 1, identity session adds `JWT_SECRET` and `REFRESH_PEPPER`).
+All secrets live in `/opt/tugeel/.env*` (chmod 600) and GitHub Actions secrets; locally in the gitignored `apps/api/.env`. Production and staging each get their own values. Generate a value with
+`node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`
+(at least 32 characters; values starting with `dev-` are refused when `NODE_ENV=production`).
+
+| Variable | Protects | Rotating it (edit `.env`, then `docker compose up -d api`) |
+|---|---|---|
+| `JWT_SECRET` | HS256 signature of the 15-minute access tokens (ADR-0027) | every access token fails at once; browsers and apps refresh silently with their refresh token, nobody is signed out. Rotate on suspicion of a leak; no schedule |
+| `AUTH_PEPPER` | HMAC of the admin-issued one-time password codes | codes issued before the rotation stop working (issue new ones); passwords, refresh tokens and sessions are unaffected |
+
+Refresh tokens are stored as SHA-256 hashes and passwords as argon2id hashes; neither depends on these variables. To sign everybody out (e.g. after a leaked database backup), revoke the sessions: `UPDATE auth_sessions SET revoked_at = now(), revoked_reason = 'ADMIN' WHERE revoked_at IS NULL;` as `migrator`.
+
+First admin, or locked out of every admin account: `docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps api node dist/modules/identity/cli/create-admin.js --username <name> --full-name "<name>"` (locally `pnpm user:create-admin --username <name> --full-name "<name>"`). It creates the user or re-activates, unlocks and re-grants ADMIN to an existing one, and prints a one-time code valid for 30 minutes; the person opens "set password with a code" in the admin.

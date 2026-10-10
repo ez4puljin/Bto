@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { normalizeUsername, USERNAME_PATTERN } from '@tugeel/shared/auth';
+import { businessDateTime } from '@tugeel/shared/time';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -85,13 +86,17 @@ export async function createAdmin(
 
 async function main(): Promise<void> {
   loadDotEnvIfPresent(join(__dirname, '..', '..', '..', '..', '.env'));
+  // pnpm 11 forwards a `--` separator to the script verbatim; options never start with one.
+  const args = process.argv.slice(2);
+  while (args[0] === '--') args.shift();
   const { values } = parseArgs({
+    args,
     options: { username: { type: 'string' }, 'full-name': { type: 'string' } },
   });
   const username = values.username;
   const fullName = values['full-name'] ?? username;
   if (!username || !fullName) {
-    throw new Error('usage: pnpm user:create-admin -- --username <name> --full-name "<full name>"');
+    throw new Error('usage: pnpm user:create-admin --username <name> --full-name "<full name>"');
   }
   const env = parseEnv(process.env, 'api');
   configurePgTypeParsers();
@@ -125,7 +130,7 @@ async function main(): Promise<void> {
     console.log(
       [
         `${result.created ? 'Created' : 'Recovered'} admin "${normalizeUsername(username)}" (id ${result.userId}).`,
-        `One-time code: ${result.code}  (valid until ${result.expiresAt.toISOString()})`,
+        `One-time code: ${result.code}  (valid until ${businessDateTime(result.expiresAt)} Ulaanbaatar time)`,
         'Open the admin, choose "set password with a code" and enter the username, this code and a new password.',
       ].join('\n'),
     );

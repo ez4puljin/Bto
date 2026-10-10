@@ -42,7 +42,9 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not installed yet: 8.21.3 is frozen since 2025-04, 9.x since 2026-08 | decide in the catalog session |
 | Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
-| argon2, pdfmake, ExcelJS, `@nestjs/throttler`, receipt-printer-encoder, html5-qrcode | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
+| argon2, @nestjs/jwt | 0.45.1 (`allowBuilds: argon2: true`, prebuilt binaries), 12.0.2 | identity (ADR-0027); no passport |
+| react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
+| pdfmake, ExcelJS, `@nestjs/throttler`, receipt-printer-encoder, html5-qrcode | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
 DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process; staging 2 / 2 / 2 (architecture §10.2).
@@ -55,7 +57,8 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 | `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install` |
 | `pnpm db:provision` / `pnpm db:migrate` | roles + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + queues as `migrator` |
 | `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
-| `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173) |
+| `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173; the api listens on `API_PORT`, 3300 locally, and Vite proxies `/api` there) |
+| `pnpm user:create-admin --username <name> --full-name "<name>"` | create (or recover) an ADMIN and print a 30-minute one-time code; the user sets the password at `/set-password` |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
@@ -71,6 +74,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Audit rows via `AuditService.record(tx, …)` inside the service transaction; document numbers allocated at SUBMIT/POST inside that tx (drafts have no number); a POSTed document is immutable, corrections are reversing documents.
 - Modules import only `modules/<other>/index.ts`; atomic cross-module writes pass the Drizzle `tx` explicitly; side effects are pg-boss jobs enqueued in the same tx; `src/integrations/**` is called only from `jobs/*.job.ts` or `*-flow.service.ts`, between transactions.
 - Errors are RFC 9457 problem+json with a stable `code` and `params`; lists use keyset pagination `{ data, nextCursor }`.
+- Every route carries exactly one of `@Public()`, `@Authenticated()` or `@RequirePermission(...)` (the global guard answers 403 otherwise); the caller is `@CurrentUser() ctx: AuthContext`, passed explicitly to services; warehouse writes call `ScopeService.assertCanWriteWarehouse` (ADR-0027, `docs/modules/identity.md`).
 - ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config). From delivery 3: no `fetch` / `axios` / `integrations/*` calls inside `db.transaction(...)`.
 - Workspace packages are CommonJS with a `@tugeel/source` export condition (ADR-0025): the api uses their built `dist`, Vite/Vitest/Jest read the source; `pnpm check` builds them first.
 

@@ -14,7 +14,11 @@ export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /** Set per container in Compose; must match the entrypoint that is running. */
   ROLE: z.enum(PROCESS_ROLES).optional(),
-  PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+  /**
+   * HTTP port of the api (3000 in the container). Not `PORT`: dev launchers export `PORT` for the
+   * web dev server. Local development uses 3300 (apps/api/.env), which the Vite proxy reads too.
+   */
+  API_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   /** Loopback health endpoint of the worker; 0 = any free port (tests). */
   WORKER_HEALTH_PORT: z.coerce.number().int().min(0).max(65_535).default(3001),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),

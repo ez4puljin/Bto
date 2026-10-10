@@ -16,7 +16,7 @@ async function bootstrap(): Promise<void> {
   if (config.get('NODE_ENV') !== 'production') {
     SwaggerModule.setup('docs', app, buildOpenApiDocument(app));
   }
-  await app.listen(config.get('PORT'), '0.0.0.0');
+  await app.listen(config.get('API_PORT'), '0.0.0.0');
 }
 
 bootstrap().catch((error: unknown) => {

@@ -57,7 +57,7 @@ Facts found while planning: `passport` (0.7.0, 2023) and `passport-jwt` (4.0.1, 
 - No passport dependencies.
 
 **Negative.**
-- About three small queries per request.
+- One extra query per request (session, status, permissions and scopes in a single statement).
 - Custom roles miss permissions added by later modules, so the admin must update them by hand.
 - The 20-second grace window lets a stolen previous token mint access tokens for at most 20 seconds.
 

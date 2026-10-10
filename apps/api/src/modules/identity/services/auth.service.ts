@@ -327,6 +327,8 @@ export class AuthService {
           passwordChangedAt: sql`now()`,
           failedLoginCount: 0,
           lockedUntil: null,
+          // Redeeming the code signs the user in.
+          lastLoginAt: sql`now()`,
           updatedAt: sql`now()`,
         })
         .where(eq(users.id, user.id));
