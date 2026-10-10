@@ -77,7 +77,7 @@ All secrets live in `/opt/tugeel/.env*` (chmod 600) and GitHub Actions secrets; 
 
 | Variable | Protects | Rotating it (edit `.env`, then `docker compose up -d api`) |
 |---|---|---|
-| `JWT_SECRET` | HS256 signature of the 15-minute access tokens (ADR-0027) | every access token fails at once; browsers and apps refresh silently with their refresh token, nobody is signed out. Rotate on suspicion of a leak; no schedule |
+| `JWT_SECRET` | HS256 signature of the 15-minute access tokens (ADR-0027) | every access token fails at once; browsers and apps refresh silently with their refresh token, nobody is signed out. File upload URLs issued in the last 15 minutes stop working (their key derives from it, ADR-0030); the upload is simply repeated. Rotate on suspicion of a leak; no schedule |
 | `AUTH_PEPPER` | HMAC of the admin-issued one-time password codes | codes issued before the rotation stop working (issue new ones); passwords, refresh tokens and sessions are unaffected |
 
 Refresh tokens are stored as SHA-256 hashes and passwords as argon2id hashes; neither depends on these variables. To sign everybody out (e.g. after a leaked database backup), revoke the sessions: `UPDATE auth_sessions SET revoked_at = now(), revoked_reason = 'ADMIN' WHERE revoked_at IS NULL;` as `migrator`.

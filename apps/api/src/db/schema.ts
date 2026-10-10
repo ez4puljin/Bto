@@ -5,6 +5,7 @@ export {
   auditLog,
   authSessions,
   branches,
+  files,
   idempotencyKeys,
   numberSequences,
   passwordResets,

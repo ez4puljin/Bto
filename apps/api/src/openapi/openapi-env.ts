@@ -7,5 +7,8 @@ process.env.DB_POOL_MAX ??= '1';
 process.env.PGBOSS_POOL_MAX ??= '1';
 process.env.JWT_SECRET ??= 'openapi-export-placeholder-0123456789abcdef';
 process.env.AUTH_PEPPER ??= 'openapi-export-placeholder-0123456789abcdef';
+// Never written: the export builds the module graph only.
+process.env.STORAGE_DRIVER = 'local';
+process.env.STORAGE_LOCAL_DIR ??= 'openapi-export-storage';
 
 export {};

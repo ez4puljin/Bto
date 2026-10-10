@@ -7,6 +7,7 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
+import { FilesController } from './controllers/files.controller';
 import { AuditController, OrgController, SettingsController } from './controllers/org.controller';
 import { RolesController } from './controllers/roles.controller';
 import { UsersController } from './controllers/users.controller';
@@ -24,9 +25,18 @@ import { PasswordHasher } from './services/password-hasher.service';
 import { RolesService } from './services/roles.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
+import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
+import { StorageUrlSigner } from './storage/url-signer';
 
-const CORE_SERVICES = [AuditService, NumberingService, OrgService, ScopeService, SettingsService];
+const CORE_SERVICES = [
+  AuditService,
+  NumberingService,
+  OrgService,
+  ScopeService,
+  SettingsService,
+  StorageService,
+];
 
 /** Identity services every process may use (api, worker jobs, CLIs). */
 @Module({ providers: CORE_SERVICES, exports: CORE_SERVICES })
@@ -82,6 +92,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     OrgController,
     SettingsController,
     AuditController,
+    FilesController,
   ],
   providers: [
     IdentityBootstrap,
@@ -91,6 +102,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     PasswordHasher,
     LoginLimiter,
     RolesService,
+    StorageUrlSigner,
     UsersService,
     { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS },
     { provide: APP_GUARD, useClass: AuthGuard },

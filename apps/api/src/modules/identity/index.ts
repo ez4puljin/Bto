@@ -15,3 +15,4 @@ export {
 } from './services/org.service';
 export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';
+export { StorageService, type StoredFile } from './services/storage.service';

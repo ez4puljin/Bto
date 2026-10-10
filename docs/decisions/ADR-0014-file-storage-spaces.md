@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0026 (only the local driver until the go-live phase; the Spaces driver and the weekly dump come with it) |
+| Amended by | ADR-0026 (only the local driver until the go-live phase; the Spaces driver and the weekly dump come with it); ADR-0030 (the local driver: API-signed URLs, public image path, owner-confirmed files) |
 
 ## Context
 

@@ -30,6 +30,16 @@ export const REDACT_PATHS = [
   ...SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`, `*.*.${key}`, `*.*.*.${key}`]),
 ];
 
+/** Signed URLs carry their credential in the query string (ADR-0030); logs keep the path only. */
+export function redactUrl(url: string | undefined): string | undefined {
+  return url?.replace(/([?&]sig=)[^&]*/g, '$1[redacted]');
+}
+
+/** Health probes and public file reads (dozens per page of thumbnails) are not access-logged. */
+function isQuietUrl(url: string | undefined): boolean {
+  return (url?.startsWith('/health') || url?.startsWith('/api/v1/files/public/')) ?? false;
+}
+
 /** Reuses a well-formed incoming x-request-id, otherwise creates one; echoes it on the response. */
 export function genReqId(req: IncomingMessage, res: ServerResponse): string {
   const incoming = req.headers['x-request-id'];
@@ -48,12 +58,12 @@ export function buildLoggerParams(
       base: { service: `tugeel-${role}` },
       redact: { paths: REDACT_PATHS, remove: true },
       genReqId,
-      autoLogging: { ignore: (req) => req.url?.startsWith('/health') ?? false },
+      autoLogging: { ignore: (req) => isQuietUrl(req.url) },
       serializers: {
         req: (req: { id?: unknown; method?: string; url?: string }) => ({
           id: req.id,
           method: req.method,
-          url: req.url,
+          url: redactUrl(req.url),
         }),
         res: (res: { statusCode?: number }) => ({ statusCode: res.statusCode }),
       },

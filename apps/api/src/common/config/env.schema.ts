@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
 export const PROCESS_ROLES = ['api', 'worker'] as const;
@@ -37,9 +38,20 @@ export const EnvSchema = z.object({
   AUTH_PEPPER: z.string().min(32).optional(),
   /** `Secure` flag of the refresh cookie; defaults to true only in production (LAN http in dev). */
   COOKIE_SECURE: z.stringbool().optional(),
+  /**
+   * File storage (ADR-0014, ADR-0030): `local` keeps files under STORAGE_LOCAL_DIR and the api signs
+   * the upload and download URLs; `spaces` arrives in the go-live phase (ADR-0026) and refuses to
+   * start until then.
+   */
+  STORAGE_DRIVER: z.enum(['spaces', 'local']).default('spaces'),
+  /** Root directory of the local driver; a relative path resolves from the working directory. */
+  STORAGE_LOCAL_DIR: z.string().trim().min(1).optional(),
 });
 
-export type Env = Omit<z.infer<typeof EnvSchema>, 'COOKIE_SECURE'> & { COOKIE_SECURE: boolean };
+export type Env = Omit<z.infer<typeof EnvSchema>, 'COOKIE_SECURE' | 'STORAGE_LOCAL_DIR'> & {
+  COOKIE_SECURE: boolean;
+  STORAGE_LOCAL_DIR: string;
+};
 
 /** Secrets the api process cannot start without; the worker never signs or checks tokens. */
 const API_SECRETS = ['JWT_SECRET', 'AUTH_PEPPER'] as const;
@@ -62,5 +74,19 @@ export function parseEnv(raw: Record<string, unknown>, role: ProcessRole): Env {
       }
     }
   }
-  return { ...data, COOKIE_SECURE: data.COOKIE_SECURE ?? data.NODE_ENV === 'production' };
+  if (data.STORAGE_DRIVER === 'spaces') {
+    throw new Error(
+      `Invalid environment (${role}): STORAGE_DRIVER=spaces arrives in the go-live phase (ADR-0026); set STORAGE_DRIVER=local`,
+    );
+  }
+  if (!data.STORAGE_LOCAL_DIR) {
+    throw new Error(
+      `Invalid environment (${role}): STORAGE_LOCAL_DIR is required when STORAGE_DRIVER=local`,
+    );
+  }
+  return {
+    ...data,
+    COOKIE_SECURE: data.COOKIE_SECURE ?? data.NODE_ENV === 'production',
+    STORAGE_LOCAL_DIR: resolve(data.STORAGE_LOCAL_DIR),
+  };
 }

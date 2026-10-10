@@ -21,8 +21,9 @@ identity is the root of the module graph: it depends on no other module, and eve
 | `number_sequences` | gapless document numbers | `(scope_key, period)` primary key, `last_value` |
 | `audit_log` | append-only change log | `REVOKE UPDATE, DELETE, TRUNCATE … FROM app` + `forbid_update_delete()` triggers (SQLSTATE 23001 even for the migrator) |
 | `idempotency_keys` | replayable POST responses | unique `(actor_kind, actor_id, key)`; status IN_PROGRESS/COMPLETED |
+| `files` (migration `0002_identity_files`) | stored files of every module (ADR-0014, ADR-0030) | `key` = server-generated `<uuid>.<ext>`, unique; `kind` `<module>.<kind>` (registry in `@tugeel/shared/files`); status PENDING/READY/DELETED; `uploaded_at` and `sha256` set together when the bytes arrive |
 
-Planned additions owned by identity: `files` in migration `0002_identity_files` at the start of the catalog session (StorageService, `STORAGE_DRIVER=local` writes `.data/storage/`; ADR-0014); `print_stations` and `print_jobs` in delivery 9 (ADR-0022).
+Planned additions owned by identity: `print_stations` and `print_jobs` in delivery 9 (ADR-0022).
 
 ## 2. Public API (`modules/identity/index.ts`)
 
@@ -34,6 +35,7 @@ Planned additions owned by identity: `files` in migration `0002_identity_files` 
 | `ScopeService.assertCanWriteWarehouse(ctx, warehouseId)` | 403 `FORBIDDEN` `params.reason = 'WAREHOUSE_SCOPE'` when the user's scope excludes the warehouse; reads are never filtered; TRANSIT is always writable |
 | `AuditService.record(tx, actor, { action, entity, entityId, before?, after? })` | inside the service transaction; keys matching `/password|hash|token|secret/i` are dropped recursively |
 | `NumberingService.next(tx, scopeKey, period)` | gapless number inside the document's transaction (rollback returns the number) |
+| `StorageService.verifyUploaded(fileId, kind)` (before the transaction), `confirm(tx, fileId, kind)`, `markDeleted(tx, fileId)`, `publicUrl(file)` | attach a file to a document: verify outside the transaction (an HTTP HEAD once Spaces exists), confirm READY inside it; only identity writes `files` |
 | `SettingsService.get(key, onDate)` / `find(key, onDate)` | value in force on an Ulaanbaatar business date (`businessDate()` from `@tugeel/shared/time`); `get` throws `SETTING_MISSING` |
 | `OrgService` (`getBranch`, `getWarehouse`, `getTransitWarehouse(tx)`, lists) | organisation lookups |
 | `WAREHOUSE_CREATED_HOOK` / `WarehouseCreatedHook` | optional provider (inventory, week 3: system bins) called inside the transaction that creates a warehouse, including the TRANSIT warehouse created at the first boot; warehouses that already exist when the hook is bound are not replayed |
@@ -58,6 +60,9 @@ Rules for other modules: never read or write identity tables directly (G1 bounda
 | `GET /settings` | `identity.settings.read` | one view per key: value in force today + history |
 | `POST /settings`, `DELETE /settings/:id` | `identity.settings.manage` | new values start today or later (the first value of a key may be back-dated); only future values can be deleted |
 | `GET /audit` | `identity.audit.read` | filters `entity`, `entityId`, `actorId`, `from`, `to` (Ulaanbaatar dates); newest first |
+| `POST /files/presign` | authenticated + the kind's permission | `{ kind, contentType, sizeBytes }` → PENDING row and a 15-minute signed `PUT` URL (ADR-0030) |
+| `PUT /files/local/:name` | public, signed | local driver only (not in OpenAPI): exact type and size, image signature, once; 403 `SIGNATURE`, 409, 413, 415 |
+| `GET /files/public/:name` | public | READY files of public kinds, `immutable` caching (not in OpenAPI) |
 
 Every auth response carries `Cache-Control: no-store`; request bodies are JSON only (no urlencoded parser: login CSRF).
 
@@ -89,7 +94,7 @@ Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; noth
 
 ## 7. Error codes introduced
 
-`INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 423, `ACCOUNT_DISABLED` 403, `SESSION_EXPIRED` 401, `PASSWORD_CODE_INVALID` 400, `PASSWORD_TOO_WEAK` 422, `CURRENT_PASSWORD_INCORRECT` 400, `LAST_ADMIN` 409, `SELF_EDIT_FORBIDDEN` 409, `ROLE_SYSTEM_READONLY` 409, `ROLE_IN_USE` 409, `WAREHOUSE_KIND_NOT_ALLOWED` 422, `SETTING_NOT_EDITABLE` 409, `SETTING_MISSING` 409, `DUPLICATE_VALUE` 409 (any unique violation, `params.constraint`), `IDEMPOTENCY_KEY_IN_PROGRESS` 409. `FORBIDDEN` carries `params.reason`: `NO_ACCESS_RULE`, `PERMISSION` or `WAREHOUSE_SCOPE`; `UNAUTHORIZED` carries `TOKEN`, `SESSION` or `REFRESH`.
+`INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 423, `ACCOUNT_DISABLED` 403, `SESSION_EXPIRED` 401, `PASSWORD_CODE_INVALID` 400, `PASSWORD_TOO_WEAK` 422, `CURRENT_PASSWORD_INCORRECT` 400, `LAST_ADMIN` 409, `SELF_EDIT_FORBIDDEN` 409, `ROLE_SYSTEM_READONLY` 409, `ROLE_IN_USE` 409, `WAREHOUSE_KIND_NOT_ALLOWED` 422, `SETTING_NOT_EDITABLE` 409, `SETTING_MISSING` 409, `DUPLICATE_VALUE` 409 (any unique violation, `params.constraint`), `IDEMPOTENCY_KEY_IN_PROGRESS` 409, `FILE_NOT_UPLOADED` 409, `FILE_KIND_MISMATCH` 422. `FORBIDDEN` carries `params.reason`: `NO_ACCESS_RULE`, `PERMISSION`, `WAREHOUSE_SCOPE` or `SIGNATURE` (file URLs); `UNAUTHORIZED` carries `TOKEN`, `SESSION` or `REFRESH`.
 
 ## 8. Audit actions
 
@@ -102,7 +107,7 @@ Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; noth
 ## 10. Operations
 
 - First admin and recovery: `pnpm user:create-admin --username <name> --full-name "<full name>"` creates the user (or re-activates, unlocks and re-grants ADMIN to an existing one) and prints a one-time code valid for 30 minutes, shown in Ulaanbaatar time.
-- Environment (api only): `JWT_SECRET`, `AUTH_PEPPER` (≥ 32 characters, `dev-` values refused in production), `COOKIE_SECURE` (true behind HTTPS), `API_PORT` (3000 in the container, 3300 locally); rotation effects in `deploy/runbook.md` §9.
+- Environment (api only): `JWT_SECRET`, `AUTH_PEPPER` (≥ 32 characters, `dev-` values refused in production), `COOKIE_SECURE` (true behind HTTPS), `API_PORT` (3000 in the container, 3300 locally); rotation effects in `deploy/runbook.md` §9. Both processes: `STORAGE_DRIVER=local` and `STORAGE_LOCAL_DIR` (`spaces` refuses to start until the go-live phase, ADR-0030).
 
 ## 11. Tests
 
@@ -110,7 +115,6 @@ Integration (`apps/api/test/integration/`): `identity-schema`, `identity-core`, 
 
 ## 12. Open items
 
-- `0002_identity_files` + `StorageService` (local driver) at the start of the catalog session.
 - inventory binds `WAREHOUSE_CREATED_HOOK` (system bins) in week 3 and must backfill the bins of warehouses created before that (TRANSIT and any created during development), e.g. in its first migration or an idempotent boot step.
-- Housekeeping jobs (expired sessions, used or expired password codes, idempotency keys older than their replay window) are not scheduled yet; add them with the first pg-boss schedule (SPEC §8.2 cut line) or in the go-live phase.
+- Housekeeping jobs (expired sessions, used or expired password codes, idempotency keys older than their replay window, PENDING files never attached and DELETED files with their bytes) are not scheduled yet; add them with the first pg-boss schedule (SPEC §8.2 cut line) or in the go-live phase.
 - Customer authentication (`/auth/customer/*`, phone identity) belongs to `partners` and the customer app (delivery 6).

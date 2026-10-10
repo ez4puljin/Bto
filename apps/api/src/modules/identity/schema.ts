@@ -359,3 +359,47 @@ export const idempotencyKeys = pgTable(
     ),
   ],
 );
+
+export const FILE_STATUSES = ['PENDING', 'READY', 'DELETED'] as const;
+export type FileStatus = (typeof FILE_STATUSES)[number];
+
+/**
+ * Stored files (ADR-0014, ADR-0030). A row is created PENDING when an upload URL is issued; the module
+ * that attaches the file to its document confirms it READY in that document's transaction. Kinds are
+ * registered in @tugeel/shared/files, so only their format is checked here.
+ */
+export const files = pgTable(
+  'files',
+  {
+    id: id(),
+    /** Server-generated object name `<uuid>.<ext>`, also the last segment of its URLs. */
+    key: text('key').notNull(),
+    kind: text('kind').notNull(),
+    contentType: text('content_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    /** Hex SHA-256 of the bytes, recorded when the upload arrives. */
+    sha256: text('sha256'),
+    status: text('status', { enum: FILE_STATUSES }).notNull().default('PENDING'),
+    ownerId: bigint('owner_id', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('files_key_key').on(t.key),
+    index('files_pending_idx')
+      .on(t.createdAt)
+      .where(sql`${t.status} = 'PENDING'`),
+    check('files_kind_format', sql`${t.kind} ~ '^[a-z]+[.][a-z_]+$'`),
+    check('files_key_format', sql`${t.key} ~ '^[0-9a-f-]{36}[.][a-z]{3,4}$'`),
+    check('files_size', sql`${t.sizeBytes} > 0`),
+    check('files_sha256', sql`${t.sha256} IS NULL OR ${t.sha256} ~ '^[0-9a-f]{64}$'`),
+    check('files_status', sql`${t.status} IN ('PENDING', 'READY', 'DELETED')`),
+    check(
+      'files_uploaded',
+      sql`(${t.uploadedAt} IS NULL) = (${t.sha256} IS NULL) AND (${t.status} = 'PENDING' OR ${t.uploadedAt} IS NOT NULL)`,
+    ),
+  ],
+);

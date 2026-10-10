@@ -15,6 +15,7 @@ import {
   auditLog,
   authSessions,
   branches,
+  files,
   idempotencyKeys,
   numberSequences,
   passwordResets,
@@ -105,10 +106,12 @@ async function main(): Promise<void> {
     max: 1,
     application_name: 'tugeel-cli',
   });
+  // Every table of src/db/schema.ts, listed by name: ESLint G2 forbids `import * as` from it.
   const schema = {
     auditLog,
     authSessions,
     branches,
+    files,
     idempotencyKeys,
     numberSequences,
     passwordResets,

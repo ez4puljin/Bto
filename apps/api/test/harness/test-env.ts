@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadDotEnvIfPresent } from '../../src/common/config/dotenv';
 import { planFromEnv, type RoleSpec, withDatabase } from '../../src/db/provisioning';
@@ -70,6 +71,8 @@ export function applyWorkerEnv(project: DbProject): void {
     JWT_SECRET: 'test-jwt-secret-0123456789abcdefghijklmnop',
     AUTH_PEPPER: 'test-auth-pepper-0123456789abcdefghijklmnop',
     COOKIE_SECURE: 'false',
+    STORAGE_DRIVER: 'local',
+    STORAGE_LOCAL_DIR: join(tmpdir(), `${database}_storage`),
   });
   delete process.env.ROLE;
   if (project === 'integrity') {

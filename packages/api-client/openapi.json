@@ -1433,6 +1433,52 @@
           "audit"
         ]
       }
+    },
+    "/api/v1/files/presign": {
+      "post": {
+        "operationId": "Files_presign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "files"
+        ]
+      }
     }
   },
   "info": {
@@ -2661,6 +2707,77 @@
           "nextCursor"
         ]
       },
+      "FileUploadRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "catalog.product_image",
+              "catalog.product_thumb"
+            ],
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "image/jpeg"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5242880
+          }
+        },
+        "required": [
+          "kind",
+          "contentType",
+          "sizeBytes"
+        ]
+      },
+      "FileUploadHeaders": {
+        "type": "object",
+        "properties": {
+          "Content-Type": {
+            "type": "string",
+            "example": "image/jpeg"
+          }
+        },
+        "required": [
+          "Content-Type"
+        ]
+      },
+      "FileUpload": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "number"
+          },
+          "uploadUrl": {
+            "type": "string",
+            "description": "PUT the bytes here with exactly these headers and no Authorization header; a path starting with \"/\" is relative to the API origin"
+          },
+          "method": {
+            "enum": [
+              "PUT"
+            ],
+            "type": "string"
+          },
+          "headers": {
+            "$ref": "#/components/schemas/FileUploadHeaders"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "fileId",
+          "uploadUrl",
+          "method",
+          "headers",
+          "expiresAt"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -2694,6 +2811,8 @@
           "WAREHOUSE_KIND_NOT_ALLOWED",
           "SETTING_NOT_EDITABLE",
           "SETTING_MISSING",
+          "FILE_NOT_UPLOADED",
+          "FILE_KIND_MISMATCH",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

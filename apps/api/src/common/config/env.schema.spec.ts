@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { parseEnv } from './env.schema';
 
 const base = {
@@ -6,6 +7,8 @@ const base = {
   PGBOSS_POOL_MAX: '2',
   JWT_SECRET: 'test-jwt-secret-0123456789abcdefghijklmnop',
   AUTH_PEPPER: 'test-auth-pepper-0123456789abcdefghijklmnop',
+  STORAGE_DRIVER: 'local',
+  STORAGE_LOCAL_DIR: '../../.data/storage',
 };
 
 describe('parseEnv', () => {
@@ -68,5 +71,15 @@ describe('parseEnv', () => {
     ).toBe(false);
     expect(parseEnv({ ...base, COOKIE_SECURE: 'true' }, 'api').COOKIE_SECURE).toBe(true);
     expect(() => parseEnv({ ...base, COOKIE_SECURE: 'maybe' }, 'api')).toThrow('COOKIE_SECURE');
+  });
+
+  it('refuses the Spaces driver before the go-live phase and needs a local directory', () => {
+    const { STORAGE_DRIVER: _driver, ...defaultDriver } = base;
+    expect(() => parseEnv(defaultDriver, 'worker')).toThrow('STORAGE_DRIVER=spaces');
+    const { STORAGE_LOCAL_DIR: _dir, ...withoutDir } = base;
+    expect(() => parseEnv(withoutDir, 'api')).toThrow('STORAGE_LOCAL_DIR is required');
+    const dir = parseEnv(base, 'api').STORAGE_LOCAL_DIR;
+    expect(isAbsolute(dir)).toBe(true);
+    expect(dir).toBe(resolve('../../.data/storage'));
   });
 });

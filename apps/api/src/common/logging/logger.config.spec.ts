@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Writable } from 'node:stream';
 import pino from 'pino';
-import { genReqId, REDACT_PATHS } from './logger.config';
+import { genReqId, REDACT_PATHS, redactUrl } from './logger.config';
 
 function capture() {
   const lines: string[] = [];
@@ -70,5 +70,16 @@ describe('genReqId', () => {
       expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(echoed).toBe(id);
     }
+  });
+});
+
+describe('redactUrl', () => {
+  it('keeps the path of signed URLs but never their signature', () => {
+    expect(redactUrl('/api/v1/files/local/a.jpg?exp=123&sig=SECRET-sig')).toBe(
+      '/api/v1/files/local/a.jpg?exp=123&sig=[redacted]',
+    );
+    expect(redactUrl('/x?sig=s1&other=1&sig=s2')).toBe('/x?sig=[redacted]&other=1&sig=[redacted]');
+    expect(redactUrl('/api/v1/products?q=sig')).toBe('/api/v1/products?q=sig');
+    expect(redactUrl(undefined)).toBeUndefined();
   });
 });

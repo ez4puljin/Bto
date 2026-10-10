@@ -634,7 +634,7 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
 
 ### 10.1 Local (Windows 11): the only environment until go-live (ADR-0026)
 
-Docker Desktop (WSL2) runs `postgres:18` only (`docker-compose.yml`, `127.0.0.1:15432`); `pnpm dev` runs api, worker, web. Expo development builds on a real Android device (delivery 4+) and the POS print agent (delivery 9) reach the API at the machine's LAN address. Every delivery is accepted here with real data imported locally. The staging PosAPI on the office box is reached over Tailscale (the dev machine joins the tailnet as `tag:dev`); QPay runs against its sandbox without callbacks (`payment/check` and the sweep); files use `STORAGE_DRIVER=local` (`.data/storage/`, ADR-0014). `pnpm docker:build` plus the staging stack behind the edge Caddy (`http://staging.localhost:8080`) rehearses the deploy. No mailpit and no email feature until a feature needs one (F11).
+Docker Desktop (WSL2) runs `postgres:18` only (`docker-compose.yml`, `127.0.0.1:15432`); `pnpm dev` runs api, worker, web. Expo development builds on a real Android device (delivery 4+) and the POS print agent (delivery 9) reach the API at the machine's LAN address. Every delivery is accepted here with real data imported locally. The staging PosAPI on the office box is reached over Tailscale (the dev machine joins the tailnet as `tag:dev`); QPay runs against its sandbox without callbacks (`payment/check` and the sweep); files use `STORAGE_DRIVER=local` (`.data/storage/`, ADR-0014, ADR-0030). `pnpm docker:build` plus the staging stack behind the edge Caddy (`http://staging.localhost:8080`) rehearses the deploy. No mailpit and no email feature until a feature needs one (F11).
 
 ### 10.2 Droplet layout and pool budget (F3): the go-live target
 
@@ -662,7 +662,8 @@ Environment variables every process reads (validated by Zod at boot; the process
 | `EBARIMT_PROVIDER` | yes | yes | `posapi` (default), `relay` or `qpay` (§5.9) |
 | `QPAY_BASE_URL`, `QPAY_CLIENT_ID`, `QPAY_CLIENT_SECRET`, `QPAY_INVOICE_CODE` | yes | yes | sandbox vs production by value |
 | `SPACES_*` | yes | yes | presigned uploads, pg_dump target |
-| `STORAGE_DRIVER` | yes | yes | `spaces` (default) or `local` (dev only, writes `.data/storage/`; ADR-0014) |
+| `STORAGE_DRIVER` | yes | yes | `spaces` (default; refuses to start until the go-live phase builds it) or `local` (ADR-0030) |
+| `STORAGE_LOCAL_DIR` | yes | yes | root of the local driver: `../../.data/storage` from `apps/api` locally, `/tmp/tugeel-storage` in the rehearsal stacks |
 | `SENTRY_DSN` | yes | yes | — |
 | `ADMIN_DATABASE_URL` | one-off | — | only for `provision.js`; production: typed at the prompt, never stored |
 | `TEST_ADMIN_DATABASE_URL` | tests | — | Jest harness; local hosts only |
