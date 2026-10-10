@@ -68,7 +68,7 @@ Every auth response carries `Cache-Control: no-store`; request bodies are JSON o
 
 ## 4. Permissions and roles
 
-- Catalog: `PERMISSIONS` in `@tugeel/shared/auth` (`identity.users.read`, `identity.users.manage`, `identity.roles.manage`, `identity.org.manage`, `identity.settings.read`, `identity.settings.manage`, `identity.audit.read`). Admin-only (never in a custom role): `identity.users.manage`, `identity.roles.manage`.
+- Catalog: `PERMISSIONS` in `@tugeel/shared/auth` (`identity.users.read`, `identity.users.manage`, `identity.roles.manage`, `identity.org.manage`, `identity.settings.read`, `identity.settings.manage`, `identity.audit.read`). Admin-only (never in a custom role): `identity.users.manage`, `identity.roles.manage`. Codes of later modules are documented with them: `catalog.products.manage`, `catalog.ebarimt.manage` (`docs/modules/catalog.md` §4; ADMIN only, assignable to custom roles).
 - System roles: ADMIN (all codes), ACCOUNTANT (`identity.settings.read`, `identity.audit.read`), OFFICE, PROCUREMENT, WAREHOUSE, HR, POS_CASHIER, SALES_REP, DRIVER (empty until their modules add codes). Read-only in the UI and the API (`ROLE_SYSTEM_READONLY`).
 - **Adding a permission in a later module:** add the code to `PERMISSIONS`, its label under `permissions.*` in `packages/shared/i18n/mn.json` (the i18n test fails otherwise), the system roles that get it in `SYSTEM_ROLE_PERMISSIONS`; the api syncs the database at boot. Custom roles never gain a new code automatically.
 - Invariants: the last active ADMIN cannot be disabled or demoted (`LAST_ADMIN`, serialised by `SELECT … FROM roles WHERE code = 'ADMIN' FOR UPDATE`); nobody edits their own roles, scopes or status (`SELF_EDIT_FORBIDDEN`); a role with users cannot be deleted (`ROLE_IN_USE`).

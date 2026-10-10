@@ -40,7 +40,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
 | i18next, react-i18next, @fontsource-variable/noto-sans | 26.4.2, 17.0.16, 5.3.0 | |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
-| TanStack Table | not installed yet: 8.21.3 is frozen since 2025-04, 9.x since 2026-08 | decide in the catalog session |
+| TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |
 | Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
 | argon2, @nestjs/jwt | 0.45.1 (`allowBuilds: argon2: true`, prebuilt binaries), 12.0.2 | identity (ADR-0027); no passport |
 | react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
@@ -55,11 +55,12 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 | Command | What it does |
 |---|---|
 | `docker compose up -d --wait` | local `postgres:18` (ICU) on `127.0.0.1:15432`; needed by `pnpm check` and `pnpm dev` |
-| `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install` |
+| `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install`; stop `pnpm dev` before adding a package |
 | `pnpm db:provision` / `pnpm db:migrate` | roles + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + queues as `migrator` |
 | `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
 | `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173; the api listens on `API_PORT`, 3300 locally, and Vite proxies `/api` there) |
 | `pnpm user:create-admin --username <name> --full-name "<name>"` | create (or recover) an ADMIN and print a 30-minute one-time code; the user sets the password at `/set-password` |
+| `pnpm catalog:reindex-search [--all]` | recompute product search keys after `SEARCH_KEYS_VERSION` changes (`--all`: every product; ADR-0028) |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
