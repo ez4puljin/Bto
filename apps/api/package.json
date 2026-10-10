@@ -22,7 +22,8 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx src/db/migrate.ts",
     "openapi:export": "nest build && node dist/openapi/export-openapi.js ../../packages/api-client/openapi.json",
-    "user:create-admin": "tsx src/modules/identity/cli/create-admin.ts"
+    "user:create-admin": "tsx src/modules/identity/cli/create-admin.ts",
+    "catalog:reindex-search": "tsx src/modules/catalog/cli/reindex-search.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",

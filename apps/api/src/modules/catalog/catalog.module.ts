@@ -3,6 +3,7 @@ import { DB } from '../../common/db/db.tokens';
 import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { IdentityModule } from '../identity';
+import { BarcodesController } from './controllers/barcodes.controller';
 import {
   BrandsController,
   CategoriesController,
@@ -53,6 +54,7 @@ export class CatalogBootstrap implements OnApplicationBootstrap {
     BrandsController,
     ProductsController,
     ProductUnitsController,
+    BarcodesController,
   ],
   providers: [CatalogBootstrap],
 })

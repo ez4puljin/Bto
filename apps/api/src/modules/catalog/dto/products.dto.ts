@@ -343,3 +343,19 @@ export class ProductDetailDto {
 export class NextSkuDto {
   @ApiProperty({ example: '10024' }) sku: string;
 }
+
+@ApiSchema({ name: 'ResolvedUnit' })
+export class ResolvedUnitDto {
+  @ApiProperty() id: number;
+  @ApiProperty() uomId: number;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ example: '24' }) factorToBase: string;
+  @ApiProperty() isBase: boolean;
+}
+
+@ApiSchema({ name: 'BarcodeResolution' })
+export class BarcodeResolutionDto {
+  @ApiProperty({ type: ProductSummaryDto }) product: ProductSummaryDto;
+  @ApiProperty({ type: ResolvedUnitDto }) unit: ResolvedUnitDto;
+  @ApiProperty({ type: BarcodeDto }) barcode: BarcodeDto;
+}

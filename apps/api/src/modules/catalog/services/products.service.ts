@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { lookupCandidates } from '@tugeel/shared/gtin';
+import { classifyBarcode, lookupCandidates } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import { normalizeName, queryTerms, searchKeys, termPattern } from '@tugeel/shared/text';
 import { isExactFactor } from '@tugeel/shared/units';
@@ -61,6 +61,12 @@ export interface ProductSummary {
   cityTax: boolean | null;
   baseUnit: { id: number; uomId: number; uomName: string };
   thumbUrl: string | null;
+}
+
+export interface BarcodeResolution {
+  product: ProductSummary;
+  unit: { id: number; uomId: number; uomName: string; factorToBase: Decimal; isBase: boolean };
+  barcode: Barcode;
 }
 
 export interface NewUnitInput {
@@ -327,6 +333,43 @@ export class ProductsService {
       data: await this.summaries(page.data.map((row) => row.product)),
       nextCursor: page.nextCursor,
     };
+  }
+
+  /**
+   * The product and current unit a scanned code belongs to (SPEC §5.2): GTIN-8/12/13/14 forms are
+   * normalised first; superseded and retired units never answer (ADR-0029).
+   */
+  async resolveBarcode(code: string): Promise<BarcodeResolution> {
+    const classified = classifyBarcode(code);
+    if (!classified.ok || lookupCandidates(code).length === 0) {
+      throw new AppError('BARCODE_INVALID', 'barcode cannot be read', {
+        problem: classified.ok ? 'CHECK_DIGIT' : classified.problem,
+      });
+    }
+    const hits = await this.barcodes.lookup(code);
+    const [hit] = hits;
+    if (!hit) throw new AppError('NOT_FOUND', 'no product has this barcode');
+    if (new Set(hits.map((row) => row.productId)).size > 1) {
+      throw new AppError('BARCODE_AMBIGUOUS', 'barcode matches several products', {
+        count: hits.length,
+      });
+    }
+    const [product] = await this.db.select().from(products).where(eq(products.id, hit.productId));
+    if (!product) throw notFound('product', hit.productId);
+    const [summary] = await this.summaries([product]);
+    const [unit] = await this.db
+      .select({
+        id: productUnits.id,
+        uomId: productUnits.uomId,
+        uomName: uoms.name,
+        factorToBase: productUnits.factorToBase,
+        isBase: productUnits.isBase,
+      })
+      .from(productUnits)
+      .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
+      .where(eq(productUnits.id, hit.unitId));
+    if (!summary || !unit) throw notFound('product unit', hit.unitId);
+    return { product: summary, unit, barcode: hit.barcode };
   }
 
   async summaries(rows: Product[], executor: Db | Tx = this.db): Promise<ProductSummary[]> {

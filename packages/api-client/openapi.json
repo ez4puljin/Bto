@@ -2690,6 +2690,52 @@
           "catalog"
         ]
       }
+    },
+    "/api/v1/barcodes/{code}": {
+      "get": {
+        "operationId": "Barcodes_resolve",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarcodeResolution"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Scan lookup: 404 unknown, 409 BARCODE_AMBIGUOUS, 422 BARCODE_INVALID (ADR-0029).",
+        "tags": [
+          "catalog"
+        ]
+      }
     }
   },
   "info": {
@@ -4792,6 +4838,53 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "ResolvedUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "uomId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24"
+          },
+          "isBase": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "uomId",
+          "uomName",
+          "factorToBase",
+          "isBase"
+        ]
+      },
+      "BarcodeResolution": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductSummary"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/ResolvedUnit"
+          },
+          "barcode": {
+            "$ref": "#/components/schemas/Barcode"
+          }
+        },
+        "required": [
+          "product",
+          "unit",
+          "barcode"
         ]
       },
       "ErrorCode": {
