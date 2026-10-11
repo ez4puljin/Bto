@@ -209,6 +209,13 @@ export const ADJUSTMENT_REASONS = {
   OPENING: 1,
 } as const satisfies Record<string, -1 | 1>;
 export type AdjustmentReason = keyof typeof ADJUSTMENT_REASONS;
+export const ADJUSTMENT_REASON_CODES = [
+  'DAMAGED',
+  'EXPIRED',
+  'SHORTAGE',
+  'SURPLUS',
+  'OPENING',
+] as const satisfies readonly AdjustmentReason[];
 export const USER_ADJUSTMENT_REASONS = ['DAMAGED', 'EXPIRED', 'SHORTAGE', 'SURPLUS'] as const;
 
 // ---------------------------------------------------------------------------------------------

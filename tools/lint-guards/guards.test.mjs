@@ -166,6 +166,30 @@ const CASES = [
     true,
   ],
   [
+    'the valuation history outside the posting service',
+    G2,
+    `${M}/inventory/services/receipts.service.ts`,
+    `import { stockValuationAdjustments } from '../ledger.schema';
+export const x = stockValuationAdjustments;`,
+    true,
+  ],
+  [
+    'the ledger through its own schema file',
+    G2,
+    `${M}/inventory/services/receipts.service.ts`,
+    `import { stockLedger } from '../ledger.schema';
+export const x = stockLedger;`,
+    true,
+  ],
+  [
+    'the posting service writes the valuation history',
+    G2,
+    `${M}/inventory/services/stock-posting.service.ts`,
+    `import { stockValuationAdjustments } from '../ledger.schema';
+export const x = stockValuationAdjustments;`,
+    false,
+  ],
+  [
     'the posting service itself',
     G2,
     `${M}/inventory/services/stock-posting.service.ts`,

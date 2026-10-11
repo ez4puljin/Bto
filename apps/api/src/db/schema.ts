@@ -36,3 +36,23 @@ export {
   supplierContacts,
   suppliers,
 } from '../modules/partners/schema';
+// The ledger, the valuation history and the snapshots are not exported: their DDL is hand-written
+// and their Drizzle objects live in modules/inventory/ledger.schema.ts (ADR-0034, ESLint G2).
+export {
+  adjustmentLines,
+  adjustments,
+  binMoveLines,
+  binMoves,
+  bins,
+  binStock,
+  goodsReceiptLines,
+  goodsReceipts,
+  lots,
+  productLocations,
+  reconciliationRuns,
+  stockReservations,
+  stocktakeBins,
+  stocktakeLines,
+  stocktakes,
+  warehouseStock,
+} from '../modules/inventory/schema';

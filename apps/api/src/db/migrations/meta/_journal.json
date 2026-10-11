@@ -36,6 +36,20 @@
       "when": 1791690602600,
       "tag": "0004_partners",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791705169122,
+      "tag": "0005_inventory",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791705193678,
+      "tag": "0006_inventory_ledger",
+      "breakpoints": true
     }
   ]
 }

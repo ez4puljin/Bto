@@ -306,9 +306,9 @@ export default defineConfig([
           patterns: [
             {
               regex: '^\\.{1,2}/',
-              importNames: ['stockLedger'],
+              importNames: ['stockLedger', 'stockValuationAdjustments'],
               message:
-                'stockLedger is imported only by inventory/services/stock-posting.service.ts and inventory tests (§3.1 rule 2, ADR-0007).',
+                'stockLedger and stockValuationAdjustments are imported only by inventory/services/stock-posting.service.ts and inventory tests (§3.1 rule 2, ADR-0007, ADR-0034).',
             },
           ],
         },
