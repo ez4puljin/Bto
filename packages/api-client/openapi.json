@@ -5176,6 +5176,627 @@
           "inventory"
         ]
       }
+    },
+    "/api/v1/receipts": {
+      "get": {
+        "operationId": "Receipts_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "costingPending",
+            "required": false,
+            "in": "query",
+            "description": "Posted receipts waiting for the accountant",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Receipt or delivery note number",
+            "schema": {
+              "maxLength": 50,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Receipts_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}": {
+      "get": {
+        "operationId": "Receipts_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "Receipts_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/lines": {
+      "post": {
+        "operationId": "Receipts_addLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/post": {
+      "post": {
+        "operationId": "Receipts_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → POSTED; idempotent so a retried click never posts twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/cancel": {
+      "post": {
+        "operationId": "Receipts_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/costing": {
+      "get": {
+        "operationId": "Receipts_costing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptCosting"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/costs": {
+      "put": {
+        "operationId": "Receipts_cost",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptCostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptCosting"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipt-lines/{id}": {
+      "patch": {
+        "operationId": "ReceiptLines_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptLineUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "delete": {
+        "operationId": "ReceiptLines_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
     }
   },
   "info": {
@@ -8926,6 +9547,514 @@
           "productId",
           "warehouseId"
         ]
+      },
+      "ReceiptSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "costingStatus": {
+            "nullable": true,
+            "enum": [
+              "PENDING",
+              "COSTED"
+            ],
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "supplierId",
+          "supplierName",
+          "supplierDocNo",
+          "status",
+          "costingStatus",
+          "lineCount",
+          "effectiveDate",
+          "createdAt"
+        ]
+      },
+      "ReceiptPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ReceiptLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "2"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "24"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "48",
+            "description": "Base units"
+          },
+          "binId": {
+            "type": "number"
+          },
+          "binCode": {
+            "type": "string",
+            "example": "A-01-03"
+          },
+          "lotId": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "enteredQty",
+          "factorSnapshot",
+          "qtyBase",
+          "binId",
+          "binCode",
+          "lotId"
+        ]
+      },
+      "ReceiptDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "GR-2026-000001"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierCode": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true,
+            "description": "The supplier’s delivery note number"
+          },
+          "supplierDocDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "costingStatus": {
+            "nullable": true,
+            "enum": [
+              "PENDING",
+              "COSTED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "warehouseName",
+          "supplierId",
+          "supplierCode",
+          "supplierName",
+          "supplierDocNo",
+          "supplierDocDate",
+          "status",
+          "costingStatus",
+          "note",
+          "effectiveDate",
+          "postedAt",
+          "createdAt",
+          "updatedAt",
+          "lines"
+        ]
+      },
+      "ReceiptLineRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "2",
+            "description": "In the product unit"
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Omitted: the fixed shelf of the product, else the receiving area"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "enteredQty"
+        ]
+      },
+      "ReceiptCreateRequest": {
+        "type": "object",
+        "properties": {
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          },
+          "supplierDocDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "lines": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptLineRequest"
+            }
+          }
+        },
+        "required": [
+          "warehouseId",
+          "supplierId"
+        ]
+      },
+      "ReceiptUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "supplierDocNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50
+          },
+          "supplierDocDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
+      },
+      "ReceiptCostingLine": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "enteredQty": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "provisionalUnitCost": {
+            "type": "string",
+            "description": "Cost per base unit the goods went in at"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "Per base unit"
+          },
+          "freeGoods": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lineId",
+          "productId",
+          "productName",
+          "unitName",
+          "enteredQty",
+          "qtyBase",
+          "provisionalUnitCost",
+          "amount",
+          "unitCost",
+          "freeGoods"
+        ]
+      },
+      "ReceiptCosting": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "costingStatus": {
+            "nullable": true,
+            "enum": [
+              "PENDING",
+              "COSTED"
+            ],
+            "type": "string"
+          },
+          "costingVersion": {
+            "type": "number"
+          },
+          "recostUntil": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "costedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptCostingLine"
+            }
+          }
+        },
+        "required": [
+          "receiptId",
+          "number",
+          "status",
+          "costingStatus",
+          "costingVersion",
+          "recostUntil",
+          "costedAt",
+          "total",
+          "lines"
+        ]
+      },
+      "ReceiptCostLineRequest": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "example": "48000",
+            "description": "Line amount, MNT ex-VAT"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "24000",
+            "description": "Price per entered unit, MNT ex-VAT"
+          },
+          "freeGoods": {
+            "type": "boolean",
+            "description": "Free bonus goods (amount 0)"
+          }
+        },
+        "required": [
+          "lineId"
+        ]
+      },
+      "ReceiptCostRequest": {
+        "type": "object",
+        "properties": {
+          "costingVersion": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The costing version the form was opened at"
+          },
+          "lines": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptCostLineRequest"
+            }
+          }
+        },
+        "required": [
+          "costingVersion",
+          "lines"
+        ]
+      },
+      "ReceiptLineUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "enteredQty": {
+            "type": "string",
+            "example": "3"
+          },
+          "binId": {
+            "type": "number",
+            "minimum": 1
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

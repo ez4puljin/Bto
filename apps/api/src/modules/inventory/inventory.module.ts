@@ -3,14 +3,17 @@ import { CatalogModule } from '../catalog';
 import { IdentityModule, WAREHOUSE_CREATED_HOOK } from '../identity';
 import { PartnersModule } from '../partners';
 import { BinsController, ProductLocationsController } from './controllers/bins.controller';
+import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
 import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
+import { ReceiptsService } from './services/receipts.service';
 import { StockPostingService } from './services/stock-posting.service';
 import { SystemBinsService } from './services/system-bins.service';
 
 const CORE_SERVICES = [
   BinsService,
   ProductLocationsService,
+  ReceiptsService,
   StockPostingService,
   SystemBinsService,
 ];
@@ -43,7 +46,12 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
 /** The HTTP side of inventory (api only). */
 @Module({
   imports: [InventoryModule],
-  controllers: [BinsController, ProductLocationsController],
+  controllers: [
+    BinsController,
+    ProductLocationsController,
+    ReceiptsController,
+    ReceiptLinesController,
+  ],
   providers: [InventoryBootstrap],
 })
 export class InventoryHttpModule {}

@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import type { INestApplicationContext } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
@@ -34,7 +35,10 @@ export function inventoryApi(app: NestExpressApplication, token: string) {
     const response = await http()
       .post('/api/v1/branches')
       .set(auth)
-      .send({ code: `B${Date.now().toString(36).toUpperCase()}`, name: 'Төв салбар' })
+      .send({
+        code: `B${Date.now().toString(36).toUpperCase()}${randomInt(1000, 9999)}`,
+        name: 'Төв салбар',
+      })
       .expect(201);
     branchId = (response.body as { id: number }).id;
     return branchId;

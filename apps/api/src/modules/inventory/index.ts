@@ -15,6 +15,15 @@ export {
   ProductLocationsService,
 } from './services/product-locations.service';
 export {
+  type CostLineInput,
+  type ReceiptCosting,
+  type ReceiptDetail,
+  type ReceiptInput,
+  type ReceiptLineInput,
+  ReceiptsService,
+  type ReceiptSummary,
+} from './services/receipts.service';
+export {
   type CostedLine,
   type Movement,
   type PostedDocType,

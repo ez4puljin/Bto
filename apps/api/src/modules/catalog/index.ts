@@ -6,5 +6,9 @@ export { BarcodeService, type ResolvedBarcode } from './services/barcode.service
 export { CatalogService } from './services/catalog.service';
 export type { ProductDetail, ProductSummary, UnitView } from './services/products.service';
 export { type ProductTaxRates, TaxService } from './services/tax.service';
-export { type ConvertedQty, UnitConversionService } from './services/unit-conversion.service';
+export {
+  type ConvertedQty,
+  type UnitInfo,
+  UnitConversionService,
+} from './services/unit-conversion.service';
 export { UnitsService } from './services/units.service';
