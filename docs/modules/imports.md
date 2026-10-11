@@ -40,7 +40,7 @@ Every route needs `imports.manage` (ADMIN; assignable to custom roles).
 |---|---|
 | `GET /imports/templates/:kind` | the `.xlsx` template: Mongolian headers from `mn.json` (required ones marked `*`), code and barcode columns formatted as text, an instructions sheet «Заавар»; file name `tugeel-<kind>.xlsx` |
 | `GET /imports`, `GET /imports/:id` | history (keyset) and one job with `canRevert` |
-| `GET /imports/:id/rows?filter=ERRORS|WARNINGS|ALL` | keyset by row number |
+| `GET /imports/:id/rows?filter=ERRORS\|WARNINGS\|ALL` | keyset by row number |
 | `POST /imports` (`Idempotency-Key`) | `{ kind, fileId, fileName }` after the presigned upload of a private `imports.source` file (`.xlsx`, ≤ 5 MiB, ZIP magic checked); enqueues `imports.validate` |
 | `POST /imports/:id/commit` (200, `Idempotency-Key`) | VALIDATED only (`IMPORT_HAS_ERRORS`, `IMPORT_STATE_INVALID`); enqueues `imports.commit` |
 | `POST /imports/:id/revert` (200, `Idempotency-Key`) | the most recent COMMITTED import of any kind only (`IMPORT_REVERT_BLOCKED`); enqueues `imports.revert` |
