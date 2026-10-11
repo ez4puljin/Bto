@@ -291,11 +291,17 @@ export class CatalogImportService {
         .where(inArray(products.id, part))
         .orderBy(asc(products.id))
         .for('update');
+      const released = await tx
+        .select({ productId: productUnits.productId, code: productBarcodes.code })
+        .from(productBarcodes)
+        .innerJoin(productUnits, eq(productUnits.id, productBarcodes.productUnitId))
+        .where(inArray(productUnits.productId, part))
+        .orderBy(asc(productBarcodes.id));
       await tx
         .update(products)
         .set({ status: 'INACTIVE', updatedAt: sql`now()` })
         .where(inArray(products.id, part));
-      const removed = await tx
+      await tx
         .delete(productBarcodes)
         .where(
           inArray(
@@ -305,17 +311,22 @@ export class CatalogImportService {
               .from(productUnits)
               .where(inArray(productUnits.productId, part)),
           ),
-        )
-        .returning({ code: productBarcodes.code, unitId: productBarcodes.productUnitId });
+        );
+      const codes = new Map<number, string[]>();
+      for (const row of released) {
+        const list = codes.get(row.productId) ?? [];
+        list.push(row.code);
+        codes.set(row.productId, list);
+      }
       await this.audit.recordMany(
         tx,
         actor,
         before.map((row) => ({
-          action: 'DEACTIVATE',
+          action: 'UPDATE',
           entity: 'products',
           entityId: row.id,
-          before: { status: row.status },
-          after: { status: 'INACTIVE', barcodesReleased: removed.length },
+          before: { status: row.status, barcodes: codes.get(row.id) ?? [] },
+          after: { status: 'INACTIVE', barcodes: [] },
         })),
       );
     }

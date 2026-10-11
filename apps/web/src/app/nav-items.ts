@@ -72,6 +72,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/warehouses', label: 'nav.warehouses', permission: 'identity.org.manage' },
       { to: '/settings', label: 'nav.settings', permission: 'identity.settings.read' },
       { to: '/audit', label: 'nav.audit', permission: 'identity.audit.read' },
+      { to: '/imports', label: 'nav.imports', permission: 'imports.manage' },
     ],
   },
 ];

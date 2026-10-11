@@ -24,6 +24,7 @@ import { ReceiptCostingPage } from '@/features/inventory/costing-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
+import { ImportPage, ImportsPage } from '@/features/imports/imports-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
@@ -124,6 +125,22 @@ export const routes: RouteObject[] = [
         element: (
           <RequirePermission permission="inventory.costs.manage">
             <ReceiptCostingPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'imports',
+        element: (
+          <RequirePermission permission="imports.manage">
+            <ImportsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'imports/:id',
+        element: (
+          <RequirePermission permission="imports.manage">
+            <ImportPage />
           </RequirePermission>
         ),
       },

@@ -135,13 +135,26 @@ describe('services for imports', () => {
       }),
     );
     expect(before.name).toBe('Бараа 102');
-    await tx((t) =>
-      catalogImport.deactivateManyInTx(t, actor, [created.get('101')?.productId ?? 0]),
-    );
+    const colaId = created.get('101')?.productId ?? 0;
+    const plainId = created.get('102')?.productId ?? 0;
+    await tx((t) => catalogImport.deactivateManyInTx(t, actor, [colaId, plainId]));
     const [inactive] = await catalogImport.productsBySku(['101']);
     expect(inactive?.status).toBe('INACTIVE');
     expect(inactive?.units.flatMap((unit) => unit.barcodes)).toEqual([]);
     expect((await catalogImport.barcodeOwners(['04006381333931'])).size).toBe(0);
+    // Each product's audit row names its own released barcodes.
+    const { rows: released } = await sql.query<{ entity_id: string; before: unknown }>(
+      `SELECT entity_id, before FROM audit_log
+        WHERE entity = 'products' AND action = 'UPDATE' AND after->>'status' = 'INACTIVE'
+        ORDER BY entity_id::int`,
+    );
+    expect(released).toEqual([
+      {
+        entity_id: String(colaId),
+        before: { status: 'ACTIVE', barcodes: ['4006381333931', '5449000000996'] },
+      },
+      { entity_id: String(plainId), before: { status: 'ACTIVE', barcodes: [] } },
+    ]);
   });
 
   it('links suppliers and sets locations in bulk under table locks', async () => {

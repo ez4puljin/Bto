@@ -1,0 +1,197 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { components } from '@tugeel/api-client';
+import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
+import mn from '@tugeel/shared/i18n/mn.json';
+import { describe, expect, it, vi } from 'vitest';
+import { ADMIN_ME, json, type Me, renderApp, signedIn } from '@/test/render-app';
+
+type Schemas = components['schemas'];
+const STAMP = '2026-10-11T02:00:00.000Z';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+const WAREHOUSE_ME: Me = {
+  ...ADMIN_ME,
+  id: 2,
+  username: 'nyarav',
+  fullName: 'Нярав Дорж',
+  permissions: [...SYSTEM_ROLE_PERMISSIONS.WAREHOUSE],
+  roles: [{ id: 4, code: 'WAREHOUSE', name: null, isSystem: true }],
+};
+
+const JOB: Schemas['ImportJob'] = {
+  id: 5,
+  kind: 'PRODUCTS',
+  fileName: 'Бараа.xlsx',
+  status: 'INVALID',
+  phase: null,
+  totalRows: 3,
+  processedRows: 3,
+  errorRows: 1,
+  warningRows: 0,
+  summary: {
+    actions: { CREATE: 1, UPDATE: 1, UNCHANGED: 0 },
+    errors: { NOT_FOUND: 1 },
+    warnings: {},
+  },
+  lastError: null,
+  canRevert: false,
+  createdAt: STAMP,
+  validatedAt: STAMP,
+  committedAt: null,
+  revertedAt: null,
+  updatedAt: STAMP,
+};
+const ROWS: Schemas['ImportRow'][] = [
+  {
+    rowNo: 3,
+    // jsonb keeps shorter keys first, not the template order.
+    raw: {
+      sku: '1002',
+      name: 'Цэвэр ус',
+      brand: 'Bonaqua',
+      boxQty: '0',
+      category: 'Цай',
+      supplier: null,
+    },
+    errors: [
+      { column: 'category', code: 'NOT_FOUND', params: { value: 'Цай' } },
+      { column: 'boxQty', code: 'NOT_POSITIVE', params: {} },
+    ],
+    warnings: [],
+    action: null,
+    changed: [],
+  },
+];
+
+const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: string) =>
+  fetchMock.mock.calls
+    .map(([request]) => request)
+    .filter((request) => request.method === method && new URL(request.url).pathname === path);
+
+describe('imports menu', () => {
+  it('shows imports to admins only', async () => {
+    renderApp('/system/status', signedIn(ADMIN_ME));
+    const nav = await screen.findByRole('navigation');
+    expect(within(nav).getByRole('link', { name: mn.nav.imports })).toBeInTheDocument();
+  });
+
+  it('keeps imports from the warehouse', async () => {
+    renderApp('/system/status', signedIn(WAREHOUSE_ME));
+    const nav = await screen.findByRole('navigation');
+    expect(within(nav).queryByRole('link', { name: mn.nav.imports })).toBeNull();
+  });
+});
+
+describe('import upload', () => {
+  it('uploads an .xlsx sheet as .xlsx whatever the browser says and opens its check', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
+      'POST /api/v1/files/presign': () =>
+        json(
+          {
+            fileId: 41,
+            uploadUrl: '/api/v1/files/local/x.xlsx?exp=1&sig=s',
+            method: 'PUT',
+            headers: { 'Content-Type': XLSX },
+            expiresAt: STAMP,
+          },
+          201,
+        ),
+      'PUT /api/v1/files/local/x.xlsx': () => new Response(null, { status: 204 }),
+      'POST /api/v1/imports': () => json({ ...JOB, status: 'UPLOADED', totalRows: 0 }, 201),
+      'GET /api/v1/imports/5': () => json({ ...JOB, status: 'UPLOADED', totalRows: 0 }),
+    });
+    // The upload itself is a plain fetch to the signed URL (no token): route it to the mock too.
+    const put = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input, init) => fetchMock(new Request(input, init)));
+    renderApp('/imports', fetchMock);
+    const user = userEvent.setup();
+    const input = await screen.findByLabelText(
+      `${mn.imports.upload}: ${mn.imports.kinds.PRODUCTS}`,
+    );
+    await user.upload(
+      input,
+      new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Бараа.xlsx', { type: '' }),
+    );
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/imports')).toHaveLength(1));
+    const presign = calls(fetchMock, 'POST', '/api/v1/files/presign')[0];
+    expect(await presign?.clone().json()).toEqual({
+      kind: 'imports.source',
+      contentType: XLSX,
+      sizeBytes: 4,
+    });
+    const created = calls(fetchMock, 'POST', '/api/v1/imports')[0];
+    expect(await created?.clone().json()).toEqual({
+      kind: 'PRODUCTS',
+      fileId: 41,
+      fileName: 'Бараа.xlsx',
+    });
+    expect(created?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(await screen.findByRole('heading', { name: 'Бараа.xlsx' })).toBeInTheDocument();
+    put.mockRestore();
+  });
+
+  it('refuses an old .xls file before uploading', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
+    });
+    renderApp('/imports', fetchMock);
+    const user = userEvent.setup({ applyAccept: false });
+    const input = await screen.findByLabelText(
+      `${mn.imports.upload}: ${mn.imports.kinds.CUSTOMERS}`,
+    );
+    await user.upload(input, new File([new Uint8Array([1])], 'old.xls'));
+    expect(await screen.findByText(mn.imports.xlsxOnly)).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/files/presign')).toHaveLength(0);
+  });
+});
+
+describe('import check', () => {
+  it('lists the problems of each row in Mongolian and offers no commit while any remains', async () => {
+    renderApp(
+      '/imports/5',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/imports/5': () => json(JOB),
+        'GET /api/v1/imports/5/rows': () => json({ data: ROWS, nextCursor: null }),
+      }),
+    );
+    expect(await screen.findByText('Ангилал: «Цай» олдсонгүй')).toBeInTheDocument();
+    expect(
+      screen.getByText('Код: 1002 · Нэр: Цэвэр ус · Ангилал: Цай · Хайрцаг дахь тоо: 0'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(mn.imports.invalidHint)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: mn.imports.commit })).toBeNull();
+  });
+
+  it('commits a checked import once after confirmation', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports/5': () => json({ ...JOB, status: 'VALIDATED', errorRows: 0 }),
+      'GET /api/v1/imports/5/rows': () =>
+        json({
+          data: [
+            { ...ROWS[0], errors: [], action: 'UPDATE', changed: ['name', 'categoryId'] },
+            { ...ROWS[0], rowNo: 4, errors: [], action: 'CREATE', changed: ['homeWarehouse'] },
+          ],
+          nextCursor: null,
+        }),
+      'POST /api/v1/imports/5/commit': () => json({ ...JOB, status: 'COMMITTING', errorRows: 0 }),
+    });
+    renderApp('/imports/5', fetchMock);
+    const user = userEvent.setup();
+    expect(await screen.findByText('Өөрчлөгдөх: Нэр, Ангилал')).toBeInTheDocument();
+    expect(screen.getByText(mn.imports.actions.CREATE)).toBeInTheDocument();
+    expect(screen.queryByText(/Харьяа агуулах/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: mn.imports.commit }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: mn.imports.commit }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/imports/5/commit')).toHaveLength(1),
+    );
+    expect(
+      calls(fetchMock, 'POST', '/api/v1/imports/5/commit')[0]?.headers.get('Idempotency-Key'),
+    ).toMatch(UUID);
+  });
+});
