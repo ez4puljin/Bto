@@ -300,6 +300,24 @@ export function reaverage(
   return before.times(avg).plus(added.times(cost)).dividedBy(total).toDecimalPlaces(COST_SCALE);
 }
 
+/**
+ * Moving average after `qty` leaves at its own `unitCost` instead of the average (TRANSIT, ADR-0035
+ * #4): what stays keeps its value. Unchanged when nothing stays; never below zero (rounding).
+ */
+export function averageAfterWithdrawal(
+  onHand: DecimalInput,
+  avg: DecimalInput,
+  qty: DecimalInput,
+  unitCost: DecimalInput,
+): Decimal {
+  const before = new Decimal(onHand);
+  const taken = new Decimal(qty);
+  const left = before.minus(taken);
+  if (left.lte(0)) return new Decimal(avg);
+  const value = before.times(avg).minus(taken.times(unitCost));
+  return Decimal.max(0, value.dividedBy(left)).toDecimalPlaces(COST_SCALE);
+}
+
 /** The value of a quantity at a unit cost, MNT with two decimals. */
 export function valueOf(qty: DecimalInput, unitCost: DecimalInput): Decimal {
   return new Decimal(qty).times(unitCost).toDecimalPlaces(MONEY_SCALE);

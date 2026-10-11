@@ -40,6 +40,7 @@ export {
 } from './services/receipts.service';
 export {
   type CostedLine,
+  MAX_MOVEMENTS_PER_POST,
   type Movement,
   type PostedDocType,
   type PostingDoc,
@@ -65,3 +66,13 @@ export {
   type StocktakeStatus,
 } from './services/stocktakes.service';
 export { SystemBinsService } from './services/system-bins.service';
+export {
+  MAX_TRANSFER_LINES,
+  type TransferCount,
+  type TransferDetail,
+  type TransferInput,
+  type TransferLineInput,
+  type TransferQuery,
+  TransfersService,
+  type TransferSummary,
+} from './services/transfers.service';

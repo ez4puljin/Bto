@@ -6771,6 +6771,637 @@
           "inventory"
         ]
       }
+    },
+    "/api/v1/transfers": {
+      "get": {
+        "operationId": "Transfers_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "description": "With warehouseId: INCOMING = it receives, OUTGOING = it sends",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOMING",
+                "OUTGOING"
+              ]
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "REQUESTED",
+                "SHIPPED",
+                "RECEIVED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Transfers_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}": {
+      "get": {
+        "operationId": "Transfers_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "Transfers_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/lines": {
+      "post": {
+        "operationId": "Transfers_addLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/request": {
+      "post": {
+        "operationId": "Transfers_request",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → REQUESTED by the destination; the request gets its number.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/ship": {
+      "post": {
+        "operationId": "Transfers_ship",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The source ships into TRANSIT; idempotent so a retried click never ships twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/receive": {
+      "post": {
+        "operationId": "Transfers_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The destination counts what arrived; differences go back to the sender (ADR-0035).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/cancel": {
+      "post": {
+        "operationId": "Transfers_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancels a draft, withdraws a request (destination) or declines it (source, with a reason).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfer-lines/{id}": {
+      "patch": {
+        "operationId": "TransferLines_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferLineUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "delete": {
+        "operationId": "TransferLines_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
     }
   },
   "info": {
@@ -11968,6 +12599,423 @@
         "required": [
           "lastRun"
         ]
+      },
+      "TransferSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "enum": [
+              "REQUEST",
+              "PUSH"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "REQUESTED",
+              "SHIPPED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "sourceWarehouseId": {
+            "type": "number"
+          },
+          "destWarehouseId": {
+            "type": "number"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shippedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "status",
+          "sourceWarehouseId",
+          "destWarehouseId",
+          "lineCount",
+          "requestedAt",
+          "shippedAt",
+          "receivedAt",
+          "createdAt"
+        ]
+      },
+      "TransferPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "TransferLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "requestUnitId": {
+            "type": "number",
+            "description": "The unit asked for"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "requestFactor": {
+            "type": "string",
+            "example": "24",
+            "description": "Base units per request unit, frozen on the line"
+          },
+          "requestedQty": {
+            "type": "string",
+            "example": "5",
+            "description": "In the request unit"
+          },
+          "baseUnitId": {
+            "type": "number"
+          },
+          "baseUnitName": {
+            "type": "string",
+            "example": "ширхэг"
+          },
+          "shippedQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "example": "120",
+            "description": "Base units"
+          },
+          "receivedQtyBase": {
+            "type": "string",
+            "nullable": true,
+            "example": "118",
+            "description": "Base units"
+          },
+          "fromBinId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chosen when shipped; before, the suggested shelf (null: to be scanned)"
+          },
+          "fromBinCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "A-01-03"
+          },
+          "toBinId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chosen when received; while in transit, the suggested bin"
+          },
+          "toBinCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "SALESFLOOR"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productSku",
+          "productName",
+          "requestUnitId",
+          "unitName",
+          "requestFactor",
+          "requestedQty",
+          "baseUnitId",
+          "baseUnitName",
+          "shippedQtyBase",
+          "receivedQtyBase",
+          "fromBinId",
+          "fromBinCode",
+          "toBinId",
+          "toBinCode"
+        ]
+      },
+      "TransferDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "TR-2026-000001"
+          },
+          "origin": {
+            "enum": [
+              "REQUEST",
+              "PUSH"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "REQUESTED",
+              "SHIPPED",
+              "RECEIVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "sourceWarehouseId": {
+            "type": "number"
+          },
+          "destWarehouseId": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shippedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "shipDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "receiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "status",
+          "sourceWarehouseId",
+          "destWarehouseId",
+          "note",
+          "requestedAt",
+          "shippedAt",
+          "shipDate",
+          "receivedAt",
+          "receiveDate",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "updatedAt",
+          "lines"
+        ]
+      },
+      "TransferLineRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The unit asked for"
+          },
+          "qty": {
+            "type": "string",
+            "example": "5",
+            "description": "Positive, in that unit"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "TransferCreateRequest": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "enum": [
+              "REQUEST",
+              "PUSH"
+            ],
+            "type": "string",
+            "description": "REQUEST: the destination asks; PUSH: the source sends on its own"
+          },
+          "sourceWarehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "destWarehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferLineRequest"
+            }
+          }
+        },
+        "required": [
+          "origin",
+          "sourceWarehouseId",
+          "destWarehouseId"
+        ]
+      },
+      "TransferUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
+      },
+      "TransferCount": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A current unit of the product; default the line’s unit"
+          },
+          "qty": {
+            "type": "string",
+            "example": "5",
+            "description": "In that unit; 0 = none. Default: requested (ship) or shipped (receive)"
+          },
+          "binId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The source shelf (ship) or destination bin (receive)"
+          }
+        },
+        "required": [
+          "lineId"
+        ]
+      },
+      "TransferCountRequest": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "description": "Lines left out take the default quantity and bin",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferCount"
+            }
+          }
+        }
+      },
+      "TransferCancelRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Required when the source declines a request"
+          }
+        }
+      },
+      "TransferLineUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "6"
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

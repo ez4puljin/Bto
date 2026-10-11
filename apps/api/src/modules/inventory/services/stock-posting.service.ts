@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  averageAfterWithdrawal,
   formatDocNumber,
   MOVEMENT_TYPES,
   type MovementType,
@@ -14,21 +15,36 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { AppError } from '../../../common/errors/app-error';
+import { AppError, invalid } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
 import { type Actor, actorUserId, NumberingService } from '../../identity';
 import { stockLedger, stockValuationAdjustments } from '../ledger.schema';
-import { adjustments, binMoves, goodsReceipts, reconciliationRuns, stocktakes } from '../schema';
+import {
+  adjustments,
+  binMoves,
+  goodsReceipts,
+  reconciliationRuns,
+  stocktakes,
+  transfers,
+} from '../schema';
 
 /** Inventory's own stock documents; other modules guard their documents themselves (ADR-0034 #5). */
-export type PostedDocType = Extract<StockDocType, 'GR' | 'BM' | 'ADJ' | 'ST'>;
+export type PostedDocType = Extract<StockDocType, 'GR' | 'BM' | 'TR' | 'ADJ' | 'ST'>;
 
 export interface PostingDoc {
   docType: PostedDocType;
   docId: number;
   expectedStatus: string;
   nextStatus: string;
+  /**
+   * Default true. A requested transfer already has its number, so its shipping and receiving post
+   * without a new one (ADR-0035 #3, #7).
+   */
+  allocateNumber?: boolean;
 }
+
+/** One posting writes at most this many movements (ADR-0035 #7); callers split larger documents. */
+export const MAX_MOVEMENTS_PER_POST = 15_000;
 
 export interface Movement {
   docType: StockDocType;
@@ -123,6 +139,14 @@ interface BinRow {
   onHand: Decimal;
 }
 
+interface DocStamp {
+  /** Null when the document keeps the number it already has. */
+  number: string | null;
+  postedAt: Date;
+  effectiveDate: string;
+  postedBy: number | null;
+}
+
 interface BinState {
   id: number;
   warehouseId: number;
@@ -146,15 +170,19 @@ const legKey = (docLineId: number, movementType: MovementType, leg: number) =>
 /** Bigint columns of raw queries arrive as strings. */
 const toInt = (value: string | null) => (value === null ? null : Number.parseInt(value, 10));
 const toId = (value: string) => Number.parseInt(value, 10);
-const DOC_ORDER: Record<PostedDocType, number> = { ADJ: 0, BM: 1, GR: 2, ST: 3 };
+const DOC_ORDER: Record<PostedDocType, number> = { ADJ: 0, BM: 1, GR: 2, ST: 3, TR: 4 };
 const MAX_DIFFS = 100;
+/** Rows per multi-row statement: far below the 65,535 bind parameters of one statement. */
+const CHUNK = 1_000;
 
 /**
  * The only writer of the stock ledger, the balance caches and the costing history (ADR-0007,
  * ADR-0033, ADR-0034). Every document service builds its movements and calls `post` inside its own
  * transaction, after locking its header. Lock order: document headers → bins FOR SHARE → missing
- * cache rows (one sorted insert) → warehouse_stock → bin_stock → inserts → document numbers last.
- * Ledger reads (reconciliation, rebuild) live here too: ESLint G2 keeps the ledger in this file.
+ * cache rows (sorted inserts) → warehouse_stock → bin_stock → inserts → document numbers last.
+ * Multi-row statements run in chunks of 1,000 rows taken in key order, so the lock order holds
+ * across chunks. Ledger reads (reconciliation, rebuild) live here too: ESLint G2 keeps the ledger
+ * in this file.
  */
 @Injectable()
 export class StockPostingService {
@@ -172,6 +200,13 @@ export class StockPostingService {
       (a, b) => DOC_ORDER[a.docType] - DOC_ORDER[b.docType] || a.docId - b.docId,
     );
     validateMovements(docs, input.movements);
+    if (input.movements.length > MAX_MOVEMENTS_PER_POST) {
+      throw invalid(
+        'lines',
+        'max',
+        `at most ${MAX_MOVEMENTS_PER_POST} stock movements in one posting`,
+      );
+    }
 
     // 1. Document headers, re-checked under their row lock (callers already hold it).
     for (const doc of docs) await this.lockDoc(tx, doc);
@@ -248,6 +283,7 @@ export class StockPostingService {
         )
         .map(({ movement }) => movement);
       const outboundCost = new Map<string, Decimal>();
+      const transitCosts = await this.transitCosts(tx, movements);
       const ledgerRows: (typeof stockLedger.$inferInsert)[] = [];
       for (const movement of ordered) {
         const key = wsKey(movement.warehouseId, movement.productId, movement.lotId);
@@ -255,7 +291,20 @@ export class StockPostingService {
         if (!balance) throw new Error(`no warehouse balance locked for ${key}`);
         const sellable = binStates.get(movement.binId)?.sellable ?? false;
         let unitCost: Decimal;
-        if (movement.qtyBase.isNegative()) {
+        if (isTransitExit(movement)) {
+          // ADR-0035 #4: a line leaves TRANSIT at the cost it entered at, never at a pooled average.
+          const entered = transitCosts.get(movement.docLineId);
+          if (!entered)
+            throw new Error(`transfer line ${movement.docLineId} never entered TRANSIT`);
+          unitCost = entered;
+          balance.avg = averageAfterWithdrawal(
+            balance.onHand,
+            balance.avg,
+            movement.qtyBase.negated(),
+            unitCost,
+          );
+          outboundCost.set(`${movement.docType}:${movement.docLineId}`, unitCost);
+        } else if (movement.qtyBase.isNegative()) {
           unitCost = balance.avg;
           outboundCost.set(`${movement.docType}:${movement.docLineId}`, unitCost);
         } else {
@@ -291,7 +340,7 @@ export class StockPostingService {
 
       // 7. The ledger; a repeated (document line, movement, leg) is ALREADY_POSTED.
       try {
-        await tx.insert(stockLedger).values(ledgerRows);
+        for (const rows of chunks(ledgerRows)) await tx.insert(stockLedger).values(rows);
       } catch (error) {
         const database = databaseErrorOf(error);
         if (database?.code === '23505' && database.constraint === 'stock_ledger_idem') {
@@ -300,37 +349,55 @@ export class StockPostingService {
         throw error;
       }
 
-      // 8. Balances, one UPDATE per row.
-      for (const [key, row] of warehouseRows) {
+      // 8. Balances: the locked rows, a chunk per UPDATE.
+      const warehouseUpdates = [...warehouseRows].flatMap(([key, row]) => {
         const balance = state.get(key);
-        if (!balance) continue;
+        return balance ? [{ id: row.id, ...balance }] : [];
+      });
+      for (const rows of chunks(warehouseUpdates)) {
         await tx.execute(sql`
-          UPDATE warehouse_stock
-             SET on_hand = ${balance.onHand.toFixed()}, sellable_on_hand = ${balance.sellable.toFixed()},
-                 avg_cost = ${balance.avg.toFixed()}, updated_at = ${postedAt}
-           WHERE id = ${row.id}`);
+          UPDATE warehouse_stock ws
+             SET on_hand = v.on_hand, sellable_on_hand = v.sellable, avg_cost = v.avg_cost,
+                 updated_at = ${postedAt}
+            FROM (VALUES ${sql.join(
+              rows.map(
+                (row) =>
+                  sql`(${row.id}::bigint, ${row.onHand.toFixed()}::numeric, ${row.sellable.toFixed()}::numeric, ${row.avg.toFixed()}::numeric)`,
+              ),
+              sql`, `,
+            )}) AS v (id, on_hand, sellable, avg_cost)
+           WHERE ws.id = v.id`);
       }
-      for (const [key, delta] of binDelta) {
+      const binUpdates = [...binDelta].flatMap(([key, delta]) => {
         const row = binRows.get(key);
-        if (!row || delta.isZero()) continue;
+        return row && !delta.isZero() ? [{ id: row.id, onHand: row.onHand.plus(delta) }] : [];
+      });
+      for (const rows of chunks(binUpdates)) {
         await tx.execute(sql`
-          UPDATE bin_stock SET on_hand = ${row.onHand.plus(delta).toFixed()}, updated_at = ${postedAt}
-           WHERE id = ${row.id}`);
+          UPDATE bin_stock bs SET on_hand = v.on_hand, updated_at = ${postedAt}
+            FROM (VALUES ${sql.join(
+              rows.map((row) => sql`(${row.id}::bigint, ${row.onHand.toFixed()}::numeric)`),
+              sql`, `,
+            )}) AS v (id, on_hand)
+           WHERE bs.id = v.id`);
       }
     }
 
     // 9. Documents: status, dates and their number, allocated last.
     const numbers = new Map<number, string>();
     for (const doc of docs) {
-      const value = await this.numbering.next(tx, doc.docType, businessYear(postedAt));
-      const number = formatDocNumber(doc.docType, businessYear(postedAt), value);
+      let number: string | null = null;
+      if (doc.allocateNumber !== false) {
+        const value = await this.numbering.next(tx, doc.docType, businessYear(postedAt));
+        number = formatDocNumber(doc.docType, businessYear(postedAt), value);
+        numbers.set(doc.docId, number);
+      }
       await this.finishDoc(tx, doc, {
         number,
         postedAt,
         effectiveDate,
         postedBy: actorUserId(actor),
       });
-      numbers.set(doc.docId, number);
     }
     return { postedAt, effectiveDate, numbers, unitCosts };
   }
@@ -680,6 +747,32 @@ export class StockPostingService {
     return before;
   }
 
+  /** The cost each transfer line entered TRANSIT at (its leg 2), for the lines leaving it here. */
+  private async transitCosts(
+    tx: Tx,
+    movements: readonly Movement[],
+  ): Promise<Map<number, Decimal>> {
+    const lineIds = [
+      ...new Set(movements.filter(isTransitExit).map((movement) => movement.docLineId)),
+    ].sort((a, b) => a - b);
+    const costs = new Map<number, Decimal>();
+    for (const part of chunks(lineIds)) {
+      const rows = await tx
+        .select({ docLineId: stockLedger.docLineId, unitCost: stockLedger.unitCost })
+        .from(stockLedger)
+        .where(
+          and(
+            eq(stockLedger.docType, 'TR'),
+            eq(stockLedger.movementType, 'TRANSFER_IN'),
+            eq(stockLedger.leg, 2),
+            inArray(stockLedger.docLineId, part),
+          ),
+        );
+      for (const row of rows) costs.set(row.docLineId, row.unitCost);
+    }
+    return costs;
+  }
+
   private async lockDoc(tx: Tx, doc: PostingDoc): Promise<void> {
     const status = await this.docStatus(tx, doc);
     if (status === undefined)
@@ -730,14 +823,25 @@ export class StockPostingService {
           .for('update');
         return row?.status;
       }
+      case 'TR': {
+        const [row] = await tx
+          .select({ status: transfers.status })
+          .from(transfers)
+          .where(eq(transfers.id, doc.docId))
+          .for('update');
+        return row?.status;
+      }
     }
   }
 
-  private async finishDoc(
-    tx: Tx,
-    doc: PostingDoc,
-    values: { number: string; postedAt: Date; effectiveDate: string; postedBy: number | null },
-  ): Promise<void> {
+  private async finishDoc(tx: Tx, doc: PostingDoc, values: DocStamp): Promise<void> {
+    if (doc.docType === 'TR') {
+      await this.finishTransfer(tx, doc, values);
+      return;
+    }
+    if (values.number === null) {
+      throw new Error(`${doc.docType} ${doc.docId} is numbered when it is posted`);
+    }
     const common = {
       number: values.number,
       postedAt: values.postedAt,
@@ -773,75 +877,100 @@ export class StockPostingService {
     }
   }
 
+  /** Shipping stamps the shipped columns, receiving the received ones (ADR-0035). */
+  private async finishTransfer(tx: Tx, doc: PostingDoc, values: DocStamp): Promise<void> {
+    const stamp =
+      doc.nextStatus === 'SHIPPED'
+        ? {
+            status: 'SHIPPED' as const,
+            shippedAt: values.postedAt,
+            shipDate: values.effectiveDate,
+            shippedBy: values.postedBy,
+          }
+        : doc.nextStatus === 'RECEIVED'
+          ? {
+              status: 'RECEIVED' as const,
+              receivedAt: values.postedAt,
+              receiveDate: values.effectiveDate,
+              receivedBy: values.postedBy,
+            }
+          : null;
+    if (!stamp) throw new Error(`a transfer is not posted into ${doc.nextStatus}`);
+    await tx
+      .update(transfers)
+      .set({
+        ...stamp,
+        ...(values.number === null ? {} : { number: values.number }),
+        updatedAt: values.postedAt,
+      })
+      .where(eq(transfers.id, doc.docId));
+  }
+
   private async lockBins(tx: Tx, movements: readonly Movement[]): Promise<Map<number, BinState>> {
     const ids = [...new Set(movements.map((movement) => movement.binId))].sort((a, b) => a - b);
-    const { rows } = await tx.execute<{
-      id: string;
-      warehouse_id: string;
-      code: string;
-      status: string;
-      archived: boolean;
-      sellable: boolean;
-    }>(sql`
-      SELECT id, warehouse_id, code, status, archived_at IS NOT NULL AS archived, sellable
-        FROM bins WHERE id IN (${sql.join(
-          ids.map((id) => sql`${id}`),
-          sql`, `,
-        )})
-       ORDER BY id FOR SHARE`);
-    return new Map(
-      rows.map((row) => [
-        toId(row.id),
-        {
+    const states = new Map<number, BinState>();
+    for (const part of chunks(ids)) {
+      const { rows } = await tx.execute<{
+        id: string;
+        warehouse_id: string;
+        code: string;
+        status: string;
+        archived: boolean;
+        sellable: boolean;
+      }>(sql`
+        SELECT id, warehouse_id, code, status, archived_at IS NOT NULL AS archived, sellable
+          FROM bins WHERE id IN (${sql.join(
+            part.map((id) => sql`${id}`),
+            sql`, `,
+          )})
+         ORDER BY id FOR SHARE`);
+      for (const row of rows) {
+        states.set(toId(row.id), {
           id: toId(row.id),
           warehouseId: toId(row.warehouse_id),
           code: row.code,
           status: row.status,
           archived: row.archived,
           sellable: row.sellable,
-        },
-      ]),
-    );
+        });
+      }
+    }
+    return states;
   }
 
   private async ensureCacheRows(tx: Tx, movements: readonly Movement[]): Promise<void> {
     const inbound = movements.filter((movement) => movement.qtyBase.gt(0));
     if (inbound.length === 0) return;
     const warehouseKeys = uniqueBy(inbound, (m) => wsKey(m.warehouseId, m.productId, m.lotId)).sort(
-      (a, b) =>
-        a.warehouseId - b.warehouseId ||
-        a.productId - b.productId ||
-        (a.lotId ?? 0) - (b.lotId ?? 0),
+      byWarehouseKey,
     );
-    await tx.execute(sql`
-      INSERT INTO warehouse_stock (warehouse_id, product_id, lot_id)
-      SELECT * FROM (VALUES ${sql.join(
-        warehouseKeys.map(
-          (m) =>
-            sql`(${m.warehouseId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
-        ),
-        sql`, `,
-      )}) AS k (warehouse_id, product_id, lot_id)
-      ON CONFLICT ON CONSTRAINT warehouse_stock_key DO NOTHING`);
+    for (const part of chunks(warehouseKeys)) {
+      await tx.execute(sql`
+        INSERT INTO warehouse_stock (warehouse_id, product_id, lot_id)
+        SELECT * FROM (VALUES ${sql.join(
+          part.map(
+            (m) =>
+              sql`(${m.warehouseId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
+          ),
+          sql`, `,
+        )}) AS k (warehouse_id, product_id, lot_id)
+        ON CONFLICT ON CONSTRAINT warehouse_stock_key DO NOTHING`);
+    }
     const binKeys = uniqueBy(inbound, (m) =>
       bsKey(m.warehouseId, m.binId, m.productId, m.lotId),
-    ).sort(
-      (a, b) =>
-        a.warehouseId - b.warehouseId ||
-        a.binId - b.binId ||
-        a.productId - b.productId ||
-        (a.lotId ?? 0) - (b.lotId ?? 0),
-    );
-    await tx.execute(sql`
-      INSERT INTO bin_stock (warehouse_id, bin_id, product_id, lot_id)
-      SELECT * FROM (VALUES ${sql.join(
-        binKeys.map(
-          (m) =>
-            sql`(${m.warehouseId}::bigint, ${m.binId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
-        ),
-        sql`, `,
-      )}) AS k (warehouse_id, bin_id, product_id, lot_id)
-      ON CONFLICT ON CONSTRAINT bin_stock_key DO NOTHING`);
+    ).sort(byBinKey);
+    for (const part of chunks(binKeys)) {
+      await tx.execute(sql`
+        INSERT INTO bin_stock (warehouse_id, bin_id, product_id, lot_id)
+        SELECT * FROM (VALUES ${sql.join(
+          part.map(
+            (m) =>
+              sql`(${m.warehouseId}::bigint, ${m.binId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
+          ),
+          sql`, `,
+        )}) AS k (warehouse_id, bin_id, product_id, lot_id)
+        ON CONFLICT ON CONSTRAINT bin_stock_key DO NOTHING`);
+    }
   }
 
   private lockWarehouseRows(
@@ -863,31 +992,33 @@ export class StockPostingService {
     tx: Tx,
     keys: readonly { warehouseId: number; productId: number; lotId: number | null }[],
   ): Promise<Map<string, WarehouseRow>> {
-    const unique = uniqueBy(keys, (k) => wsKey(k.warehouseId, k.productId, k.lotId));
-    if (unique.length === 0) return new Map();
-    const { rows } = await tx.execute<{
-      id: string;
-      warehouse_id: string;
-      product_id: string;
-      lot_id: string | null;
-      on_hand: string;
-      sellable_on_hand: string;
-      avg_cost: string;
-    }>(sql`
-      SELECT ws.id, ws.warehouse_id, ws.product_id, ws.lot_id, ws.on_hand, ws.sellable_on_hand, ws.avg_cost
-        FROM warehouse_stock ws
-        JOIN (VALUES ${sql.join(
-          unique.map(
-            (k) => sql`(${k.warehouseId}::bigint, ${k.productId}::bigint, ${k.lotId}::bigint)`,
-          ),
-          sql`, `,
-        )}) AS k (warehouse_id, product_id, lot_id)
-          ON ws.warehouse_id = k.warehouse_id AND ws.product_id = k.product_id
-         AND ws.lot_id IS NOT DISTINCT FROM k.lot_id
-       ORDER BY ws.warehouse_id, ws.product_id, ws.lot_id NULLS FIRST
-         FOR UPDATE OF ws`);
-    return new Map(
-      rows.map((row) => {
+    const unique = uniqueBy(keys, (k) => wsKey(k.warehouseId, k.productId, k.lotId)).sort(
+      byWarehouseKey,
+    );
+    const locked = new Map<string, WarehouseRow>();
+    for (const part of chunks(unique)) {
+      const { rows } = await tx.execute<{
+        id: string;
+        warehouse_id: string;
+        product_id: string;
+        lot_id: string | null;
+        on_hand: string;
+        sellable_on_hand: string;
+        avg_cost: string;
+      }>(sql`
+        SELECT ws.id, ws.warehouse_id, ws.product_id, ws.lot_id, ws.on_hand, ws.sellable_on_hand, ws.avg_cost
+          FROM warehouse_stock ws
+          JOIN (VALUES ${sql.join(
+            part.map(
+              (k) => sql`(${k.warehouseId}::bigint, ${k.productId}::bigint, ${k.lotId}::bigint)`,
+            ),
+            sql`, `,
+          )}) AS k (warehouse_id, product_id, lot_id)
+            ON ws.warehouse_id = k.warehouse_id AND ws.product_id = k.product_id
+           AND ws.lot_id IS NOT DISTINCT FROM k.lot_id
+         ORDER BY ws.warehouse_id, ws.product_id, ws.lot_id NULLS FIRST
+           FOR UPDATE OF ws`);
+      for (const row of rows) {
         const value: WarehouseRow = {
           id: toId(row.id),
           warehouseId: toId(row.warehouse_id),
@@ -897,36 +1028,40 @@ export class StockPostingService {
           sellableOnHand: new Decimal(row.sellable_on_hand),
           avgCost: new Decimal(row.avg_cost),
         };
-        return [wsKey(value.warehouseId, value.productId, value.lotId), value];
-      }),
-    );
+        locked.set(wsKey(value.warehouseId, value.productId, value.lotId), value);
+      }
+    }
+    return locked;
   }
 
   private async lockBinRows(tx: Tx, movements: readonly Movement[]): Promise<Map<string, BinRow>> {
-    const unique = uniqueBy(movements, (m) => bsKey(m.warehouseId, m.binId, m.productId, m.lotId));
-    const { rows } = await tx.execute<{
-      id: string;
-      warehouse_id: string;
-      bin_id: string;
-      product_id: string;
-      lot_id: string | null;
-      on_hand: string;
-    }>(sql`
-      SELECT bs.id, bs.warehouse_id, bs.bin_id, bs.product_id, bs.lot_id, bs.on_hand
-        FROM bin_stock bs
-        JOIN (VALUES ${sql.join(
-          unique.map(
-            (m) =>
-              sql`(${m.warehouseId}::bigint, ${m.binId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
-          ),
-          sql`, `,
-        )}) AS k (warehouse_id, bin_id, product_id, lot_id)
-          ON bs.warehouse_id = k.warehouse_id AND bs.bin_id = k.bin_id AND bs.product_id = k.product_id
-         AND bs.lot_id IS NOT DISTINCT FROM k.lot_id
-       ORDER BY bs.warehouse_id, bs.bin_id, bs.product_id, bs.lot_id NULLS FIRST
-         FOR UPDATE OF bs`);
-    return new Map(
-      rows.map((row) => {
+    const unique = uniqueBy(movements, (m) =>
+      bsKey(m.warehouseId, m.binId, m.productId, m.lotId),
+    ).sort(byBinKey);
+    const locked = new Map<string, BinRow>();
+    for (const part of chunks(unique)) {
+      const { rows } = await tx.execute<{
+        id: string;
+        warehouse_id: string;
+        bin_id: string;
+        product_id: string;
+        lot_id: string | null;
+        on_hand: string;
+      }>(sql`
+        SELECT bs.id, bs.warehouse_id, bs.bin_id, bs.product_id, bs.lot_id, bs.on_hand
+          FROM bin_stock bs
+          JOIN (VALUES ${sql.join(
+            part.map(
+              (m) =>
+                sql`(${m.warehouseId}::bigint, ${m.binId}::bigint, ${m.productId}::bigint, ${m.lotId ?? null}::bigint)`,
+            ),
+            sql`, `,
+          )}) AS k (warehouse_id, bin_id, product_id, lot_id)
+            ON bs.warehouse_id = k.warehouse_id AND bs.bin_id = k.bin_id AND bs.product_id = k.product_id
+           AND bs.lot_id IS NOT DISTINCT FROM k.lot_id
+         ORDER BY bs.warehouse_id, bs.bin_id, bs.product_id, bs.lot_id NULLS FIRST
+           FOR UPDATE OF bs`);
+      for (const row of rows) {
         const value: BinRow = {
           id: toId(row.id),
           warehouseId: toId(row.warehouse_id),
@@ -935,9 +1070,10 @@ export class StockPostingService {
           lotId: toInt(row.lot_id),
           onHand: new Decimal(row.on_hand),
         };
-        return [bsKey(value.warehouseId, value.binId, value.productId, value.lotId), value];
-      }),
-    );
+        locked.set(bsKey(value.warehouseId, value.binId, value.productId, value.lotId), value);
+      }
+    }
+    return locked;
   }
 }
 
@@ -947,6 +1083,45 @@ async function transactionTime(tx: Tx): Promise<Date> {
   const value = rows[0]?.now;
   if (value === undefined) throw new Error('now() returned no row');
   return value instanceof Date ? value : new Date(value);
+}
+
+/** A transfer's receive taking a line out of TRANSIT (leg 3, ADR-0035 #4). */
+function isTransitExit(movement: Movement): boolean {
+  return (
+    movement.docType === 'TR' && movement.movementType === 'TRANSFER_OUT' && movement.leg === 3
+  );
+}
+
+/** Consecutive slices of at most CHUNK items, in the given order. */
+function chunks<T>(items: readonly T[]): T[][] {
+  const parts: T[][] = [];
+  for (let start = 0; start < items.length; start += CHUNK) {
+    parts.push(items.slice(start, start + CHUNK));
+  }
+  return parts;
+}
+
+interface StockKey {
+  warehouseId: number;
+  productId: number;
+  lotId?: number | null;
+}
+
+/** The SQL lock order of warehouse balances: warehouse, product, lot with NULL first. */
+function byWarehouseKey(a: StockKey, b: StockKey): number {
+  return (
+    a.warehouseId - b.warehouseId || a.productId - b.productId || (a.lotId ?? 0) - (b.lotId ?? 0)
+  );
+}
+
+/** The SQL lock order of bin balances: warehouse, bin, product, lot with NULL first. */
+function byBinKey(a: StockKey & { binId: number }, b: StockKey & { binId: number }): number {
+  return (
+    a.warehouseId - b.warehouseId ||
+    a.binId - b.binId ||
+    a.productId - b.productId ||
+    (a.lotId ?? 0) - (b.lotId ?? 0)
+  );
 }
 
 function uniqueBy<T>(items: readonly T[], key: (item: T) => string): T[] {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Decimal } from '../money';
 import {
   ADJUSTMENT_REASONS,
+  averageAfterWithdrawal,
   BinRangeError,
   binCodeRange,
   canRecost,
@@ -156,6 +157,15 @@ describe('cost arithmetic', () => {
     expect(text(reaverage('0', '0', '24', '83.3333'))).toBe('83.3333');
     // Same cost in, same average out: intra-warehouse moves never move the average.
     expect(text(reaverage('7', '1234.5678', '3', '1234.5678'))).toBe('1234.5678');
+  });
+
+  it('keeps what stays at its value when goods leave at their own cost (TRANSIT)', () => {
+    // 10 shipped at 1000 and 10 at 1500 are in transit together (average 1250).
+    const pooled = reaverage('10', '1000', '10', '1500');
+    expect(text(pooled)).toBe('1250');
+    expect(text(averageAfterWithdrawal('20', pooled, '10', '1000'))).toBe('1500');
+    expect(text(averageAfterWithdrawal('10', '1500', '10', '1500'))).toBe('1500');
+    expect(text(averageAfterWithdrawal('3', '0.0001', '2', '0.0002'))).toBe('0');
   });
 
   it('turns prices into amounts and amounts into costs per base unit', () => {

@@ -16,6 +16,7 @@ import type {
   ReceiptLineDto,
   ReceiptSummaryDto,
 } from '../dto/receipts.dto';
+import type { TransferDetailDto, TransferSummaryDto } from '../dto/transfers.dto';
 import type { AdjustmentDetail, AdjustmentSummary } from '../services/adjustments.service';
 import type { BinMoveDetail, BinMoveSummary } from '../services/bin-moves.service';
 import type { Bin } from '../services/bins.service';
@@ -33,6 +34,7 @@ import type {
   ReceiptLine,
   ReceiptSummary,
 } from '../services/receipts.service';
+import type { TransferDetail, TransferSummary } from '../services/transfers.service';
 
 export function toBinDto(bin: Bin): BinDto {
   return {
@@ -295,5 +297,60 @@ export function toReconciliationRunDto(run: ReconciliationSummary): Reconciliati
     diffs: run.diffs,
     startedAt: run.startedAt.toISOString(),
     triggeredBy: run.triggeredBy,
+  };
+}
+
+export function toTransferDetailDto(transfer: TransferDetail): TransferDetailDto {
+  return {
+    id: transfer.id,
+    number: transfer.number,
+    origin: transfer.origin,
+    status: transfer.status,
+    sourceWarehouseId: transfer.sourceWarehouseId,
+    destWarehouseId: transfer.destWarehouseId,
+    note: transfer.note,
+    requestedAt: transfer.requestedAt?.toISOString() ?? null,
+    shippedAt: transfer.shippedAt?.toISOString() ?? null,
+    shipDate: transfer.shipDate,
+    receivedAt: transfer.receivedAt?.toISOString() ?? null,
+    receiveDate: transfer.receiveDate,
+    cancelledAt: transfer.cancelledAt?.toISOString() ?? null,
+    cancelReason: transfer.cancelReason,
+    createdAt: transfer.createdAt.toISOString(),
+    updatedAt: transfer.updatedAt.toISOString(),
+    lines: transfer.lines.map((line) => ({
+      id: line.id,
+      productId: line.productId,
+      productSku: line.productSku,
+      productName: line.productName,
+      requestUnitId: line.requestUnitId,
+      unitName: line.unitName,
+      requestFactor: line.requestFactor.toFixed(),
+      requestedQty: line.requestedQty.toFixed(),
+      baseUnitId: line.baseUnitId,
+      baseUnitName: line.baseUnitName,
+      shippedQtyBase: line.shippedQtyBase?.toFixed() ?? null,
+      receivedQtyBase: line.receivedQtyBase?.toFixed() ?? null,
+      fromBinId: line.fromBinId,
+      fromBinCode: line.fromBinCode,
+      toBinId: line.toBinId,
+      toBinCode: line.toBinCode,
+    })),
+  };
+}
+
+export function toTransferSummaryDto(summary: TransferSummary): TransferSummaryDto {
+  return {
+    id: summary.id,
+    number: summary.number,
+    origin: summary.origin,
+    status: summary.status,
+    sourceWarehouseId: summary.sourceWarehouseId,
+    destWarehouseId: summary.destWarehouseId,
+    lineCount: summary.lineCount,
+    requestedAt: summary.requestedAt?.toISOString() ?? null,
+    shippedAt: summary.shippedAt?.toISOString() ?? null,
+    receivedAt: summary.receivedAt?.toISOString() ?? null,
+    createdAt: summary.createdAt.toISOString(),
   };
 }

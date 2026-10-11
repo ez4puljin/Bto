@@ -24,6 +24,7 @@ const STATUSES: Record<PostedDocType, [string, string]> = {
   BM: ['DRAFT', 'POSTED'],
   ADJ: ['SUBMITTED', 'POSTED'],
   ST: ['REVIEW', 'APPROVED'],
+  TR: ['DRAFT', 'SHIPPED'],
 };
 
 /**
@@ -75,6 +76,12 @@ describe('integrity: stock posting', () => {
       case 'ST':
         return one(
           `INSERT INTO stocktakes (warehouse_id, status, started_at) VALUES ($1, $2, now()) RETURNING id`,
+          [warehouseId, status],
+        );
+      case 'TR':
+        return one(
+          `INSERT INTO transfers (origin, source_warehouse_id, dest_warehouse_id, status)
+           SELECT 'PUSH', $1, id, $2 FROM warehouses WHERE kind = 'TRANSIT' RETURNING id`,
           [warehouseId, status],
         );
     }

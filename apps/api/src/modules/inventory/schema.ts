@@ -3,6 +3,8 @@ import {
   BIN_TYPES,
   SELLABLE_BIN_TYPES,
   STOCK_DOC_TYPES,
+  TRANSFER_ORIGINS,
+  TRANSFER_STATUSES,
   USER_BIN_TYPES,
 } from '@tugeel/shared/inventory';
 import { sql } from 'drizzle-orm';
@@ -427,10 +429,15 @@ export const adjustments = pgTable(
     note: text('note'),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),
     submittedBy: userRef('submitted_by'),
+    /** An OPENING_REVERSAL names the adjustment it takes back, at most once (ADR-0036). */
+    reversesAdjustmentId: ref('reverses_adjustment_id').references(
+      (): AnyPgColumn => adjustments.id,
+    ),
     ...postingColumns(),
   },
   (t) => [
     unique('adjustments_number_key').on(t.number),
+    unique('adjustments_reverses_key').on(t.reversesAdjustmentId),
     index('adjustments_warehouse_idx').on(t.warehouseId, t.status, t.id),
     check('adjustments_reason', inList(t.reason, ADJUSTMENT_REASON_CODES)),
     check('adjustments_status', inList(t.status, ADJUSTMENT_STATUSES)),
@@ -465,6 +472,118 @@ export const adjustmentLines = pgTable(
     check('adjustment_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
     check('adjustment_lines_cost', sql`${t.unitCost} IS NULL OR ${t.unitCost} >= 0`),
     check('adjustment_lines_note', sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 300`),
+  ],
+);
+
+/**
+ * Transfers (TR-, ADR-0035): requested by the receiver (REQUEST) or sent on the sender's own
+ * initiative (PUSH, e.g. supermarket returns); shipped into TRANSIT and received at the destination,
+ * where a shortfall goes back to the sender and a surplus comes out of the sender's stock.
+ */
+export const transfers = pgTable(
+  'transfers',
+  {
+    id: id(),
+    number: text('number'),
+    origin: text('origin', { enum: TRANSFER_ORIGINS }).notNull(),
+    sourceWarehouseId: ref('source_warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    destWarehouseId: ref('dest_warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    status: text('status', { enum: TRANSFER_STATUSES }).notNull().default('DRAFT'),
+    note: text('note'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }),
+    requestedBy: userRef('requested_by'),
+    shippedAt: timestamp('shipped_at', { withTimezone: true }),
+    shippedBy: userRef('shipped_by'),
+    shipDate: date('ship_date', { mode: 'string' }),
+    receivedAt: timestamp('received_at', { withTimezone: true }),
+    receivedBy: userRef('received_by'),
+    receiveDate: date('receive_date', { mode: 'string' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelledBy: userRef('cancelled_by'),
+    cancelReason: text('cancel_reason'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('transfers_number_key').on(t.number),
+    index('transfers_source_idx').on(t.sourceWarehouseId, t.status, t.id),
+    index('transfers_dest_idx').on(t.destWarehouseId, t.status, t.id),
+    check('transfers_origin', inList(t.origin, TRANSFER_ORIGINS)),
+    check('transfers_status', inList(t.status, TRANSFER_STATUSES)),
+    check('transfers_warehouses', sql`${t.sourceWarehouseId} <> ${t.destWarehouseId}`),
+    // Drafts have no number; a sent request and everything after it has one (SPEC §6.13).
+    check(
+      'transfers_number',
+      sql`(${t.status} <> 'DRAFT' OR ${t.number} IS NULL)
+        AND (${t.status} NOT IN ('REQUESTED', 'SHIPPED', 'RECEIVED') OR ${t.number} IS NOT NULL)`,
+    ),
+    check(
+      'transfers_requested',
+      sql`(${t.status} <> 'REQUESTED' OR ${t.requestedAt} IS NOT NULL)
+        AND (${t.origin} = 'REQUEST' OR ${t.requestedAt} IS NULL)`,
+    ),
+    check(
+      'transfers_shipped',
+      sql`(${t.status} IN ('SHIPPED', 'RECEIVED'))
+        = (${t.shippedAt} IS NOT NULL AND ${t.shipDate} IS NOT NULL)`,
+    ),
+    check(
+      'transfers_received',
+      sql`(${t.status} = 'RECEIVED') = (${t.receivedAt} IS NOT NULL AND ${t.receiveDate} IS NOT NULL)`,
+    ),
+    check('transfers_cancelled', sql`(${t.status} = 'CANCELLED') = (${t.cancelledAt} IS NOT NULL)`),
+    check('transfers_note', sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500`),
+    check(
+      'transfers_cancel_reason',
+      sql`${t.cancelReason} IS NULL OR length(${t.cancelReason}) BETWEEN 1 AND 300`,
+    ),
+  ],
+);
+
+/**
+ * One line per product (and lot) of a transfer: the unit and quantity asked for (planned, for a
+ * push), and what was shipped and received, in base units (ADR-0035 #4).
+ */
+export const transferLines = pgTable(
+  'transfer_lines',
+  {
+    id: id(),
+    transferId: ref('transfer_id')
+      .notNull()
+      .references(() => transfers.id),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    requestUnitId: ref('request_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    requestFactor: factor('request_factor').notNull(),
+    /** In the request unit. */
+    requestedQty: qty('requested_qty').notNull(),
+    /** Set when shipped; 0 for a line the sender did not ship. */
+    shippedQtyBase: qty('shipped_qty_base'),
+    fromBinId: ref('from_bin_id').references(() => bins.id),
+    /** Set when received. */
+    receivedQtyBase: qty('received_qty_base'),
+    toBinId: ref('to_bin_id').references(() => bins.id),
+    lotId: ref('lot_id').references(() => lots.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('transfer_lines_product_key').on(t.transferId, t.productId, t.lotId).nullsNotDistinct(),
+    index('transfer_lines_transfer_idx').on(t.transferId, t.id),
+    check(
+      'transfer_lines_qty',
+      sql`${t.requestFactor} > 0 AND ${t.requestedQty} > 0
+        AND (${t.shippedQtyBase} IS NULL OR ${t.shippedQtyBase} >= 0)
+        AND (${t.receivedQtyBase} IS NULL OR (${t.shippedQtyBase} IS NOT NULL AND ${t.receivedQtyBase} >= 0))`,
+    ),
   ],
 );
 
