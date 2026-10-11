@@ -62,6 +62,16 @@
       "types": "./dist/files/index.d.ts",
       "default": "./dist/files/index.js"
     },
+    "./taxpayer": {
+      "@tugeel/source": "./src/taxpayer/index.ts",
+      "types": "./dist/taxpayer/index.d.ts",
+      "default": "./dist/taxpayer/index.js"
+    },
+    "./geo": {
+      "@tugeel/source": "./src/geo/index.ts",
+      "types": "./dist/geo/index.d.ts",
+      "default": "./dist/geo/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },

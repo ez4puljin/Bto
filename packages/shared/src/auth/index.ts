@@ -15,6 +15,10 @@ export const PERMISSIONS = [
   'identity.audit.read',
   'catalog.products.manage',
   'catalog.ebarimt.manage',
+  'partners.customers.read',
+  'partners.customers.manage',
+  'partners.credit.manage',
+  'partners.suppliers.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -56,10 +60,17 @@ export function isSystemRole(value: unknown): value is SystemRole {
 /** ADMIN holds every permission; the other roles grow as their modules are built. */
 export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permission[]>> = {
   ADMIN: PERMISSIONS,
-  OFFICE: [],
+  OFFICE: ['partners.customers.read', 'partners.customers.manage'],
   PROCUREMENT: [],
   WAREHOUSE: [],
-  ACCOUNTANT: ['identity.settings.read', 'identity.audit.read'],
+  // The accountant also types TINs the lookup cannot find (SPEC §5.3) and sets credit terms.
+  ACCOUNTANT: [
+    'identity.settings.read',
+    'identity.audit.read',
+    'partners.customers.read',
+    'partners.customers.manage',
+    'partners.credit.manage',
+  ],
   HR: [],
   POS_CASHIER: [],
   SALES_REP: [],

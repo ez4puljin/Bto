@@ -37,7 +37,7 @@ const TESTS = [
 const MODULE_DEPS = {
   identity: [],
   catalog: ['identity'],
-  partners: ['identity'],
+  partners: ['identity', 'catalog'], // ADR-0032: product_suppliers
   inventory: ['identity', 'catalog', 'partners'],
   imports: ['identity', 'catalog', 'partners', 'inventory', 'pricing'],
   pricing: ['identity', 'catalog', 'partners'],

@@ -3136,7 +3136,11 @@
           "identity.settings.manage",
           "identity.audit.read",
           "catalog.products.manage",
-          "catalog.ebarimt.manage"
+          "catalog.ebarimt.manage",
+          "partners.customers.read",
+          "partners.customers.manage",
+          "partners.credit.manage",
+          "partners.suppliers.manage"
         ]
       },
       "RoleRef": {
@@ -4040,7 +4044,8 @@
           "tax.city_tax_rate_pct",
           "company.vat_payer",
           "company.city_tax_payer",
-          "auth.staff_session_hours"
+          "auth.staff_session_hours",
+          "credit.payment_term_days"
         ]
       },
       "SettingEntry": {
@@ -5398,6 +5403,8 @@
           "BARCODE_TAKEN",
           "BARCODE_AMBIGUOUS",
           "TAX_ATTRIBUTES_MISSING",
+          "CUSTOMER_INACTIVE",
+          "SUPPLIER_INACTIVE",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

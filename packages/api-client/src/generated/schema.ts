@@ -816,7 +816,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.ebarimt.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.ebarimt.manage" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -1065,7 +1065,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "credit.payment_term_days";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -1420,7 +1420,7 @@ export interface components {
             cityTax: number;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;

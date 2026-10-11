@@ -58,6 +58,20 @@ const CASES = [
     true,
   ],
   [
+    'partners -> catalog index (ADR-0032)',
+    G1,
+    `${M}/partners/services/customers.service.ts`,
+    `import { catalog } from '../../catalog';\nexport const x = catalog;`,
+    false,
+  ],
+  [
+    'catalog -> partners stays against the direction',
+    G1,
+    `${M}/catalog/services/catalog.service.ts`,
+    `import { partners } from '../../partners';\nexport const x = partners;`,
+    true,
+  ],
+  [
     'schema.ts -> schema.ts for references()',
     G1,
     `${M}/catalog/schema.ts`,

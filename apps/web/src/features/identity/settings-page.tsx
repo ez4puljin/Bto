@@ -1,4 +1,9 @@
-import { parseSettingValue, SETTINGS, type SettingKey } from '@tugeel/shared/settings';
+import {
+  parseSettingValue,
+  type SettingDefinition,
+  SETTINGS,
+  type SettingKey,
+} from '@tugeel/shared/settings';
 import { businessDate } from '@tugeel/shared/time';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,7 +71,8 @@ function candidateValue(kind: 'percent' | 'boolean' | 'integer', raw: string) {
 function SettingCard({ view }: { view: SettingView }) {
   const { t } = useTranslation();
   const settingKey = view.key;
-  const kind = SETTINGS[settingKey].kind;
+  const definition: SettingDefinition = SETTINGS[settingKey];
+  const kind = definition.kind;
   const canManage = useHasPermission('identity.settings.manage');
   const mutations = useIdentityMutations();
   const today = businessDate();
@@ -192,7 +198,12 @@ function SettingCard({ view }: { view: SettingView }) {
             </div>
             {invalid ? (
               <p role="alert" className="text-sm text-destructive">
-                {kind === 'integer' ? t('validation.hours') : t('validation.percent')}
+                {kind === 'integer'
+                  ? t('validation.integerRange', {
+                      min: definition.min ?? 0,
+                      max: definition.max ?? 9999,
+                    })
+                  : t('validation.percent')}
               </p>
             ) : null}
           </div>
