@@ -40,7 +40,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-svh bg-background text-foreground">
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4">
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4 print:hidden">
         <Button
           variant="ghost"
           size="icon"
@@ -86,6 +86,7 @@ export function AppShell() {
           className={cn(
             'border-b px-2 py-3 md:sticky md:top-14 md:block md:h-[calc(100svh-3.5rem)] md:w-56 md:shrink-0 md:overflow-y-auto md:border-r md:border-b-0',
             menuOpen ? 'block' : 'hidden',
+            'print:hidden!',
           )}
         >
           {groups.map((group) => (

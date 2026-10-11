@@ -1,4 +1,5 @@
 import type { ProblemDetails } from '@tugeel/api-client';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,8 @@ export function ConfirmDialog(props: {
   problem?: ProblemDetails | null;
   onConfirm: () => void;
   onClose: () => void;
+  /** Details shown above the buttons (e.g. what a posting will change). */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -32,6 +35,7 @@ export function ConfirmDialog(props: {
           <DialogTitle>{props.title}</DialogTitle>
           {props.description ? <DialogDescription>{props.description}</DialogDescription> : null}
         </DialogHeader>
+        {props.children}
         <ProblemAlert problem={props.problem} />
         <DialogFooter closeLabel={t('common.cancel')}>
           <Button

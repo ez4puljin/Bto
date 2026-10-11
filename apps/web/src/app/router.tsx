@@ -24,6 +24,7 @@ import { ReceiptCostingPage } from '@/features/inventory/costing-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
+import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
 import { CustomersPage } from '@/features/partners/customers-page';
@@ -126,6 +127,8 @@ export const routes: RouteObject[] = [
           </RequirePermission>
         ),
       },
+      { path: 'inventory/transfers', element: <TransfersPage /> },
+      { path: 'inventory/transfers/:id', element: <TransferPage /> },
       { path: 'inventory/moves', element: <BinMovesPage /> },
       { path: 'inventory/adjustments', element: <AdjustmentsPage /> },
       { path: 'inventory/adjustments/:id', element: <AdjustmentPage /> },

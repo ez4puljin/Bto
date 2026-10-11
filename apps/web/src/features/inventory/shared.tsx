@@ -9,7 +9,8 @@ import type { Warehouse } from '@/features/identity/api';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { isQty } from './helpers';
 
-type DocStatus = 'DRAFT' | 'SUBMITTED' | 'POSTED' | 'CANCELLED';
+type DocStatus =
+  'DRAFT' | 'SUBMITTED' | 'REQUESTED' | 'SHIPPED' | 'POSTED' | 'RECEIVED' | 'CANCELLED';
 
 export function WarehouseSelect(props: {
   options: readonly Warehouse[];
@@ -43,13 +44,11 @@ export function WarehouseSelect(props: {
 export function DocStatusBadge({ status }: { status: DocStatus }) {
   const { t } = useTranslation();
   const variant =
-    status === 'POSTED'
+    status === 'POSTED' || status === 'RECEIVED'
       ? 'secondary'
-      : status === 'CANCELLED'
-        ? 'outline'
-        : status === 'SUBMITTED'
-          ? 'default'
-          : 'outline';
+      : status === 'SUBMITTED' || status === 'REQUESTED' || status === 'SHIPPED'
+        ? 'default'
+        : 'outline';
   return <Badge variant={variant}>{t(`inventory.docStatus.${status}`)}</Badge>;
 }
 

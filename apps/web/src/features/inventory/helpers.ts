@@ -1,6 +1,7 @@
 import type { components } from '@tugeel/api-client';
 import { ADJUSTMENT_REASONS, type AdjustmentReason } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
+import { fromBase } from '@tugeel/shared/units';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthState } from '@/app/auth-context';
@@ -116,4 +117,37 @@ export function lineAmount(
   return mode === 'amount'
     ? new Decimal(value)
     : new Decimal(value).times(enteredQty).toDecimalPlaces(2);
+}
+
+/** A transfer count as typed: in the line's unit, or in base units. */
+export interface CountEntry {
+  qty: string;
+  base: boolean;
+}
+
+/** The base units of a count, or null while it is not a quantity (zero is one: nothing came). */
+export function countBase(count: CountEntry, line: { requestFactor: string }): Decimal | null {
+  const text = count.qty.trim();
+  if (!QTY.test(text)) return null;
+  return new Decimal(text).times(count.base ? 1 : line.requestFactor);
+}
+
+/** A base quantity as a count in the line's unit when that is exact, else in base units. */
+export function countEntry(qtyBase: string, line: { requestFactor: string }): CountEntry {
+  const inLineUnit = new Decimal(qtyBase).dividedBy(line.requestFactor);
+  return inLineUnit.decimalPlaces() <= 3
+    ? { qty: inLineUnit.toFixed(), base: false }
+    : { qty: new Decimal(qtyBase).toFixed(), base: true };
+}
+
+/** A base quantity in a line's unit, for display: 30 pieces are 1.25 boxes of 24. */
+export function inUnit(qtyBase: string, factor: string): string {
+  return fromBase(qtyBase, factor).toFixed();
+}
+
+/** Whether the user writes documents for a warehouse (ADR-0027 #7). */
+export function useCanWrite(): (warehouseId: number) => boolean {
+  const state = useAuthState();
+  const scope = state.status === 'authenticated' ? state.me.writableWarehouseIds : [];
+  return (warehouseId) => scope === null || scope.includes(warehouseId);
 }

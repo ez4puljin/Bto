@@ -49,6 +49,7 @@ export const KEYS = {
   moves: ['inventory', 'moves'] as const,
   adjustments: ['inventory', 'adjustments'] as const,
   reconciliation: ['inventory', 'reconciliation'] as const,
+  transfers: ['inventory', 'transfers'] as const,
 };
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
@@ -449,6 +450,132 @@ export function useInventoryMutations() {
           }),
         ),
       onSuccess: adjustmentsChanged,
+    }),
+  };
+}
+
+export type TransferSummary = Schemas['TransferSummary'];
+export type TransferDetail = Schemas['TransferDetail'];
+export type TransferLine = Schemas['TransferLine'];
+export type TransferCreate = Schemas['TransferCreateRequest'];
+export type TransferCount = Schemas['TransferCount'];
+export type TransferStatus = TransferDetail['status'];
+export type TransferOrigin = TransferDetail['origin'];
+
+export interface TransferFilter {
+  warehouseId?: number;
+  direction?: 'INCOMING' | 'OUTGOING';
+  status?: TransferStatus;
+}
+
+export function useTransfers(filter: TransferFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.transfers, 'list', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/transfers', {
+          params: {
+            query: {
+              warehouseId: filter.warehouseId,
+              direction: filter.warehouseId === undefined ? undefined : filter.direction,
+              status: filter.status,
+              cursor: pageParam,
+              limit: 50,
+            },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useTransfer(id: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.transfers, id],
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/transfers/{id}', { params: { path: { id } }, signal })),
+  });
+}
+
+/** Transfer mutations; each refreshes the transfers and, when stock moved, the stock pages. */
+export function useTransferMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = (stock = false) =>
+    Promise.all(
+      [KEYS.transfers, ...(stock ? [KEYS.stock] : [])].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
+
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<TransferCreate>) =>
+        unwrap(
+          await api.POST('/api/v1/transfers', { params: { header: idempotencyKey(key) }, body }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    addLine: useMutation({
+      mutationFn: async ({
+        id,
+        body,
+      }: {
+        id: number;
+        body: { productUnitId: number; qty: string };
+      }) =>
+        unwrap(await api.POST('/api/v1/transfers/{id}/lines', { params: { path: { id } }, body })),
+      onSuccess: () => changed(),
+    }),
+    updateLine: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: { qty?: string } }) =>
+        unwrap(await api.PATCH('/api/v1/transfer-lines/{id}', { params: { path: { id } }, body })),
+      onSuccess: () => changed(),
+    }),
+    removeLine: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.DELETE('/api/v1/transfer-lines/{id}', { params: { path: { id } } })),
+      onSuccess: () => changed(),
+    }),
+    request: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/transfers/{id}/request', { params: { path: { id } } })),
+      onSuccess: () => changed(),
+    }),
+    ship: useMutation({
+      mutationFn: async ({ id, key, lines }: { id: number; key: string; lines: TransferCount[] }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/ship', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { lines },
+          }),
+        ),
+      onSuccess: () => changed(true),
+    }),
+    receive: useMutation({
+      mutationFn: async ({ id, key, lines }: { id: number; key: string; lines: TransferCount[] }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/receive', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { lines },
+          }),
+        ),
+      onSuccess: () => changed(true),
+    }),
+    cancel: useMutation({
+      mutationFn: async ({ id, reason }: { id: number; reason?: string }) =>
+        unwrap(
+          await api.POST('/api/v1/transfers/{id}/cancel', {
+            params: { path: { id } },
+            body: reason ? { reason } : {},
+          }),
+        ),
+      onSuccess: () => changed(),
     }),
   };
 }
