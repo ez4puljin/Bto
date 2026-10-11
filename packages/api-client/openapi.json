@@ -4494,6 +4494,688 @@
           "partners"
         ]
       }
+    },
+    "/api/v1/bins": {
+      "get": {
+        "operationId": "Bins_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Start of a bin code",
+            "schema": {
+              "maxLength": 40,
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "RECEIVING",
+                "STORAGE",
+                "PICKING",
+                "STAGING",
+                "SHIP",
+                "DAMAGED",
+                "RETURNS",
+                "SALESFLOOR",
+                "CARGO",
+                "TRANSIT"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Include archived bins",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BinPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Bins_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BinCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/bins/lookup": {
+      "get": {
+        "operationId": "Bins_lookup",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "description": "Scanned or typed label text",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A scanned shelf label in a warehouse. Declared before `:id`.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/bins/{id}": {
+      "get": {
+        "operationId": "Bins_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "Bins_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BinUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "delete": {
+        "operationId": "Bins_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/bins/bulk": {
+      "post": {
+        "operationId": "Bins_bulk",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BinRangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BinRangeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A block of shelves; with `dryRun` only the codes and the ones that already exist.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/bins/{id}/archive": {
+      "post": {
+        "operationId": "Bins_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/bins/{id}/restore": {
+      "post": {
+        "operationId": "Bins_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/product-locations": {
+      "get": {
+        "operationId": "ProductLocations_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductLocationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "By product (every warehouse) or by warehouse (paged).",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "put": {
+        "operationId": "ProductLocations_set",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductLocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductLocation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/product-locations/home": {
+      "put": {
+        "operationId": "ProductLocations_setHome",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductHomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductLocationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/product-locations/{id}": {
+      "delete": {
+        "operationId": "ProductLocations_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
     }
   },
   "info": {
@@ -7897,6 +8579,352 @@
         "required": [
           "productId",
           "supplierId"
+        ]
+      },
+      "Bin": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "A-01-03",
+            "description": "The text of the shelf label"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "enum": [
+              "RECEIVING",
+              "STORAGE",
+              "PICKING",
+              "STAGING",
+              "SHIP",
+              "DAMAGED",
+              "RETURNS",
+              "SALESFLOOR",
+              "CARGO",
+              "TRANSIT"
+            ],
+            "type": "string"
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "Stock here can be sold (storage, picking, sales floor)"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "COUNTING"
+            ],
+            "type": "string"
+          },
+          "isSystem": {
+            "type": "boolean"
+          },
+          "pickSequence": {
+            "type": "number",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "code",
+          "name",
+          "type",
+          "sellable",
+          "status",
+          "isSystem",
+          "pickSequence",
+          "archivedAt"
+        ]
+      },
+      "BinPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Bin"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "BinCreateRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "example": "A-01-03"
+          },
+          "type": {
+            "enum": [
+              "STORAGE",
+              "PICKING"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "pickSequence": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "warehouseId",
+          "code",
+          "type"
+        ]
+      },
+      "BinRangeRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "type": {
+            "enum": [
+              "STORAGE",
+              "PICKING"
+            ],
+            "type": "string"
+          },
+          "rowFrom": {
+            "type": "string",
+            "pattern": "^[A-Z]$",
+            "example": "A"
+          },
+          "rowTo": {
+            "type": "string",
+            "pattern": "^[A-Z]$",
+            "example": "C"
+          },
+          "rackFrom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "rackTo": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "levelFrom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "levelTo": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Only list the codes; create nothing"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "type",
+          "rowFrom",
+          "rowTo",
+          "rackFrom",
+          "rackTo",
+          "levelFrom",
+          "levelTo"
+        ]
+      },
+      "BinRangeResult": {
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "existing": {
+            "description": "Codes the warehouse already had",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "codes",
+          "existing",
+          "created"
+        ]
+      },
+      "BinUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "pickSequence": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
+      },
+      "ProductLocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "isHome": {
+            "type": "boolean",
+            "description": "The product’s home warehouse"
+          },
+          "defaultBinId": {
+            "type": "number",
+            "nullable": true
+          },
+          "defaultBinCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "minQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24"
+          },
+          "maxQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "240"
+          }
+        },
+        "required": [
+          "id",
+          "warehouseId",
+          "productId",
+          "isHome",
+          "defaultBinId",
+          "defaultBinCode",
+          "minQty",
+          "maxQty"
+        ]
+      },
+      "ProductLocationList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductLocation"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ProductLocationRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "defaultBinId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Fixed shelf; null clears it"
+          },
+          "minQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units"
+          },
+          "maxQty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "productId"
+        ]
+      },
+      "ProductHomeRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "A wholesale warehouse; null: no home"
+          }
+        },
+        "required": [
+          "productId",
+          "warehouseId"
         ]
       },
       "ErrorCode": {

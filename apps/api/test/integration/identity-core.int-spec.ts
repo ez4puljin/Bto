@@ -48,7 +48,10 @@ describe('identity core services', () => {
   let sqlClient: Client;
 
   beforeAll(async () => {
-    app = await createHttpApp({ providers: [{ provide: WAREHOUSE_CREATED_HOOK, useValue: hook }] });
+    // Inventory binds the real hook; override it so this probe is the one identity resolves.
+    app = await createHttpApp({
+      override: (builder) => builder.overrideProvider(WAREHOUSE_CREATED_HOOK).useValue(hook),
+    });
     db = app.get<Db>(DB);
     sqlClient = await connectAs('app');
   });
