@@ -1,5 +1,7 @@
+import type { INestApplicationContext } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import { StockPostingService } from '../../src/modules/inventory';
 import { bearer } from './identity';
 
 export interface BinJson {
@@ -84,4 +86,10 @@ export function inventoryApi(app: NestExpressApplication, token: string) {
         .expect(200);
     },
   };
+}
+
+/** Fails the test unless the ledger and both balance caches agree (run after every inventory file). */
+export async function expectReconciled(app: INestApplicationContext): Promise<void> {
+  const run = await app.get(StockPostingService).reconcile('TEST');
+  expect(run.diffs).toEqual([]);
 }

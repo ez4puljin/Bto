@@ -5,9 +5,15 @@ import { PartnersModule } from '../partners';
 import { BinsController, ProductLocationsController } from './controllers/bins.controller';
 import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
+import { StockPostingService } from './services/stock-posting.service';
 import { SystemBinsService } from './services/system-bins.service';
 
-const CORE_SERVICES = [BinsService, ProductLocationsService, SystemBinsService];
+const CORE_SERVICES = [
+  BinsService,
+  ProductLocationsService,
+  StockPostingService,
+  SystemBinsService,
+];
 
 /**
  * Inventory services every process may use (api, worker jobs, imports). Binding identity's

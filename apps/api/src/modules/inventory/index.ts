@@ -14,4 +14,15 @@ export {
   type ProductLocation,
   ProductLocationsService,
 } from './services/product-locations.service';
+export {
+  type CostedLine,
+  type Movement,
+  type PostedDocType,
+  type PostingDoc,
+  type PostingResult,
+  type ReconciliationDiff,
+  type ReconciliationRun,
+  StockPostingService,
+  type Valuation,
+} from './services/stock-posting.service';
 export { SystemBinsService } from './services/system-bins.service';
