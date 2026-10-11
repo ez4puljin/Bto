@@ -2,6 +2,7 @@ import type { components } from '@tugeel/api-client';
 import { ADJUSTMENT_REASONS, type AdjustmentReason } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthState } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
 
@@ -28,12 +29,19 @@ export function useWarehouseOptions(kinds: readonly WarehouseKind[], writable = 
   return { options, isPending: warehouses.isPending, error: warehouses.error };
 }
 
-/** Warehouse names by id, for list rows that carry only the id. */
+/** Warehouse names by id, for list rows that carry only the id (TRANSIT by its kind, as on /warehouses). */
 export function useWarehouseName(): (id: number) => string {
+  const { t } = useTranslation();
   const warehouses = useWarehouses();
   const names = useMemo(
-    () => new Map((warehouses.data ?? []).map((warehouse) => [warehouse.id, warehouse.name])),
-    [warehouses.data],
+    () =>
+      new Map(
+        (warehouses.data ?? []).map((warehouse) => [
+          warehouse.id,
+          warehouse.kind === 'TRANSIT' ? t('org.kinds.TRANSIT') : warehouse.name,
+        ]),
+      ),
+    [warehouses.data, t],
   );
   return (id) => names.get(id) ?? String(id);
 }

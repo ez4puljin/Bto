@@ -33,7 +33,7 @@ export function WarehouseSelect(props: {
       <option value="">{props.emptyLabel}</option>
       {props.options.map((warehouse) => (
         <option key={warehouse.id} value={warehouse.id}>
-          {warehouse.name}
+          {warehouse.kind === 'TRANSIT' ? t('org.kinds.TRANSIT') : warehouse.name}
         </option>
       ))}
     </NativeSelect>

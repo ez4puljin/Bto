@@ -1,6 +1,6 @@
 # Tugeel (Түгээл) — Architecture
 
-Version 0.5 — 2026-10-11 (partners: ADR-0032 product ↔ supplier link, credit fields, GPS addresses; 0.4 — 2026-10-11, catalog: ADR-0028 search keys, ADR-0029 barcode model, ADR-0030 local file storage, ADR-0031 camera scanning; 0.3 — 2026-10-10: week-1 scaffold ADR-0023 … ADR-0025, local-only development until one go-live ADR-0026) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
+Version 0.6 — 2026-10-11 (inventory core: ADR-0033 receipts on their shelf and costing after posting, ADR-0034 posting protocol; 0.5 — 2026-10-11, partners: ADR-0032 product ↔ supplier link, credit fields, GPS addresses; 0.4 — 2026-10-11, catalog: ADR-0028 search keys, ADR-0029 barcode model, ADR-0030 local file storage, ADR-0031 camera scanning; 0.3 — 2026-10-10: week-1 scaffold ADR-0023 … ADR-0025, local-only development until one go-live ADR-0026) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
 
 **Read §0, §4 and §12 before every session; read the module's §5 subsection before implementing it.** `TODO-VERIFY` marks business or external unknowns only (register in §13); every tooling choice in this document is decided.
 
@@ -206,7 +206,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 | identity | users, roles, permissions, role_permissions, user_roles, user_scopes, auth_sessions, password_resets, branches (branch_no, district_code), warehouses (kind WHOLESALE/STORE/VEHICLE/TRANSIT, branch_id), settings (effective-dated VAT / city-tax rates), number_sequences (scope_key, period), audit_log, idempotency_keys, files, print_jobs, print_stations (delivery 9, ADR-0022) | AuthGuard (global, fail-closed) with `@Public`/`@Authenticated`/`@RequirePermission`, `@CurrentUser` → `AuthContext`, ScopeService.assertCanWriteWarehouse, UsersService, RolesService, OrgService (branches, warehouses, getTransitWarehouse, optional `WAREHOUSE_CREATED_HOOK` bound by inventory), NumberingService.next(tx, scopeKey, period), AuditService.record(tx, actor, …), IdempotencyInterceptor/`@Idempotent`, SettingsService.get(key, onDate), StorageService (createPending/verifyUploaded/confirm(tx)/markDeleted/publicUrl over `files`, migration `0002_identity_files`; local driver until go-live, ADR-0030); job backup.pgdump (weekly, from the go-live phase: ADR-0026). REST /auth/*, /users, /roles, /branches, /warehouses, /settings, /audit, /files | — | 1 |
 | catalog | categories (tree, default_classification_code), brands, uoms (system PCS/BLOCK/BOX/KG synced at boot, fractional, default measure_unit), products (sku numeric, name, search_text, search_phonetic, search_version, category_id, brand_id, vat_type, city_tax NULL = undecided, classification_code NULL, tax_product_code NULL, status, tracks_lots, weight_kg), product_units (factor_to_base, is_base, is_default_sales/purchase, measure_unit NULL, superseded_by, superseded_at), product_barcodes (code, gtin14, lookup_key unique, barcode_type, is_primary, is_internal), product_images | CatalogService.get/getMany/search, UnitConversionService.toBase(unitId, qty) (returns the factor snapshot), UnitsService.supersedeInTx(tx, actor, unitId, factor) with the optional `UNIT_SUPERSEDED_HOOK` (bound by pricing), BarcodeService.lookup(code) (current units only), TaxService.rates(productId, date). REST /uoms, /categories, /brands, /products, /product-units, /product-barcodes, /product-images, /barcodes/:code, /catalog/ebarimt-readiness. Contract: `docs/modules/catalog.md` | identity | 1 |
 | partners | customers (kind COMPANY/INDIVIDUAL, code, name + search keys, reg_no text, tin NULL, tin_source, consumer_no NULL, phone, vat_payer, city_payer, tax_status_source, credit_limit NULL = not decided, payment_term_days NULL = the setting `credit.payment_term_days`, credit_hold + reason, status), customer_addresses (address, lat/lng, gps_source, zone_id NULL — the FK to delivery_zones is added by the delivery module's migration in delivery 5, is_default, archived_at), customer_contacts, suppliers, supplier_contacts, product_suppliers (ADR-0032); customer_tiers (delivery 2, if pricing needs tiers) and customer_users (delivery 6) come later | CustomersService.get/getMany/search/assertActive/creditTerms(id, date)/lockForUpdate(tx, id) (FOR NO KEY UPDATE)/createInTx/updateInTx/setCreditInTx, CustomerAddressesService.defaultAddress/setLocationInTx, SuppliersService.get/getMany/assertActive, ProductSuppliersService.mainSupplierOf(productIds). REST /customers, /customer-addresses, /customer-contacts, /suppliers, /supplier-contacts, /product-suppliers (/auth/customer/* in delivery 6). Contract: `docs/modules/partners.md` | identity, catalog (ADR-0032) | 1 (minimal), 2 |
-| inventory | bins (type, sellable, pick_sequence, status ACTIVE/COUNTING), product_locations, stock_ledger, bin_stock, warehouse_stock, stock_reservations, goods_receipts(+lines), bin_moves(+lines), transfers(+lines), adjustments(+lines), stocktakes(+lines), stock_snapshot_daily, stock_snapshot_bin_monthly, reconciliation_runs, lots (empty) | StockPostingService.post(tx, doc, movements, options?) (ONLY ledger writer; signature in §5.3), ReservationService.reserve/release/consume, AvailabilityService.available(warehouseId, productIds[]), StockQueryService, ReceiptsService, BinMovesService, TransfersService, AdjustmentsService, StocktakesService, ShortListQuery; jobs inventory.reconcile (nightly, REPEATABLE READ, writes stock_snapshot_daily), inventory.snapshotMonthly, inventory.staleReservations. REST /bins, /stock, /receipts, /bin-moves, /transfers, /adjustments, /stocktakes, /labels, /stock/short-list | identity, catalog, partners (supplier ref) | 1 |
+| inventory | bins (code = shelf label, type, sellable, pick_sequence, status ACTIVE/COUNTING, archived_at), product_locations (home warehouse, fixed bin, min/max), stock_ledger, stock_valuation_adjustments, bin_stock, warehouse_stock, stock_reservations, goods_receipts(+lines, costing status/version), bin_moves(+lines), transfers(+lines, week 4), adjustments(+lines), stocktakes(+bins, +lines), stock_snapshot_daily, stock_snapshot_bin_monthly, reconciliation_runs, lots (empty) | StockPostingService.post(tx, actor, { docs, movements }) (ONLY ledger and cache writer; ADR-0034, §5.3), StockPostingService.revalue/reconcile/rebuildBalances, SystemBinsService (bound to `WAREHOUSE_CREATED_HOOK`), BinsService, ProductLocationsService.assertMayReceive (home rule), StockQueryService, ReceiptsService (+ costing, ADR-0033), BinMovesService, AdjustmentsService, StocktakesService; later ReservationService.reserve/release/consume, AvailabilityService, TransfersService, ShortListQuery; jobs (cut line) inventory.reconcile (nightly, REPEATABLE READ, writes stock_snapshot_daily), inventory.snapshotMonthly, inventory.staleReservations. REST /bins, /product-locations, /stock, /receipts, /receipt-lines, /bin-moves, /adjustments, /adjustment-lines; later /transfers, /stocktakes, /labels, /stock/short-list. Contract: `docs/modules/inventory.md` | identity, catalog, partners (active supplier) | 1 |
 | imports | import_jobs, import_rows | REST /imports (template, upload, preview, commit, status, revert); job imports.commit. No in-process API; calls other modules' services | catalog, partners, inventory; pricing later | 1 |
 | pricing | price_lists (kind BASE/TIER/CONTRACT/PROMO/RETAIL, customer_id for CONTRACT, channel, priority), price_rules (effective-dated, never updated), price_import_log | PriceResolver.resolve(ctx)/resolveMany(ctx[]) → {unitPrice, listPrice, discountPct, ruleId, priceSource, vatRate, cityTaxRate, explanation}; pure algorithm in `packages/shared`. REST /price-lists, /price-rules, /pricing/quote | identity, catalog, partners | 2 |
 | sales | sales_orders, sales_order_lines (frozen prices + factor snapshot, qty_base, qty_approved, qty_backordered, qty_picked, qty_delivered), order_status_events, order_approvals, pickings(+lines), packages, pos_sessions, pos_sales(+lines), sales_returns(+lines), rep_visits | OrdersService.create/submit/approve/confirm/cancel/markDispatched/markDelivered/markDeliveryFailed, PickingService.createWave/confirmPick/pack, PosService.openSession/checkout/closeSession, OrderQueries.forDelivery; defines `CreditChecker` interface with `AllowAllCreditChecker` default. REST /orders, /pickings, /pos/*, /me/orders, /rep/* | identity, catalog, partners, pricing, inventory; finance via CreditChecker (optional); ebarimt (POS path) | 2 (POS: 9) |
@@ -236,7 +236,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 
 | Bin type | Sellable | Created automatically for | Purpose |
 |---|---|---|---|
-| RECEIVING | no | every warehouse | goods receipts land here |
+| RECEIVING | no | every warehouse | receipt lines without a fixed shelf land here (ADR-0033) |
 | STORAGE | yes | — (user-created) | shelf locations |
 | PICKING | yes | — (user-created) | forward pick faces |
 | STAGING | no | every warehouse | picked/packed orders awaiting load |
@@ -248,7 +248,8 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 | TRANSIT | no | the TRANSIT warehouse | in-transit stock between warehouses |
 
 - `bins.status`: ACTIVE or COUNTING. A stocktake sets the counted bins to COUNTING at freeze time; `StockPostingService` rejects any movement touching a COUNTING bin with `BIN_LOCKED_FOR_COUNT` (409); approval or cancellation of the stocktake returns them to ACTIVE in the same tx (D3). The integrity suite covers "posting into a COUNTING bin fails".
-- `product_locations` (warehouse, product, default bin, min/max level) drive put-away suggestions and the low-stock list.
+- `bins.code` is the text of the shelf label (`A-01-03`: row letter, rack, level), unique per warehouse and normalised before every lookup (NFKC, no spaces, upper case, dash variants and Cyrillic look-alikes → Latin). System bins are created in the warehouse's creating transaction through identity's `WAREHOUSE_CREATED_HOOK` (and backfilled at boot); shelves are created one at a time or as a range with a preview; a used bin is archived, an unused one may be deleted.
+- `product_locations` (warehouse, product, home flag, fixed bin, min/max level): one home warehouse per product — the only WHOLESALE warehouse it is received into (ADR-0033) — and the fixed shelf that receipt lines default to; min/max drive the low-stock list.
 
 ### 5.2 Catalog and units
 
@@ -268,7 +269,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 
 | Movement type | Document | Legs | Sign | Typical bins |
 |---|---|---|---|---|
-| RECEIPT | GR- | 1 | + | RECEIVING |
+| RECEIPT | GR- | 1 | + | the line's bin: the fixed shelf, else RECEIVING (ADR-0033) |
 | PUTAWAY_OUT / PUTAWAY_IN | BM- | 1 / 2 | − / + | RECEIVING → STORAGE/PICKING |
 | BIN_MOVE_OUT / BIN_MOVE_IN | BM- | 1 / 2 | − / + | any → any within one warehouse (incl. → DAMAGED) |
 | PICK_OUT / PICK_IN | PK- | 1 / 2 | − / + | STORAGE/PICKING → STAGING (reservation consumed) |
@@ -285,7 +286,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 - Idempotency: `UNIQUE (doc_type, doc_line_id, movement_type, leg)`; `doc_type` + `doc_line_id` are NOT NULL, so no movement exists without a document (D5).
 - Every stock movement belongs to a document with a status machine; put-away and storage↔storage moves use `bin_moves` (code `BM-`), so a web double-submit or a mobile retry cannot post a move twice.
 
-Roles `app` and `migrator` are created once per environment by `pnpm db:provision` (`apps/api/src/db/provision.ts`; `node dist/db/provision.js` in the image), run with the admin connection (DigitalOcean `doadmin`; local and staging `postgres`) and documented in `deploy/runbook.md`; migrations run as `migrator`, and a migration cannot create the role it runs as (on Managed PostgreSQL only the admin user may create roles). The foundation migration `0000_foundation.sql` (ADR-0024) creates the extensions, `assert_unicode_casefold()`, the generic trigger function `forbid_update_delete()` (SQLSTATE 23001) and `ALTER DEFAULT PRIVILEGES FOR ROLE migrator … TO app` (DML on tables, USAGE/SELECT on sequences); it never creates a role or a business table. The ledger guards below are hand-edited into the **inventory module's first migration** (week 3, after `pnpm db:generate --name=inventory`):
+Roles `app` and `migrator` are created once per environment by `pnpm db:provision` (`apps/api/src/db/provision.ts`; `node dist/db/provision.js` in the image), run with the admin connection (DigitalOcean `doadmin`; local and staging `postgres`) and documented in `deploy/runbook.md`; migrations run as `migrator`, and a migration cannot create the role it runs as (on Managed PostgreSQL only the admin user may create roles). The foundation migration `0000_foundation.sql` (ADR-0024) creates the extensions, `assert_unicode_casefold()`, the generic trigger function `forbid_update_delete()` (SQLSTATE 23001) and `ALTER DEFAULT PRIVILEGES FOR ROLE migrator … TO app` (DML on tables, USAGE/SELECT on sequences); it never creates a role or a business table. As built (week 3): `0005_inventory` holds the generated tables with hand-added CHECKs, the `bins_fixed_columns` trigger and the REVOKEs; the ledger, the valuation history and the snapshot tables are hand-written in `0006_inventory_ledger` (`--custom`, ADR-0034 #6), whose essence is:
 
 ```sql
 -- privileges: default privileges already give app DML on every table migrator creates
@@ -328,10 +329,10 @@ CREATE TABLE stock_snapshot_daily (
 
 | Document | States | Notes |
 |---|---|---|
-| goods_receipts (GR-) | DRAFT → POSTED; DRAFT → CANCELLED | number allocated at POST |
+| goods_receipts (GR-) | DRAFT → POSTED; DRAFT → CANCELLED | number allocated at POST; then `costing_status` PENDING → COSTED by the accountant, re-costed with a new `costing_version` (ADR-0033) |
 | bin_moves (BM-) | DRAFT → POSTED | created and posted in one request from the scanner flow |
-| transfers (TR-) | DRAFT → SHIPPED → RECEIVED; DRAFT → CANCELLED | SHIPPED posts leg 1 pair, RECEIVED posts leg 2 pair + shortfall ADJ- |
-| adjustments (ADJ-) | DRAFT → POSTED; DRAFT → CANCELLED | reason code and unit_cost on positive lines |
+| transfers (TR-) | DRAFT → SHIPPED → RECEIVED; DRAFT → CANCELLED | SHIPPED posts leg 1 pair, RECEIVED posts legs 3/4 + shortfall ADJ- (ADR-0034 #3) |
+| adjustments (ADJ-) | DRAFT → SUBMITTED → POSTED; SUBMITTED → DRAFT (returned); DRAFT/SUBMITTED → CANCELLED | warehouse staff submit, an approver posts (owner, 2026-10-11); the reason fixes the sign; unit_cost on inbound lines |
 | stocktakes (ST-) | DRAFT → COUNTING → REVIEW → APPROVED; → CANCELLED | COUNTING sets `bins.status`; APPROVED posts COUNT_CORRECTION and restores ACTIVE |
 | pickings (PK-) | DRAFT → IN_PROGRESS → CONFIRMED | CONFIRMED posts PICK pairs with reservation consume |
 
@@ -339,27 +340,26 @@ CREATE TABLE stock_snapshot_daily (
 - `bin_stock` (warehouse, bin, product, lot) with `on_hand CHECK (on_hand >= 0)`.
 - `warehouse_stock` (warehouse, product, lot) with `on_hand`, `sellable_on_hand`, `reserved`, `avg_cost NUMERIC(14,4)`; `CHECK (on_hand >= 0 AND reserved >= 0)` **only** (D2). `reserved <= sellable_on_hand` is enforced by `ReservationService.reserve` under the row lock, not by a table constraint, so a shortage posting never fails on a constraint. `available = sellable_on_hand - reserved`. Unique indexes use `NULLS NOT DISTINCT` on `lot_id`.
 
-**`StockPostingService.post(tx, doc: { docType, docId, expectedStatus, nextStatus }, movements: Movement[], options?: { reservationConsume?: boolean })`** is the only code path that inserts ledger rows; this is the one signature used by every stock document, the §4 table and ADR-0007. Its steps, in order:
+**`StockPostingService.post(tx, actor, { docs: [{ docType, docId, expectedStatus, nextStatus }], movements })`** (ADR-0034; `options.reservationConsume` joins with pickings in delivery 2) is the only code path that inserts ledger rows or touches the caches; every stock document uses it. Any number of documents per call (a transfer receive and its shortfall adjustment), zero movements allowed (a count without differences). Its steps, in order, as built in week 3:
 
 ```
-post(tx, doc, movements, options):
-  1. validate: every movement has doc_type/doc_id/doc_line_id (matching doc.docType/doc.docId),
-     qty_base <> 0, entered_qty + product_unit_id + factor_snapshot present; normalise to base units
-  2. status guard: UPDATE <table of doc.docType> SET status = doc.nextStatus, posted_at = now()
-       WHERE id = doc.docId AND status = doc.expectedStatus
-       -- must affect exactly 1 row, else 409 DOC_ALREADY_POSTED
-  3. reject any movement whose bin has status = COUNTING          -- 409 BIN_LOCKED_FOR_COUNT
-  4. upsert missing bin_stock / warehouse_stock rows (zero balances)
-  5. lock: SELECT ... FROM warehouse_stock WHERE (warehouse_id, product_id, lot_id) IN (...)
-       ORDER BY warehouse_id, product_id, lot_id FOR UPDATE;
-     then SELECT ... FROM bin_stock ... ORDER BY warehouse_id, bin_id, product_id, lot_id FOR UPDATE
-  6. compute deltas per row; any resulting on_hand < 0 -> 409 STOCK_INSUFFICIENT (bin, available)
-  7. apply cost rules (table below); write unit_cost on every ledger row
-  8. INSERT stock_ledger rows (UNIQUE index rejects a re-post -> 409 ALREADY_POSTED)
-  9. UPDATE bin_stock / warehouse_stock in one statement per row; with options.reservationConsume
-     every PICK_OUT adjusts sellable_on_hand and reserved in the same UPDATE
- 10. update stock_reservations (CONSUMED / RELEASED) when options.reservationConsume is set
- 11. enqueue follow-up jobs (labels, notifications) with pg-boss inside tx
+post(tx, actor, { docs, movements }):
+  1. validate: every movement belongs to one of the docs; qty_base <> 0; entered_qty > 0,
+     product_unit_id and factor_snapshot present; the movement type's sign and leg
+  2. headers (sorted by doc type, id): SELECT status ... FOR UPDATE (callers already hold it);
+     status = next -> 409 DOC_ALREADY_POSTED, other than expected -> 409 DOC_STATE_INVALID
+  3. bins: SELECT ... WHERE id IN (...) ORDER BY id FOR SHARE
+     -- COUNTING -> 409 BIN_LOCKED_FOR_COUNT, archived -> 409 BIN_ARCHIVED
+  4. missing cache rows, inbound keys only: one sorted INSERT ... ON CONFLICT DO NOTHING
+  5. lock: warehouse_stock then bin_stock FOR UPDATE, keys joined from a VALUES list with
+     IS NOT DISTINCT FROM (NULL lots), ordered by the key
+  6. deltas summed per key; any bin below zero -> 409 STOCK_INSUFFICIENT
+     (params binCode, available, requested; a missing outbound row counts as zero)
+  7. cost rules (table below) movement by movement, outbound legs first within a line
+  8. INSERT stock_ledger rows (stock_ledger_idem rejects a re-post -> 409 ALREADY_POSTED)
+  9. UPDATE warehouse_stock / bin_stock, one statement per row
+ 10. per document: number (NumberingService, last), status, posted_at, effective_date, posted_by
+     -- one now() per posting gives posted_at, the Ulaanbaatar effective date and the number's year
 ```
 
 READ COMMITTED, deterministic lock order, no retries. No negative stock, no exceptions: shortages are explicit adjustment documents.
@@ -375,7 +375,7 @@ READ COMMITTED, deterministic lock order, no retries. No negative stock, no exce
 
 | Movement (positive leg) | unit_cost on the ledger row | avg_cost effect |
 |---|---|---|
-| RECEIPT (goods receipt, with or without PO) | supplier price per base unit (0 allowed only with reason code FREE_GOODS) | re-averages: `(on_hand × avg + qty × cost) / (on_hand + qty)` |
+| RECEIPT (goods receipt, with or without PO) | the warehouse's current `avg_cost` (provisional, ADR-0033); the accountant's costing later records the supplier amount ex-VAT per line (bonus goods 0) in `stock_valuation_adjustments` | none at posting; the costing moves the average by the share still on hand: absorbed = Δ × min(Q, on_hand) / Q, `avg += absorbed / on_hand`, the rest is a variance |
 | TRANSFER_IN, DISPATCH_IN, RETURN_IN, PICK_IN, PUTAWAY_IN, BIN_MOVE_IN | the source row's `avg_cost` at posting time | none at warehouse level for intra-warehouse moves; destination warehouse re-averages with the carried cost on TRANSFER_IN / RETURN_IN |
 | ADJUSTMENT (+), COUNT_CORRECTION (+) | explicit `unit_cost` required (default = current `avg_cost`; opening-stock Excel has a mandatory cost column) | re-averages |
 | any negative leg | current `avg_cost` | none |
@@ -384,9 +384,9 @@ The supermarket (STORE) therefore carries real cost from day one even though it 
 
 **Snapshots** (D9): `stock_snapshot_daily` at warehouse level (non-zero rows only, written by the nightly reconciliation in the same tx) and `stock_snapshot_bin_monthly` at bin level, both `PARTITION BY RANGE (snapshot_date)` by month from the inventory module's first migration; a monthly job creates the next partition and drops partitions older than 13 months. As-of bin stock = last monthly snapshot + ledger delta.
 
-**Reconciliation** (D10): nightly job runs `SUM(ledger) EXCEPT balances` and the snapshot write inside one `REPEATABLE READ` transaction so both sides see the same snapshot; a non-empty diff writes `reconciliation_runs`, raises a Sentry alert and a red admin banner. `scripts/rebuild-balances.ts` regenerates caches from the ledger.
+**Reconciliation** (D10): `StockPostingService.reconcile` compares the ledger sums with both caches (bin, warehouse, sellable) and writes the day's snapshot inside one `REPEATABLE READ` transaction, so both sides see the same snapshot; every run writes `reconciliation_runs` (OK or DRIFT with the first 100 differences) and a drift shows a red admin banner (Sentry with the nightly job). `pnpm inventory:reconcile` runs it by hand (exit 2 on drift); `pnpm inventory:rebuild-balances` recomputes the cache quantities from the ledger under `LOCK TABLE … IN EXCLUSIVE MODE`, keeping the averages. The nightly pg-boss schedule is cut-line item SPEC §8.2 #5.
 
-**Flows.** Receipt → RECEIVING (GR-); put-away = `bin_moves` BM- with PUTAWAY_OUT/IN; storage↔storage = BM- with BIN_MOVE_OUT/IN; transfer (TR-) = TRANSFER_OUT source + TRANSFER_IN TRANSIT on ship, then TRANSFER_OUT TRANSIT for the **full shipped qty** + TRANSFER_IN destination RECEIVING for the received qty on receive; any shortfall posts a linked ADJUSTMENT at the destination so TRANSIT returns to zero per line (D14); pick (PK-) = PICK_OUT storage + PICK_IN STAGING with reservation consume; trip load = DISPATCH_OUT STAGING/SHIP + DISPATCH_IN CARGO of the VEHICLE warehouse; delivery confirm = DELIVERY_ISSUE from CARGO; failed stop stays on CARGO; trip close moves leftovers CARGO → RETURNS of the home warehouse; pickup handover = DELIVERY_ISSUE from STAGING; POS checkout = POS_SALE from SALESFLOOR; stocktake (ST-) freezes expected qty per (bin, product), sets bins COUNTING, counts, posts COUNT_CORRECTION, returns bins to ACTIVE. Opening stock = Excel → ADJUSTMENT (ADJ-) per warehouse with cost.
+**Flows.** Receipt → the line's bin (GR-; the fixed shelf, else RECEIVING); put-away = `bin_moves` BM- with PUTAWAY_OUT/IN; storage↔storage = BM- with BIN_MOVE_OUT/IN; transfer (TR-) = TRANSFER_OUT source + TRANSFER_IN TRANSIT on ship, then TRANSFER_OUT TRANSIT for the **full shipped qty** + TRANSFER_IN destination RECEIVING for the received qty on receive; any shortfall posts a linked ADJUSTMENT at the destination so TRANSIT returns to zero per line (D14); pick (PK-) = PICK_OUT storage + PICK_IN STAGING with reservation consume; trip load = DISPATCH_OUT STAGING/SHIP + DISPATCH_IN CARGO of the VEHICLE warehouse; delivery confirm = DELIVERY_ISSUE from CARGO; failed stop stays on CARGO; trip close moves leftovers CARGO → RETURNS of the home warehouse; pickup handover = DELIVERY_ISSUE from STAGING; POS checkout = POS_SALE from SALESFLOOR; stocktake (ST-) freezes expected qty per (bin, product), sets bins COUNTING, counts, posts COUNT_CORRECTION, returns bins to ACTIVE. Opening stock = Excel → ADJUSTMENT (ADJ-) per warehouse with cost.
 
 **Document numbering** (D11, D14, F11): `number_sequences (scope_key, period, last_value)` with a row lock; `NumberingService.next(tx, scopeKey, period)` returns the next value. Document codes: `SO-2026-000123` (scope `SO`, period `2026`), `GR-`, `BM-`, `TR-`, `ADJ-`, `ST-`, `PK-`, `PO-`, `INV-`, `CN-`, `PAY-`, `TRIP-`. Numbers are allocated at SUBMIT (orders) or POST (stock documents, invoices) inside the posting tx; DRAFTs carry only their bigint id, so abandoned drafts never create gaps. e-Barimt `billIdSuffix` uses scope `BILLID:<pos_no>` with period = the Ulaanbaatar calendar date (§5.9).
 

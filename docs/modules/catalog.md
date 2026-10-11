@@ -28,6 +28,7 @@ Names mix Cyrillic and Latin; weighed goods are sold in bulk by the kilogram; pr
 | `CatalogModule` | import into a feature module to get the services below |
 | `CatalogService.get(id, executor?)`, `getMany(ids, executor?)`, `search(query)` | product detail with units, barcodes and images; summaries for lists; the same search as `GET /products` |
 | `UnitConversionService.toBase(unitId, enteredQty, executor?)` → `{ productId, unitId, factorSnapshot, qtyBase }` | what a document line stores (ADR-0008 #2); `UNIT_SUPERSEDED` for superseded or retired units, `UNIT_FACTOR_INEXACT` when the base quantity needs more than 3 decimals or is not whole pieces |
+| `UnitConversionService.describe(unitIds, executor?)`, `baseUnits(productIds, executor?)` → `Map<…, UnitInfo>` | names and factors of the units on document lines (current or superseded); the base unit of each product (stocktake corrections post in base units). Added with inventory, 2026-10-11 |
 | `UnitsService.supersedeInTx(tx, actor, unitId, factorToBase)` | the single supersede path: old row closed, new row inserted with the flags, barcodes re-pointed, `UNIT_SUPERSEDED_HOOK` called, audit — one transaction |
 | `UNIT_SUPERSEDED_HOOK` / `UnitSupersededHook` | optional provider; pricing binds it in delivery 2 to re-issue price rules on the new unit (resolved through `ModuleRef`, `strict: false`) |
 | `BarcodeService.lookup(code, executor?)` | every current unit a scanned code may belong to (an 8-digit code may be EAN-8 or UPC-E) |
@@ -74,7 +75,7 @@ Actions `CREATE`, `UPDATE`, `DELETE`, `SUPERSEDE`, `RETIRE`, `ASSIGN` on the ent
 
 ## 8. Screens (`apps/web`)
 
-Menu group «Бараа»: `/catalog/products` (list with search, filters in the URL, thumbnails), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
+Menu group «Бараа»: `/catalog/products` (list with search, filters in the URL, thumbnails), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8, and the «Байршил ба үлдэгдэл» card from `features/inventory`, `docs/modules/inventory.md` §9), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
 
 ## 9. Tests
 
