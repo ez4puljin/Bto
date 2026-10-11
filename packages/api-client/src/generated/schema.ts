@@ -1362,6 +1362,169 @@ export interface paths {
         patch: operations["ReceiptLines_update"];
         trace?: never;
     };
+    "/api/v1/bin-moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BinMoves_list"];
+        put?: never;
+        post: operations["BinMoves_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bin-moves/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BinMoves_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Adjustments_list"];
+        put?: never;
+        post: operations["Adjustments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Adjustments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Adjustments_update"];
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Adjustments_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → SUBMITTED, for an approver. */
+        post: operations["Adjustments_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SUBMITTED → DRAFT, back to the warehouse. */
+        post: operations["Adjustments_returnToDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Adjustments_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustments/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SUBMITTED → POSTED by an approver; idempotent so a retried click never posts twice. */
+        post: operations["Adjustments_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/adjustment-lines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["AdjustmentLines_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["AdjustmentLines_update"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2527,6 +2690,187 @@ export interface components {
             lines: components["schemas"]["ReceiptCostLineRequest"][];
         };
         ReceiptLineUpdateRequest: {
+            /** @example 3 */
+            enteredQty?: string;
+            binId?: number;
+        };
+        BinMoveSummary: {
+            id: number;
+            number: string | null;
+            warehouseId: number;
+            note: string | null;
+            lineCount: number;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+        };
+        BinMovePage: {
+            data: components["schemas"]["BinMoveSummary"][];
+            nextCursor: string | null;
+        };
+        BinMoveLine: {
+            id: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            /** @example хайрцаг */
+            unitName: string;
+            /** @example 2 */
+            enteredQty: string;
+            /**
+             * @description Base units
+             * @example 48
+             */
+            qtyBase: string;
+            fromBinId: number;
+            /** @example RECEIVING */
+            fromBinCode: string;
+            toBinId: number;
+            /** @example A-01-03 */
+            toBinCode: string;
+        };
+        BinMoveDetail: {
+            id: number;
+            /** @example BM-2026-000001 */
+            number: string | null;
+            warehouseId: number;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED";
+            note: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["BinMoveLine"][];
+        };
+        BinMoveLineRequest: {
+            productUnitId: number;
+            /**
+             * @description In the product unit
+             * @example 2
+             */
+            enteredQty: string;
+            fromBinId: number;
+            toBinId: number;
+        };
+        BinMoveCreateRequest: {
+            warehouseId: number;
+            note?: string | null;
+            lines: components["schemas"]["BinMoveLineRequest"][];
+        };
+        AdjustmentSummary: {
+            id: number;
+            number: string | null;
+            warehouseId: number;
+            /** @enum {string} */
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
+            lineCount: number;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdjustmentPage: {
+            data: components["schemas"]["AdjustmentSummary"][];
+            nextCursor: string | null;
+        };
+        AdjustmentLine: {
+            id: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            /** @example ширхэг */
+            unitName: string;
+            /**
+             * @description Positive; the reason sets the direction
+             * @example 2
+             */
+            enteredQty: string;
+            /**
+             * @description Base units
+             * @example 2
+             */
+            qtyBase: string;
+            binId: number;
+            /** @example A-01-03 */
+            binCode: string;
+            note: string | null;
+        };
+        AdjustmentDetail: {
+            id: number;
+            /** @example ADJ-2026-000001 */
+            number: string | null;
+            warehouseId: number;
+            /** @enum {string} */
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
+            note: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lines: components["schemas"]["AdjustmentLine"][];
+        };
+        AdjustmentLineRequest: {
+            note?: string | null;
+            productUnitId: number;
+            /**
+             * @description Positive, in the product unit
+             * @example 2
+             */
+            enteredQty: string;
+            binId: number;
+            /**
+             * @description Inbound reasons, cost holders only: cost per base unit; omitted = the average
+             * @example 1250.5
+             */
+            unitCost?: string | null;
+        };
+        AdjustmentCreateRequest: {
+            warehouseId: number;
+            /**
+             * @description OPENING: approvers only
+             * @enum {string}
+             */
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            note?: string | null;
+            lines?: components["schemas"]["AdjustmentLineRequest"][];
+        };
+        AdjustmentUpdateRequest: {
+            /** @enum {string} */
+            reason?: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            note?: string | null;
+        };
+        AdjustmentCostRequest: {
+            lineId: number;
+            /**
+             * @description Cost per base unit
+             * @example 1250.5
+             */
+            unitCost: string;
+        };
+        AdjustmentApproveRequest: {
+            /** @description Inbound reasons, cost holders only; lines without a cost take the average */
+            costs?: components["schemas"]["AdjustmentCostRequest"][];
+        };
+        AdjustmentLineUpdateRequest: {
+            note?: string | null;
             /** @example 3 */
             enteredQty?: string;
             binId?: number;
@@ -6254,6 +6598,462 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BinMoves_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinMovePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BinMoves_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BinMoveCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinMoveDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BinMoves_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinMoveDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId?: number;
+                status?: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_addLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentLineRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_returnToDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Adjustments_approve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentApproveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AdjustmentLines_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AdjustmentLines_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentLineUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjustmentDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

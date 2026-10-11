@@ -155,7 +155,7 @@ describe('goods receipts', () => {
       .query({ costingPending: 'true' })
       .set(bearer(accountant))
       .expect(200);
-    expect(pending.body.data.map((row: { id: number }) => row.id)).toEqual([draft.id]);
+    expect(pending.body.data).toEqual([expect.objectContaining({ id: draft.id, lineCount: 2 })]);
 
     const again = await postReceipt(worker, draft.id).expect(409);
     expect(again.body.code).toBe('DOC_ALREADY_POSTED');

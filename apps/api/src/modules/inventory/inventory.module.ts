@@ -3,7 +3,14 @@ import { CatalogModule } from '../catalog';
 import { IdentityModule, WAREHOUSE_CREATED_HOOK } from '../identity';
 import { PartnersModule } from '../partners';
 import { BinsController, ProductLocationsController } from './controllers/bins.controller';
+import {
+  AdjustmentLinesController,
+  AdjustmentsController,
+  BinMovesController,
+} from './controllers/moves-adjustments.controller';
 import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
+import { AdjustmentsService } from './services/adjustments.service';
+import { BinMovesService } from './services/bin-moves.service';
 import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
 import { ReceiptsService } from './services/receipts.service';
@@ -11,6 +18,8 @@ import { StockPostingService } from './services/stock-posting.service';
 import { SystemBinsService } from './services/system-bins.service';
 
 const CORE_SERVICES = [
+  AdjustmentsService,
+  BinMovesService,
   BinsService,
   ProductLocationsService,
   ReceiptsService,
@@ -51,6 +60,9 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     ProductLocationsController,
     ReceiptsController,
     ReceiptLinesController,
+    BinMovesController,
+    AdjustmentsController,
+    AdjustmentLinesController,
   ],
   providers: [InventoryBootstrap],
 })

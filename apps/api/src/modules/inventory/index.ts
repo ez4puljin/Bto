@@ -2,6 +2,21 @@
 // file; named exports only (ESLint G2 rejects `export *`).
 export { InventoryHttpModule, InventoryModule } from './inventory.module';
 export {
+  type AdjustmentDetail,
+  type AdjustmentInput,
+  type AdjustmentLineInput,
+  AdjustmentsService,
+  type AdjustmentStatus,
+  type AdjustmentSummary,
+} from './services/adjustments.service';
+export {
+  type BinMoveDetail,
+  type BinMoveInput,
+  type BinMoveLineInput,
+  BinMovesService,
+  type BinMoveSummary,
+} from './services/bin-moves.service';
+export {
   type Bin,
   type BinInput,
   type BinQuery,

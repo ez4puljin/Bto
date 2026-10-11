@@ -527,7 +527,9 @@ export class ReceiptsService {
         costingStatus: goodsReceipts.costingStatus,
         effectiveDate: goodsReceipts.effectiveDate,
         createdAt: goodsReceipts.createdAt,
-        lineCount: sql<string>`(SELECT count(*) FROM goods_receipt_lines l WHERE l.receipt_id = ${goodsReceipts.id})`,
+        // Spelled out: Drizzle leaves columns of a single-table select unqualified, and a bare "id"
+        // inside the subquery would mean the line’s own id.
+        lineCount: sql<string>`(SELECT count(*) FROM goods_receipt_lines l WHERE l.receipt_id = goods_receipts.id)`,
       })
       .from(goodsReceipts)
       .where(and(...filters))

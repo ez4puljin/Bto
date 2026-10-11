@@ -1,3 +1,5 @@
+import type { AdjustmentDetailDto, AdjustmentSummaryDto } from '../dto/adjustments.dto';
+import type { BinMoveDetailDto, BinMoveSummaryDto } from '../dto/bin-moves.dto';
 import type { BinDto, ProductLocationDto } from '../dto/bins.dto';
 import type {
   ReceiptCostingDto,
@@ -5,6 +7,8 @@ import type {
   ReceiptLineDto,
   ReceiptSummaryDto,
 } from '../dto/receipts.dto';
+import type { AdjustmentDetail, AdjustmentSummary } from '../services/adjustments.service';
+import type { BinMoveDetail, BinMoveSummary } from '../services/bin-moves.service';
 import type { Bin } from '../services/bins.service';
 import type { ProductLocation } from '../services/product-locations.service';
 import type {
@@ -120,5 +124,88 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
       unitCost: line.unitCost?.toFixed() ?? null,
       freeGoods: line.freeGoods,
     })),
+  };
+}
+
+export function toBinMoveDetailDto(move: BinMoveDetail): BinMoveDetailDto {
+  return {
+    id: move.id,
+    number: move.number,
+    warehouseId: move.warehouseId,
+    status: move.status,
+    note: move.note,
+    effectiveDate: move.effectiveDate,
+    postedAt: move.postedAt?.toISOString() ?? null,
+    createdAt: move.createdAt.toISOString(),
+    lines: move.lines.map((line) => ({
+      id: line.id,
+      productId: line.productId,
+      productSku: line.productSku,
+      productName: line.productName,
+      productUnitId: line.productUnitId,
+      unitName: line.unitName,
+      enteredQty: line.enteredQty.toFixed(),
+      qtyBase: line.qtyBase.toFixed(),
+      fromBinId: line.fromBinId,
+      fromBinCode: line.fromBinCode,
+      toBinId: line.toBinId,
+      toBinCode: line.toBinCode,
+    })),
+  };
+}
+
+export function toBinMoveSummaryDto(summary: BinMoveSummary): BinMoveSummaryDto {
+  return {
+    id: summary.id,
+    number: summary.number,
+    warehouseId: summary.warehouseId,
+    note: summary.note,
+    lineCount: summary.lineCount,
+    effectiveDate: summary.effectiveDate,
+    postedAt: summary.postedAt?.toISOString() ?? null,
+  };
+}
+
+/** No cost ever reaches this DTO; approvers send costs, they never read them back here. */
+export function toAdjustmentDetailDto(adjustment: AdjustmentDetail): AdjustmentDetailDto {
+  return {
+    id: adjustment.id,
+    number: adjustment.number,
+    warehouseId: adjustment.warehouseId,
+    reason: adjustment.reason,
+    status: adjustment.status,
+    note: adjustment.note,
+    submittedAt: adjustment.submittedAt?.toISOString() ?? null,
+    effectiveDate: adjustment.effectiveDate,
+    postedAt: adjustment.postedAt?.toISOString() ?? null,
+    createdAt: adjustment.createdAt.toISOString(),
+    updatedAt: adjustment.updatedAt.toISOString(),
+    lines: adjustment.lines.map((line) => ({
+      id: line.id,
+      productId: line.productId,
+      productSku: line.productSku,
+      productName: line.productName,
+      productUnitId: line.productUnitId,
+      unitName: line.unitName,
+      enteredQty: line.enteredQty.toFixed(),
+      qtyBase: line.qtyBase.toFixed(),
+      binId: line.binId,
+      binCode: line.binCode,
+      note: line.note,
+    })),
+  };
+}
+
+export function toAdjustmentSummaryDto(summary: AdjustmentSummary): AdjustmentSummaryDto {
+  return {
+    id: summary.id,
+    number: summary.number,
+    warehouseId: summary.warehouseId,
+    reason: summary.reason,
+    status: summary.status,
+    lineCount: summary.lineCount,
+    submittedAt: summary.submittedAt?.toISOString() ?? null,
+    effectiveDate: summary.effectiveDate,
+    createdAt: summary.createdAt.toISOString(),
   };
 }
