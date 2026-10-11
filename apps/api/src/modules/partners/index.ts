@@ -15,3 +15,14 @@ export {
   type LockedCustomer,
   type PaymentTerm,
 } from './services/customers.service';
+export {
+  type ProductSupplierLink,
+  ProductSuppliersService,
+  type SupplierProduct,
+} from './services/product-suppliers.service';
+export {
+  type Supplier,
+  type SupplierDetail,
+  type SupplierSummary,
+  SuppliersService,
+} from './services/suppliers.service';

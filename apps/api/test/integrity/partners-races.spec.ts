@@ -4,10 +4,20 @@ import { DB } from '../../src/common/db/db.tokens';
 import type { Db } from '../../src/common/db/db.types';
 import { inTransaction } from '../../src/common/db/transaction';
 import { systemActor } from '../../src/modules/identity';
-import { CustomerAddressesService, CustomersService } from '../../src/modules/partners';
+import {
+  CustomerAddressesService,
+  CustomersService,
+  ProductSuppliersService,
+  SuppliersService,
+} from '../../src/modules/partners';
 import { connectAs, createHttpApp, sqlStateOf } from '../harness/apps';
+import { catalogApi } from '../harness/catalog';
+import { login, seedUser } from '../harness/identity';
 
-/** Concurrency rules of partners (docs/modules/partners.md): codes, default addresses, credit lock. */
+/**
+ * Concurrency rules of partners (docs/modules/partners.md): codes, default addresses, the main
+ * supplier of a product (ADR-0032) and the credit lock.
+ */
 describe('integrity: partners concurrency', () => {
   let app: NestExpressApplication;
   let sql: Client;
@@ -94,5 +104,35 @@ describe('integrity: partners concurrency', () => {
       release();
       await decision;
     }
+  });
+
+  it('keeps exactly one main supplier when links and main changes race', async () => {
+    const admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
+    const catalog = catalogApi(app, admin);
+    const product = await catalog.product({
+      sku: '9101',
+      name: 'Уралдаан',
+      categoryId: await catalog.category('Уралдаан'),
+      baseUomId: await catalog.uomId('PCS'),
+    });
+    const suppliers = app.get(SuppliersService);
+    const links = app.get(ProductSuppliersService);
+    const [a, b, c] = await Promise.all(
+      ['Нэг', 'Хоёр', 'Гурав'].map((name) => suppliers.create(actor, { name: `${name} ХХК` })),
+    );
+    if (!a || !b || !c) throw new Error('suppliers missing');
+    const created = await Promise.all(
+      [a, b, c].map((supplier) => links.link(actor, product.id, supplier.id)),
+    );
+    const mainCount = async () => {
+      const { rows } = await sql.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM product_suppliers WHERE product_id = $1 AND is_main`,
+        [product.id],
+      );
+      return rows[0]?.count;
+    };
+    expect(await mainCount()).toBe('1');
+    await Promise.all(created.map((link) => links.setMain(actor, link.id)));
+    expect(await mainCount()).toBe('1');
   });
 });
