@@ -15,6 +15,9 @@ export interface FileKindDefinition {
 }
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** Office Open XML workbook (.xlsx); the old binary .xls is not accepted (ADR-0036). */
+export const XLSX_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 export const FILE_KINDS = {
   'catalog.product_image': {
@@ -28,6 +31,13 @@ export const FILE_KINDS = {
     maxBytes: 512 * 1024,
     visibility: 'public',
     permission: 'catalog.products.manage',
+  },
+  /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
+  'imports.source': {
+    contentTypes: [XLSX_CONTENT_TYPE],
+    maxBytes: 5 * 1024 * 1024,
+    visibility: 'private',
+    permission: 'imports.manage',
   },
 } as const satisfies Record<string, FileKindDefinition>;
 
@@ -47,6 +57,7 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  [XLSX_CONTENT_TYPE]: 'xlsx',
 };
 
 /** File-name extension for a content type the registry allows. */
@@ -56,7 +67,7 @@ export function extensionFor(contentType: string): string {
   return extension;
 }
 
-/** Whether the first bytes of a file match its declared image type (JPEG, PNG, WebP). */
+/** Whether the first bytes of a file match its declared type (JPEG, PNG, WebP; xlsx is a ZIP). */
 export function matchesMagicBytes(contentType: string, head: Uint8Array): boolean {
   const starts = (bytes: readonly number[], offset = 0) =>
     bytes.every((byte, index) => head[offset + index] === byte);
@@ -67,6 +78,8 @@ export function matchesMagicBytes(contentType: string, head: Uint8Array): boolea
       return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     case 'image/webp':
       return starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8);
+    case XLSX_CONTENT_TYPE:
+      return starts([0x50, 0x4b, 0x03, 0x04]);
     default:
       return false;
   }

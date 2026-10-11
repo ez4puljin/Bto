@@ -305,7 +305,7 @@ export class StocktakesService {
       for (const cost of costs) {
         const line = byId.get(cost.lineId);
         if (!line) throw invalid('costs', 'line', 'lines of this stocktake');
-        if (!differenceOf(line).isPositive())
+        if (!differenceOf(line).gt(0))
           throw invalid('costs', 'surplus', 'only surpluses take a cost');
         await tx
           .update(stocktakeLines)
@@ -342,7 +342,7 @@ export class StocktakesService {
         enteredQty: difference.abs(),
         productUnitId: unit.unitId,
         factorSnapshot: unit.factorToBase,
-        ...(difference.isPositive() && line.unitCost ? { unitCost: line.unitCost } : {}),
+        ...(difference.gt(0) && line.unitCost ? { unitCost: line.unitCost } : {}),
       };
     });
     const result = await this.posting.post(tx, actor, {

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import mn from '../i18n/mn.json';
 import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
+import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
+import { ADJUSTMENT_REASON_CODES } from './inventory';
 import { SETTING_KEYS } from './settings';
 
 function lookup(path: string): unknown {
@@ -32,6 +34,20 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   });
 
   it.each(SETTING_KEYS.map((key) => `settings.keys.${key}`))('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each(ADJUSTMENT_REASON_CODES.map((code) => `inventory.reasons.${code}`))('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...IMPORT_KINDS.map((kind) => `imports.kinds.${kind}`),
+    ...IMPORT_KINDS.flatMap((kind) =>
+      IMPORT_COLUMNS[kind].map((column) => `imports.columns.${kind}.${column.key}`),
+    ),
+    ...[...ROW_ERROR_CODES, ...ROW_WARNING_CODES].map((code) => `imports.issues.${code}`),
+  ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });
 });

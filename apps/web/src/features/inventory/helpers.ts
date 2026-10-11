@@ -55,7 +55,7 @@ export function looksLikeLabel(code: string): boolean {
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 
 export function isQty(value: string): boolean {
-  return QTY.test(value) && new Decimal(value).isPositive();
+  return QTY.test(value) && new Decimal(value).gt(0);
 }
 
 /** The reason adds stock (found goods, opening stock) rather than writing it off. */

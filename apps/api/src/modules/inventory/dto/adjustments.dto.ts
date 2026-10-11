@@ -17,6 +17,11 @@ import { PageQueryDto } from '../../../common/pagination/page';
 import { ADJUSTMENT_STATUSES } from '../schema';
 import { QTY, trimmed } from './bins.dto';
 
+/** Reasons a person may choose; OPENING_REVERSAL is posted only by an import revert (ADR-0036). */
+const REQUESTABLE_REASONS = ADJUSTMENT_REASON_CODES.filter(
+  (reason) => reason !== 'OPENING_REVERSAL',
+);
+
 /** Cost per base unit, NUMERIC(14,4). */
 export const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
 
@@ -112,8 +117,8 @@ export class AdjustmentLineRequestDto extends AdjustmentNoteDto {
 @ApiSchema({ name: 'AdjustmentCreateRequest' })
 export class CreateAdjustmentDto {
   @ApiProperty() @IsInt() @Min(1) warehouseId: number;
-  @ApiProperty({ enum: ADJUSTMENT_REASON_CODES, description: 'OPENING: approvers only' })
-  @IsIn(ADJUSTMENT_REASON_CODES)
+  @ApiProperty({ enum: REQUESTABLE_REASONS, description: 'OPENING: approvers only' })
+  @IsIn(REQUESTABLE_REASONS)
   reason: AdjustmentReason;
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 500 })
   @IsOptional()
@@ -132,9 +137,9 @@ export class CreateAdjustmentDto {
 
 @ApiSchema({ name: 'AdjustmentUpdateRequest' })
 export class UpdateAdjustmentDto {
-  @ApiPropertyOptional({ enum: ADJUSTMENT_REASON_CODES })
+  @ApiPropertyOptional({ enum: REQUESTABLE_REASONS })
   @IsOptional()
-  @IsIn(ADJUSTMENT_REASON_CODES)
+  @IsIn(REQUESTABLE_REASONS)
   reason?: AdjustmentReason;
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 500 })
   @IsOptional()

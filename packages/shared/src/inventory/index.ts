@@ -157,7 +157,8 @@ export function binCodeRange(range: BinCodeRange): string[] {
 /**
  * Every movement type of the ledger with its sign (1 inbound, -1 outbound, 0 either) and allowed
  * legs. A pair posts leg 1 (out) and leg 2 (in) under one document line; a transfer's receive
- * posts legs 3 and 4 so that ship and receive never share an idempotency key.
+ * posts legs 3 and 4, and its corrections legs 5 and 6 (ADR-0035), so that ship and receive never
+ * share an idempotency key.
  */
 export const MOVEMENT_TYPES = {
   RECEIPT: { sign: 1, legs: [1] },
@@ -171,8 +172,8 @@ export const MOVEMENT_TYPES = {
   DISPATCH_IN: { sign: 1, legs: [2] },
   DELIVERY_ISSUE: { sign: -1, legs: [1] },
   POS_SALE: { sign: -1, legs: [1] },
-  TRANSFER_OUT: { sign: -1, legs: [1, 3] },
-  TRANSFER_IN: { sign: 1, legs: [2, 4] },
+  TRANSFER_OUT: { sign: -1, legs: [1, 3, 5] },
+  TRANSFER_IN: { sign: 1, legs: [2, 4, 6] },
   RETURN_IN: { sign: 1, legs: [1] },
   ADJUSTMENT: { sign: 0, legs: [1] },
   COUNT_CORRECTION: { sign: 0, legs: [1] },
@@ -207,6 +208,8 @@ export const ADJUSTMENT_REASONS = {
   SURPLUS: 1,
   /** Opening stock: only the importer and approvers use it. */
   OPENING: 1,
+  /** Takes back an opening-stock adjustment when its import is reverted (system only, ADR-0036). */
+  OPENING_REVERSAL: -1,
 } as const satisfies Record<string, -1 | 1>;
 export type AdjustmentReason = keyof typeof ADJUSTMENT_REASONS;
 export const ADJUSTMENT_REASON_CODES = [
@@ -215,8 +218,66 @@ export const ADJUSTMENT_REASON_CODES = [
   'SHORTAGE',
   'SURPLUS',
   'OPENING',
+  'OPENING_REVERSAL',
 ] as const satisfies readonly AdjustmentReason[];
 export const USER_ADJUSTMENT_REASONS = ['DAMAGED', 'EXPIRED', 'SHORTAGE', 'SURPLUS'] as const;
+
+// ---------------------------------------------------------------------------------------------
+// Transfers (ADR-0035)
+
+export const TRANSFER_STATUSES = [
+  'DRAFT',
+  'REQUESTED',
+  'SHIPPED',
+  'RECEIVED',
+  'CANCELLED',
+] as const;
+export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
+/** REQUEST: the receiver asked for the goods; PUSH: the sender sends on its own (returns). */
+export const TRANSFER_ORIGINS = ['REQUEST', 'PUSH'] as const;
+export type TransferOrigin = (typeof TRANSFER_ORIGINS)[number];
+
+/** Where a receive leg posts: the TRANSIT bin, the destination bin or the sender's bin. */
+export type TransferPlace = 'TRANSIT' | 'DESTINATION' | 'SOURCE';
+
+export interface TransferReceiveLeg {
+  movementType: 'TRANSFER_OUT' | 'TRANSFER_IN';
+  leg: 3 | 4 | 5 | 6;
+  place: TransferPlace;
+  /** Signed base quantity. */
+  qty: Decimal;
+}
+
+/**
+ * The ledger legs of receiving one transfer line (owner, 2026-10-11): TRANSIT gives up everything
+ * shipped (leg 3) and the destination takes what arrived up to that (leg 4). A shortfall goes back
+ * to the sender's bin (leg 6); a surplus leaves the sender's bin (leg 5) for the destination
+ * (leg 6). Every inbound leg follows the outbound leg before it, so it carries that leg's cost.
+ */
+export function transferReceiveLegs(
+  shipped: DecimalInput,
+  received: DecimalInput,
+): TransferReceiveLeg[] {
+  const s = new Decimal(shipped);
+  const r = new Decimal(received);
+  if (s.isNegative() || r.isNegative()) throw new RangeError('quantities are never negative');
+  const legs: TransferReceiveLeg[] = [];
+  if (s.gt(0)) {
+    legs.push({ movementType: 'TRANSFER_OUT', leg: 3, place: 'TRANSIT', qty: s.negated() });
+    const arrived = Decimal.min(r, s);
+    if (arrived.gt(0)) {
+      legs.push({ movementType: 'TRANSFER_IN', leg: 4, place: 'DESTINATION', qty: arrived });
+    }
+  }
+  if (r.lessThan(s)) {
+    legs.push({ movementType: 'TRANSFER_IN', leg: 6, place: 'SOURCE', qty: s.minus(r) });
+  } else if (r.greaterThan(s)) {
+    const extra = r.minus(s);
+    legs.push({ movementType: 'TRANSFER_OUT', leg: 5, place: 'SOURCE', qty: extra.negated() });
+    legs.push({ movementType: 'TRANSFER_IN', leg: 6, place: 'DESTINATION', qty: extra });
+  }
+  return legs;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Cost arithmetic (ADR-0007 cost rules, ADR-0033 costing after posting)

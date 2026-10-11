@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Decimal } from '../money';
+import { Decimal } from '../money';
 import {
+  ADJUSTMENT_REASONS,
   BinRangeError,
   binCodeRange,
   canRecost,
@@ -14,10 +15,13 @@ import {
   reaverage,
   revalue,
   systemBinTypes,
+  transferReceiveLegs,
+  USER_ADJUSTMENT_REASONS,
   unitCostOf,
 } from './index';
 
 const text = (value: Decimal) => value.toFixed();
+const zero = new Decimal(0);
 
 describe('bin codes', () => {
   it('stores the label text in one form whatever the keyboard typed', () => {
@@ -95,8 +99,49 @@ describe('movements and documents', () => {
       if (type.endsWith('_OUT')) expect(rule.sign).toBe(-1);
       if (type.endsWith('_IN')) expect(rule.sign).toBe(1);
     }
-    expect(MOVEMENT_TYPES.TRANSFER_OUT.legs).toEqual([1, 3]);
-    expect(MOVEMENT_TYPES.TRANSFER_IN.legs).toEqual([2, 4]);
+    expect(MOVEMENT_TYPES.TRANSFER_OUT.legs).toEqual([1, 3, 5]);
+    expect(MOVEMENT_TYPES.TRANSFER_IN.legs).toEqual([2, 4, 6]);
+  });
+
+  it('receives a transfer line exactly, short or over (ADR-0035)', () => {
+    const legs = (shipped: string, received: string) =>
+      transferReceiveLegs(shipped, received).map(
+        ({ leg, place, qty }) => `${leg}:${place}:${qty.toFixed()}`,
+      );
+    expect(legs('24', '24')).toEqual(['3:TRANSIT:-24', '4:DESTINATION:24']);
+    // Two short: TRANSIT empties, the sender gets them back.
+    expect(legs('24', '22')).toEqual(['3:TRANSIT:-24', '4:DESTINATION:22', '6:SOURCE:2']);
+    // Two over: they leave the sender's bin for the destination.
+    expect(legs('10', '12')).toEqual([
+      '3:TRANSIT:-10',
+      '4:DESTINATION:10',
+      '5:SOURCE:-2',
+      '6:DESTINATION:2',
+    ]);
+    expect(legs('10', '0')).toEqual(['3:TRANSIT:-10', '6:SOURCE:10']);
+    expect(legs('0', '3')).toEqual(['5:SOURCE:-3', '6:DESTINATION:3']);
+    expect(legs('0', '0')).toEqual([]);
+    for (const [shipped, received] of [
+      ['24', '22'],
+      ['10', '12'],
+      ['5.5', '5.25'],
+    ] as const) {
+      const all = transferReceiveLegs(shipped, received);
+      // TRANSIT gives up exactly what was shipped; the destination ends up with what arrived.
+      const sum = (place: string) =>
+        all.filter((leg) => leg.place === place).reduce((total, leg) => total.plus(leg.qty), zero);
+      expect(sum('TRANSIT').negated().toFixed()).toBe(shipped);
+      expect(sum('DESTINATION').toFixed()).toBe(received);
+      for (const leg of all) {
+        expect(leg.qty.isNegative()).toBe(leg.movementType === 'TRANSFER_OUT');
+      }
+    }
+  });
+
+  it('keeps the system adjustment reasons out of the people’s list', () => {
+    expect(ADJUSTMENT_REASONS.OPENING_REVERSAL).toBe(-1);
+    expect(USER_ADJUSTMENT_REASONS).not.toContain('OPENING_REVERSAL');
+    expect(USER_ADJUSTMENT_REASONS).not.toContain('OPENING');
   });
 
   it('formats gapless yearly numbers', () => {

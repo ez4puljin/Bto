@@ -6,6 +6,7 @@ import {
   FILE_KINDS,
   isFileKind,
   matchesMagicBytes,
+  XLSX_CONTENT_TYPE,
 } from './index';
 
 describe('file kinds (ADR-0029)', () => {
@@ -30,5 +31,19 @@ describe('file kinds (ADR-0029)', () => {
     expect(matchesMagicBytes('image/jpeg', png)).toBe(false);
     expect(matchesMagicBytes('image/gif', png)).toBe(false);
     expect(() => extensionFor('image/gif')).toThrow(RangeError);
+  });
+
+  it('keeps import sheets private and recognises the xlsx (ZIP) signature', () => {
+    expect(FILE_KINDS['imports.source']).toMatchObject({
+      visibility: 'private',
+      permission: 'imports.manage',
+      contentTypes: [XLSX_CONTENT_TYPE],
+    });
+    expect(extensionFor(XLSX_CONTENT_TYPE)).toBe('xlsx');
+    const zip = Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+    expect(matchesMagicBytes(XLSX_CONTENT_TYPE, zip)).toBe(true);
+    // An old binary .xls (OLE2) renamed to .xlsx is refused.
+    const ole = Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    expect(matchesMagicBytes(XLSX_CONTENT_TYPE, ole)).toBe(false);
   });
 });

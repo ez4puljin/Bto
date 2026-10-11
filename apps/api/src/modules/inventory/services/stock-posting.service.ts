@@ -805,7 +805,7 @@ export class StockPostingService {
   }
 
   private async ensureCacheRows(tx: Tx, movements: readonly Movement[]): Promise<void> {
-    const inbound = movements.filter((movement) => movement.qtyBase.isPositive());
+    const inbound = movements.filter((movement) => movement.qtyBase.gt(0));
     if (inbound.length === 0) return;
     const warehouseKeys = uniqueBy(inbound, (m) => wsKey(m.warehouseId, m.productId, m.lotId)).sort(
       (a, b) =>
@@ -974,7 +974,7 @@ function validateMovements(docs: readonly PostingDoc[], movements: readonly Move
       throw new Error(`${movement.movementType} cannot use leg ${movement.leg}`);
     }
     if (
-      !movement.enteredQty.isPositive() ||
+      !movement.enteredQty.gt(0) ||
       !movement.qtyBase.abs().equals(movement.enteredQty.times(movement.factorSnapshot))
     ) {
       throw new Error(`line ${movement.docLineId}: entered quantity × factor ≠ base quantity`);

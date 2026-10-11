@@ -6872,7 +6872,9 @@
           "inventory.adjustments.approve",
           "inventory.stocktakes.manage",
           "inventory.stocktakes.approve",
-          "inventory.costs.manage"
+          "inventory.costs.manage",
+          "inventory.transfers.manage",
+          "imports.manage"
         ]
       },
       "RoleRef": {
@@ -8019,7 +8021,8 @@
           "kind": {
             "enum": [
               "catalog.product_image",
-              "catalog.product_thumb"
+              "catalog.product_thumb",
+              "imports.source"
             ],
             "type": "string"
           },
@@ -11282,7 +11285,8 @@
               "EXPIRED",
               "SHORTAGE",
               "SURPLUS",
-              "OPENING"
+              "OPENING",
+              "OPENING_REVERSAL"
             ],
             "type": "string"
           },
@@ -11422,7 +11426,8 @@
               "EXPIRED",
               "SHORTAGE",
               "SURPLUS",
-              "OPENING"
+              "OPENING",
+              "OPENING_REVERSAL"
             ],
             "type": "string"
           },
@@ -12019,6 +12024,12 @@
           "DOC_STATE_INVALID",
           "PRODUCT_NOT_IN_WAREHOUSE",
           "COSTING_CLOSED",
+          "TRANSFER_NOTHING_SHIPPED",
+          "IMPORT_FILE_INVALID",
+          "IMPORT_STATE_INVALID",
+          "IMPORT_HAS_ERRORS",
+          "IMPORT_BUSY",
+          "IMPORT_REVERT_BLOCKED",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

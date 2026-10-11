@@ -240,7 +240,7 @@ export class StockQueryService {
     for (const list of result.values()) {
       for (const balance of list) {
         balance.available = Decimal.max(ZERO, balance.sellableOnHand.minus(balance.reserved));
-        if (balance.onHand.isPositive()) {
+        if (balance.onHand.gt(0)) {
           balance.avgCost = balance.value.dividedBy(balance.onHand).toDecimalPlaces(COST_SCALE);
         }
       }

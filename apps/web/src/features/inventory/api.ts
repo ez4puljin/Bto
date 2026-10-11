@@ -34,6 +34,8 @@ export type AdjustmentDetail = Schemas['AdjustmentDetail'];
 export type AdjustmentCreate = Schemas['AdjustmentCreateRequest'];
 export type AdjustmentLineRequest = Schemas['AdjustmentLineRequest'];
 export type AdjustmentReason = AdjustmentDetail['reason'];
+/** The reasons people may choose (OPENING_REVERSAL comes only from an import revert). */
+export type RequestableReason = AdjustmentCreate['reason'];
 export type AdjustmentStatus = AdjustmentDetail['status'];
 export type ProductStock = Schemas['ProductStock'];
 export type ProductStockDetail = Schemas['ProductStockDetail'];
@@ -396,7 +398,7 @@ export function useInventoryMutations() {
         body,
       }: {
         id: number;
-        body: { reason?: AdjustmentReason; note?: string | null };
+        body: { reason?: RequestableReason; note?: string | null };
       }) => unwrap(await api.PATCH('/api/v1/adjustments/{id}', { params: { path: { id } }, body })),
       onSuccess: adjustmentsChanged,
     }),

@@ -27,7 +27,7 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
   type AdjustmentDetail,
-  type AdjustmentReason,
+  type RequestableReason,
   type AdjustmentStatus,
   type Bin,
   useAdjustment,
@@ -155,9 +155,9 @@ function AdjustmentCreateCard() {
   const action = useAction();
   const [key] = useState(randomUuid);
   const [warehouseId, setWarehouseId] = useState<number | undefined>();
-  const [reason, setReason] = useState<AdjustmentReason>('DAMAGED');
+  const [reason, setReason] = useState<RequestableReason>('DAMAGED');
   const [note, setNote] = useState('');
-  const reasons: readonly AdjustmentReason[] = canApprove
+  const reasons: readonly RequestableReason[] = canApprove
     ? [...USER_ADJUSTMENT_REASONS, 'OPENING']
     : USER_ADJUSTMENT_REASONS;
 

@@ -28,6 +28,8 @@ export const PERMISSIONS = [
   'inventory.stocktakes.manage',
   'inventory.stocktakes.approve',
   'inventory.costs.manage',
+  'inventory.transfers.manage',
+  'imports.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -78,6 +80,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.moves.manage',
     'inventory.adjustments.manage',
     'inventory.stocktakes.manage',
+    'inventory.transfers.manage',
   ],
   // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms and
   // enters the supplier prices of goods receipts (ADR-0033).
@@ -90,7 +93,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.costs.manage',
   ],
   HR: [],
-  POS_CASHIER: [],
+  // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
+  POS_CASHIER: ['inventory.transfers.manage'],
   SALES_REP: [],
   DRIVER: [],
 };

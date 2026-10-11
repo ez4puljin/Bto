@@ -109,6 +109,7 @@ export class AdjustmentsService {
 
   async create(ctx: AuthContext, input: AdjustmentInput): Promise<AdjustmentDetail> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
+    assertRequestable(input.reason);
     if (input.reason === 'OPENING' && !ctx.permissions.has(APPROVE)) {
       throw new AppError('FORBIDDEN', 'opening stock is entered by approvers', {
         reason: 'OPENING',
@@ -161,6 +162,7 @@ export class AdjustmentsService {
   ): Promise<AdjustmentDetail> {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, ctx, id);
+      if (patch.reason) assertRequestable(patch.reason);
       if (patch.reason === 'OPENING' && !ctx.permissions.has(APPROVE)) {
         throw new AppError('FORBIDDEN', 'opening stock is entered by approvers', {
           reason: 'OPENING',
@@ -588,6 +590,11 @@ export class AdjustmentsService {
       .set({ updatedAt: sql`now()` })
       .where(eq(adjustments.id, id));
   }
+}
+
+/** OPENING_REVERSAL is posted only when an import is reverted (ADR-0036). */
+function assertRequestable(reason: AdjustmentReason): void {
+  if (reason === 'OPENING_REVERSAL') throw invalid('reason', 'system', 'a system reason');
 }
 
 function direction(reason: AdjustmentReason): -1 | 1 {

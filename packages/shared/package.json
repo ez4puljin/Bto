@@ -77,6 +77,11 @@
       "types": "./dist/inventory/index.d.ts",
       "default": "./dist/inventory/index.js"
     },
+    "./imports": {
+      "@tugeel/source": "./src/imports/index.ts",
+      "types": "./dist/imports/index.d.ts",
+      "default": "./dist/imports/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },
