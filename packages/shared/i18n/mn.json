@@ -346,7 +346,13 @@
       "categories": "Ангилал",
       "brands": "Брэнд",
       "uoms": "Хэмжих нэгж",
-      "files": "Файл"
+      "files": "Файл",
+      "customers": "Харилцагч",
+      "customer_addresses": "Харилцагчийн хаяг",
+      "customer_contacts": "Харилцагчийн холбоо барих хүн",
+      "suppliers": "Нийлүүлэгч",
+      "supplier_contacts": "Нийлүүлэгчийн холбоо барих хүн",
+      "product_suppliers": "Барааны нийлүүлэгч"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -365,7 +371,9 @@
       "ADMIN_RECOVERED": "Админыг сэргээсэн",
       "SUPERSEDE": "Коэффициент сольсон",
       "RETIRE": "Зогсоосон",
-      "ASSIGN": "Бөөнөөр оноосон"
+      "ASSIGN": "Бөөнөөр оноосон",
+      "CREDIT": "Зээлийн нөхцөл өөрчилсөн",
+      "ARCHIVE": "Архивласан"
     }
   },
   "errors": {

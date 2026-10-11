@@ -792,6 +792,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customers_list"];
+        put?: never;
+        /** Idempotent: the server allocates the code when it is omitted, so a retry must not add a twin. */
+        post: operations["Customers_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/next-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Declared before `:id`, so "next-code" never reaches ParseIntPipe. */
+        get: operations["Customers_nextCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Customers_update"];
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Credit limit, payment term and hold: the accountant's (partners.credit.manage). */
+        put: operations["Customers_setCredit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customers_listAddresses"];
+        put?: never;
+        post: operations["Customers_addAddress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Customers_listContacts"];
+        put?: never;
+        post: operations["Customers_addContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-addresses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archives the address: orders keep pointing at it; the oldest other one becomes the default. */
+        delete: operations["CustomerAddresses_archive"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomerAddresses_update"];
+        trace?: never;
+    };
+    "/api/v1/customer-addresses/{id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAddresses_setDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CustomerContacts_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CustomerContacts_update"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1418,6 +1566,192 @@ export interface components {
             classificationCode: number;
             taxProductCode: number;
             cityTax: number;
+        };
+        CustomerSummary: {
+            id: number;
+            code: string;
+            /** @enum {string} */
+            kind: "COMPANY" | "INDIVIDUAL";
+            name: string;
+            regNo: string | null;
+            tin: string | null;
+            phone: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            creditHold: boolean;
+            /** @description A company without a TIN: receipts wait for it */
+            tinPending: boolean;
+            /** @description Text of the default address */
+            address: string | null;
+            /** @description The default address has a GPS point */
+            hasGps: boolean;
+        };
+        CustomerPage: {
+            data: components["schemas"]["CustomerSummary"][];
+            nextCursor: string | null;
+        };
+        NextCode: {
+            /** @example 1024 */
+            code: string;
+        };
+        PaymentTerm: {
+            days: number | null;
+            /**
+             * @description The customer’s own days, the company setting, or neither yet
+             * @enum {string}
+             */
+            source: "CUSTOMER" | "DEFAULT" | "UNSET";
+        };
+        CustomerAddress: {
+            id: number;
+            label: string | null;
+            address: string | null;
+            /** @example 47.918412 */
+            lat: string | null;
+            /** @example 106.917712 */
+            lng: string | null;
+            /** @enum {string|null} */
+            gpsSource: "OFFICE" | "FIELD" | null;
+            /** @description Delivery zone (delivery 5) */
+            zoneId: number | null;
+            note: string | null;
+            isDefault: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+        };
+        Contact: {
+            id: number;
+            name: string | null;
+            position: string | null;
+            /** @example +97699112233 */
+            phone: string | null;
+            note: string | null;
+        };
+        CustomerDetail: {
+            id: number;
+            code: string;
+            /** @enum {string} */
+            kind: "COMPANY" | "INDIVIDUAL";
+            name: string;
+            regNo: string | null;
+            tin: string | null;
+            phone: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            creditHold: boolean;
+            /** @description A company without a TIN: receipts wait for it */
+            tinPending: boolean;
+            /** @description Text of the default address */
+            address: string | null;
+            /** @description The default address has a GPS point */
+            hasGps: boolean;
+            /** @enum {string|null} */
+            tinSource: "LOOKUP" | "MANUAL" | null;
+            consumerNo: string | null;
+            vatPayer: boolean;
+            cityPayer: boolean;
+            /**
+             * @description null = not checked yet
+             * @enum {string|null}
+             */
+            taxStatusSource: "LOOKUP" | "MANUAL" | null;
+            /** Format: date-time */
+            taxStatusCheckedAt: string | null;
+            /**
+             * @description null = not decided
+             * @example 5000000.00
+             */
+            creditLimit: string | null;
+            /** @description Own days; null = the company setting */
+            paymentTermDays: number | null;
+            paymentTerm: components["schemas"]["PaymentTerm"];
+            creditHoldReason: string | null;
+            note: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Active addresses, the default first */
+            addresses: components["schemas"]["CustomerAddress"][];
+            contacts: components["schemas"]["Contact"][];
+        };
+        CustomerAddressRequest: {
+            label?: string | null;
+            address?: string | null;
+            /** @example 47.918412 */
+            lat?: string | null;
+            /** @example 106.917712 */
+            lng?: string | null;
+            /** @description Landmark */
+            note?: string | null;
+        };
+        CustomerCreateRequest: {
+            /** @description Registration number */
+            regNo?: string | null;
+            /** @description Company 11 digits, citizen 12–14 (spaces allowed) */
+            tin?: string | null;
+            /** @description Citizens only, 8 digits */
+            consumerNo?: string | null;
+            /** @description Mongolian mobile number */
+            phone?: string | null;
+            /** @description Setting it records a manual payer check */
+            vatPayer?: boolean;
+            cityPayer?: boolean;
+            note?: string | null;
+            /** @description Omitted: the next free number */
+            code?: string;
+            /** @enum {string} */
+            kind: "COMPANY" | "INDIVIDUAL";
+            name: string;
+            /** @description The first, default address */
+            address?: components["schemas"]["CustomerAddressRequest"];
+        };
+        CustomerUpdateRequest: {
+            /** @description Registration number */
+            regNo?: string | null;
+            /** @description Company 11 digits, citizen 12–14 (spaces allowed) */
+            tin?: string | null;
+            /** @description Citizens only, 8 digits */
+            consumerNo?: string | null;
+            /** @description Mongolian mobile number */
+            phone?: string | null;
+            /** @description Setting it records a manual payer check */
+            vatPayer?: boolean;
+            cityPayer?: boolean;
+            note?: string | null;
+            code?: string;
+            /** @enum {string} */
+            kind?: "COMPANY" | "INDIVIDUAL";
+            name?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        CustomerCreditRequest: {
+            /** @description MNT; null = not decided yet */
+            creditLimit: string | null;
+            /** @description null = the company setting */
+            paymentTermDays: number | null;
+            creditHold: boolean;
+            creditHoldReason: string | null;
+        };
+        CustomerAddressCreateRequest: {
+            label?: string | null;
+            address?: string | null;
+            /** @example 47.918412 */
+            lat?: string | null;
+            /** @example 106.917712 */
+            lng?: string | null;
+            /** @description Landmark */
+            note?: string | null;
+            /** @description Make it the default address */
+            isDefault?: boolean;
+        };
+        ContactRequest: {
+            name?: string | null;
+            position?: string | null;
+            /** @description Mongolian mobile number in any common form; stored as +976XXXXXXXX */
+            phone?: string | null;
+            note?: string | null;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
@@ -3468,6 +3802,490 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessAssignResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name in either script, code, phone, TIN or registration number */
+                q?: string;
+                kind?: "COMPANY" | "INDIVIDUAL";
+                status?: "ACTIVE" | "INACTIVE";
+                creditHold?: boolean;
+                /** @description Companies without a TIN */
+                tinPending?: boolean;
+                /** @description The default address has no GPS point */
+                gpsMissing?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_nextCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextCode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_setCredit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreditRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_listAddresses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_addAddress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAddressCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_listContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Customers_addContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAddresses_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAddresses_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAddressRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAddresses_setDefault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAddress"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerContacts_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerContacts_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
                 };
             };
             /** @description RFC 9457 problem details */

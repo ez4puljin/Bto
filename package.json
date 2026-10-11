@@ -38,7 +38,8 @@
     "ci:rehearse": "node scripts/ci-rehearse.mjs",
     "docker:build": "docker build -f apps/api/Dockerfile -t ghcr.io/ez4puljin/bto-api:local . && docker build -f apps/web/Dockerfile -t ghcr.io/ez4puljin/bto-web:local .",
     "user:create-admin": "pnpm run build:packages && pnpm --filter @tugeel/api run user:create-admin",
-    "catalog:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run catalog:reindex-search"
+    "catalog:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run catalog:reindex-search",
+    "partners:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run partners:reindex-search"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

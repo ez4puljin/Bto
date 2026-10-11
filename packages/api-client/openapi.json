@@ -3048,6 +3048,799 @@
           "catalog"
         ]
       }
+    },
+    "/api/v1/customers": {
+      "get": {
+        "operationId": "Customers_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name in either script, code, phone, TIN or registration number",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COMPANY",
+                "INDIVIDUAL"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            }
+          },
+          {
+            "name": "creditHold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "tinPending",
+            "required": false,
+            "in": "query",
+            "description": "Companies without a TIN",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "gpsMissing",
+            "required": false,
+            "in": "query",
+            "description": "The default address has no GPS point",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "post": {
+        "operationId": "Customers_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Idempotent: the server allocates the code when it is omitted, so a retry must not add a twin.",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customers/next-code": {
+      "get": {
+        "operationId": "Customers_nextCode",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextCode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declared before `:id`, so \"next-code\" never reaches ParseIntPipe.",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "operationId": "Customers_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "patch": {
+        "operationId": "Customers_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/credit": {
+      "put": {
+        "operationId": "Customers_setCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Credit limit, payment term and hold: the accountant's (partners.credit.manage).",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/addresses": {
+      "get": {
+        "operationId": "Customers_listAddresses",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerAddress"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "post": {
+        "operationId": "Customers_addAddress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerAddressCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAddress"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/contacts": {
+      "get": {
+        "operationId": "Customers_listContacts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Contact"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "post": {
+        "operationId": "Customers_addContact",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customer-addresses/{id}": {
+      "patch": {
+        "operationId": "CustomerAddresses_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerAddressRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAddress"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerAddresses_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives the address: orders keep pointing at it; the oldest other one becomes the default.",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customer-addresses/{id}/default": {
+      "post": {
+        "operationId": "CustomerAddresses_setDefault",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAddress"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customer-contacts/{id}": {
+      "patch": {
+        "operationId": "CustomerContacts_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerContacts_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
     }
   },
   "info": {
@@ -5358,6 +6151,644 @@
           "taxProductCode",
           "cityTax"
         ]
+      },
+      "CustomerSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "INDIVIDUAL"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "creditHold": {
+            "type": "boolean"
+          },
+          "tinPending": {
+            "type": "boolean",
+            "description": "A company without a TIN: receipts wait for it"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Text of the default address"
+          },
+          "hasGps": {
+            "type": "boolean",
+            "description": "The default address has a GPS point"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "kind",
+          "name",
+          "regNo",
+          "tin",
+          "phone",
+          "status",
+          "creditHold",
+          "tinPending",
+          "address",
+          "hasGps"
+        ]
+      },
+      "CustomerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "NextCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "1024"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "PaymentTerm": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "nullable": true
+          },
+          "source": {
+            "enum": [
+              "CUSTOMER",
+              "DEFAULT",
+              "UNSET"
+            ],
+            "type": "string",
+            "description": "The customer’s own days, the company setting, or neither yet"
+          }
+        },
+        "required": [
+          "days",
+          "source"
+        ]
+      },
+      "CustomerAddress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "lat": {
+            "type": "string",
+            "nullable": true,
+            "example": "47.918412"
+          },
+          "lng": {
+            "type": "string",
+            "nullable": true,
+            "example": "106.917712"
+          },
+          "gpsSource": {
+            "nullable": true,
+            "enum": [
+              "OFFICE",
+              "FIELD"
+            ],
+            "type": "string"
+          },
+          "zoneId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Delivery zone (delivery 5)"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "address",
+          "lat",
+          "lng",
+          "gpsSource",
+          "zoneId",
+          "note",
+          "isDefault",
+          "archivedAt"
+        ]
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+97699112233"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position",
+          "phone",
+          "note"
+        ]
+      },
+      "CustomerDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "INDIVIDUAL"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "creditHold": {
+            "type": "boolean"
+          },
+          "tinPending": {
+            "type": "boolean",
+            "description": "A company without a TIN: receipts wait for it"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Text of the default address"
+          },
+          "hasGps": {
+            "type": "boolean",
+            "description": "The default address has a GPS point"
+          },
+          "tinSource": {
+            "nullable": true,
+            "enum": [
+              "LOOKUP",
+              "MANUAL"
+            ],
+            "type": "string"
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "vatPayer": {
+            "type": "boolean"
+          },
+          "cityPayer": {
+            "type": "boolean"
+          },
+          "taxStatusSource": {
+            "nullable": true,
+            "enum": [
+              "LOOKUP",
+              "MANUAL"
+            ],
+            "type": "string",
+            "description": "null = not checked yet"
+          },
+          "taxStatusCheckedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "example": "5000000.00",
+            "description": "null = not decided"
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true,
+            "description": "Own days; null = the company setting"
+          },
+          "paymentTerm": {
+            "$ref": "#/components/schemas/PaymentTerm"
+          },
+          "creditHoldReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "addresses": {
+            "description": "Active addresses, the default first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAddress"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "kind",
+          "name",
+          "regNo",
+          "tin",
+          "phone",
+          "status",
+          "creditHold",
+          "tinPending",
+          "address",
+          "hasGps",
+          "tinSource",
+          "consumerNo",
+          "vatPayer",
+          "cityPayer",
+          "taxStatusSource",
+          "taxStatusCheckedAt",
+          "creditLimit",
+          "paymentTermDays",
+          "paymentTerm",
+          "creditHoldReason",
+          "note",
+          "createdAt",
+          "updatedAt",
+          "addresses",
+          "contacts"
+        ]
+      },
+      "CustomerAddressRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "lat": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,6})?$",
+            "example": "47.918412"
+          },
+          "lng": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,6})?$",
+            "example": "106.917712"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Landmark"
+          }
+        }
+      },
+      "CustomerCreateRequest": {
+        "type": "object",
+        "properties": {
+          "regNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20,
+            "description": "Registration number"
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20,
+            "description": "Company 11 digits, citizen 12–14 (spaces allowed)"
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 12,
+            "description": "Citizens only, 8 digits"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Mongolian mobile number"
+          },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "Setting it records a manual payer check"
+          },
+          "cityPayer": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{1,20}$",
+            "description": "Omitted: the next free number"
+          },
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "INDIVIDUAL"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "address": {
+            "description": "The first, default address",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAddressRequest"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ]
+      },
+      "CustomerUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "regNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20,
+            "description": "Registration number"
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20,
+            "description": "Company 11 digits, citizen 12–14 (spaces allowed)"
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 12,
+            "description": "Citizens only, 8 digits"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Mongolian mobile number"
+          },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "Setting it records a manual payer check"
+          },
+          "cityPayer": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{1,20}$"
+          },
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "INDIVIDUAL"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "CustomerCreditRequest": {
+        "type": "object",
+        "properties": {
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
+            "description": "MNT; null = not decided yet"
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 365,
+            "description": "null = the company setting"
+          },
+          "creditHold": {
+            "type": "boolean"
+          },
+          "creditHoldReason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "creditLimit",
+          "paymentTermDays",
+          "creditHold",
+          "creditHoldReason"
+        ]
+      },
+      "CustomerAddressCreateRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "lat": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,6})?$",
+            "example": "47.918412"
+          },
+          "lng": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,6})?$",
+            "example": "106.917712"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Landmark"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Make it the default address"
+          }
+        }
+      },
+      "ContactRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "position": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Mongolian mobile number in any common form; stored as +976XXXXXXXX"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
       },
       "ErrorCode": {
         "type": "string",

@@ -23,7 +23,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "openapi:export": "nest build && node dist/openapi/export-openapi.js ../../packages/api-client/openapi.json",
     "user:create-admin": "tsx src/modules/identity/cli/create-admin.ts",
-    "catalog:reindex-search": "tsx src/modules/catalog/cli/reindex-search.ts"
+    "catalog:reindex-search": "tsx src/modules/catalog/cli/reindex-search.ts",
+    "partners:reindex-search": "tsx src/modules/partners/cli/reindex-search.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",
