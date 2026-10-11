@@ -45,7 +45,8 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | argon2, @nestjs/jwt | 0.45.1 (`allowBuilds: argon2: true`, prebuilt binaries), 12.0.2 | identity (ADR-0027); no passport |
 | react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
 | barcode-detector, zxing-wasm | 3.2.2, 3.1.3 | web camera fallback; `zxing-wasm` = the exact version `barcode-detector` declares, `.wasm` served from our build (ADR-0031) |
-| pdfmake, ExcelJS, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
+| exceljs | 4.4.0 (api only) | imports (ADR-0036): the worker loads the whole workbook (`workbook.xlsx.load`, files ≤ 5 MiB); never the streaming reader, which loses shared strings and hyperlink targets |
+| pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
 DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process; staging 2 / 2 / 2 (architecture §10.2).

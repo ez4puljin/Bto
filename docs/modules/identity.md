@@ -33,9 +33,9 @@ Planned additions owned by identity: `print_stations` and `print_jobs` in delive
 | `RequirePermission(...codes)`, `Authenticated()`, `CurrentUser()` | route access rules and the caller; `Public()` lives in `src/common/auth` |
 | `AuthContext`, `Actor`, `actorUserId`, `systemActor` | the caller, passed explicitly from controller to service (no AsyncLocalStorage) |
 | `ScopeService.assertCanWriteWarehouse(ctx, warehouseId)` | 403 `FORBIDDEN` `params.reason = 'WAREHOUSE_SCOPE'` when the user's scope excludes the warehouse; reads are never filtered; TRANSIT is always writable |
-| `AuditService.record(tx, actor, { action, entity, entityId, before?, after? })` | inside the service transaction; keys matching `/password|hash|token|secret/i` are dropped recursively |
+| `AuditService.record(tx, actor, { action, entity, entityId, before?, after? })`, `recordMany(tx, actor, entries)` | inside the service transaction; keys matching `/password|hash|token|secret/i` are dropped recursively; `recordMany` inserts one row per entry in chunks of 1,000 (bulk writes of the imports, 2026-10-11) |
 | `NumberingService.next(tx, scopeKey, period)` | gapless number inside the document's transaction (rollback returns the number) |
-| `StorageService.verifyUploaded(fileId, kind)` (before the transaction), `confirm(tx, fileId, kind)`, `markDeleted(tx, fileId)`, `publicUrl(file)` | attach a file to a document: verify outside the transaction (an HTTP HEAD once Spaces exists), confirm READY inside it; only identity writes `files` |
+| `StorageService.verifyUploaded(fileId, kind)` (before the transaction), `confirm(tx, fileId, kind)`, `markDeleted(tx, fileId)`, `publicUrl(file)`, `openPrivate(fileId, kind)` | attach a file to a document: verify outside the transaction (an HTTP HEAD once Spaces exists), confirm READY inside it; only identity writes `files`. `openPrivate` streams the bytes of a READY private file of that kind for server-side reading (the import worker; `NOT_FOUND`, `FILE_NOT_UPLOADED`) |
 | `SettingsService.get(key, onDate)` / `find(key, onDate)` | value in force on an Ulaanbaatar business date (`businessDate()` from `@tugeel/shared/time`); `get` throws `SETTING_MISSING` |
 | `OrgService` (`getBranch`, `getWarehouse`, `getTransitWarehouse(tx)`, lists) | organisation lookups |
 | `WAREHOUSE_CREATED_HOOK` / `WarehouseCreatedHook` | optional provider called inside the transaction that creates a warehouse, including the TRANSIT warehouse created at the first boot; bound by `InventoryModule` to `SystemBinsService` (system bins, 2026-10-11), which also backfills the warehouses that existed before at boot (`InventoryBootstrap`) |
@@ -108,7 +108,7 @@ Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; noth
 ## 10. Operations
 
 - First admin and recovery: `pnpm user:create-admin --username <name> --full-name "<full name>"` creates the user (or re-activates, unlocks and re-grants ADMIN to an existing one) and prints a one-time code valid for 30 minutes, shown in Ulaanbaatar time.
-- Environment (api only): `JWT_SECRET`, `AUTH_PEPPER` (≥ 32 characters, `dev-` values refused in production), `COOKIE_SECURE` (true behind HTTPS), `API_PORT` (3000 in the container, 3300 locally); rotation effects in `deploy/runbook.md` §9. Both processes: `STORAGE_DRIVER=local` and `STORAGE_LOCAL_DIR` (`spaces` refuses to start until the go-live phase, ADR-0030).
+- Environment (api only): `JWT_SECRET`, `AUTH_PEPPER` (≥ 32 characters, `dev-` values refused in production), `COOKIE_SECURE` (true behind HTTPS), `API_PORT` (3000 in the container, 3300 locally); rotation effects in `deploy/runbook.md` §9. Both processes: `STORAGE_DRIVER=local` and `STORAGE_LOCAL_DIR` (`spaces` refuses to start until the go-live phase, ADR-0030); in the compose stacks the api and the worker share one storage volume at `/data/storage` (the worker reads uploaded import sheets, 2026-10-11).
 
 ## 11. Tests
 
