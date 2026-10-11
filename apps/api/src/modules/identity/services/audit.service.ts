@@ -45,16 +45,32 @@ export function auditSnapshot(value: unknown): unknown {
 @Injectable()
 export class AuditService {
   async record(tx: Tx, actor: Actor, entry: AuditEntry): Promise<void> {
-    await tx.insert(auditLog).values({
-      actorKind: actor.kind,
-      actorId: actor.kind === 'STAFF' ? actor.userId : null,
-      actorLabel: actor.kind === 'SYSTEM' ? actor.label : null,
-      action: entry.action,
-      entity: entry.entity,
-      entityId: String(entry.entityId),
-      before: entry.before === undefined ? null : auditSnapshot(entry.before),
-      after: entry.after === undefined ? null : auditSnapshot(entry.after),
-      requestId: actor.requestId ?? null,
-    });
+    await tx.insert(auditLog).values(auditRow(actor, entry));
   }
+
+  /** Many entries of one change (an import), a chunk of rows per statement. */
+  async recordMany(tx: Tx, actor: Actor, entries: readonly AuditEntry[]): Promise<void> {
+    for (let start = 0; start < entries.length; start += AUDIT_CHUNK) {
+      await tx
+        .insert(auditLog)
+        .values(entries.slice(start, start + AUDIT_CHUNK).map((entry) => auditRow(actor, entry)));
+    }
+  }
+}
+
+/** Rows per multi-row insert: far below the bind-parameter limit of one statement. */
+const AUDIT_CHUNK = 1_000;
+
+function auditRow(actor: Actor, entry: AuditEntry) {
+  return {
+    actorKind: actor.kind,
+    actorId: actor.kind === 'STAFF' ? actor.userId : null,
+    actorLabel: actor.kind === 'SYSTEM' ? actor.label : null,
+    action: entry.action,
+    entity: entry.entity,
+    entityId: String(entry.entityId),
+    before: entry.before === undefined ? null : auditSnapshot(entry.before),
+    after: entry.after === undefined ? null : auditSnapshot(entry.after),
+    requestId: actor.requestId ?? null,
+  };
 }

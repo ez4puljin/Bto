@@ -9,6 +9,8 @@ x-app: &app
   init: true
   stop_grace_period: 30s
   env_file: [.env]
+  # Uploaded files (product images, import sheets): one volume for api and worker (ADR-0036 #1).
+  volumes: ['storage:/data/storage']
   logging: &logging
     driver: json-file
     options: { max-size: '10m', max-file: '5' }
@@ -60,5 +62,6 @@ networks:
   edge_staging: { name: tugeel_edge_staging, external: true }
 
 volumes:
+  storage: {}
   caddy_data: {}
   caddy_config: {}

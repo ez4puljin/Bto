@@ -210,6 +210,22 @@ export class StorageService {
     return { file, body: this.store.read('public', file.key) };
   }
 
+  /**
+   * The bytes of a READY private file of the given kind (an import sheet), for reading on the
+   * server; NOT_FOUND when it is missing or of another kind.
+   */
+  async openPrivate(fileId: number, kind: FileKind): Promise<{ file: StoredFile; body: Readable }> {
+    const file = await this.get(fileId);
+    if (!file || file.status !== 'READY' || file.kind !== kind) {
+      throw new AppError('NOT_FOUND', `file ${fileId} not found`, { id: fileId });
+    }
+    if (fileKind(kind).visibility !== 'private') throw new Error(`${kind} is not a private kind`);
+    if ((await this.store.size('private', file.key)) === null) {
+      throw new AppError('FILE_NOT_UPLOADED', `file ${fileId} has no bytes`, { id: fileId });
+    }
+    return { file, body: this.store.read('private', file.key) };
+  }
+
   private kindOf(file: StoredFile): FileKind {
     if (!isFileKind(file.kind)) throw new Error(`file ${file.id} has an unknown kind ${file.kind}`);
     return file.kind;

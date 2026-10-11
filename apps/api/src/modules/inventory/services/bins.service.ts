@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import mn from '@tugeel/shared/i18n/mn.json';
 import {
   BIN_TYPES,
   BinRangeError,
@@ -18,6 +19,7 @@ import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import {
+  type Actor,
   type AuthContext,
   AuditService,
   OrgService,
@@ -71,6 +73,8 @@ export interface BinRangeResult {
 /** Shelves are made in wholesale warehouses and the store; vehicles and TRANSIT hold only system bins. */
 const SHELF_WAREHOUSE_KINDS: readonly Warehouse['kind'][] = ['WHOLESALE', 'STORE'];
 const RESERVED_CODES: ReadonlySet<string> = new Set(BIN_TYPES);
+/** Code of the shelf opening stock without a shelf goes to (ADR-0036 #5). */
+export const NO_SHELF_CODE = 'NOSHELF';
 
 /**
  * Bins (architecture §5.1, owner 2026-10-11): shelves are numbered like their labels (A-01-03) and
@@ -109,6 +113,49 @@ export class BinsService {
       .from(bins)
       .where(and(eq(bins.warehouseId, warehouseId), eq(bins.code, normalised)));
     if (!row) throw new AppError('NOT_FOUND', `no bin ${normalised}`, { code: normalised });
+    return row;
+  }
+
+  /** Every bin of these warehouses, archived ones included (imports match codes in bulk). */
+  async ofWarehouses(warehouseIds: readonly number[], executor: Db | Tx = this.db): Promise<Bin[]> {
+    if (warehouseIds.length === 0) return [];
+    return executor
+      .select()
+      .from(bins)
+      .where(inArray(bins.warehouseId, [...new Set(warehouseIds)]))
+      .orderBy(asc(bins.warehouseId), asc(bins.code));
+  }
+
+  /**
+   * The warehouse's «Тавиургүй» storage shelf (code NOSHELF, ADR-0036 #5) for opening stock
+   * without a shelf; created on first use in the caller's transaction.
+   */
+  async ensureNoShelfInTx(tx: Tx, actor: Actor, warehouseId: number): Promise<Bin> {
+    const created = await tx
+      .insert(bins)
+      .values({
+        warehouseId,
+        code: NO_SHELF_CODE,
+        name: mn.inventory.bins.noShelf,
+        type: 'STORAGE',
+      })
+      .onConflictDoNothing({ target: [bins.warehouseId, bins.code] })
+      .returning();
+    const [row] = created.length
+      ? created
+      : await tx
+          .select()
+          .from(bins)
+          .where(and(eq(bins.warehouseId, warehouseId), eq(bins.code, NO_SHELF_CODE)));
+    if (!row) throw new Error(`warehouse ${warehouseId} has no ${NO_SHELF_CODE} bin`);
+    if (created.length) {
+      await this.audit.record(tx, actor, {
+        action: 'CREATE',
+        entity: 'bins',
+        entityId: row.id,
+        after: row,
+      });
+    }
     return row;
   }
 

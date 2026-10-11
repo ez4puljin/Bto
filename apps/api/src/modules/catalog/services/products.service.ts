@@ -208,44 +208,50 @@ export class ProductsService {
 
   update(actor: Actor, id: number, patch: ProductPatch): Promise<ProductDetail> {
     return inTransaction(this.db, async (tx) => {
-      const [before] = await tx.select().from(products).where(eq(products.id, id)).for('update');
-      if (!before) throw notFound('product', id);
-      await this.assertReferences(tx, patch);
-      const name = patch.name === undefined ? before.name : normalizeName(patch.name);
-      const sku = patch.sku ?? before.sku;
-      const keys = searchKeys(name, [sku]);
-      const [after] = await tx
-        .update(products)
-        .set({
-          sku,
-          name,
-          searchText: keys.strict,
-          searchPhonetic: keys.phonetic,
-          searchVersion: keys.version,
-          ...(patch.categoryId === undefined ? {} : { categoryId: patch.categoryId }),
-          ...(patch.brandId === undefined ? {} : { brandId: patch.brandId }),
-          ...(patch.vatType === undefined ? {} : { vatType: patch.vatType }),
-          ...(patch.cityTax === undefined ? {} : { cityTax: patch.cityTax }),
-          ...(patch.classificationCode === undefined
-            ? {}
-            : { classificationCode: patch.classificationCode }),
-          ...(patch.taxProductCode === undefined ? {} : { taxProductCode: patch.taxProductCode }),
-          ...(patch.weightKg === undefined ? {} : { weightKg: patch.weightKg }),
-          ...(patch.status === undefined ? {} : { status: patch.status }),
-          updatedAt: sql`now()`,
-        })
-        .where(eq(products.id, id))
-        .returning();
-      if (!after) throw notFound('product', id);
-      await this.audit.record(tx, actor, {
-        action: 'UPDATE',
-        entity: 'products',
-        entityId: id,
-        before,
-        after,
-      });
+      await this.updateInTx(tx, actor, id, patch);
       return this.get(id, tx);
     });
+  }
+
+  /** Changes a product's fields in the caller's transaction; returns the row before the change. */
+  async updateInTx(tx: Tx, actor: Actor, id: number, patch: ProductPatch): Promise<Product> {
+    const [before] = await tx.select().from(products).where(eq(products.id, id)).for('update');
+    if (!before) throw notFound('product', id);
+    await this.assertReferences(tx, patch);
+    const name = patch.name === undefined ? before.name : normalizeName(patch.name);
+    const sku = patch.sku ?? before.sku;
+    const keys = searchKeys(name, [sku]);
+    const [after] = await tx
+      .update(products)
+      .set({
+        sku,
+        name,
+        searchText: keys.strict,
+        searchPhonetic: keys.phonetic,
+        searchVersion: keys.version,
+        ...(patch.categoryId === undefined ? {} : { categoryId: patch.categoryId }),
+        ...(patch.brandId === undefined ? {} : { brandId: patch.brandId }),
+        ...(patch.vatType === undefined ? {} : { vatType: patch.vatType }),
+        ...(patch.cityTax === undefined ? {} : { cityTax: patch.cityTax }),
+        ...(patch.classificationCode === undefined
+          ? {}
+          : { classificationCode: patch.classificationCode }),
+        ...(patch.taxProductCode === undefined ? {} : { taxProductCode: patch.taxProductCode }),
+        ...(patch.weightKg === undefined ? {} : { weightKg: patch.weightKg }),
+        ...(patch.status === undefined ? {} : { status: patch.status }),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(products.id, id))
+      .returning();
+    if (!after) throw notFound('product', id);
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'products',
+      entityId: id,
+      before,
+      after,
+    });
+    return before;
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<ProductDetail> {

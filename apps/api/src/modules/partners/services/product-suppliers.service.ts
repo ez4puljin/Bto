@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -12,6 +12,10 @@ import type { PartnerStatus } from './customers.service';
 import { advisoryLock, LOCKS } from './support';
 
 type LinkRow = typeof productSuppliers.$inferSelect;
+
+/** Rows per multi-row statement. */
+const CHUNK = 1_000;
+const pairKey = (productId: number, supplierId: number) => `${productId}:${supplierId}`;
 
 export interface ProductSupplierLink {
   id: number;
@@ -148,6 +152,101 @@ export class ProductSuppliersService {
       after: row,
     });
     return row.id;
+  }
+
+  /**
+   * Many links at once in the caller's transaction (the product import, ADR-0036 #3): the table is
+   * locked against concurrent link changes instead of one advisory lock per product, pairs already
+   * linked are skipped, and a product's first link becomes its main supplier. Returns the new link
+   * id of every pair that was added, keyed `productId:supplierId`.
+   */
+  async linkManyInTx(
+    tx: Tx,
+    actor: Actor,
+    pairs: readonly { productId: number; supplierId: number }[],
+  ): Promise<Map<string, number>> {
+    const added = new Map<string, number>();
+    if (pairs.length === 0) return added;
+    await tx.execute(sql`LOCK TABLE product_suppliers IN SHARE ROW EXCLUSIVE MODE`);
+    const productIds = [...new Set(pairs.map((pair) => pair.productId))];
+    const existing: LinkRow[] = [];
+    for (let start = 0; start < productIds.length; start += CHUNK) {
+      existing.push(
+        ...(await tx
+          .select()
+          .from(productSuppliers)
+          .where(inArray(productSuppliers.productId, productIds.slice(start, start + CHUNK)))),
+      );
+    }
+    const linked = new Set(existing.map((row) => pairKey(row.productId, row.supplierId)));
+    const hasMain = new Set(existing.filter((row) => row.isMain).map((row) => row.productId));
+    const values: (typeof productSuppliers.$inferInsert)[] = [];
+    for (const pair of pairs) {
+      const key = pairKey(pair.productId, pair.supplierId);
+      if (linked.has(key)) continue;
+      linked.add(key);
+      values.push({ ...pair, isMain: !hasMain.has(pair.productId) });
+      hasMain.add(pair.productId);
+    }
+    for (let start = 0; start < values.length; start += CHUNK) {
+      const rows = await tx
+        .insert(productSuppliers)
+        .values(values.slice(start, start + CHUNK))
+        .returning();
+      for (const row of rows) added.set(pairKey(row.productId, row.supplierId), row.id);
+      await this.audit.recordMany(
+        tx,
+        actor,
+        rows.map((row) => ({
+          action: 'CREATE',
+          entity: 'product_suppliers',
+          entityId: row.id,
+          after: row,
+        })),
+      );
+    }
+    return added;
+  }
+
+  /**
+   * Removes links in the caller's transaction (an import revert), under the same table lock; a
+   * product that loses its main link gets its oldest remaining link as the main one.
+   */
+  async unlinkManyInTx(tx: Tx, actor: Actor, linkIds: readonly number[]): Promise<void> {
+    if (linkIds.length === 0) return;
+    await tx.execute(sql`LOCK TABLE product_suppliers IN SHARE ROW EXCLUSIVE MODE`);
+    for (let start = 0; start < linkIds.length; start += CHUNK) {
+      const removed = await tx
+        .delete(productSuppliers)
+        .where(inArray(productSuppliers.id, linkIds.slice(start, start + CHUNK)))
+        .returning();
+      await this.audit.recordMany(
+        tx,
+        actor,
+        removed.map((row) => ({
+          action: 'DELETE',
+          entity: 'product_suppliers',
+          entityId: row.id,
+          before: row,
+        })),
+      );
+      for (const productId of new Set(
+        removed.filter((row) => row.isMain).map((row) => row.productId),
+      )) {
+        const [next] = await tx
+          .select()
+          .from(productSuppliers)
+          .where(eq(productSuppliers.productId, productId))
+          .orderBy(asc(productSuppliers.id))
+          .limit(1);
+        if (next) {
+          await tx
+            .update(productSuppliers)
+            .set({ isMain: true })
+            .where(eq(productSuppliers.id, next.id));
+        }
+      }
+    }
   }
 
   /** Makes a link the main supplier of its product. */

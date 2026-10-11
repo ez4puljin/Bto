@@ -3,7 +3,7 @@ import { COST_SCALE, valueOf } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { and, desc, eq, gt, inArray, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { CatalogService, type ProductSummary } from '../../catalog';
@@ -165,6 +165,31 @@ export class StockQueryService {
       startedAt: run.startedAt,
       triggeredBy: run.triggeredBy,
     };
+  }
+
+  /**
+   * Of these products, the ones holding stock anywhere (on hand or reserved), e.g. products an
+   * import revert may not deactivate.
+   */
+  async productsWithStock(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Set<number>> {
+    const held = new Set<number>();
+    const unique = [...new Set(productIds)];
+    for (let start = 0; start < unique.length; start += 1_000) {
+      const rows = await executor
+        .selectDistinct({ productId: warehouseStock.productId })
+        .from(warehouseStock)
+        .where(
+          and(
+            inArray(warehouseStock.productId, unique.slice(start, start + 1_000)),
+            sql`(${warehouseStock.onHand} <> 0 OR ${warehouseStock.reserved} <> 0)`,
+          ),
+        );
+      for (const row of rows) held.add(row.productId);
+    }
+    return held;
   }
 
   // -------------------------------------------------------------------------------------------

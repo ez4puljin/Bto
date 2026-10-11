@@ -46,35 +46,43 @@ export class UnitsService implements OnModuleInit {
   }
 
   add(actor: Actor, productId: number, input: NewUnitInput): Promise<ProductUnit> {
-    return inTransaction(this.db, async (tx) => {
-      const baseFractional = await this.lockProduct(tx, productId);
-      const [uom] = await tx.select({ id: uoms.id }).from(uoms).where(eq(uoms.id, input.uomId));
-      if (!uom) throw invalid('uomId', 'exists', `unit of measure ${input.uomId} not found`);
-      this.assertExact(input.factorToBase, baseFractional);
-      for (const flag of ['isDefaultSales', 'isDefaultPurchase'] as const) {
-        if (input[flag]) await this.clearDefault(tx, productId, flag);
-      }
-      const [row] = await tx
-        .insert(productUnits)
-        .values({
-          productId,
-          uomId: input.uomId,
-          factorToBase: input.factorToBase,
-          isDefaultSales: input.isDefaultSales ?? false,
-          isDefaultPurchase: input.isDefaultPurchase ?? false,
-          measureUnit: input.measureUnit ?? null,
-        })
-        .returning();
-      if (!row) throw new Error('unit insert returned no row');
-      for (const code of input.barcodes ?? []) await this.barcodes.addInTx(tx, actor, row.id, code);
-      await this.audit.record(tx, actor, {
-        action: 'CREATE',
-        entity: 'product_units',
-        entityId: row.id,
-        after: row,
-      });
-      return row;
+    return inTransaction(this.db, (tx) => this.addInTx(tx, actor, productId, input));
+  }
+
+  /** A new unit (and its barcodes) of a product in the caller's transaction. */
+  async addInTx(
+    tx: Tx,
+    actor: Actor,
+    productId: number,
+    input: NewUnitInput,
+  ): Promise<ProductUnit> {
+    const baseFractional = await this.lockProduct(tx, productId);
+    const [uom] = await tx.select({ id: uoms.id }).from(uoms).where(eq(uoms.id, input.uomId));
+    if (!uom) throw invalid('uomId', 'exists', `unit of measure ${input.uomId} not found`);
+    this.assertExact(input.factorToBase, baseFractional);
+    for (const flag of ['isDefaultSales', 'isDefaultPurchase'] as const) {
+      if (input[flag]) await this.clearDefault(tx, productId, flag);
+    }
+    const [row] = await tx
+      .insert(productUnits)
+      .values({
+        productId,
+        uomId: input.uomId,
+        factorToBase: input.factorToBase,
+        isDefaultSales: input.isDefaultSales ?? false,
+        isDefaultPurchase: input.isDefaultPurchase ?? false,
+        measureUnit: input.measureUnit ?? null,
+      })
+      .returning();
+    if (!row) throw new Error('unit insert returned no row');
+    for (const code of input.barcodes ?? []) await this.barcodes.addInTx(tx, actor, row.id, code);
+    await this.audit.record(tx, actor, {
+      action: 'CREATE',
+      entity: 'product_units',
+      entityId: row.id,
+      after: row,
     });
+    return row;
   }
 
   /** Default flags (moved in two steps, the partial unique indexes allow one per product) and measure unit. */
@@ -111,31 +119,34 @@ export class UnitsService implements OnModuleInit {
 
   /** Stops using a unit: no successor, its barcodes are removed, documents keep their snapshot. */
   retire(actor: Actor, unitId: number): Promise<ProductUnit> {
-    return inTransaction(this.db, async (tx) => {
-      const before = await this.currentUnit(tx, unitId);
-      if (before.isBase)
-        throw new AppError('UNIT_BASE_LOCKED', `unit ${unitId} is the base unit`, { id: unitId });
-      const [row] = await tx
-        .update(productUnits)
-        .set({
-          supersededAt: sql`now()`,
-          isDefaultSales: false,
-          isDefaultPurchase: false,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(productUnits.id, unitId))
-        .returning();
-      if (!row) throw notFound('product unit', unitId);
-      await this.barcodes.removeAllOfUnit(tx, actor, unitId);
-      await this.audit.record(tx, actor, {
-        action: 'RETIRE',
-        entity: 'product_units',
-        entityId: unitId,
-        before,
-        after: row,
-      });
-      return row;
+    return inTransaction(this.db, (tx) => this.retireInTx(tx, actor, unitId));
+  }
+
+  /** Retires a unit in the caller's transaction (an import revert takes back a unit it added). */
+  async retireInTx(tx: Tx, actor: Actor, unitId: number): Promise<ProductUnit> {
+    const before = await this.currentUnit(tx, unitId);
+    if (before.isBase)
+      throw new AppError('UNIT_BASE_LOCKED', `unit ${unitId} is the base unit`, { id: unitId });
+    const [row] = await tx
+      .update(productUnits)
+      .set({
+        supersededAt: sql`now()`,
+        isDefaultSales: false,
+        isDefaultPurchase: false,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(productUnits.id, unitId))
+      .returning();
+    if (!row) throw notFound('product unit', unitId);
+    await this.barcodes.removeAllOfUnit(tx, actor, unitId);
+    await this.audit.record(tx, actor, {
+      action: 'RETIRE',
+      entity: 'product_units',
+      entityId: unitId,
+      before,
+      after: row,
     });
+    return row;
   }
 
   supersede(actor: Actor, unitId: number, factorToBase: Decimal): Promise<ProductUnit> {

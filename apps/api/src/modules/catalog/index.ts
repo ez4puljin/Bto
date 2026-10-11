@@ -3,8 +3,22 @@
 export { CatalogHttpModule, CatalogModule } from './catalog.module';
 export { UNIT_SUPERSEDED_HOOK, type UnitSupersededHook } from './hooks';
 export { BarcodeService, type ResolvedBarcode } from './services/barcode.service';
+export {
+  type BulkProductInput,
+  type CatalogReference,
+  CatalogImportService,
+  type CreatedProduct,
+  type ImportProduct,
+} from './services/catalog-import.service';
 export { CatalogService } from './services/catalog.service';
-export type { ProductDetail, ProductSummary, UnitView } from './services/products.service';
+export type {
+  NewUnitInput,
+  ProductDetail,
+  ProductPatch,
+  ProductSummary,
+  UnitView,
+} from './services/products.service';
+export { VAT_TYPES, type VatType } from './schema';
 export { type ProductTaxRates, TaxService } from './services/tax.service';
 export {
   type ConvertedQty,

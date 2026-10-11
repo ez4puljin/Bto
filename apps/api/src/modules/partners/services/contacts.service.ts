@@ -138,25 +138,33 @@ export class SupplierContactsService {
   }
 
   add(actor: Actor, supplierId: number, input: ContactInput): Promise<SupplierContact> {
-    return inTransaction(this.db, async (tx) => {
-      const [owner] = await tx
-        .select({ id: suppliers.id })
-        .from(suppliers)
-        .where(eq(suppliers.id, supplierId));
-      if (!owner) throw notFound('supplier', supplierId);
-      const [row] = await tx
-        .insert(supplierContacts)
-        .values({ supplierId, ...validated(input) })
-        .returning();
-      if (!row) throw new Error('contact insert returned no row');
-      await this.audit.record(tx, actor, {
-        action: 'CREATE',
-        entity: 'supplier_contacts',
-        entityId: row.id,
-        after: row,
-      });
-      return row;
+    return inTransaction(this.db, (tx) => this.addInTx(tx, actor, supplierId, input));
+  }
+
+  /** A contact of a supplier in the caller's transaction (the supplier import). */
+  async addInTx(
+    tx: Tx,
+    actor: Actor,
+    supplierId: number,
+    input: ContactInput,
+  ): Promise<SupplierContact> {
+    const [owner] = await tx
+      .select({ id: suppliers.id })
+      .from(suppliers)
+      .where(eq(suppliers.id, supplierId));
+    if (!owner) throw notFound('supplier', supplierId);
+    const [row] = await tx
+      .insert(supplierContacts)
+      .values({ supplierId, ...validated(input) })
+      .returning();
+    if (!row) throw new Error('contact insert returned no row');
+    await this.audit.record(tx, actor, {
+      action: 'CREATE',
+      entity: 'supplier_contacts',
+      entityId: row.id,
+      after: row,
     });
+    return row;
   }
 
   update(actor: Actor, id: number, input: ContactInput): Promise<SupplierContact> {

@@ -8,11 +8,42 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { CatalogService } from '../../catalog';
-import { type AuthContext, AuditService, OrgService, ScopeService } from '../../identity';
+import {
+  type Actor,
+  type AuthContext,
+  AuditService,
+  OrgService,
+  ScopeService,
+} from '../../identity';
 import { bins, productLocations } from '../schema';
 import { advisoryLock, LOCKS } from './support';
 
 type LocationRow = typeof productLocations.$inferSelect;
+
+/** Rows per multi-row statement. */
+const CHUNK = 1_000;
+
+/** A product's location change in a bulk call; omitted fields stay as they are. */
+export interface LocationChange {
+  productId: number;
+  /** A WHOLESALE warehouse as the product's home, or null for none. */
+  homeWarehouseId?: number | null;
+  /** The product's fixed shelf in a warehouse (null clears it). */
+  fixedBin?: { warehouseId: number; binId: number | null };
+}
+
+/** Where a product lived before a bulk change. */
+export interface LocationState {
+  productId: number;
+  homeWarehouseId: number | null;
+  fixedBins: { warehouseId: number; binId: number }[];
+}
+
+const stateOf = (productId: number, fixedBins: LocationState['fixedBins']): LocationState => ({
+  productId,
+  homeWarehouseId: null,
+  fixedBins,
+});
 
 export interface ProductLocation extends LocationRow {
   /** Code of the fixed bin, for display and scanning. */
@@ -127,6 +158,115 @@ export class ProductLocationsService {
     }
   }
 
+  /** Every location row of these products (home flags and fixed shelves). */
+  async ofProducts(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<LocationRow[]> {
+    const rows: LocationRow[] = [];
+    const unique = [...new Set(productIds)];
+    for (let start = 0; start < unique.length; start += CHUNK) {
+      rows.push(
+        ...(await executor
+          .select()
+          .from(productLocations)
+          .where(inArray(productLocations.productId, unique.slice(start, start + CHUNK)))),
+      );
+    }
+    return rows;
+  }
+
+  /**
+   * Home warehouses and fixed shelves of many products in the caller's transaction (the product
+   * import, ADR-0036 #3): the table is locked against concurrent location changes instead of one
+   * advisory lock per product. Returns what each product had before, for a revert.
+   */
+  async setManyInTx(
+    tx: Tx,
+    actor: Actor,
+    changes: readonly LocationChange[],
+  ): Promise<Map<number, LocationState>> {
+    const before = new Map<number, LocationState>();
+    if (changes.length === 0) return before;
+    await tx.execute(sql`LOCK TABLE product_locations IN SHARE ROW EXCLUSIVE MODE`);
+    const productIds = [...new Set(changes.map((change) => change.productId))];
+    for (const row of await this.ofProducts(productIds, tx)) {
+      const state = before.get(row.productId) ?? stateOf(row.productId, []);
+      if (row.isHome) state.homeWarehouseId = row.warehouseId;
+      if (row.defaultBinId !== null) {
+        state.fixedBins.push({ warehouseId: row.warehouseId, binId: row.defaultBinId });
+      }
+      before.set(row.productId, state);
+    }
+    for (const id of productIds) if (!before.has(id)) before.set(id, stateOf(id, []));
+
+    const homes = changes.flatMap((change) =>
+      change.homeWarehouseId === undefined
+        ? []
+        : [{ productId: change.productId, warehouseId: change.homeWarehouseId }],
+    );
+    const fixed = changes.flatMap((change) =>
+      change.fixedBin === undefined ? [] : [{ productId: change.productId, ...change.fixedBin }],
+    );
+    await this.assertHomes(tx, homes);
+    await this.assertShelves(tx, fixed);
+
+    for (let start = 0; start < homes.length; start += CHUNK) {
+      const part = homes.slice(start, start + CHUNK);
+      // Clear old homes first: one home per product (partial unique index).
+      await tx.execute(sql`
+        UPDATE product_locations pl SET is_home = false, updated_at = now()
+          FROM (VALUES ${sql.join(
+            part.map((home) => sql`(${home.productId}::bigint, ${home.warehouseId}::bigint)`),
+            sql`, `,
+          )}) AS v (product_id, warehouse_id)
+         WHERE pl.product_id = v.product_id AND pl.is_home
+           AND pl.warehouse_id IS DISTINCT FROM v.warehouse_id`);
+      const set = part.filter(
+        (home): home is { productId: number; warehouseId: number } => home.warehouseId !== null,
+      );
+      if (set.length > 0) {
+        await tx.execute(sql`
+          INSERT INTO product_locations (warehouse_id, product_id, is_home)
+          SELECT * FROM (VALUES ${sql.join(
+            set.map((home) => sql`(${home.warehouseId}::bigint, ${home.productId}::bigint, true)`),
+            sql`, `,
+          )}) AS v (warehouse_id, product_id, is_home)
+          ON CONFLICT (warehouse_id, product_id) DO UPDATE SET is_home = true, updated_at = now()`);
+      }
+    }
+    for (let start = 0; start < fixed.length; start += CHUNK) {
+      await tx.execute(sql`
+        INSERT INTO product_locations (warehouse_id, product_id, default_bin_id)
+        SELECT * FROM (VALUES ${sql.join(
+          fixed
+            .slice(start, start + CHUNK)
+            .map(
+              (entry) =>
+                sql`(${entry.warehouseId}::bigint, ${entry.productId}::bigint, ${entry.binId}::bigint)`,
+            ),
+          sql`, `,
+        )}) AS v (warehouse_id, product_id, default_bin_id)
+        ON CONFLICT (warehouse_id, product_id)
+          DO UPDATE SET default_bin_id = excluded.default_bin_id, updated_at = now()`);
+    }
+    await this.audit.recordMany(
+      tx,
+      actor,
+      productIds.map((productId) => ({
+        action: 'UPDATE',
+        entity: 'product_locations',
+        entityId: productId,
+        before: before.get(productId),
+        after: {
+          home: homes.find((home) => home.productId === productId)?.warehouseId,
+          fixedBins: fixed.filter((entry) => entry.productId === productId),
+        },
+      })),
+    );
+    return before;
+  }
+
   /** The fixed shelf and levels of a product in one warehouse (created on first use). */
   async set(ctx: AuthContext, input: LocationInput): Promise<ProductLocation> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
@@ -232,6 +372,56 @@ export class ProductLocationsService {
         before,
       });
     });
+  }
+
+  /** Home warehouses are wholesale ones (WAREHOUSE_KIND_NOT_ALLOWED otherwise). */
+  private async assertHomes(
+    tx: Tx,
+    homes: readonly { warehouseId: number | null }[],
+  ): Promise<void> {
+    const ids = [
+      ...new Set(homes.flatMap((home) => (home.warehouseId === null ? [] : [home.warehouseId]))),
+    ];
+    for (const id of ids) {
+      const warehouse = await this.org.getWarehouse(id, tx);
+      if (warehouse.kind !== 'WHOLESALE') {
+        throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'a home warehouse is a wholesale one', {
+          kind: warehouse.kind,
+        });
+      }
+    }
+  }
+
+  /** Fixed shelves are active storage or picking shelves of their warehouse. */
+  private async assertShelves(
+    tx: Tx,
+    entries: readonly { warehouseId: number; binId: number | null }[],
+  ): Promise<void> {
+    const ids = [
+      ...new Set(entries.flatMap((entry) => (entry.binId === null ? [] : [entry.binId]))),
+    ];
+    const found = new Map<number, typeof bins.$inferSelect>();
+    for (let start = 0; start < ids.length; start += CHUNK) {
+      for (const bin of await tx
+        .select()
+        .from(bins)
+        .where(inArray(bins.id, ids.slice(start, start + CHUNK)))) {
+        found.set(bin.id, bin);
+      }
+    }
+    for (const entry of entries) {
+      if (entry.binId === null) continue;
+      const bin = found.get(entry.binId);
+      if (!bin || bin.warehouseId !== entry.warehouseId) {
+        throw invalid('defaultBinId', 'warehouse', 'a bin of the same warehouse');
+      }
+      if (!(USER_BIN_TYPES as readonly string[]).includes(bin.type)) {
+        throw invalid('defaultBinId', 'type', 'a storage or picking shelf');
+      }
+      if (bin.archivedAt) {
+        throw new AppError('BIN_ARCHIVED', `bin ${bin.id} is archived`, { code: bin.code });
+      }
+    }
   }
 
   private async find(tx: Tx, warehouseId: number, productId: number) {

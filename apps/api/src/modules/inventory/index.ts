@@ -8,6 +8,8 @@ export {
   AdjustmentsService,
   type AdjustmentStatus,
   type AdjustmentSummary,
+  type SystemAdjustmentInput,
+  type SystemAdjustmentLine,
 } from './services/adjustments.service';
 export {
   type BinMoveDetail,
@@ -23,9 +25,12 @@ export {
   type BinRangeInput,
   type BinRangeResult,
   BinsService,
+  NO_SHELF_CODE,
 } from './services/bins.service';
 export {
+  type LocationChange,
   type LocationInput,
+  type LocationState,
   type ProductLocation,
   ProductLocationsService,
 } from './services/product-locations.service';

@@ -18,7 +18,7 @@ import {
 } from '../../identity';
 import { ADJUSTMENT_STATUSES, adjustmentLines, adjustments, bins } from '../schema';
 import { ProductLocationsService } from './product-locations.service';
-import { StockPostingService } from './stock-posting.service';
+import { MAX_MOVEMENTS_PER_POST, StockPostingService } from './stock-posting.service';
 import { optionalText } from './support';
 
 type AdjustmentRow = typeof adjustments.$inferSelect;
@@ -39,6 +39,29 @@ export interface AdjustmentLineInput {
   unitCost?: Decimal | null;
   note?: string | null;
 }
+
+/** A line of a system adjustment: the unit and factor frozen by the caller. */
+export interface SystemAdjustmentLine {
+  productId: number;
+  productUnitId: number;
+  enteredQty: Decimal;
+  factorSnapshot: Decimal;
+  binId: number;
+  /** Inbound only: cost per base unit (opening stock); null = the average. */
+  unitCost: Decimal | null;
+}
+
+export interface SystemAdjustmentInput {
+  warehouseId: number;
+  reason: 'OPENING' | 'OPENING_REVERSAL';
+  note?: string | null;
+  /** The OPENING adjustment a reversal takes back. */
+  reversesAdjustmentId?: number;
+  lines: readonly SystemAdjustmentLine[];
+}
+
+/** Rows per multi-row statement. */
+const CHUNK = 1_000;
 
 export interface AdjustmentInput {
   warehouseId: number;
@@ -389,6 +412,156 @@ export class AdjustmentsService {
       entityId: id,
       before: header,
       after: { number: result.numbers.get(id), lines },
+    });
+  }
+
+  /**
+   * An adjustment written and posted by the system in the caller's transaction (opening stock of
+   * an import and its reversal, ADR-0036): lines inserted in chunks, one posting, one audit row.
+   * Units and factors come from the caller (frozen on the lines); bins must be in the warehouse.
+   */
+  async postSystemInTx(
+    tx: Tx,
+    actor: Actor,
+    input: SystemAdjustmentInput,
+  ): Promise<{ id: number; number: string }> {
+    if (input.lines.length === 0) throw invalid('lines', 'empty', 'an adjustment needs lines');
+    if (input.lines.length > MAX_MOVEMENTS_PER_POST) {
+      throw invalid('lines', 'max', `at most ${MAX_MOVEMENTS_PER_POST} lines`);
+    }
+    const warehouse = await this.org.getWarehouse(input.warehouseId, tx);
+    if (!ADJUSTABLE_KINDS.includes(warehouse.kind)) {
+      throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', `no adjustments in ${warehouse.kind}`, {
+        kind: warehouse.kind,
+      });
+    }
+    const binIds = [...new Set(input.lines.map((line) => line.binId))];
+    for (let start = 0; start < binIds.length; start += CHUNK) {
+      const part = binIds.slice(start, start + CHUNK);
+      const found = await tx
+        .select({ id: bins.id })
+        .from(bins)
+        .where(and(inArray(bins.id, part), eq(bins.warehouseId, input.warehouseId)));
+      if (found.length !== part.length) {
+        throw invalid('binId', 'warehouse', 'bins of the adjustment’s warehouse');
+      }
+    }
+    const sign = direction(input.reason);
+    const [header] = await tx
+      .insert(adjustments)
+      .values({
+        warehouseId: input.warehouseId,
+        reason: input.reason,
+        status: 'SUBMITTED',
+        note: optionalText(input.note) ?? null,
+        submittedAt: sql`now()`,
+        submittedBy: actorUserId(actor),
+        reversesAdjustmentId: input.reversesAdjustmentId ?? null,
+        createdBy: actorUserId(actor),
+      })
+      .returning();
+    if (!header) throw new Error('adjustment insert returned no row');
+    const lines: AdjustmentLineRow[] = [];
+    for (let start = 0; start < input.lines.length; start += CHUNK) {
+      lines.push(
+        ...(await tx
+          .insert(adjustmentLines)
+          .values(
+            input.lines.slice(start, start + CHUNK).map((line) => ({
+              adjustmentId: header.id,
+              productId: line.productId,
+              productUnitId: line.productUnitId,
+              enteredQty: line.enteredQty,
+              factorSnapshot: line.factorSnapshot,
+              qtyBase: line.enteredQty.times(line.factorSnapshot),
+              binId: line.binId,
+              unitCost: sign === 1 ? (line.unitCost ?? null) : null,
+            })),
+          )
+          .returning()),
+      );
+    }
+    const result = await this.posting.post(tx, actor, {
+      docs: [
+        { docType: 'ADJ', docId: header.id, expectedStatus: 'SUBMITTED', nextStatus: 'POSTED' },
+      ],
+      movements: lines.map((line) => ({
+        docType: 'ADJ' as const,
+        docId: header.id,
+        docLineId: line.id,
+        movementType: 'ADJUSTMENT' as const,
+        leg: 1,
+        warehouseId: input.warehouseId,
+        binId: line.binId,
+        productId: line.productId,
+        lotId: line.lotId,
+        qtyBase: sign === 1 ? line.qtyBase : line.qtyBase.negated(),
+        enteredQty: line.enteredQty,
+        productUnitId: line.productUnitId,
+        factorSnapshot: line.factorSnapshot,
+        ...(sign === 1 && line.unitCost ? { unitCost: line.unitCost } : {}),
+      })),
+    });
+    const number = result.numbers.get(header.id);
+    if (!number) throw new Error(`adjustment ${header.id} got no number`);
+    await this.audit.record(tx, actor, {
+      action: 'POST',
+      entity: 'adjustments',
+      entityId: header.id,
+      after: {
+        number,
+        warehouseId: input.warehouseId,
+        reason: input.reason,
+        reversesAdjustmentId: input.reversesAdjustmentId ?? null,
+        lineCount: lines.length,
+      },
+    });
+    return { id: header.id, number };
+  }
+
+  /**
+   * Takes back a posted opening-stock adjustment with an OPENING_REVERSAL of the same lines
+   * (an import revert). Never twice: `reverses_adjustment_id` is unique. STOCK_INSUFFICIENT when
+   * the goods have moved since.
+   */
+  async reverseOpeningInTx(
+    tx: Tx,
+    actor: Actor,
+    adjustmentId: number,
+  ): Promise<{ id: number; number: string }> {
+    const header = await this.lockHeader(tx, adjustmentId);
+    if (header.reason !== 'OPENING' || header.status !== 'POSTED') {
+      throw new AppError(
+        'DOC_STATE_INVALID',
+        `adjustment ${adjustmentId} is not posted opening stock`,
+        {
+          status: header.status,
+        },
+      );
+    }
+    const [reversed] = await tx
+      .select({ id: adjustments.id })
+      .from(adjustments)
+      .where(eq(adjustments.reversesAdjustmentId, adjustmentId));
+    if (reversed) {
+      throw new AppError('DOC_ALREADY_POSTED', `adjustment ${adjustmentId} is already reversed`, {
+        status: header.status,
+      });
+    }
+    const lines = await this.linesOf(tx, adjustmentId);
+    return this.postSystemInTx(tx, actor, {
+      warehouseId: header.warehouseId,
+      reason: 'OPENING_REVERSAL',
+      note: header.number,
+      reversesAdjustmentId: adjustmentId,
+      lines: lines.map((line) => ({
+        productId: line.productId,
+        productUnitId: line.productUnitId,
+        enteredQty: line.enteredQty,
+        factorSnapshot: line.factorSnapshot,
+        binId: line.binId,
+        unitCost: null,
+      })),
     });
   }
 

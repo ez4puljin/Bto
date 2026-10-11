@@ -150,16 +150,19 @@ export class BarcodeService {
 
   /** Deletes a barcode; when it was primary, the oldest remaining one takes over. */
   remove(actor: Actor, barcodeId: number): Promise<void> {
-    return inTransaction(this.db, async (tx) => {
-      const before = await this.get(tx, barcodeId);
-      await tx.delete(productBarcodes).where(eq(productBarcodes.id, barcodeId));
-      if (before.isPrimary) await this.promoteOldest(tx, before.productUnitId);
-      await this.audit.record(tx, actor, {
-        action: 'DELETE',
-        entity: 'product_barcodes',
-        entityId: barcodeId,
-        before,
-      });
+    return inTransaction(this.db, (tx) => this.removeInTx(tx, actor, barcodeId));
+  }
+
+  /** Deletes a barcode in the caller's transaction; the oldest remaining one becomes primary. */
+  async removeInTx(tx: Tx, actor: Actor, barcodeId: number): Promise<void> {
+    const before = await this.get(tx, barcodeId);
+    await tx.delete(productBarcodes).where(eq(productBarcodes.id, barcodeId));
+    if (before.isPrimary) await this.promoteOldest(tx, before.productUnitId);
+    await this.audit.record(tx, actor, {
+      action: 'DELETE',
+      entity: 'product_barcodes',
+      entityId: barcodeId,
+      before,
     });
   }
 

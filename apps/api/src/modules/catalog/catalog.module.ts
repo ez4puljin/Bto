@@ -14,6 +14,7 @@ import { ProductImagesController, ReadinessController } from './controllers/read
 import { syncSystemUoms } from './reference-data';
 import { BarcodeService } from './services/barcode.service';
 import { BrandsService } from './services/brands.service';
+import { CatalogImportService } from './services/catalog-import.service';
 import { CatalogService } from './services/catalog.service';
 import { CategoriesService } from './services/categories.service';
 import { EbarimtReadinessService } from './services/ebarimt-readiness.service';
@@ -27,6 +28,7 @@ import { UomsService } from './services/uoms.service';
 const CORE_SERVICES = [
   BarcodeService,
   BrandsService,
+  CatalogImportService,
   CatalogService,
   CategoriesService,
   EbarimtReadinessService,

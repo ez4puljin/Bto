@@ -30,6 +30,9 @@ COPY --chmod=0755 apps/api/docker/entrypoint.sh /usr/local/bin/tugeel-entrypoint
 COPY apps/api/docker/healthcheck.mjs /usr/local/lib/tugeel/healthcheck.mjs
 # Guards against CRLF if the file was ever checked out with Windows line endings.
 RUN sed -i 's/\r$//' /usr/local/bin/tugeel-entrypoint
+# File storage (STORAGE_LOCAL_DIR): the named volume shared by api and worker is mounted here and
+# takes this owner when Docker creates it.
+RUN mkdir -p /data/storage && chown node:node /data/storage
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=3 \
