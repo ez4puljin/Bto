@@ -30,11 +30,48 @@ export function layoutDigit(event: KeyInfo): string | null {
  * symbol is suppressed), or null to let the key through unchanged.
  */
 export function withLayoutDigit(event: KeyboardEvent<HTMLInputElement>, value: string) {
-  const digit = layoutDigit(event);
-  if (digit === null) return null;
+  return typeAt(event, value, layoutDigit(event));
+}
+
+const LETTER_KEY = /^Key([A-Z])$/;
+/** The symbols a shelf label may hold (`normalizeBinCode`), by physical key. */
+const LABEL_SYMBOLS: Readonly<Record<string, string>> = {
+  Minus: '-',
+  NumpadSubtract: '-',
+  Period: '.',
+  NumpadDecimal: '.',
+  Slash: '/',
+  NumpadDivide: '/',
+};
+
+/**
+ * The character of a shelf label or barcode key by its physical position: digits, Latin capitals
+ * and `-` `.` `/`. On the Mongolian layout a scanner reading the label "A-01-03" types Cyrillic
+ * letters and other symbols, and `event.code` still names the keys it pressed. Only scan contexts
+ * (the scan boxes of stock documents) read keys this way, since a person could not type Mongolian
+ * there; null for any other key.
+ */
+export function scanChar(event: KeyInfo): string | null {
+  if (event.ctrlKey || event.altKey || event.metaKey) return null;
+  const letter = LETTER_KEY.exec(event.code)?.[1];
+  if (letter !== undefined) return letter;
+  if (event.shiftKey) return null;
+  const digit = DIGIT_KEY.exec(event.code)?.[1];
+  if (digit !== undefined) return digit;
+  return LABEL_SYMBOLS[event.code] ?? null;
+}
+
+/** For a scan input's keydown: like withLayoutDigit, for every label character (scanChar). */
+export function withScanChar(event: KeyboardEvent<HTMLInputElement>, value: string) {
+  const char = scanChar(event);
+  return typeAt(event, value, char === event.key ? null : char);
+}
+
+function typeAt(event: KeyboardEvent<HTMLInputElement>, value: string, char: string | null) {
+  if (char === null) return null;
   event.preventDefault();
   const input = event.currentTarget;
   const start = input.selectionStart ?? value.length;
   const end = input.selectionEnd ?? value.length;
-  return `${value.slice(0, start)}${digit}${value.slice(end)}`;
+  return `${value.slice(0, start)}${char}${value.slice(end)}`;
 }

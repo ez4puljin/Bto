@@ -5,16 +5,23 @@ import { useTranslation } from 'react-i18next';
 import { CameraScanner } from '@/components/camera-scanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { withLayoutDigit } from '@/lib/barcode-keys';
+import { withLayoutDigit, withScanChar } from '@/lib/barcode-keys';
 import { cameraAvailable } from '@/lib/scan/camera';
 import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 
 /**
  * The visible scan box (ADR-0021 #1): a keyboard-wedge scanner works with or without focus here,
- * a code can be typed, and where the page may open a camera a button reads one with it.
+ * a code can be typed, and where the page may open a camera a button reads one with it. With
+ * `letters` it also reads shelf labels ("A-01-03") whatever the keyboard layout.
  */
-export function ScanBox({ onScan }: { onScan: (code: string) => void }) {
+export function ScanBox(props: {
+  onScan: (code: string) => void;
+  letters?: boolean;
+  label?: string;
+  placeholder?: string;
+}) {
   const { t } = useTranslation();
+  const { onScan, letters = false } = props;
   const [draft, setDraft] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [canUseCamera] = useState(cameraAvailable);
@@ -24,17 +31,17 @@ export function ScanBox({ onScan }: { onScan: (code: string) => void }) {
     setDraft('');
     if (code) onScan(code);
   };
-  useWedgeScanner(submit, !cameraOpen);
+  useWedgeScanner(submit, !cameraOpen, { letters });
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
         <Input
-          aria-label={t('scan.label')}
+          aria-label={props.label ?? t('scan.label')}
           className="max-w-sm font-mono"
           autoComplete="off"
           spellCheck={false}
-          placeholder={t('scan.placeholder')}
+          placeholder={props.placeholder ?? t('scan.placeholder')}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
@@ -43,7 +50,7 @@ export function ScanBox({ onScan }: { onScan: (code: string) => void }) {
               submit(draft);
               return;
             }
-            const typed = withLayoutDigit(event, draft);
+            const typed = letters ? withScanChar(event, draft) : withLayoutDigit(event, draft);
             if (typed !== null) setDraft(typed);
           }}
         />

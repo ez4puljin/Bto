@@ -20,7 +20,8 @@ export interface NavGroup {
  * (ADR-0027); a group without visible entries is hidden. Catalog pages and suppliers are readable by
  * every user; customers only by the office, accountants and admins.
  * Branches and warehouses are readable by every user too (other pages list them), but only people
- * who manage them need the menu entry.
+ * who manage them need the menu entry. Stock and receipts are read by every user (without costs);
+ * moves, adjustments and shelves only by the people who make them.
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -39,6 +40,20 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/partners/customers', label: 'nav.customers', permission: 'partners.customers.read' },
       { to: '/partners/suppliers', label: 'nav.suppliers' },
+    ],
+  },
+  {
+    label: 'nav.groups.inventory',
+    items: [
+      { to: '/inventory/stock', label: 'nav.stock' },
+      { to: '/inventory/receipts', label: 'nav.receipts' },
+      { to: '/inventory/moves', label: 'nav.binMoves', permission: 'inventory.moves.manage' },
+      {
+        to: '/inventory/adjustments',
+        label: 'nav.adjustments',
+        permission: 'inventory.adjustments.manage',
+      },
+      { to: '/inventory/bins', label: 'nav.bins', permission: 'inventory.setup.manage' },
     ],
   },
   {

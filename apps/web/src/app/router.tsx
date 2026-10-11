@@ -18,6 +18,12 @@ import { RolesPage } from '@/features/identity/roles-page';
 import { SettingsPage } from '@/features/identity/settings-page';
 import { UserDetailPage } from '@/features/identity/user-detail-page';
 import { UsersPage } from '@/features/identity/users-page';
+import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
+import { BinsPage } from '@/features/inventory/bins-page';
+import { ReceiptCostingPage } from '@/features/inventory/costing-page';
+import { BinMovesPage } from '@/features/inventory/moves-page';
+import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
+import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
 import { CustomersPage } from '@/features/partners/customers-page';
@@ -100,6 +106,37 @@ export const routes: RouteObject[] = [
         ),
       },
       { path: 'partners/suppliers/:id', element: <SupplierPage /> },
+      { path: 'inventory/stock', element: <StockPage /> },
+      { path: 'inventory/stock/:id', element: <StockProductPage /> },
+      { path: 'inventory/receipts', element: <ReceiptsPage /> },
+      {
+        path: 'inventory/receipts/new',
+        element: (
+          <RequirePermission permission="inventory.receipts.manage">
+            <ReceiptCreatePage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'inventory/receipts/:id', element: <ReceiptPage /> },
+      {
+        path: 'inventory/receipts/:id/costing',
+        element: (
+          <RequirePermission permission="inventory.costs.manage">
+            <ReceiptCostingPage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'inventory/moves', element: <BinMovesPage /> },
+      { path: 'inventory/adjustments', element: <AdjustmentsPage /> },
+      { path: 'inventory/adjustments/:id', element: <AdjustmentPage /> },
+      {
+        path: 'inventory/bins',
+        element: (
+          <RequirePermission permission="inventory.setup.manage">
+            <BinsPage />
+          </RequirePermission>
+        ),
+      },
       {
         path: 'users',
         element: (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WedgeDetector, type WedgeKey } from './wedge-detector';
+import { WEDGE_DEFAULTS, WedgeDetector, type WedgeKey } from './wedge-detector';
 
 const KEY_CODES: Record<string, string> = {
   Enter: 'Enter',
@@ -58,6 +58,34 @@ describe('WedgeDetector', () => {
     three.code = 'Digit3';
     four.code = 'Digit4';
     expect(feedAll(detector, events)).toEqual(['1234K']);
+  });
+
+  it('reads a shelf label through the Mongolian layout when asked for letters', () => {
+    // "A-01-03": Shift+KeyA types Ф, Minus another letter, the number row symbols.
+    const keys: [string, string, boolean][] = [
+      ['Shift', 'ShiftLeft', true],
+      ['Ф', 'KeyA', true],
+      ['х', 'Minus', false],
+      ['?', 'Digit0', false],
+      ['№', 'Digit1', false],
+      ['х', 'Minus', false],
+      ['?', 'Digit0', false],
+      ['"', 'Digit3', false],
+      ['Enter', 'Enter', false],
+    ];
+    const events = keys.map(([key, code, shiftKey], index) => ({
+      key,
+      code,
+      shiftKey,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      timeStamp: 1000 + index * 6,
+    }));
+    const labels = new WedgeDetector({ ...WEDGE_DEFAULTS, letters: true });
+    expect(feedAll(labels, events)).toEqual(['A-01-03']);
+    // Barcode screens keep the layout's letters: no Latin label there.
+    expect(feedAll(new WedgeDetector(), events)).toEqual(['Фх01х03']);
   });
 
   it('drops a burst when a shortcut or a navigation key comes in between', () => {

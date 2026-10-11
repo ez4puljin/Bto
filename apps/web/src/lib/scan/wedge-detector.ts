@@ -1,10 +1,12 @@
-import { type KeyInfo, layoutDigit } from '@/lib/barcode-keys';
+import { type KeyInfo, layoutDigit, scanChar } from '@/lib/barcode-keys';
 
 export interface WedgeOptions {
   /** Shortest code accepted (onScan.js default). */
   minLength: number;
   /** Longest pause between two keys of one scan, in milliseconds. */
   maxGapMs: number;
+  /** Read letters and label symbols by physical key too (shelf labels, `scanChar`). */
+  letters?: boolean;
 }
 
 /**
@@ -43,7 +45,8 @@ export class WedgeDetector {
       return code;
     }
     const plain = !event.ctrlKey && !event.altKey && !event.metaKey;
-    const char = layoutDigit(event) ?? (plain && event.key.length === 1 ? event.key : null);
+    const mapped = this.options.letters ? scanChar(event) : layoutDigit(event);
+    const char = mapped ?? (plain && event.key.length === 1 ? event.key : null);
     if (char === null) {
       this.reset();
       return null;

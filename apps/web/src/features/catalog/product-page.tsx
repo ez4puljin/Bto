@@ -7,6 +7,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
 import { problemFromError } from '@/lib/problem';
 import { useBrands, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
@@ -89,6 +90,7 @@ export function ProductPage() {
       <UnitsCard product={detail} canManage={canManage} />
       <ImagesCard product={detail} canManage={canManage} />
       <ProductSuppliersCard productId={detail.id} />
+      <ProductLocationCard productId={detail.id} />
     </div>
   );
 }

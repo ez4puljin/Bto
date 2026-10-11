@@ -1,7 +1,7 @@
 import type { ApiClient } from '@tugeel/api-client';
 import { createApiClient } from '@tugeel/api-client';
 import { describe, expect, it, vi } from 'vitest';
-import { layoutDigit } from '@/lib/barcode-keys';
+import { layoutDigit, scanChar } from '@/lib/barcode-keys';
 import { fitWithin, resizeToJpeg, UnsupportedImageError } from '@/lib/image-resize';
 import { ApiProblem } from '@/lib/problem';
 import { uploadFile } from '@/lib/upload';
@@ -31,6 +31,25 @@ describe('layoutDigit', () => {
     expect(layoutDigit(press('у', 'KeyE'))).toBeNull();
     expect(layoutDigit(press('!', 'Digit1', { shiftKey: true }))).toBeNull();
     expect(layoutDigit(press('c', 'Digit1', { ctrlKey: true }))).toBeNull();
+  });
+});
+
+describe('scanChar', () => {
+  it('reads shelf label keys by position whatever the layout', () => {
+    // Mongolian Cyrillic layout: a scanner reading "A-01-03" presses KeyA with Shift, Minus, digits.
+    expect(scanChar(press('Ф', 'KeyA', { shiftKey: true }))).toBe('A');
+    expect(scanChar(press('ф', 'KeyA'))).toBe('A');
+    expect(scanChar(press('х', 'Minus'))).toBe('-');
+    expect(scanChar(press('-', 'NumpadSubtract'))).toBe('-');
+    expect(scanChar(press('ю', 'Period'))).toBe('.');
+    expect(scanChar(press('№', 'Digit1'))).toBe('1');
+  });
+
+  it('leaves shortcuts, shifted symbols and other keys alone', () => {
+    expect(scanChar(press('c', 'KeyC', { ctrlKey: true }))).toBeNull();
+    expect(scanChar(press('!', 'Digit1', { shiftKey: true }))).toBeNull();
+    expect(scanChar(press('Enter', 'Enter'))).toBeNull();
+    expect(scanChar(press(' ', 'Space'))).toBeNull();
   });
 });
 
