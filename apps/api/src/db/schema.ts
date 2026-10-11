@@ -28,3 +28,11 @@ export {
   productUnits,
   uoms,
 } from '../modules/catalog/schema';
+export {
+  customerAddresses,
+  customerContacts,
+  customers,
+  productSuppliers,
+  supplierContacts,
+  suppliers,
+} from '../modules/partners/schema';

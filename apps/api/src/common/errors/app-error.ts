@@ -28,3 +28,12 @@ export class AppError extends Error {
     this.status = ERROR_HTTP_STATUS[code];
   }
 }
+
+/** 422 VALIDATION_FAILED with one field error, the shape the DTO pipe produces. */
+export function invalid(path: string, constraint: string, message: string): AppError {
+  return new AppError('VALIDATION_FAILED', message, undefined, [{ path, constraint, message }]);
+}
+
+export function notFound(entity: string, id: number): AppError {
+  return new AppError('NOT_FOUND', `${entity} ${id} not found`, { id });
+}

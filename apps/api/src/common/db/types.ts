@@ -45,6 +45,8 @@ export const cost = decimalColumn(14, 4);
 export const factor = decimalColumn(18, 6);
 /** Weights in kilograms, NUMERIC(12,4) (e.g. the net weight of one piece). */
 export const weight = decimalColumn(12, 4);
+/** Latitudes and longitudes in degrees, NUMERIC(9,6) (about 10 cm; @tugeel/shared/geo). */
+export const coordinate = decimalColumn(9, 6);
 
 /**
  * JSONB that round-trips every JSON value. Drizzle's own jsonb() runs JSON.parse a second time on
