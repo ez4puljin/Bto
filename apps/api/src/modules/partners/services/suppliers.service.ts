@@ -234,6 +234,16 @@ export class SuppliersService {
     }
   }
 
+  /** Suppliers by id with every field (an import revert compares what it changed). */
+  async findByIds(ids: readonly number[], executor: Db | Tx = this.db): Promise<Supplier[]> {
+    if (ids.length === 0) return [];
+    const rows = await executor
+      .select()
+      .from(suppliers)
+      .where(inArray(suppliers.id, [...new Set(ids)]));
+    return rows.map(supplierView);
+  }
+
   /** Suppliers by code, for the Excel import (week 4). */
   async findByCodes(codes: readonly string[], executor: Db | Tx = this.db): Promise<Supplier[]> {
     if (codes.length === 0) return [];

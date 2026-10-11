@@ -19,7 +19,8 @@ export class JobWorkerService implements OnApplicationBootstrap {
     await this.register(this.ping);
   }
 
-  private async register<N extends JobName>(handler: JobHandler<N>): Promise<void> {
+  /** Registers a handler; modules with jobs call it from their worker module at bootstrap. */
+  async register<N extends JobName>(handler: JobHandler<N>): Promise<void> {
     await this.boss.work<JobPayloads[N]>(handler.name, handler.workOptions, async ([job]) => {
       if (!job) return undefined;
       const output = await handler.handle(job);

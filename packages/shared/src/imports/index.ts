@@ -129,6 +129,19 @@ export const ROW_WARNING_CODES = [
 ] as const;
 export type RowWarningCode = (typeof ROW_WARNING_CODES)[number];
 
+/** Why a whole sheet cannot be imported; each code has a message `imports.fileIssues.<code>`. */
+export const FILE_ISSUE_CODES = [
+  'UNREADABLE',
+  'NO_SHEET',
+  'NO_HEADER',
+  'MISSING_COLUMNS',
+  'DUPLICATE_COLUMNS',
+  'TOO_MANY_COLUMNS',
+  'TOO_MANY_ROWS',
+  'EMPTY',
+] as const;
+export type FileIssueCode = (typeof FILE_ISSUE_CODES)[number];
+
 export interface RowIssue<C extends string = RowErrorCode | RowWarningCode> {
   /** The column key, or null for the whole row. */
   column: string | null;

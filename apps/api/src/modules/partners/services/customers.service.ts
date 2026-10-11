@@ -414,6 +414,16 @@ export class CustomersService {
     };
   }
 
+  /** Customers by id with every field (an import revert compares what it changed). */
+  async findByIds(ids: readonly number[], executor: Db | Tx = this.db) {
+    if (ids.length === 0) return [];
+    const rows = await executor
+      .select()
+      .from(customers)
+      .where(inArray(customers.id, [...new Set(ids)]));
+    return rows.map(customerAuditView);
+  }
+
   /** Customers by code, for the Excel import (week 4): idempotent re-import keyed on the code. */
   async findByCodes(codes: readonly string[], executor: Db | Tx = this.db) {
     if (codes.length === 0) return [];

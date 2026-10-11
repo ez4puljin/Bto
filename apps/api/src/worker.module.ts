@@ -5,10 +5,18 @@ import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
+import { ImportsWorkerModule } from './modules/imports';
 
 /** The pg-boss worker (ROLE=worker): job handlers and cron, no public HTTP. */
 @Module({
-  imports: [CoreModule.forRoot('worker'), DbModule, JobsModule, JobsWorkerModule, HealthCoreModule],
+  imports: [
+    CoreModule.forRoot('worker'),
+    DbModule,
+    JobsModule,
+    JobsWorkerModule,
+    HealthCoreModule,
+    ImportsWorkerModule,
+  ],
   providers: [WorkerHealthServer],
 })
 export class WorkerModule {}

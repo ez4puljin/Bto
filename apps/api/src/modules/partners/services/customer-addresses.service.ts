@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { isInMongolia } from '@tugeel/shared/geo';
 import type { Decimal } from '@tugeel/shared/money';
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -62,6 +62,29 @@ export class CustomerAddressesService {
         ),
       )
       .orderBy(desc(customerAddresses.isDefault), asc(customerAddresses.id));
+  }
+
+  /** Active addresses of many customers (the customer import compares what it would add). */
+  async ofCustomers(
+    customerIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<AddressRow[]> {
+    const rows: AddressRow[] = [];
+    const unique = [...new Set(customerIds)];
+    for (let start = 0; start < unique.length; start += 1_000) {
+      rows.push(
+        ...(await executor
+          .select()
+          .from(customerAddresses)
+          .where(
+            and(
+              inArray(customerAddresses.customerId, unique.slice(start, start + 1_000)),
+              isNull(customerAddresses.archivedAt),
+            ),
+          )),
+      );
+    }
+    return rows;
   }
 
   /** The default address of a customer, or null when it has none. */

@@ -7402,6 +7402,437 @@
           "inventory"
         ]
       }
+    },
+    "/api/v1/imports/templates/{kind}": {
+      "get": {
+        "operationId": "Imports_template",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "PRODUCTS",
+                "CUSTOMERS",
+                "SUPPLIERS",
+                "OPENING_STOCK"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports": {
+      "get": {
+        "operationId": "Imports_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCTS",
+                "CUSTOMERS",
+                "SUPPLIERS",
+                "OPENING_STOCK"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UPLOADED",
+                "VALIDATING",
+                "VALIDATED",
+                "INVALID",
+                "COMMITTING",
+                "COMMITTED",
+                "FAILED",
+                "REVERTING",
+                "REVERTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "imports"
+        ]
+      },
+      "post": {
+        "operationId": "Imports_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attaches an uploaded sheet; the worker reads and checks it.",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}": {
+      "get": {
+        "operationId": "Imports_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}/rows": {
+      "get": {
+        "operationId": "Imports_rows",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ERRORS",
+                "WARNINGS",
+                "ALL"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRowPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}/commit": {
+      "post": {
+        "operationId": "Imports_commit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "VALIDATED → COMMITTING: the worker applies every row in one transaction.",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{id}/revert": {
+      "post": {
+        "operationId": "Imports_revert",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "COMMITTED → REVERTING, for the most recent committed import only.",
+        "tags": [
+          "imports"
+        ]
+      }
     }
   },
   "info": {
@@ -13016,6 +13447,342 @@
             "example": "6"
           }
         }
+      },
+      "ImportFileIssue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "MISSING_COLUMNS"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "ImportSummary": {
+        "type": "object",
+        "properties": {
+          "fileIssues": {
+            "description": "Why the whole sheet was refused",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportFileIssue"
+            }
+          },
+          "actions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Rows by action: CREATE, UPDATE, UNCHANGED"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "warnings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "applied": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "What the commit did, by action"
+          },
+          "refreshed": {
+            "type": "boolean",
+            "description": "The commit found the data changed and checked again"
+          },
+          "advisoryLocks": {
+            "type": "number",
+            "description": "Advisory locks the commit held at its end (diagnostics)"
+          }
+        }
+      },
+      "ImportProblem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "IMPORT_REVERT_BLOCKED"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "ImportJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "PRODUCTS",
+              "CUSTOMERS",
+              "SUPPLIERS",
+              "OPENING_STOCK"
+            ],
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "UPLOADED",
+              "VALIDATING",
+              "VALIDATED",
+              "INVALID",
+              "COMMITTING",
+              "COMMITTED",
+              "FAILED",
+              "REVERTING",
+              "REVERTED"
+            ],
+            "type": "string"
+          },
+          "phase": {
+            "type": "string",
+            "nullable": true,
+            "description": "PARSING, CHECKING, APPLYING or REVERTING while the worker runs"
+          },
+          "totalRows": {
+            "type": "number"
+          },
+          "processedRows": {
+            "type": "number"
+          },
+          "errorRows": {
+            "type": "number"
+          },
+          "warningRows": {
+            "type": "number"
+          },
+          "summary": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportSummary"
+              }
+            ]
+          },
+          "lastError": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportProblem"
+              }
+            ]
+          },
+          "canRevert": {
+            "type": "boolean",
+            "description": "The most recent committed import: only it can be reverted"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "committedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "revertedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fileName",
+          "status",
+          "phase",
+          "totalRows",
+          "processedRows",
+          "errorRows",
+          "warningRows",
+          "summary",
+          "lastError",
+          "canRevert",
+          "createdAt",
+          "validatedAt",
+          "committedAt",
+          "revertedAt",
+          "updatedAt"
+        ]
+      },
+      "ImportJobPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportJob"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ImportIssue": {
+        "type": "object",
+        "properties": {
+          "column": {
+            "type": "string",
+            "nullable": true,
+            "description": "Column key; null for the whole row"
+          },
+          "code": {
+            "type": "string",
+            "example": "NOT_FOUND"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "column",
+          "code"
+        ]
+      },
+      "ImportRow": {
+        "type": "object",
+        "properties": {
+          "rowNo": {
+            "type": "number",
+            "description": "The row number in the sheet"
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            },
+            "description": "Cell text by column key"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportIssue"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportIssue"
+            }
+          },
+          "action": {
+            "nullable": true,
+            "enum": [
+              "CREATE",
+              "UPDATE",
+              "UNCHANGED"
+            ],
+            "type": "string"
+          },
+          "changed": {
+            "description": "Fields an UPDATE row changes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "rowNo",
+          "raw",
+          "errors",
+          "warnings",
+          "action",
+          "changed"
+        ]
+      },
+      "ImportRowPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ImportCreateRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PRODUCTS",
+              "CUSTOMERS",
+              "SUPPLIERS",
+              "OPENING_STOCK"
+            ],
+            "type": "string"
+          },
+          "fileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded file of kind imports.source"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "example": "Бараа.xlsx"
+          }
+        },
+        "required": [
+          "kind",
+          "fileId",
+          "fileName"
+        ]
       },
       "ErrorCode": {
         "type": "string",

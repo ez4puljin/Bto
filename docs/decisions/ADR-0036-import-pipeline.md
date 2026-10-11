@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-11 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Revised | 2026-10-11, same session, before the code: the worker loads the workbook instead of streaming it, because ExcelJS 4.4's streaming reader loses shared strings in some files and never sees hyperlink targets (GPS links) |
 | Amends | ADR-0015 #2 (batched commits), #4 (customer kind and TIN lookup), #5 (opening-stock cost required) |
 
 ## Context
@@ -17,11 +18,11 @@ Delivery 1 week 4 builds the `imports` module of ADR-0015 (SPEC §5.5, §8.1 #6)
 - the product sheet has one "box quantity" column and several barcodes in one cell; the customer sheet has no company/individual column;
 - the owner fills the system's templates (columns found by their headers); the files are `.xlsx`; only admins import.
 
-A design review found that a single-transaction commit of ~10,000 products would exhaust PostgreSQL's lock table through per-product advisory locks, that one opening-stock document per warehouse can exceed the bind-parameter limit of one ledger insert, and that parsing large sheets in the api process competes with the scanners for its event loop.
+A design review found that a single-transaction commit of ~10,000 products would exhaust PostgreSQL's lock table through per-product advisory locks, that one opening-stock document per warehouse can exceed the bind-parameter limit of one ledger insert, and that reading large sheets in the api process competes with the scanners for its event loop.
 
 ## Decision
 
-1. **Upload and parsing.** The browser uploads the sheet through the presigned flow (private file kind `imports.source`, `.xlsx` only, 5 MiB). `POST /imports` only verifies and attaches the file and enqueues `imports.validate`. The worker streams the first sheet (ExcelJS), finds the header row in the first 10 rows by the labels and aliases in `mn.json`, and stores every data row (at most 20,000 rows, 60 columns, 1,000 characters per cell). The api and the worker share the file storage.
+1. **Upload and parsing.** The browser uploads the sheet through the presigned flow (private file kind `imports.source`, `.xlsx` only, 5 MiB). `POST /imports` only verifies and attaches the file and enqueues `imports.validate`. The worker reads the first sheet with ExcelJS (the whole workbook in memory, which the 5 MiB cap bounds), finds the header row in the first 10 rows by the labels and aliases in `mn.json`, and stores every data row (at most 20,000 rows, 60 columns, 1,000 characters per cell). The api and the worker share the file storage.
 2. **Validation and preview.** Every row is normalised and checked in the worker (shared rules in `@tugeel/shared/imports`, bulk lookups against the database, duplicates within the file and against the database); errors and warnings are stored per row with a column and a code, shown in Mongolian.
 3. **All or nothing.** A file with errors cannot be committed. `imports.commit` runs in one transaction: it validates again first (a different outcome rolls back and replaces the preview), then applies every row. Rows never use savepoints. Only one import commits or reverts at a time (`pg_advisory_xact_lock`, `IMPORT_BUSY`). Writes that would lock per product use table locks and bulk statements instead. Progress is written every 250 rows on a separate connection, and the job row is updated in the transaction only at the end.
 4. **References must exist.** Categories (full path or a leaf name that is unique), brands, suppliers, warehouses and shelves are looked up, never created. A customer's kind is read from the registration number, else the TIN's length, else company with a warning; the TIN lookup through the office box waits for delivery 3.

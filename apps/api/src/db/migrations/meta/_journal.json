@@ -57,6 +57,13 @@
       "when": 1791720519869,
       "tag": "0007_inventory_transfers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791723934075,
+      "tag": "0008_imports",
+      "breakpoints": true
     }
   ]
 }

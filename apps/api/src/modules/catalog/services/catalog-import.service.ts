@@ -121,54 +121,24 @@ export class CatalogImportService {
         .select()
         .from(products)
         .where(inArray(products.sku, unique.slice(start, start + CHUNK)));
-      if (rows.length === 0) continue;
-      const ids = rows.map((row) => row.id);
-      const units = await executor
+      found.push(...(await this.withUnits(rows, executor)));
+    }
+    return found;
+  }
+
+  /** Products by id with their current units and barcodes (an import revert). */
+  async productsByIds(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<ImportProduct[]> {
+    const found: ImportProduct[] = [];
+    const unique = [...new Set(ids)];
+    for (let start = 0; start < unique.length; start += CHUNK) {
+      const rows = await executor
         .select()
-        .from(productUnits)
-        .where(and(inArray(productUnits.productId, ids), isNull(productUnits.supersededAt)))
-        .orderBy(asc(productUnits.id));
-      const codes =
-        units.length === 0
-          ? []
-          : await executor
-              .select({
-                id: productBarcodes.id,
-                unitId: productBarcodes.productUnitId,
-                code: productBarcodes.code,
-                lookupKey: productBarcodes.lookupKey,
-              })
-              .from(productBarcodes)
-              .where(
-                inArray(
-                  productBarcodes.productUnitId,
-                  units.map((unit) => unit.id),
-                ),
-              )
-              .orderBy(asc(productBarcodes.id));
-      for (const row of rows) {
-        found.push({
-          id: row.id,
-          sku: row.sku,
-          name: row.name,
-          categoryId: row.categoryId,
-          brandId: row.brandId,
-          vatType: row.vatType,
-          weightKg: row.weightKg,
-          status: row.status,
-          units: units
-            .filter((unit) => unit.productId === row.id)
-            .map((unit) => ({
-              id: unit.id,
-              uomId: unit.uomId,
-              factorToBase: unit.factorToBase,
-              isBase: unit.isBase,
-              barcodes: codes
-                .filter((code) => code.unitId === unit.id)
-                .map(({ id, code, lookupKey }) => ({ id, code, lookupKey })),
-            })),
-        });
-      }
+        .from(products)
+        .where(inArray(products.id, unique.slice(start, start + CHUNK)));
+      found.push(...(await this.withUnits(rows, executor)));
     }
     return found;
   }
@@ -349,6 +319,69 @@ export class CatalogImportService {
         })),
       );
     }
+  }
+
+  /** Current units and their barcodes of up to one chunk of products. */
+  private async withUnits(rows: Product[], executor: Db | Tx): Promise<ImportProduct[]> {
+    if (rows.length === 0) return [];
+    const units = await executor
+      .select()
+      .from(productUnits)
+      .where(
+        and(
+          inArray(
+            productUnits.productId,
+            rows.map((row) => row.id),
+          ),
+          isNull(productUnits.supersededAt),
+        ),
+      )
+      .orderBy(asc(productUnits.id));
+    const codes = new Map<number, { id: number; code: string; lookupKey: string }[]>();
+    if (units.length > 0) {
+      const barcodeRows = await executor
+        .select({
+          id: productBarcodes.id,
+          unitId: productBarcodes.productUnitId,
+          code: productBarcodes.code,
+          lookupKey: productBarcodes.lookupKey,
+        })
+        .from(productBarcodes)
+        .where(
+          inArray(
+            productBarcodes.productUnitId,
+            units.map((unit) => unit.id),
+          ),
+        )
+        .orderBy(asc(productBarcodes.id));
+      for (const { unitId, ...code } of barcodeRows) {
+        codes.set(unitId, [...(codes.get(unitId) ?? []), code]);
+      }
+    }
+    const unitsOf = new Map<number, ImportProduct['units']>();
+    for (const unit of units) {
+      unitsOf.set(unit.productId, [
+        ...(unitsOf.get(unit.productId) ?? []),
+        {
+          id: unit.id,
+          uomId: unit.uomId,
+          factorToBase: unit.factorToBase,
+          isBase: unit.isBase,
+          barcodes: codes.get(unit.id) ?? [],
+        },
+      ]);
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      sku: row.sku,
+      name: row.name,
+      categoryId: row.categoryId,
+      brandId: row.brandId,
+      vatType: row.vatType,
+      weightKg: row.weightKg,
+      status: row.status,
+      units: unitsOf.get(row.id) ?? [],
+    }));
   }
 
   /** Every referenced category, brand and unit of measure exists; box factors are exact. */

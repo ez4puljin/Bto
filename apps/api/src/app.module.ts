@@ -6,6 +6,7 @@ import { CoreModule } from './core.module';
 import { HealthModule } from './health/health.module';
 import { CatalogHttpModule } from './modules/catalog';
 import { IdentityHttpModule } from './modules/identity';
+import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
 import { PartnersHttpModule } from './modules/partners';
 
@@ -21,6 +22,7 @@ import { PartnersHttpModule } from './modules/partners';
     CatalogHttpModule,
     PartnersHttpModule,
     InventoryHttpModule,
+    ImportsHttpModule,
   ],
 })
 export class AppModule {}

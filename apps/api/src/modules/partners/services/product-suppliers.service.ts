@@ -101,6 +101,24 @@ export class ProductSuppliersService {
     };
   }
 
+  /** Every link of these products (the product import compares what it would add). */
+  async linksOfProducts(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<LinkRow[]> {
+    const rows: LinkRow[] = [];
+    const unique = [...new Set(productIds)];
+    for (let start = 0; start < unique.length; start += CHUNK) {
+      rows.push(
+        ...(await executor
+          .select()
+          .from(productSuppliers)
+          .where(inArray(productSuppliers.productId, unique.slice(start, start + CHUNK)))),
+      );
+    }
+    return rows;
+  }
+
   /** Main supplier per product, for receiving (inventory, week 3). */
   async mainSupplierOf(
     productIds: readonly number[],

@@ -58,3 +58,4 @@ export {
   transfers,
   warehouseStock,
 } from '../modules/inventory/schema';
+export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
