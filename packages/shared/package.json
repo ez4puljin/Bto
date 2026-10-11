@@ -72,6 +72,11 @@
       "types": "./dist/geo/index.d.ts",
       "default": "./dist/geo/index.js"
     },
+    "./inventory": {
+      "@tugeel/source": "./src/inventory/index.ts",
+      "types": "./dist/inventory/index.d.ts",
+      "default": "./dist/inventory/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },

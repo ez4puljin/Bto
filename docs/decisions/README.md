@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0033`.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0035`.
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -48,6 +48,8 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0030](ADR-0030-local-file-storage.md) | Local file storage until go-live: API-signed URLs, public images, owner-confirmed files | Accepted | 2026-10-11 |
 | [ADR-0031](ADR-0031-camera-scanning-fallback.md) | Camera scanning fallback: barcode-detector with self-hosted ZXing WebAssembly, layout-independent wedge input | Accepted | 2026-10-11 |
 | [ADR-0032](ADR-0032-product-supplier-link.md) | The product ↔ supplier link lives in partners, which may depend on catalog | Accepted | 2026-10-11 |
+| [ADR-0033](ADR-0033-receipts-and-costing.md) | Goods receipts land on their shelf and are costed after posting | Accepted | 2026-10-11 |
+| [ADR-0034](ADR-0034-stock-posting-protocol.md) | The stock posting protocol: lock order, NULL-safe keys, several documents per posting | Accepted | 2026-10-11 |
 
 ## Template
 

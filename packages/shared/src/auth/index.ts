@@ -19,6 +19,15 @@ export const PERMISSIONS = [
   'partners.customers.manage',
   'partners.credit.manage',
   'partners.suppliers.manage',
+  'inventory.setup.manage',
+  'inventory.locations.manage',
+  'inventory.receipts.manage',
+  'inventory.moves.manage',
+  'inventory.adjustments.manage',
+  'inventory.adjustments.approve',
+  'inventory.stocktakes.manage',
+  'inventory.stocktakes.approve',
+  'inventory.costs.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -62,14 +71,23 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   ADMIN: PERMISSIONS,
   OFFICE: ['partners.customers.read', 'partners.customers.manage'],
   PROCUREMENT: [],
-  WAREHOUSE: [],
-  // The accountant also types TINs the lookup cannot find (SPEC §5.3) and sets credit terms.
+  // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
+  WAREHOUSE: [
+    'inventory.locations.manage',
+    'inventory.receipts.manage',
+    'inventory.moves.manage',
+    'inventory.adjustments.manage',
+    'inventory.stocktakes.manage',
+  ],
+  // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms and
+  // enters the supplier prices of goods receipts (ADR-0033).
   ACCOUNTANT: [
     'identity.settings.read',
     'identity.audit.read',
     'partners.customers.read',
     'partners.customers.manage',
     'partners.credit.manage',
+    'inventory.costs.manage',
   ],
   HR: [],
   POS_CASHIER: [],

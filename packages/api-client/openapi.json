@@ -4586,7 +4586,16 @@
           "partners.customers.read",
           "partners.customers.manage",
           "partners.credit.manage",
-          "partners.suppliers.manage"
+          "partners.suppliers.manage",
+          "inventory.setup.manage",
+          "inventory.locations.manage",
+          "inventory.receipts.manage",
+          "inventory.moves.manage",
+          "inventory.adjustments.manage",
+          "inventory.adjustments.approve",
+          "inventory.stocktakes.manage",
+          "inventory.stocktakes.approve",
+          "inventory.costs.manage"
         ]
       },
       "RoleRef": {
@@ -7940,6 +7949,11 @@
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",
           "BIN_LOCKED_FOR_COUNT",
+          "BIN_NOT_EMPTY",
+          "BIN_ARCHIVED",
+          "DOC_STATE_INVALID",
+          "PRODUCT_NOT_IN_WAREHOUSE",
+          "COSTING_CLOSED",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

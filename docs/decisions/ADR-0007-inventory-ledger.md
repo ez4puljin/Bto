@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0024 ("from migration 0001" = from the inventory module's first migration) |
+| Amended by | ADR-0024 ("from migration 0001" = from the inventory module's first migration), ADR-0033 (receipts into the shelf bin, costing after posting), ADR-0034 (posting protocol) |
 
 ## Context
 
