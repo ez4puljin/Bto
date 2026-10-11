@@ -2,11 +2,11 @@
 
 Status: **built** in delivery 1 (week 2), session of 2026-10-11; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/catalog/`, shared rules in `packages/shared/src/{text,gtin,units,files}`, screens in `apps/web/src/features/catalog/`, scanning in `apps/web/src/lib/scan/` and `apps/web/src/components/{scan-box,camera-scanner}.tsx`. Decisions: ADR-0008 (units and factors), ADR-0010 (money and tax), ADR-0011 (i18n), ADR-0015 #3 (e-Barimt attributes optional in delivery 1), ADR-0028 (search keys), ADR-0029 (barcode model), ADR-0030 (file storage), ADR-0031 (camera fallback), architecture §4 (catalog row) and §5.2.
 
-catalog depends only on `identity` (audit, settings, storage, access decorators). inventory, imports, pricing, sales, procurement and ebarimt import its `index.ts`.
+catalog depends only on `identity` (audit, settings, storage, access decorators). partners (`product_suppliers`, ADR-0032), inventory, imports, pricing, sales, procurement and ebarimt import its `index.ts`.
 
 ## 1. Owner's answers behind the design (interview of 2026-10-10/11)
 
-Names mix Cyrillic and Latin; weighed goods are sold in bulk by the kilogram; pre-packed bundles are ordinary products and promotional bundles belong to pricing (delivery 2); pieces, blocks and boxes carry their own barcodes and some products have none; the product code (SKU) is numeric and comes from the owner's Excel sheet, the system suggests the next one; categories form a tree; only the admin edits the catalog; VAT-exempt goods exist and city tax is undecided until the accountant answers (SPEC §11 #3a); the admin uploads photos by hand. The Excel columns map as follows: code, name, category, barcode, box quantity and unit weight → catalog; home warehouse → inventory (week 3, `product_locations`); price → the delivery-2 price import; supplier → decided in the partners session; image → uploaded by hand.
+Names mix Cyrillic and Latin; weighed goods are sold in bulk by the kilogram; pre-packed bundles are ordinary products and promotional bundles belong to pricing (delivery 2); pieces, blocks and boxes carry their own barcodes and some products have none; the product code (SKU) is numeric and comes from the owner's Excel sheet, the system suggests the next one; categories form a tree; only the admin edits the catalog; VAT-exempt goods exist and city tax is undecided until the accountant answers (SPEC §11 #3a); the admin uploads photos by hand. The Excel columns map as follows: code, name, category, barcode, box quantity and unit weight → catalog; home warehouse → inventory (week 3, `product_locations`); price → the delivery-2 price import; supplier → partners `product_suppliers` (ADR-0032); image → uploaded by hand.
 
 ## 2. Owned tables (migration `0003_catalog`)
 
@@ -74,7 +74,7 @@ Actions `CREATE`, `UPDATE`, `DELETE`, `SUPERSEDE`, `RETIRE`, `ASSIGN` on the ent
 
 ## 8. Screens (`apps/web`)
 
-Menu group «Бараа»: `/catalog/products` (list with search, filters in the URL, thumbnails), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
+Menu group «Бараа»: `/catalog/products` (list with search, filters in the URL, thumbnails), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
 
 ## 9. Tests
 
@@ -82,7 +82,7 @@ Shared (Vitest): `text`, `gtin`, `units`, `files`. Integration (`apps/api/test/i
 
 ## 10. Open items
 
-- The supplier link (Excel "нийлүүлэгч") is decided in the partners session; catalog may not import partners (architecture §4), so it lives on the partners or procurement side.
+- ~~The supplier link (Excel "нийлүүлэгч")~~ resolved 2026-10-11: `product_suppliers` in partners (ADR-0032), one main supplier per product; the week-4 product import fills it through `ProductSuppliersService.linkInTx`.
 - Home warehouse (Excel "харьяалагдах агуулах") and shelf labels with barcodes: inventory, week 3.
 - Product and price Excel import: `imports`, week 4 (products) and delivery 2 (prices).
 - Cleanup of PENDING image uploads that were never attached and of DELETED files: identity's housekeeping job (identity.md §12).

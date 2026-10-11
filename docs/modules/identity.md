@@ -68,8 +68,8 @@ Every auth response carries `Cache-Control: no-store`; request bodies are JSON o
 
 ## 4. Permissions and roles
 
-- Catalog: `PERMISSIONS` in `@tugeel/shared/auth` (`identity.users.read`, `identity.users.manage`, `identity.roles.manage`, `identity.org.manage`, `identity.settings.read`, `identity.settings.manage`, `identity.audit.read`). Admin-only (never in a custom role): `identity.users.manage`, `identity.roles.manage`. Codes of later modules are documented with them: `catalog.products.manage`, `catalog.ebarimt.manage` (`docs/modules/catalog.md` §4; ADMIN only, assignable to custom roles).
-- System roles: ADMIN (all codes), ACCOUNTANT (`identity.settings.read`, `identity.audit.read`), OFFICE, PROCUREMENT, WAREHOUSE, HR, POS_CASHIER, SALES_REP, DRIVER (empty until their modules add codes). Read-only in the UI and the API (`ROLE_SYSTEM_READONLY`).
+- Catalog: `PERMISSIONS` in `@tugeel/shared/auth` (`identity.users.read`, `identity.users.manage`, `identity.roles.manage`, `identity.org.manage`, `identity.settings.read`, `identity.settings.manage`, `identity.audit.read`). Admin-only (never in a custom role): `identity.users.manage`, `identity.roles.manage`. Codes of later modules are documented with them: `catalog.products.manage`, `catalog.ebarimt.manage` (`docs/modules/catalog.md` §4; ADMIN only, assignable to custom roles); `partners.customers.read`, `partners.customers.manage` (ADMIN, OFFICE, ACCOUNTANT), `partners.credit.manage` (ADMIN, ACCOUNTANT), `partners.suppliers.manage` (ADMIN) (`docs/modules/partners.md` §4).
+- System roles: ADMIN (all codes), ACCOUNTANT (`identity.settings.read`, `identity.audit.read`, `partners.customers.read`, `partners.customers.manage`, `partners.credit.manage`), OFFICE (`partners.customers.read`, `partners.customers.manage`), PROCUREMENT, WAREHOUSE, HR, POS_CASHIER, SALES_REP, DRIVER (the others stay empty until their modules add codes). Read-only in the UI and the API (`ROLE_SYSTEM_READONLY`).
 - **Adding a permission in a later module:** add the code to `PERMISSIONS`, its label under `permissions.*` in `packages/shared/i18n/mn.json` (the i18n test fails otherwise), the system roles that get it in `SYSTEM_ROLE_PERMISSIONS`; the api syncs the database at boot. Custom roles never gain a new code automatically.
 - Invariants: the last active ADMIN cannot be disabled or demoted (`LAST_ADMIN`, serialised by `SELECT … FROM roles WHERE code = 'ADMIN' FOR UPDATE`); nobody edits their own roles, scopes or status (`SELF_EDIT_FORBIDDEN`); a role with users cannot be deleted (`ROLE_IN_USE`).
 
@@ -81,8 +81,9 @@ Every auth response carries `Cache-Control: no-store`; request bodies are JSON o
 | `tax.city_tax_rate_pct` | percent string | none |
 | `company.vat_payer`, `company.city_tax_payer` | boolean | none |
 | `auth.staff_session_hours` | integer 1–168 | 12 |
+| `credit.payment_term_days` | integer 0–365 | none: the one payment term for every customer, the number of days comes from the accountant (SPEC §11 #20); a customer may override it (`docs/modules/partners.md`) |
 
-Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; nothing else (the screen renders every key).
+Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; nothing else (the screen renders every key; an integer key shows its own min–max range as the error message).
 
 ## 6. Authentication facts (ADR-0027)
 
