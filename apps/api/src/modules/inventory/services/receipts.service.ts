@@ -172,7 +172,7 @@ export class ReceiptsService {
     private readonly units: UnitConversionService,
   ) {}
 
-  create(ctx: AuthContext, input: ReceiptInput): Promise<ReceiptDetail> {
+  async create(ctx: AuthContext, input: ReceiptInput): Promise<ReceiptDetail> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     return inTransaction(this.db, async (tx) => {
       const id = await this.createInTx(tx, ctx, input);

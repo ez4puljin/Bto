@@ -6549,6 +6549,228 @@
           "inventory"
         ]
       }
+    },
+    "/api/v1/stock": {
+      "get": {
+        "operationId": "Stock_overview",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, SKU or barcode, as in the catalog search",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "Show this warehouse’s quantities only",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "Without q: only products holding stock",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductStockPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock/products/{id}": {
+      "get": {
+        "operationId": "Stock_product",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductStockDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock/bins/{id}": {
+      "get": {
+        "operationId": "Stock_bin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BinContent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stock/reconciliation/latest": {
+      "get": {
+        "operationId": "Stock_reconciliation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The last check of the caches against the ledger, for the admin banner.",
+        "tags": [
+          "inventory"
+        ]
+      }
     }
   },
   "info": {
@@ -11400,6 +11622,347 @@
             "minimum": 1
           }
         }
+      },
+      "StockProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseUnitName": {
+            "type": "string",
+            "example": "ширхэг"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "baseUnitName",
+          "thumbUrl"
+        ]
+      },
+      "WarehouseBalance": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "onHand": {
+            "type": "string",
+            "example": "48",
+            "description": "Base units"
+          },
+          "sellableOnHand": {
+            "type": "string"
+          },
+          "reserved": {
+            "type": "string"
+          },
+          "available": {
+            "type": "string",
+            "description": "Sellable minus reserved"
+          },
+          "avgCost": {
+            "type": "string",
+            "description": "Cost holders only"
+          },
+          "value": {
+            "type": "string",
+            "description": "Cost holders only, MNT"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "onHand",
+          "sellableOnHand",
+          "reserved",
+          "available"
+        ]
+      },
+      "ProductStock": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/StockProduct"
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "available": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "Cost holders only, MNT"
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBalance"
+            }
+          }
+        },
+        "required": [
+          "product",
+          "onHand",
+          "available",
+          "warehouses"
+        ]
+      },
+      "ProductStockPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStock"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "BinBalance": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "binId": {
+            "type": "number"
+          },
+          "binCode": {
+            "type": "string",
+            "example": "A-01-03"
+          },
+          "binType": {
+            "type": "string",
+            "enum": [
+              "RECEIVING",
+              "STORAGE",
+              "PICKING",
+              "STAGING",
+              "SHIP",
+              "DAMAGED",
+              "RETURNS",
+              "SALESFLOOR",
+              "CARGO",
+              "TRANSIT"
+            ]
+          },
+          "sellable": {
+            "type": "boolean"
+          },
+          "lotId": {
+            "type": "number",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "binId",
+          "binCode",
+          "binType",
+          "sellable",
+          "lotId",
+          "onHand"
+        ]
+      },
+      "ProductStockDetail": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/StockProduct"
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "available": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "Cost holders only, MNT"
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBalance"
+            }
+          },
+          "bins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BinBalance"
+            }
+          }
+        },
+        "required": [
+          "product",
+          "onHand",
+          "available",
+          "warehouses",
+          "bins"
+        ]
+      },
+      "BinContentLine": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/StockProduct"
+          },
+          "lotId": {
+            "type": "number",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "product",
+          "lotId",
+          "onHand"
+        ]
+      },
+      "BinContent": {
+        "type": "object",
+        "properties": {
+          "bin": {
+            "$ref": "#/components/schemas/Bin"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BinContentLine"
+            }
+          }
+        },
+        "required": [
+          "bin",
+          "lines"
+        ]
+      },
+      "ReconciliationDiff": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "enum": [
+              "BIN",
+              "WAREHOUSE",
+              "SELLABLE"
+            ],
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true
+          },
+          "productId": {
+            "type": "number"
+          },
+          "lotId": {
+            "type": "number",
+            "nullable": true
+          },
+          "ledger": {
+            "type": "string",
+            "description": "Sum of the ledger"
+          },
+          "cache": {
+            "type": "string",
+            "description": "The cached balance"
+          }
+        },
+        "required": [
+          "level",
+          "warehouseId",
+          "binId",
+          "productId",
+          "lotId",
+          "ledger",
+          "cache"
+        ]
+      },
+      "ReconciliationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "DRIFT"
+            ],
+            "type": "string"
+          },
+          "diffCount": {
+            "type": "number"
+          },
+          "diffs": {
+            "description": "The first 100",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationDiff"
+            }
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "triggeredBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "diffCount",
+          "diffs",
+          "startedAt",
+          "triggeredBy"
+        ]
+      },
+      "ReconciliationStatus": {
+        "type": "object",
+        "properties": {
+          "lastRun": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReconciliationRun"
+              }
+            ]
+          }
+        },
+        "required": [
+          "lastRun"
+        ]
       },
       "ErrorCode": {
         "type": "string",

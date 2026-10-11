@@ -92,7 +92,7 @@ export class BinMovesService {
     private readonly units: UnitConversionService,
   ) {}
 
-  create(ctx: AuthContext, input: BinMoveInput): Promise<BinMoveDetail> {
+  async create(ctx: AuthContext, input: BinMoveInput): Promise<BinMoveDetail> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     return inTransaction(this.db, async (tx) => {
       const id = await this.createInTx(tx, ctx, input);

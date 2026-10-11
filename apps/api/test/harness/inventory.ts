@@ -2,6 +2,8 @@ import { randomInt } from 'node:crypto';
 import type { INestApplicationContext } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import { SYSTEM_ROLE_PERMISSIONS, type SystemRole } from '@tugeel/shared/auth';
+import type { AuthContext } from '../../src/modules/identity';
 import { StockPostingService } from '../../src/modules/inventory';
 import { bearer } from './identity';
 
@@ -96,4 +98,22 @@ export function inventoryApi(app: NestExpressApplication, token: string) {
 export async function expectReconciled(app: INestApplicationContext): Promise<void> {
   const run = await app.get(StockPostingService).reconcile('TEST');
   expect(run.diffs).toEqual([]);
+}
+
+/** An AuthContext with a system role's permissions, for services without routes (stocktakes). */
+export function staffContext(
+  userId: number,
+  role: SystemRole,
+  writableWarehouseIds: readonly number[] | null = null,
+): AuthContext {
+  return {
+    kind: 'STAFF',
+    userId,
+    sessionId: 'test',
+    username: `user${userId}`,
+    fullName: 'Тест хэрэглэгч',
+    permissions: new Set(SYSTEM_ROLE_PERMISSIONS[role]),
+    roleIds: [],
+    writableWarehouseIds: writableWarehouseIds === null ? null : new Set(writableWarehouseIds),
+  };
 }

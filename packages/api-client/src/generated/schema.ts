@@ -1525,6 +1525,71 @@ export interface paths {
         patch: operations["AdjustmentLines_update"];
         trace?: never;
     };
+    "/api/v1/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Stock_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Stock_product"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock/bins/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Stock_bin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stock/reconciliation/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The last check of the caches against the ledger, for the admin banner. */
+        get: operations["Stock_reconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2874,6 +2939,97 @@ export interface components {
             /** @example 3 */
             enteredQty?: string;
             binId?: number;
+        };
+        StockProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            /** @example ширхэг */
+            baseUnitName: string;
+            thumbUrl: string | null;
+        };
+        WarehouseBalance: {
+            warehouseId: number;
+            /**
+             * @description Base units
+             * @example 48
+             */
+            onHand: string;
+            sellableOnHand: string;
+            reserved: string;
+            /** @description Sellable minus reserved */
+            available: string;
+            /** @description Cost holders only */
+            avgCost?: string;
+            /** @description Cost holders only, MNT */
+            value?: string;
+        };
+        ProductStock: {
+            product: components["schemas"]["StockProduct"];
+            onHand: string;
+            available: string;
+            /** @description Cost holders only, MNT */
+            value?: string;
+            warehouses: components["schemas"]["WarehouseBalance"][];
+        };
+        ProductStockPage: {
+            data: components["schemas"]["ProductStock"][];
+            nextCursor: string | null;
+        };
+        BinBalance: {
+            warehouseId: number;
+            binId: number;
+            /** @example A-01-03 */
+            binCode: string;
+            /** @enum {string} */
+            binType: "RECEIVING" | "STORAGE" | "PICKING" | "STAGING" | "SHIP" | "DAMAGED" | "RETURNS" | "SALESFLOOR" | "CARGO" | "TRANSIT";
+            sellable: boolean;
+            lotId: number | null;
+            onHand: string;
+        };
+        ProductStockDetail: {
+            product: components["schemas"]["StockProduct"];
+            onHand: string;
+            available: string;
+            /** @description Cost holders only, MNT */
+            value?: string;
+            warehouses: components["schemas"]["WarehouseBalance"][];
+            bins: components["schemas"]["BinBalance"][];
+        };
+        BinContentLine: {
+            product: components["schemas"]["StockProduct"];
+            lotId: number | null;
+            onHand: string;
+        };
+        BinContent: {
+            bin: components["schemas"]["Bin"];
+            lines: components["schemas"]["BinContentLine"][];
+        };
+        ReconciliationDiff: {
+            /** @enum {string} */
+            level: "BIN" | "WAREHOUSE" | "SELLABLE";
+            warehouseId: number;
+            binId: number | null;
+            productId: number;
+            lotId: number | null;
+            /** @description Sum of the ledger */
+            ledger: string;
+            /** @description The cached balance */
+            cache: string;
+        };
+        ReconciliationRun: {
+            id: number;
+            /** @enum {string} */
+            status: "OK" | "DRIFT";
+            diffCount: number;
+            /** @description The first 100 */
+            diffs: components["schemas"]["ReconciliationDiff"][];
+            /** Format: date-time */
+            startedAt: string;
+            triggeredBy: string;
+        };
+        ReconciliationStatus: {
+            lastRun: components["schemas"]["ReconciliationRun"] | null;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
@@ -7054,6 +7210,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdjustmentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_overview: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name, SKU or barcode, as in the catalog search */
+                q?: string;
+                categoryId?: number;
+                /** @description Show this warehouse’s quantities only */
+                warehouseId?: number;
+                /** @description Without q: only products holding stock */
+                inStock?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductStockPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductStockDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_bin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinContent"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_reconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationStatus"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -1,6 +1,15 @@
+import type { ProductSummary } from '../../catalog';
 import type { AdjustmentDetailDto, AdjustmentSummaryDto } from '../dto/adjustments.dto';
 import type { BinMoveDetailDto, BinMoveSummaryDto } from '../dto/bin-moves.dto';
 import type { BinDto, ProductLocationDto } from '../dto/bins.dto';
+import type {
+  BinContentDto,
+  ProductStockDetailDto,
+  ProductStockDto,
+  ReconciliationRunDto,
+  StockProductDto,
+  WarehouseBalanceDto,
+} from '../dto/stock.dto';
 import type {
   ReceiptCostingDto,
   ReceiptDetailDto,
@@ -11,6 +20,13 @@ import type { AdjustmentDetail, AdjustmentSummary } from '../services/adjustment
 import type { BinMoveDetail, BinMoveSummary } from '../services/bin-moves.service';
 import type { Bin } from '../services/bins.service';
 import type { ProductLocation } from '../services/product-locations.service';
+import type {
+  BinContent,
+  ProductStock,
+  ProductStockDetail,
+  ReconciliationSummary,
+  WarehouseBalance,
+} from '../services/stock-query.service';
 import type {
   ReceiptCosting,
   ReceiptDetail,
@@ -207,5 +223,77 @@ export function toAdjustmentSummaryDto(summary: AdjustmentSummary): AdjustmentSu
     submittedAt: summary.submittedAt?.toISOString() ?? null,
     effectiveDate: summary.effectiveDate,
     createdAt: summary.createdAt.toISOString(),
+  };
+}
+
+function toStockProductDto(product: ProductSummary): StockProductDto {
+  return {
+    id: product.id,
+    sku: product.sku,
+    name: product.name,
+    baseUnitName: product.baseUnit.uomName,
+    thumbUrl: product.thumbUrl,
+  };
+}
+
+function toWarehouseBalanceDto(balance: WarehouseBalance, withCosts: boolean): WarehouseBalanceDto {
+  return {
+    warehouseId: balance.warehouseId,
+    onHand: balance.onHand.toFixed(),
+    sellableOnHand: balance.sellableOnHand.toFixed(),
+    reserved: balance.reserved.toFixed(),
+    available: balance.available.toFixed(),
+    ...(withCosts ? { avgCost: balance.avgCost.toFixed(), value: balance.value.toFixed(2) } : {}),
+  };
+}
+
+/** Without inventory.costs.manage no average or value reaches the response (ADR-0033 #8). */
+export function toProductStockDto(stock: ProductStock, withCosts: boolean): ProductStockDto {
+  return {
+    product: toStockProductDto(stock.product),
+    onHand: stock.onHand.toFixed(),
+    available: stock.available.toFixed(),
+    ...(withCosts ? { value: stock.value.toFixed(2) } : {}),
+    warehouses: stock.warehouses.map((balance) => toWarehouseBalanceDto(balance, withCosts)),
+  };
+}
+
+export function toProductStockDetailDto(
+  stock: ProductStockDetail,
+  withCosts: boolean,
+): ProductStockDetailDto {
+  return {
+    ...toProductStockDto(stock, withCosts),
+    bins: stock.bins.map((bin) => ({
+      warehouseId: bin.warehouseId,
+      binId: bin.binId,
+      binCode: bin.binCode,
+      binType: bin.binType,
+      sellable: bin.sellable,
+      lotId: bin.lotId,
+      onHand: bin.onHand.toFixed(),
+    })),
+  };
+}
+
+export function toBinContentDto(content: BinContent): BinContentDto {
+  return {
+    bin: toBinDto(content.bin),
+    lines: content.lines.map((line) => ({
+      product: toStockProductDto(line.product),
+      lotId: line.lotId,
+      onHand: line.onHand.toFixed(),
+    })),
+  };
+}
+
+export function toReconciliationRunDto(run: ReconciliationSummary): ReconciliationRunDto {
+  return {
+    id: run.id,
+    status: run.status,
+    diffCount: run.diffCount,
+    diffs: run.diffs,
+    startedAt: run.startedAt.toISOString(),
+    triggeredBy: run.triggeredBy,
   };
 }

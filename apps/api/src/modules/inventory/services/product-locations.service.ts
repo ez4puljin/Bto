@@ -128,7 +128,7 @@ export class ProductLocationsService {
   }
 
   /** The fixed shelf and levels of a product in one warehouse (created on first use). */
-  set(ctx: AuthContext, input: LocationInput): Promise<ProductLocation> {
+  async set(ctx: AuthContext, input: LocationInput): Promise<ProductLocation> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     return inTransaction(this.db, async (tx) => {
       await this.assertProduct(input.productId, tx);
@@ -166,7 +166,7 @@ export class ProductLocationsService {
   }
 
   /** Makes a WHOLESALE warehouse the product's home (null: no home); one home per product. */
-  setHome(
+  async setHome(
     ctx: AuthContext,
     productId: number,
     warehouseId: number | null,

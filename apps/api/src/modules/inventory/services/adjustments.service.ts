@@ -107,7 +107,7 @@ export class AdjustmentsService {
     private readonly units: UnitConversionService,
   ) {}
 
-  create(ctx: AuthContext, input: AdjustmentInput): Promise<AdjustmentDetail> {
+  async create(ctx: AuthContext, input: AdjustmentInput): Promise<AdjustmentDetail> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     if (input.reason === 'OPENING' && !ctx.permissions.has(APPROVE)) {
       throw new AppError('FORBIDDEN', 'opening stock is entered by approvers', {
@@ -186,7 +186,11 @@ export class AdjustmentsService {
     });
   }
 
-  addLine(ctx: AuthContext, id: number, line: AdjustmentLineInput): Promise<AdjustmentDetail> {
+  async addLine(
+    ctx: AuthContext,
+    id: number,
+    line: AdjustmentLineInput,
+  ): Promise<AdjustmentDetail> {
     if (line.unitCost !== undefined && line.unitCost !== null) this.assertCosts(ctx);
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, ctx, id);
@@ -303,7 +307,7 @@ export class AdjustmentsService {
    * SUBMITTED → POSTED by an approver. Inbound lines take the given costs (cost holders only), else
    * their stored cost, else the average.
    */
-  approve(
+  async approve(
     ctx: AuthContext,
     id: number,
     costs: readonly { lineId: number; unitCost: Decimal }[] = [],

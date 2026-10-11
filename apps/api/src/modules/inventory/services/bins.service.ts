@@ -146,7 +146,7 @@ export class BinsService {
     return toPage(rows, limit, (row) => ({ code: row.code, id: row.id }));
   }
 
-  create(ctx: AuthContext, input: BinInput): Promise<Bin> {
+  async create(ctx: AuthContext, input: BinInput): Promise<Bin> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     return inTransaction(this.db, async (tx) => {
       await this.shelfWarehouse(input.warehouseId, tx);
@@ -172,7 +172,7 @@ export class BinsService {
   }
 
   /** A block of shelves (rows × racks × levels); existing codes are kept, never duplicated. */
-  createRange(ctx: AuthContext, input: BinRangeInput): Promise<BinRangeResult> {
+  async createRange(ctx: AuthContext, input: BinRangeInput): Promise<BinRangeResult> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
     let codes: string[];
     try {

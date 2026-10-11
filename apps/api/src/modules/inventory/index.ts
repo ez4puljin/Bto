@@ -49,4 +49,19 @@ export {
   StockPostingService,
   type Valuation,
 } from './services/stock-posting.service';
+export {
+  type BinContent,
+  type ProductStock,
+  type ProductStockDetail,
+  type StockQuery,
+  StockQueryService,
+  type WarehouseBalance,
+} from './services/stock-query.service';
+export {
+  type CountEntry,
+  type StocktakeDetail,
+  type StocktakeInput,
+  StocktakesService,
+  type StocktakeStatus,
+} from './services/stocktakes.service';
 export { SystemBinsService } from './services/system-bins.service';
