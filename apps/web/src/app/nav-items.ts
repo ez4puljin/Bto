@@ -17,7 +17,8 @@ export interface NavGroup {
 
 /**
  * Sidebar menu, one group per area. An entry with a permission is shown only to users who hold it
- * (ADR-0027); a group without visible entries is hidden. Catalog pages are readable by every user.
+ * (ADR-0027); a group without visible entries is hidden. Catalog pages and suppliers are readable by
+ * every user; customers only by the office, accountants and admins.
  * Branches and warehouses are readable by every user too (other pages list them), but only people
  * who manage them need the menu entry.
  */
@@ -31,6 +32,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/catalog/uoms', label: 'nav.uoms' },
       { to: '/catalog/scan', label: 'nav.scan' },
       { to: '/catalog/ebarimt', label: 'nav.ebarimt', permission: 'catalog.ebarimt.manage' },
+    ],
+  },
+  {
+    label: 'nav.groups.partners',
+    items: [
+      { to: '/partners/customers', label: 'nav.customers', permission: 'partners.customers.read' },
+      { to: '/partners/suppliers', label: 'nav.suppliers' },
     ],
   },
   {

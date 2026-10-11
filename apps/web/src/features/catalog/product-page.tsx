@@ -7,6 +7,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
 import { problemFromError } from '@/lib/problem';
 import { useBrands, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
 import { ImagesCard } from './images-card';
@@ -14,7 +15,10 @@ import { ProductForm } from './product-form';
 import { type ProductFormValues, productValues, updateBody } from './product-schema';
 import { UnitsCard } from './units-card';
 
-/** One product: its data and e-Barimt attributes, units with barcodes, photos (SPEC §5.2). */
+/**
+ * One product: its data and e-Barimt attributes, units with barcodes, photos (SPEC §5.2) and the
+ * suppliers it is ordered from (SPEC §5.3, ADR-0032).
+ */
 export function ProductPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
@@ -84,6 +88,7 @@ export function ProductPage() {
       </Card>
       <UnitsCard product={detail} canManage={canManage} />
       <ImagesCard product={detail} canManage={canManage} />
+      <ProductSuppliersCard productId={detail.id} />
     </div>
   );
 }

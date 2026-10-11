@@ -18,6 +18,14 @@ import { RolesPage } from '@/features/identity/roles-page';
 import { SettingsPage } from '@/features/identity/settings-page';
 import { UserDetailPage } from '@/features/identity/user-detail-page';
 import { UsersPage } from '@/features/identity/users-page';
+import { CustomerCreatePage } from '@/features/partners/customer-create-page';
+import { CustomerPage } from '@/features/partners/customer-page';
+import { CustomersPage } from '@/features/partners/customers-page';
+import {
+  SupplierCreatePage,
+  SupplierPage,
+  SuppliersPage,
+} from '@/features/partners/supplier-pages';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
@@ -58,6 +66,40 @@ export const routes: RouteObject[] = [
           </RequirePermission>
         ),
       },
+      {
+        path: 'partners/customers',
+        element: (
+          <RequirePermission permission="partners.customers.read">
+            <CustomersPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'partners/customers/new',
+        element: (
+          <RequirePermission permission="partners.customers.manage">
+            <CustomerCreatePage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'partners/customers/:id',
+        element: (
+          <RequirePermission permission="partners.customers.read">
+            <CustomerPage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'partners/suppliers', element: <SuppliersPage /> },
+      {
+        path: 'partners/suppliers/new',
+        element: (
+          <RequirePermission permission="partners.suppliers.manage">
+            <SupplierCreatePage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'partners/suppliers/:id', element: <SupplierPage /> },
       {
         path: 'users',
         element: (

@@ -298,6 +298,24 @@ describe('settings', () => {
     );
   });
 
+  it('names the allowed range of a whole-number setting', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/settings': () =>
+        list([{ key: 'credit.payment_term_days', current: null, entries: [] }]),
+    });
+    renderApp('/settings', fetchMock);
+    const user = userEvent.setup();
+    const card = cardOf(await screen.findByText(mn.settings.keys.credit.payment_term_days));
+    await user.type(card.getByLabelText(mn.settings.value), '400');
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    expect(
+      await card.findByText(
+        mn.validation.integerRange.replace('{{min}}', '0').replace('{{max}}', '365'),
+      ),
+    ).toBeInTheDocument();
+    expect(calledWith(fetchMock, 'POST', '/api/v1/settings')).toBe(false);
+  });
+
   it('deletes only a value that is not in force yet', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       'GET /api/v1/settings': () => list(views),
