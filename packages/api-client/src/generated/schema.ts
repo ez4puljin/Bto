@@ -1191,7 +1191,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** By product (every warehouse) or by warehouse (paged). */
+        /** By product (every warehouse), by several products, or by warehouse (paged). */
         get: operations["ProductLocations_list"];
         put: operations["ProductLocations_set"];
         post?: never;
@@ -2243,7 +2243,17 @@ export interface components {
             uomId: number;
             uomName: string;
         };
-        ProductSummary: {
+        ProductListUnit: {
+            id: number;
+            uomId: number;
+            uomName: string;
+            /** @example 24 */
+            factorToBase: string;
+            isBase: boolean;
+            /** @description The primary barcode first */
+            barcodes: string[];
+        };
+        ProductListItem: {
             id: number;
             sku: string;
             name: string;
@@ -2256,9 +2266,15 @@ export interface components {
             cityTax: boolean | null;
             baseUnit: components["schemas"]["ProductBaseUnit"];
             thumbUrl: string | null;
+            /** @description kg per base unit */
+            weightKg: string | null;
+            classificationCode: string | null;
+            taxProductCode: string | null;
+            /** @description Current units, base first, then by factor */
+            units: components["schemas"]["ProductListUnit"][];
         };
         ProductPage: {
-            data: components["schemas"]["ProductSummary"][];
+            data: components["schemas"]["ProductListItem"][];
             nextCursor: string | null;
         };
         NextSku: {
@@ -2390,6 +2406,20 @@ export interface components {
         };
         BarcodeRequest: {
             code: string;
+        };
+        ProductSummary: {
+            id: number;
+            sku: string;
+            name: string;
+            categoryId: number;
+            brandId: number | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** @enum {string} */
+            vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
+            cityTax: boolean | null;
+            baseUnit: components["schemas"]["ProductBaseUnit"];
+            thumbUrl: string | null;
         };
         ResolvedUnit: {
             id: number;
@@ -6347,8 +6377,10 @@ export interface operations {
     };
     ProductSuppliers_ofProduct: {
         parameters: {
-            query: {
-                productId: number;
+            query?: {
+                productId?: number;
+                /** @description Repeated: productIds=1&productIds=2 */
+                productIds?: number[];
             };
             header?: never;
             path?: never;
@@ -6759,6 +6791,8 @@ export interface operations {
                 limit?: number;
                 productId?: number;
                 warehouseId?: number;
+                /** @description Repeated: productIds=1&productIds=2; not with productId or warehouseId */
+                productIds?: number[];
             };
             header?: never;
             path?: never;

@@ -1,13 +1,19 @@
 import type {
   BarcodeDto,
   ProductDetailDto,
+  ProductListItemDto,
   ProductSummaryDto,
   ProductUnitDto,
 } from '../dto/products.dto';
 import type { CategoryDto, UomDto } from '../dto/masters.dto';
 import type { Barcode } from '../services/barcode.service';
 import type { CategoryView } from '../services/categories.service';
-import type { ProductDetail, ProductSummary, UnitView } from '../services/products.service';
+import type {
+  ProductDetail,
+  ProductListItem,
+  ProductSummary,
+  UnitView,
+} from '../services/products.service';
 import type { Uom } from '../services/uoms.service';
 
 export const toUomDto = (row: Uom): UomDto => ({
@@ -73,3 +79,11 @@ export const toProductDetailDto = (row: ProductDetail): ProductDetailDto => ({
 });
 
 export const toProductSummaryDto = (row: ProductSummary): ProductSummaryDto => ({ ...row });
+
+export const toProductListItemDto = (row: ProductListItem): ProductListItemDto => ({
+  ...toProductSummaryDto(row),
+  weightKg: row.weightKg?.toString() ?? null,
+  classificationCode: row.classificationCode,
+  taxProductCode: row.taxProductCode,
+  units: row.units.map((unit) => ({ ...unit, factorToBase: unit.factorToBase.toString() })),
+});

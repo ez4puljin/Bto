@@ -7,6 +7,9 @@ import {
 } from '@tugeel/shared/inventory';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -18,7 +21,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { PageQueryDto } from '../../../common/pagination/page';
+import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { BIN_STATUSES } from '../schema';
 
 export const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -183,9 +186,24 @@ export class ProductLocationListDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
+/** By product, by warehouse (paged) or by several products (the product list, ADR-0037). */
 export class ProductLocationsQueryDto extends PageQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) productId?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) warehouseId?: number;
+
+  @ApiPropertyOptional({
+    type: [Number],
+    maxItems: MAX_PAGE_LIMIT,
+    description: 'Repeated: productIds=1&productIds=2; not with productId or warehouseId',
+  })
+  @IsOptional()
+  @Transform(queryIds)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_PAGE_LIMIT)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  productIds?: number[];
 }
 
 @ApiSchema({ name: 'ProductLocationRequest' })

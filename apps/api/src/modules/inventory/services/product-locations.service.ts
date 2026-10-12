@@ -75,7 +75,18 @@ export class ProductLocationsService {
   ) {}
 
   async ofProduct(productId: number, executor: Db | Tx = this.db): Promise<ProductLocation[]> {
-    return this.select(executor, eq(productLocations.productId, productId), [
+    return this.ofProductIds([productId], executor);
+  }
+
+  /** The locations of several products with their shelf codes (the product list, ADR-0037). */
+  async ofProductIds(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<ProductLocation[]> {
+    const ids = [...new Set(productIds)];
+    if (ids.length === 0) return [];
+    return this.select(executor, inArray(productLocations.productId, ids), [
+      asc(productLocations.productId),
       asc(productLocations.warehouseId),
     ]);
   }

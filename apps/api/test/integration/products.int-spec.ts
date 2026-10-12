@@ -2,7 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
-import { catalogApi, type ProductJson, unitOf } from '../harness/catalog';
+import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 
 describe('products: create, update, list (SPEC §5.2)', () => {
@@ -239,5 +239,71 @@ describe('products: create, update, list (SPEC §5.2)', () => {
     expect(inCola.data.every((row) => row.categoryId === cola)).toBe(true);
     const inactive = await page('status=INACTIVE');
     expect(inactive.data.map((row) => row.name)).toEqual(['Фанта 1л']);
+  });
+
+  it('gives each list row its weight, e-Barimt codes and current units with their barcodes', async () => {
+    interface ListRow {
+      id: number;
+      weightKg: string | null;
+      classificationCode: string | null;
+      taxProductCode: string | null;
+      units: { uomId: number; isBase: boolean; factorToBase: string; barcodes: string[] }[];
+    }
+    const api = catalogApi(app, admin);
+    const block = await api.uomId('BLOCK');
+    const product = await api.product({
+      sku: '20077',
+      name: 'Жагсаалтын бараа',
+      categoryId: cola,
+      baseUomId: pcs,
+      vatType: 'VAT_FREE',
+      classificationCode: '2211100',
+      taxProductCode: '305',
+      weightKg: '1.25',
+      baseBarcodes: ['LIST-A', 'LIST-B'],
+      units: [{ uomId: box, factorToBase: '12', barcodes: ['LIST-BOX'] }],
+    });
+    // The second base barcode becomes primary; a block unit sits between the base and the box.
+    const second = unitOf(product, 'PCS').barcodes.find((code) => code.code === 'LIST-B');
+    await http()
+      .post(`/api/v1/product-barcodes/${second?.id ?? 0}/primary`)
+      .set(bearer(admin))
+      .expect(200);
+    await http()
+      .post(`/api/v1/products/${product.id}/units`)
+      .set(bearer(admin))
+      .send({ uomId: block, factorToBase: '6' })
+      .expect(201);
+    // The superseded box leaves the list; its successor carries the barcode.
+    await http()
+      .post(`/api/v1/product-units/${unitOf(product, 'BOX').id}/supersede`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({ factorToBase: '10' })
+      .expect(201);
+    const plain = await api.product({
+      sku: '20078',
+      name: 'Жагсаалтын энгийн бараа',
+      categoryId: cola,
+      baseUomId: pcs,
+    });
+
+    const rows = (await http().get('/api/v1/products?limit=200').set(bearer(worker)).expect(200))
+      .body.data as ListRow[];
+    expect(rows.find((row) => row.id === product.id)).toMatchObject({
+      weightKg: '1.25',
+      classificationCode: '2211100',
+      taxProductCode: '305',
+      units: [
+        { uomId: pcs, isBase: true, factorToBase: '1', barcodes: ['LIST-B', 'LIST-A'] },
+        { uomId: block, isBase: false, factorToBase: '6', barcodes: [] },
+        { uomId: box, isBase: false, factorToBase: '10', barcodes: ['LIST-BOX'] },
+      ],
+    });
+    expect(rows.find((row) => row.id === plain.id)).toMatchObject({
+      weightKg: null,
+      classificationCode: null,
+      units: [{ uomId: pcs, isBase: true, factorToBase: '1', barcodes: [] }],
+    });
   });
 });

@@ -308,9 +308,33 @@ export class ProductSummaryDto {
   @ApiProperty({ type: String, nullable: true }) thumbUrl: string | null;
 }
 
+@ApiSchema({ name: 'ProductListUnit' })
+export class ProductListUnitDto {
+  @ApiProperty() id: number;
+  @ApiProperty() uomId: number;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ example: '24' }) factorToBase: string;
+  @ApiProperty() isBase: boolean;
+  @ApiProperty({ type: [String], description: 'The primary barcode first' }) barcodes: string[];
+}
+
+/** A row of the product list screen: the summary plus what the list columns show (ADR-0037). */
+@ApiSchema({ name: 'ProductListItem' })
+export class ProductListItemDto extends ProductSummaryDto {
+  @ApiProperty({ type: String, nullable: true, description: 'kg per base unit' })
+  weightKg: string | null;
+  @ApiProperty({ type: String, nullable: true }) classificationCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) taxProductCode: string | null;
+  @ApiProperty({
+    type: [ProductListUnitDto],
+    description: 'Current units, base first, then by factor',
+  })
+  units: ProductListUnitDto[];
+}
+
 @ApiSchema({ name: 'ProductPage' })
 export class ProductPageDto {
-  @ApiProperty({ type: [ProductSummaryDto] }) data: ProductSummaryDto[];
+  @ApiProperty({ type: [ProductListItemDto] }) data: ProductListItemDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 

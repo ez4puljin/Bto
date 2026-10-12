@@ -45,7 +45,20 @@ export class ProductSuppliersService {
 
   /** Links of a product, the main supplier first. */
   async ofProduct(productId: number, executor: Db | Tx = this.db): Promise<ProductSupplierLink[]> {
-    const rows = await executor
+    return this.ofProductIds([productId], executor);
+  }
+
+  /**
+   * The links of several products (the product list screen, ADR-0037), each product's main
+   * supplier first; unknown ids simply have no links.
+   */
+  async ofProductIds(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<ProductSupplierLink[]> {
+    const ids = [...new Set(productIds)];
+    if (ids.length === 0) return [];
+    return executor
       .select({
         id: productSuppliers.id,
         productId: productSuppliers.productId,
@@ -59,9 +72,12 @@ export class ProductSuppliersService {
       })
       .from(productSuppliers)
       .innerJoin(suppliers, eq(suppliers.id, productSuppliers.supplierId))
-      .where(eq(productSuppliers.productId, productId))
-      .orderBy(desc(productSuppliers.isMain), asc(productSuppliers.id));
-    return rows;
+      .where(inArray(productSuppliers.productId, ids))
+      .orderBy(
+        asc(productSuppliers.productId),
+        desc(productSuppliers.isMain),
+        asc(productSuppliers.id),
+      );
   }
 
   /**

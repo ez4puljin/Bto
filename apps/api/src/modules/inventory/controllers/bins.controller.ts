@@ -146,11 +146,18 @@ export class BinsController {
 export class ProductLocationsController {
   constructor(private readonly locations: ProductLocationsService) {}
 
-  /** By product (every warehouse) or by warehouse (paged). */
+  /** By product (every warehouse), by several products, or by warehouse (paged). */
   @Get()
   @Authenticated()
   @ApiOkResponse({ type: ProductLocationListDto })
   async list(@Query() query: ProductLocationsQueryDto): Promise<ProductLocationListDto> {
+    if (query.productIds !== undefined) {
+      if (query.productId !== undefined || query.warehouseId !== undefined) {
+        throw invalid('productIds', 'alone', 'productIds without productId or warehouseId');
+      }
+      const rows = await this.locations.ofProductIds(query.productIds);
+      return { data: rows.map(toLocationDto), nextCursor: null };
+    }
     if (query.productId !== undefined) {
       const rows = await this.locations.ofProduct(query.productId);
       return { data: rows.map(toLocationDto), nextCursor: null };

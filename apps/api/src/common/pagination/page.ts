@@ -23,6 +23,18 @@ export class PageQueryDto {
   limit?: number;
 }
 
+/**
+ * A repeated id query parameter (`productIds=1&productIds=2`, as openapi-fetch and supertest send
+ * arrays) as numbers: a single value arrives as a plain string. Anything that is not a positive
+ * integer is kept as it came, so `@IsInt({ each: true })` refuses it (ADR-0037).
+ */
+export const queryIds = ({ value }: { value: unknown }): unknown => {
+  if (value === undefined) return undefined;
+  return (Array.isArray(value) ? value : [value]).map((item: unknown) =>
+    typeof item === 'string' && /^[1-9]\d{0,14}$/.test(item) ? Number.parseInt(item, 10) : item,
+  );
+};
+
 /** Encodes the sort key of the last row of a page. */
 export function encodeCursor(key: Record<string, string | number>): string {
   return Buffer.from(JSON.stringify(key), 'utf8').toString('base64url');

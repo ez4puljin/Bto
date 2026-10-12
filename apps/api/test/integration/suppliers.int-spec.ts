@@ -173,6 +173,44 @@ describe('suppliers and product links', () => {
     ]);
   });
 
+  it('reads the links of several products at once for the product list', async () => {
+    const product = (sku: string) =>
+      catalog.product({ sku, name: `Жагсаалт ${sku}`, categoryId: category, baseUomId: pcs });
+    const tea = await product('7101');
+    const salt = await product('7102');
+    const lonely = await product('7103');
+    const one = await api.supplier({ name: 'Цайны нийлүүлэгч' });
+    const two = await api.supplier({ name: 'Давсны нийлүүлэгч' });
+    const link = (productId: number, supplierId: number) =>
+      http()
+        .post('/api/v1/product-suppliers')
+        .set(bearer(admin))
+        .send({ productId, supplierId })
+        .expect(201);
+    await link(tea.id, one.id);
+    await link(tea.id, two.id);
+    await link(salt.id, two.id);
+    const read = (query: Record<string, unknown>, status = 200) =>
+      http().get('/api/v1/product-suppliers').query(query).set(bearer(worker)).expect(status);
+
+    const many = (await read({ productIds: [salt.id, tea.id, lonely.id, tea.id] })).body
+      .data as LinkJson[];
+    expect(many.map((row) => [row.productId, row.supplier.name, row.isMain])).toEqual([
+      [tea.id, 'Цайны нийлүүлэгч', true],
+      [tea.id, 'Давсны нийлүүлэгч', false],
+      [salt.id, 'Давсны нийлүүлэгч', true],
+    ]);
+    const single = (await read({ productIds: salt.id })).body.data as LinkJson[];
+    expect(single.map((row) => row.productId)).toEqual([salt.id]);
+    expect((await read({ productIds: 999999 })).body.data).toEqual([]);
+
+    await read({}, 422);
+    await read({ productId: tea.id, productIds: [salt.id] }, 422);
+    await read({ productIds: 0 }, 422);
+    await read({ productIds: 'abc' }, 422);
+    await read({ productIds: Array.from({ length: 201 }, (_, index) => index + 1) }, 422);
+  });
+
   it('refuses goods from a deactivated supplier', async () => {
     const old = await api.supplier({ name: 'Хуучин нийлүүлэгч' });
     await http()

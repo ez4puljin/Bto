@@ -4328,11 +4328,26 @@
         "parameters": [
           {
             "name": "productId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "minimum": 1,
               "type": "number"
+            }
+          },
+          {
+            "name": "productIds",
+            "required": false,
+            "in": "query",
+            "description": "Repeated: productIds=1&productIds=2",
+            "schema": {
+              "minItems": 1,
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
             }
           }
         ],
@@ -5014,6 +5029,21 @@
               "minimum": 1,
               "type": "number"
             }
+          },
+          {
+            "name": "productIds",
+            "required": false,
+            "in": "query",
+            "description": "Repeated: productIds=1&productIds=2; not with productId or warehouseId",
+            "schema": {
+              "minItems": 1,
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
           }
         ],
         "responses": {
@@ -5043,7 +5073,7 @@
             "bearer": []
           }
         ],
-        "summary": "By product (every warehouse) or by warehouse (paged).",
+        "summary": "By product (every warehouse), by several products, or by warehouse (paged).",
         "tags": [
           "inventory"
         ]
@@ -9403,7 +9433,43 @@
           "uomName"
         ]
       },
-      "ProductSummary": {
+      "ProductListUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "uomId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24"
+          },
+          "isBase": {
+            "type": "boolean"
+          },
+          "barcodes": {
+            "description": "The primary barcode first",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "uomId",
+          "uomName",
+          "factorToBase",
+          "isBase",
+          "barcodes"
+        ]
+      },
+      "ProductListItem": {
         "type": "object",
         "properties": {
           "id": {
@@ -9448,6 +9514,26 @@
           "thumbUrl": {
             "type": "string",
             "nullable": true
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg per base unit"
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "units": {
+            "description": "Current units, base first, then by factor",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductListUnit"
+            }
           }
         },
         "required": [
@@ -9460,7 +9546,11 @@
           "vatType",
           "cityTax",
           "baseUnit",
-          "thumbUrl"
+          "thumbUrl",
+          "weightKg",
+          "classificationCode",
+          "taxProductCode",
+          "units"
         ]
       },
       "ProductPage": {
@@ -9469,7 +9559,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ProductSummary"
+              "$ref": "#/components/schemas/ProductListItem"
             }
           },
           "nextCursor": {
@@ -9952,6 +10042,66 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "ProductSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "brandId": {
+            "type": "number",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "baseUnit": {
+            "$ref": "#/components/schemas/ProductBaseUnit"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "brandId",
+          "status",
+          "vatType",
+          "cityTax",
+          "baseUnit",
+          "thumbUrl"
         ]
       },
       "ResolvedUnit": {

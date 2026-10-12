@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -11,7 +14,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { PageQueryDto } from '../../../common/pagination/page';
+import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { PARTNER_STATUSES } from '../schema';
 import { CODE, ContactDto, trimmed } from './common.dto';
 
@@ -190,8 +193,23 @@ export class LinkRequestDto {
   @ApiProperty() @IsInt() @Min(1) supplierId: number;
 }
 
+/** One product, or several (the product list, ADR-0037): exactly one of the two. */
 export class ProductSuppliersQueryDto {
-  @ApiProperty() @Type(() => Number) @IsInt() @Min(1) productId: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) productId?: number;
+
+  @ApiPropertyOptional({
+    type: [Number],
+    maxItems: MAX_PAGE_LIMIT,
+    description: 'Repeated: productIds=1&productIds=2',
+  })
+  @IsOptional()
+  @Transform(queryIds)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_PAGE_LIMIT)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  productIds?: number[];
 }
 
 @ApiSchema({ name: 'SupplierProductItem' })

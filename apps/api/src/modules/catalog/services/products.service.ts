@@ -3,7 +3,7 @@ import { classifyBarcode, lookupCandidates } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import { normalizeName, queryTerms, searchKeys, termPattern } from '@tugeel/shared/text';
 import { isExactFactor } from '@tugeel/shared/units';
-import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -61,6 +61,25 @@ export interface ProductSummary {
   cityTax: boolean | null;
   baseUnit: { id: number; uomId: number; uomName: string };
   thumbUrl: string | null;
+}
+
+/** A current unit on the product list: base first, then by factor. */
+export interface ProductListUnit {
+  id: number;
+  uomId: number;
+  uomName: string;
+  factorToBase: Decimal;
+  isBase: boolean;
+  /** The primary barcode first. */
+  barcodes: string[];
+}
+
+/** A row of the product list screen (ADR-0037). */
+export interface ProductListItem extends ProductSummary {
+  weightKg: Decimal | null;
+  classificationCode: string | null;
+  taxProductCode: string | null;
+  units: ProductListUnit[];
 }
 
 export interface BarcodeResolution {
@@ -306,6 +325,90 @@ export class ProductsService {
    * (ADR-0028); exact SKU or barcode hits rank first, then strict matches, then phonetic ones.
    */
   async list(query: ProductQuery): Promise<{ data: ProductSummary[]; nextCursor: string | null }> {
+    const page = await this.pageRows(query);
+    return { data: await this.summaries(page.data), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The product list screen's rows (ADR-0037): the summary plus weight, e-Barimt codes and the
+   * current units with their barcodes, read with one statement each for the whole page.
+   */
+  async listItems(
+    query: ProductQuery,
+  ): Promise<{ data: ProductListItem[]; nextCursor: string | null }> {
+    const page = await this.pageRows(query);
+    const summaries = await this.summaries(page.data);
+    const ids = page.data.map((row) => row.id);
+    const units =
+      ids.length === 0
+        ? []
+        : await this.db
+            .select({
+              id: productUnits.id,
+              productId: productUnits.productId,
+              uomId: uoms.id,
+              uomName: uoms.name,
+              factorToBase: productUnits.factorToBase,
+              isBase: productUnits.isBase,
+            })
+            .from(productUnits)
+            .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
+            .where(and(inArray(productUnits.productId, ids), isNull(productUnits.supersededAt)))
+            .orderBy(
+              asc(productUnits.productId),
+              desc(productUnits.isBase),
+              asc(productUnits.factorToBase),
+              asc(productUnits.id),
+            );
+    const codes =
+      units.length === 0
+        ? []
+        : await this.db
+            .select({ unitId: productBarcodes.productUnitId, code: productBarcodes.code })
+            .from(productBarcodes)
+            .where(
+              inArray(
+                productBarcodes.productUnitId,
+                units.map((unit) => unit.id),
+              ),
+            )
+            .orderBy(desc(productBarcodes.isPrimary), asc(productBarcodes.id));
+    const codesOf = new Map<number, string[]>();
+    for (const row of codes) {
+      const list = codesOf.get(row.unitId) ?? [];
+      list.push(row.code);
+      codesOf.set(row.unitId, list);
+    }
+    const unitsOf = new Map<number, ProductListUnit[]>();
+    for (const { productId, ...unit } of units) {
+      const list = unitsOf.get(productId) ?? [];
+      list.push({ ...unit, barcodes: codesOf.get(unit.id) ?? [] });
+      unitsOf.set(productId, list);
+    }
+    const summaryOf = new Map(summaries.map((summary) => [summary.id, summary]));
+    return {
+      data: page.data.flatMap((row) => {
+        const summary = summaryOf.get(row.id);
+        return summary
+          ? [
+              {
+                ...summary,
+                weightKg: row.weightKg,
+                classificationCode: row.classificationCode,
+                taxProductCode: row.taxProductCode,
+                units: unitsOf.get(row.id) ?? [],
+              },
+            ]
+          : [];
+      }),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /** One keyset page of product rows: search rank, then name, then id. */
+  private async pageRows(
+    query: ProductQuery,
+  ): Promise<{ data: Product[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     if (query.status) filters.push(eq(products.status, query.status));
@@ -335,10 +438,7 @@ export class ProductsService {
       .orderBy(...(searched ? [searched] : []), asc(products.name), asc(products.id))
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ id: row.product.id, rank: row.rank }));
-    return {
-      data: await this.summaries(page.data.map((row) => row.product)),
-      nextCursor: page.nextCursor,
-    };
+    return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
   }
 
   /**

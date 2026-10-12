@@ -40,7 +40,7 @@ import {
 } from '../services/products.service';
 import { toDecimal } from '../services/support';
 import { UnitsService } from '../services/units.service';
-import { toBarcodeDto, toProductDetailDto, toProductSummaryDto, toUnitDto } from './mappers';
+import { toBarcodeDto, toProductDetailDto, toProductListItemDto, toUnitDto } from './mappers';
 
 const MANAGE = 'catalog.products.manage';
 
@@ -58,8 +58,8 @@ export class ProductsController {
   @Authenticated()
   @ApiOkResponse({ type: ProductPageDto })
   async list(@Query() query: ProductListQueryDto): Promise<ProductPageDto> {
-    const page = await this.products.list(query);
-    return { data: page.data.map(toProductSummaryDto), nextCursor: page.nextCursor };
+    const page = await this.products.listItems(query);
+    return { data: page.data.map(toProductListItemDto), nextCursor: page.nextCursor };
   }
 
   /** Declared before `:id`, so "next-sku" never reaches ParseIntPipe. */

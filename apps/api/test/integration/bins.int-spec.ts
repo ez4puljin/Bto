@@ -293,4 +293,43 @@ describe('bins and product locations', () => {
     ).accessToken;
     await set(scoped, { warehouseId: wh1.id, productId: product.id, minQty: '1' }).expect(403);
   });
+
+  it('reads the locations of several products at once for the product list', async () => {
+    const catalog = catalogApi(app, admin);
+    const categoryId = await catalog.category('Жагсаалтын ангилал');
+    const baseUomId = await catalog.uomId('PCS');
+    const tea = await catalog.product({ sku: '210', name: 'Цай', categoryId, baseUomId });
+    const salt = await catalog.product({ sku: '211', name: 'Давс', categoryId, baseUomId });
+    await api.setHome(tea.id, wh1.id);
+    const shelf = await api.bin(wh1.id, 'Z-09-09');
+    await http()
+      .put('/api/v1/product-locations')
+      .set(bearer(admin))
+      .send({ warehouseId: wh1.id, productId: tea.id, defaultBinId: shelf.id })
+      .expect(200);
+    await api.setHome(salt.id, wh2.id);
+    const read = (query: Record<string, unknown>, status = 200) =>
+      http().get('/api/v1/product-locations').query(query).set(bearer(worker)).expect(status);
+
+    const page = (await read({ productIds: [salt.id, tea.id] })).body as {
+      data: {
+        productId: number;
+        warehouseId: number;
+        isHome: boolean;
+        defaultBinCode: string | null;
+      }[];
+      nextCursor: string | null;
+    };
+    expect(page.nextCursor).toBeNull();
+    expect(
+      page.data.map((row) => [row.productId, row.warehouseId, row.isHome, row.defaultBinCode]),
+    ).toEqual([
+      [tea.id, wh1.id, true, 'Z-09-09'],
+      [salt.id, wh2.id, true, null],
+    ]);
+    expect((await read({ productIds: 999999 })).body.data).toEqual([]);
+    await read({ productIds: [tea.id], warehouseId: wh1.id }, 422);
+    await read({ productIds: [tea.id], productId: tea.id }, 422);
+    await read({ productIds: 'abc' }, 422);
+  });
 });

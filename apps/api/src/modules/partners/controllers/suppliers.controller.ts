@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { invalid } from '../../../common/errors/app-error';
 import { PageQueryDto } from '../../../common/pagination/page';
 import {
   type AuthContext,
@@ -179,7 +180,11 @@ export class ProductSuppliersController {
   @Authenticated()
   @ApiOkResponse({ type: ProductSupplierListDto })
   async ofProduct(@Query() query: ProductSuppliersQueryDto): Promise<ProductSupplierListDto> {
-    return { data: await this.links.ofProduct(query.productId), nextCursor: null };
+    if ((query.productId === undefined) === (query.productIds === undefined)) {
+      throw invalid('productId', 'exactlyOne', 'productId or productIds, not both');
+    }
+    const ids = query.productIds ?? (query.productId === undefined ? [] : [query.productId]);
+    return { data: await this.links.ofProductIds(ids), nextCursor: null };
   }
 
   @Post()
