@@ -8,6 +8,8 @@ catalog depends only on `identity` (audit, settings, storage, access decorators)
 
 Names mix Cyrillic and Latin; weighed goods are sold in bulk by the kilogram; pre-packed bundles are ordinary products and promotional bundles belong to pricing (delivery 2); pieces, blocks and boxes carry their own barcodes and some products have none; the product code (SKU) is numeric and comes from the owner's Excel sheet, the system suggests the next one; categories form a tree; only the admin edits the catalog; VAT-exempt goods exist and city tax is undecided until the accountant answers (SPEC §11 #3a); the admin uploads photos by hand. The Excel columns map as follows: code, name, category, barcode, box quantity and unit weight → catalog; home warehouse → inventory (week 3, `product_locations`); price → the delivery-2 price import; supplier → partners `product_suppliers` (ADR-0032); image → uploaded by hand.
 
+On 2026-10-12, checking the screens, the owner asked for every piece of product information as a column of the product list, chosen with a «Баганууд» button and remembered on the computer, without stock columns; and could not find how to edit a product from the list (ADR-0037).
+
 ## 2. Owned tables (migration `0003_catalog`)
 
 | Table | Purpose | Key rules (DB-enforced unless noted) |
@@ -26,7 +28,7 @@ Names mix Cyrillic and Latin; weighed goods are sold in bulk by the kilogram; pr
 | Export | Use |
 |---|---|
 | `CatalogModule` | import into a feature module to get the services below |
-| `CatalogService.get(id, executor?)`, `getMany(ids, executor?)`, `search(query)` | product detail with units, barcodes and images; summaries for lists; the same search as `GET /products` |
+| `CatalogService.get(id, executor?)`, `getMany(ids, executor?)`, `search(query)` | product detail with units, barcodes and images; summaries for lists; the same search and order as `GET /products` (plain summaries; the list screen's extra fields come from `ProductsService.listItems`) |
 | `UnitConversionService.toBase(unitId, enteredQty, executor?)` → `{ productId, unitId, factorSnapshot, qtyBase }` | what a document line stores (ADR-0008 #2); `UNIT_SUPERSEDED` for superseded or retired units, `UNIT_FACTOR_INEXACT` when the base quantity needs more than 3 decimals or is not whole pieces |
 | `UnitConversionService.describe(unitIds, executor?)`, `baseUnits(productIds, executor?)` → `Map<…, UnitInfo>` | names and factors of the units on document lines (current or superseded); the base unit of each product (stocktake corrections post in base units). Added with inventory, 2026-10-11 |
 | `UnitsService.supersedeInTx(tx, actor, unitId, factorToBase)` | the single supersede path: old row closed, new row inserted with the flags, barcodes re-pointed, `UNIT_SUPERSEDED_HOOK` called, audit — one transaction |
@@ -47,7 +49,7 @@ Two permissions, both ADMIN-only system mappings and assignable to custom roles:
 |---|---|---|
 | `GET /uoms`, `GET /categories`, `GET /brands` | authenticated | short lists; categories carry `productCount` (direct) and `childCount`, brands `productCount` |
 | `POST/PATCH/DELETE /uoms[/:id]`, `/categories[/:id]`, `/brands[/:id]` | `catalog.products.manage` | delete only when unused (`IN_USE`, `CATEGORY_NOT_EMPTY`); system units cannot be deleted (`IN_USE`); moving a category under itself → `CATEGORY_CYCLE` |
-| `GET /products` | authenticated | `q` (any script, SKU or barcode; ADR-0028), `categoryId` (with subcategories), `brandId`, `status`, keyset `cursor`/`limit`; strict matches first |
+| `GET /products` | authenticated | `q` (any script, SKU or barcode; ADR-0028), `categoryId` (with subcategories), `brandId`, `status`, keyset `cursor`/`limit`; strict matches first. Rows are `ProductListItem`: the summary plus `weightKg`, `classificationCode`, `taxProductCode` and `units` (current units, base first then by factor, each with its barcodes, primary first), read with one statement each per page (ADR-0037) |
 | `GET /products/next-sku` | `catalog.products.manage` | the largest SKU + 1, same width |
 | `GET /products/:id` | authenticated | units (current first), barcodes, images with public URLs |
 | `POST /products`, `PATCH /products/:id` | `catalog.products.manage` | create takes the base unit, other units and barcodes in one transaction; a taken SKU is `DUPLICATE_VALUE` with `params.constraint = 'products_sku_key'` |
@@ -77,7 +79,7 @@ Actions `CREATE`, `UPDATE`, `DELETE`, `SUPERSEDE`, `RETIRE`, `ASSIGN` on the ent
 
 ## 8. Screens (`apps/web`)
 
-Menu group «Бараа»: `/catalog/products` (list with search, filters in the URL, thumbnails), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8, and the «Байршил ба үлдэгдэл» card from `features/inventory`, `docs/modules/inventory.md` §9), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
+Menu group «Бараа»: `/catalog/products` (search, filters in the URL; every piece of product information as a column — image, SKU, name, category, brand, base unit, other units «1 хайрцаг = 24 ш», base and other-unit barcodes, VAT, city tax, weight, home warehouse and fixed shelves from inventory, main supplier «+N» from partners, e-Barimt codes, status — read per page with `productIds` only for visible columns; «Баганууд» hides and shows columns (SKU and name stay), remembered per browser in `localStorage` `tugeel.catalog.products.hiddenColumns.v1`; a sticky «Засах» / «Харах» button and a click anywhere on the row open the product; the page uses the full width (route `handle: { wide: true }`); ADR-0037), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8, and the «Байршил ба үлдэгдэл» card from `features/inventory`, `docs/modules/inventory.md` §9), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
 
 ## 9. Tests
 

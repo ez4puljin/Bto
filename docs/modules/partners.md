@@ -42,7 +42,7 @@ partners depends on `identity` (audit, settings, access decorators) and, for `pr
 | `SuppliersService.get / getMany / list / nextCode`, `assertActive(tx, id)` | `SUPPLIER_INACTIVE` (409) for goods receipts (week 3) |
 | `SuppliersService.createInTx / updateInTx`, `findByCodes(codes)`, `findByNames(names)`, `findByIds(ids)` | the supplier and product imports (week 4): a product sheet's supplier column is matched by code, then by name (`name_key`) |
 | `SupplierContactsService.addInTx(tx, actor, supplierId, input)` | the supplier import adds a contact person the supplier does not have yet |
-| `ProductSuppliersService.ofProduct(productId)`, `productsOf(supplierId, query)`, `mainSupplierOf(productIds)` → `Map<productId, supplierId>`, `linkInTx(tx, actor, productId, supplierId)`, `linksOfProducts(productIds)`, `linkManyInTx(tx, actor, pairs)`, `unlinkManyInTx(tx, actor, linkIds)` | the receiving screen suggests the main supplier; the import links many products at once under `LOCK TABLE product_suppliers` (existing pairs skipped, the first link of a product becomes the main one) and a revert removes exactly the links it added |
+| `ProductSuppliersService.ofProduct(productId)`, `ofProductIds(productIds)`, `productsOf(supplierId, query)`, `mainSupplierOf(productIds)` → `Map<productId, supplierId>`, `linkInTx(tx, actor, productId, supplierId)`, `linksOfProducts(productIds)`, `linkManyInTx(tx, actor, pairs)`, `unlinkManyInTx(tx, actor, linkIds)` | the receiving screen suggests the main supplier; the import links many products at once under `LOCK TABLE product_suppliers` (existing pairs skipped, the first link of a product becomes the main one) and a revert removes exactly the links it added |
 | types `CustomerInput`, `CustomerPatch`, `CreditInput`, `SupplierInput`, `SupplierPatch`, `ContactInput`, `SupplierContact`, `PartnerStatus`, … | the importers build these inputs |
 | types `CustomerDetail`, `CustomerSummary`, `CreditTerms`, `LockedCustomer`, `PaymentTerm`, `AddressInput`, `AddressSnapshot`, `GpsSource`, `Supplier`, `SupplierDetail`, `SupplierSummary`, `ProductSupplierLink`, `SupplierProduct` | |
 
@@ -65,7 +65,7 @@ Permissions (ADR-0027 system mappings, assignable to custom roles): `partners.cu
 | `GET /suppliers`, `GET /suppliers/:id`, `GET /suppliers/:id/products` | authenticated | search like customers; products paged by link id |
 | `GET /suppliers/next-code`, `POST /suppliers` (`Idempotency-Key`), `PATCH /suppliers/:id` | `partners.suppliers.manage` | a taken name → `DUPLICATE_VALUE` `suppliers_name_key_key`; bank account spaces and dashes removed, upper case |
 | `POST /suppliers/:id/contacts`, `PATCH/DELETE /supplier-contacts/:id` | `partners.suppliers.manage` | |
-| `GET /product-suppliers?productId=` | authenticated | the product's suppliers, the main one first |
+| `GET /product-suppliers?productId=` or `?productIds=1&productIds=2` | authenticated | the product's suppliers, the main one first; with `productIds` (repeated, ≤ 200, exactly one of the two) the links of several products, by product then main first (the product list, ADR-0037) |
 | `POST /product-suppliers`, `POST /product-suppliers/:id/main` (200), `DELETE /product-suppliers/:id` (204) | `partners.suppliers.manage` | an unknown product → 404 through `CatalogService.getMany`; a repeated pair → `DUPLICATE_VALUE` `product_suppliers_pair_key` |
 
 ## 5. Rules worth knowing
