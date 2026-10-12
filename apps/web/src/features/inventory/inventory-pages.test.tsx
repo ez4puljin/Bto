@@ -195,6 +195,180 @@ describe('stock page', () => {
   });
 });
 
+describe('movement history', () => {
+  const PRODUCT = {
+    id: COLA.id,
+    sku: COLA.sku,
+    name: COLA.name,
+    baseUnitName: 'ш',
+    thumbUrl: null,
+  };
+  const movement = (
+    overrides: Partial<Schemas['StockMovement']> &
+      Pick<Schemas['StockMovement'], 'id' | 'movementType' | 'docType' | 'docId' | 'qtyBase'>,
+  ): Schemas['StockMovement'] => ({
+    postedAt: STAMP,
+    effectiveDate: '2026-10-11',
+    warehouseId: 1,
+    binId: SHELF.id,
+    binCode: SHELF.code,
+    product: PRODUCT,
+    lotId: null,
+    docNumber: null,
+    enteredQty: overrides.qtyBase.replace('-', ''),
+    unitName: 'ш',
+    warehouseBalance: null,
+    binBalance: null,
+    ...overrides,
+  });
+  const HISTORY = [
+    movement({
+      id: 4,
+      movementType: 'ADJUSTMENT',
+      docType: 'ADJ',
+      docId: 9,
+      docNumber: 'ADJ-2026-000001',
+      qtyBase: '-4',
+      warehouseBalance: '44',
+      binBalance: '44',
+    }),
+    movement({
+      id: 2,
+      movementType: 'BIN_MOVE_IN',
+      docType: 'BM',
+      docId: 3,
+      docNumber: 'BM-2026-000001',
+      qtyBase: '10',
+      warehouseBalance: '48',
+      binBalance: '10',
+    }),
+    movement({
+      id: 1,
+      movementType: 'RECEIPT',
+      docType: 'GR',
+      docId: 5,
+      docNumber: 'GR-2026-000001',
+      qtyBase: '48',
+      enteredQty: '2',
+      unitName: 'хайрцаг',
+      warehouseBalance: '48',
+      binBalance: '48',
+    }),
+  ];
+  const DETAIL: Schemas['ProductStockDetail'] = {
+    product: PRODUCT,
+    onHand: '44',
+    available: '44',
+    warehouses: [
+      { warehouseId: 1, onHand: '44', sellableOnHand: '44', reserved: '0', available: '44' },
+    ],
+    bins: [
+      {
+        warehouseId: 1,
+        binId: SHELF.id,
+        binCode: SHELF.code,
+        binType: 'STORAGE',
+        sellable: true,
+        lotId: null,
+        onHand: '44',
+      },
+    ],
+  };
+
+  it('shows a product’s movements with their documents and the stock left after each', async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/stock/movements': () => list(HISTORY),
+      'GET /api/v1/stock/products/10': () => json(DETAIL),
+    });
+    renderApp('/inventory/movements?product=10', fetchMock);
+    expect(await screen.findByRole('link', { name: 'GR-2026-000001' })).toHaveAttribute(
+      'href',
+      '/inventory/receipts/5',
+    );
+    expect(screen.getByRole('link', { name: 'ADJ-2026-000001' })).toHaveAttribute(
+      'href',
+      '/inventory/adjustments/9',
+    );
+    expect(screen.getByText('BM-2026-000001').closest('a')).toBeNull();
+    const table = within(screen.getByRole('table'));
+    for (const text of [
+      mn.inventory.movements.types.RECEIPT,
+      mn.inventory.movements.types.BIN_MOVE_IN,
+      mn.inventory.movements.types.ADJUSTMENT,
+      '+48 ш',
+      '2 хайрцаг',
+      '-4 ш',
+      '44',
+    ]) {
+      expect(table.getAllByText(text).length).toBeGreaterThan(0);
+    }
+    expect(
+      screen.getByRole('columnheader', { name: mn.inventory.movements.columns.warehouseBalance }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: mn.inventory.movements.columns.unitCost }),
+    ).toBeNull();
+    expect(await screen.findByText(COLA.name, { selector: 'span' })).toBeInTheDocument();
+    expect(
+      calls(fetchMock, 'GET', '/api/v1/stock/movements').every(
+        (request) => new URL(request.url).searchParams.get('productId') === '10',
+      ),
+    ).toBe(true);
+  });
+
+  it('filters by document type through the URL and shows costs to cost holders', async () => {
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/stock/movements': () =>
+        list([
+          {
+            ...HISTORY[1]!,
+            warehouseBalance: null,
+            binBalance: null,
+            unitCost: '1000',
+            value: '10000.00',
+          },
+        ]),
+    });
+    const { router } = renderApp('/inventory/movements', fetchMock);
+    const user = userEvent.setup();
+    expect(await screen.findByText('BM-2026-000001')).toBeInTheDocument();
+    expect(screen.getByText('10,000')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: mn.inventory.movements.columns.binBalance }),
+    ).toBeNull();
+    await user.selectOptions(screen.getByLabelText(mn.inventory.movements.docType), 'BM');
+    await waitFor(() => expect(router.state.location.search).toBe('?doc=BM'));
+    await waitFor(() =>
+      expect(
+        calls(fetchMock, 'GET', '/api/v1/stock/movements').some(
+          (request) => new URL(request.url).searchParams.get('docType') === 'BM',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('opens the history from a product’s stock page and from each of its shelves', async () => {
+    renderApp(
+      '/inventory/stock/10',
+      signedIn(WAREHOUSE_ME, {
+        'GET /api/v1/warehouses': warehouses,
+        'GET /api/v1/stock/products/10': () => json(DETAIL),
+      }),
+    );
+    // The menu has an entry with the same name: look in the page.
+    const page = within(await screen.findByRole('main'));
+    expect(await page.findByRole('link', { name: mn.inventory.movements.history })).toHaveAttribute(
+      'href',
+      '/inventory/movements?product=10',
+    );
+    expect(
+      screen.getByRole('link', { name: `${mn.inventory.movements.history}: A-01-03` }),
+    ).toHaveAttribute('href', '/inventory/movements?product=10&warehouse=1&bin=31');
+  });
+});
+
 describe('receipt editor', () => {
   it('puts a scanned product on the scanned shelf, counts repeats and posts once', async () => {
     let receipt = DRAFT;

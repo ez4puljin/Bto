@@ -1,3 +1,4 @@
+import { History } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -181,6 +182,12 @@ export function StockProductPage() {
         actions={
           <>
             <Button variant="outline" asChild>
+              <Link to={`/inventory/movements?product=${detail.product.id}`}>
+                <History />
+                {t('inventory.movements.history')}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
               <Link to={`/catalog/products/${detail.product.id}`}>
                 {t('inventory.stock.productCard')}
               </Link>
@@ -258,6 +265,9 @@ export function StockProductPage() {
                   <TableHead>{t('inventory.bin')}</TableHead>
                   <TableHead>{t('inventory.bins.type')}</TableHead>
                   <TableHead className="text-right">{t('inventory.stock.onHand')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('inventory.movements.history')}</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -268,6 +278,15 @@ export function StockProductPage() {
                     <TableCell>{t(`inventory.binTypes.${row.binType}`)}</TableCell>
                     <TableCell className="text-right font-mono">
                       {t('inventory.qtyWithUnit', { qty: row.onHand, unit })}
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        to={`/inventory/movements?product=${detail.product.id}&warehouse=${row.warehouseId}&bin=${row.binId}`}
+                        className="text-sm text-primary underline-offset-4 hover:underline"
+                        aria-label={`${t('inventory.movements.history')}: ${row.binCode}`}
+                      >
+                        {t('inventory.movements.binHistory')}
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

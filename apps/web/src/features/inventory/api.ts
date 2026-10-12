@@ -5,7 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { type components, idempotencyKey } from '@tugeel/api-client';
+import { type components, idempotencyKey, type paths } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
 
@@ -16,6 +16,12 @@ export type BinCreate = Schemas['BinCreateRequest'];
 export type BinRangeRequest = Schemas['BinRangeRequest'];
 export type BinRangeResult = Schemas['BinRangeResult'];
 export type ProductLocation = Schemas['ProductLocation'];
+export type StockMovement = Schemas['StockMovement'];
+export type MovementDocType = NonNullable<
+  NonNullable<
+    NonNullable<paths['/api/v1/stock/movements']['get']['parameters']['query']>['docType']
+  >
+>;
 export type LocationRequest = Schemas['ProductLocationRequest'];
 export type ReceiptSummary = Schemas['ReceiptSummary'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];
@@ -86,10 +92,11 @@ export function useStock(filter: StockFilter) {
   });
 }
 
-export function useProductStock(productId: number) {
+export function useProductStock(productId: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.stock, 'product', productId],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/stock/products/{id}', {
@@ -101,6 +108,33 @@ export function useProductStock(productId: number) {
 }
 
 /** The last reconciliation run, for the admins' banner. */
+export interface MovementFilter {
+  productId?: number;
+  warehouseId?: number;
+  binId?: number;
+  docType?: MovementDocType;
+  from?: string;
+  to?: string;
+}
+
+/** Movement history (SPEC §8.2 #1): ledger rows newest first, 50 at a time. */
+export function useStockMovements(filter: MovementFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.stock, 'movements', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stock/movements', {
+          params: { query: { ...filter, cursor: pageParam, limit: 50 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useReconciliation(enabled: boolean) {
   const api = useApiClient();
   return useQuery({
@@ -141,6 +175,17 @@ export function useBins(filter: BinFilter) {
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** One bin by id (a filter that remembers a shelf); off without an id. */
+export function useBin(id: number | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.bins, 'one', id],
+    enabled: id !== undefined,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/bins/{id}', { params: { path: { id: id ?? 0 } }, signal })),
   });
 }
 

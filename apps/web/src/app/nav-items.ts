@@ -47,6 +47,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'nav.groups.inventory',
     items: [
       { to: '/inventory/stock', label: 'nav.stock' },
+      { to: '/inventory/movements', label: 'nav.movements' },
       { to: '/inventory/receipts', label: 'nav.receipts' },
       {
         to: '/inventory/transfers',

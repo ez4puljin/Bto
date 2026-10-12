@@ -53,7 +53,14 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
 }
 
 /** Search active products by name, SKU or barcode and pick one (documents without a scanner). */
-export function ProductSearch({ onPick }: { onPick: (product: ProductSummary) => void }) {
+export function ProductSearch({
+  onPick,
+  pickLabel,
+}: {
+  onPick: (product: ProductSummary) => void;
+  /** The button of each found product; default «Нэмэх». */
+  pickLabel?: string;
+}) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
@@ -83,13 +90,13 @@ export function ProductSearch({ onPick }: { onPick: (product: ProductSummary) =>
                 size="xs"
                 variant="outline"
                 className="ml-auto"
-                aria-label={`${t('inventory.add')}: ${product.name}`}
+                aria-label={`${pickLabel ?? t('inventory.add')}: ${product.name}`}
                 onClick={() => {
                   onPick(product);
                   setSearch('');
                 }}
               >
-                {t('inventory.add')}
+                {pickLabel ?? t('inventory.add')}
               </Button>
             </li>
           ))}
