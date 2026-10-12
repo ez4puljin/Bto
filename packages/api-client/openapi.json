@@ -6920,6 +6920,771 @@
         ]
       }
     },
+    "/api/v1/stocktakes": {
+      "get": {
+        "operationId": "Stocktakes_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "COUNTING",
+                "REVIEW",
+                "APPROVED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Stocktakes_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StocktakeCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/bin-preview": {
+      "get": {
+        "operationId": "Stocktakes_binPreview",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "prefix",
+            "required": false,
+            "in": "query",
+            "description": "The beginning of a shelf code",
+            "schema": {
+              "maxLength": 32,
+              "example": "A-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "description": "Every shelf and the sales floor",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeBinPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What a code prefix or «every bin» would count, before the stocktake is created.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}": {
+      "get": {
+        "operationId": "Stocktakes_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/lines": {
+      "get": {
+        "operationId": "Stocktakes_lines",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "binId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "differences",
+            "required": false,
+            "in": "query",
+            "description": "Only lines counted differently; approvers (inventory.stocktakes.approve) only",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeLinePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lines in bin order. Counters receive only the lines a person counted (ADR-0038).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/start": {
+      "post": {
+        "operationId": "Stocktakes_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → COUNTING: the bins are locked and their stock frozen.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/scan": {
+      "post": {
+        "operationId": "Stocktakes_scan",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StocktakeScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeScanResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One scan, added to its line; idempotent so a retried request never counts twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/counts": {
+      "post": {
+        "operationId": "Stocktakes_counts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StocktakeCountsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeCountResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Counts typed in base units; each replaces the last count of its bin and product.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/bins/{binId}/finish": {
+      "post": {
+        "operationId": "Stocktakes_finishBin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "binId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeBin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A counter is done with a bin: what nobody counted there is 0.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/review": {
+      "post": {
+        "operationId": "Stocktakes_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "COUNTING → REVIEW once every bin is finished.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/recount": {
+      "post": {
+        "operationId": "Stocktakes_recount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StocktakeRecountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "REVIEW → COUNTING: the chosen bins are counted again from nothing.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/approve": {
+      "post": {
+        "operationId": "Stocktakes_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StocktakeApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "REVIEW → APPROVED: posts the differences; idempotent so a retried click never posts twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/stocktakes/{id}/cancel": {
+      "post": {
+        "operationId": "Stocktakes_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StocktakeDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Frees the bins without postings; a stocktake in review is cancelled by an approver.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/transfers": {
       "get": {
         "operationId": "Transfers_list",
@@ -13598,6 +14363,574 @@
           "lastRun"
         ]
       },
+      "StocktakeSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "ST-2026-000001"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "COUNTING",
+              "REVIEW",
+              "APPROVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "binCount": {
+            "type": "number"
+          },
+          "finishedBinCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "status",
+          "note",
+          "startedAt",
+          "effectiveDate",
+          "postedAt",
+          "createdAt",
+          "binCount",
+          "finishedBinCount"
+        ]
+      },
+      "StocktakePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StocktakeBinPreview": {
+        "type": "object",
+        "properties": {
+          "binCount": {
+            "type": "number",
+            "description": "At most 2001: more is too many"
+          },
+          "countingCount": {
+            "type": "number",
+            "description": "Bins another stocktake is counting: starting would be refused"
+          },
+          "firstCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "A-01-01"
+          },
+          "lastCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "A-01-12"
+          }
+        },
+        "required": [
+          "binCount",
+          "countingCount",
+          "firstCode",
+          "lastCode"
+        ]
+      },
+      "StocktakeBin": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "A-01-03"
+          },
+          "type": {
+            "enum": [
+              "RECEIVING",
+              "STORAGE",
+              "PICKING",
+              "STAGING",
+              "SHIP",
+              "DAMAGED",
+              "RETURNS",
+              "SALESFLOOR",
+              "CARGO",
+              "TRANSIT"
+            ],
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When a counter finished the bin"
+          },
+          "countedCount": {
+            "type": "number",
+            "description": "Lines a person counted"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "Frozen and found lines; approvers (inventory.stocktakes.approve) only"
+          },
+          "differenceCount": {
+            "type": "number",
+            "description": "Lines counted differently; approvers (inventory.stocktakes.approve) only"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "finishedAt",
+          "countedCount"
+        ]
+      },
+      "StocktakeDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "ST-2026-000001"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "COUNTING",
+              "REVIEW",
+              "APPROVED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bins": {
+            "description": "In code order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeBin"
+            }
+          },
+          "countedCount": {
+            "type": "number",
+            "description": "Lines a person counted"
+          },
+          "lineCount": {
+            "type": "number",
+            "description": "Frozen and found lines; approvers (inventory.stocktakes.approve) only"
+          },
+          "differenceCount": {
+            "type": "number",
+            "description": "Lines counted differently; approvers (inventory.stocktakes.approve) only"
+          },
+          "shortageValue": {
+            "type": "string",
+            "example": "139393.94",
+            "description": "MNT of the shortages at the warehouse average, while counting or in review; approvers holding inventory.costs.manage only"
+          },
+          "surplusValue": {
+            "type": "string",
+            "example": "1393.94",
+            "description": "MNT of the surpluses (given cost, else the average), while counting or in review; approvers holding inventory.costs.manage only"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "status",
+          "note",
+          "startedAt",
+          "effectiveDate",
+          "postedAt",
+          "createdAt",
+          "updatedAt",
+          "bins",
+          "countedCount"
+        ]
+      },
+      "StocktakeLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "binId": {
+            "type": "number"
+          },
+          "binCode": {
+            "type": "string",
+            "example": "A-01-03"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "baseUnitId": {
+            "type": "number"
+          },
+          "baseUnitName": {
+            "type": "string",
+            "example": "ширхэг"
+          },
+          "countedQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "48",
+            "description": "Base units"
+          },
+          "countedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When a person last counted it; NULL with a count of 0: not found (the bin was finished)"
+          },
+          "expectedQty": {
+            "type": "string",
+            "example": "50",
+            "description": "Frozen base units; approvers (inventory.stocktakes.approve) only"
+          },
+          "difference": {
+            "type": "string",
+            "nullable": true,
+            "example": "-2",
+            "description": "counted − expected once counted; approvers (inventory.stocktakes.approve) only"
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost per base unit given to a surplus at approval; approvers holding inventory.costs.manage only"
+          },
+          "avgCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "The warehouse average now, what an uncosted surplus takes; approvers holding inventory.costs.manage only"
+          }
+        },
+        "required": [
+          "id",
+          "binId",
+          "binCode",
+          "productId",
+          "productSku",
+          "productName",
+          "baseUnitId",
+          "baseUnitName",
+          "countedQty",
+          "countedAt"
+        ]
+      },
+      "StocktakeLinePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeLine"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StocktakeCreateRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "binIds": {
+            "maxItems": 2000,
+            "description": "Exactly one of binIds, prefix and all: these bins, any type",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "prefix": {
+            "type": "string",
+            "maxLength": 32,
+            "example": "A-01",
+            "description": "The storage and picking shelves whose code starts with this"
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Every storage and picking shelf and the sales floor"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "warehouseId"
+        ]
+      },
+      "StocktakeScanRequest": {
+        "type": "object",
+        "properties": {
+          "binId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The scanned unit (a box barcode adds its factor)"
+          },
+          "qty": {
+            "type": "string",
+            "example": "1",
+            "description": "In the unit, never 0; negative takes a scan back"
+          }
+        },
+        "required": [
+          "binId",
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "StocktakeScanAdded": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "string",
+            "example": "1",
+            "description": "In the scanned unit; negative for a take-back"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "24",
+            "description": "Base units"
+          }
+        },
+        "required": [
+          "qty",
+          "unitName",
+          "qtyBase"
+        ]
+      },
+      "StocktakeScanResult": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "$ref": "#/components/schemas/StocktakeLine"
+          },
+          "added": {
+            "$ref": "#/components/schemas/StocktakeScanAdded"
+          },
+          "bin": {
+            "$ref": "#/components/schemas/StocktakeBin"
+          }
+        },
+        "required": [
+          "line",
+          "added",
+          "bin"
+        ]
+      },
+      "StocktakeCountEntry": {
+        "type": "object",
+        "properties": {
+          "binId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "countedQty": {
+            "type": "string",
+            "example": "48",
+            "description": "Base units; 0 = none here"
+          },
+          "previousQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24",
+            "description": "The count the screen showed (null: none yet); a different stored count answers 409 CONFLICT"
+          }
+        },
+        "required": [
+          "binId",
+          "productId",
+          "countedQty"
+        ]
+      },
+      "StocktakeCountsRequest": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeCountEntry"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "StocktakeCountResult": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeLine"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "StocktakeRecountRequest": {
+        "type": "object",
+        "properties": {
+          "binIds": {
+            "minItems": 1,
+            "description": "Bins whose counts are cleared and counted again",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "binIds"
+        ]
+      },
+      "StocktakeCostRequest": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "unitCost": {
+            "type": "string",
+            "example": "1250.5",
+            "description": "Cost per base unit"
+          }
+        },
+        "required": [
+          "lineId",
+          "unitCost"
+        ]
+      },
+      "StocktakeApproveRequest": {
+        "type": "object",
+        "properties": {
+          "costs": {
+            "description": "Surplus lines, cost holders only; lines without a cost take the average",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeCostRequest"
+            }
+          }
+        }
+      },
       "TransferSummary": {
         "type": "object",
         "properties": {
@@ -14407,6 +15740,7 @@
           "PRODUCT_NOT_IN_WAREHOUSE",
           "COSTING_CLOSED",
           "TRANSFER_NOTHING_SHIPPED",
+          "STOCKTAKE_BINS_UNFINISHED",
           "IMPORT_FILE_INVALID",
           "IMPORT_STATE_INVALID",
           "IMPORT_HAS_ERRORS",

@@ -64,11 +64,21 @@ export {
   type WarehouseBalance,
 } from './services/stock-query.service';
 export {
+  type BinPreview,
+  type BinSelection,
   type CountEntry,
+  MAX_STOCKTAKE_BINS,
+  MAX_STOCKTAKE_LINES,
+  type ScanInput,
+  type ScanResult,
+  type StocktakeBin,
   type StocktakeDetail,
   type StocktakeInput,
+  type StocktakeLine,
+  type StocktakeLineQuery,
   StocktakesService,
   type StocktakeStatus,
+  type StocktakeSummary,
 } from './services/stocktakes.service';
 export { SystemBinsService } from './services/system-bins.service';
 export {

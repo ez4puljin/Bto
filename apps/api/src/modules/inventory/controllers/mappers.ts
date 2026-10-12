@@ -18,6 +18,13 @@ import type {
   ReceiptLineDto,
   ReceiptSummaryDto,
 } from '../dto/receipts.dto';
+import type {
+  StocktakeBinDto,
+  StocktakeDetailDto,
+  StocktakeLineDto,
+  StocktakeScanResultDto,
+  StocktakeSummaryDto,
+} from '../dto/stocktakes.dto';
 import type { TransferDetailDto, TransferSummaryDto } from '../dto/transfers.dto';
 import type { AdjustmentDetail, AdjustmentSummary } from '../services/adjustments.service';
 import type { BinMoveDetail, BinMoveSummary } from '../services/bin-moves.service';
@@ -37,6 +44,13 @@ import type {
   ReceiptLine,
   ReceiptSummary,
 } from '../services/receipts.service';
+import type {
+  ScanResult,
+  StocktakeBin,
+  StocktakeDetail,
+  StocktakeLine,
+  StocktakeSummary,
+} from '../services/stocktakes.service';
 import type { TransferDetail, TransferSummary } from '../services/transfers.service';
 
 export function toBinDto(bin: Bin): BinDto {
@@ -381,5 +395,107 @@ export function toTransferSummaryDto(summary: TransferSummary): TransferSummaryD
     shippedAt: summary.shippedAt?.toISOString() ?? null,
     receivedAt: summary.receivedAt?.toISOString() ?? null,
     createdAt: summary.createdAt.toISOString(),
+  };
+}
+
+/**
+ * What a reader of a stocktake may see (ADR-0038): counters their own counts only; approvers the
+ * frozen quantities, differences and line totals; approvers holding costs also the values.
+ */
+export interface StocktakeView {
+  withExpected: boolean;
+  withCosts: boolean;
+}
+
+export function toStocktakeSummaryDto(summary: StocktakeSummary): StocktakeSummaryDto {
+  return {
+    id: summary.id,
+    number: summary.number,
+    warehouseId: summary.warehouseId,
+    status: summary.status,
+    note: summary.note,
+    startedAt: summary.startedAt?.toISOString() ?? null,
+    effectiveDate: summary.effectiveDate,
+    postedAt: summary.postedAt?.toISOString() ?? null,
+    createdAt: summary.createdAt.toISOString(),
+    binCount: summary.binCount,
+    finishedBinCount: summary.finishedBinCount,
+  };
+}
+
+export function toStocktakeBinDto(bin: StocktakeBin, view: StocktakeView): StocktakeBinDto {
+  return {
+    id: bin.id,
+    code: bin.code,
+    type: bin.type,
+    finishedAt: bin.finishedAt?.toISOString() ?? null,
+    countedCount: bin.countedCount,
+    ...(view.withExpected
+      ? { lineCount: bin.lineCount, differenceCount: bin.differenceCount }
+      : {}),
+  };
+}
+
+export function toStocktakeDetailDto(
+  detail: StocktakeDetail,
+  view: StocktakeView,
+): StocktakeDetailDto {
+  const withValues = view.withExpected && view.withCosts;
+  return {
+    id: detail.id,
+    number: detail.number,
+    warehouseId: detail.warehouseId,
+    status: detail.status,
+    note: detail.note,
+    startedAt: detail.startedAt?.toISOString() ?? null,
+    effectiveDate: detail.effectiveDate,
+    postedAt: detail.postedAt?.toISOString() ?? null,
+    createdAt: detail.createdAt.toISOString(),
+    updatedAt: detail.updatedAt.toISOString(),
+    bins: detail.bins.map((bin) => toStocktakeBinDto(bin, view)),
+    countedCount: detail.countedCount,
+    ...(view.withExpected
+      ? { lineCount: detail.lineCount, differenceCount: detail.differenceCount }
+      : {}),
+    ...(withValues && detail.shortageValue
+      ? { shortageValue: detail.shortageValue.toFixed(2) }
+      : {}),
+    ...(withValues && detail.surplusValue ? { surplusValue: detail.surplusValue.toFixed(2) } : {}),
+  };
+}
+
+export function toStocktakeLineDto(line: StocktakeLine, view: StocktakeView): StocktakeLineDto {
+  return {
+    id: line.id,
+    binId: line.binId,
+    binCode: line.binCode,
+    productId: line.productId,
+    productSku: line.productSku,
+    productName: line.productName,
+    baseUnitId: line.baseUnitId,
+    baseUnitName: line.baseUnitName,
+    countedQty: line.countedQty?.toFixed() ?? null,
+    countedAt: line.countedAt?.toISOString() ?? null,
+    ...(view.withExpected
+      ? { expectedQty: line.expectedQty.toFixed(), difference: line.difference?.toFixed() ?? null }
+      : {}),
+    ...(view.withExpected && view.withCosts
+      ? { unitCost: line.unitCost?.toFixed() ?? null, avgCost: line.avgCost?.toFixed() ?? null }
+      : {}),
+  };
+}
+
+export function toStocktakeScanResultDto(
+  result: ScanResult,
+  view: StocktakeView,
+): StocktakeScanResultDto {
+  return {
+    line: toStocktakeLineDto(result.line, view),
+    added: {
+      qty: result.added.qty.toFixed(),
+      unitName: result.added.unitName,
+      qtyBase: result.added.qtyBase.toFixed(),
+    },
+    bin: toStocktakeBinDto(result.bin, view),
   };
 }

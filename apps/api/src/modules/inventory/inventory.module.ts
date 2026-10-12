@@ -10,6 +10,7 @@ import {
 } from './controllers/moves-adjustments.controller';
 import { ReceiptLinesController, ReceiptsController } from './controllers/receipts.controller';
 import { StockController } from './controllers/stock.controller';
+import { StocktakesController } from './controllers/stocktakes.controller';
 import { TransferLinesController, TransfersController } from './controllers/transfers.controller';
 import { AdjustmentsService } from './services/adjustments.service';
 import { BinMovesService } from './services/bin-moves.service';
@@ -72,6 +73,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     AdjustmentsController,
     AdjustmentLinesController,
     StockController,
+    StocktakesController,
     TransfersController,
     TransferLinesController,
   ],

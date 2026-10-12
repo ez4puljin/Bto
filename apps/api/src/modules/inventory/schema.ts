@@ -622,7 +622,10 @@ export const stocktakes = pgTable(
   ],
 );
 
-/** The bins a stocktake counts. */
+/**
+ * The bins a stocktake counts. A counter finishes each bin (ADR-0038): its uncounted lines become 0
+ * and the bin is marked, so an empty shelf is told apart from one nobody reached.
+ */
 export const stocktakeBins = pgTable(
   'stocktake_bins',
   {
@@ -632,8 +635,13 @@ export const stocktakeBins = pgTable(
     binId: ref('bin_id')
       .notNull()
       .references(() => bins.id),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    finishedBy: userRef('finished_by'),
   },
-  (t) => [unique('stocktake_bins_key').on(t.stocktakeId, t.binId)],
+  (t) => [
+    unique('stocktake_bins_key').on(t.stocktakeId, t.binId),
+    check('stocktake_bins_finished', sql`(${t.finishedAt} IS NULL) = (${t.finishedBy} IS NULL)`),
+  ],
 );
 
 export const stocktakeLines = pgTable(
@@ -653,6 +661,11 @@ export const stocktakeLines = pgTable(
     /** On hand when counting started; 0 for goods found during the count. */
     expectedQty: qty('expected_qty').notNull(),
     countedQty: qty('counted_qty'),
+    /**
+     * When a person last counted the line. Finishing a bin sets the lines nobody counted to 0 and
+     * leaves this NULL: «not found», never shown to counters (ADR-0038).
+     */
+    countedAt: timestamp('counted_at', { withTimezone: true }),
     /** Cost per base unit of a surplus; NULL = the average at approval. */
     unitCost: cost('unit_cost'),
     createdAt: createdAt(),
@@ -667,6 +680,7 @@ export const stocktakeLines = pgTable(
       sql`${t.expectedQty} >= 0 AND (${t.countedQty} IS NULL OR ${t.countedQty} >= 0)
         AND (${t.unitCost} IS NULL OR ${t.unitCost} >= 0)`,
     ),
+    check('stocktake_lines_counted', sql`${t.countedAt} IS NULL OR ${t.countedQty} IS NOT NULL`),
   ],
 );
 

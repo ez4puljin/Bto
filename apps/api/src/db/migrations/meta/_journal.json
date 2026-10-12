@@ -71,6 +71,13 @@
       "when": 1791826900888,
       "tag": "0009_stock_ledger_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791838410525,
+      "tag": "0010_stocktake_counting",
+      "breakpoints": true
     }
   ]
 }

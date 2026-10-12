@@ -1607,6 +1607,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocktakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Stocktakes_list"];
+        put?: never;
+        post: operations["Stocktakes_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/bin-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a code prefix or «every bin» would count, before the stocktake is created. */
+        get: operations["Stocktakes_binPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Stocktakes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lines in bin order. Counters receive only the lines a person counted (ADR-0038). */
+        get: operations["Stocktakes_lines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → COUNTING: the bins are locked and their stock frozen. */
+        post: operations["Stocktakes_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One scan, added to its line; idempotent so a retried request never counts twice. */
+        post: operations["Stocktakes_scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Counts typed in base units; each replaces the last count of its bin and product. */
+        post: operations["Stocktakes_counts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/bins/{binId}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A counter is done with a bin: what nobody counted there is 0. */
+        post: operations["Stocktakes_finishBin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** COUNTING → REVIEW once every bin is finished. */
+        post: operations["Stocktakes_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/recount": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** REVIEW → COUNTING: the chosen bins are counted again from nothing. */
+        post: operations["Stocktakes_recount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** REVIEW → APPROVED: posts the differences; idempotent so a retried click never posts twice. */
+        post: operations["Stocktakes_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stocktakes/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Frees the bins without postings; a stocktake in review is cancelled by an approver. */
+        post: operations["Stocktakes_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers": {
         parameters: {
             query?: never;
@@ -3395,6 +3597,212 @@ export interface components {
         ReconciliationStatus: {
             lastRun: components["schemas"]["ReconciliationRun"] | null;
         };
+        StocktakeSummary: {
+            id: number;
+            /** @example ST-2026-000001 */
+            number: string | null;
+            warehouseId: number;
+            /** @enum {string} */
+            status: "DRAFT" | "COUNTING" | "REVIEW" | "APPROVED" | "CANCELLED";
+            note: string | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            binCount: number;
+            finishedBinCount: number;
+        };
+        StocktakePage: {
+            data: components["schemas"]["StocktakeSummary"][];
+            nextCursor: string | null;
+        };
+        StocktakeBinPreview: {
+            /** @description At most 2001: more is too many */
+            binCount: number;
+            /** @description Bins another stocktake is counting: starting would be refused */
+            countingCount: number;
+            /** @example A-01-01 */
+            firstCode: string | null;
+            /** @example A-01-12 */
+            lastCode: string | null;
+        };
+        StocktakeBin: {
+            id: number;
+            /** @example A-01-03 */
+            code: string;
+            /** @enum {string} */
+            type: "RECEIVING" | "STORAGE" | "PICKING" | "STAGING" | "SHIP" | "DAMAGED" | "RETURNS" | "SALESFLOOR" | "CARGO" | "TRANSIT";
+            /**
+             * Format: date-time
+             * @description When a counter finished the bin
+             */
+            finishedAt: string | null;
+            /** @description Lines a person counted */
+            countedCount: number;
+            /** @description Frozen and found lines; approvers (inventory.stocktakes.approve) only */
+            lineCount?: number;
+            /** @description Lines counted differently; approvers (inventory.stocktakes.approve) only */
+            differenceCount?: number;
+        };
+        StocktakeDetail: {
+            id: number;
+            /** @example ST-2026-000001 */
+            number: string | null;
+            warehouseId: number;
+            /** @enum {string} */
+            status: "DRAFT" | "COUNTING" | "REVIEW" | "APPROVED" | "CANCELLED";
+            note: string | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description In code order */
+            bins: components["schemas"]["StocktakeBin"][];
+            /** @description Lines a person counted */
+            countedCount: number;
+            /** @description Frozen and found lines; approvers (inventory.stocktakes.approve) only */
+            lineCount?: number;
+            /** @description Lines counted differently; approvers (inventory.stocktakes.approve) only */
+            differenceCount?: number;
+            /**
+             * @description MNT of the shortages at the warehouse average, while counting or in review; approvers holding inventory.costs.manage only
+             * @example 139393.94
+             */
+            shortageValue?: string;
+            /**
+             * @description MNT of the surpluses (given cost, else the average), while counting or in review; approvers holding inventory.costs.manage only
+             * @example 1393.94
+             */
+            surplusValue?: string;
+        };
+        StocktakeLine: {
+            id: number;
+            binId: number;
+            /** @example A-01-03 */
+            binCode: string;
+            productId: number;
+            productSku: string;
+            productName: string;
+            baseUnitId: number;
+            /** @example ширхэг */
+            baseUnitName: string;
+            /**
+             * @description Base units
+             * @example 48
+             */
+            countedQty: string | null;
+            /**
+             * Format: date-time
+             * @description When a person last counted it; NULL with a count of 0: not found (the bin was finished)
+             */
+            countedAt: string | null;
+            /**
+             * @description Frozen base units; approvers (inventory.stocktakes.approve) only
+             * @example 50
+             */
+            expectedQty?: string;
+            /**
+             * @description counted − expected once counted; approvers (inventory.stocktakes.approve) only
+             * @example -2
+             */
+            difference?: string | null;
+            /** @description Cost per base unit given to a surplus at approval; approvers holding inventory.costs.manage only */
+            unitCost?: string | null;
+            /** @description The warehouse average now, what an uncosted surplus takes; approvers holding inventory.costs.manage only */
+            avgCost?: string | null;
+        };
+        StocktakeLinePage: {
+            data: components["schemas"]["StocktakeLine"][];
+            nextCursor: string | null;
+        };
+        StocktakeCreateRequest: {
+            warehouseId: number;
+            /** @description Exactly one of binIds, prefix and all: these bins, any type */
+            binIds?: number[];
+            /**
+             * @description The storage and picking shelves whose code starts with this
+             * @example A-01
+             */
+            prefix?: string;
+            /** @description Every storage and picking shelf and the sales floor */
+            all?: boolean;
+            note?: string | null;
+        };
+        StocktakeScanRequest: {
+            binId: number;
+            /** @description The scanned unit (a box barcode adds its factor) */
+            productUnitId: number;
+            /**
+             * @description In the unit, never 0; negative takes a scan back
+             * @example 1
+             */
+            qty: string;
+        };
+        StocktakeScanAdded: {
+            /**
+             * @description In the scanned unit; negative for a take-back
+             * @example 1
+             */
+            qty: string;
+            /** @example хайрцаг */
+            unitName: string;
+            /**
+             * @description Base units
+             * @example 24
+             */
+            qtyBase: string;
+        };
+        StocktakeScanResult: {
+            line: components["schemas"]["StocktakeLine"];
+            added: components["schemas"]["StocktakeScanAdded"];
+            bin: components["schemas"]["StocktakeBin"];
+        };
+        StocktakeCountEntry: {
+            binId: number;
+            productId: number;
+            /**
+             * @description Base units; 0 = none here
+             * @example 48
+             */
+            countedQty: string;
+            /**
+             * @description The count the screen showed (null: none yet); a different stored count answers 409 CONFLICT
+             * @example 24
+             */
+            previousQty?: string | null;
+        };
+        StocktakeCountsRequest: {
+            entries: components["schemas"]["StocktakeCountEntry"][];
+        };
+        StocktakeCountResult: {
+            lines: components["schemas"]["StocktakeLine"][];
+        };
+        StocktakeRecountRequest: {
+            /** @description Bins whose counts are cleared and counted again */
+            binIds: number[];
+        };
+        StocktakeCostRequest: {
+            lineId: number;
+            /**
+             * @description Cost per base unit
+             * @example 1250.5
+             */
+            unitCost: string;
+        };
+        StocktakeApproveRequest: {
+            /** @description Surplus lines, cost holders only; lines without a cost take the average */
+            costs?: components["schemas"]["StocktakeCostRequest"][];
+        };
         TransferSummary: {
             id: number;
             number: string | null;
@@ -3641,7 +4049,7 @@ export interface components {
             fileName: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -7988,6 +8396,439 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId?: number;
+                status?: "DRAFT" | "COUNTING" | "REVIEW" | "APPROVED" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StocktakeCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_binPreview: {
+        parameters: {
+            query: {
+                warehouseId: number;
+                /** @description The beginning of a shelf code */
+                prefix?: string;
+                /** @description Every shelf and the sales floor */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeBinPreview"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_lines: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                binId?: number;
+                /** @description Only lines counted differently; approvers (inventory.stocktakes.approve) only */
+                differences?: boolean;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeLinePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_scan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StocktakeScanRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeScanResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StocktakeCountsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeCountResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_finishBin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                binId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeBin"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_recount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StocktakeRecountRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_approve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StocktakeApproveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stocktakes_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StocktakeDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

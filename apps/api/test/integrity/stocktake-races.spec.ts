@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Decimal } from '@tugeel/shared/money';
 import type { Client } from 'pg';
 import request from 'supertest';
+import { toProblem } from '../../src/common/errors/problem-details';
 import type { AuthContext } from '../../src/modules/identity';
 import { StocktakesService } from '../../src/modules/inventory';
 import { connectAs, createHttpApp } from '../harness/apps';
@@ -13,7 +14,8 @@ import { partnersApi } from '../harness/partners';
 /**
  * SPEC §6.8 under concurrency: a stocktake starting while goods move off its bin freezes exactly
  * what the bin holds once the move is settled, and approving and cancelling the same count let
- * exactly one through.
+ * exactly one through. Counting (ADR-0038): concurrent scans all add up, finishing a bin never
+ * swallows a scan, and nothing changes a count once the stocktake is in review.
  */
 describe('integrity: stocktake races', () => {
   let app: NestExpressApplication;
@@ -27,6 +29,7 @@ describe('integrity: stocktake races', () => {
   let unitId: number;
   let shelf: number;
   let other: number;
+  let empty: number;
   const http = () => request(app.getHttpServer());
   const onHand = async (binId: number) => {
     const { rows } = await sql.query<{ on_hand: string }>(
@@ -56,6 +59,7 @@ describe('integrity: stocktake races', () => {
     warehouseId = (await inventory.warehouse('WH1')).id;
     shelf = (await inventory.bin(warehouseId, 'A-01-01')).id;
     other = (await inventory.bin(warehouseId, 'A-01-02')).id;
+    empty = (await inventory.bin(warehouseId, 'A-01-03')).id;
     const catalog = catalogApi(app, adminToken);
     const product = await catalog.product({
       sku: '1',
@@ -109,7 +113,8 @@ describe('integrity: stocktake races', () => {
       } else {
         expect(moved.status).toBe(201);
       }
-      const frozen = started.lines.find((line) => line.productId === productId)?.expectedQty;
+      const lines = (await stocktakes.lines(started.id, { limit: 200 })).data;
+      const frozen = lines.find((line) => line.productId === productId)?.expectedQty;
       expect(frozen?.toFixed()).toBe((await onHand(shelf)).toFixed());
       await stocktakes.cancel(worker, draft.id);
       expect(await binStatus(shelf)).toBe('ACTIVE');
@@ -120,21 +125,24 @@ describe('integrity: stocktake races', () => {
   it('lets exactly one of approve and cancel win', async () => {
     for (let round = 0; round < 6; round += 1) {
       const draft = await stocktakes.create(worker, { warehouseId, binIds: [shelf] });
-      const started = await stocktakes.start(worker, draft.id);
+      await stocktakes.start(worker, draft.id);
       const before = await onHand(shelf);
+      const frozen = (await stocktakes.lines(draft.id, { limit: 200 })).data;
       await stocktakes.count(
         worker,
         draft.id,
-        started.lines.map((line) => ({
+        frozen.map((line) => ({
           binId: line.binId,
           productId: line.productId,
           countedQty: line.expectedQty.minus(1),
         })),
       );
+      await stocktakes.finishBin(worker, draft.id, shelf);
       await stocktakes.review(worker, draft.id);
+      // A stocktake in review is cancelled by an approver (ADR-0038).
       const [approved, cancelled] = await Promise.allSettled([
         stocktakes.approve(admin, draft.id),
-        stocktakes.cancel(worker, draft.id),
+        stocktakes.cancel(admin, draft.id),
       ]);
       const outcome = [approved.status, cancelled.status];
       expect([
@@ -156,6 +164,56 @@ describe('integrity: stocktake races', () => {
         expect(after.toFixed()).toBe(before.toFixed());
       }
       expect(await binStatus(shelf)).toBe('ACTIVE');
+    }
+  });
+
+  it('adds up every concurrent scan, on a frozen line and on a found one', async () => {
+    const draft = await stocktakes.create(worker, { warehouseId, binIds: [shelf, empty] });
+    await stocktakes.start(worker, draft.id);
+    const scans = (binId: number) =>
+      Array.from({ length: 12 }, () =>
+        stocktakes.scan(worker, draft.id, { binId, productUnitId: unitId, qty: new Decimal(2) }),
+      );
+    await Promise.all([...scans(shelf), ...scans(empty)]);
+    const lines = (await stocktakes.lines(draft.id, { limit: 200 })).data;
+    expect(lines.map((line) => [line.binId, line.countedQty?.toFixed()])).toEqual([
+      [shelf, '24'],
+      [empty, '24'],
+    ]);
+    await stocktakes.cancel(worker, draft.id);
+  });
+
+  it('keeps a scan that races its bin being finished, and no scan lands after review', async () => {
+    for (let round = 0; round < 4; round += 1) {
+      const draft = await stocktakes.create(worker, { warehouseId, binIds: [shelf, empty] });
+      await stocktakes.start(worker, draft.id);
+      const scan = (qty: number) =>
+        stocktakes.scan(worker, draft.id, {
+          binId: shelf,
+          productUnitId: unitId,
+          qty: new Decimal(qty),
+        });
+      // Finished first: the uncounted line is 0, then the scan adds 3; scanned first: 3 stays.
+      await Promise.all([stocktakes.finishBin(worker, draft.id, shelf), scan(3)]);
+      const counted = async () =>
+        (await stocktakes.lines(draft.id, { binId: shelf })).data[0]?.countedQty?.toFixed();
+      expect(await counted()).toBe('3');
+      await stocktakes.finishBin(worker, draft.id, empty);
+      const [reviewed, ...late] = await Promise.allSettled([
+        stocktakes.review(worker, draft.id),
+        ...Array.from({ length: 6 }, () => scan(1)),
+      ]);
+      expect(reviewed?.status).toBe('fulfilled');
+      let added = 0;
+      for (const result of late) {
+        if (result.status === 'fulfilled') added += 1;
+        else expect(toProblem(result.reason, {}).code).toBe('DOC_STATE_INVALID');
+      }
+      expect(await counted()).toBe(String(3 + added));
+      expect(toProblem(await scan(1).catch((error: unknown) => error), {}).code).toBe(
+        'DOC_STATE_INVALID',
+      );
+      await stocktakes.cancel(admin, draft.id);
     }
   });
 });

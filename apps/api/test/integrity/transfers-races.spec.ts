@@ -289,7 +289,8 @@ describe('integrity: transfers', () => {
         stocktakes.start(worker, draft.id),
       ]);
       if (started.status !== 'fulfilled') throw started.reason;
-      const frozen = started.value.lines.find((line) => line.productId === flour.id)?.expectedQty;
+      const lines = (await stocktakes.lines(started.value.id, { limit: 200 })).data;
+      const frozen = lines.find((line) => line.productId === flour.id)?.expectedQty;
       if (received.status === 'fulfilled') {
         // The 3 pieces came back before the count froze the shelf.
         expect(frozen?.toFixed(3)).toBe(await onHand(shelf, flour.id));
