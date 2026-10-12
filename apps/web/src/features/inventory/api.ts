@@ -167,6 +167,25 @@ export function useProductLocations(productId: number) {
   });
 }
 
+/**
+ * Home warehouses and fixed shelves of a page of products (the product list, ADR-0037): one
+ * request per page, none while `enabled` is false.
+ */
+export function useProductLocationsOf(productIds: readonly number[], enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.locations, 'of', productIds],
+    enabled: enabled && productIds.length > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/product-locations', {
+          params: { query: { productIds: [...productIds] } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 export interface ReceiptFilter {
   warehouseId?: number;
   status?: ReceiptStatus;

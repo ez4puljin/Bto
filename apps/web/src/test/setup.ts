@@ -22,4 +22,6 @@ if (!('ResizeObserver' in globalThis)) {
 
 afterEach(() => {
   cleanup();
+  // Lists remember hidden columns in localStorage (ADR-0037); each test starts with none.
+  localStorage.clear();
 });

@@ -1,4 +1,4 @@
-import { ImageOff, Plus } from 'lucide-react';
+import { Columns3, Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
@@ -6,21 +6,29 @@ import { useHasPermission } from '@/app/auth-context';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { useWarehouseName } from '@/features/inventory/helpers';
 import { problemFromError } from '@/lib/problem';
+import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { type ProductStatus, useBrands, useCategories, useProducts } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
+import {
+  LOCKED_PRODUCT_COLUMNS,
+  PRODUCT_COLUMN_KEYS,
+  PRODUCT_COLUMNS,
+  type ProductColumnKey,
+} from './product-columns';
 import { PRODUCT_STATUSES } from './product-schema';
+import { ProductTable, type ProductTableContext } from './product-table';
 
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
@@ -29,9 +37,13 @@ const positiveId = (value: string | null) => {
 const isStatus = (value: string | null): value is ProductStatus =>
   PRODUCT_STATUSES.some((status) => status === value);
 
+const COLUMNS_STORAGE_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
+const NO_PAGES: readonly { data: never[] }[] = [];
+
 /**
  * Products: search by name in either script, SKU or barcode, filter by category (with its
  * subcategories), brand and status. Filters live in the URL so "back" keeps them (SPEC §5.2).
+ * Every piece of product information has a column; the user picks which ones show (ADR-0037).
  */
 export function ProductsPage() {
   const { t } = useTranslation();
@@ -48,7 +60,32 @@ export function ProductsPage() {
   const brands = useBrands();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
-  const rows = products.data?.pages.flatMap((page) => page.data) ?? [];
+  const brandNames = useMemo(
+    () => new Map((brands.data ?? []).map((brand) => [brand.id, brand.name])),
+    [brands.data],
+  );
+  const warehouseName = useWarehouseName();
+  const columnState = useHiddenColumns(
+    COLUMNS_STORAGE_KEY,
+    PRODUCT_COLUMN_KEYS,
+    LOCKED_PRODUCT_COLUMNS,
+  );
+  const { hidden } = columnState;
+  const columns = useMemo(
+    () => PRODUCT_COLUMNS.filter((column) => !hidden.has(column.key)),
+    [hidden],
+  );
+  const context = useMemo<ProductTableContext>(
+    () => ({
+      t,
+      categoryPath: (id) => paths.get(id),
+      brandName: (id) => brandNames.get(id),
+      warehouseName,
+    }),
+    [t, paths, brandNames, warehouseName],
+  );
+  const pages = products.data?.pages ?? NO_PAGES;
+  const empty = !products.isPending && pages.every((page) => page.data.length === 0);
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -66,14 +103,21 @@ export function ProductsPage() {
       <PageHeader
         title={t('catalog.products.title')}
         actions={
-          canManage ? (
-            <Button asChild>
-              <Link to="/catalog/products/new">
-                <Plus />
-                {t('catalog.products.create')}
-              </Link>
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            <ColumnChooser
+              hidden={hidden}
+              toggle={columnState.toggle}
+              showAll={columnState.showAll}
+            />
+            {canManage ? (
+              <Button asChild>
+                <Link to="/catalog/products/new">
+                  <Plus />
+                  {t('catalog.products.create')}
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,57 +169,8 @@ export function ProductsPage() {
         </NativeSelect>
       </div>
       <ProblemAlert problem={problemFromError(products.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-14">{t('catalog.products.columns.image')}</TableHead>
-            <TableHead>{t('catalog.products.columns.sku')}</TableHead>
-            <TableHead>{t('catalog.products.columns.name')}</TableHead>
-            <TableHead>{t('catalog.products.columns.category')}</TableHead>
-            <TableHead>{t('catalog.products.columns.baseUnit')}</TableHead>
-            <TableHead>{t('catalog.products.columns.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell>
-                {product.thumbUrl ? (
-                  <img
-                    src={product.thumbUrl}
-                    alt=""
-                    loading="lazy"
-                    className="size-10 rounded-md object-cover"
-                  />
-                ) : (
-                  <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-                    <ImageOff className="size-4 text-muted-foreground" />
-                  </div>
-                )}
-              </TableCell>
-              <TableCell className="font-mono">{product.sku}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/catalog/products/${product.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {product.name}
-                </Link>
-              </TableCell>
-              <TableCell className="whitespace-normal text-muted-foreground">
-                {paths.get(product.categoryId) ?? t('common.none')}
-              </TableCell>
-              <TableCell>{product.baseUnit.uomName}</TableCell>
-              <TableCell>
-                <Badge variant={product.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                  {t(`catalog.products.status.${product.status}`)}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!products.isPending && rows.length === 0 ? (
+      <ProductTable pages={pages} columns={columns} context={context} canManage={canManage} />
+      {empty ? (
         <p className="py-6 text-sm text-muted-foreground">{t('catalog.products.empty')}</p>
       ) : null}
       {products.hasNextPage ? (
@@ -189,5 +184,42 @@ export function ProductsPage() {
         </Button>
       ) : null}
     </div>
+  );
+}
+
+/** «Баганууд»: show or hide each column; the code and the name always show. */
+function ColumnChooser(props: {
+  hidden: ReadonlySet<string>;
+  toggle: (key: ProductColumnKey) => void;
+  showAll: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline">
+          <Columns3 />
+          {t('catalog.products.columnsButton')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        {PRODUCT_COLUMN_KEYS.map((key) => (
+          <DropdownMenuCheckboxItem
+            key={key}
+            checked={!props.hidden.has(key)}
+            disabled={LOCKED_PRODUCT_COLUMNS.includes(key)}
+            onCheckedChange={() => props.toggle(key)}
+            // Keep the menu open while several columns are picked.
+            onSelect={(event) => event.preventDefault()}
+          >
+            {t(`catalog.products.columns.${key}`)}
+          </DropdownMenuCheckboxItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={props.hidden.size === 0} onSelect={props.showAll}>
+          {t('catalog.products.showAllColumns')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

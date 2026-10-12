@@ -14,6 +14,7 @@ export type Uom = Schemas['Uom'];
 export type Category = Schemas['Category'];
 export type Brand = Schemas['Brand'];
 export type ProductSummary = Schemas['ProductSummary'];
+export type ProductListItem = Schemas['ProductListItem'];
 export type ProductDetail = Schemas['ProductDetail'];
 export type ProductUnit = Schemas['ProductUnit'];
 export type Barcode = Schemas['Barcode'];

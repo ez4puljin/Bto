@@ -540,13 +540,34 @@
         "sku": "Код",
         "name": "Нэр",
         "category": "Ангилал",
+        "brand": "Брэнд",
         "baseUnit": "Суурь нэгж",
+        "units": "Бусад нэгж",
+        "baseBarcodes": "Суурь нэгжийн баркод",
+        "unitBarcodes": "Бусад нэгжийн баркод",
+        "vatType": "НӨАТ",
+        "cityTax": "НХАТ",
+        "weight": "Жин (кг)",
+        "homeWarehouse": "Харьяа агуулах",
+        "fixedBins": "Тогтмол тавиур",
+        "supplier": "Нийлүүлэгч",
+        "classificationCode": "БҮНА код",
+        "taxProductCode": "Татварын код",
         "status": "Төлөв"
       },
       "status": {
         "ACTIVE": "Идэвхтэй",
         "INACTIVE": "Идэвхгүй"
-      }
+      },
+      "columnsButton": "Баганууд",
+      "showAllColumns": "Бүгдийг харуулах",
+      "edit": "Засах",
+      "view": "Харах",
+      "editProduct": "Засах: {{name}}",
+      "viewProduct": "Харах: {{name}}",
+      "unitBarcode": "{{code}} ({{unit}})",
+      "fixedBin": "{{warehouse}}: {{bin}}",
+      "moreSuppliers": "+{{count}}"
     },
     "product": {
       "newTitle": "Шинэ бараа",

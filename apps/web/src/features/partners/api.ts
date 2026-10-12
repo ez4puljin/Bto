@@ -162,6 +162,25 @@ export function useProductSuppliers(productId: number) {
   });
 }
 
+/**
+ * The supplier links of a page of products (the product list, ADR-0037): one request per page,
+ * none while `enabled` is false. Under the same key prefix, so link changes refresh it.
+ */
+export function useProductSuppliersOf(productIds: readonly number[], enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.productSuppliers, 'of', productIds],
+    enabled: enabled && productIds.length > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/product-suppliers', {
+          params: { query: { productIds: [...productIds] } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 /** Mutations; each refreshes what it can change. */
 export function usePartnersMutations() {
   const api = useApiClient();

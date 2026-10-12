@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LogOut, Menu, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
 import { visibleNav } from '@/app/nav-items';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
+/** A route's `handle` asks for the full width with `{ wide: true }`. */
+const isWide = (handle: unknown): boolean =>
+  typeof handle === 'object' && handle !== null && 'wide' in handle && handle.wide === true;
+
 /** Top bar with the account menu, a grouped sidebar (a toggled panel on phones) and the page. */
 export function AppShell() {
   const { t } = useTranslation();
@@ -25,6 +29,8 @@ export function AppShell() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Wide tables (the product list) take the whole width instead of the reading width.
+  const wide = useMatches().some((match) => isWide(match.handle));
   useEffect(() => {
     document.title = t('app.name');
   }, [t]);
@@ -117,7 +123,7 @@ export function AppShell() {
           ))}
         </nav>
         <main className="min-w-0 flex-1 p-4">
-          <div className="mx-auto max-w-6xl">
+          <div className={cn('mx-auto', wide ? 'max-w-none' : 'max-w-6xl')}>
             <Outlet />
           </div>
         </main>

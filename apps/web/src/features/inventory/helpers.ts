@@ -2,7 +2,7 @@ import type { components } from '@tugeel/api-client';
 import { ADJUSTMENT_REASONS, type AdjustmentReason } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { fromBase } from '@tugeel/shared/units';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthState } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
@@ -44,7 +44,8 @@ export function useWarehouseName(): (id: number) => string {
       ),
     [warehouses.data, t],
   );
-  return (id) => names.get(id) ?? String(id);
+  // Stable while the names are, so memoised lists that receive it do not re-render.
+  return useCallback((id: number) => names.get(id) ?? String(id), [names]);
 }
 
 /** A scanned text that looks like a shelf label ("A-01-03") rather than a product barcode. */

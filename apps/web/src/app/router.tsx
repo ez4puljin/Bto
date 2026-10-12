@@ -52,7 +52,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/system/status" replace /> },
       { path: 'system/status', element: <SystemStatusPage /> },
       { path: 'account', element: <AccountPage /> },
-      { path: 'catalog/products', element: <ProductsPage /> },
+      { path: 'catalog/products', element: <ProductsPage />, handle: { wide: true } },
       {
         path: 'catalog/products/new',
         element: (

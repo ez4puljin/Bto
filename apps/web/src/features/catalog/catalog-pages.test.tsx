@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import { gtinCheckDigit } from '@tugeel/shared/gtin';
 import mn from '@tugeel/shared/i18n/mn.json';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ADMIN_ME, json, problem, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
+import { PRODUCT_COLUMN_KEYS } from './product-columns';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-01T02:00:00.000Z';
@@ -145,15 +146,76 @@ describe('catalog menu and access', () => {
   });
 });
 
+const listItem = (
+  id: number,
+  sku: string,
+  name: string,
+  overrides: Partial<Schemas['ProductListItem']> = {},
+): Schemas['ProductListItem'] => ({
+  ...summary(id, sku, name),
+  weightKg: null,
+  classificationCode: null,
+  taxProductCode: null,
+  units: [{ id: id * 10, uomId: 1, uomName: 'ш', factorToBase: '1', isBase: true, barcodes: [] }],
+  ...overrides,
+});
+const WH: Schemas['Warehouse'] = {
+  id: 4,
+  code: 'WH1',
+  name: 'Бөөний агуулах',
+  kind: 'WHOLESALE',
+  branchId: 1,
+  status: 'ACTIVE',
+  createdAt: STAMP,
+  updatedAt: STAMP,
+};
+const COLA_ROW = listItem(1, '10001', 'Кока кола', {
+  cityTax: false,
+  weightKg: '0.55',
+  classificationCode: '2211100',
+  units: [
+    { id: 10, uomId: 1, uomName: 'ш', factorToBase: '1', isBase: true, barcodes: [COLA_CODE] },
+    {
+      id: 11,
+      uomId: 3,
+      uomName: 'хайрцаг',
+      factorToBase: '24',
+      isBase: false,
+      barcodes: ['BOX-1'],
+    },
+  ],
+});
+const supplierLink = (
+  id: number,
+  productId: number,
+  name: string,
+  isMain: boolean,
+): Schemas['ProductSupplierLink'] => ({
+  id,
+  productId,
+  isMain,
+  supplier: { id: id + 100, code: String(id), name, status: 'ACTIVE' },
+});
+const LIST_ROUTES = {
+  ...MASTER_ROUTES,
+  'GET /api/v1/warehouses': () => list([WH]),
+  'GET /api/v1/product-suppliers': () => list([]),
+  'GET /api/v1/product-locations': () => list([]),
+};
+const HIDDEN_COLUMNS_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
+const idsOf = (request: Request) => new URL(request.url).searchParams.getAll('productIds');
+const columnHeader = (key: keyof typeof mn.catalog.products.columns) =>
+  screen.queryByRole('columnheader', { name: mn.catalog.products.columns[key] });
+
 describe('products list', () => {
   it('searches, keeps the search in the URL and loads the next page', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
-      ...MASTER_ROUTES,
+      ...LIST_ROUTES,
       'GET /api/v1/products': (request) => {
         const query = new URL(request.url).searchParams;
-        if (query.get('cursor') === 'page-2') return list([summary(2, '10002', 'Фанта')]);
-        if (query.get('q') === 'coca') return list([summary(1, '10001', 'Кока кола')]);
-        return list([summary(1, '10001', 'Кока кола')], 'page-2');
+        if (query.get('cursor') === 'page-2') return list([listItem(2, '10002', 'Фанта')]);
+        if (query.get('q') === 'coca') return list([listItem(1, '10001', 'Кока кола')]);
+        return list([listItem(1, '10001', 'Кока кола')], 'page-2');
       },
     });
     const { router } = renderApp('/catalog/products', fetchMock);
@@ -165,6 +227,14 @@ describe('products list', () => {
     expect(screen.getAllByText('Ундаа').length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: mn.common.loadMore }));
     expect(await screen.findByRole('link', { name: 'Фанта' })).toBeInTheDocument();
+    // Each page reads the suppliers and locations of its own products, once.
+    await waitFor(() =>
+      expect(calls(fetchMock, 'GET', '/api/v1/product-suppliers').map(idsOf)).toEqual([
+        ['1'],
+        ['2'],
+      ]),
+    );
+    expect(calls(fetchMock, 'GET', '/api/v1/product-locations').map(idsOf)).toEqual([['1'], ['2']]);
 
     await user.type(screen.getByRole('searchbox', { name: mn.common.search }), 'coca');
     await waitFor(() => expect(router.state.location.search).toBe('?q=coca'));
@@ -174,6 +244,148 @@ describe('products list', () => {
         (request) => new URL(request.url).searchParams.get('q') === 'coca',
       ),
     ).toBe(true);
+  });
+
+  it('shows every piece of product information in its own column', async () => {
+    renderApp(
+      '/catalog/products',
+      signedIn(ADMIN_ME, {
+        ...LIST_ROUTES,
+        'GET /api/v1/products': () => list([COLA_ROW]),
+        'GET /api/v1/product-suppliers': () =>
+          list([supplierLink(1, 1, 'МСМ ХХК', true), supplierLink(2, 1, 'АПУ ХК', false)]),
+        'GET /api/v1/product-locations': () =>
+          list([
+            {
+              id: 1,
+              warehouseId: WH.id,
+              productId: 1,
+              isHome: true,
+              defaultBinId: 40,
+              defaultBinCode: 'A-01-01',
+              minQty: null,
+              maxQty: null,
+            },
+          ]),
+      }),
+    );
+    const table = await screen.findByRole('table');
+    expect(await within(table).findByText('МСМ ХХК +1')).toBeInTheDocument();
+    for (const text of [
+      'Coca-Cola',
+      '1 хайрцаг = 24 ш',
+      COLA_CODE,
+      'BOX-1 (хайрцаг)',
+      mn.catalog.product.vatTypes.VAT_ABLE,
+      mn.catalog.product.cityTaxValues.no,
+      '0.55',
+      '2211100',
+      'Бөөний агуулах',
+      'Бөөний агуулах: A-01-01',
+    ]) {
+      expect(within(table).getByText(text)).toBeInTheDocument();
+    }
+    for (const key of PRODUCT_COLUMN_KEYS) {
+      expect(columnHeader(key)).toBeInTheDocument();
+    }
+  });
+
+  it('hides a column, remembers it, and shows every column again', async () => {
+    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
+    expect(
+      await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.sku }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await user.click(
+      screen.getByRole('menuitemcheckbox', { name: mn.catalog.products.columns.brand }),
+    );
+    await user.keyboard('{Escape}');
+    expect(columnHeader('brand')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]')).toEqual(['brand']);
+
+    // A new visit keeps the choice until every column is shown again.
+    cleanup();
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('brand')).toBeNull();
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.showAllColumns }),
+    );
+    expect(columnHeader('brand')).toBeInTheDocument();
+    expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBeNull();
+  });
+
+  it('reads no suppliers or locations while their columns are hidden', async () => {
+    localStorage.setItem(
+      HIDDEN_COLUMNS_KEY,
+      JSON.stringify(['supplier', 'homeWarehouse', 'fixedBins']),
+    );
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/products': () => list([COLA_ROW]),
+    });
+    renderApp('/catalog/products', fetchMock);
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('supplier')).toBeNull();
+    expect(columnHeader('category')).toBeInTheDocument();
+    expect(calls(fetchMock, 'GET', '/api/v1/product-suppliers')).toHaveLength(0);
+    expect(calls(fetchMock, 'GET', '/api/v1/product-locations')).toHaveLength(0);
+  });
+
+  it('ignores a broken or foreign stored choice and still hides when storage refuses', async () => {
+    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, '{not json');
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('brand')).toBeInTheDocument();
+
+    cleanup();
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(['sku', 'name', 'price', 'brand']));
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('sku')).toBeInTheDocument();
+    expect(columnHeader('name')).toBeInTheDocument();
+    expect(columnHeader('brand')).toBeNull();
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
+    await user.click(
+      await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.weight }),
+    );
+    await user.keyboard('{Escape}');
+    expect(columnHeader('weight')).toBeNull();
+    setItem.mockRestore();
+  });
+
+  it('opens a product from its edit button or anywhere on its row', async () => {
+    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    const first = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('link', {
+        name: `${mn.catalog.products.edit}: Кока кола`,
+      }),
+    );
+    await waitFor(() => expect(first.router.state.location.pathname).toBe('/catalog/products/1'));
+
+    cleanup();
+    const second = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const table = await screen.findByRole('table');
+    await user.click(await within(table).findByText('Coca-Cola'));
+    await waitFor(() => expect(second.router.state.location.pathname).toBe('/catalog/products/1'));
+
+    cleanup();
+    renderApp('/catalog/products', signedIn(WORKER_ME, routes));
+    expect(
+      await screen.findByRole('link', { name: `${mn.catalog.products.view}: Кока кола` }),
+    ).toHaveAttribute('href', '/catalog/products/1');
   });
 });
 
