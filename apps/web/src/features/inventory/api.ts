@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  type QueryClient,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -56,6 +57,7 @@ export const KEYS = {
   adjustments: ['inventory', 'adjustments'] as const,
   reconciliation: ['inventory', 'reconciliation'] as const,
   transfers: ['inventory', 'transfers'] as const,
+  stocktakes: ['inventory', 'stocktakes'] as const,
 };
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
@@ -640,6 +642,255 @@ export function useTransferMutations() {
           }),
         ),
       onSuccess: () => changed(),
+    }),
+  };
+}
+
+export type StocktakeSummary = Schemas['StocktakeSummary'];
+export type StocktakeDetail = Schemas['StocktakeDetail'];
+export type StocktakeBin = Schemas['StocktakeBin'];
+export type StocktakeLine = Schemas['StocktakeLine'];
+export type StocktakeLinePage = Schemas['StocktakeLinePage'];
+export type StocktakeStatus = StocktakeDetail['status'];
+export type StocktakeCreate = Schemas['StocktakeCreateRequest'];
+export type StocktakeScanResult = Schemas['StocktakeScanResult'];
+export type StocktakeCountEntry = Schemas['StocktakeCountEntry'];
+export type StocktakeBinPreview = Schemas['StocktakeBinPreview'];
+
+export interface StocktakeFilter {
+  warehouseId?: number;
+  status?: StocktakeStatus;
+}
+
+export function useStocktakes(filter: StocktakeFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.stocktakes, 'list', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stocktakes', {
+          params: {
+            query: {
+              warehouseId: filter.warehouseId,
+              status: filter.status,
+              cursor: pageParam,
+              limit: 50,
+            },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** One stocktake with its bins; fresh again whenever the counter comes back to the page. */
+export function useStocktake(id: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.stocktakes, id],
+    refetchOnWindowFocus: true,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/stocktakes/{id}', { params: { path: { id } }, signal })),
+  });
+}
+
+/**
+ * The lines of one bin, at most 200 (a shelf holds far fewer). Counters receive only what a person
+ * counted there (ADR-0038).
+ */
+export function useStocktakeBinLines(id: number, binId: number | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.stocktakes, id, 'bin-lines', binId],
+    enabled: binId !== undefined,
+    refetchOnWindowFocus: true,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stocktakes/{id}/lines', {
+          params: { path: { id }, query: { binId, limit: 200 } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** Lines across bins for an approver's review, 100 at a time. */
+export function useStocktakeLines(id: number, differences: boolean, enabled: boolean) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.stocktakes, id, 'lines', differences],
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stocktakes/{id}/lines', {
+          params: { path: { id }, query: { differences, cursor: pageParam, limit: 100 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** What a code prefix or «every bin» would count; off until the form names one. */
+export function useStocktakeBinPreview(filter: {
+  warehouseId?: number;
+  prefix?: string;
+  all?: boolean;
+}) {
+  const api = useApiClient();
+  const { warehouseId, prefix, all } = filter;
+  return useQuery({
+    queryKey: [...KEYS.stocktakes, 'bin-preview', filter],
+    enabled: warehouseId !== undefined && (Boolean(prefix) || all === true),
+    retry: false,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stocktakes/bin-preview', {
+          params: { query: { warehouseId: warehouseId ?? 0, prefix: prefix || undefined, all } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** A counted line into the cached bin it belongs to (scans update the page without a refetch). */
+function putStocktakeLine(queryClient: QueryClient, id: number, line: StocktakeLine) {
+  queryClient.setQueryData<StocktakeLinePage>(
+    [...KEYS.stocktakes, id, 'bin-lines', line.binId],
+    (old) => {
+      if (!old) return old;
+      const at = old.data.findIndex((row) => row.id === line.id);
+      if (at === -1) return { ...old, data: [...old.data, line] };
+      return { ...old, data: old.data.map((row) => (row.id === line.id ? line : row)) };
+    },
+  );
+}
+
+/** A bin's progress into the cached stocktake. */
+function putStocktakeBin(queryClient: QueryClient, id: number, bin: StocktakeBin) {
+  queryClient.setQueryData<StocktakeDetail>([...KEYS.stocktakes, id], (old) => {
+    if (!old) return old;
+    const bins = old.bins.map((row) => (row.id === bin.id ? bin : row));
+    return { ...old, bins, countedCount: bins.reduce((sum, row) => sum + row.countedCount, 0) };
+  });
+}
+
+/** Stocktake mutations; a scan updates the cache itself, the other steps refetch. */
+export function useStocktakeMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const invalidate = (...keys: (readonly unknown[])[]) =>
+    Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  // Starting, cancelling and approving lock or free bins; approving also changes stock.
+  const binsChanged = () => invalidate(KEYS.stocktakes, KEYS.bins);
+
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<StocktakeCreate>) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes', { params: { header: idempotencyKey(key) }, body }),
+        ),
+      onSuccess: () => invalidate(KEYS.stocktakes),
+    }),
+    start: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/stocktakes/{id}/start', { params: { path: { id } } })),
+      onSuccess: binsChanged,
+    }),
+    scan: useMutation({
+      mutationFn: async ({
+        id,
+        key,
+        ...body
+      }: {
+        id: number;
+        key: string;
+        binId: number;
+        productUnitId: number;
+        qty: string;
+      }) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes/{id}/scan', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSuccess: (result, { id }) => {
+        putStocktakeLine(queryClient, id, result.line);
+        putStocktakeBin(queryClient, id, result.bin);
+      },
+    }),
+    setCount: useMutation({
+      mutationFn: async ({ id, ...entry }: { id: number } & StocktakeCountEntry) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes/{id}/counts', {
+            params: { path: { id } },
+            body: { entries: [entry] },
+          }),
+        ),
+      onSuccess: (result, { id }) => {
+        for (const line of result.lines) putStocktakeLine(queryClient, id, line);
+        return queryClient.invalidateQueries({ queryKey: [...KEYS.stocktakes, id], exact: true });
+      },
+      // A count changed meanwhile: show the stored one again.
+      onError: (_error, { id, binId }) =>
+        queryClient.invalidateQueries({ queryKey: [...KEYS.stocktakes, id, 'bin-lines', binId] }),
+    }),
+    finishBin: useMutation({
+      mutationFn: async ({ id, binId }: { id: number; binId: number }) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes/{id}/bins/{binId}/finish', {
+            params: { path: { id, binId } },
+          }),
+        ),
+      onSuccess: (bin, { id }) => {
+        putStocktakeBin(queryClient, id, bin);
+        return queryClient.invalidateQueries({
+          queryKey: [...KEYS.stocktakes, id, 'bin-lines', bin.id],
+        });
+      },
+    }),
+    review: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/stocktakes/{id}/review', { params: { path: { id } } })),
+      onSuccess: () => invalidate(KEYS.stocktakes),
+    }),
+    recount: useMutation({
+      mutationFn: async ({ id, binIds }: { id: number; binIds: number[] }) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes/{id}/recount', {
+            params: { path: { id } },
+            body: { binIds },
+          }),
+        ),
+      onSuccess: () => invalidate(KEYS.stocktakes),
+    }),
+    approve: useMutation({
+      mutationFn: async ({
+        id,
+        key,
+        costs,
+      }: {
+        id: number;
+        key: string;
+        costs: { lineId: number; unitCost: string }[];
+      }) =>
+        unwrap(
+          await api.POST('/api/v1/stocktakes/{id}/approve', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { costs },
+          }),
+        ),
+      onSuccess: () => invalidate(KEYS.stocktakes, KEYS.bins, KEYS.stock),
+    }),
+    cancel: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/stocktakes/{id}/cancel', { params: { path: { id } } })),
+      onSuccess: binsChanged,
     }),
   };
 }

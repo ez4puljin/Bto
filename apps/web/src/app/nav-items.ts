@@ -21,8 +21,8 @@ export interface NavGroup {
  * every user; customers only by the office, accountants and admins.
  * Branches and warehouses are readable by every user too (other pages list them), but only people
  * who manage them need the menu entry. Stock and receipts are read by every user (without costs);
- * transfers, moves, adjustments and shelves only by the people who make them (every user may still
- * open a transfer by its link).
+ * transfers, moves, adjustments, stocktakes and shelves only by the people who make them (every user
+ * may still open a transfer or a stocktake by its link).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -59,6 +59,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/inventory/adjustments',
         label: 'nav.adjustments',
         permission: 'inventory.adjustments.manage',
+      },
+      {
+        to: '/inventory/stocktakes',
+        label: 'nav.stocktakes',
+        permission: 'inventory.stocktakes.manage',
       },
       { to: '/inventory/bins', label: 'nav.bins', permission: 'inventory.setup.manage' },
     ],

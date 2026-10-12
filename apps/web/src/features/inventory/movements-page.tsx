@@ -40,6 +40,7 @@ const DOC_PAGES: Partial<Record<StockMovement['docType'], string>> = {
   GR: '/inventory/receipts',
   ADJ: '/inventory/adjustments',
   TR: '/inventory/transfers',
+  ST: '/inventory/stocktakes',
 };
 
 const positiveId = (value: string | null) => {

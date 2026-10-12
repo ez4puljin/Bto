@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   type BinType,
   isBinCode,
+  MAX_STOCKTAKE_BINS,
+  MAX_STOCKTAKE_LINES,
   normalizeBinCode,
   USER_BIN_TYPES,
 } from '@tugeel/shared/inventory';
@@ -58,9 +60,8 @@ const APPROVE = 'inventory.stocktakes.approve';
 const COUNTED_KINDS = ['WHOLESALE', 'STORE'];
 /** «Every bin»: the shelves and the sales floor, never the areas documents pass through. */
 const ALL_BIN_TYPES: readonly BinType[] = ['STORAGE', 'PICKING', 'SALESFLOOR'];
-/** One approval posts every difference: a stocktake stays well under MAX_MOVEMENTS_PER_POST. */
-export const MAX_STOCKTAKE_BINS = 2_000;
-export const MAX_STOCKTAKE_LINES = 10_000;
+// Both well under MAX_MOVEMENTS_PER_POST: one approval posts every difference.
+export { MAX_STOCKTAKE_BINS, MAX_STOCKTAKE_LINES };
 const ZERO = new Decimal(0);
 const lineKey = (binId: number, productId: number, lotId: number | null) =>
   `${binId}:${productId}:${lotId ?? ''}`;

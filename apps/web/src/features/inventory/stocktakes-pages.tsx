@@ -1,0 +1,832 @@
+import { MAX_STOCKTAKE_BINS } from '@tugeel/shared/inventory';
+import { Decimal } from '@tugeel/shared/money';
+import { X } from 'lucide-react';
+import { useDeferredValue, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useHasPermission } from '@/app/auth-context';
+import { CheckboxGroup } from '@/components/checkbox-group';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { NativeSelect } from '@/components/native-select';
+import { PageHeader } from '@/components/page-header';
+import { ProblemAlert } from '@/components/problem-alert';
+import { ScanBox } from '@/components/scan-box';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { formatUbDateTime } from '@/lib/dayjs';
+import { formatMnt } from '@/lib/money';
+import { problemFromError } from '@/lib/problem';
+import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
+import { randomUuid } from '@/lib/uuid';
+import {
+  type Bin,
+  type StocktakeBin,
+  type StocktakeDetail,
+  type StocktakeLine,
+  type StocktakeStatus,
+  useBinLookup,
+  useStocktake,
+  useStocktakeBinPreview,
+  useStocktakeLines,
+  useStocktakeMutations,
+  useStocktakes,
+} from './api';
+import { useCanWrite, useWarehouseName, useWarehouseOptions } from './helpers';
+import { DocStatusBadge, WarehouseSelect } from './shared';
+import { StocktakeCounter } from './stocktake-count';
+
+const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
+const STATUSES: readonly StocktakeStatus[] = [
+  'DRAFT',
+  'COUNTING',
+  'REVIEW',
+  'APPROVED',
+  'CANCELLED',
+];
+const SCOPES = ['prefix', 'all', 'scan'] as const;
+type Scope = (typeof SCOPES)[number];
+/** Cost per base unit, NUMERIC(14,4). */
+const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
+/** Shelf codes listed on a page before «+N». */
+const CODES_SHOWN = 60;
+
+const isStatus = (value: string | null): value is StocktakeStatus =>
+  STATUSES.some((status) => status === value);
+const signed = (value: string) => (value.startsWith('-') ? value : `+${value}`);
+
+/**
+ * Stocktakes (ST-, ADR-0038): warehouse staff count shelf by shelf without seeing what the system
+ * expects; an admin reviews the differences and approves them.
+ */
+export function StocktakesPage() {
+  const { t } = useTranslation();
+  const canManage = useHasPermission('inventory.stocktakes.manage');
+  const [params, setParams] = useSearchParams();
+  const warehouses = useWarehouseOptions(SHELF_KINDS);
+  const warehouseName = useWarehouseName();
+  const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
+  const warehouseId = Number.isNaN(warehouseParam) ? undefined : warehouseParam;
+  const statusParam = params.get('status');
+  const status = isStatus(statusParam) ? statusParam : undefined;
+  const stocktakes = useStocktakes({ warehouseId, status });
+  const rows = stocktakes.data?.pages.flatMap((page) => page.data) ?? [];
+
+  const setParam = (key: string, value: string) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader title={t('inventory.stocktakes.title')} />
+      {canManage ? <StocktakeCreateCard /> : null}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <WarehouseSelect
+          options={warehouses.options}
+          value={warehouseId}
+          emptyLabel={t('inventory.allWarehouses')}
+          onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
+        />
+        <NativeSelect
+          aria-label={t('inventory.status')}
+          value={status ?? ''}
+          onChange={(event) => setParam('status', event.target.value)}
+        >
+          <option value="">{t('inventory.stocktakes.allStatuses')}</option>
+          {STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {t(`inventory.docStatus.${value}`)}
+            </option>
+          ))}
+        </NativeSelect>
+      </div>
+      <ProblemAlert problem={problemFromError(stocktakes.error)} />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('inventory.number')}</TableHead>
+            <TableHead>{t('inventory.warehouse')}</TableHead>
+            <TableHead className="text-right">{t('inventory.stocktakes.shelves')}</TableHead>
+            <TableHead>{t('inventory.status')}</TableHead>
+            <TableHead>{t('inventory.date')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="font-mono">
+                <Link
+                  to={`/inventory/stocktakes/${row.id}`}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {row.number ?? t('inventory.stocktake.noNumber', { id: row.id })}
+                </Link>
+              </TableCell>
+              <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+              <TableCell className="text-right font-mono">
+                {t('inventory.stocktakes.shelvesProgress', {
+                  finished: row.finishedBinCount,
+                  total: row.binCount,
+                })}
+              </TableCell>
+              <TableCell>
+                <DocStatusBadge status={row.status} />
+              </TableCell>
+              <TableCell className="font-mono">
+                {row.effectiveDate ?? formatUbDateTime(Date.parse(row.startedAt ?? row.createdAt))}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {!stocktakes.isPending && rows.length === 0 ? (
+        <p className="py-2 text-sm text-muted-foreground">{t('inventory.stocktakes.empty')}</p>
+      ) : null}
+      {stocktakes.hasNextPage ? (
+        <Button
+          className="self-start"
+          variant="outline"
+          disabled={stocktakes.isFetchingNextPage}
+          onClick={() => void stocktakes.fetchNextPage()}
+        >
+          {t('common.loadMore')}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/** A draft names its warehouse and shelves: a code prefix, every shelf, or scanned labels. */
+function StocktakeCreateCard() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const mine = useWarehouseOptions(SHELF_KINDS, true);
+  const mutations = useStocktakeMutations();
+  const lookup = useBinLookup();
+  const action = useAction();
+  const [key, setKey] = useState(randomUuid);
+  const [picked, setPicked] = useState<number | undefined>();
+  const [scope, setScope] = useState<Scope>('prefix');
+  const [prefix, setPrefix] = useState('');
+  const [scanned, setScanned] = useState<Bin[]>([]);
+  const [missing, setMissing] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  // A warehouse worker usually writes for one warehouse: it is chosen already.
+  const warehouseId = picked ?? (mine.options.length === 1 ? mine.options[0]?.id : undefined);
+  const typed = useDeferredValue(prefix.trim());
+  const preview = useStocktakeBinPreview(
+    scope === 'scan'
+      ? {}
+      : { warehouseId, ...(scope === 'prefix' ? { prefix: typed } : { all: true }) },
+  );
+  const counted = preview.data?.binCount ?? 0;
+  const previewOk = counted > 0 && counted <= MAX_STOCKTAKE_BINS;
+  const ready =
+    warehouseId !== undefined &&
+    (scope === 'scan' ? scanned.length > 0 : previewOk && !preview.isFetching);
+
+  const addBin = (code: string) => {
+    if (warehouseId === undefined) return;
+    lookup.mutate(
+      { warehouseId, code },
+      {
+        onSuccess: (bin) => {
+          setMissing(null);
+          setScanned((list) => (list.some((row) => row.id === bin.id) ? list : [...list, bin]));
+        },
+        onError: () => setMissing(code),
+      },
+    );
+  };
+
+  const create = () =>
+    void action
+      .run(async () => {
+        if (warehouseId === undefined) return;
+        const created = await mutations.create.mutateAsync({
+          key,
+          warehouseId,
+          ...(scope === 'prefix'
+            ? { prefix: prefix.trim() }
+            : scope === 'all'
+              ? { all: true }
+              : { binIds: scanned.map((bin) => bin.id) }),
+          ...(note.trim() ? { note: note.trim() } : {}),
+        });
+        await navigate(`/inventory/stocktakes/${created.id}`);
+      })
+      .then((done) => {
+        // A refused draft is a new intent once the form changes.
+        if (!done) setKey(randomUuid());
+      });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('inventory.stocktake.newTitle')}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <ProblemAlert problem={action.problem} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <WarehouseSelect
+            options={mine.options}
+            value={warehouseId}
+            emptyLabel={t('inventory.stocktake.pickWarehouse')}
+            onChange={(id) => {
+              setPicked(id);
+              setScanned([]);
+            }}
+          />
+          <NativeSelect
+            aria-label={t('inventory.stocktake.scope')}
+            value={scope}
+            onChange={(event) => {
+              const next = SCOPES.find((value) => value === event.target.value);
+              if (next) setScope(next);
+            }}
+          >
+            {SCOPES.map((value) => (
+              <option key={value} value={value}>
+                {t(`inventory.stocktake.scopes.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
+          {scope === 'prefix' ? (
+            <Input
+              aria-label={t('inventory.stocktake.prefix')}
+              placeholder={t('inventory.stocktake.prefixPlaceholder')}
+              className="font-mono"
+              autoComplete="off"
+              maxLength={32}
+              value={prefix}
+              onChange={(event) => setPrefix(event.target.value)}
+            />
+          ) : null}
+          <Input
+            aria-label={t('inventory.note')}
+            placeholder={t('inventory.note')}
+            maxLength={500}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t(`inventory.stocktake.scopeHints.${scope}`)}
+        </p>
+        {scope === 'scan' ? (
+          warehouseId === undefined ? null : (
+            <div className="flex flex-col gap-2">
+              <ScanBox
+                letters
+                label={t('inventory.stocktake.scanBins')}
+                placeholder={t('inventory.stocktake.scanBinsPlaceholder')}
+                onScan={addBin}
+              />
+              {missing ? (
+                <p className="text-sm text-destructive">
+                  {t('inventory.stocktake.binNotFound', { code: missing })}
+                </p>
+              ) : null}
+              {scanned.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {scanned.map((bin) => (
+                    <Badge key={bin.id} variant="outline" className="gap-1 font-mono">
+                      {bin.code}
+                      <button
+                        type="button"
+                        aria-label={t('inventory.stocktake.removeBin', { code: bin.code })}
+                        onClick={() =>
+                          setScanned((list) => list.filter((row) => row.id !== bin.id))
+                        }
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )
+        ) : (
+          <BinPreviewLine
+            problem={problemFromError(preview.error)}
+            preview={warehouseId === undefined ? undefined : preview.data}
+          />
+        )}
+        <Button
+          className="self-start"
+          disabled={!ready || mutations.create.isPending}
+          onClick={create}
+        >
+          {t('inventory.stocktake.createDraft')}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BinPreviewLine({
+  preview,
+  problem,
+}: {
+  preview:
+    | { binCount: number; countingCount: number; firstCode: string | null; lastCode: string | null }
+    | undefined;
+  problem: ReturnType<typeof problemFromError>;
+}) {
+  const { t } = useTranslation();
+  if (problem) return <ProblemAlert problem={problem} />;
+  if (!preview) return null;
+  if (preview.binCount === 0) {
+    return <p className="text-sm text-destructive">{t('inventory.stocktake.previewNone')}</p>;
+  }
+  if (preview.binCount > MAX_STOCKTAKE_BINS) {
+    return (
+      <p className="text-sm text-destructive">
+        {t('inventory.stocktake.previewTooMany', { max: MAX_STOCKTAKE_BINS })}
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <p className="font-medium">
+        {t('inventory.stocktake.preview', {
+          count: preview.binCount,
+          first: preview.firstCode ?? '',
+          last: preview.lastCode ?? '',
+        })}
+      </p>
+      {preview.countingCount > 0 ? (
+        <p className="text-destructive">
+          {t('inventory.stocktake.previewCounting', { count: preview.countingCount })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** One stocktake: the step its status and the reader's rights call for. */
+export function StocktakePage() {
+  const { t } = useTranslation();
+  const id = Number.parseInt(useParams().id ?? '', 10);
+  const canManage = useHasPermission('inventory.stocktakes.manage');
+  const canApprove = useHasPermission('inventory.stocktakes.approve');
+  const canWrite = useCanWrite();
+  const stocktake = useStocktake(id);
+  const warehouseName = useWarehouseName();
+
+  const loadProblem = problemFromError(stocktake.error);
+  if (loadProblem) return <ProblemAlert problem={loadProblem} />;
+  if (!stocktake.data) {
+    return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
+  }
+  const detail = stocktake.data;
+  const writer = canWrite(detail.warehouseId);
+  const counter = detail.status === 'COUNTING' && canManage && writer;
+  const finished = detail.bins.filter((bin) => bin.finishedAt !== null).length;
+
+  const body = (() => {
+    switch (detail.status) {
+      case 'DRAFT':
+        return canManage && writer ? (
+          <StocktakeDraft detail={detail} />
+        ) : (
+          <BinCodes bins={detail.bins} />
+        );
+      case 'COUNTING':
+        return counter ? (
+          <StocktakeCounter key={detail.id} detail={detail} />
+        ) : (
+          <BinCodes bins={detail.bins} />
+        );
+      case 'REVIEW':
+        return canApprove && writer ? (
+          <StocktakeReview detail={detail} />
+        ) : (
+          <p className="text-sm">{t('inventory.stocktake.waiting')}</p>
+        );
+      case 'APPROVED':
+        return canApprove ? (
+          <StocktakeReview detail={detail} />
+        ) : (
+          <p className="text-sm">{t('inventory.stocktake.approvedNote')}</p>
+        );
+      case 'CANCELLED':
+        return <p className="text-sm">{t('inventory.stocktake.cancelledNote')}</p>;
+    }
+  })();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
+        actions={
+          <Button variant="outline" asChild>
+            <Link to="/inventory/stocktakes">{t('common.back')}</Link>
+          </Button>
+        }
+      />
+      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <DocStatusBadge status={detail.status} />
+        <span>{warehouseName(detail.warehouseId)}</span>
+        {/* The counter's shelf list shows the progress itself. */}
+        {detail.status === 'COUNTING' && !counter ? (
+          <span className="text-muted-foreground">
+            {t('inventory.stocktake.progress', { finished, total: detail.bins.length })}
+          </span>
+        ) : null}
+        {detail.effectiveDate ? (
+          <span className="font-mono text-muted-foreground">
+            {t('inventory.stocktake.approvedOn', { date: detail.effectiveDate })}
+          </span>
+        ) : null}
+      </div>
+      {detail.note ? <p className="text-sm">{detail.note}</p> : null}
+      {body}
+    </div>
+  );
+}
+
+/** The shelves of a stocktake, finished ones marked. */
+function BinCodes({ bins }: { bins: StocktakeBin[] }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap gap-1">
+      {bins.slice(0, CODES_SHOWN).map((bin) => (
+        <Badge
+          key={bin.id}
+          variant={bin.finishedAt ? 'secondary' : 'outline'}
+          className="font-mono"
+          title={bin.finishedAt ? t('inventory.stocktake.finished') : undefined}
+        >
+          {bin.code}
+        </Badge>
+      ))}
+      {bins.length > CODES_SHOWN ? (
+        <Badge variant="outline">
+          {t('inventory.stocktake.moreCodes', { count: bins.length - CODES_SHOWN })}
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
+
+/** A draft: its shelves, started on the counting day or cancelled. */
+function StocktakeDraft({ detail }: { detail: StocktakeDetail }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const mutations = useStocktakeMutations();
+  const action = useAction();
+  const [confirm, setConfirm] = useState<'start' | 'cancel' | null>(null);
+  const ask = (which: 'start' | 'cancel') => {
+    action.clear();
+    setConfirm(which);
+  };
+  const start = () =>
+    void action.run(async () => {
+      await mutations.start.mutateAsync(detail.id);
+      setConfirm(null);
+    });
+  const cancel = () =>
+    void action.run(async () => {
+      await mutations.cancel.mutateAsync(detail.id);
+      setConfirm(null);
+      await navigate('/inventory/stocktakes');
+    });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('inventory.stocktake.binsTitle', { count: detail.bins.length })}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <BinCodes bins={detail.bins} />
+        <p className="text-xs text-muted-foreground">{t('inventory.stocktake.draftHint')}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => ask('start')}>{t('inventory.stocktake.start')}</Button>
+          <Button variant="outline" onClick={() => ask('cancel')}>
+            {t('inventory.stocktake.cancel')}
+          </Button>
+        </div>
+      </CardContent>
+      <ConfirmDialog
+        open={confirm === 'start'}
+        variant="default"
+        title={t('inventory.stocktake.startTitle')}
+        description={t('inventory.stocktake.startDescription')}
+        confirmLabel={t('inventory.stocktake.start')}
+        pending={mutations.start.isPending}
+        problem={action.problem}
+        onConfirm={start}
+        onClose={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={confirm === 'cancel'}
+        title={t('inventory.stocktake.cancelTitle')}
+        description={t('inventory.stocktake.cancelDescription')}
+        confirmLabel={t('inventory.stocktake.cancel')}
+        pending={mutations.cancel.isPending}
+        problem={action.problem}
+        onConfirm={cancel}
+        onClose={() => setConfirm(null)}
+      />
+    </Card>
+  );
+}
+
+/** What a counted line shows: a count, or 0 marked as not found when nobody counted it. */
+function countedText(line: StocktakeLine, none: string, notFound: (qty: string) => string) {
+  if (line.countedQty === null) return none;
+  return line.countedAt === null ? notFound(line.countedQty) : line.countedQty;
+}
+
+/**
+ * The approver's review: frozen against counted per line, the differences first. In review the
+ * approver gives surpluses a cost (cost holders), approves, sends shelves back or cancels; after
+ * approval the same table stays as the record.
+ */
+function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const canCost = useHasPermission('inventory.costs.manage');
+  const open = detail.status === 'REVIEW';
+  const [all, setAll] = useState(false);
+  const lines = useStocktakeLines(detail.id, !all, true);
+  const rows = lines.data?.pages.flatMap((page) => page.data) ?? [];
+  const mutations = useStocktakeMutations();
+  const action = useAction();
+  const [confirm, setConfirm] = useState<'approve' | 'recount' | 'cancel' | null>(null);
+  const [key, setKey] = useState(randomUuid);
+  const [costs, setCosts] = useState<Record<number, string>>({});
+  const [recount, setRecount] = useState<number[]>([]);
+  const withAverages = open && canCost;
+  const costsValid = Object.values(costs).every(
+    (value) => !value.trim() || UNIT_COST.test(value.trim()),
+  );
+  // Shelves with differences first, in code order.
+  const shelves = [...detail.bins].sort(
+    (a, b) => Number((b.differenceCount ?? 0) > 0) - Number((a.differenceCount ?? 0) > 0),
+  );
+
+  const ask = (which: 'approve' | 'recount' | 'cancel') => {
+    action.clear();
+    if (which === 'approve') setKey(randomUuid());
+    if (which === 'recount') {
+      setRecount(detail.bins.filter((bin) => (bin.differenceCount ?? 0) > 0).map((bin) => bin.id));
+    }
+    setConfirm(which);
+  };
+  const approve = () =>
+    void action.run(async () => {
+      await mutations.approve.mutateAsync({
+        id: detail.id,
+        key,
+        costs: Object.entries(costs)
+          .filter(([, value]) => value.trim())
+          .map(([lineId, value]) => ({
+            lineId: Number.parseInt(lineId, 10),
+            unitCost: value.trim(),
+          })),
+      });
+      setConfirm(null);
+    });
+  const sendBack = () =>
+    void action.run(async () => {
+      await mutations.recount.mutateAsync({ id: detail.id, binIds: recount });
+      setConfirm(null);
+    });
+  const cancel = () =>
+    void action.run(async () => {
+      await mutations.cancel.mutateAsync(detail.id);
+      setConfirm(null);
+      await navigate('/inventory/stocktakes');
+    });
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-medium">
+            {t('inventory.stocktake.summary', { count: detail.differenceCount ?? 0 })}
+          </span>
+          {detail.shortageValue !== undefined ? (
+            <span>
+              {t('inventory.stocktake.shortageValue', { value: formatMnt(detail.shortageValue) })}
+            </span>
+          ) : null}
+          {detail.surplusValue !== undefined ? (
+            <span>
+              {t('inventory.stocktake.surplusValue', { value: formatMnt(detail.surplusValue) })}
+            </span>
+          ) : null}
+          {detail.shortageValue !== undefined ? (
+            <span className="text-muted-foreground">{t('inventory.stocktake.valuesNote')}</span>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={all ? 'outline' : 'default'}
+            aria-pressed={!all}
+            onClick={() => setAll(false)}
+          >
+            {t('inventory.stocktake.onlyDifferences')}
+          </Button>
+          <Button
+            size="sm"
+            variant={all ? 'default' : 'outline'}
+            aria-pressed={all}
+            onClick={() => setAll(true)}
+          >
+            {t('inventory.stocktake.allLines')}
+          </Button>
+        </div>
+        <ProblemAlert
+          problem={confirm ? null : (action.problem ?? problemFromError(lines.error))}
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.stocktake.columns.bin')}</TableHead>
+              <TableHead>{t('inventory.stocktake.columns.product')}</TableHead>
+              <TableHead className="text-right">
+                {t('inventory.stocktake.columns.expected')}
+              </TableHead>
+              <TableHead className="text-right">
+                {t('inventory.stocktake.columns.counted')}
+              </TableHead>
+              <TableHead className="text-right">
+                {t('inventory.stocktake.columns.difference')}
+              </TableHead>
+              {withAverages ? (
+                <>
+                  <TableHead className="text-right">
+                    {t('inventory.stocktake.columns.avgCost')}
+                  </TableHead>
+                  <TableHead>{t('inventory.stocktake.columns.unitCost')}</TableHead>
+                </>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((line) => {
+              const difference = line.difference ?? null;
+              const changed = difference !== null && !new Decimal(difference).isZero();
+              const surplus = difference !== null && new Decimal(difference).gt(0);
+              return (
+                <TableRow key={line.id}>
+                  <TableCell className="font-mono">{line.binCode}</TableCell>
+                  <TableCell className="min-w-48 whitespace-normal">
+                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                    {line.productName}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {line.expectedQty ?? t('common.none')}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {countedText(line, t('common.none'), (qty) =>
+                      t('inventory.stocktake.notFound', { qty }),
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono',
+                      changed && !surplus && 'text-destructive',
+                    )}
+                  >
+                    {difference === null || !changed
+                      ? t('common.none')
+                      : t('inventory.qtyWithUnit', {
+                          qty: signed(difference),
+                          unit: line.baseUnitName,
+                        })}
+                  </TableCell>
+                  {withAverages ? (
+                    <>
+                      <TableCell className="text-right font-mono">
+                        {line.avgCost ? formatMnt(line.avgCost) : t('common.none')}
+                      </TableCell>
+                      <TableCell>
+                        {surplus ? (
+                          <Input
+                            aria-label={t('inventory.stocktake.unitCostFor', {
+                              code: line.binCode,
+                              name: line.productName,
+                            })}
+                            placeholder={t('inventory.stocktake.unitCostHint')}
+                            inputMode="decimal"
+                            className="w-40 font-mono"
+                            value={costs[line.id] ?? ''}
+                            onChange={(event) =>
+                              setCosts((previous) => ({
+                                ...previous,
+                                [line.id]: event.target.value,
+                              }))
+                            }
+                          />
+                        ) : null}
+                      </TableCell>
+                    </>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        {!lines.isPending && rows.length === 0 ? (
+          <p className="py-2 text-sm text-muted-foreground">
+            {all ? t('inventory.stocktake.noLinesAll') : t('inventory.stocktake.noDifferences')}
+          </p>
+        ) : null}
+        {lines.hasNextPage ? (
+          <Button
+            className="self-start"
+            variant="outline"
+            disabled={lines.isFetchingNextPage}
+            onClick={() => void lines.fetchNextPage()}
+          >
+            {t('common.loadMore')}
+          </Button>
+        ) : null}
+        {open ? (
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={!costsValid} onClick={() => ask('approve')}>
+              {t('inventory.stocktake.approve')}
+            </Button>
+            <Button variant="outline" onClick={() => ask('recount')}>
+              {t('inventory.stocktake.recount')}
+            </Button>
+            <Button variant="ghost" onClick={() => ask('cancel')}>
+              {t('inventory.stocktake.cancel')}
+            </Button>
+          </div>
+        ) : null}
+      </CardContent>
+      <ConfirmDialog
+        open={confirm === 'approve'}
+        variant="default"
+        title={t('inventory.stocktake.approveTitle')}
+        description={t('inventory.stocktake.approveDescription')}
+        confirmLabel={t('inventory.stocktake.approve')}
+        pending={mutations.approve.isPending}
+        problem={action.problem}
+        onConfirm={approve}
+        onClose={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={confirm === 'recount'}
+        variant="default"
+        title={t('inventory.stocktake.recountTitle')}
+        description={t('inventory.stocktake.recountDescription')}
+        confirmLabel={t('inventory.stocktake.recount')}
+        pending={mutations.recount.isPending}
+        disabled={recount.length === 0}
+        problem={action.problem}
+        onConfirm={sendBack}
+        onClose={() => setConfirm(null)}
+      >
+        <div className="max-h-72 overflow-y-auto">
+          <CheckboxGroup
+            name="recount"
+            options={shelves.map((bin) => ({
+              value: bin.id,
+              label: t('inventory.stocktake.recountBin', {
+                code: bin.code,
+                count: bin.differenceCount ?? 0,
+              }),
+            }))}
+            value={recount}
+            onChange={setRecount}
+          />
+        </div>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === 'cancel'}
+        title={t('inventory.stocktake.cancelTitle')}
+        description={t('inventory.stocktake.cancelDescription')}
+        confirmLabel={t('inventory.stocktake.cancel')}
+        pending={mutations.cancel.isPending}
+        problem={action.problem}
+        onConfirm={cancel}
+        onClose={() => setConfirm(null)}
+      />
+    </Card>
+  );
+}

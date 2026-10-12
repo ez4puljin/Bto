@@ -280,6 +280,13 @@ export function transferReceiveLegs(
 }
 
 // ---------------------------------------------------------------------------------------------
+// Stocktakes (ADR-0038)
+
+/** One approval posts every difference: a stocktake counts at most this many bins and lines. */
+export const MAX_STOCKTAKE_BINS = 2_000;
+export const MAX_STOCKTAKE_LINES = 10_000;
+
+// ---------------------------------------------------------------------------------------------
 // Cost arithmetic (ADR-0007 cost rules, ADR-0033 costing after posting)
 
 export const COST_SCALE = 4;

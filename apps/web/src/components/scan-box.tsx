@@ -12,16 +12,18 @@ import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 /**
  * The visible scan box (ADR-0021 #1): a keyboard-wedge scanner works with or without focus here,
  * a code can be typed, and where the page may open a camera a button reads one with it. With
- * `letters` it also reads shelf labels ("A-01-03") whatever the keyboard layout.
+ * `letters` it also reads shelf labels ("A-01-03") whatever the keyboard layout. While `disabled`
+ * (a dialog is open) it reads nothing.
  */
 export function ScanBox(props: {
   onScan: (code: string) => void;
   letters?: boolean;
+  disabled?: boolean;
   label?: string;
   placeholder?: string;
 }) {
   const { t } = useTranslation();
-  const { onScan, letters = false } = props;
+  const { onScan, letters = false, disabled = false } = props;
   const [draft, setDraft] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [canUseCamera] = useState(cameraAvailable);
@@ -31,7 +33,7 @@ export function ScanBox(props: {
     setDraft('');
     if (code) onScan(code);
   };
-  useWedgeScanner(submit, !cameraOpen, { letters });
+  useWedgeScanner(submit, !cameraOpen && !disabled, { letters });
 
   return (
     <div className="flex flex-col gap-2">
@@ -39,6 +41,7 @@ export function ScanBox(props: {
         <Input
           aria-label={props.label ?? t('scan.label')}
           className="max-w-sm font-mono"
+          disabled={disabled}
           autoComplete="off"
           spellCheck={false}
           placeholder={props.placeholder ?? t('scan.placeholder')}

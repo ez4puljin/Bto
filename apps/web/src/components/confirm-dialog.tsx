@@ -21,6 +21,8 @@ export function ConfirmDialog(props: {
   /** Posting a document is final but not destructive. */
   variant?: 'default' | 'destructive';
   pending?: boolean;
+  /** Nothing to confirm yet (e.g. nothing chosen). */
+  disabled?: boolean;
   problem?: ProblemDetails | null;
   onConfirm: () => void;
   onClose: () => void;
@@ -40,7 +42,7 @@ export function ConfirmDialog(props: {
         <DialogFooter closeLabel={t('common.cancel')}>
           <Button
             variant={props.variant ?? 'destructive'}
-            disabled={props.pending}
+            disabled={props.pending || props.disabled}
             onClick={props.onConfirm}
           >
             {props.confirmLabel}

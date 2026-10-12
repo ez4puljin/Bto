@@ -10,7 +10,16 @@ import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { isQty } from './helpers';
 
 type DocStatus =
-  'DRAFT' | 'SUBMITTED' | 'REQUESTED' | 'SHIPPED' | 'POSTED' | 'RECEIVED' | 'CANCELLED';
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'REQUESTED'
+  | 'SHIPPED'
+  | 'POSTED'
+  | 'RECEIVED'
+  | 'COUNTING'
+  | 'REVIEW'
+  | 'APPROVED'
+  | 'CANCELLED';
 
 export function WarehouseSelect(props: {
   options: readonly Warehouse[];
@@ -44,9 +53,13 @@ export function WarehouseSelect(props: {
 export function DocStatusBadge({ status }: { status: DocStatus }) {
   const { t } = useTranslation();
   const variant =
-    status === 'POSTED' || status === 'RECEIVED'
+    status === 'POSTED' || status === 'RECEIVED' || status === 'APPROVED'
       ? 'secondary'
-      : status === 'SUBMITTED' || status === 'REQUESTED' || status === 'SHIPPED'
+      : status === 'SUBMITTED' ||
+          status === 'REQUESTED' ||
+          status === 'SHIPPED' ||
+          status === 'COUNTING' ||
+          status === 'REVIEW'
         ? 'default'
         : 'outline';
   return <Badge variant={variant}>{t(`inventory.docStatus.${status}`)}</Badge>;

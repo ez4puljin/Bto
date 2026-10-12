@@ -25,6 +25,7 @@ import { BinMovesPage } from '@/features/inventory/moves-page';
 import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
+import { StocktakePage, StocktakesPage } from '@/features/inventory/stocktakes-pages';
 import { ImportPage, ImportsPage } from '@/features/imports/imports-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -152,6 +153,8 @@ export const routes: RouteObject[] = [
       { path: 'inventory/moves', element: <BinMovesPage /> },
       { path: 'inventory/adjustments', element: <AdjustmentsPage /> },
       { path: 'inventory/adjustments/:id', element: <AdjustmentPage /> },
+      { path: 'inventory/stocktakes', element: <StocktakesPage /> },
+      { path: 'inventory/stocktakes/:id', element: <StocktakePage /> },
       {
         path: 'inventory/bins',
         element: (
