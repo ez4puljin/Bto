@@ -1,13 +1,14 @@
 import { CUSTOMER_KINDS } from '@tugeel/shared/taxpayer';
 import { Plus } from 'lucide-react';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ColumnChooser } from '@/components/column-chooser';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Badge } from '@/components/ui/badge';
+import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -21,11 +22,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { type CustomerKind, type PartnerStatus, useCustomers } from './api';
+import {
+  CUSTOMER_COLUMN_KEYS,
+  CUSTOMER_COLUMNS,
+  LOCKED_CUSTOMER_COLUMNS,
+} from './customer-columns';
 import { PARTNER_STATUSES } from './partner-schema';
-import { localPhone } from './phone';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
+const COLUMNS_STORAGE_KEY = 'tugeel.partners.customers.hiddenColumns.v1';
 type Flag = (typeof FLAGS)[number];
 
 const isKind = (value: string | null): value is CustomerKind =>
@@ -58,6 +65,16 @@ export function CustomersPage() {
     creditHold: flag('creditHold'),
   });
   const rows = customers.data?.pages.flatMap((page) => page.data) ?? [];
+  const columnState = useHiddenColumns(
+    COLUMNS_STORAGE_KEY,
+    CUSTOMER_COLUMN_KEYS,
+    LOCKED_CUSTOMER_COLUMNS,
+  );
+  const { hidden } = columnState;
+  const columns = useMemo(
+    () => CUSTOMER_COLUMNS.filter((column) => !hidden.has(column.key)),
+    [hidden],
+  );
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -75,14 +92,24 @@ export function CustomersPage() {
       <PageHeader
         title={t('partners.customers.title')}
         actions={
-          canManage ? (
-            <Button asChild>
-              <Link to="/partners/customers/new">
-                <Plus />
-                {t('partners.customers.create')}
-              </Link>
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            <ColumnChooser
+              keys={CUSTOMER_COLUMN_KEYS}
+              locked={LOCKED_CUSTOMER_COLUMNS}
+              label={(key) => t(`partners.customers.columns.${key}`)}
+              hidden={hidden}
+              toggle={columnState.toggle}
+              showAll={columnState.showAll}
+            />
+            {canManage ? (
+              <Button asChild>
+                <Link to="/partners/customers/new">
+                  <Plus />
+                  {t('partners.customers.create')}
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
       <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -140,66 +167,28 @@ export function CustomersPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('partners.customers.columns.code')}</TableHead>
-            <TableHead>{t('partners.customers.columns.name')}</TableHead>
-            <TableHead>{t('partners.customers.columns.kind')}</TableHead>
-            <TableHead>{t('partners.customers.columns.tin')}</TableHead>
-            <TableHead>{t('partners.customers.columns.phone')}</TableHead>
-            <TableHead>{t('partners.customers.columns.address')}</TableHead>
-            <TableHead>{t('partners.customers.columns.status')}</TableHead>
+            <RecordActionsHead />
+            {columns.map((column) => (
+              <TableHead key={column.key}>
+                {t(`partners.customers.columns.${column.key}`)}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((customer) => (
-            <TableRow key={customer.id}>
-              <TableCell className="font-mono">{customer.code}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/partners/customers/${customer.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {customer.name}
-                </Link>
-                {customer.regNo ? (
-                  <span className="block font-mono text-xs text-muted-foreground">
-                    {customer.regNo}
-                  </span>
-                ) : null}
-              </TableCell>
-              <TableCell>{t(`partners.kinds.${customer.kind}`)}</TableCell>
-              <TableCell>
-                {customer.tin ? (
-                  <span className="font-mono">{customer.tin}</span>
-                ) : customer.tinPending ? (
-                  <Badge variant="outline">{t('partners.customer.tinPending')}</Badge>
-                ) : (
-                  t('common.none')
-                )}
-              </TableCell>
-              <TableCell className="font-mono">
-                {customer.phone ? localPhone(customer.phone) : t('common.none')}
-              </TableCell>
-              <TableCell className="whitespace-normal">
-                <span className="text-muted-foreground">
-                  {customer.address ?? t('common.none')}
-                </span>
-                {customer.hasGps ? null : (
-                  <Badge variant="outline" className="ml-2">
-                    {t('partners.addresses.noGps')}
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant={customer.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                    {t(`partners.status.${customer.status}`)}
-                  </Badge>
-                  {customer.creditHold ? (
-                    <Badge variant="destructive">{t('partners.credit.held')}</Badge>
-                  ) : null}
-                </div>
-              </TableCell>
-            </TableRow>
+            <RecordRow
+              key={customer.id}
+              href={`/partners/customers/${customer.id}`}
+              name={customer.name}
+              canManage={canManage}
+            >
+              {columns.map((column) => (
+                <TableCell key={column.key} className={column.className}>
+                  {column.cell(customer, t)}
+                </TableCell>
+              ))}
+            </RecordRow>
           ))}
         </TableBody>
       </Table>

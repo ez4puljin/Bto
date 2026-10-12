@@ -76,6 +76,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'partners/customers',
+        handle: { wide: true },
         element: (
           <RequirePermission permission="partners.customers.read">
             <CustomersPage />
@@ -98,7 +99,7 @@ export const routes: RouteObject[] = [
           </RequirePermission>
         ),
       },
-      { path: 'partners/suppliers', element: <SuppliersPage /> },
+      { path: 'partners/suppliers', element: <SuppliersPage />, handle: { wide: true } },
       {
         path: 'partners/suppliers/new',
         element: (

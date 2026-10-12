@@ -1,32 +1,20 @@
-import { Columns3, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ColumnChooser } from '@/components/column-chooser';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { type ProductStatus, useBrands, useCategories, useProducts } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
-import {
-  LOCKED_PRODUCT_COLUMNS,
-  PRODUCT_COLUMN_KEYS,
-  PRODUCT_COLUMNS,
-  type ProductColumnKey,
-} from './product-columns';
+import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMN_KEYS, PRODUCT_COLUMNS } from './product-columns';
 import { PRODUCT_STATUSES } from './product-schema';
 import { ProductTable, type ProductTableContext } from './product-table';
 
@@ -105,6 +93,9 @@ export function ProductsPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <ColumnChooser
+              keys={PRODUCT_COLUMN_KEYS}
+              locked={LOCKED_PRODUCT_COLUMNS}
+              label={(key) => t(`catalog.products.columns.${key}`)}
               hidden={hidden}
               toggle={columnState.toggle}
               showAll={columnState.showAll}
@@ -184,42 +175,5 @@ export function ProductsPage() {
         </Button>
       ) : null}
     </div>
-  );
-}
-
-/** «Баганууд»: show or hide each column; the code and the name always show. */
-function ColumnChooser(props: {
-  hidden: ReadonlySet<string>;
-  toggle: (key: ProductColumnKey) => void;
-  showAll: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline">
-          <Columns3 />
-          {t('catalog.products.columnsButton')}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
-        {PRODUCT_COLUMN_KEYS.map((key) => (
-          <DropdownMenuCheckboxItem
-            key={key}
-            checked={!props.hidden.has(key)}
-            disabled={LOCKED_PRODUCT_COLUMNS.includes(key)}
-            onCheckedChange={() => props.toggle(key)}
-            // Keep the menu open while several columns are picked.
-            onSelect={(event) => event.preventDefault()}
-          >
-            {t(`catalog.products.columns.${key}`)}
-          </DropdownMenuCheckboxItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={props.hidden.size === 0} onSelect={props.showAll}>
-          {t('catalog.products.showAllColumns')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

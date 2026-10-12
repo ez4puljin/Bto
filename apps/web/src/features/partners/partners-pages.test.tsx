@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
@@ -30,10 +30,11 @@ const OFFICE_ME: Me = {
   roles: [{ id: 2, code: 'OFFICE', name: null, isSystem: true }],
 };
 
+const POINT = { lat: '47.918400', lng: '106.917700' };
 const summary = (
-  overrides: Partial<Schemas['CustomerSummary']> &
-    Pick<Schemas['CustomerSummary'], 'id' | 'code' | 'name'>,
-): Schemas['CustomerSummary'] => ({
+  overrides: Partial<Schemas['CustomerListItem']> &
+    Pick<Schemas['CustomerListItem'], 'id' | 'code' | 'name'>,
+): Schemas['CustomerListItem'] => ({
   kind: 'COMPANY',
   regNo: null,
   tin: null,
@@ -42,7 +43,35 @@ const summary = (
   creditHold: false,
   tinPending: false,
   address: null,
-  hasGps: true,
+  hasGps: overrides.hasGps ?? true,
+  consumerNo: null,
+  vatPayer: false,
+  cityPayer: false,
+  taxStatusSource: null,
+  creditLimit: null,
+  paymentTerm: { days: null, source: 'UNSET' },
+  creditHoldReason: null,
+  note: null,
+  gps: overrides.hasGps === false ? null : POINT,
+  contact: null,
+  ...overrides,
+});
+const supplierRow = (
+  overrides: Partial<Schemas['SupplierListItem']> &
+    Pick<Schemas['SupplierListItem'], 'id' | 'code' | 'name'>,
+): Schemas['SupplierListItem'] => ({
+  tin: null,
+  phone: null,
+  status: 'ACTIVE',
+  regNo: null,
+  email: null,
+  address: null,
+  bankName: null,
+  bankAccount: null,
+  paymentTermDays: null,
+  note: null,
+  contact: null,
+  productCount: 0,
   ...overrides,
 });
 
@@ -196,6 +225,97 @@ describe('customers list', () => {
         }),
       ).toBe(true),
     );
+  });
+
+  it('shows every customer field in its own column and opens the customer from its row', async () => {
+    const routes = {
+      'GET /api/v1/customers': () =>
+        list([
+          summary({
+            id: 1,
+            code: '1001',
+            name: 'Номин дэлгүүр',
+            regNo: '1234567',
+            tin: '12345678901',
+            phone: '+97699112233',
+            address: 'БЗД, 13-р хороо',
+            vatPayer: true,
+            taxStatusSource: 'MANUAL',
+            creditLimit: '5000000.00',
+            paymentTerm: { days: 30, source: 'CUSTOMER' },
+            creditHold: true,
+            creditHoldReason: 'Өр төлөөгүй',
+            note: 'Өглөө хүргэнэ',
+            contact: { name: 'Бат', phone: '+97688112233' },
+          }),
+          summary({
+            id: 3,
+            code: '1003',
+            name: 'Бат иргэн',
+            kind: 'INDIVIDUAL',
+            consumerNo: '11234567',
+          }),
+        ]),
+    };
+    const first = renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
+    const table = within(await screen.findByRole('table'));
+    expect(await table.findByText('Өр төлөөгүй')).toBeInTheDocument();
+    for (const text of [
+      '1234567',
+      '11234567',
+      '9911 2233',
+      mn.common.yes,
+      'БЗД, 13-р хороо',
+      'Бат',
+      '8811 2233',
+      '5,000,000',
+      '30 хоног',
+      mn.partners.credit.held,
+      mn.partners.credit.limitUndecided,
+      'Өглөө хүргэнэ',
+    ]) {
+      expect(table.getAllByText(text).length).toBeGreaterThan(0);
+    }
+    expect(table.getAllByRole('link', { name: mn.partners.addresses.openMap })).toHaveLength(2);
+    for (const label of Object.values(mn.partners.customers.columns)) {
+      expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
+    }
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('link', { name: `${mn.common.edit}: Номин дэлгүүр` }));
+    await waitFor(() => expect(first.router.state.location.pathname).toBe('/partners/customers/1'));
+
+    cleanup();
+    const second = renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
+    await user.click(await within(await screen.findByRole('table')).findByText('11234567'));
+    await waitFor(() =>
+      expect(second.router.state.location.pathname).toBe('/partners/customers/3'),
+    );
+  });
+
+  it('hides a customer column and remembers it in this browser', async () => {
+    const routes = {
+      'GET /api/v1/customers': () =>
+        list([summary({ id: 1, code: '1001', name: 'Номин дэлгүүр', note: 'Өглөө' })]),
+    };
+    renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Номин дэлгүүр' });
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(
+      await screen.findByRole('menuitemcheckbox', { name: mn.partners.customers.columns.note }),
+    );
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('columnheader', { name: mn.partners.customers.columns.note }),
+    ).toBeNull();
+    expect(localStorage.getItem('tugeel.partners.customers.hiddenColumns.v1')).toBe('["note"]');
+
+    cleanup();
+    renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
+    await screen.findByRole('link', { name: 'Номин дэлгүүр' });
+    expect(
+      screen.queryByRole('columnheader', { name: mn.partners.customers.columns.note }),
+    ).toBeNull();
   });
 });
 
@@ -428,6 +548,55 @@ describe('customer page', () => {
 });
 
 describe('suppliers', () => {
+  it('shows every supplier field in its own column, read-only to a warehouse worker', async () => {
+    const { router } = renderApp(
+      '/partners/suppliers',
+      signedIn(WORKER_ME, {
+        'GET /api/v1/suppliers': () =>
+          list([
+            supplierRow({
+              id: 3,
+              code: '010',
+              name: 'МСМ ХХК',
+              regNo: '7654321',
+              tin: '12345678901',
+              phone: '+97670112233',
+              email: 'sales@msm.mn',
+              address: 'ХУД, 3-р хороо',
+              bankName: 'Хаан банк',
+              bankAccount: 'MN120005005012345678',
+              paymentTermDays: 15,
+              note: 'Сар бүр',
+              contact: { name: 'Сараа', phone: '+97699001122' },
+              productCount: 12,
+            }),
+          ]),
+      }),
+    );
+    const table = within(await screen.findByRole('table'));
+    for (const text of [
+      '7654321',
+      '12345678901',
+      '7011 2233',
+      'sales@msm.mn',
+      'ХУД, 3-р хороо',
+      'Хаан банк',
+      'MN120005005012345678',
+      '15 хоног',
+      'Сараа',
+      '9900 1122',
+      '12',
+      'Сар бүр',
+    ]) {
+      expect(await table.findByText(text)).toBeInTheDocument();
+    }
+    for (const label of Object.values(mn.partners.suppliers.columns)) {
+      expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
+    }
+    await userEvent.setup().click(screen.getByRole('link', { name: `${mn.common.view}: МСМ ХХК` }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/partners/suppliers/3'));
+  });
+
   it('keeps suppliers read-only for a warehouse worker and lists their products', async () => {
     renderApp(
       '/partners/suppliers/3',
@@ -575,9 +744,9 @@ describe('product suppliers card', () => {
       ...productRoutes,
       'GET /api/v1/suppliers': (request) => {
         const q = new URL(request.url).searchParams.get('q');
-        const rows: Schemas['SupplierSummary'][] = [
-          { id: 3, code: '010', name: 'МСМ ХХК', tin: null, phone: null, status: 'ACTIVE' },
-          { id: 5, code: '012', name: 'Гурилын үйлдвэр', tin: null, phone: null, status: 'ACTIVE' },
+        const rows = [
+          supplierRow({ id: 3, code: '010', name: 'МСМ ХХК' }),
+          supplierRow({ id: 5, code: '012', name: 'Гурилын үйлдвэр' }),
         ];
         return list(q ? rows.filter((row) => row.name.startsWith('Гурил')) : rows);
       },

@@ -209,7 +209,12 @@
     "copy": "Хуулах",
     "copied": "Хуулагдлаа",
     "confirm": "Батлах",
-    "all": "Бүгд"
+    "all": "Бүгд",
+    "columns": "Баганууд",
+    "showAllColumns": "Бүгдийг харуулах",
+    "view": "Харах",
+    "editRecord": "Засах: {{name}}",
+    "viewRecord": "Харах: {{name}}"
   },
   "validation": {
     "required": "Заавал бөглөнө",
@@ -559,12 +564,6 @@
         "ACTIVE": "Идэвхтэй",
         "INACTIVE": "Идэвхгүй"
       },
-      "columnsButton": "Баганууд",
-      "showAllColumns": "Бүгдийг харуулах",
-      "edit": "Засах",
-      "view": "Харах",
-      "editProduct": "Засах: {{name}}",
-      "viewProduct": "Харах: {{name}}",
       "unitBarcode": "{{code}} ({{unit}})",
       "fixedBin": "{{warehouse}}: {{bin}}",
       "moreSuppliers": "+{{count}}"
@@ -754,10 +753,20 @@
         "kind": "Төрөл",
         "regNo": "Регистр",
         "tin": "ТТД",
+        "consumerNo": "Хэрэглэгчийн дугаар",
         "phone": "Утас",
+        "vatPayer": "НӨАТ төлөгч",
+        "cityPayer": "НХАТ төлөгч",
         "address": "Хаяг",
+        "gps": "GPS",
+        "contact": "Хариуцсан хүн",
+        "creditLimit": "Зээлийн лимит",
+        "paymentTerm": "Төлбөрийн хугацаа",
+        "creditHold": "Зээлийн төлөв",
+        "note": "Тэмдэглэл",
         "status": "Төлөв"
-      }
+      },
+      "payerUnchecked": "Шалгаагүй"
     },
     "customer": {
       "newTitle": "Шинэ харилцагч",
@@ -844,8 +853,17 @@
       "columns": {
         "code": "Код",
         "name": "Нэр",
+        "regNo": "Регистр",
         "tin": "ТТД",
         "phone": "Утас",
+        "email": "Имэйл",
+        "address": "Хаяг",
+        "bankName": "Банк",
+        "bankAccount": "Дансны дугаар",
+        "paymentTerm": "Төлбөрийн хугацаа",
+        "contact": "Хариуцсан хүн",
+        "productCount": "Барааны тоо",
+        "note": "Тэмдэглэл",
         "status": "Төлөв"
       }
     },

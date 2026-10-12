@@ -1,11 +1,13 @@
 import { ImageOff, Plus } from 'lucide-react';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ColumnChooser } from '@/components/column-chooser';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { randomUuid } from '@/lib/uuid';
 import {
   type PartnerStatus,
@@ -37,8 +40,14 @@ import {
   supplierUpdateBody,
   supplierValues,
 } from './partner-schema';
-import { localPhone } from './phone';
+import {
+  LOCKED_SUPPLIER_COLUMNS,
+  SUPPLIER_COLUMN_KEYS,
+  SUPPLIER_COLUMNS,
+} from './supplier-columns';
 import { SupplierForm } from './supplier-form';
+
+const COLUMNS_STORAGE_KEY = 'tugeel.partners.suppliers.hiddenColumns.v1';
 
 const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
@@ -54,6 +63,16 @@ export function SuppliersPage() {
   const status = isStatus(statusParam) ? statusParam : undefined;
   const suppliers = useSuppliers({ q, status });
   const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
+  const columnState = useHiddenColumns(
+    COLUMNS_STORAGE_KEY,
+    SUPPLIER_COLUMN_KEYS,
+    LOCKED_SUPPLIER_COLUMNS,
+  );
+  const { hidden } = columnState;
+  const columns = useMemo(
+    () => SUPPLIER_COLUMNS.filter((column) => !hidden.has(column.key)),
+    [hidden],
+  );
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -71,14 +90,24 @@ export function SuppliersPage() {
       <PageHeader
         title={t('partners.suppliers.title')}
         actions={
-          canManage ? (
-            <Button asChild>
-              <Link to="/partners/suppliers/new">
-                <Plus />
-                {t('partners.suppliers.create')}
-              </Link>
-            </Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            <ColumnChooser
+              keys={SUPPLIER_COLUMN_KEYS}
+              locked={LOCKED_SUPPLIER_COLUMNS}
+              label={(key) => t(`partners.suppliers.columns.${key}`)}
+              hidden={hidden}
+              toggle={columnState.toggle}
+              showAll={columnState.showAll}
+            />
+            {canManage ? (
+              <Button asChild>
+                <Link to="/partners/suppliers/new">
+                  <Plus />
+                  {t('partners.suppliers.create')}
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,35 +139,28 @@ export function SuppliersPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('partners.suppliers.columns.code')}</TableHead>
-            <TableHead>{t('partners.suppliers.columns.name')}</TableHead>
-            <TableHead>{t('partners.suppliers.columns.tin')}</TableHead>
-            <TableHead>{t('partners.suppliers.columns.phone')}</TableHead>
-            <TableHead>{t('partners.suppliers.columns.status')}</TableHead>
+            <RecordActionsHead />
+            {columns.map((column) => (
+              <TableHead key={column.key}>
+                {t(`partners.suppliers.columns.${column.key}`)}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((supplier) => (
-            <TableRow key={supplier.id}>
-              <TableCell className="font-mono">{supplier.code}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/partners/suppliers/${supplier.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {supplier.name}
-                </Link>
-              </TableCell>
-              <TableCell className="font-mono">{supplier.tin ?? t('common.none')}</TableCell>
-              <TableCell className="font-mono">
-                {supplier.phone ? localPhone(supplier.phone) : t('common.none')}
-              </TableCell>
-              <TableCell>
-                <Badge variant={supplier.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                  {t(`partners.status.${supplier.status}`)}
-                </Badge>
-              </TableCell>
-            </TableRow>
+            <RecordRow
+              key={supplier.id}
+              href={`/partners/suppliers/${supplier.id}`}
+              name={supplier.name}
+              canManage={canManage}
+            >
+              {columns.map((column) => (
+                <TableCell key={column.key} className={column.className}>
+                  {column.cell(supplier, t)}
+                </TableCell>
+              ))}
+            </RecordRow>
           ))}
         </TableBody>
       </Table>

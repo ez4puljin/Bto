@@ -10,7 +10,13 @@ import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
-export type CustomerSummary = Schemas['CustomerSummary'];
+export type ListContact = Schemas['ListContact'];
+/** A row of the customer list (ADR-0037). */
+export type CustomerListItem = Schemas['CustomerListItem'];
+export type CustomerSummary = Pick<
+  CustomerListItem,
+  'id' | 'code' | 'kind' | 'name' | 'regNo' | 'tin' | 'phone' | 'status' | 'creditHold'
+>;
 export type CustomerDetail = Schemas['CustomerDetail'];
 export type CustomerAddress = Schemas['CustomerAddress'];
 export type Contact = Schemas['Contact'];
@@ -19,7 +25,13 @@ export type CustomerUpdate = Schemas['CustomerUpdateRequest'];
 export type CustomerCredit = Schemas['CustomerCreditRequest'];
 export type AddressRequest = Schemas['CustomerAddressRequest'];
 export type ContactRequest = Schemas['ContactRequest'];
-export type SupplierSummary = Schemas['SupplierSummary'];
+/** A row of the supplier list (ADR-0037). */
+export type SupplierListItem = Schemas['SupplierListItem'];
+/** A supplier as pickers show it. */
+export type SupplierSummary = Pick<
+  SupplierListItem,
+  'id' | 'code' | 'name' | 'tin' | 'phone' | 'status'
+>;
 export type SupplierDetail = Schemas['SupplierDetail'];
 export type SupplierCreate = Schemas['SupplierCreateRequest'];
 export type SupplierUpdate = Schemas['SupplierUpdateRequest'];

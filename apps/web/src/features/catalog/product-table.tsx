@@ -1,9 +1,7 @@
-import { Eye, Pencil } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Button } from '@/components/ui/button';
+import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import {
   Table,
   TableBody,
@@ -21,12 +19,10 @@ import type { ProductCellContext, ProductColumn } from './product-columns';
 /** What every page of rows shares; suppliers and locations are read per page. */
 export type ProductTableContext = Omit<ProductCellContext, 'suppliers' | 'locations'>;
 
-const STICKY = 'sticky left-0 z-10 bg-background';
-
 /**
  * The product list (ADR-0037): one body for every loaded page; each page reads the supplier links
- * and locations of its own products, only while a column shows them. A click anywhere on a row
- * opens the product.
+ * and locations of its own products, only while a column shows them. Rows open the product
+ * (`RecordRow`).
  */
 export const ProductTable = memo(function ProductTable(props: {
   pages: readonly { data: ProductListItem[] }[];
@@ -39,9 +35,7 @@ export const ProductTable = memo(function ProductTable(props: {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className={STICKY}>
-            <span className="sr-only">{t('common.actions')}</span>
-          </TableHead>
+          <RecordActionsHead />
           {props.columns.map((column) => (
             <TableHead key={column.key}>{t(`catalog.products.columns.${column.key}`)}</TableHead>
           ))}
@@ -70,8 +64,6 @@ const ProductPageRows = memo(function ProductPageRows(props: {
   canManage: boolean;
 }) {
   const { rows, columns, context, canManage } = props;
-  const { t } = useTranslation();
-  const navigate = useNavigate();
   const ids = useMemo(() => rows.map((row) => row.id), [rows]);
   const suppliers = useProductSuppliersOf(
     ids,
@@ -100,36 +92,20 @@ const ProductPageRows = memo(function ProductPageRows(props: {
           </TableCell>
         </TableRow>
       ) : null}
-      {rows.map((row) => {
-        const label = canManage
-          ? t('catalog.products.editProduct', { name: row.name })
-          : t('catalog.products.viewProduct', { name: row.name });
-        return (
-          <TableRow
-            key={row.id}
-            className="cursor-pointer"
-            onClick={(event) => {
-              // Links and buttons inside the row act on their own.
-              if (event.target instanceof Element && event.target.closest('a, button')) return;
-              void navigate(`/catalog/products/${row.id}`);
-            }}
-          >
-            <TableCell className={STICKY}>
-              <Button asChild size="sm" variant="outline">
-                <Link to={`/catalog/products/${row.id}`} aria-label={label}>
-                  {canManage ? <Pencil /> : <Eye />}
-                  {canManage ? t('catalog.products.edit') : t('catalog.products.view')}
-                </Link>
-              </Button>
+      {rows.map((row) => (
+        <RecordRow
+          key={row.id}
+          href={`/catalog/products/${row.id}`}
+          name={row.name}
+          canManage={canManage}
+        >
+          {columns.map((column) => (
+            <TableCell key={column.key} className={column.className}>
+              {column.cell(row, cellContext)}
             </TableCell>
-            {columns.map((column) => (
-              <TableCell key={column.key} className={column.className}>
-                {column.cell(row, cellContext)}
-              </TableCell>
-            ))}
-          </TableRow>
-        );
-      })}
+          ))}
+        </RecordRow>
+      ))}
     </>
   );
 });

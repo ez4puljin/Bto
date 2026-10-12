@@ -295,7 +295,7 @@ describe('products list', () => {
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
     await screen.findByRole('link', { name: 'Кока кола' });
-    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
     expect(
       await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.sku }),
     ).toHaveAttribute('aria-disabled', 'true');
@@ -311,10 +311,8 @@ describe('products list', () => {
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('brand')).toBeNull();
-    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
-    await user.click(
-      await screen.findByRole('menuitem', { name: mn.catalog.products.showAllColumns }),
-    );
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
     expect(columnHeader('brand')).toBeInTheDocument();
     expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBeNull();
   });
@@ -355,7 +353,7 @@ describe('products list', () => {
       throw new DOMException('full', 'QuotaExceededError');
     });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: mn.catalog.products.columnsButton }));
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
     await user.click(
       await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.weight }),
     );
@@ -370,7 +368,7 @@ describe('products list', () => {
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole('link', {
-        name: `${mn.catalog.products.edit}: Кока кола`,
+        name: `${mn.common.edit}: Кока кола`,
       }),
     );
     await waitFor(() => expect(first.router.state.location.pathname).toBe('/catalog/products/1'));
@@ -384,7 +382,7 @@ describe('products list', () => {
     cleanup();
     renderApp('/catalog/products', signedIn(WORKER_ME, routes));
     expect(
-      await screen.findByRole('link', { name: `${mn.catalog.products.view}: Кока кола` }),
+      await screen.findByRole('link', { name: `${mn.common.view}: Кока кола` }),
     ).toHaveAttribute('href', '/catalog/products/1');
   });
 });
