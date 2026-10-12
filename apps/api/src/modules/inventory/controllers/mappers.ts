@@ -1,3 +1,4 @@
+import { valueOf } from '@tugeel/shared/inventory';
 import type { ProductSummary } from '../../catalog';
 import type { AdjustmentDetailDto, AdjustmentSummaryDto } from '../dto/adjustments.dto';
 import type { BinMoveDetailDto, BinMoveSummaryDto } from '../dto/bin-moves.dto';
@@ -7,6 +8,7 @@ import type {
   ProductStockDetailDto,
   ProductStockDto,
   ReconciliationRunDto,
+  StockMovementDto,
   StockProductDto,
   WarehouseBalanceDto,
 } from '../dto/stock.dto';
@@ -26,6 +28,7 @@ import type {
   ProductStock,
   ProductStockDetail,
   ReconciliationSummary,
+  StockMovement,
   WarehouseBalance,
 } from '../services/stock-query.service';
 import type {
@@ -246,6 +249,32 @@ function toWarehouseBalanceDto(balance: WarehouseBalance, withCosts: boolean): W
     reserved: balance.reserved.toFixed(),
     available: balance.available.toFixed(),
     ...(withCosts ? { avgCost: balance.avgCost.toFixed(), value: balance.value.toFixed(2) } : {}),
+  };
+}
+
+/** A movement of the history; costs only for cost holders (ADR-0033 #8). */
+export function toStockMovementDto(row: StockMovement, withCosts: boolean): StockMovementDto {
+  return {
+    id: row.id,
+    postedAt: row.postedAt.toISOString(),
+    effectiveDate: row.effectiveDate,
+    warehouseId: row.warehouseId,
+    binId: row.binId,
+    binCode: row.binCode,
+    product: toStockProductDto(row.product),
+    lotId: row.lotId,
+    movementType: row.movementType,
+    docType: row.docType,
+    docId: row.docId,
+    docNumber: row.docNumber,
+    qtyBase: row.qtyBase.toFixed(),
+    enteredQty: row.enteredQty.toFixed(),
+    unitName: row.unitName,
+    warehouseBalance: row.warehouseBalance?.toFixed() ?? null,
+    binBalance: row.binBalance?.toFixed() ?? null,
+    ...(withCosts
+      ? { unitCost: row.unitCost.toFixed(), value: valueOf(row.qtyBase, row.unitCost).toFixed(2) }
+      : {}),
   };
 }
 

@@ -6,6 +6,8 @@ import {
   ProductStockDetailDto,
   ProductStockPageDto,
   ReconciliationStatusDto,
+  StockMovementPageDto,
+  StockMovementQueryDto,
   StockQueryDto,
 } from '../dto/stock.dto';
 import { StockQueryService } from '../services/stock-query.service';
@@ -14,6 +16,7 @@ import {
   toProductStockDetailDto,
   toProductStockDto,
   toReconciliationRunDto,
+  toStockMovementDto,
 } from './mappers';
 
 const COSTS = 'inventory.costs.manage';
@@ -35,6 +38,22 @@ export class StockController {
     const withCosts = ctx.permissions.has(COSTS);
     return {
       data: page.data.map((row) => toProductStockDto(row, withCosts)),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /** Movement history (SPEC §8.2 #1): ledger rows newest first, with document numbers. */
+  @Get('movements')
+  @Authenticated()
+  @ApiOkResponse({ type: StockMovementPageDto })
+  async movements(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: StockMovementQueryDto,
+  ): Promise<StockMovementPageDto> {
+    const page = await this.stock.movements(query);
+    const withCosts = ctx.permissions.has(COSTS);
+    return {
+      data: page.data.map((row) => toStockMovementDto(row, withCosts)),
       nextCursor: page.nextCursor,
     };
   }

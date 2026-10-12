@@ -6675,6 +6675,124 @@
         ]
       }
     },
+    "/api/v1/stock/movements": {
+      "get": {
+        "operationId": "Stock_movements",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "binId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "docType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GR",
+                "BM",
+                "TR",
+                "ADJ",
+                "ST"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Movement history (SPEC §8.2 #1): ledger rows newest first, with document numbers.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/stock/products/{id}": {
       "get": {
         "operationId": "Stock_product",
@@ -13096,6 +13214,153 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductStock"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "StockMovement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "postedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "example": "2026-10-11"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "binId": {
+            "type": "number"
+          },
+          "binCode": {
+            "type": "string",
+            "example": "A-01-03"
+          },
+          "product": {
+            "$ref": "#/components/schemas/StockProduct"
+          },
+          "lotId": {
+            "type": "number",
+            "nullable": true
+          },
+          "movementType": {
+            "type": "string",
+            "enum": [
+              "RECEIPT",
+              "PUTAWAY_OUT",
+              "PUTAWAY_IN",
+              "BIN_MOVE_OUT",
+              "BIN_MOVE_IN",
+              "PICK_OUT",
+              "PICK_IN",
+              "DISPATCH_OUT",
+              "DISPATCH_IN",
+              "DELIVERY_ISSUE",
+              "POS_SALE",
+              "TRANSFER_OUT",
+              "TRANSFER_IN",
+              "RETURN_IN",
+              "ADJUSTMENT",
+              "COUNT_CORRECTION"
+            ]
+          },
+          "docType": {
+            "type": "string",
+            "enum": [
+              "GR",
+              "BM",
+              "TR",
+              "ADJ",
+              "ST",
+              "PK",
+              "TRIP",
+              "SO",
+              "POS",
+              "CN"
+            ]
+          },
+          "docId": {
+            "type": "number"
+          },
+          "docNumber": {
+            "type": "string",
+            "nullable": true,
+            "example": "GR-2026-000001"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "-24",
+            "description": "Base units, negative when it left the bin"
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "2",
+            "description": "As entered on the document line"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "warehouseBalance": {
+            "type": "string",
+            "nullable": true,
+            "description": "The product’s balance in this warehouse after the movement (product filter only)"
+          },
+          "binBalance": {
+            "type": "string",
+            "nullable": true,
+            "description": "The product’s balance on this bin after the movement (product filter only)"
+          },
+          "unitCost": {
+            "type": "string",
+            "description": "Cost holders only"
+          },
+          "value": {
+            "type": "string",
+            "description": "Cost holders only, MNT, signed"
+          }
+        },
+        "required": [
+          "id",
+          "postedAt",
+          "effectiveDate",
+          "warehouseId",
+          "binId",
+          "binCode",
+          "product",
+          "lotId",
+          "movementType",
+          "docType",
+          "docId",
+          "docNumber",
+          "qtyBase",
+          "enteredQty",
+          "unitName",
+          "warehouseBalance",
+          "binBalance"
+        ]
+      },
+      "StockMovementPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockMovement"
             }
           },
           "nextCursor": {

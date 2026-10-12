@@ -6,7 +6,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { CatalogService, type ProductSummary } from '../../catalog';
+import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
 import {
   binStock,
   bins,
@@ -15,7 +15,12 @@ import {
   warehouseStock,
 } from '../schema';
 import { type Bin, BinsService } from './bins.service';
-import type { ReconciliationDiff } from './stock-posting.service';
+import {
+  type LedgerMovement,
+  type MovementQuery,
+  type ReconciliationDiff,
+  StockPostingService,
+} from './stock-posting.service';
 
 const ZERO = new Decimal(0);
 
@@ -68,6 +73,12 @@ export interface BinContent {
   lines: { product: ProductSummary; lotId: number | null; onHand: Decimal }[];
 }
 
+/** A movement with its product and the name of the unit it was entered in. */
+export interface StockMovement extends LedgerMovement {
+  product: ProductSummary;
+  unitName: string;
+}
+
 export interface ReconciliationSummary {
   id: number;
   status: (typeof RECONCILIATION_STATUSES)[number];
@@ -88,6 +99,8 @@ export class StockQueryService {
     @Inject(DB) private readonly db: Db,
     private readonly bins: BinsService,
     private readonly catalog: CatalogService,
+    private readonly posting: StockPostingService,
+    private readonly units: UnitConversionService,
   ) {}
 
   async overview(query: StockQuery): Promise<{ data: ProductStock[]; nextCursor: string | null }> {
@@ -148,6 +161,33 @@ export class StockQueryService {
     });
     lines.sort((a, b) => a.product.name.localeCompare(b.product.name, 'mn'));
     return { bin, lines };
+  }
+
+  /**
+   * Movement history (SPEC §8.2 #1): the ledger rows of StockPostingService with each row's product
+   * and the unit its quantity was entered in. Costs are dropped by the controller for non-holders.
+   */
+  async movements(
+    query: MovementQuery,
+  ): Promise<{ data: StockMovement[]; nextCursor: string | null }> {
+    const page = await this.posting.movements(query);
+    const products = new Map(
+      (await this.catalog.getMany([...new Set(page.data.map((row) => row.productId))])).map(
+        (product) => [product.id, product],
+      ),
+    );
+    const units = await this.units.describe([
+      ...new Set(page.data.map((row) => row.productUnitId)),
+    ]);
+    return {
+      data: page.data.flatMap((row) => {
+        const product = products.get(row.productId);
+        return product
+          ? [{ ...row, product, unitName: units.get(row.productUnitId)?.uomName ?? '' }]
+          : [];
+      }),
+      nextCursor: page.nextCursor,
+    };
   }
 
   async latestReconciliation(): Promise<ReconciliationSummary | null> {

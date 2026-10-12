@@ -1541,6 +1541,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Movement history (SPEC §8.2 #1): ledger rows newest first, with document numbers. */
+        get: operations["Stock_movements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock/products/{id}": {
         parameters: {
             query?: never;
@@ -3277,6 +3294,50 @@ export interface components {
         };
         ProductStockPage: {
             data: components["schemas"]["ProductStock"][];
+            nextCursor: string | null;
+        };
+        StockMovement: {
+            id: number;
+            /** Format: date-time */
+            postedAt: string;
+            /** @example 2026-10-11 */
+            effectiveDate: string;
+            warehouseId: number;
+            binId: number;
+            /** @example A-01-03 */
+            binCode: string;
+            product: components["schemas"]["StockProduct"];
+            lotId: number | null;
+            /** @enum {string} */
+            movementType: "RECEIPT" | "PUTAWAY_OUT" | "PUTAWAY_IN" | "BIN_MOVE_OUT" | "BIN_MOVE_IN" | "PICK_OUT" | "PICK_IN" | "DISPATCH_OUT" | "DISPATCH_IN" | "DELIVERY_ISSUE" | "POS_SALE" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_IN" | "ADJUSTMENT" | "COUNT_CORRECTION";
+            /** @enum {string} */
+            docType: "GR" | "BM" | "TR" | "ADJ" | "ST" | "PK" | "TRIP" | "SO" | "POS" | "CN";
+            docId: number;
+            /** @example GR-2026-000001 */
+            docNumber: string | null;
+            /**
+             * @description Base units, negative when it left the bin
+             * @example -24
+             */
+            qtyBase: string;
+            /**
+             * @description As entered on the document line
+             * @example 2
+             */
+            enteredQty: string;
+            /** @example хайрцаг */
+            unitName: string;
+            /** @description The product’s balance in this warehouse after the movement (product filter only) */
+            warehouseBalance: string | null;
+            /** @description The product’s balance on this bin after the movement (product filter only) */
+            binBalance: string | null;
+            /** @description Cost holders only */
+            unitCost?: string;
+            /** @description Cost holders only, MNT, signed */
+            value?: string;
+        };
+        StockMovementPage: {
+            data: components["schemas"]["StockMovement"][];
             nextCursor: string | null;
         };
         BinBalance: {
@@ -7801,6 +7862,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductStockPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_movements: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                productId?: number;
+                warehouseId?: number;
+                binId?: number;
+                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST";
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovementPage"];
                 };
             };
             /** @description RFC 9457 problem details */

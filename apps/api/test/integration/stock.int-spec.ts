@@ -211,4 +211,110 @@ describe('stock queries', () => {
       lastRun: { status: 'OK', diffCount: 0, diffs: [], triggeredBy: 'TEST' },
     });
   });
+
+  it('shows the movement history newest first with documents, balances and costs for holders', async () => {
+    interface MovementJson {
+      movementType: string;
+      docType: string;
+      docNumber: string | null;
+      binCode: string;
+      qtyBase: string;
+      enteredQty: string;
+      unitName: string;
+      warehouseBalance: string | null;
+      binBalance: string | null;
+      unitCost?: string;
+      value?: string;
+    }
+    const lower = (await inventoryApi(app, admin).bin(wh1.id, 'A-01-02')).id;
+    await http()
+      .post('/api/v1/bin-moves')
+      .set(bearer(worker))
+      .set(idempotency())
+      .send({
+        warehouseId: wh1.id,
+        lines: [
+          {
+            productUnitId: unitOf(cola, 'PCS').id,
+            enteredQty: '10',
+            fromBinId: shelf,
+            toBinId: lower,
+          },
+        ],
+      })
+      .expect(201);
+    const damaged = await http()
+      .post('/api/v1/adjustments')
+      .set(bearer(worker))
+      .set(idempotency())
+      .send({
+        warehouseId: wh1.id,
+        reason: 'DAMAGED',
+        lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '4', binId: lower }],
+      })
+      .expect(201);
+    const adjustmentId = (damaged.body as { id: number }).id;
+    await http().post(`/api/v1/adjustments/${adjustmentId}/submit`).set(bearer(worker)).expect(200);
+    await http()
+      .post(`/api/v1/adjustments/${adjustmentId}/post`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({})
+      .expect(200);
+
+    const read = async (token: string, query: Record<string, unknown>, status = 200) =>
+      (await http().get('/api/v1/stock/movements').query(query).set(bearer(token)).expect(status))
+        .body as { data: MovementJson[]; nextCursor: string | null };
+    const history = await read(worker, { productId: cola.id });
+    expect(
+      history.data.map((row) => [
+        row.movementType,
+        row.docType,
+        row.binCode,
+        row.qtyBase,
+        row.warehouseBalance,
+        row.binBalance,
+      ]),
+    ).toEqual([
+      ['ADJUSTMENT', 'ADJ', 'A-01-02', '-4', '44', '6'],
+      ['BIN_MOVE_IN', 'BM', 'A-01-02', '10', '48', '10'],
+      ['BIN_MOVE_OUT', 'BM', 'A-01-01', '-10', '38', '38'],
+      ['RECEIPT', 'GR', 'A-01-01', '48', '48', '48'],
+    ]);
+    expect(history.data.map((row) => row.docNumber)).toEqual([
+      expect.stringMatching(/^ADJ-\d{4}-\d{6}$/),
+      expect.stringMatching(/^BM-\d{4}-\d{6}$/),
+      expect.stringMatching(/^BM-\d{4}-\d{6}$/),
+      expect.stringMatching(/^GR-\d{4}-\d{6}$/),
+    ]);
+    expect(history.data[3]).toMatchObject({ enteredQty: '2', unitName: 'хайрцаг' });
+    expect(JSON.stringify(history)).not.toMatch(/unitCost|"value"/);
+
+    const costed = await read(accountant, { productId: cola.id, limit: 1 });
+    expect(costed.data[0]).toMatchObject({ unitCost: '1000', value: '-4000.00' });
+
+    // Filters: a shelf, a warehouse, a document type, dates, and keyset pages.
+    expect((await read(worker, { binId: lower })).data.map((row) => row.movementType)).toEqual([
+      'ADJUSTMENT',
+      'BIN_MOVE_IN',
+    ]);
+    const other = await read(worker, { warehouseId: wh2.id });
+    expect(other.data.map((row) => [row.movementType, row.warehouseBalance])).toEqual([
+      ['RECEIPT', null],
+    ]);
+    expect((await read(worker, { docType: 'BM', productId: cola.id })).data).toHaveLength(2);
+    expect((await read(worker, { productId: cola.id, from: '2099-01-01' })).data).toEqual([]);
+    expect((await read(worker, { productId: cola.id, to: '2099-12-31' })).data.length).toBe(4);
+    await read(worker, { from: '2026-13-01' }, 422);
+    await read(worker, { docType: 'XX' }, 422);
+    const first = await read(worker, { productId: cola.id, limit: 2 });
+    expect(first.nextCursor).not.toBeNull();
+    const second = await read(worker, {
+      productId: cola.id,
+      limit: 2,
+      cursor: first.nextCursor ?? '',
+    });
+    expect(second.data.map((row) => row.movementType)).toEqual(['BIN_MOVE_OUT', 'RECEIPT']);
+    expect(second.data.map((row) => row.warehouseBalance)).toEqual(['38', '48']);
+  });
 });

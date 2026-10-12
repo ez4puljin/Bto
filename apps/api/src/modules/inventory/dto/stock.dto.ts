@@ -1,8 +1,18 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { BIN_TYPES } from '@tugeel/shared/inventory';
+import { BIN_TYPES, MOVEMENT_TYPES, STOCK_DOC_TYPES } from '@tugeel/shared/inventory';
 import { RECONCILIATION_STATUSES } from '../schema';
 import { BinDto, queryBoolean } from './bins.dto';
 
@@ -118,4 +128,73 @@ export class ReconciliationRunDto {
 @ApiSchema({ name: 'ReconciliationStatus' })
 export class ReconciliationStatusDto {
   @ApiProperty({ type: ReconciliationRunDto, nullable: true }) lastRun: ReconciliationRunDto | null;
+}
+
+const MOVEMENT_DOC_TYPES = ['GR', 'BM', 'TR', 'ADJ', 'ST'] as const;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Movement history filters (SPEC §8.2 #1); dates are Ulaanbaatar business days, inclusive. */
+export class StockMovementQueryDto extends PageQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) productId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) warehouseId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) binId?: number;
+
+  @ApiPropertyOptional({ enum: MOVEMENT_DOC_TYPES })
+  @IsOptional()
+  @IsIn(MOVEMENT_DOC_TYPES)
+  docType?: (typeof MOVEMENT_DOC_TYPES)[number];
+
+  @ApiPropertyOptional({ example: '2026-10-01' })
+  @IsOptional()
+  @Matches(DAY)
+  @IsISO8601({ strict: true, strictSeparator: true })
+  from?: string;
+
+  @ApiPropertyOptional({ example: '2026-10-31' })
+  @IsOptional()
+  @Matches(DAY)
+  @IsISO8601({ strict: true, strictSeparator: true })
+  to?: string;
+}
+
+/** A ledger row of the movement history; `unitCost` and `value` only for cost holders. */
+@ApiSchema({ name: 'StockMovement' })
+export class StockMovementDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ format: 'date-time' }) postedAt: string;
+  @ApiProperty({ example: '2026-10-11' }) effectiveDate: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty() binId: number;
+  @ApiProperty({ example: 'A-01-03' }) binCode: string;
+  @ApiProperty({ type: StockProductDto }) product: StockProductDto;
+  @ApiProperty({ type: Number, nullable: true }) lotId: number | null;
+  @ApiProperty({ enum: Object.keys(MOVEMENT_TYPES) }) movementType: string;
+  @ApiProperty({ enum: STOCK_DOC_TYPES }) docType: string;
+  @ApiProperty() docId: number;
+  @ApiProperty({ type: String, nullable: true, example: 'GR-2026-000001' }) docNumber:
+    string | null;
+  @ApiProperty({ example: '-24', description: 'Base units, negative when it left the bin' })
+  qtyBase: string;
+  @ApiProperty({ example: '2', description: 'As entered on the document line' }) enteredQty: string;
+  @ApiProperty({ example: 'хайрцаг' }) unitName: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The product’s balance in this warehouse after the movement (product filter only)',
+  })
+  warehouseBalance: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The product’s balance on this bin after the movement (product filter only)',
+  })
+  binBalance: string | null;
+  @ApiPropertyOptional({ description: 'Cost holders only' }) unitCost?: string;
+  @ApiPropertyOptional({ description: 'Cost holders only, MNT, signed' }) value?: string;
+}
+
+@ApiSchema({ name: 'StockMovementPage' })
+export class StockMovementPageDto {
+  @ApiProperty({ type: [StockMovementDto] }) data: StockMovementDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }

@@ -11,17 +11,19 @@ import {
 } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate, businessYear } from '@tugeel/shared/time';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, lte, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
+import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type Actor, actorUserId, NumberingService } from '../../identity';
 import { stockLedger, stockValuationAdjustments } from '../ledger.schema';
 import {
   adjustments,
   binMoves,
+  bins,
   goodsReceipts,
   reconciliationRuns,
   stocktakes,
@@ -41,6 +43,44 @@ export interface PostingDoc {
    * without a new one (ADR-0035 #3, #7).
    */
   allocateNumber?: boolean;
+}
+
+/** Filters of the movement history; dates are Ulaanbaatar business days, both inclusive. */
+export interface MovementQuery {
+  productId?: number;
+  warehouseId?: number;
+  binId?: number;
+  docType?: PostedDocType;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/** A ledger row as the movement history shows it. */
+export interface LedgerMovement {
+  id: number;
+  postedAt: Date;
+  effectiveDate: string;
+  warehouseId: number;
+  binId: number;
+  binCode: string;
+  productId: number;
+  lotId: number | null;
+  /** Signed: negative left the bin. */
+  qtyBase: Decimal;
+  unitCost: Decimal;
+  movementType: MovementType;
+  docType: StockDocType;
+  docId: number;
+  /** null for documents of later modules until they get their numbers here. */
+  docNumber: string | null;
+  /** As entered on the document line, in `productUnitId`. */
+  enteredQty: Decimal;
+  productUnitId: number;
+  /** The product's balance in this warehouse and this bin after the movement (product queries). */
+  warehouseBalance: Decimal | null;
+  binBalance: Decimal | null;
 }
 
 /** One posting writes at most this many movements (ADR-0035 #7); callers split larger documents. */
@@ -554,6 +594,88 @@ export class StockPostingService {
         ),
       );
     return new Map(rows.map((row) => [row.docLineId, row.unitCost]));
+  }
+
+  /**
+   * Movement history (SPEC §8.2 #1): ledger rows newest first with their shelf and document
+   * number. With a product, each row also carries the product's balance in its warehouse and its
+   * bin right after the movement, computed over the product's whole history.
+   */
+  async movements(
+    query: MovementQuery,
+  ): Promise<{ data: LedgerMovement[]; nextCursor: string | null }> {
+    const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const filters: SQL[] = [];
+    if (query.productId !== undefined) filters.push(eq(stockLedger.productId, query.productId));
+    if (query.warehouseId !== undefined) {
+      filters.push(eq(stockLedger.warehouseId, query.warehouseId));
+    }
+    if (query.binId !== undefined) filters.push(eq(stockLedger.binId, query.binId));
+    if (query.docType !== undefined) filters.push(eq(stockLedger.docType, query.docType));
+    if (query.from !== undefined) filters.push(gte(stockLedger.effectiveDate, query.from));
+    if (query.to !== undefined) filters.push(lte(stockLedger.effectiveDate, query.to));
+    const after = decodeCursor(query.cursor);
+    if (typeof after?.id === 'number') filters.push(lt(stockLedger.id, after.id));
+    const rows = await this.db
+      .select({
+        id: stockLedger.id,
+        postedAt: stockLedger.postedAt,
+        effectiveDate: stockLedger.effectiveDate,
+        warehouseId: stockLedger.warehouseId,
+        binId: stockLedger.binId,
+        binCode: bins.code,
+        productId: stockLedger.productId,
+        lotId: stockLedger.lotId,
+        qtyBase: stockLedger.qtyBase,
+        unitCost: stockLedger.unitCost,
+        movementType: stockLedger.movementType,
+        docType: stockLedger.docType,
+        docId: stockLedger.docId,
+        docNumber: sql<string | null>`CASE "stock_ledger"."doc_type"
+          WHEN 'GR' THEN (SELECT d.number FROM goods_receipts d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'BM' THEN (SELECT d.number FROM bin_moves d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'ADJ' THEN (SELECT d.number FROM adjustments d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'ST' THEN (SELECT d.number FROM stocktakes d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'TR' THEN (SELECT d.number FROM transfers d WHERE d.id = "stock_ledger"."doc_id")
+        END`,
+        enteredQty: stockLedger.enteredQty,
+        productUnitId: stockLedger.productUnitId,
+      })
+      .from(stockLedger)
+      .innerJoin(bins, eq(bins.id, stockLedger.binId))
+      .where(and(...filters))
+      .orderBy(desc(stockLedger.id))
+      .limit(limit + 1);
+    const page = toPage(rows, limit, (row) => ({ id: row.id }));
+    const balances = new Map<number, { warehouse: Decimal; bin: Decimal }>();
+    if (query.productId !== undefined && page.data.length > 0) {
+      const ids = page.data.map((row) => row.id);
+      const result = await this.db.execute<{ id: string; warehouse: string; bin: string }>(sql`
+        SELECT h.id::text AS id, h.warehouse::text AS warehouse, h.bin::text AS bin FROM (
+          SELECT id,
+            sum(qty_base) OVER (PARTITION BY warehouse_id ORDER BY id) AS warehouse,
+            sum(qty_base) OVER (PARTITION BY bin_id ORDER BY id) AS bin
+          FROM stock_ledger WHERE product_id = ${query.productId}
+        ) h
+        WHERE h.id IN (${sql.join(
+          ids.map((id) => sql`${id}`),
+          sql`, `,
+        )})`);
+      for (const row of result.rows) {
+        balances.set(Number.parseInt(row.id, 10), {
+          warehouse: new Decimal(row.warehouse),
+          bin: new Decimal(row.bin),
+        });
+      }
+    }
+    return {
+      data: page.data.map((row) => ({
+        ...row,
+        warehouseBalance: balances.get(row.id)?.warehouse ?? null,
+        binBalance: balances.get(row.id)?.bin ?? null,
+      })),
+      nextCursor: page.nextCursor,
+    };
   }
 
   /**

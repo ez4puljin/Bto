@@ -64,6 +64,13 @@
       "when": 1791723934075,
       "tag": "0008_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791826900888,
+      "tag": "0009_stock_ledger_indexes",
+      "breakpoints": true
     }
   ]
 }
