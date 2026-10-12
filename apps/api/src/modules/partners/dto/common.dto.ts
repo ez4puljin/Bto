@@ -16,6 +16,13 @@ export const CODE = /^[0-9]{1,20}$/;
 export const COORDINATE = /^-?\d{1,3}(\.\d{1,6})?$/;
 export const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
+/** The first contact of a customer or supplier, as list rows show it. */
+@ApiSchema({ name: 'ListContact' })
+export class ListContactDto {
+  @ApiProperty({ type: String, nullable: true }) name: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '+97699112233' }) phone: string | null;
+}
+
 @ApiSchema({ name: 'NextCode' })
 export class NextCodeDto {
   @ApiProperty({ example: '1024' }) code: string;

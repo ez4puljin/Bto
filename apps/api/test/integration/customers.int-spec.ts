@@ -324,4 +324,71 @@ describe('customers', () => {
     expect(terms).toMatchObject({ creditLimit: null, creditHold: false });
     expect(terms.paymentTerm.source).toBe('DEFAULT');
   });
+
+  it('gives each list row every field, the point of its default address and its first contact', async () => {
+    interface ListRow {
+      id: number;
+      consumerNo: string | null;
+      vatPayer: boolean;
+      taxStatusSource: string | null;
+      creditLimit: string | null;
+      paymentTerm: { days: number | null; source: string };
+      creditHold: boolean;
+      creditHoldReason: string | null;
+      note: string | null;
+      gps: { lat: string; lng: string } | null;
+      contact: { name: string | null; phone: string | null } | null;
+    }
+    const person = await api.customer({
+      kind: 'INDIVIDUAL',
+      name: 'Жагсаалтын иргэн',
+      consumerNo: '11234567',
+      note: 'Өглөө хүргэнэ',
+      address: { address: 'Сансар', ...UB },
+    });
+    const shop = await api.customer({ name: 'Жагсаалтын дэлгүүр' });
+    for (const name of ['Эхний хүн', 'Хоёр дахь хүн']) {
+      await http()
+        .post(`/api/v1/customers/${shop.id}/contacts`)
+        .set(bearer(office))
+        .send({ name, phone: '99001122' })
+        .expect(201);
+    }
+    await http()
+      .put(`/api/v1/customers/${shop.id}/credit`)
+      .set(bearer(accountant))
+      .send({
+        creditLimit: '2500000',
+        paymentTermDays: 30,
+        creditHold: true,
+        creditHoldReason: 'Өр төлөөгүй',
+      })
+      .expect(200);
+
+    const rows = (
+      await http()
+        .get('/api/v1/customers')
+        .query({ q: 'Жагсаалтын', limit: 10 })
+        .set(bearer(office))
+        .expect(200)
+    ).body.data as ListRow[];
+    expect(rows.find((row) => row.id === person.id)).toMatchObject({
+      consumerNo: '11234567',
+      vatPayer: false,
+      taxStatusSource: null,
+      creditLimit: null,
+      paymentTerm: { days: 14, source: 'DEFAULT' },
+      note: 'Өглөө хүргэнэ',
+      gps: UB,
+      contact: null,
+    });
+    expect(rows.find((row) => row.id === shop.id)).toMatchObject({
+      creditLimit: '2500000.00',
+      paymentTerm: { days: 30, source: 'CUSTOMER' },
+      creditHold: true,
+      creditHoldReason: 'Өр төлөөгүй',
+      gps: null,
+      contact: { name: 'Эхний хүн', phone: '+97699001122' },
+    });
+  });
 });

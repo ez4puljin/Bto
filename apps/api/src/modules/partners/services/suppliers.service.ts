@@ -9,9 +9,9 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type Actor, AuditService } from '../../identity';
-import { suppliers } from '../schema';
+import { productSuppliers, supplierContacts, suppliers } from '../schema';
 import { type SupplierContact, SupplierContactsService } from './contacts.service';
-import type { PartnerStatus } from './customers.service';
+import type { ListContact, PartnerStatus } from './customers.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
 
 type SupplierRow = typeof suppliers.$inferSelect;
@@ -48,6 +48,20 @@ export interface SupplierSummary {
   tin: string | null;
   phone: string | null;
   status: PartnerStatus;
+}
+
+/** A row of the supplier list screen: the summary plus every other field (ADR-0037). */
+export interface SupplierListItem extends SupplierSummary {
+  regNo: string | null;
+  email: string | null;
+  address: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+  paymentTermDays: number | null;
+  note: string | null;
+  contact: ListContact | null;
+  /** Products linked to the supplier. */
+  productCount: number;
 }
 
 export interface SupplierDetail extends Supplier {
@@ -196,6 +210,58 @@ export class SuppliersService {
   async list(
     query: SupplierQuery,
   ): Promise<{ data: SupplierSummary[]; nextCursor: string | null }> {
+    const page = await this.pageRows(query);
+    return { data: page.data.map(toSummary), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The supplier list screen's rows (ADR-0037): every field, the first contact and the number of
+   * linked products, read with one statement each for the whole page.
+   */
+  async listItems(
+    query: SupplierQuery,
+  ): Promise<{ data: SupplierListItem[]; nextCursor: string | null }> {
+    const page = await this.pageRows(query);
+    const ids = page.data.map((row) => row.id);
+    if (ids.length === 0) return { data: [], nextCursor: page.nextCursor };
+    const contacts = await this.db
+      .selectDistinctOn([supplierContacts.supplierId], {
+        supplierId: supplierContacts.supplierId,
+        name: supplierContacts.name,
+        phone: supplierContacts.phone,
+      })
+      .from(supplierContacts)
+      .where(inArray(supplierContacts.supplierId, ids))
+      .orderBy(asc(supplierContacts.supplierId), asc(supplierContacts.id));
+    const counts = await this.db
+      .select({ supplierId: productSuppliers.supplierId, count: sql<number>`count(*)::int` })
+      .from(productSuppliers)
+      .where(inArray(productSuppliers.supplierId, ids))
+      .groupBy(productSuppliers.supplierId);
+    const contactOf = new Map(contacts.map((contact) => [contact.supplierId, contact]));
+    const countOf = new Map(counts.map((row) => [row.supplierId, row.count]));
+    return {
+      data: page.data.map((row) => {
+        const contact = contactOf.get(row.id);
+        return {
+          ...toSummary(row),
+          regNo: row.regNo,
+          email: row.email,
+          address: row.address,
+          bankName: row.bankName,
+          bankAccount: row.bankAccount,
+          paymentTermDays: row.paymentTermDays,
+          note: row.note,
+          contact: contact ? { name: contact.name, phone: contact.phone } : null,
+          productCount: countOf.get(row.id) ?? 0,
+        };
+      }),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /** One keyset page of suppliers (search rank, name, id) with every column the lists show. */
+  private async pageRows(query: SupplierQuery) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     if (query.status) filters.push(eq(suppliers.status, query.status));
@@ -210,16 +276,22 @@ export class SuppliersService {
       );
     }
     const rows = await this.db
-      .select({ ...SUMMARY, rank: sql<number>`${rank}` })
+      .select({
+        ...SUMMARY,
+        regNo: suppliers.regNo,
+        email: suppliers.email,
+        address: suppliers.address,
+        bankName: suppliers.bankName,
+        bankAccount: suppliers.bankAccount,
+        paymentTermDays: suppliers.paymentTermDays,
+        note: suppliers.note,
+        rank: sql<number>`${rank}`,
+      })
       .from(suppliers)
       .where(and(...filters))
       .orderBy(...(searched ? [searched.rank] : []), asc(suppliers.name), asc(suppliers.id))
       .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ id: row.id, rank: row.rank }));
-    return {
-      data: page.data.map(({ rank: _rank, ...summary }) => summary),
-      nextCursor: page.nextCursor,
-    };
+    return toPage(rows, limit, (row) => ({ id: row.id, rank: row.rank }));
   }
 
   /** SUPPLIER_INACTIVE (409) for a deactivated supplier (goods receipts, delivery 1 week 3). */
@@ -271,6 +343,17 @@ const SUMMARY = {
   phone: suppliers.phone,
   status: suppliers.status,
 };
+
+function toSummary(row: SupplierSummary): SupplierSummary {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    tin: row.tin,
+    phone: row.phone,
+    status: row.status,
+  };
+}
 
 /** Normalised optional fields; the database checks the same formats. */
 function validated(input: SupplierInput) {

@@ -16,7 +16,7 @@ import {
 } from 'class-validator';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { PARTNER_STATUSES } from '../schema';
-import { CODE, ContactDto, trimmed } from './common.dto';
+import { CODE, ContactDto, ListContactDto, trimmed } from './common.dto';
 
 type PartnerStatus = (typeof PARTNER_STATUSES)[number];
 
@@ -44,9 +44,24 @@ export class SupplierDetailDto extends SupplierSummaryDto {
   @ApiProperty({ type: [ContactDto] }) contacts: ContactDto[];
 }
 
+/** A row of the supplier list screen: the summary plus every other field (ADR-0037). */
+@ApiSchema({ name: 'SupplierListItem' })
+export class SupplierListItemDto extends SupplierSummaryDto {
+  @ApiProperty({ type: String, nullable: true }) regNo: string | null;
+  @ApiProperty({ type: String, nullable: true }) email: string | null;
+  @ApiProperty({ type: String, nullable: true }) address: string | null;
+  @ApiProperty({ type: String, nullable: true }) bankName: string | null;
+  @ApiProperty({ type: String, nullable: true }) bankAccount: string | null;
+  @ApiProperty({ type: Number, nullable: true }) paymentTermDays: number | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: ListContactDto, nullable: true, description: 'The first contact' })
+  contact: ListContactDto | null;
+  @ApiProperty({ description: 'Products linked to the supplier' }) productCount: number;
+}
+
 @ApiSchema({ name: 'SupplierPage' })
 export class SupplierPageDto {
-  @ApiProperty({ type: [SupplierSummaryDto] }) data: SupplierSummaryDto[];
+  @ApiProperty({ type: [SupplierListItemDto] }) data: SupplierListItemDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 

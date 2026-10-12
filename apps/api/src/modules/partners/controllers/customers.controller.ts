@@ -34,7 +34,7 @@ import {
   toAddressInput,
   toContactDto,
   toCustomerDetailDto,
-  toCustomerSummaryDto,
+  toCustomerListItemDto,
 } from './mappers';
 
 const READ = 'partners.customers.read';
@@ -57,8 +57,8 @@ export class CustomersController {
     @CurrentUser() ctx: AuthContext,
     @Query() query: CustomerListQueryDto,
   ): Promise<CustomerPageDto> {
-    const page = await this.customers.list(ctx, query);
-    return { data: page.data.map(toCustomerSummaryDto), nextCursor: page.nextCursor };
+    const page = await this.customers.listItems(ctx, query);
+    return { data: page.data.map(toCustomerListItemDto), nextCursor: page.nextCursor };
   }
 
   /** Declared before `:id`, so "next-code" never reaches ParseIntPipe. */

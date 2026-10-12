@@ -10,7 +10,7 @@ import {
 } from '@tugeel/shared/taxpayer';
 import { normalizeName, searchKeys } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -100,6 +100,28 @@ export interface CustomerSummary {
   tinPending: boolean;
   address: string | null;
   hasGps: boolean;
+}
+
+/** A contact shown on a list row: the customer's or supplier's first one. */
+export interface ListContact {
+  name: string | null;
+  phone: string | null;
+}
+
+/** A row of the customer list screen: the summary plus every other field (ADR-0037). */
+export interface CustomerListItem extends CustomerSummary {
+  consumerNo: string | null;
+  vatPayer: boolean;
+  cityPayer: boolean;
+  /** null = the payer flags were never checked. */
+  taxStatusSource: CustomerRow['taxStatusSource'];
+  creditLimit: Decimal | null;
+  paymentTerm: PaymentTerm;
+  creditHoldReason: string | null;
+  note: string | null;
+  /** The point of the default address. */
+  gps: { lat: Decimal; lng: Decimal } | null;
+  contact: ListContact | null;
 }
 
 export interface CustomerDetail extends Omit<
@@ -328,6 +350,75 @@ export class CustomersService {
     ctx: AuthContext,
     query: CustomerQuery,
   ): Promise<{ data: CustomerSummary[]; nextCursor: string | null }> {
+    const page = await this.pageRows(ctx, query);
+    return { data: page.data.map(toSummary), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The customer list screen's rows (ADR-0037): every field of the customer, the point of its
+   * default address and its first contact, read with one statement each for the whole page.
+   */
+  async listItems(
+    ctx: AuthContext,
+    query: CustomerQuery,
+  ): Promise<{ data: CustomerListItem[]; nextCursor: string | null }> {
+    const page = await this.pageRows(ctx, query);
+    const ids = page.data.map((row) => row.id);
+    if (ids.length === 0) return { data: [], nextCursor: page.nextCursor };
+    const points = await this.db
+      .select({
+        customerId: customerAddresses.customerId,
+        lat: customerAddresses.lat,
+        lng: customerAddresses.lng,
+      })
+      .from(customerAddresses)
+      .where(
+        and(
+          inArray(customerAddresses.customerId, ids),
+          eq(customerAddresses.isDefault, true),
+          isNotNull(customerAddresses.lat),
+        ),
+      );
+    const contacts = await this.db
+      .selectDistinctOn([customerContacts.customerId], {
+        customerId: customerContacts.customerId,
+        name: customerContacts.name,
+        phone: customerContacts.phone,
+      })
+      .from(customerContacts)
+      .where(inArray(customerContacts.customerId, ids))
+      .orderBy(asc(customerContacts.customerId), asc(customerContacts.id));
+    const defaultDays = await this.settings.find(
+      'credit.payment_term_days',
+      businessDate(),
+      this.db,
+    );
+    const pointOf = new Map(points.map((point) => [point.customerId, point]));
+    const contactOf = new Map(contacts.map((contact) => [contact.customerId, contact]));
+    return {
+      data: page.data.map((row) => {
+        const point = pointOf.get(row.id);
+        const contact = contactOf.get(row.id);
+        return {
+          ...toSummary(row),
+          consumerNo: row.consumerNo,
+          vatPayer: row.vatPayer,
+          cityPayer: row.cityPayer,
+          taxStatusSource: row.taxStatusSource,
+          creditLimit: row.creditLimit,
+          paymentTerm: termOf(row.paymentTermDays, defaultDays),
+          creditHoldReason: row.creditHoldReason,
+          note: row.note,
+          gps: point?.lat && point.lng ? { lat: point.lat, lng: point.lng } : null,
+          contact: contact ? { name: contact.name, phone: contact.phone } : null,
+        };
+      }),
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  /** One keyset page of customers (search rank, name, id) with every column the lists show. */
+  private async pageRows(ctx: AuthContext, query: CustomerQuery) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [this.visibleTo(ctx)];
     if (query.kind) filters.push(eq(customers.kind, query.kind));
@@ -350,13 +441,23 @@ export class CustomersService {
       );
     }
     const rows = await this.db
-      .select({ ...this.summaryColumns(), rank: sql<number>`${rank}` })
+      .select({
+        ...this.summaryColumns(),
+        consumerNo: customers.consumerNo,
+        vatPayer: customers.vatPayer,
+        cityPayer: customers.cityPayer,
+        taxStatusSource: customers.taxStatusSource,
+        creditLimit: customers.creditLimit,
+        paymentTermDays: customers.paymentTermDays,
+        creditHoldReason: customers.creditHoldReason,
+        note: customers.note,
+        rank: sql<number>`${rank}`,
+      })
       .from(customers)
       .where(and(...filters))
       .orderBy(...(searched ? [searched.rank] : []), asc(customers.name), asc(customers.id))
       .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ id: row.id, rank: row.rank }));
-    return { data: page.data.map(toSummary), nextCursor: page.nextCursor };
+    return toPage(rows, limit, (row) => ({ id: row.id, rank: row.rank }));
   }
 
   /** CUSTOMER_INACTIVE (409) for a deactivated customer; NOT_FOUND for an unknown one. */
@@ -439,9 +540,8 @@ export class CustomersService {
     onDate: string,
     executor: Db | Tx,
   ): Promise<PaymentTerm> {
-    if (own !== null) return { days: own, source: 'CUSTOMER' };
-    const days = await this.settings.find('credit.payment_term_days', onDate, executor);
-    return days === undefined ? { days: null, source: 'UNSET' } : { days, source: 'DEFAULT' };
+    if (own !== null) return termOf(own, undefined);
+    return termOf(null, await this.settings.find('credit.payment_term_days', onDate, executor));
   }
 
   private async lockRow(tx: Tx, id: number): Promise<CustomerRow> {
@@ -505,6 +605,14 @@ export class CustomersService {
         WHERE a.customer_id = customers.id AND a.is_default AND a.lat IS NOT NULL)`,
     };
   }
+}
+
+/** A customer's own days, else the company setting's, else unset. */
+function termOf(own: number | null, setting: number | undefined): PaymentTerm {
+  if (own !== null) return { days: own, source: 'CUSTOMER' };
+  return setting === undefined
+    ? { days: null, source: 'UNSET' }
+    : { days: setting, source: 'DEFAULT' };
 }
 
 function isTinPending(row: { kind: CustomerKind; tin: string | null }): boolean {

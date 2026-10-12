@@ -4,11 +4,16 @@ import type {
   AddressDto,
   AddressRequestDto,
   CustomerDetailDto,
+  CustomerListItemDto,
   CustomerSummaryDto,
 } from '../dto/customers.dto';
 import type { customerAddresses } from '../schema';
 import type { AddressInput } from '../services/customer-addresses.service';
-import type { CustomerDetail, CustomerSummary } from '../services/customers.service';
+import type {
+  CustomerDetail,
+  CustomerListItem,
+  CustomerSummary,
+} from '../services/customers.service';
 
 type AddressRow = typeof customerAddresses.$inferSelect;
 
@@ -49,6 +54,22 @@ export function toContactDto(row: ContactDto): ContactDto {
 
 export function toCustomerSummaryDto(row: CustomerSummary): CustomerSummaryDto {
   return { ...row };
+}
+
+export function toCustomerListItemDto(row: CustomerListItem): CustomerListItemDto {
+  return {
+    ...toCustomerSummaryDto(row),
+    consumerNo: row.consumerNo,
+    vatPayer: row.vatPayer,
+    cityPayer: row.cityPayer,
+    taxStatusSource: row.taxStatusSource,
+    creditLimit: row.creditLimit?.toFixed(2) ?? null,
+    paymentTerm: row.paymentTerm,
+    creditHoldReason: row.creditHoldReason,
+    note: row.note,
+    gps: row.gps ? { lat: row.gps.lat.toFixed(6), lng: row.gps.lng.toFixed(6) } : null,
+    contact: row.contact,
+  };
 }
 
 export function toCustomerDetailDto(detail: CustomerDetail): CustomerDetailDto {

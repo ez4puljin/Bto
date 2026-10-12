@@ -10306,7 +10306,64 @@
           "cityTax"
         ]
       },
-      "CustomerSummary": {
+      "PaymentTerm": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "number",
+            "nullable": true
+          },
+          "source": {
+            "enum": [
+              "CUSTOMER",
+              "DEFAULT",
+              "UNSET"
+            ],
+            "type": "string",
+            "description": "The customer’s own days, the company setting, or neither yet"
+          }
+        },
+        "required": [
+          "days",
+          "source"
+        ]
+      },
+      "GpsPoint": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "string",
+            "example": "47.918540"
+          },
+          "lng": {
+            "type": "string",
+            "example": "106.917450"
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "ListContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+97699112233"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "CustomerListItem": {
         "type": "object",
         "properties": {
           "id": {
@@ -10359,6 +10416,62 @@
           "hasGps": {
             "type": "boolean",
             "description": "The default address has a GPS point"
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "vatPayer": {
+            "type": "boolean"
+          },
+          "cityPayer": {
+            "type": "boolean"
+          },
+          "taxStatusSource": {
+            "nullable": true,
+            "enum": [
+              "LOOKUP",
+              "MANUAL"
+            ],
+            "type": "string",
+            "description": "null = not checked yet"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "example": "5000000.00",
+            "description": "null = not decided"
+          },
+          "paymentTerm": {
+            "$ref": "#/components/schemas/PaymentTerm"
+          },
+          "creditHoldReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "gps": {
+            "nullable": true,
+            "description": "The point of the default address",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GpsPoint"
+              }
+            ]
+          },
+          "contact": {
+            "nullable": true,
+            "description": "The first contact",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListContact"
+              }
+            ]
           }
         },
         "required": [
@@ -10373,7 +10486,17 @@
           "creditHold",
           "tinPending",
           "address",
-          "hasGps"
+          "hasGps",
+          "consumerNo",
+          "vatPayer",
+          "cityPayer",
+          "taxStatusSource",
+          "creditLimit",
+          "paymentTerm",
+          "creditHoldReason",
+          "note",
+          "gps",
+          "contact"
         ]
       },
       "CustomerPage": {
@@ -10382,7 +10505,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CustomerSummary"
+              "$ref": "#/components/schemas/CustomerListItem"
             }
           },
           "nextCursor": {
@@ -10405,28 +10528,6 @@
         },
         "required": [
           "code"
-        ]
-      },
-      "PaymentTerm": {
-        "type": "object",
-        "properties": {
-          "days": {
-            "type": "number",
-            "nullable": true
-          },
-          "source": {
-            "enum": [
-              "CUSTOMER",
-              "DEFAULT",
-              "UNSET"
-            ],
-            "type": "string",
-            "description": "The customer’s own days, the company setting, or neither yet"
-          }
-        },
-        "required": [
-          "days",
-          "source"
         ]
       },
       "CustomerAddress": {
@@ -10944,7 +11045,7 @@
           }
         }
       },
-      "SupplierSummary": {
+      "SupplierListItem": {
         "type": "object",
         "properties": {
           "id": {
@@ -10970,6 +11071,48 @@
               "INACTIVE"
             ],
             "type": "string"
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankAccount": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentTermDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact": {
+            "nullable": true,
+            "description": "The first contact",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ListContact"
+              }
+            ]
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Products linked to the supplier"
           }
         },
         "required": [
@@ -10978,7 +11121,16 @@
           "name",
           "tin",
           "phone",
-          "status"
+          "status",
+          "regNo",
+          "email",
+          "address",
+          "bankName",
+          "bankAccount",
+          "paymentTermDays",
+          "note",
+          "contact",
+          "productCount"
         ]
       },
       "SupplierPage": {
@@ -10987,7 +11139,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/SupplierSummary"
+              "$ref": "#/components/schemas/SupplierListItem"
             }
           },
           "nextCursor": {

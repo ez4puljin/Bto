@@ -63,7 +63,7 @@ export class SuppliersController {
   @Authenticated()
   @ApiOkResponse({ type: SupplierPageDto })
   async list(@Query() query: SupplierListQueryDto): Promise<SupplierPageDto> {
-    return this.suppliers.list(query);
+    return this.suppliers.listItems(query);
   }
 
   /** Declared before `:id`, so "next-code" never reaches ParseIntPipe. */

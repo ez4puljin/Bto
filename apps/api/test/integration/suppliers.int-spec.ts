@@ -211,6 +211,53 @@ describe('suppliers and product links', () => {
     await read({ productIds: Array.from({ length: 201 }, (_, index) => index + 1) }, 422);
   });
 
+  it('gives each supplier list row every field, its first contact and its product count', async () => {
+    const supplier = await api.supplier({
+      name: 'Жагсаалтын нийлүүлэгч',
+      email: 'list@example.mn',
+      address: 'Хан-Уул',
+      bankName: 'Хаан банк',
+      bankAccount: 'MN120005005012345679',
+      paymentTermDays: 15,
+      note: 'Сар бүр',
+    });
+    await http()
+      .post(`/api/v1/suppliers/${supplier.id}/contacts`)
+      .set(bearer(admin))
+      .send({ name: 'Нийлүүлэгчийн хүн', phone: '88112233' })
+      .expect(201);
+    for (const sku of ['7201', '7202']) {
+      const product = await catalog.product({
+        sku,
+        name: `Нийлүүлэгчийн бараа ${sku}`,
+        categoryId: category,
+        baseUomId: pcs,
+      });
+      await http()
+        .post('/api/v1/product-suppliers')
+        .set(bearer(admin))
+        .send({ productId: product.id, supplierId: supplier.id })
+        .expect(201);
+    }
+    const rows = (
+      await http()
+        .get('/api/v1/suppliers')
+        .query({ q: 'Жагсаалтын нийлүүлэгч' })
+        .set(bearer(worker))
+        .expect(200)
+    ).body.data as { id: number }[];
+    expect(rows.find((row) => row.id === supplier.id)).toMatchObject({
+      email: 'list@example.mn',
+      address: 'Хан-Уул',
+      bankName: 'Хаан банк',
+      bankAccount: 'MN120005005012345679',
+      paymentTermDays: 15,
+      note: 'Сар бүр',
+      contact: { name: 'Нийлүүлэгчийн хүн', phone: '+97688112233' },
+      productCount: 2,
+    });
+  });
+
   it('refuses goods from a deactivated supplier', async () => {
     const old = await api.supplier({ name: 'Хуучин нийлүүлэгч' });
     await http()

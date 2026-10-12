@@ -16,7 +16,15 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { GPS_SOURCES, PARTNER_STATUSES, TAX_INFO_SOURCES } from '../schema';
-import { CODE, COORDINATE, ContactDto, MONEY, queryBoolean, trimmed } from './common.dto';
+import {
+  CODE,
+  COORDINATE,
+  ContactDto,
+  ListContactDto,
+  MONEY,
+  queryBoolean,
+  trimmed,
+} from './common.dto';
 
 type PartnerStatus = (typeof PARTNER_STATUSES)[number];
 
@@ -150,9 +158,43 @@ export class CustomerDetailDto extends CustomerSummaryDto {
   @ApiProperty({ type: [ContactDto] }) contacts: ContactDto[];
 }
 
+@ApiSchema({ name: 'GpsPoint' })
+export class GpsPointDto {
+  @ApiProperty({ example: '47.918540' }) lat: string;
+  @ApiProperty({ example: '106.917450' }) lng: string;
+}
+
+/** A row of the customer list screen: the summary plus every other field (ADR-0037). */
+@ApiSchema({ name: 'CustomerListItem' })
+export class CustomerListItemDto extends CustomerSummaryDto {
+  @ApiProperty({ type: String, nullable: true }) consumerNo: string | null;
+  @ApiProperty() vatPayer: boolean;
+  @ApiProperty() cityPayer: boolean;
+  @ApiProperty({ enum: TAX_INFO_SOURCES, nullable: true, description: 'null = not checked yet' })
+  taxStatusSource: (typeof TAX_INFO_SOURCES)[number] | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '5000000.00',
+    description: 'null = not decided',
+  })
+  creditLimit: string | null;
+  @ApiProperty({ type: PaymentTermDto }) paymentTerm: PaymentTermDto;
+  @ApiProperty({ type: String, nullable: true }) creditHoldReason: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({
+    type: GpsPointDto,
+    nullable: true,
+    description: 'The point of the default address',
+  })
+  gps: GpsPointDto | null;
+  @ApiProperty({ type: ListContactDto, nullable: true, description: 'The first contact' })
+  contact: ListContactDto | null;
+}
+
 @ApiSchema({ name: 'CustomerPage' })
 export class CustomerPageDto {
-  @ApiProperty({ type: [CustomerSummaryDto] }) data: CustomerSummaryDto[];
+  @ApiProperty({ type: [CustomerListItemDto] }) data: CustomerListItemDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 

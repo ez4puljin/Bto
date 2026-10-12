@@ -2478,7 +2478,26 @@ export interface components {
             taxProductCode: number;
             cityTax: number;
         };
-        CustomerSummary: {
+        PaymentTerm: {
+            days: number | null;
+            /**
+             * @description The customer’s own days, the company setting, or neither yet
+             * @enum {string}
+             */
+            source: "CUSTOMER" | "DEFAULT" | "UNSET";
+        };
+        GpsPoint: {
+            /** @example 47.918540 */
+            lat: string;
+            /** @example 106.917450 */
+            lng: string;
+        };
+        ListContact: {
+            name: string | null;
+            /** @example +97699112233 */
+            phone: string | null;
+        };
+        CustomerListItem: {
             id: number;
             code: string;
             /** @enum {string} */
@@ -2496,22 +2515,34 @@ export interface components {
             address: string | null;
             /** @description The default address has a GPS point */
             hasGps: boolean;
+            consumerNo: string | null;
+            vatPayer: boolean;
+            cityPayer: boolean;
+            /**
+             * @description null = not checked yet
+             * @enum {string|null}
+             */
+            taxStatusSource: "LOOKUP" | "MANUAL" | null;
+            /**
+             * @description null = not decided
+             * @example 5000000.00
+             */
+            creditLimit: string | null;
+            paymentTerm: components["schemas"]["PaymentTerm"];
+            creditHoldReason: string | null;
+            note: string | null;
+            /** @description The point of the default address */
+            gps: components["schemas"]["GpsPoint"] | null;
+            /** @description The first contact */
+            contact: components["schemas"]["ListContact"] | null;
         };
         CustomerPage: {
-            data: components["schemas"]["CustomerSummary"][];
+            data: components["schemas"]["CustomerListItem"][];
             nextCursor: string | null;
         };
         NextCode: {
             /** @example 1024 */
             code: string;
-        };
-        PaymentTerm: {
-            days: number | null;
-            /**
-             * @description The customer’s own days, the company setting, or neither yet
-             * @enum {string}
-             */
-            source: "CUSTOMER" | "DEFAULT" | "UNSET";
         };
         CustomerAddress: {
             id: number;
@@ -2664,7 +2695,7 @@ export interface components {
             phone?: string | null;
             note?: string | null;
         };
-        SupplierSummary: {
+        SupplierListItem: {
             id: number;
             code: string;
             name: string;
@@ -2672,9 +2703,20 @@ export interface components {
             phone: string | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            regNo: string | null;
+            email: string | null;
+            address: string | null;
+            bankName: string | null;
+            bankAccount: string | null;
+            paymentTermDays: number | null;
+            note: string | null;
+            /** @description The first contact */
+            contact: components["schemas"]["ListContact"] | null;
+            /** @description Products linked to the supplier */
+            productCount: number;
         };
         SupplierPage: {
-            data: components["schemas"]["SupplierSummary"][];
+            data: components["schemas"]["SupplierListItem"][];
             nextCursor: string | null;
         };
         SupplierDetail: {
