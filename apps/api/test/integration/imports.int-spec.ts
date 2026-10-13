@@ -39,8 +39,13 @@ describe('imports', () => {
   const codes = (rows: { errors: { code: string; column: string | null }[] }[]) =>
     rows.flatMap((row) => row.errors.map((issue) => `${issue.column}:${issue.code}`));
   const productRow = async (sku: string) => {
-    const { rows } = await sql.query<{ id: string; name: string; status: string }>(
-      `SELECT id::text, name, status FROM products WHERE sku = $1`,
+    const { rows } = await sql.query<{
+      id: string;
+      name: string;
+      status: string;
+      sale_ready: boolean;
+    }>(
+      `SELECT id::text, name, status, sale_ready_at IS NOT NULL AS sale_ready FROM products WHERE sku = $1`,
       [sku],
     );
     return rows[0];
@@ -175,6 +180,8 @@ describe('imports', () => {
         WHERE p.sku = '1001'`,
     );
     expect(where).toEqual([{ is_home: true, bin: 'A-01-01', supplier: 'МСМ ХХК' }]);
+    // Imported products wait for their prices like registered ones (ADR-0044).
+    expect(await productRow('1001')).toMatchObject({ status: 'ACTIVE', sale_ready: false });
 
     // The same file again changes nothing; a new name is an update, a new box size is refused.
     const again = await imports.check('PRODUCTS', rows);
@@ -478,7 +485,11 @@ describe('imports', () => {
       `SELECT count(*)::int AS n FROM adjustments WHERE reason = 'OPENING_REVERSAL' AND status = 'POSTED'`,
     );
     expect(reversals[0]).toEqual({ n: 2 });
-    expect(await productRow('1001')).toMatchObject({ status: 'INACTIVE', name: 'Кока кола 0.5л' });
+    expect(await productRow('1001')).toMatchObject({
+      status: 'INACTIVE',
+      name: 'Кока кола 0.5л',
+      sale_ready: false,
+    });
     const { rows: barcodes } = await sql.query(`SELECT count(*)::int AS n FROM product_barcodes`);
     expect(barcodes[0]).toEqual({ n: 1 });
     const { rows: partners } = await sql.query(

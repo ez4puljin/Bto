@@ -84,6 +84,7 @@ const COLA: Schemas['ProductSummary'] = {
   name: 'Кока кола',
   categoryId: 1,
   status: 'ACTIVE',
+  saleReadyAt: '2026-10-01T00:00:00.000Z',
   vatType: 'VAT_ABLE',
   cityTax: null,
   baseUnit: { id: 70, uomId: 1, uomName: 'ш' },

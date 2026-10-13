@@ -115,6 +115,11 @@ export const products = pgTable(
     classificationCode: text('classification_code'),
     taxProductCode: text('tax_product_code'),
     status: text('status', { enum: PRODUCT_STATUSES }).notNull().default('ACTIVE'),
+    /**
+     * When the price clerk completed the product (ADR-0044); NULL = «Үнэ хүлээгдэж буй»: usable in
+     * the warehouse, not yet on orders. New products start NULL; an import revert clears it.
+     */
+    saleReadyAt: timestamp('sale_ready_at', { withTimezone: true }),
     tracksLots: boolean('tracks_lots').notNull().default(false),
     /** Net weight of one base unit in kilograms (the Excel "хувийн жин"). */
     weightKg: weight('weight_kg'),

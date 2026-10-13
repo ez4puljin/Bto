@@ -1,3 +1,4 @@
+import { CircleCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -57,12 +59,16 @@ function useUnitLabel(prices: ProductPrices | undefined) {
 
 /**
  * Prices of a product on its page (ADR-0041 #1): each current unit in both lists, today's price
- * (its own, or the base unit's × factor), planned changes and past prices. pricing.manage sets
- * them from a day on.
+ * (its own, or the base unit's × factor), planned changes and past prices. The price clerk
+ * (pricing.prices.manage) sets them from a day on and, while the product waits for its prices,
+ * completes it once both base prices are in force (ADR-0044).
  */
-export function ProductPricesCard({ productId }: { productId: number }) {
+export function ProductPricesCard({ productId, pending }: { productId: number; pending: boolean }) {
   const { t } = useTranslation();
-  const canManage = useHasPermission('pricing.manage');
+  const canManage = useHasPermission('pricing.prices.manage');
+  const mutations = usePricingMutations();
+  const completion = useAction();
+  const [completeKey] = useState(randomUuid);
   const prices = useProductPrices(productId);
   const [editing, setEditing] = useState(false);
   const data = prices.data;
@@ -83,6 +89,34 @@ export function ProductPricesCard({ productId }: { productId: number }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProblemAlert problem={problemFromError(prices.error)} />
+        {pending ? (
+          <div className="flex flex-col gap-3 rounded-xl bg-warning-soft px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-warning">{t('pricing.saleReady.pendingNote')}</p>
+            {canManage ? (
+              <Button
+                size="sm"
+                className="shrink-0"
+                disabled={mutations.completeProducts.isPending}
+                onClick={() =>
+                  void completion
+                    .run(() =>
+                      mutations.completeProducts.mutateAsync({
+                        key: completeKey,
+                        productIds: [productId],
+                      }),
+                    )
+                    .then((ok) =>
+                      ok ? toast.success(t('pricing.saleReady.completed')) : undefined,
+                    )
+                }
+              >
+                <CircleCheck />
+                {t('pricing.saleReady.complete')}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        <ProblemAlert problem={completion.problem} />
         {baseMissing ? (
           <p className="text-sm text-destructive">{t('pricing.card.missingBase')}</p>
         ) : null}

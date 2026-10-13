@@ -6,7 +6,7 @@ import request from 'supertest';
 import { DB } from '../../src/common/db/db.tokens';
 import type { Db, Tx } from '../../src/common/db/db.types';
 import { inTransaction } from '../../src/common/db/transaction';
-import { CatalogImportService } from '../../src/modules/catalog';
+import { CatalogImportService, ProductLifecycleService } from '../../src/modules/catalog';
 import { StorageService, systemActor } from '../../src/modules/identity';
 import {
   AdjustmentsService,
@@ -125,9 +125,16 @@ describe('services for imports', () => {
     expect(before.name).toBe('Бараа 102');
     const colaId = created.get('101')?.productId ?? 0;
     const plainId = created.get('102')?.productId ?? 0;
+    // A completed product taken back waits for its prices again if it is ever re-imported.
+    await tx((t) => app.get(ProductLifecycleService).markSaleReadyInTx(t, actor, [colaId]));
     await tx((t) => catalogImport.deactivateManyInTx(t, actor, [colaId, plainId]));
     const [inactive] = await catalogImport.productsBySku(['101']);
     expect(inactive?.status).toBe('INACTIVE');
+    const { rows: readiness } = await sql.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM products WHERE id = ANY($1) AND sale_ready_at IS NOT NULL`,
+      [[colaId, plainId]],
+    );
+    expect(readiness[0]).toEqual({ n: 0 });
     expect(inactive?.units.flatMap((unit) => unit.barcodes)).toEqual([]);
     expect((await catalogImport.barcodeOwners(['04006381333931'])).size).toBe(0);
     // Each product's audit row names its own released barcodes.

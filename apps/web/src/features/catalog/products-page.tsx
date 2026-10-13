@@ -15,15 +15,22 @@ import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { type ProductStatus, useCategories, useProducts } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
 import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMN_KEYS, PRODUCT_COLUMNS } from './product-columns';
-import { PRODUCT_STATUSES } from './product-schema';
+import { type ProductStage } from './product-stage';
 import { ProductTable, type ProductTableContext } from './product-table';
 
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
-const isStatus = (value: string | null): value is ProductStatus =>
-  PRODUCT_STATUSES.some((status) => status === value);
+/** The status pill: complete, waiting for prices (ADR-0044) or not in use. */
+const STAGES: readonly ProductStage[] = ['ACTIVE', 'PENDING', 'INACTIVE'];
+const isStage = (value: string | null): value is ProductStage =>
+  STAGES.some((stage) => stage === value);
+const STAGE_FILTER: Record<ProductStage, { status: ProductStatus; saleReady?: boolean }> = {
+  ACTIVE: { status: 'ACTIVE', saleReady: true },
+  PENDING: { status: 'ACTIVE', saleReady: false },
+  INACTIVE: { status: 'INACTIVE' },
+};
 
 const COLUMNS_STORAGE_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
 const NO_PAGES: readonly { data: never[] }[] = [];
@@ -40,9 +47,9 @@ export function ProductsPage() {
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const categoryId = positiveId(params.get('category'));
-  const statusParam = params.get('status');
-  const status = isStatus(statusParam) ? statusParam : undefined;
-  const products = useProducts({ q, categoryId, status });
+  const stageParam = params.get('status');
+  const stage = isStage(stageParam) ? stageParam : undefined;
+  const products = useProducts({ q, categoryId, ...(stage ? STAGE_FILTER[stage] : {}) });
   const categories = useCategories();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
@@ -131,11 +138,11 @@ export function ProductsPage() {
         <NativeSelect
           variant="filter"
           aria-label={t('catalog.product.status')}
-          value={status ?? ''}
+          value={stage ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
         >
           <option value="">{t('catalog.products.allStatuses')}</option>
-          {PRODUCT_STATUSES.map((value) => (
+          {STAGES.map((value) => (
             <option key={value} value={value}>
               {t(`catalog.products.status.${value}`)}
             </option>

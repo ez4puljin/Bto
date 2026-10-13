@@ -708,6 +708,7 @@ describe('product suppliers card', () => {
     classificationCode: null,
     taxProductCode: null,
     status: 'ACTIVE',
+    saleReadyAt: '2026-10-01T00:00:00.000Z',
     tracksLots: false,
     weightKg: null,
     createdAt: STAMP,

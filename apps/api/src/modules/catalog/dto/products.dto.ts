@@ -20,6 +20,12 @@ import { PRODUCT_STATUSES, VAT_TYPES } from '../schema';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
+/** "true"/"false" query strings as booleans (other values fail @IsBoolean). */
+const queryBoolean = ({ value }: { value: unknown }) => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
 const SKU = /^[0-9]{1,20}$/;
 const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
 const WEIGHT = /^\d{1,8}(\.\d{1,4})?$/;
@@ -149,9 +155,41 @@ export class UpdateProductDto {
 
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) categoryId?: number;
 
+  @ApiPropertyOptional({ type: String, nullable: true, pattern: WEIGHT.source })
+  @IsOptional()
+  @Matches(WEIGHT)
+  weightKg?: string | null;
+
+  @ApiPropertyOptional({ enum: PRODUCT_STATUSES })
+  @IsOptional()
+  @IsIn(PRODUCT_STATUSES)
+  status?: ProductStatus;
+}
+
+@ApiSchema({ name: 'UnitMeasureUnitRequest' })
+export class UnitMeasureUnitDto {
+  @ApiProperty() @IsInt() @Min(1) unitId: number;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    maxLength: 50,
+    description: 'null: the unit of measure default',
+  })
+  @Transform(trimmed)
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  measureUnit: string | null;
+}
+
+/** The accountant's e-Barimt data of a product (ADR-0044 #6). */
+@ApiSchema({ name: 'ProductEbarimtRequest' })
+export class UpdateProductEbarimtDto {
   @ApiPropertyOptional({ enum: VAT_TYPES }) @IsOptional() @IsIn(VAT_TYPES) vatType?: VatType;
 
-  @ApiPropertyOptional({ type: Boolean, nullable: true })
+  @ApiPropertyOptional({ type: Boolean, nullable: true, description: 'null = not decided yet' })
   @IsOptional()
   @IsBoolean()
   cityTax?: boolean | null;
@@ -166,15 +204,13 @@ export class UpdateProductDto {
   @Matches(TAX_PRODUCT_CODE)
   taxProductCode?: string | null;
 
-  @ApiPropertyOptional({ type: String, nullable: true, pattern: WEIGHT.source })
+  @ApiPropertyOptional({ type: [UnitMeasureUnitDto], description: 'Current units of the product' })
   @IsOptional()
-  @Matches(WEIGHT)
-  weightKg?: string | null;
-
-  @ApiPropertyOptional({ enum: PRODUCT_STATUSES })
-  @IsOptional()
-  @IsIn(PRODUCT_STATUSES)
-  status?: ProductStatus;
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => UnitMeasureUnitDto)
+  units?: UnitMeasureUnitDto[];
 }
 
 export class ProductListQueryDto extends PageQueryDto {
@@ -195,6 +231,15 @@ export class ProductListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(PRODUCT_STATUSES)
   status?: ProductStatus;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'true: complete products; false: those waiting for prices (ADR-0044)',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  saleReady?: boolean;
 }
 
 @ApiSchema({ name: 'UnitUpdateRequest' })
@@ -287,6 +332,13 @@ export class ProductSummaryDto {
   @ApiProperty() name: string;
   @ApiProperty() categoryId: number;
   @ApiProperty({ enum: PRODUCT_STATUSES }) status: ProductStatus;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'When the price clerk completed the product; null = waiting for prices (ADR-0044)',
+  })
+  saleReadyAt: string | null;
   @ApiProperty({ enum: VAT_TYPES }) vatType: VatType;
   @ApiProperty({ type: Boolean, nullable: true }) cityTax: boolean | null;
   @ApiProperty({ type: ProductBaseUnitDto }) baseUnit: ProductBaseUnitDto;
@@ -334,6 +386,13 @@ export class ProductDetailDto {
   @ApiProperty({ type: String, nullable: true }) classificationCode: string | null;
   @ApiProperty({ type: String, nullable: true }) taxProductCode: string | null;
   @ApiProperty({ enum: PRODUCT_STATUSES }) status: ProductStatus;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'When the price clerk completed the product; null = waiting for prices (ADR-0044)',
+  })
+  saleReadyAt: string | null;
   @ApiProperty() tracksLots: boolean;
   @ApiProperty({ type: String, nullable: true, description: 'kg per base unit' }) weightKg:
     string | null;

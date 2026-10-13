@@ -10,8 +10,8 @@ export interface FileKindDefinition {
   contentTypes: readonly string[];
   maxBytes: number;
   visibility: 'public' | 'private';
-  /** Permission required to request an upload URL for this kind. */
-  permission: Permission;
+  /** Permissions allowed to request an upload URL for this kind: any one of them is enough. */
+  permissions: readonly Permission[];
 }
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -24,20 +24,21 @@ export const FILE_KINDS = {
     contentTypes: IMAGE_TYPES,
     maxBytes: 5 * 1024 * 1024,
     visibility: 'public',
-    permission: 'catalog.products.manage',
+    // The product page and the registration form (ADR-0044) upload photos.
+    permissions: ['catalog.products.manage', 'catalog.products.register'],
   },
   'catalog.product_thumb': {
     contentTypes: IMAGE_TYPES,
     maxBytes: 512 * 1024,
     visibility: 'public',
-    permission: 'catalog.products.manage',
+    permissions: ['catalog.products.manage', 'catalog.products.register'],
   },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],
     maxBytes: 5 * 1024 * 1024,
     visibility: 'private',
-    permission: 'imports.manage',
+    permissions: ['imports.manage'],
   },
 } as const satisfies Record<string, FileKindDefinition>;
 

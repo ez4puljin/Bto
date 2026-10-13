@@ -6,7 +6,6 @@ import { useHasPermission } from '@/app/auth-context';
 import { DetailCard, FieldList } from '@/components/detail';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
@@ -15,15 +14,19 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { type ProductDetail, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
 import { categoryPaths } from './category-tree';
+import { EbarimtCard } from './ebarimt-card';
 import { ImagesCard } from './images-card';
 import { ProductForm } from './product-form';
-import { cityTaxChoice, type ProductFormValues, productValues, updateBody } from './product-schema';
+import { type ProductFormValues, productValues, updateBody } from './product-schema';
+import { productStage } from './product-stage';
+import { ProductStageBadge } from './product-stage-badge';
 import { UnitsCard } from './units-card';
 
 /**
- * One product: its data and e-Barimt attributes (read first, «Засах» to change them, ADR-0042),
- * units with barcodes, prices, photos (SPEC §5.2), the suppliers it is ordered from (SPEC §5.3,
- * ADR-0032) and where it is kept. On a wide screen the side column holds the photos and suppliers.
+ * One product: its data (read first, «Засах» to change them, ADR-0042), units with barcodes,
+ * prices (and «Бүрэн болгох» while it waits for them, ADR-0044), its e-Barimt data for the
+ * accountant, photos (SPEC §5.2), the suppliers it is ordered from (SPEC §5.3, ADR-0032) and where
+ * it is kept. On a wide screen the side column holds the photos and suppliers.
  */
 export function ProductPage() {
   const { t } = useTranslation();
@@ -72,9 +75,7 @@ export function ProductPage() {
                 {categoryPath}
               </span>
             ) : null}
-            <Badge variant={detail.status === 'ACTIVE' ? 'success' : 'secondary'}>
-              {t(`catalog.products.status.${detail.status}`)}
-            </Badge>
+            <ProductStageBadge product={detail} />
           </>
         }
         actions={
@@ -113,7 +114,8 @@ export function ProductPage() {
             )}
           />
           <UnitsCard product={detail} canManage={canManage} />
-          <ProductPricesCard productId={detail.id} />
+          <ProductPricesCard productId={detail.id} pending={productStage(detail) === 'PENDING'} />
+          <EbarimtCard product={detail} />
           <ProductLocationCard productId={detail.id} />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
@@ -125,7 +127,7 @@ export function ProductPage() {
   );
 }
 
-/** The reading side of the product's card: its data, then its e-Barimt attributes. */
+/** The reading side of the product's card (the e-Barimt data has its own card). */
 function ProductFacts(props: { detail: ProductDetail; categoryPath: string | undefined }) {
   const { t } = useTranslation();
   const { detail } = props;
@@ -146,32 +148,7 @@ function ProductFacts(props: { detail: ProductDetail; categoryPath: string | und
           },
           {
             label: t('catalog.product.status'),
-            value: t(`catalog.products.status.${detail.status}`),
-          },
-        ]}
-      />
-      <FieldList
-        title={t('catalog.product.ebarimt')}
-        items={[
-          {
-            label: t('catalog.product.vatType'),
-            value: t(`catalog.product.vatTypes.${detail.vatType}`),
-          },
-          {
-            label: t('catalog.product.cityTax'),
-            value: t(`catalog.product.cityTaxValues.${cityTaxChoice(detail.cityTax)}`),
-          },
-          {
-            label: t('catalog.product.classificationCode'),
-            value: detail.classificationCode ? (
-              <span className="font-mono">{detail.classificationCode}</span>
-            ) : null,
-          },
-          {
-            label: t('catalog.product.taxProductCode'),
-            value: detail.taxProductCode ? (
-              <span className="font-mono">{detail.taxProductCode}</span>
-            ) : null,
+            value: t(`catalog.products.status.${productStage(detail)}`),
           },
         ]}
       />

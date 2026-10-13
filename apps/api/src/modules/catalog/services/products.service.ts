@@ -3,7 +3,19 @@ import { classifyBarcode, lookupCandidates } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import { normalizeName, queryTerms, searchKeys, termPattern } from '@tugeel/shared/text';
 import { isExactFactor } from '@tugeel/shared/units';
-import { and, asc, desc, eq, inArray, isNull, like, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -55,6 +67,8 @@ export interface ProductSummary {
   name: string;
   categoryId: number;
   status: ProductStatus;
+  /** NULL while the product waits for its prices (ADR-0044). */
+  saleReadyAt: Date | null;
   vatType: VatType;
   cityTax: boolean | null;
   baseUnit: { id: number; uomId: number; uomName: string };
@@ -126,6 +140,8 @@ export interface ProductQuery {
   q?: string;
   categoryId?: number;
   status?: ProductStatus;
+  /** true: completed products; false: those waiting for prices (ADR-0044). */
+  saleReady?: boolean;
   cursor?: string;
   limit?: number;
 }
@@ -405,6 +421,11 @@ export class ProductsService {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     if (query.status) filters.push(eq(products.status, query.status));
+    if (query.saleReady !== undefined) {
+      filters.push(
+        query.saleReady ? isNotNull(products.saleReadyAt) : isNull(products.saleReadyAt),
+      );
+    }
     if (query.categoryId !== undefined) {
       filters.push(sql`${products.categoryId} IN (
         WITH RECURSIVE down(id) AS (
@@ -501,6 +522,7 @@ export class ProductsService {
         name: row.name,
         categoryId: row.categoryId,
         status: row.status,
+        saleReadyAt: row.saleReadyAt,
         vatType: row.vatType,
         cityTax: row.cityTax,
         baseUnit: { id: base.id, uomId: base.uomId, uomName: base.uomName },

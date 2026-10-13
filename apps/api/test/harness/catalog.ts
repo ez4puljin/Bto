@@ -22,6 +22,7 @@ export interface UnitJson {
   isBase: boolean;
   isDefaultSales: boolean;
   isDefaultPurchase: boolean;
+  measureUnit: string | null;
   supersededBy: number | null;
   supersededAt: string | null;
   barcodes: {

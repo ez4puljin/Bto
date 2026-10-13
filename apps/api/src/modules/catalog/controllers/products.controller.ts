@@ -30,9 +30,11 @@ import {
   ProductUnitDto,
   SupersedeUnitDto,
   UpdateProductDto,
+  UpdateProductEbarimtDto,
   UpdateUnitDto,
 } from '../dto/products.dto';
 import { BarcodeService } from '../services/barcode.service';
+import { ProductEbarimtService } from '../services/product-ebarimt.service';
 import {
   type NewUnitInput,
   type ProductPatch,
@@ -43,6 +45,7 @@ import { UnitsService } from '../services/units.service';
 import { toBarcodeDto, toProductDetailDto, toProductListItemDto, toUnitDto } from './mappers';
 
 const MANAGE = 'catalog.products.manage';
+const EBARIMT = 'catalog.ebarimt.manage';
 
 const toUnitInput = (unit: NewUnitDto): NewUnitInput => ({
   ...unit,
@@ -52,7 +55,10 @@ const toUnitInput = (unit: NewUnitDto): NewUnitInput => ({
 @ApiTags('catalog')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly products: ProductsService) {}
+  constructor(
+    private readonly products: ProductsService,
+    private readonly ebarimt: ProductEbarimtService,
+  ) {}
 
   @Get()
   @Authenticated()
@@ -108,6 +114,18 @@ export class ProductsController {
         : { weightKg: weightKg === null ? null : toDecimal(weightKg) }),
     };
     return toProductDetailDto(await this.products.update(ctx, id, patch));
+  }
+
+  /** The accountant's e-Barimt data, apart from the product's other fields (ADR-0044 #6). */
+  @Patch(':id/ebarimt')
+  @RequirePermission(EBARIMT)
+  @ApiOkResponse({ type: ProductDetailDto })
+  async updateEbarimt(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateProductEbarimtDto,
+  ): Promise<ProductDetailDto> {
+    return toProductDetailDto(await this.ebarimt.update(ctx, id, body));
   }
 }
 

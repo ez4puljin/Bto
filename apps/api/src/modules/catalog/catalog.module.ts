@@ -13,7 +13,9 @@ import { CatalogImportService } from './services/catalog-import.service';
 import { CatalogService } from './services/catalog.service';
 import { CategoriesService } from './services/categories.service';
 import { EbarimtReadinessService } from './services/ebarimt-readiness.service';
+import { ProductEbarimtService } from './services/product-ebarimt.service';
 import { ProductImagesService } from './services/product-images.service';
+import { ProductLifecycleService } from './services/product-lifecycle.service';
 import { ProductsService } from './services/products.service';
 import { TaxService } from './services/tax.service';
 import { UnitConversionService } from './services/unit-conversion.service';
@@ -26,7 +28,9 @@ const CORE_SERVICES = [
   CatalogService,
   CategoriesService,
   EbarimtReadinessService,
+  ProductEbarimtService,
   ProductImagesService,
+  ProductLifecycleService,
   ProductsService,
   TaxService,
   UnitConversionService,

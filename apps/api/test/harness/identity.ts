@@ -116,3 +116,24 @@ export async function login(
 }
 
 export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+/** A user holding only a custom role with these permissions, signed in (ADR-0027 #4). */
+export async function customRoleUser(
+  app: NestExpressApplication,
+  adminToken: string,
+  permissions: readonly string[],
+): Promise<string> {
+  const http = () => request(app.getHttpServer());
+  const role = await http()
+    .post('/api/v1/roles')
+    .set(bearer(adminToken))
+    .send({ name: `Дүр ${uniqueUsername('role')}`, permissions })
+    .expect(201);
+  const user = await seedUser(app);
+  await http()
+    .patch(`/api/v1/users/${user.id}`)
+    .set(bearer(adminToken))
+    .send({ roleIds: [(role.body as { id: number }).id] })
+    .expect(200);
+  return (await login(app, user)).accessToken;
+}

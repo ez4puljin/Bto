@@ -517,6 +517,23 @@ export interface paths {
         patch: operations["Products_update"];
         trace?: never;
     };
+    "/api/v1/products/{id}/ebarimt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** The accountant's e-Barimt data, apart from the product's other fields (ADR-0044 #6). */
+        patch: operations["Products_updateEbarimt"];
+        trace?: never;
+    };
     "/api/v1/products/{id}/units": {
         parameters: {
             query?: never;
@@ -2109,6 +2126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pricing/sale-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Completes registered products whose base unit has both prices today (ADR-0044 #3). */
+        post: operations["Pricing_saleReady"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pricing/quote": {
         parameters: {
             query?: never;
@@ -2149,7 +2183,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.ebarimt.manage" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -2551,6 +2585,11 @@ export interface components {
             categoryId: number;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            /**
+             * Format: date-time
+             * @description When the price clerk completed the product; null = waiting for prices (ADR-0044)
+             */
+            saleReadyAt: string | null;
             /** @enum {string} */
             vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
             cityTax: boolean | null;
@@ -2624,6 +2663,11 @@ export interface components {
             taxProductCode: string | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            /**
+             * Format: date-time
+             * @description When the price clerk completed the product; null = waiting for prices (ADR-0044)
+             */
+            saleReadyAt: string | null;
             tracksLots: boolean;
             /** @description kg per base unit */
             weightKg: string | null;
@@ -2673,14 +2717,24 @@ export interface components {
             sku?: string;
             name?: string;
             categoryId?: number;
-            /** @enum {string} */
-            vatType?: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
-            cityTax?: boolean | null;
-            classificationCode?: string | null;
-            taxProductCode?: string | null;
             weightKg?: string | null;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
+        };
+        UnitMeasureUnitRequest: {
+            unitId: number;
+            /** @description null: the unit of measure default */
+            measureUnit: string | null;
+        };
+        ProductEbarimtRequest: {
+            /** @enum {string} */
+            vatType?: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
+            /** @description null = not decided yet */
+            cityTax?: boolean | null;
+            classificationCode?: string | null;
+            taxProductCode?: string | null;
+            /** @description Current units of the product */
+            units?: components["schemas"]["UnitMeasureUnitRequest"][];
         };
         UnitUpdateRequest: {
             isDefaultSales?: boolean;
@@ -2701,6 +2755,11 @@ export interface components {
             categoryId: number;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            /**
+             * Format: date-time
+             * @description When the price clerk completed the product; null = waiting for prices (ADR-0044)
+             */
+            saleReadyAt: string | null;
             /** @enum {string} */
             vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
             cityTax: boolean | null;
@@ -4289,6 +4348,15 @@ export interface components {
             validTo?: string | null;
             steps: components["schemas"]["DiscountStep"][];
         };
+        SaleReadyRequest: {
+            productIds: number[];
+        };
+        SaleReadyResult: {
+            /** @description Completed by this call */
+            completed: number[];
+            /** @description Complete already */
+            alreadyComplete: number[];
+        };
         QuoteLineRequest: {
             productUnitId: number;
             /**
@@ -4348,7 +4416,7 @@ export interface components {
             total: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -5653,6 +5721,8 @@ export interface operations {
                 /** @description Includes its subcategories */
                 categoryId?: number;
                 status?: "ACTIVE" | "INACTIVE";
+                /** @description true: complete products; false: those waiting for prices (ADR-0044) */
+                saleReady?: boolean;
             };
             header?: never;
             path?: never;
@@ -5781,6 +5851,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProductUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Products_updateEbarimt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductEbarimtRequest"];
             };
         };
         responses: {
@@ -9928,6 +10032,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Pricing_saleReady: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleReadyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleReadyResult"];
                 };
             };
             /** @description RFC 9457 problem details */

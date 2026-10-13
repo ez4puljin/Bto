@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
+import { KEYS as CATALOG_KEYS } from '@/features/catalog/api';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -87,13 +88,27 @@ export function useDiscountProgram(id: number) {
   });
 }
 
-/** Mutations; prices refresh the price queries, programs the program queries. */
+/**
+ * Mutations; prices refresh the price queries, programs the program queries, completing products
+ * (ADR-0044) the product queries.
+ */
 export function usePricingMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   const invalidate = (queryKey: readonly unknown[]) => queryClient.invalidateQueries({ queryKey });
 
   return {
+    completeProducts: useMutation({
+      mutationFn: async ({ key, productIds }: Keyed<{ productIds: number[] }>) =>
+        unwrap(
+          await api.POST('/api/v1/pricing/sale-ready', {
+            params: { header: idempotencyKey(key) },
+            body: { productIds },
+          }),
+        ),
+      onSuccess: () =>
+        Promise.all([invalidate(CATALOG_KEYS.products), invalidate(CATALOG_KEYS.readiness)]),
+    }),
     setPrices: useMutation({
       mutationFn: async ({
         key,

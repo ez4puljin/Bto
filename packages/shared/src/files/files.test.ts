@@ -13,7 +13,8 @@ describe('file kinds (ADR-0029)', () => {
   it('names every kind <module>.<kind> with a real permission and an extension per type', () => {
     for (const [kind, definition] of Object.entries(FILE_KINDS)) {
       expect(kind).toMatch(FILE_KIND_PATTERN);
-      expect(isPermission(definition.permission)).toBe(true);
+      expect(definition.permissions.length).toBeGreaterThan(0);
+      expect(definition.permissions.every(isPermission)).toBe(true);
       expect(definition.maxBytes).toBeGreaterThan(0);
       for (const type of definition.contentTypes) expect(extensionFor(type)).toMatch(/^[a-z]+$/);
     }
@@ -36,7 +37,7 @@ describe('file kinds (ADR-0029)', () => {
   it('keeps import sheets private and recognises the xlsx (ZIP) signature', () => {
     expect(FILE_KINDS['imports.source']).toMatchObject({
       visibility: 'private',
-      permission: 'imports.manage',
+      permissions: ['imports.manage'],
       contentTypes: [XLSX_CONTENT_TYPE],
     });
     expect(extensionFor(XLSX_CONTENT_TYPE)).toBe('xlsx');

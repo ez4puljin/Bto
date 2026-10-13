@@ -53,6 +53,7 @@ export const ErrorCode = {
   // partners (docs/modules/partners.md)
   CUSTOMER_INACTIVE: 'CUSTOMER_INACTIVE',
   SUPPLIER_INACTIVE: 'SUPPLIER_INACTIVE',
+  PRODUCT_INACTIVE: 'PRODUCT_INACTIVE',
   // inventory (docs/modules/inventory.md)
   DOC_ALREADY_POSTED: 'DOC_ALREADY_POSTED',
   ALREADY_POSTED: 'ALREADY_POSTED',

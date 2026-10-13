@@ -12,6 +12,10 @@ export {
 } from './services/catalog-import.service';
 export { CatalogService } from './services/catalog.service';
 export { type Category, CategoriesService } from './services/categories.service';
+export {
+  ProductLifecycleService,
+  type SaleReadyCandidate,
+} from './services/product-lifecycle.service';
 export type {
   NewUnitInput,
   ProductDetail,

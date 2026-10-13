@@ -21,6 +21,7 @@ export type Barcode = Schemas['Barcode'];
 export type ProductImage = Schemas['ProductImage'];
 export type ProductCreate = Schemas['ProductCreateRequest'];
 export type ProductUpdate = Schemas['ProductUpdateRequest'];
+export type ProductEbarimt = Schemas['ProductEbarimtRequest'];
 export type UnitRequest = Schemas['UnitRequest'];
 export type ReadinessReport = Schemas['ReadinessReport'];
 export type ReadinessRow = Schemas['ReadinessRow'];
@@ -63,6 +64,8 @@ export interface ProductFilter {
   q?: string;
   categoryId?: number;
   status?: ProductStatus;
+  /** true: complete; false: waiting for prices (ADR-0044). */
+  saleReady?: boolean;
 }
 
 export function useProducts(filter: ProductFilter, options: ListReadOptions = {}) {
@@ -80,6 +83,7 @@ export function useProducts(filter: ProductFilter, options: ListReadOptions = {}
               q: filter.q || undefined,
               categoryId: filter.categoryId,
               status: filter.status,
+              saleReady: filter.saleReady,
               cursor: pageParam,
               limit,
             },
@@ -196,6 +200,13 @@ export function useCatalogMutations() {
       mutationFn: async ({ id, body }: { id: number; body: ProductUpdate }) =>
         unwrap(await api.PATCH('/api/v1/products/{id}', { params: { path: { id } }, body })),
       onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories),
+    }),
+    updateEbarimt: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: ProductEbarimt }) =>
+        unwrap(
+          await api.PATCH('/api/v1/products/{id}/ebarimt', { params: { path: { id } }, body }),
+        ),
+      onSuccess: () => invalidate(KEYS.products, KEYS.readiness),
     }),
     addUnit: useMutation({
       mutationFn: async ({ productId, body }: { productId: number; body: UnitRequest }) =>

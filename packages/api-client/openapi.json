@@ -1877,6 +1877,15 @@
                 "INACTIVE"
               ]
             }
+          },
+          {
+            "name": "saleReady",
+            "required": false,
+            "in": "query",
+            "description": "true: complete products; false: those waiting for prices (ADR-0044)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2085,6 +2094,62 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/ebarimt": {
+      "patch": {
+        "operationId": "Products_updateEbarimt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductEbarimtRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The accountant's e-Barimt data, apart from the product's other fields (ADR-0044 #6).",
         "tags": [
           "catalog"
         ]
@@ -9132,6 +9197,63 @@
         ]
       }
     },
+    "/api/v1/pricing/sale-ready": {
+      "post": {
+        "operationId": "Pricing_saleReady",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleReadyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleReadyResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Completes registered products whose base unit has both prices today (ADR-0044 #3).",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
     "/api/v1/pricing/quote": {
       "post": {
         "operationId": "Pricing_quote",
@@ -9265,6 +9387,7 @@
           "identity.settings.manage",
           "identity.audit.read",
           "catalog.products.manage",
+          "catalog.products.register",
           "catalog.ebarimt.manage",
           "partners.customers.read",
           "partners.customers.manage",
@@ -9281,7 +9404,8 @@
           "inventory.costs.manage",
           "inventory.transfers.manage",
           "imports.manage",
-          "pricing.manage"
+          "pricing.manage",
+          "pricing.prices.manage"
         ]
       },
       "RoleRef": {
@@ -10755,6 +10879,12 @@
             ],
             "type": "string"
           },
+          "saleReadyAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the price clerk completed the product; null = waiting for prices (ADR-0044)"
+          },
           "vatType": {
             "enum": [
               "VAT_ABLE",
@@ -10802,6 +10932,7 @@
           "name",
           "categoryId",
           "status",
+          "saleReadyAt",
           "vatType",
           "cityTax",
           "baseUnit",
@@ -11030,6 +11161,12 @@
             ],
             "type": "string"
           },
+          "saleReadyAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the price clerk completed the product; null = waiting for prices (ADR-0044)"
+          },
           "tracksLots": {
             "type": "boolean"
           },
@@ -11070,6 +11207,7 @@
           "classificationCode",
           "taxProductCode",
           "status",
+          "saleReadyAt",
           "tracksLots",
           "weightKg",
           "createdAt",
@@ -11210,29 +11348,6 @@
             "type": "number",
             "minimum": 1
           },
-          "vatType": {
-            "enum": [
-              "VAT_ABLE",
-              "VAT_FREE",
-              "VAT_ZERO",
-              "NO_VAT"
-            ],
-            "type": "string"
-          },
-          "cityTax": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "classificationCode": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^[0-9]{7}$"
-          },
-          "taxProductCode": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^[0-9]{3}$"
-          },
           "weightKg": {
             "type": "string",
             "nullable": true,
@@ -11244,6 +11359,62 @@
               "INACTIVE"
             ],
             "type": "string"
+          }
+        }
+      },
+      "UnitMeasureUnitRequest": {
+        "type": "object",
+        "properties": {
+          "unitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "measureUnit": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 50,
+            "description": "null: the unit of measure default"
+          }
+        },
+        "required": [
+          "unitId",
+          "measureUnit"
+        ]
+      },
+      "ProductEbarimtRequest": {
+        "type": "object",
+        "properties": {
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "cityTax": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "null = not decided yet"
+          },
+          "classificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
+          },
+          "taxProductCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{3}$"
+          },
+          "units": {
+            "maxItems": 10,
+            "description": "Current units of the product",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitMeasureUnitRequest"
+            }
           }
         }
       },
@@ -11310,6 +11481,12 @@
             ],
             "type": "string"
           },
+          "saleReadyAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the price clerk completed the product; null = waiting for prices (ADR-0044)"
+          },
           "vatType": {
             "enum": [
               "VAT_ABLE",
@@ -11337,6 +11514,7 @@
           "name",
           "categoryId",
           "status",
+          "saleReadyAt",
           "vatType",
           "cityTax",
           "baseUnit",
@@ -16637,6 +16815,46 @@
           "steps"
         ]
       },
+      "SaleReadyRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "productIds"
+        ]
+      },
+      "SaleReadyResult": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "description": "Completed by this call",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "alreadyComplete": {
+            "description": "Complete already",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "completed",
+          "alreadyComplete"
+        ]
+      },
       "QuoteLineRequest": {
         "type": "object",
         "properties": {
@@ -16892,6 +17110,7 @@
           "TAX_ATTRIBUTES_MISSING",
           "CUSTOMER_INACTIVE",
           "SUPPLIER_INACTIVE",
+          "PRODUCT_INACTIVE",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

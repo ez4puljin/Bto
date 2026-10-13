@@ -262,8 +262,9 @@ export class CatalogImportService {
   }
 
   /**
-   * Takes back products an import created (ADR-0036 #7): they become INACTIVE and their barcodes
-   * are released. The caller checks first that they hold no stock.
+   * Takes back products an import created (ADR-0036 #7): they become INACTIVE, wait for their
+   * prices again if they are ever re-imported (ADR-0044) and their barcodes are released. The
+   * caller checks first that they hold no stock.
    */
   async deactivateManyInTx(tx: Tx, actor: Actor, productIds: readonly number[]): Promise<void> {
     for (let start = 0; start < productIds.length; start += CHUNK) {
@@ -282,7 +283,7 @@ export class CatalogImportService {
         .orderBy(asc(productBarcodes.id));
       await tx
         .update(products)
-        .set({ status: 'INACTIVE', updatedAt: sql`now()` })
+        .set({ status: 'INACTIVE', saleReadyAt: null, updatedAt: sql`now()` })
         .where(inArray(products.id, part));
       await tx
         .delete(productBarcodes)

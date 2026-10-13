@@ -32,16 +32,21 @@ import {
   ProductPricesQueryDto,
   QuoteDto,
   QuoteRequestDto,
+  SaleReadyRequestDto,
+  SaleReadyResultDto,
   SetPricesDto,
 } from '../dto/pricing.dto';
 import { DiscountProgramsService } from '../services/discount-programs.service';
 import { PriceQuoteService } from '../services/price-quote.service';
+import { SaleReadinessService } from '../services/sale-readiness.service';
 import { UnitPricesService } from '../services/unit-prices.service';
 import { toProductPricesDto, toProgramDto, toProgramInput, toQuoteDto } from './mappers';
 
 const MANAGE = 'pricing.manage';
+/** The price clerk (ADR-0044): unit prices and completing registered products. */
+const PRICES = 'pricing.prices.manage';
 
-/** Unit prices (ADR-0041 #1): every signed-in user reads them; pricing.manage sets them. */
+/** Unit prices (ADR-0041 #1): every signed-in user reads them; pricing.prices.manage sets them. */
 @ApiTags('pricing')
 @Controller('unit-prices')
 export class UnitPricesController {
@@ -69,7 +74,7 @@ export class UnitPricesController {
 
   /** Idempotent: a retried change must not close the price it just inserted. */
   @Post()
-  @RequirePermission(MANAGE)
+  @RequirePermission(PRICES)
   @Idempotent()
   @HttpCode(200)
   @ApiOkResponse({ type: ProductPricesDto })
@@ -162,7 +167,23 @@ export class DiscountProgramsController {
 @ApiTags('pricing')
 @Controller('pricing')
 export class PricingController {
-  constructor(private readonly quotes: PriceQuoteService) {}
+  constructor(
+    private readonly quotes: PriceQuoteService,
+    private readonly saleReadiness: SaleReadinessService,
+  ) {}
+
+  /** Completes registered products whose base unit has both prices today (ADR-0044 #3). */
+  @Post('sale-ready')
+  @RequirePermission(PRICES)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: SaleReadyResultDto })
+  async saleReady(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: SaleReadyRequestDto,
+  ): Promise<SaleReadyResultDto> {
+    return this.saleReadiness.complete(ctx, body.productIds);
+  }
 
   @Post('quote')
   @Authenticated()

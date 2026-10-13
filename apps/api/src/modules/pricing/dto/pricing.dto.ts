@@ -30,6 +30,7 @@ import {
 } from 'class-validator';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { PROGRAM_STATUSES, type ProgramStatus } from '../services/discount-programs.service';
+import { MAX_SALE_READY } from '../services/sale-readiness.service';
 import { MAX_PRICE_ENTRIES } from '../services/unit-prices.service';
 
 const WHOLE_MNT = /^[1-9]\d{0,11}$/;
@@ -142,6 +143,26 @@ export class SetPricesDto {
   @ValidateNested({ each: true })
   @Type(() => PriceEntryDto)
   entries: PriceEntryDto[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Completing registered products (ADR-0044 #3)
+
+@ApiSchema({ name: 'SaleReadyRequest' })
+export class SaleReadyRequestDto {
+  @ApiProperty({ type: [Number], minItems: 1, maxItems: MAX_SALE_READY })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_SALE_READY)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  productIds: number[];
+}
+
+@ApiSchema({ name: 'SaleReadyResult' })
+export class SaleReadyResultDto {
+  @ApiProperty({ type: [Number], description: 'Completed by this call' }) completed: number[];
+  @ApiProperty({ type: [Number], description: 'Complete already' }) alreadyComplete: number[];
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
 import { type BarcodeResolution, useBarcodeLookup } from './api';
+import { productStage } from './product-stage';
+import { ProductStageBadge } from './product-stage-badge';
 
 interface ScanEntry {
   id: number;
@@ -156,9 +158,7 @@ function ScanResult({ entry }: { entry: ScanEntry }) {
             </Link>
             <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
               <span className="font-mono">{product.sku}</span>
-              {product.status === 'INACTIVE' ? (
-                <Badge variant="secondary">{t('catalog.products.status.INACTIVE')}</Badge>
-              ) : null}
+              {productStage(product) === 'ACTIVE' ? null : <ProductStageBadge product={product} />}
             </div>
             <span className="text-sm">
               {unit.isBase

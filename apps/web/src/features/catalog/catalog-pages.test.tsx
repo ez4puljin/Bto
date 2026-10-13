@@ -65,6 +65,7 @@ const summary = (id: number, sku: string, name: string): Schemas['ProductSummary
   name,
   categoryId: 12,
   status: 'ACTIVE',
+  saleReadyAt: '2026-10-01T00:00:00.000Z',
   vatType: 'VAT_ABLE',
   cityTax: null,
   baseUnit: { id: id * 10, uomId: 1, uomName: 'ш' },
@@ -98,6 +99,7 @@ const COLA: Schemas['ProductDetail'] = {
   classificationCode: null,
   taxProductCode: null,
   status: 'ACTIVE',
+  saleReadyAt: '2026-10-01T00:00:00.000Z',
   tracksLots: false,
   weightKg: '0.55',
   createdAt: STAMP,
@@ -251,6 +253,20 @@ describe('products list', () => {
         (request) => new URL(request.url).searchParams.get('q') === 'coca',
       ),
     ).toBe(true);
+  });
+
+  it('filters the products waiting for their prices and marks them', async () => {
+    const waiting = listItem(3, '10003', 'Шинэ ус', { saleReadyAt: null });
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/products': () => list([waiting]),
+    });
+    renderApp('/catalog/products?status=PENDING', fetchMock);
+    const table = await screen.findByRole('table');
+    expect(await within(table).findByText(mn.catalog.products.status.PENDING)).toBeInTheDocument();
+    const [request] = calls(fetchMock, 'GET', '/api/v1/products');
+    const query = new URL(request?.url ?? 'http://x').searchParams;
+    expect([query.get('status'), query.get('saleReady')]).toEqual(['ACTIVE', 'false']);
   });
 
   it('shows every piece of product information in its own column', async () => {
@@ -656,7 +672,7 @@ describe('product page', () => {
         productRoutes({
           'PATCH /api/v1/products/7': async (request: Request) => {
             patched = await request.json();
-            return json({ ...COLA, cityTax: true, updatedAt: '2026-10-02T02:00:00.000Z' });
+            return json({ ...COLA, weightKg: '0.6', updatedAt: '2026-10-02T02:00:00.000Z' });
           },
         }),
       ),
@@ -664,7 +680,11 @@ describe('product page', () => {
     const user = userEvent.setup();
     const edit = `${mn.common.edit}: ${mn.catalog.product.info}`;
     await user.click(await screen.findByRole('button', { name: edit }));
-    await user.selectOptions(await screen.findByLabelText(mn.catalog.product.cityTax), 'yes');
+    // e-Barimt fields live in their own card (ADR-0044).
+    expect(screen.queryByLabelText(mn.catalog.product.cityTax)).toBeNull();
+    const weight = await screen.findByLabelText(mn.catalog.product.weight);
+    await user.clear(weight);
+    await user.type(weight, '0.6');
     // The status is a switch, on while the product is active.
     const status = screen.getByRole('switch', { name: mn.catalog.product.status });
     expect(status).toBeChecked();
@@ -679,13 +699,81 @@ describe('product page', () => {
       sku: '10023',
       name: 'Кока кола 0.5 л',
       categoryId: 12,
-      vatType: 'VAT_ABLE',
-      cityTax: true,
-      classificationCode: null,
-      taxProductCode: null,
-      weightKg: '0.55',
+      weightKg: '0.6',
       status: 'INACTIVE',
     });
+  });
+
+  it('lets the accountant set the e-Barimt data in its own card', async () => {
+    let patched: unknown;
+    const accountant = { ...WORKER_ME, permissions: ['catalog.ebarimt.manage' as const] };
+    renderApp(
+      '/catalog/products/7',
+      signedIn(
+        accountant,
+        productRoutes({
+          'PATCH /api/v1/products/7/ebarimt': async (request: Request) => {
+            patched = await request.json();
+            return json({ ...COLA, cityTax: true, classificationCode: '2211100' });
+          },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    // Product data stays read-only; only the e-Barimt card has «Засах».
+    expect(
+      await screen.findByRole('button', {
+        name: `${mn.common.edit}: ${mn.catalog.ebarimtCard.title}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.catalog.product.info}` }),
+    ).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: `${mn.common.edit}: ${mn.catalog.ebarimtCard.title}` }),
+    );
+    await user.selectOptions(await screen.findByLabelText(mn.catalog.product.cityTax), 'yes');
+    await user.type(screen.getByLabelText(mn.catalog.product.classificationCode), '2211100');
+    // The units card is a region named «ш» too: ask for the field.
+    await user.type(screen.getByRole('textbox', { name: 'ш' }), 'ш');
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.catalog.ebarimtCard.saved);
+    expect(patched).toEqual({
+      vatType: 'VAT_ABLE',
+      cityTax: true,
+      classificationCode: '2211100',
+      taxProductCode: null,
+      units: [
+        { unitId: 70, measureUnit: 'ш' },
+        { unitId: 71, measureUnit: null },
+      ],
+    });
+  });
+
+  it('completes a product waiting for its prices from the prices card', async () => {
+    const posted: { key: string | null; body: unknown }[] = [];
+    const waiting = { ...COLA, saleReadyAt: null };
+    const routes = {
+      ...MASTER_ROUTES,
+      'GET /api/v1/products/7': () => json(waiting),
+      'POST /api/v1/pricing/sale-ready': async (request: Request) => {
+        posted.push({ key: request.headers.get('Idempotency-Key'), body: await request.json() });
+        return json({ completed: [7], alreadyComplete: [] });
+      },
+    };
+    renderApp('/catalog/products/7', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    expect(await screen.findByText(mn.pricing.saleReady.pendingNote)).toBeInTheDocument();
+    expect(screen.getAllByText(mn.catalog.products.status.PENDING).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: mn.pricing.saleReady.complete }));
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.pricing.saleReady.completed);
+    expect(posted).toEqual([{ key: expect.stringMatching(UUID), body: { productIds: [7] } }]);
+
+    // A worker sees that the product waits but cannot complete it.
+    cleanup();
+    renderApp('/catalog/products/7', signedIn(WORKER_ME, routes));
+    expect(await screen.findByText(mn.pricing.saleReady.pendingNote)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: mn.pricing.saleReady.complete })).toBeNull();
   });
 });
 

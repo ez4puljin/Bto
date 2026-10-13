@@ -168,55 +168,57 @@ export function ProductForm(props: {
           ) : null}
         </FormSection>
 
-        <FormSection
-          title={t('catalog.product.ebarimt')}
-          description={t('catalog.product.ebarimtHint')}
-        >
-          <FormRow label={t('catalog.product.vatType')} htmlFor="product-vat">
-            <NativeSelect id="product-vat" {...form.register('vatType')}>
-              {VAT_TYPES.map((vatType) => (
-                <option key={vatType} value={vatType}>
-                  {t(`catalog.product.vatTypes.${vatType}`)}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormRow>
-          <FormRow label={t('catalog.product.cityTax')} htmlFor="product-city-tax">
-            <NativeSelect id="product-city-tax" {...form.register('cityTax')}>
-              {CITY_TAX_CHOICES.map((choice) => (
-                <option key={choice} value={choice}>
-                  {t(`catalog.product.cityTaxValues.${choice}`)}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormRow>
-          <FormRow
-            label={t('catalog.product.classificationCode')}
-            htmlFor="product-classification"
-            error={errors.classificationCode?.message}
+        {mode === 'create' ? (
+          <FormSection
+            title={t('catalog.product.ebarimt')}
+            description={t('catalog.product.ebarimtHint')}
           >
-            <Input
-              id="product-classification"
-              inputMode="numeric"
-              autoComplete="off"
-              className="font-mono sm:w-44"
-              {...form.register('classificationCode')}
-            />
-          </FormRow>
-          <FormRow
-            label={t('catalog.product.taxProductCode')}
-            htmlFor="product-tax-code"
-            error={errors.taxProductCode?.message}
-          >
-            <Input
-              id="product-tax-code"
-              inputMode="numeric"
-              autoComplete="off"
-              className="font-mono sm:w-28"
-              {...form.register('taxProductCode')}
-            />
-          </FormRow>
-        </FormSection>
+            <FormRow label={t('catalog.product.vatType')} htmlFor="product-vat">
+              <NativeSelect id="product-vat" {...form.register('vatType')}>
+                {VAT_TYPES.map((vatType) => (
+                  <option key={vatType} value={vatType}>
+                    {t(`catalog.product.vatTypes.${vatType}`)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormRow>
+            <FormRow label={t('catalog.product.cityTax')} htmlFor="product-city-tax">
+              <NativeSelect id="product-city-tax" {...form.register('cityTax')}>
+                {CITY_TAX_CHOICES.map((choice) => (
+                  <option key={choice} value={choice}>
+                    {t(`catalog.product.cityTaxValues.${choice}`)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormRow>
+            <FormRow
+              label={t('catalog.product.classificationCode')}
+              htmlFor="product-classification"
+              error={errors.classificationCode?.message}
+            >
+              <Input
+                id="product-classification"
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono sm:w-44"
+                {...form.register('classificationCode')}
+              />
+            </FormRow>
+            <FormRow
+              label={t('catalog.product.taxProductCode')}
+              htmlFor="product-tax-code"
+              error={errors.taxProductCode?.message}
+            >
+              <Input
+                id="product-tax-code"
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono sm:w-28"
+                {...form.register('taxProductCode')}
+              />
+            </FormRow>
+          </FormSection>
+        ) : null}
 
         {mode === 'create' ? (
           <>

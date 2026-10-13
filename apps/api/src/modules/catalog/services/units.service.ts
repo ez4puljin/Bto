@@ -87,34 +87,37 @@ export class UnitsService implements OnModuleInit {
 
   /** Default flags (moved in two steps, the partial unique indexes allow one per product) and measure unit. */
   update(actor: Actor, unitId: number, patch: UnitPatch): Promise<ProductUnit> {
-    return inTransaction(this.db, async (tx) => {
-      const before = await this.currentUnit(tx, unitId);
-      for (const flag of ['isDefaultSales', 'isDefaultPurchase'] as const) {
-        if (patch[flag] === true && !before[flag])
-          await this.clearDefault(tx, before.productId, flag);
-      }
-      const [row] = await tx
-        .update(productUnits)
-        .set({
-          ...(patch.isDefaultSales === undefined ? {} : { isDefaultSales: patch.isDefaultSales }),
-          ...(patch.isDefaultPurchase === undefined
-            ? {}
-            : { isDefaultPurchase: patch.isDefaultPurchase }),
-          ...(patch.measureUnit === undefined ? {} : { measureUnit: patch.measureUnit }),
-          updatedAt: sql`now()`,
-        })
-        .where(eq(productUnits.id, unitId))
-        .returning();
-      if (!row) throw notFound('product unit', unitId);
-      await this.audit.record(tx, actor, {
-        action: 'UPDATE',
-        entity: 'product_units',
-        entityId: unitId,
-        before,
-        after: row,
-      });
-      return row;
+    return inTransaction(this.db, (tx) => this.updateInTx(tx, actor, unitId, patch));
+  }
+
+  /** The same in the caller's transaction (the e-Barimt card sets measure units, ADR-0044 #6). */
+  async updateInTx(tx: Tx, actor: Actor, unitId: number, patch: UnitPatch): Promise<ProductUnit> {
+    const before = await this.currentUnit(tx, unitId);
+    for (const flag of ['isDefaultSales', 'isDefaultPurchase'] as const) {
+      if (patch[flag] === true && !before[flag])
+        await this.clearDefault(tx, before.productId, flag);
+    }
+    const [row] = await tx
+      .update(productUnits)
+      .set({
+        ...(patch.isDefaultSales === undefined ? {} : { isDefaultSales: patch.isDefaultSales }),
+        ...(patch.isDefaultPurchase === undefined
+          ? {}
+          : { isDefaultPurchase: patch.isDefaultPurchase }),
+        ...(patch.measureUnit === undefined ? {} : { measureUnit: patch.measureUnit }),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(productUnits.id, unitId))
+      .returning();
+    if (!row) throw notFound('product unit', unitId);
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'product_units',
+      entityId: unitId,
+      before,
+      after: row,
     });
+    return row;
   }
 
   /** Stops using a unit: no successor, its barcodes are removed, documents keep their snapshot. */

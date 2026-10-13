@@ -69,6 +69,7 @@ export const toProductDetailDto = (row: ProductDetail): ProductDetailDto => ({
   classificationCode: row.classificationCode,
   taxProductCode: row.taxProductCode,
   status: row.status,
+  saleReadyAt: row.saleReadyAt?.toISOString() ?? null,
   tracksLots: row.tracksLots,
   weightKg: row.weightKg?.toString() ?? null,
   createdAt: row.createdAt.toISOString(),
@@ -77,7 +78,10 @@ export const toProductDetailDto = (row: ProductDetail): ProductDetailDto => ({
   images: row.images,
 });
 
-export const toProductSummaryDto = (row: ProductSummary): ProductSummaryDto => ({ ...row });
+export const toProductSummaryDto = (row: ProductSummary): ProductSummaryDto => ({
+  ...row,
+  saleReadyAt: row.saleReadyAt?.toISOString() ?? null,
+});
 
 export const toProductListItemDto = (row: ProductListItem): ProductListItemDto => ({
   ...toProductSummaryDto(row),

@@ -9,9 +9,15 @@ import {
 import { DiscountProgramsService } from './services/discount-programs.service';
 import { PriceQuoteService } from './services/price-quote.service';
 import { PricingUnitsHook } from './services/pricing-units.hook';
+import { SaleReadinessService } from './services/sale-readiness.service';
 import { UnitPricesService } from './services/unit-prices.service';
 
-const CORE_SERVICES = [DiscountProgramsService, PriceQuoteService, UnitPricesService];
+const CORE_SERVICES = [
+  DiscountProgramsService,
+  PriceQuoteService,
+  SaleReadinessService,
+  UnitPricesService,
+];
 
 /**
  * Pricing services every process may use (the api now; orders and the price import next).

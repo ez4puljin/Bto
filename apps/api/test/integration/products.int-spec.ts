@@ -10,6 +10,7 @@ describe('products: create, update, list (SPEC §5.2)', () => {
   let sql: Client;
   let admin: string;
   let worker: string;
+  let accountant: string;
   let pcs: number;
   let box: number;
   let kg: number;
@@ -22,6 +23,7 @@ describe('products: create, update, list (SPEC §5.2)', () => {
     sql = await connectAs('app');
     admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
     worker = (await login(app, await seedUser(app, { roles: ['WAREHOUSE'] }))).accessToken;
+    accountant = (await login(app, await seedUser(app, { roles: ['ACCOUNTANT'] }))).accessToken;
     const api = catalogApi(app, admin);
     pcs = await api.uomId('PCS');
     box = await api.uomId('BOX');
@@ -52,6 +54,8 @@ describe('products: create, update, list (SPEC §5.2)', () => {
       sku: '10023',
       name: 'Кока кола 0,5л',
       status: 'ACTIVE',
+      // A new product waits for its prices (ADR-0044).
+      saleReadyAt: null,
       weightKg: '0.55',
       cityTax: false,
     });
@@ -188,9 +192,9 @@ describe('products: create, update, list (SPEC §5.2)', () => {
     const updated = await http()
       .patch(`/api/v1/products/${product.id}`)
       .set(bearer(admin))
-      .send({ name: 'Фанта 1л', status: 'INACTIVE', cityTax: null })
+      .send({ name: 'Фанта 1л', status: 'INACTIVE' })
       .expect(200);
-    expect(updated.body).toMatchObject({ name: 'Фанта 1л', status: 'INACTIVE', cityTax: null });
+    expect(updated.body).toMatchObject({ name: 'Фанта 1л', status: 'INACTIVE' });
     const { rows } = await sql.query<{ search_phonetic: string }>(
       `SELECT search_phonetic FROM products WHERE id = $1`,
       [product.id],
@@ -208,6 +212,63 @@ describe('products: create, update, list (SPEC §5.2)', () => {
       .post('/api/v1/products')
       .set(bearer(worker))
       .send({ name: 'x', categoryId: cola, baseUomId: pcs })
+      .expect(403);
+  });
+
+  it('lets the accountant set the e-Barimt data apart from the other fields (ADR-0044 #6)', async () => {
+    const api = catalogApi(app, admin);
+    const juice = await api.product({
+      name: 'Жүүс 1л',
+      categoryId: cola,
+      baseUomId: pcs,
+      units: [{ uomId: box, factorToBase: '12' }],
+    });
+    const other = await api.product({ name: 'Ус 0.5л', categoryId: cola, baseUomId: pcs });
+    // The general update no longer takes e-Barimt fields.
+    await http()
+      .patch(`/api/v1/products/${juice.id}`)
+      .set(bearer(admin))
+      .send({ cityTax: true })
+      .expect(422);
+    const set = await http()
+      .patch(`/api/v1/products/${juice.id}/ebarimt`)
+      .set(bearer(accountant))
+      .send({
+        vatType: 'VAT_FREE',
+        cityTax: false,
+        classificationCode: '2211100',
+        taxProductCode: '101',
+        units: [
+          { unitId: unitOf(juice, 'PCS').id, measureUnit: 'ш' },
+          { unitId: unitOf(juice, 'BOX').id, measureUnit: null },
+        ],
+      })
+      .expect(200);
+    const updated = set.body as ProductJson;
+    expect(updated).toMatchObject({
+      vatType: 'VAT_FREE',
+      cityTax: false,
+      classificationCode: '2211100',
+      taxProductCode: '101',
+    });
+    expect(unitOf(updated, 'PCS').measureUnit).toBe('ш');
+    expect(unitOf(updated, 'BOX').measureUnit).toBeNull();
+    // A unit of another product, the accountant on other fields, a worker on e-Barimt: refused.
+    const foreign = await http()
+      .patch(`/api/v1/products/${juice.id}/ebarimt`)
+      .set(bearer(accountant))
+      .send({ units: [{ unitId: unitOf(other, 'PCS').id, measureUnit: 'ш' }] })
+      .expect(422);
+    expect(foreign.body.errors).toEqual([expect.objectContaining({ path: 'units.0.unitId' })]);
+    await http()
+      .patch(`/api/v1/products/${juice.id}`)
+      .set(bearer(accountant))
+      .send({ name: 'x' })
+      .expect(403);
+    await http()
+      .patch(`/api/v1/products/${juice.id}/ebarimt`)
+      .set(bearer(worker))
+      .send({ cityTax: true })
       .expect(403);
   });
 

@@ -2,12 +2,12 @@ import type { TFunction } from 'i18next';
 import { ImageOff } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { Badge } from '@/components/ui/badge';
 import type { ProductLocation } from '@/features/inventory/api';
 import type { ProductSupplierLink } from '@/features/partners/api';
 import type { CurrentPrice } from '@/features/pricing/api';
 import { formatMnt } from '@/lib/money';
 import type { ProductListItem } from './api';
+import { ProductStageBadge } from './product-stage-badge';
 
 /** Every column of the product list, in the order of the owner's product sheet (ADR-0037). */
 export const PRODUCT_COLUMN_KEYS = [
@@ -224,10 +224,6 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'status',
-    cell: (row, ctx) => (
-      <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
-        {ctx.t(`catalog.products.status.${row.status}`)}
-      </Badge>
-    ),
+    cell: (row) => <ProductStageBadge product={row} />,
   },
 ];

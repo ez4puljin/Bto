@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   'identity.settings.manage',
   'identity.audit.read',
   'catalog.products.manage',
+  'catalog.products.register',
   'catalog.ebarimt.manage',
   'partners.customers.read',
   'partners.customers.manage',
@@ -31,6 +32,7 @@ export const PERMISSIONS = [
   'inventory.transfers.manage',
   'imports.manage',
   'pricing.manage',
+  'pricing.prices.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -83,11 +85,12 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.stocktakes.manage',
     'inventory.transfers.manage',
   ],
-  // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms and
-  // enters the supplier prices of goods receipts (ADR-0033).
+  // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms, enters
+  // the supplier prices of goods receipts (ADR-0033) and the products' e-Barimt data (ADR-0044).
   ACCOUNTANT: [
     'identity.settings.read',
     'identity.audit.read',
+    'catalog.ebarimt.manage',
     'partners.customers.read',
     'partners.customers.manage',
     'partners.credit.manage',

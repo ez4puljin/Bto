@@ -5,6 +5,7 @@ import type { ValidationMessage } from '@/lib/forms';
 import type {
   ProductCreate,
   ProductDetail,
+  ProductEbarimt,
   ProductStatus,
   ProductUpdate,
   Uom,
@@ -171,6 +172,53 @@ export function createBody(values: ProductFormValues): ProductCreate {
   };
 }
 
+/** The product card's fields; the e-Barimt data has its own card and route (ADR-0044 #6). */
 export function updateBody(values: ProductFormValues): ProductUpdate {
-  return { ...common(values), status: values.status satisfies ProductStatus };
+  return {
+    sku: values.sku,
+    name: values.name,
+    categoryId: id(values.categoryId),
+    weightKg: values.weightKg || null,
+    status: values.status satisfies ProductStatus,
+  };
+}
+
+/** The e-Barimt card (the accountant, ADR-0044 #6): tax fields and each current unit's measure unit. */
+export const ebarimtSchema = z.object({
+  vatType: z.enum(VAT_TYPES),
+  cityTax: z.enum(CITY_TAX_CHOICES),
+  classificationCode: optional(CLASSIFICATION_CODE, 'validation.classificationCode'),
+  taxProductCode: optional(TAX_PRODUCT_CODE, 'validation.taxProductCode'),
+  units: z.array(
+    z.object({
+      unitId: z.number(),
+      measureUnit: z.string().trim().max(50, 'validation.tooLong'),
+    }),
+  ),
+});
+export type EbarimtFormValues = z.infer<typeof ebarimtSchema>;
+
+export function ebarimtValues(product: ProductDetail): EbarimtFormValues {
+  return {
+    vatType: product.vatType,
+    cityTax: cityTaxChoice(product.cityTax),
+    classificationCode: product.classificationCode ?? '',
+    taxProductCode: product.taxProductCode ?? '',
+    units: product.units
+      .filter((unit) => unit.supersededAt === null)
+      .map((unit) => ({ unitId: unit.id, measureUnit: unit.measureUnit ?? '' })),
+  };
+}
+
+export function ebarimtBody(values: EbarimtFormValues): ProductEbarimt {
+  return {
+    vatType: values.vatType satisfies VatType,
+    cityTax: cityTaxValue(values.cityTax),
+    classificationCode: values.classificationCode || null,
+    taxProductCode: values.taxProductCode || null,
+    units: values.units.map((unit) => ({
+      unitId: unit.unitId,
+      measureUnit: unit.measureUnit.trim() || null,
+    })),
+  };
 }
