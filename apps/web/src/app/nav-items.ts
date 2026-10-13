@@ -9,6 +9,7 @@ import {
   Calculator,
   ClipboardCheck,
   Factory,
+  FileChartColumn,
   FileSpreadsheet,
   FolderTree,
   History,
@@ -26,6 +27,7 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Store,
   Users,
   Warehouse,
@@ -57,7 +59,8 @@ export interface NavGroup {
  * by the people who make them (every user may still open a transfer or a stocktake by its link).
  * Discount programs and the price calculator are read by every user; pricing.manage changes them
  * (ADR-0041). The products waiting for their prices are the price clerk's list
- * (pricing.prices.manage, ADR-0044).
+ * (pricing.prices.manage, ADR-0044). The AI assistant and its saved reports need ai.ask
+ * (ADR-0045).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -137,6 +140,18 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
       { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
+    ],
+  },
+  {
+    label: 'nav.groups.ai',
+    items: [
+      { to: '/ai', label: 'nav.aiAssistant', icon: Sparkles, permission: 'ai.ask' },
+      {
+        to: '/ai/reports',
+        label: 'nav.aiReports',
+        icon: FileChartColumn,
+        permission: 'ai.ask',
+      },
     ],
   },
   {
@@ -236,6 +251,7 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
   },
   { to: '/catalog/scan', label: 'home.actions.scan', icon: ScanBarcode },
   { to: '/pricing/quote', label: 'home.actions.quote', icon: Calculator },
+  { to: '/ai', label: 'home.actions.askAi', icon: Sparkles, permission: 'ai.ask' },
 ];
 
 export function visibleQuickActions(permissions: readonly Permission[]): QuickAction[] {

@@ -45,6 +45,8 @@ import {
   SuppliersPage,
 } from '@/features/partners/supplier-pages';
 import { HomePage } from '@/features/home/home-page';
+import { AiPage } from '@/features/ai/ai-page';
+import { AiReportsPage } from '@/features/ai/reports-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
@@ -173,6 +175,24 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
+          {
+            path: 'ai',
+            element: (
+              <RequirePermission permission="ai.ask">
+                <AiPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
+          {
+            path: 'ai/reports',
+            element: (
+              <RequirePermission permission="ai.ask">
+                <AiReportsPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
           {
             path: 'imports',
             element: (

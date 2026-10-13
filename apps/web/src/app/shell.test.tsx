@@ -95,7 +95,11 @@ describe('home page', () => {
   it('gives an admin every shortcut, the transfer one opening its dialog', async () => {
     renderApp('/', signedIn(ADMIN_ME));
     const actions = within(await screen.findByRole('region', { name: mn.home.quickActions }));
-    expect(actions.getAllByRole('link')).toHaveLength(6);
+    expect(actions.getAllByRole('link')).toHaveLength(7);
+    expect(actions.getByRole('link', { name: mn.home.actions.askAi })).toHaveAttribute(
+      'href',
+      '/ai',
+    );
     expect(actions.getByRole('link', { name: mn.home.actions.newTransfer })).toHaveAttribute(
       'href',
       '/inventory/transfers?new=1',
