@@ -4,7 +4,7 @@ Tugeel is an in-house ERP for the wholesale distribution of Бүтэн-Орги�
 multi-warehouse stock with bins on an append-only ledger, customer orders (web, customer app, sales reps), picking,
 zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay
 payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
-reporting, HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
+reporting, an AI assistant answering questions from the company's own data (ADR-0045), HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
 Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Бүтэн-Оргил ХХК's internal system, owner 2026-10-13, ADR-0042 #11); code names stay `tugeel`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
 ## Start of every session
@@ -46,10 +46,11 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
 | barcode-detector, zxing-wasm | 3.2.2, 3.1.3 | web camera fallback; `zxing-wasm` = the exact version `barcode-detector` declares, `.wasm` served from our build (ADR-0031) |
 | exceljs | 4.4.0 (api only) | imports (ADR-0036): the worker loads the whole workbook (`workbook.xlsx.load`, files ≤ 5 MiB); never the streaming reader, which loses shared strings and hyperlink targets |
+| libpg-query, @pgsql/types | 18.1.5, 18.0.0 (api only) | the AI assistant's SQL guard (ADR-0045): the PostgreSQL 18 parser in WebAssembly; LLM providers through plain `fetch`, no SDK |
 | pdfmake, `@nestjs/throttler`, receipt-printer-encoder | `npm view <pkg> version` when first installed; pick a version older than 24 h | |
 
 Majors change only in dedicated sessions between deliveries.
-DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process; staging 2 / 2 / 2 (architecture §10.2).
+DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): production api 6, worker 3, pg-boss 2 per process, AI reader 2 (api only); staging 2 / 2 / 2 / 2 (architecture §10.2).
 
 ## Commands
 
@@ -57,7 +58,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 |---|---|
 | `docker compose up -d --wait` | local `postgres:18` (ICU) on `127.0.0.1:15432`; needed by `pnpm check` and `pnpm dev` |
 | `pnpm install` | install the workspace (Node 26, pnpm 11); a pnpm `EPERM rmdir` on Windows: rerun `pnpm install`; stop `pnpm dev` before adding a package |
-| `pnpm db:provision` / `pnpm db:migrate` | roles + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + queues as `migrator` |
+| `pnpm db:provision` / `pnpm db:migrate` | roles (`app`, `migrator`, and `ai_reader` when `AI_DATABASE_URL` is set) + ICU database (admin URL in `apps/api/.env`) / drizzle migrations + pg-boss schema + `ai` grants + queues as `migrator` |
 | `pnpm db:generate --name=<module>` | generate SQL from `src/db/schema.ts`, then hand-edit CHECK / EXCLUDE / REVOKE / triggers (`--custom` for SQL-only) |
 | `pnpm dev` | builds packages, then watches shared + api + worker + web (http://localhost:5173; the api listens on `API_PORT`, 3300 locally, and Vite proxies `/api` there) |
 | `start.bat` / `stop.bat` | the owner's double-click start for testing from other PCs on the LAN: PostgreSQL, `pnpm db:migrate`, then `pnpm dev` in a «Bto dev» window with `DEV_LAN=1` (Vite on every interface; prints `http://<LAN address>:5173`) / stops that window, every node process of this repo and the tugeel PostgreSQL container — never other projects |
@@ -81,7 +82,8 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Modules import only `modules/<other>/index.ts`; atomic cross-module writes pass the Drizzle `tx` explicitly; side effects are pg-boss jobs enqueued in the same tx; `src/integrations/**` is called only from `jobs/*.job.ts` or `*-flow.service.ts`, between transactions.
 - Errors are RFC 9457 problem+json with a stable `code` and `params`; lists use keyset pagination `{ data, nextCursor }`.
 - Every route carries exactly one of `@Public()`, `@Authenticated()` or `@RequirePermission(...)` (the global guard answers 403 otherwise); the caller is `@CurrentUser() ctx: AuthContext`, passed explicitly to services; warehouse writes call `ScopeService.assertCanWriteWarehouse` (ADR-0027, `docs/modules/identity.md`).
-- ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config). From delivery 3: no `fetch` / `axios` / `integrations/*` calls inside `db.transaction(...)`.
+- ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config); TX_GUARD (ADR-0045): no `fetch` / `axios` / LLM client call inside an `inTransaction(...)` or `.transaction(...)` callback.
+- The AI assistant (ADR-0045, `docs/modules/ai.md`) reads only schema `ai`, as role `ai_reader`; model-written SQL runs only through `AiReaderService` after `sqlGuard`. A migration that changes a column an `ai.*` view uses recreates the view; a module opens its data to the assistant with its own views and `AI_DATASETS` entries.
 - Workspace packages are CommonJS with a `@tugeel/source` export condition (ADR-0025): the api uses their built `dist`, Vite/Vitest/Jest read the source; `pnpm check` builds them first.
 - Web screens follow `docs/ui.md` (ADR-0042): `PageHeader` with the menu breadcrumb (no «Буцах» buttons), the list kit (filter bar, list card, rows that open their record), read-first `DetailCard`s, create dialogs on `?new=1`, toasts for confirmations, tokens instead of colour literals. `components/ui` keeps shadcn formatting: run prettier from the repo root only.
 
@@ -107,6 +109,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Install `typescript@7` or a second TypeScript version; upgrade a major dependency inside a delivery session.
 - Skip, weaken or retry the integrity suite; add `jest.retryTimes` or any retry to CI.
 - Commit secrets or `.env*` files (only `.env.example`); paste credentials into docs or code.
+- Send a credential to an LLM provider; log prompts, answers or result rows; let a test reach a real provider or use a real key.
 - Expose PosAPI port 7080 beyond the Tailscale ACL; add Redis, mailpit or `@nestjs/event-emitter` to the stack.
 
 ## Docs map
