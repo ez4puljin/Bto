@@ -12,12 +12,13 @@ import {
 } from '@/components/ui/table';
 import { useProductLocationsOf } from '@/features/inventory/api';
 import { useProductSuppliersOf } from '@/features/partners/api';
+import { useCurrentPricesOf } from '@/features/pricing/api';
 import { problemFromError } from '@/lib/problem';
 import type { ProductListItem } from './api';
 import type { ProductCellContext, ProductColumn } from './product-columns';
 
-/** What every page of rows shares; suppliers and locations are read per page. */
-export type ProductTableContext = Omit<ProductCellContext, 'suppliers' | 'locations'>;
+/** What every page of rows shares; suppliers, locations and prices are read per page. */
+export type ProductTableContext = Omit<ProductCellContext, 'suppliers' | 'locations' | 'prices'>;
 
 /**
  * The product list (ADR-0037): one body for every loaded page; each page reads the supplier links
@@ -73,15 +74,23 @@ const ProductPageRows = memo(function ProductPageRows(props: {
     ids,
     columns.some((column) => column.source === 'locations'),
   );
+  const prices = useCurrentPricesOf(
+    ids,
+    columns.some((column) => column.source === 'prices'),
+  );
   const cellContext = useMemo<ProductCellContext>(
     () => ({
       ...context,
       suppliers: byProduct(suppliers.data),
       locations: byProduct(locations.data),
+      prices: byProduct(prices.data),
     }),
-    [context, suppliers.data, locations.data],
+    [context, suppliers.data, locations.data, prices.data],
   );
-  const problem = problemFromError(suppliers.error) ?? problemFromError(locations.error);
+  const problem =
+    problemFromError(suppliers.error) ??
+    problemFromError(locations.error) ??
+    problemFromError(prices.error);
 
   return (
     <>

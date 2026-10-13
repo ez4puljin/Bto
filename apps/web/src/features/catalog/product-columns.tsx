@@ -5,6 +5,8 @@ import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import type { ProductLocation } from '@/features/inventory/api';
 import type { ProductSupplierLink } from '@/features/partners/api';
+import type { CurrentPrice } from '@/features/pricing/api';
+import { formatMnt } from '@/lib/money';
 import type { ProductListItem } from './api';
 
 /** Every column of the product list, in the order of the owner's product sheet (ADR-0037). */
@@ -16,6 +18,8 @@ export const PRODUCT_COLUMN_KEYS = [
   'brand',
   'baseUnit',
   'units',
+  'wholesalePrice',
+  'retailPrice',
   'baseBarcodes',
   'unitBarcodes',
   'vatType',
@@ -33,7 +37,7 @@ export type ProductColumnKey = (typeof PRODUCT_COLUMN_KEYS)[number];
 /** Columns that name the row; they cannot be hidden. */
 export const LOCKED_PRODUCT_COLUMNS: readonly ProductColumnKey[] = ['sku', 'name'];
 
-/** What the cells read besides the row; `suppliers` / `locations` are undefined until loaded. */
+/** What the cells read besides the row; `suppliers`, `locations`, `prices` are undefined until loaded. */
 export interface ProductCellContext {
   t: TFunction;
   categoryPath: (id: number) => string | undefined;
@@ -41,12 +45,13 @@ export interface ProductCellContext {
   warehouseName: (id: number) => string;
   suppliers: ReadonlyMap<number, readonly ProductSupplierLink[]> | undefined;
   locations: ReadonlyMap<number, readonly ProductLocation[]> | undefined;
+  prices: ReadonlyMap<number, readonly CurrentPrice[]> | undefined;
 }
 
 export interface ProductColumn {
   key: ProductColumnKey;
   /** Read from another module per page, only while the column shows. */
-  source?: 'suppliers' | 'locations';
+  source?: 'suppliers' | 'locations' | 'prices';
   className?: string;
   cell: (row: ProductListItem, ctx: ProductCellContext) => ReactNode;
 }
@@ -71,6 +76,13 @@ const text = (value: string | null | undefined, ctx: ProductCellContext) =>
   value ? value : none(ctx);
 
 const otherUnits = (row: ProductListItem) => row.units.filter((unit) => !unit.isBase);
+
+/** The base unit's price today in a list (ADR-0041), or «—». */
+const priceCell = (row: ProductListItem, ctx: ProductCellContext, list: CurrentPrice['list']) => {
+  if (!ctx.prices) return null;
+  const price = ctx.prices.get(row.id)?.find((entry) => entry.list === list);
+  return price ? ctx.t('pricing.money', { amount: formatMnt(price.price) }) : none(ctx);
+};
 
 export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
@@ -121,6 +133,18 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         ),
         ctx,
       ),
+  },
+  {
+    key: 'wholesalePrice',
+    source: 'prices',
+    className: 'text-right font-mono',
+    cell: (row, ctx) => priceCell(row, ctx, 'WHOLESALE'),
+  },
+  {
+    key: 'retailPrice',
+    source: 'prices',
+    className: 'text-right font-mono',
+    cell: (row, ctx) => priceCell(row, ctx, 'RETAIL'),
   },
   {
     key: 'baseBarcodes',

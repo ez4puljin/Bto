@@ -28,6 +28,12 @@ import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
 import { StocktakePage, StocktakesPage } from '@/features/inventory/stocktakes-pages';
 import { ImportPage, ImportsPage } from '@/features/imports/imports-pages';
+import {
+  DiscountProgramCreatePage,
+  DiscountProgramEditPage,
+} from '@/features/pricing/discount-form';
+import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/discount-pages';
+import { PriceQuotePage } from '@/features/pricing/quote-page';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
@@ -134,6 +140,25 @@ export const routes: RouteObject[] = [
           </RequirePermission>
         ),
       },
+      { path: 'pricing/discounts', element: <DiscountProgramsPage />, handle: { wide: true } },
+      {
+        path: 'pricing/discounts/new',
+        element: (
+          <RequirePermission permission="pricing.manage">
+            <DiscountProgramCreatePage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'pricing/discounts/:id', element: <DiscountProgramPage /> },
+      {
+        path: 'pricing/discounts/:id/edit',
+        element: (
+          <RequirePermission permission="pricing.manage">
+            <DiscountProgramEditPage />
+          </RequirePermission>
+        ),
+      },
+      { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
       {
         path: 'imports',
         element: (

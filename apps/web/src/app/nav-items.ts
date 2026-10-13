@@ -23,7 +23,8 @@ export interface NavGroup {
  * who manage them need the menu entry. Stock, its history, the low-stock list and receipts are read
  * by every user (without costs);
  * transfers, moves, adjustments, stocktakes and shelves only by the people who make them (every user
- * may still open a transfer or a stocktake by its link).
+ * may still open a transfer or a stocktake by its link). Discount programs and the price calculator
+ * are read by every user; pricing.manage changes them (ADR-0041).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -68,6 +69,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'inventory.stocktakes.manage',
       },
       { to: '/inventory/bins', label: 'nav.bins', permission: 'inventory.setup.manage' },
+    ],
+  },
+  {
+    label: 'nav.groups.pricing',
+    items: [
+      { to: '/pricing/discounts', label: 'nav.discounts' },
+      { to: '/pricing/quote', label: 'nav.priceQuote' },
     ],
   },
   {

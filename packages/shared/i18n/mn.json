@@ -17,7 +17,8 @@
       "catalog": "Бараа",
       "system": "Систем",
       "partners": "Харилцагч",
-      "inventory": "Агуулах"
+      "inventory": "Агуулах",
+      "pricing": "Үнэ"
     },
     "products": "Бараа",
     "categories": "Ангилал",
@@ -35,7 +36,9 @@
     "transfers": "Шилжүүлэг",
     "bins": "Тавиур",
     "movements": "Хөдөлгөөний түүх",
-    "lowStock": "Бага үлдэгдэл"
+    "lowStock": "Бага үлдэгдэл",
+    "discounts": "Хямдрал",
+    "priceQuote": "Үнэ тооцоолох"
   },
   "systemStatus": {
     "title": "Системийн төлөв",
@@ -429,7 +432,9 @@
       "adjustments": "Залруулга",
       "stocktakes": "Тооллого",
       "transfers": "Шилжүүлэг",
-      "import_jobs": "Импорт"
+      "import_jobs": "Импорт",
+      "unit_prices": "Барааны үнэ",
+      "discount_programs": "Хямдрал"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -462,7 +467,9 @@
       "SHIP": "Илгээсэн",
       "RECEIVE": "Хүлээн авсан",
       "COMMIT": "Импортолсон",
-      "REVERT": "Импортыг буцаасан"
+      "REVERT": "Импортыг буцаасан",
+      "CLOSE": "Хаасан",
+      "STOP": "Зогсоосон"
     }
   },
   "errors": {
@@ -567,7 +574,9 @@
         "supplier": "Нийлүүлэгч",
         "classificationCode": "БҮНА код",
         "taxProductCode": "Татварын код",
-        "status": "Төлөв"
+        "status": "Төлөв",
+        "wholesalePrice": "Бөөний үнэ",
+        "retailPrice": "Супермаркетын үнэ"
       },
       "status": {
         "ACTIVE": "Идэвхтэй",
@@ -1659,6 +1668,169 @@
       "status": "Төлөв",
       "credit": "Зээлийн нөхцөл",
       "contact": "Хариуцсан хүн"
+    }
+  },
+  "pricing": {
+    "lists": {
+      "WHOLESALE": "Бөөний",
+      "RETAIL": "Супермаркет"
+    },
+    "money": "{{amount}}₮",
+    "card": {
+      "title": "Үнэ",
+      "set": "Үнэ тохируулах",
+      "unit": "Нэгж",
+      "none": "Үнэ алга",
+      "derived": "Ширхгийн үнээс",
+      "planned": "{{date}}-с {{price}}₮",
+      "history": "Өмнөх үнэ",
+      "historyEntry": "{{from}} – {{to}}: {{price}}₮",
+      "missingBase": "Суурь нэгжийн үнэ тохируулаагүй тул энэ барааг зарах боломжгүй."
+    },
+    "dialog": {
+      "title": "Үнэ тохируулах",
+      "validFrom": "Хэзээнээс",
+      "hint": "Өнөөдрөөс эсвэл ирээдүйн өдрөөс эхэлнэ. Суурь бус нэгжийг хоосон үлдээвэл ширхгийн үнэ × тоогоор бодогдоно.",
+      "base": "суурь нэгж",
+      "noChanges": "Өөрчлөгдсөн үнэ алга.",
+      "invalidPrice": "Үнэ нь бүхэл төгрөг байна",
+      "baseRequired": "Суурь нэгжийн үнэ заавал байна"
+    },
+    "programs": {
+      "title": "Хямдрал",
+      "new": "Шинэ хямдрал",
+      "edit": "Хямдрал засах",
+      "empty": "Хямдрал алга.",
+      "intro": "Таарсан бүх хямдрал дарааллаар нэмэгдэнэ: барааны хямдрал, дараа нь ангиллынх, дараа нь захиалгын нийт дүнгийнх. Босгыг өмнөх хямдралын дараах дүнгээр шалгана.",
+      "filters": {
+        "ACTIVE": "Идэвхтэй",
+        "SCHEDULED": "Төлөвлөсөн",
+        "ENDED": "Дууссан",
+        "ALL": "Бүгд"
+      },
+      "status": {
+        "SCHEDULED": "Төлөвлөсөн",
+        "ACTIVE": "Идэвхтэй",
+        "ENDED": "Дууссан"
+      },
+      "scopes": {
+        "PRODUCT": "Бараа",
+        "CATEGORY": "Ангилал",
+        "ORDER": "Захиалга"
+      },
+      "measures": {
+        "QTY": "Тоогоор",
+        "AMOUNT": "Дүнгээр"
+      },
+      "effects": {
+        "PRICE": "Шинэ үнэ",
+        "PERCENT": "Хувиар",
+        "AMOUNT": "Төгрөг хасах"
+      },
+      "columns": {
+        "name": "Нэр",
+        "list": "Үнэ",
+        "scope": "Юунд",
+        "effect": "Хэлбэр",
+        "steps": "Шатлал",
+        "period": "Хугацаа",
+        "status": "Төлөв"
+      },
+      "target": {
+        "product": "{{name}}",
+        "productUnit": "{{name}} ({{unit}})",
+        "category": "«{{name}}» ангилал",
+        "order": "Захиалгын нийт дүн"
+      },
+      "period": "{{from}} – {{to}}",
+      "openEnded": "{{from}}-с",
+      "fields": {
+        "name": "Нэр",
+        "list": "Аль үнэд",
+        "scope": "Юунд хямдрах",
+        "product": "Бараа",
+        "productUnit": "Аль нэгжид",
+        "everyUnit": "Бүх нэгжид",
+        "thresholdUnit": "Босгыг ямар нэгжээр тоолох",
+        "category": "Ангилал",
+        "measure": "Босгыг юугаар",
+        "countUom": "Тоолох нэгж",
+        "effect": "Хямдралын хэлбэр",
+        "validFrom": "Эхлэх өдөр",
+        "validTo": "Дуусах өдөр (заавал биш)",
+        "steps": "Шатлал"
+      },
+      "stepHeads": {
+        "qty": "Хэдээс ({{unit}})",
+        "amount": "Хэдэн ₮-өөс",
+        "PRICE": "Шинэ үнэ, ₮",
+        "PERCENT": "Хямдрал, %",
+        "AMOUNT_UNIT": "Нэгж тутмаас хасах, ₮",
+        "AMOUNT_TOTAL": "Нийт дүнгээс хасах, ₮"
+      },
+      "addStep": "Шат нэмэх",
+      "removeStep": "Шат хасах",
+      "stepSummary": {
+        "qty": "{{threshold}} {{unit}}+ → {{value}}",
+        "amount": "{{threshold}}₮+ → {{value}}",
+        "always": "Үргэлж → {{value}}"
+      },
+      "values": {
+        "PRICE": "{{value}}₮",
+        "PERCENT": "{{value}}%",
+        "AMOUNT": "−{{value}}₮"
+      },
+      "pickProduct": "Сонгох",
+      "changeProduct": "Өөр бараа",
+      "unitsOf": "{{unit}} ({{factor}} {{base}})",
+      "stop": "Зогсоох",
+      "stopTitle": "Хямдралыг зогсоох уу?",
+      "stopDescription": "Өнөөдрөөс эхлэн хэрэглэгдэхгүй. Өмнө баталсан захиалгын үнэ өөрчлөгдөхгүй.",
+      "delete": "Устгах",
+      "deleteTitle": "Хямдралыг устгах уу?",
+      "deleteDescription": "Эхлээгүй хямдрал бүрмөсөн устгагдана.",
+      "startedHint": "Эхэлсэн хямдралыг засахгүй: зогсоогоод шинээр үүсгэнэ.",
+      "issues": {
+        "PRODUCT_REQUIRED": "Барааг сонгоно уу",
+        "UNIT_REQUIRED": "Нэгжийг сонгоно уу",
+        "CATEGORY_REQUIRED": "Ангиллыг сонгоно уу",
+        "COUNT_UNIT_REQUIRED": "Тоолох нэгжийг сонгоно уу",
+        "MEASURE_NOT_ALLOWED": "Энэ хүрээнд босгыг ингэж тоолохгүй",
+        "EFFECT_NOT_ALLOWED": "Шинэ үнэ зөвхөн барааны нэгжид",
+        "TARGET_NOT_ALLOWED": "Хүрээ тохирохгүй",
+        "NO_STEPS": "Дор хаяж нэг шат нэмнэ үү",
+        "TOO_MANY_STEPS": "Хамгийн ихдээ 20 шат",
+        "THRESHOLD_RANGE": "{{step}}-р шатны босго буруу байна",
+        "THRESHOLD_ORDER": "{{step}}-р шатны босго өмнөхөөсөө их байх ёстой",
+        "VALUE_RANGE": "{{step}}-р шатны утга буруу байна (хувь 100-аас бага, төгрөг бүхэл)",
+        "NAME_REQUIRED": "Нэрийг оруулна уу",
+        "DATES": "Дуусах өдөр эхлэх өдрөөс хойш байна"
+      }
+    },
+    "quote": {
+      "title": "Үнэ тооцоолох",
+      "hint": "Туршилтын сагс: захиалга шиг үнэ, хямдралыг тооцоолж харуулна. Юу ч хадгалагдахгүй.",
+      "list": "Аль үнээр",
+      "date": "Аль өдрийн үнээр",
+      "unit": "Нэгж",
+      "qty": "Тоо",
+      "remove": "Хасах",
+      "calculate": "Тооцоолох",
+      "empty": "Бараа нэмнэ үү.",
+      "columns": {
+        "product": "Бараа",
+        "qty": "Тоо",
+        "listPrice": "Жагсаалтын үнэ",
+        "unitPrice": "Нэгжийн үнэ",
+        "subtotal": "Дүн",
+        "discount": "Хямдрал",
+        "total": "Нийт"
+      },
+      "missing": "Үнэ тохируулаагүй",
+      "derived": "ширхгийн үнээс",
+      "applied": "{{name}}: {{value}}",
+      "appliedAmount": "{{name}}: {{value}} (−{{amount}}₮)",
+      "totals": "Нийт: {{subtotal}}₮ − {{discount}}₮ хямдрал = {{total}}₮"
     }
   }
 }

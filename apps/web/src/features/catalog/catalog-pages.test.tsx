@@ -201,6 +201,7 @@ const LIST_ROUTES = {
   'GET /api/v1/warehouses': () => list([WH]),
   'GET /api/v1/product-suppliers': () => list([]),
   'GET /api/v1/product-locations': () => list([]),
+  'GET /api/v1/unit-prices/current': () => json([]),
 };
 const HIDDEN_COLUMNS_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
 const idsOf = (request: Request) => new URL(request.url).searchParams.getAll('productIds');
@@ -267,10 +268,17 @@ describe('products list', () => {
               maxQty: null,
             },
           ]),
+        'GET /api/v1/unit-prices/current': () =>
+          json([
+            { productId: 1, list: 'RETAIL', productUnitId: 10, price: '1200' },
+            { productId: 1, list: 'WHOLESALE', productUnitId: 10, price: '990' },
+          ]),
       }),
     );
     const table = await screen.findByRole('table');
     expect(await within(table).findByText('МСМ ХХК +1')).toBeInTheDocument();
+    expect(await within(table).findByText('990₮')).toBeInTheDocument();
+    expect(within(table).getByText('1,200₮')).toBeInTheDocument();
     for (const text of [
       'Coca-Cola',
       '1 хайрцаг = 24 ш',
@@ -317,10 +325,10 @@ describe('products list', () => {
     expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBeNull();
   });
 
-  it('reads no suppliers or locations while their columns are hidden', async () => {
+  it('reads no suppliers, locations or prices while their columns are hidden', async () => {
     localStorage.setItem(
       HIDDEN_COLUMNS_KEY,
-      JSON.stringify(['supplier', 'homeWarehouse', 'fixedBins']),
+      JSON.stringify(['supplier', 'homeWarehouse', 'fixedBins', 'wholesalePrice', 'retailPrice']),
     );
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
@@ -332,6 +340,7 @@ describe('products list', () => {
     expect(columnHeader('category')).toBeInTheDocument();
     expect(calls(fetchMock, 'GET', '/api/v1/product-suppliers')).toHaveLength(0);
     expect(calls(fetchMock, 'GET', '/api/v1/product-locations')).toHaveLength(0);
+    expect(calls(fetchMock, 'GET', '/api/v1/unit-prices/current')).toHaveLength(0);
   });
 
   it('ignores a broken or foreign stored choice and still hides when storage refuses', async () => {

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
+import { ProductPricesCard } from '@/features/pricing/product-prices-card';
 import { problemFromError } from '@/lib/problem';
 import { useBrands, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
 import { ImagesCard } from './images-card';
@@ -88,6 +89,7 @@ export function ProductPage() {
         </CardContent>
       </Card>
       <UnitsCard product={detail} canManage={canManage} />
+      <ProductPricesCard productId={detail.id} />
       <ImagesCard product={detail} canManage={canManage} />
       <ProductSuppliersCard productId={detail.id} />
       <ProductLocationCard productId={detail.id} />
