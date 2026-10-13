@@ -1,6 +1,6 @@
 # Module `identity` — contract
 
-Status: **built** in delivery 1 (weeks 1–2), session of 2026-10-10; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/identity/`, shared rules in `packages/shared/src/{auth,settings,time,phone}`, screens in `apps/web/src/features/{auth,identity}/`. Decisions: ADR-0005 (auth model), ADR-0027 (access control model), ADR-0026 (local-only), architecture §4 (identity row) and §7.
+Status: **built** in delivery 1 (weeks 1–2), session of 2026-10-10; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/identity/`, shared rules in `packages/shared/src/{auth,settings,time,phone}`, screens in `apps/web/src/features/{auth,identity}/`. Decisions: ADR-0005 (auth model), ADR-0027 (access control model), ADR-0026 (local-only), ADR-0040 (housekeeping), architecture §4 (identity row) and §7.
 
 identity is the root of the module graph: it depends on no other module, and every other module may import its `index.ts`.
 
@@ -21,7 +21,7 @@ identity is the root of the module graph: it depends on no other module, and eve
 | `number_sequences` | gapless document numbers | `(scope_key, period)` primary key, `last_value` |
 | `audit_log` | append-only change log | `REVOKE UPDATE, DELETE, TRUNCATE … FROM app` + `forbid_update_delete()` triggers (SQLSTATE 23001 even for the migrator) |
 | `idempotency_keys` | replayable POST responses | unique `(actor_kind, actor_id, key)`; status IN_PROGRESS/COMPLETED |
-| `files` (migration `0002_identity_files`) | stored files of every module (ADR-0014, ADR-0030) | `key` = server-generated `<uuid>.<ext>`, unique; `kind` `<module>.<kind>` (registry in `@tugeel/shared/files`); status PENDING/READY/DELETED; `uploaded_at` and `sha256` set together when the bytes arrive |
+| `files` (migration `0002_identity_files`) | stored files of every module (ADR-0014, ADR-0030) | `key` = server-generated `<uuid>.<ext>`, unique; `kind` `<module>.<kind>` (registry in `@tugeel/shared/files`); status PENDING/READY/DELETED; `uploaded_at` and `sha256` set together when the bytes arrive; `purged_at` (`0012_nightly_jobs`) when the housekeeping removed the bytes of a DELETED file (CHECK `files_purged`, partial index `files_unpurged_idx`) |
 
 Planned additions owned by identity: `print_stations` and `print_jobs` in delivery 9 (ADR-0022).
 
@@ -29,13 +29,13 @@ Planned additions owned by identity: `print_stations` and `print_jobs` in delive
 
 | Export | Use |
 |---|---|
-| `IdentityModule` | import into a feature module to get the services below |
+| `IdentityModule` | import into a feature module to get the services below (`IdentityWorkerModule`, worker only, registers the nightly housekeeping) |
 | `RequirePermission(...codes)`, `Authenticated()`, `CurrentUser()` | route access rules and the caller; `Public()` lives in `src/common/auth` |
 | `AuthContext`, `Actor`, `actorUserId`, `systemActor` | the caller, passed explicitly from controller to service (no AsyncLocalStorage) |
 | `ScopeService.assertCanWriteWarehouse(ctx, warehouseId)` | 403 `FORBIDDEN` `params.reason = 'WAREHOUSE_SCOPE'` when the user's scope excludes the warehouse; reads are never filtered; TRANSIT is always writable |
 | `AuditService.record(tx, actor, { action, entity, entityId, before?, after? })`, `recordMany(tx, actor, entries)` | inside the service transaction; keys matching `/password|hash|token|secret/i` are dropped recursively; `recordMany` inserts one row per entry in chunks of 1,000 (bulk writes of the imports, 2026-10-11) |
 | `NumberingService.next(tx, scopeKey, period)` | gapless number inside the document's transaction (rollback returns the number) |
-| `StorageService.verifyUploaded(fileId, kind)` (before the transaction), `confirm(tx, fileId, kind)`, `markDeleted(tx, fileId)`, `publicUrl(file)`, `openPrivate(fileId, kind)` | attach a file to a document: verify outside the transaction (an HTTP HEAD once Spaces exists), confirm READY inside it; only identity writes `files`. `openPrivate` streams the bytes of a READY private file of that kind for server-side reading (the import worker; `NOT_FOUND`, `FILE_NOT_UPLOADED`) |
+| `StorageService.verifyUploaded(fileId, kind)` (before the transaction), `confirm(tx, fileId, kind)`, `markDeleted(tx, fileId)`, `publicUrl(file)`, `openPrivate(fileId, kind)` | attach a file to a document: verify outside the transaction (an HTTP HEAD once Spaces exists), confirm READY inside it; only identity writes `files`. `openPrivate` streams the bytes of a READY private file of that kind for server-side reading (the import worker; `NOT_FOUND`, `FILE_NOT_UPLOADED`). `markDeleted` leaves a DELETED file as it is. For the housekeeping: `abandonPending(hours)` (upload slots nobody attached: rows without bytes deleted, with bytes DELETED) and `purgeDeleted()` (removes the bytes of DELETED files one at a time outside any transaction and stamps `purged_at`; the row stays) |
 | `SettingsService.get(key, onDate)` / `find(key, onDate)` | value in force on an Ulaanbaatar business date (`businessDate()` from `@tugeel/shared/time`); `get` throws `SETTING_MISSING` |
 | `OrgService` (`getBranch`, `getWarehouse`, `getTransitWarehouse(tx)`, lists) | organisation lookups |
 | `WAREHOUSE_CREATED_HOOK` / `WarehouseCreatedHook` | optional provider called inside the transaction that creates a warehouse, including the TRANSIT warehouse created at the first boot; bound by `InventoryModule` to `SystemBinsService` (system bins, 2026-10-11), which also backfills the warehouses that existed before at boot (`InventoryBootstrap`) |
@@ -110,12 +110,14 @@ Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; noth
 - First admin and recovery: `pnpm user:create-admin --username <name> --full-name "<full name>"` creates the user (or re-activates, unlocks and re-grants ADMIN to an existing one) and prints a one-time code valid for 30 minutes, shown in Ulaanbaatar time.
 - Environment (api only): `JWT_SECRET`, `AUTH_PEPPER` (≥ 32 characters, `dev-` values refused in production), `COOKIE_SECURE` (true behind HTTPS), `API_PORT` (3000 in the container, 3300 locally); rotation effects in `deploy/runbook.md` §9. Both processes: `STORAGE_DRIVER=local` and `STORAGE_LOCAL_DIR` (`spaces` refuses to start until the go-live phase, ADR-0030); in the compose stacks the api and the worker share one storage volume at `/data/storage` (the worker reads uploaded import sheets, 2026-10-11).
 
+- Housekeeping (ADR-0040): the job `identity.housekeeping` runs every night at 04:30 Ulaanbaatar time in the worker (`HousekeepingService`): sessions 90 days after they expired or were revoked, one-time codes 30 days after they expired and idempotency keys 7 days after they were claimed (a stuck IN_PROGRESS key too) are deleted; upload slots older than 24 hours are retired and the bytes of DELETED files removed. It logs the counts only. A night the worker was down is made up once when it starts.
+
 ## 11. Tests
 
-Integration (`apps/api/test/integration/`): `identity-schema`, `identity-core`, `auth`, `users-roles`, `org-settings-audit`, `create-admin`. Integrity (`apps/api/test/integrity/`): `audit-log-guard`, `numbering`, `auth-concurrency` (parallel refreshes, parallel failed logins), `last-admin`, `idempotency`. Web: `apps/web/src/features/auth/auth-pages.test.tsx`, `apps/web/src/features/identity/identity-pages.test.tsx`, `apps/web/src/lib/auth/auth-session.test.ts`.
+Integration (`apps/api/test/integration/`): `identity-schema`, `identity-core`, `auth`, `users-roles`, `org-settings-audit`, `create-admin`. Integrity (`apps/api/test/integrity/`): `audit-log-guard`, `numbering`, `auth-concurrency` (parallel refreshes, parallel failed logins), `last-admin`, `idempotency`. The housekeeping: `nightly-jobs` (old and recent sessions, codes, idempotency keys and files; the bytes gone from disk; a second run finds nothing). Web: `apps/web/src/features/auth/auth-pages.test.tsx`, `apps/web/src/features/identity/identity-pages.test.tsx`, `apps/web/src/lib/auth/auth-session.test.ts`.
 
 ## 12. Open items
 
 - Done 2026-10-11: inventory binds `WAREHOUSE_CREATED_HOOK` (system bins) and backfills the warehouses created before it in an idempotent boot step (`InventoryBootstrap`, advisory lock); the identity hook test overrides the provider.
-- Housekeeping jobs (expired sessions, used or expired password codes, idempotency keys older than their replay window, PENDING files never attached and DELETED files with their bytes) are not scheduled yet; add them with the first pg-boss schedule (SPEC §8.2 cut line) or in the go-live phase.
+- Done 2026-10-13: the nightly housekeeping (ADR-0040). The retention periods (90 / 30 / 7 days, 24 hours) wait for the owner's review; the Spaces driver's delete comes with go-live.
 - Customer authentication (`/auth/customer/*`, phone identity) belongs to `partners` and the customer app (delivery 6).
