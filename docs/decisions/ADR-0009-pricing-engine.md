@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0041 (the owner's interview of 2026-10-13: one price per list for every customer, WHOLESALE and RETAIL; discount programs by product, category and order that all stack in order; no manual discounts. Replaces #1, #3, #4, #7; #2, #5, #6 stand) |
 
 ## Context
 

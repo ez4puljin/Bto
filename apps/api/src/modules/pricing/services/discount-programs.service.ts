@@ -284,7 +284,7 @@ export class DiscountProgramsService {
   }
 
   /**
-   * A superseded unit (ADR-0041 #1): programs on it stop today, planned ones never start; a new
+   * A superseded unit (ADR-0041 #6): programs on it stop today, planned ones never start; a new
    * price for the new unit is a new program.
    */
   async closeForUnitInTx(tx: Tx, actor: Actor, unitId: number, today: string): Promise<number> {

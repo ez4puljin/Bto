@@ -59,7 +59,7 @@ describe('integrity: unit supersede', () => {
       ],
     });
     const next = await app.get(UnitsService).supersede(actor, old.id, new Decimal(20));
-    // Pricing's hook ran in the same transaction (ADR-0041 #1): the old box's price is gone and
+    // Pricing's hook ran in the same transaction (ADR-0041 #6): the old box's price is gone and
     // the new box takes the piece price × 20.
     const prices = await app.get(UnitPricesService).view(product.id);
     expect(prices.lists.WHOLESALE.map((unit) => unit.current?.price.toString())).toEqual([

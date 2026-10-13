@@ -207,7 +207,7 @@ export class UnitPricesService {
   }
 
   /**
-   * A superseded unit (ADR-0041 #1): its prices end today and planned ones are voided; the new
+   * A superseded unit (ADR-0041 #6): its prices end today and planned ones are voided; the new
    * unit takes its base unit's price until it gets its own.
    */
   async closeUnitInTx(tx: Tx, actor: Actor, unitId: number, today: string): Promise<number> {

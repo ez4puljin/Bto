@@ -7,7 +7,7 @@ import { DiscountProgramsService } from './discount-programs.service';
 import { UnitPricesService } from './unit-prices.service';
 
 /**
- * Bound to catalog's UNIT_SUPERSEDED_HOOK and run inside the supersede transaction (ADR-0041 #1,
+ * Bound to catalog's UNIT_SUPERSEDED_HOOK and run inside the supersede transaction (ADR-0041 #6,
  * replacing ADR-0008 #4): the old unit's prices end today and its programs stop. Nothing is copied
  * to the new unit, whose factor differs: it takes its base unit's price × factor until the admin
  * gives it its own, so a customer never pays the old box's price for a smaller box.

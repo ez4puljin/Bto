@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0029 (#1: `barcode_type` moves to each barcode, plus a primary barcode per unit) |
+| Amended by | ADR-0029 (#1: `barcode_type` moves to each barcode, plus a primary barcode per unit), ADR-0041 (#4: a superseded unit's prices end and nothing is copied to the new unit, which takes its base unit's price × factor) |
 
 ## Context
 

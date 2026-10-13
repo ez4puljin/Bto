@@ -1,6 +1,6 @@
 # Tugeel (Түгээл) — Architecture
 
-Version 0.9 — 2026-10-13 (nightly jobs and retention, ADR-0040; blind stocktakes ADR-0038 and the low-stock list ADR-0039; 0.8 — 2026-10-12, batch reads for wide lists and per-browser column choices, ADR-0037; 0.7 — 2026-10-11, transfers and imports: ADR-0035 transfers requested by the receiver with differences back to the sender, ADR-0036 import pipeline; 0.6 — 2026-10-11, inventory core: ADR-0033 receipts on their shelf and costing after posting, ADR-0034 posting protocol; 0.5 — 2026-10-11, partners: ADR-0032 product ↔ supplier link, credit fields, GPS addresses; 0.4 — 2026-10-11, catalog: ADR-0028 search keys, ADR-0029 barcode model, ADR-0030 local file storage, ADR-0031 camera scanning; 0.3 — 2026-10-10: week-1 scaffold ADR-0023 … ADR-0025, local-only development until one go-live ADR-0026) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
+Version 0.10 — 2026-10-13 (pricing as built: one price per list, dated unit prices, stacked discount programs, ADR-0041; 0.9 — 2026-10-13, nightly jobs and retention, ADR-0040; blind stocktakes ADR-0038 and the low-stock list ADR-0039; 0.8 — 2026-10-12, batch reads for wide lists and per-browser column choices, ADR-0037; 0.7 — 2026-10-11, transfers and imports: ADR-0035 transfers requested by the receiver with differences back to the sender, ADR-0036 import pipeline; 0.6 — 2026-10-11, inventory core: ADR-0033 receipts on their shelf and costing after posting, ADR-0034 posting protocol; 0.5 — 2026-10-11, partners: ADR-0032 product ↔ supplier link, credit fields, GPS addresses; 0.4 — 2026-10-11, catalog: ADR-0028 search keys, ADR-0029 barcode model, ADR-0030 local file storage, ADR-0031 camera scanning; 0.3 — 2026-10-10: week-1 scaffold ADR-0023 … ADR-0025, local-only development until one go-live ADR-0026) — English. Companion to `docs/SPEC.md` (Mongolian scope and business rules), `docs/decisions/` (ADRs) and `CLAUDE.md` (agent contract).
 
 **Read §0, §4 and §12 before every session; read the module's §5 subsection before implementing it.** `TODO-VERIFY` marks business or external unknowns only (register in §13); every tooling choice in this document is decided.
 
@@ -208,7 +208,7 @@ Dependency graph (acyclic; build order follows it). Each module owns its tables,
 | partners | customers (kind COMPANY/INDIVIDUAL, code, name + search keys, reg_no text, tin NULL, tin_source, consumer_no NULL, phone, vat_payer, city_payer, tax_status_source, credit_limit NULL = not decided, payment_term_days NULL = the setting `credit.payment_term_days`, credit_hold + reason, status), customer_addresses (address, lat/lng, gps_source, zone_id NULL — the FK to delivery_zones is added by the delivery module's migration in delivery 5, is_default, archived_at), customer_contacts, suppliers, supplier_contacts, product_suppliers (ADR-0032); customer_tiers (delivery 2, if pricing needs tiers) and customer_users (delivery 6) come later | CustomersService.get/getMany/search/assertActive/creditTerms(id, date)/lockForUpdate(tx, id) (FOR NO KEY UPDATE)/createInTx/updateInTx/setCreditInTx, CustomerAddressesService.defaultAddress/setLocationInTx, SuppliersService.get/getMany/assertActive, ProductSuppliersService.mainSupplierOf(productIds). REST /customers, /customer-addresses, /customer-contacts, /suppliers, /supplier-contacts, /product-suppliers (/auth/customer/* in delivery 6). Contract: `docs/modules/partners.md` | identity, catalog (ADR-0032) | 1 (minimal), 2 |
 | inventory | bins (code = shelf label, type, sellable, pick_sequence, status ACTIVE/COUNTING, archived_at), product_locations (home warehouse, fixed bin, min/max), stock_ledger, stock_valuation_adjustments, bin_stock, warehouse_stock, stock_reservations, goods_receipts(+lines, costing status/version), bin_moves(+lines), transfers(+lines), adjustments(+lines), stocktakes(+bins, +lines), stock_snapshot_daily, stock_snapshot_bin_monthly, reconciliation_runs, lots (empty) | StockPostingService.post(tx, actor, { docs, movements }) (ONLY ledger and cache writer; ADR-0034, §5.3), StockPostingService.revalue/reconcile/rebuildBalances, SystemBinsService (bound to `WAREHOUSE_CREATED_HOOK`), BinsService, ProductLocationsService.assertMayReceive (home rule), StockQueryService, ReceiptsService (+ costing, ADR-0033), BinMovesService, AdjustmentsService (+ postSystemInTx/reverseInTx for imports), TransfersService (ADR-0035), StocktakesService (blind counting per shelf, ADR-0038); later ReservationService.reserve/release/consume, AvailabilityService, ShortListQuery; jobs (ADR-0040) inventory.reconcile (nightly 03:00, REPEATABLE READ, writes stock_snapshot_daily), inventory.snapshotMonthly (03:30 on the 1st: the snapshot partitions through the migrator-owned `maintain_stock_snapshot_partitions()`, then the bin snapshot from the ledger); later inventory.staleReservations. REST /bins, /product-locations, /stock, /receipts, /receipt-lines, /bin-moves, /adjustments, /adjustment-lines, /transfers, /transfer-lines, /stocktakes, /stock/low (the low-stock list, ADR-0039); later /labels, /stock/short-list. Contract: `docs/modules/inventory.md` | identity, catalog, partners (active supplier) | 1 |
 | imports | import_jobs, import_rows, import_documents | REST /imports (templates for products, customers, suppliers, opening stock and low-stock levels, create from an uploaded `.xlsx`, status, rows, commit, revert); jobs imports.validate (parse + check), imports.commit (one transaction, all or nothing), imports.revert (ADR-0036), imports.housekeeping (nightly 04:00: the rows of old refused, failed or reverted imports, sheets after a year; ADR-0040). No in-process API; calls other modules' `*InTx` services inside its own transaction. Contract: `docs/modules/imports.md` | identity (files, audit), catalog, partners, inventory; pricing later | 1 |
-| pricing | price_lists (kind BASE/TIER/CONTRACT/PROMO/RETAIL, customer_id for CONTRACT, channel, priority), price_rules (effective-dated, never updated), price_import_log | PriceResolver.resolve(ctx)/resolveMany(ctx[]) → {unitPrice, listPrice, discountPct, ruleId, priceSource, vatRate, cityTaxRate, explanation}; pure algorithm in `packages/shared`. REST /price-lists, /price-rules, /pricing/quote | identity, catalog, partners | 2 |
+| pricing | unit_prices (list WHOLESALE / RETAIL × product unit, whole MNT, `valid_from` / `valid_to`; EXCLUDE no overlap, a trigger lets only `valid_to` move earlier, no DELETE), discount_programs (scope PRODUCT / CATEGORY / ORDER, measure QTY / AMOUNT, effect PRICE / PERCENT / AMOUNT, dates; one PRICE program per unit and day) + discount_steps (ADR-0041, migration `0013_pricing`); customer, contract and tier lists are not used (owner 2026-10-13) | UnitPricesService.view/currentOf/inForce/set(actor, { productId, validFrom, entries })/closeUnitInTx, DiscountProgramsService.list/get/create/update/stop/remove/inForce, PriceQuoteService.quote({ list, date, lines }, executor?) → lines with listPrice, priceSource, unitPrice, subtotal, discountAmount, total, applied programs; the pure resolver `resolveQuote` in `@tugeel/shared/pricing`; `PricingUnitsHook` bound to catalog's `UNIT_SUPERSEDED_HOOK`. REST /unit-prices, /unit-prices/current, /discount-programs, /pricing/quote. Contract: `docs/modules/pricing.md` | identity, catalog (partners not needed while every customer pays one price) | 2 |
 | sales | sales_orders, sales_order_lines (frozen prices + factor snapshot, qty_base, qty_approved, qty_backordered, qty_picked, qty_delivered), order_status_events, order_approvals, pickings(+lines), packages, pos_sessions, pos_sales(+lines), sales_returns(+lines), rep_visits | OrdersService.create/submit/approve/confirm/cancel/markDispatched/markDelivered/markDeliveryFailed, PickingService.createWave/confirmPick/pack, PosService.openSession/checkout/closeSession, OrderQueries.forDelivery; defines `CreditChecker` interface with `AllowAllCreditChecker` default. REST /orders, /pickings, /pos/*, /me/orders, /rep/* | identity, catalog, partners, pricing, inventory; finance via CreditChecker (optional); ebarimt (POS path) | 2 (POS: 9) |
 | finance | invoices(+lines, open_amount), credit_notes, ar_entries (append-only), customer_balances (cache), payments (tender_data jsonb), payment_allocations, payment_intents, cash_registers, cash_sessions, bank_accounts, bank_statements(+lines), recon_matches, credit_holds, tax_periods, supplier_bills, supplier_payments | ArService.checkCredit(tx, customerId, amount) (implements sales.CreditChecker), InvoicingService.createFromSnapshot(tx, snapshot), PaymentsService.record/allocate, QrPaymentService.createIntent/verify/sweep, BankReconService, CustomerBalanceService; jobs qpay.check, qpay.sweep. REST /invoices, /payments, /customers/:id/ledger, /payment-intents, /webhooks/qpay, /bank/*, /reports/finance/* | identity, partners, ebarimt; receives snapshots from sales/delivery, never reads their tables | 3 (QPay 5, bank recon 10) |
 | ebarimt | ebarimt_receipts, ebarimt_submission_log, ebarimt_config (one row per PosAPI instance, encrypted) | EbarimtService.prepare(tx, snapshot) → receiptId (PENDING row), issue(receiptId) (HTTP, outside tx), void(receiptId), status(receiptId), lookupTin(regNo), lookupInfo(tin); `ReceiptProvider` interface (PosApiProvider default; fallback provider by config); jobs ebarimt.issue, ebarimt.sendData (nightly), ebarimt.monitor (5 min), ebarimt.refreshReference (nightly). REST /ebarimt/* | identity, catalog (TaxService, attribute check); integrations/ebarimt over Tailscale | 3 (spike in Week 0/1) |
@@ -394,28 +394,51 @@ The supermarket (STORE) therefore carries real cost from day one even though it 
 
 ### 5.4 Pricing
 
-- Prices live only in pricing (no price columns on products). All prices MNT, VAT-inclusive (flag per list allows exclusive later), per product unit; `DERIVED` = base-unit price × factor when a unit has no rule.
-- Precedence: customer CONTRACT list → customer TIER list → active PROMO → channel default (POS → RETAIL) → BASE (mandatory for every sellable unit; `PRICE_MISSING` otherwise). Within a list: product-specific beats list-wide, unit-specific beats any-unit, highest qualifying `min_qty_base` wins (quantity breaks compared in base units summed per product across the order). A percentage rule composes onto the next-lower fixed price; `applies_to_contract` defaults to false so discounts never silently stack on negotiated prices. At most one discount rule applies (priority, then larger discount).
-- **Effective-dated, never updated** (D12): a change sets `valid_to` + `superseded_by` and inserts a new row. Overlap is impossible by constraint:
+As built in delivery 2 (ADR-0041, after the owner's interview of 2026-10-13; it replaces the list precedence and the single-discount rule of ADR-0009). Contract: `docs/modules/pricing.md`.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-ALTER TABLE price_rules ADD CONSTRAINT price_rules_no_overlap
-  EXCLUDE USING gist (
-    price_list_id WITH =,
-    coalesce(product_id, 0) WITH =,          -- 0 = list-wide rule
-    coalesce(product_unit_id, 0) WITH =,     -- 0 = any unit
-    min_qty_base WITH =,
-    daterange(valid_from, valid_to, '[)') WITH &&
-  );
-```
+- **One price per list.** Prices live only in pricing (no price columns on products). Two lists:
+  - `WHOLESALE`: every channel but the supermarket;
+  - `RETAIL`: the supermarket; the POS uses it from delivery 9.
 
-  Fixed-price tie-break when two rules still qualify at different `min_qty_base` or scope levels: latest `valid_from`, then highest `id`; the resolver's table-driven tests pin this.
+  Every customer pays the same price: there are no customer, contract or tier lists.
+- **Unit prices.** `unit_prices` holds a price per list and product unit: whole MNT, VAT included (SPEC §6.1 #1 until the accountant answers), `valid_from` up to `valid_to`. A unit without its own price in force is `DERIVED` = base unit price × factor (HALF_UP); a base unit without a price makes a line `PRICE_MISSING`.
+  - **A change from day D** (today or later): `UnitPricesService.set` closes the row in force on D (`valid_to = D`) and inserts the new one up to that row's old end, or up to the next planned row. A row replaced on its first day is voided (`valid_to = valid_from`).
+  - **Database guards:**
+    - `unit_prices_no_overlap`: `EXCLUDE USING gist (list WITH =, product_unit_id WITH =, daterange(valid_from, valid_to, '[)') WITH &&)`;
+    - trigger `unit_prices_guard`: only `valid_to` changes, only earlier (23001, even for the migrator);
+    - `REVOKE DELETE, TRUNCATE` from app;
+    - a two-key advisory lock per unit serialises changes.
+- **Discount programs.** `discount_programs` + `discount_steps`, every program in force applies. Each program has:
+  - a name, a list and dates;
+  - a scope: `PRODUCT` (the product's quantity in the whole cart, base units), `CATEGORY` (its subtree; boxes counted — every box is one, pieces as boxes, a product without that unit counts nothing — or the amount) or `ORDER` (the amount);
+  - an effect: `PRICE` (a product unit's new price, never above the price so far; one per unit and list on a day, partial EXCLUDE `discount_programs_one_price`), `PERCENT`, or `AMOUNT` (per unit for a product, off the subtotal otherwise);
+  - ascending steps "from threshold → value", the highest step reached applying.
 
-- **Resolver contract** (`packages/shared/pricing/resolve.ts`, pure, no I/O): input = `{ customer: { tierId, contractListId?, vatPayer }, channel, date, lines: [{ productId, unitId, qtyBase }], rules: PriceRule[] (pre-fetched), taxRates }` (`tierId` stays null until pricing introduces tiers: the owner has none today, contract prices may come — SPEC §11 #5, 2026-10-11); output per line = `{ unitPrice, listPrice, discountPct, ruleId, priceSource, vatRate, cityTaxRate, explanation }`. The explanation is a Mongolian i18n key plus parameters (`pricing.explain.contract_break`, `{ minQty: 24 }`) so the admin and the customer app can show why a price applies. The API wraps the pure function with rule fetching and caching (`/pricing/quote`, < 500 ms for a 50-line cart).
-- **Resolver re-run at SUBMIT** (D11): lines carry resolved prices while DRAFT for display only; `OrdersService.submit` re-runs `PriceResolver` for the whole cart and freezes `unit_price`, `list_price`, `discount_pct`, `price_rule_id`, `price_source`, `vat_rate`, `city_tax_rate`, `factor_snapshot`. CONFIRM re-runs it again if the submit is older than 24 hours.
-- **Rounding** (D13): resolved unit prices are rounded HALF_UP to whole MNT before freezing; `line_total = round0(unit_price × entered_qty)` is an integer MNT amount; per-line `vat_amount = round2(line_total × r / (1 + r + c))` and `city_tax_amount = round2(line_total × c / (1 + r + c))` keep 2 decimals and are summed into the header (never recomputed from the header). Table-driven test: Σ payments (integer MNT) = document total = Σ e-Barimt sub-receipt `totalAmount`.
-- Manual discounts need `sales.discount_manual`, are capped per role, and above the cap flip the order to APPROVAL_PENDING. Clients never compute prices; they call `/pricing/quote` with the whole cart.
+  A promotion is a program with an end date. A program is edited or deleted only before it starts and stopped after. The shape rules live in `discountShapeIssue` (shared) and the CHECK `discount_programs_shape`.
+- **Resolution order** (`resolveQuote`, pure, table-tested):
+  1. list price;
+  2. the product's programs: PRICE, PERCENT, then AMOUNT per unit, on exact values, then the unit price rounded HALF_UP to whole MNT and the line subtotal = unit price × quantity in whole MNT;
+  3. category programs, measured on the amounts after step 2;
+  4. order programs, measured on the amount after step 3.
+
+  In steps 3–4:
+  - a stage's programs are measured on the stage's starting amounts;
+  - PERCENT programs then AMOUNT programs apply, each by id;
+  - a percentage comes off each line in whole MNT;
+  - an amount is split over the lines in proportion to their amounts (largest remainder), never more than they are worth.
+
+  Each line carries `listPrice`, `priceSource`, `unitPrice`, `subtotal`, `discountAmount`, `total` and the applied programs (name, step, and for steps 3–4 the tugriks taken). Lines without a price are left out of the amounts, but their quantities count.
+- **Quote and freeze.**
+  - `PriceQuoteService.quote` fetches the prices and programs in force on a date (category subtrees through catalog's `CategoriesService.subtreeIds`) and runs the resolver. `/pricing/quote` and the «Үнэ тооцоолох» screen call it; a 50-line cart is far below 500 ms.
+  - `OrdersService.submit` (D11) re-runs it in its transaction and freezes per line the list price, unit price, discount amount, applied programs, `factor_snapshot` and the tax rates. CONFIRM re-runs it if the submit is older than 24 hours.
+  - The quote carries no tax; the per-line tax split comes with invoices (delivery 3).
+- **Rounding** (D13):
+  - unit prices are whole MNT;
+  - `line_total = subtotal − discount_amount` in whole MNT (a line's total is not always unit price × quantity once category or order discounts apply; how e-Barimt lines carry the discount is a delivery-3 decision);
+  - per-line `vat_amount = round2(line_total × r / (1 + r + c))` and `city_tax_amount = round2(line_total × c / (1 + r + c))` keep 2 decimals and are summed into the header, never recomputed from it;
+  - table-driven test: Σ payments (integer MNT) = document total = Σ e-Barimt sub-receipt `totalAmount`.
+- **Superseded units.** `PricingUnitsHook` runs in the supersede transaction: the old unit's prices end today, planned ones are voided, its programs stop. Nothing is copied; the new unit is `DERIVED` until it gets its own price (replaces ADR-0008 #4).
+- **No manual discounts** (owner 2026-10-13, SPEC §11 #18). Clients never compute prices; they call `/pricing/quote` with the whole cart.
 
 ### 5.5 Partners and credit
 
@@ -443,7 +466,7 @@ Returns:        after DELIVERED via sales_returns + credit note (CN-) and an ina
 | Transition | Who | Side effects (all in one tx) |
 |---|---|---|
 | DRAFT → SUBMITTED | customer app, rep, office | re-run resolver, freeze prices, allocate `SO-` number, audit |
-| SUBMITTED → APPROVAL_PENDING | system | manual discount over cap, or CreditChecker NEEDS_APPROVAL |
+| SUBMITTED → APPROVAL_PENDING | system | CreditChecker NEEDS_APPROVAL (no manual discounts, ADR-0041) |
 | SUBMITTED / APPROVAL_PENDING → CONFIRMED | system / approver (`sales.approve`, `sales.approve_over_credit`) | lock customer row, CreditChecker, `reserve()` per line (shortfall → `qty_backordered`, §5.3), `customer_balances.open_orders += total`, push "confirmed" |
 | CONFIRMED → PICKING | warehouse (wave) | picking document created |
 | PICKING → PACKED | warehouse | PICK pairs posted, reservations consumed, remainder released, packages recorded |
