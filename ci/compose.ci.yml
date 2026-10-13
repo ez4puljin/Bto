@@ -25,6 +25,7 @@ services:
       TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
       DATABASE_URL: postgres://app:app_ci_pw@postgres:5432/tugeel
       MIGRATOR_DATABASE_URL: postgres://migrator:migrator_ci_pw@postgres:5432/tugeel
+      AI_DATABASE_URL: postgres://ai_reader:ai_reader_ci_pw@postgres:5432/tugeel
       REHEARSAL_REF: ${REHEARSAL_REF:-HEAD}
     volumes:
       - '..:/src:ro'

@@ -36,6 +36,7 @@ jobs:
       TEST_ADMIN_DATABASE_URL: postgres://postgres:postgres@localhost:15432/postgres
       DATABASE_URL: postgres://app:app_ci_pw@localhost:15432/tugeel
       MIGRATOR_DATABASE_URL: postgres://migrator:migrator_ci_pw@localhost:15432/tugeel
+      AI_DATABASE_URL: postgres://ai_reader:ai_reader_ci_pw@localhost:15432/tugeel
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

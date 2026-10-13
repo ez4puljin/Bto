@@ -1,13 +1,19 @@
 import { Client, escapeIdentifier, escapeLiteral } from 'pg';
 import { z } from 'zod';
+import { AI_READER_ROLE } from '../common/config/env.schema';
 
 /**
- * Environment provisioning (ADR-0024): roles app and migrator, the UTF-8 + ICU database, grants,
- * extensions and the Mongolian case-folding assertion. Shared by `pnpm db:provision` and the test
- * harness. Idempotent: safe to run again at any time. Never prints passwords.
+ * Environment provisioning (ADR-0024): roles app and migrator (and ai_reader, ADR-0045), the
+ * UTF-8 + ICU database, grants, extensions and the Mongolian case-folding assertion. Shared by
+ * `pnpm db:provision` and the test harness. Idempotent: safe to run again at any time. Never
+ * prints passwords.
  */
 export const APP_ROLE = 'app';
 export const MIGRATOR_ROLE = 'migrator';
+export { AI_READER_ROLE };
+
+/** The assistant's pool is AI_POOL_MAX (≤ 4) per api process; the role never holds more. */
+export const AI_READER_CONNECTION_LIMIT = 4;
 
 const pgUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
@@ -42,22 +48,83 @@ function roleFrom(url: string, expected: string): RoleSpec {
   return { name, password: decodeURIComponent(parsed.password) };
 }
 
-/** Passwords come from DATABASE_URL / MIGRATOR_DATABASE_URL: one source of truth, no extra secrets. */
+/**
+ * Passwords come from DATABASE_URL / MIGRATOR_DATABASE_URL (and AI_DATABASE_URL when the AI
+ * assistant is set up): one source of truth, no extra secrets.
+ */
 export function planFromEnv(raw: Record<string, string | undefined>): ProvisionPlan {
   const env = z
-    .object({ ADMIN_DATABASE_URL: pgUrl, DATABASE_URL: pgUrl, MIGRATOR_DATABASE_URL: pgUrl })
+    .object({
+      ADMIN_DATABASE_URL: pgUrl,
+      DATABASE_URL: pgUrl,
+      MIGRATOR_DATABASE_URL: pgUrl,
+      AI_DATABASE_URL: z.preprocess(
+        (value) => (value === '' ? undefined : value),
+        pgUrl.optional(),
+      ),
+    })
     .parse(raw);
-  if (databaseOf(env.DATABASE_URL) !== databaseOf(env.MIGRATOR_DATABASE_URL)) {
-    throw new Error('DATABASE_URL and MIGRATOR_DATABASE_URL must name the same database');
+  const database = databaseOf(env.DATABASE_URL);
+  for (const [key, url] of [
+    ['MIGRATOR_DATABASE_URL', env.MIGRATOR_DATABASE_URL],
+    ['AI_DATABASE_URL', env.AI_DATABASE_URL],
+  ] as const) {
+    if (url && databaseOf(url) !== database) {
+      throw new Error(`DATABASE_URL and ${key} must name the same database`);
+    }
   }
   return {
     adminUrl: env.ADMIN_DATABASE_URL,
-    database: databaseOf(env.DATABASE_URL),
+    database,
     roles: [
       roleFrom(env.MIGRATOR_DATABASE_URL, MIGRATOR_ROLE),
       roleFrom(env.DATABASE_URL, APP_ROLE),
+      ...(env.AI_DATABASE_URL ? [roleFrom(env.AI_DATABASE_URL, AI_READER_ROLE)] : []),
     ],
   };
+}
+
+/**
+ * Session defaults of the assistant's read-only role (ADR-0045 #4): every transaction read-only,
+ * only schema ai on the search path, Ulaanbaatar time, timeouts that end a stuck query or a
+ * forgotten transaction, and a connection cap. All are user-settable parameters, so a
+ * non-superuser admin (DigitalOcean doadmin) may set them on a role it administers.
+ */
+export function aiReaderSettings(connectionLimit = AI_READER_CONNECTION_LIMIT): string[] {
+  const role = escapeIdentifier(AI_READER_ROLE);
+  return [
+    `ALTER ROLE ${role} CONNECTION LIMIT ${connectionLimit}`,
+    `ALTER ROLE ${role} SET default_transaction_read_only = on`,
+    `ALTER ROLE ${role} SET search_path = ai`,
+    `ALTER ROLE ${role} SET timezone = 'Asia/Ulaanbaatar'`,
+    `ALTER ROLE ${role} SET statement_timeout = '30s'`,
+    `ALTER ROLE ${role} SET transaction_timeout = '60s'`,
+    `ALTER ROLE ${role} SET idle_in_transaction_session_timeout = '10s'`,
+    `ALTER ROLE ${role} SET client_connection_check_interval = '2s'`,
+  ];
+}
+
+/**
+ * Applies aiReaderSettings, plus `temp_file_limit` (a superuser-only parameter) when the admin is a
+ * superuser; on a managed cluster that limit is skipped (architecture §13.1 A6).
+ */
+export async function configureAiReader(
+  admin: Client,
+  connectionLimit = AI_READER_CONNECTION_LIMIT,
+): Promise<string> {
+  for (const statement of aiReaderSettings(connectionLimit)) await admin.query(statement);
+  const { rows } = await admin.query<{ superuser: boolean }>(
+    'SELECT rolsuper AS superuser FROM pg_roles WHERE rolname = current_user',
+  );
+  if (!rows[0]?.superuser)
+    return 'read-only defaults set (temp_file_limit skipped: not a superuser)';
+  await admin.query(`ALTER ROLE ${escapeIdentifier(AI_READER_ROLE)} SET temp_file_limit = '256MB'`);
+  return 'read-only defaults set';
+}
+
+async function roleExists(client: Client, name: string): Promise<boolean> {
+  const { rowCount } = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [name]);
+  return rowCount === 1;
 }
 
 /**
@@ -115,6 +182,12 @@ export async function ensureIcuDatabase(
 /** Database-level grants. CREATE DATABASE … TEMPLATE does not copy them: rerun for every clone. */
 export async function grantDatabase(admin: Client, name: string): Promise<void> {
   const db = escapeIdentifier(name);
+  // PUBLIC gets CONNECT and TEMPORARY on every new database: only the roles below keep them, so the
+  // read-only role creates no temporary tables (ADR-0045 #4).
+  await admin.query(`REVOKE CONNECT, TEMPORARY ON DATABASE ${db} FROM PUBLIC`);
+  if (await roleExists(admin, AI_READER_ROLE)) {
+    await admin.query(`GRANT CONNECT ON DATABASE ${db} TO ${AI_READER_ROLE}`);
+  }
   await admin.query(`GRANT CONNECT, TEMPORARY ON DATABASE ${db} TO ${APP_ROLE}`);
   // CREATE: drizzle's migrator runs CREATE SCHEMA IF NOT EXISTS "drizzle" (checked even when the
   // schema exists) and the pg-boss CLI creates schema pgboss.
@@ -124,6 +197,8 @@ export async function grantDatabase(admin: Client, name: string): Promise<void> 
 
 /** Connected to the target database as the admin (owner of schema public via pg_database_owner). */
 export async function prepareDatabase(adminInDatabase: Client): Promise<void> {
+  // PUBLIC's USAGE on schema public would let the read-only role resolve names there (ADR-0045 #4).
+  await adminInDatabase.query('REVOKE ALL ON SCHEMA public FROM PUBLIC');
   await adminInDatabase.query(`GRANT USAGE, CREATE ON SCHEMA public TO ${MIGRATOR_ROLE}`);
   await adminInDatabase.query(`GRANT USAGE ON SCHEMA public TO ${APP_ROLE}`);
   await adminInDatabase.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
@@ -149,6 +224,9 @@ export async function provisionEnvironment(
       admin,
       plan.roles.map((role) => role.name),
     );
+    if (plan.roles.some((role) => role.name === AI_READER_ROLE)) {
+      log(`role ${AI_READER_ROLE}: ${await configureAiReader(admin)}`);
+    }
     log(`database ${plan.database}: ${await ensureIcuDatabase(admin, plan.database)}`);
     await grantDatabase(admin, plan.database);
   } finally {

@@ -10,9 +10,17 @@ export interface TestEnv {
   adminUrl: string;
   appUrl: string;
   migratorUrl: string;
+  /** Role ai_reader (ADR-0045): the AI assistant's read-only connection. */
+  aiUrl: string;
   prefix: string;
   roles: RoleSpec[];
 }
+
+/**
+ * Parallel workers share the cluster-wide role, so tests lift its connection cap; production and
+ * development keep AI_READER_CONNECTION_LIMIT (4).
+ */
+export const TEST_AI_READER_CONNECTION_LIMIT = 32;
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'postgres']);
 
@@ -30,10 +38,13 @@ export function loadTestEnv(): TestEnv {
       `TEST_ADMIN_DATABASE_URL must point at the local postgres container, not ${host}`,
     );
   }
+  const aiUrl = process.env.AI_DATABASE_URL ?? '';
+  if (!aiUrl) throw new Error('AI_DATABASE_URL is not set (see apps/api/.env.example)');
   const plan = planFromEnv({
     ADMIN_DATABASE_URL: adminUrl,
     DATABASE_URL: process.env.DATABASE_URL,
     MIGRATOR_DATABASE_URL: process.env.MIGRATOR_DATABASE_URL,
+    AI_DATABASE_URL: aiUrl,
   });
   const prefix = process.env.TEST_DATABASE_PREFIX ?? 'tugeel_test';
   if (!/^[a-z][a-z0-9_]*$/.test(prefix)) throw new Error(`bad TEST_DATABASE_PREFIX "${prefix}"`);
@@ -41,6 +52,7 @@ export function loadTestEnv(): TestEnv {
     adminUrl,
     appUrl: process.env.DATABASE_URL ?? '',
     migratorUrl: process.env.MIGRATOR_DATABASE_URL ?? '',
+    aiUrl,
     prefix,
     roles: plan.roles,
   };
@@ -63,6 +75,8 @@ export function applyWorkerEnv(project: DbProject): void {
     LOG_LEVEL: process.env.TEST_LOG_LEVEL ?? 'silent',
     DATABASE_URL: withDatabase(env.appUrl, database),
     MIGRATOR_DATABASE_URL: withDatabase(env.migratorUrl, database),
+    AI_DATABASE_URL: withDatabase(env.aiUrl, database),
+    AI_POOL_MAX: '2',
     TEST_DATABASE_ADMIN_URL: withDatabase(env.adminUrl, database),
     DB_POOL_MAX: '4',
     PGBOSS_POOL_MAX: '2',
@@ -79,8 +93,6 @@ export function applyWorkerEnv(project: DbProject): void {
   for (const key of Object.keys(process.env)) {
     if (key.startsWith('LLM_')) delete process.env[key];
   }
-  delete process.env.AI_DATABASE_URL;
-  delete process.env.AI_POOL_MAX;
   if (project === 'integrity') {
     // node-postgres reads PGOPTIONS for every new connection: deadlocks fail fast and loudly.
     process.env.PGOPTIONS = '-c statement_timeout=5s';

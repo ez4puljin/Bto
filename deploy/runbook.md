@@ -11,7 +11,7 @@ Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0
 | Networks | external `tugeel_edge_prod` and `tugeel_edge_staging`; the edge Caddy joins both, the two stacks cannot reach each other |
 | Images | `ghcr.io/ez4puljin/bto-api:<tag>` (ROLE=api or worker) and `ghcr.io/ez4puljin/bto-web:<tag>` (Caddy file server, port 8080); tags are `sha-<git sha>` |
 | Databases | production: DigitalOcean Managed PostgreSQL 18 (SGP1); staging: the `postgres-staging` container with a named volume |
-| Pool budget | production api 6 + pg-boss 2, worker 3 + pg-boss 2, transient migrator 1; staging 2/2/2. **Cluster connection limit: record it here on creation day:** `____` |
+| Pool budget | production api 6 + pg-boss 2 + AI reader 2, worker 3 + pg-boss 2, transient migrator 1; staging 2/2/2/2. **Cluster connection limit: record it here on creation day:** `____` |
 
 ## 2. Droplet bootstrap (once)
 
@@ -41,6 +41,7 @@ Operational steps for the DigitalOcean droplet (docs/architecture.md §10, ADR-0
    docker compose -f docker-compose.prod.yml --env-file .env run --rm --no-deps -e ADMIN_DATABASE_URL api node dist/db/provision.js
    unset ADMIN_DATABASE_URL
    ```
+   Provisioning creates `app`, `migrator` and, when `AI_DATABASE_URL` is set, the AI assistant's read-only role `ai_reader` with its session defaults (ADR-0045); it also takes `CONNECT`, `TEMPORARY` and schema `public` away from `PUBLIC`. `doadmin` is not a superuser, so the role's `temp_file_limit` is skipped with a notice (architecture §13.1 A6). Provision before the api starts: its migrations grant the `ai` views to an existing `ai_reader` only (run provisioning again, then restart the api, if the assistant is set up later).
 6. Production stack: `docker compose -f docker-compose.prod.yml --env-file .env up -d --wait`
 7. Checks: `curl -fsS https://staging.<domain>/health`, `curl -fsS https://api.<domain>/health`, open `https://admin.<domain>/system/status`.
 8. UptimeRobot monitors: `https://api.<domain>/health` and `https://admin.<domain>/`.
@@ -79,6 +80,8 @@ All secrets live in `/opt/tugeel/.env*` (chmod 600) and GitHub Actions secrets; 
 |---|---|---|
 | `JWT_SECRET` | HS256 signature of the 15-minute access tokens (ADR-0027) | every access token fails at once; browsers and apps refresh silently with their refresh token, nobody is signed out. File upload URLs issued in the last 15 minutes stop working (their key derives from it, ADR-0030); the upload is simply repeated. Rotate on suspicion of a leak; no schedule |
 | `AUTH_PEPPER` | HMAC of the admin-issued one-time password codes | codes issued before the rotation stop working (issue new ones); passwords, refresh tokens and sessions are unaffected |
+| `LLM_API_KEY` | the AI provider account (ADR-0045); api only, the worker never sees it | create a new key in the provider's console, put it in `.env`, restart the api, then delete the old key there. Set a monthly budget limit in the same console |
+| `AI_DATABASE_URL` password | role `ai_reader` (read-only) | change it in `.env`, run `provision.js` again (it sets the password from the URL), restart the api |
 
 Refresh tokens are stored as SHA-256 hashes and passwords as argon2id hashes; neither depends on these variables. To sign everybody out (e.g. after a leaked database backup), revoke the sessions: `UPDATE auth_sessions SET revoked_at = now(), revoked_reason = 'ADMIN' WHERE revoked_at IS NULL;` as `migrator`.
 

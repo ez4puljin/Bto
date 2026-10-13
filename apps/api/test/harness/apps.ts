@@ -38,16 +38,18 @@ export async function createWorker(): Promise<INestApplicationContext> {
   return moduleRef;
 }
 
-export type Role = 'app' | 'migrator' | 'admin';
+export type Role = 'app' | 'migrator' | 'ai_reader' | 'admin';
+
+const ROLE_URLS: Record<Role, string> = {
+  app: 'DATABASE_URL',
+  migrator: 'MIGRATOR_DATABASE_URL',
+  ai_reader: 'AI_DATABASE_URL',
+  admin: 'TEST_DATABASE_ADMIN_URL',
+};
 
 /** A plain pg client connected to this worker's database as the given role. */
 export async function connectAs(role: Role): Promise<Client> {
-  const url =
-    role === 'app'
-      ? process.env.DATABASE_URL
-      : role === 'migrator'
-        ? process.env.MIGRATOR_DATABASE_URL
-        : process.env.TEST_DATABASE_ADMIN_URL;
+  const url = process.env[ROLE_URLS[role]];
   const client = new Client({ connectionString: url, application_name: `tugeel-test-${role}` });
   await client.connect();
   return client;

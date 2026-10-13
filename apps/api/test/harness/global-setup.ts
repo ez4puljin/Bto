@@ -1,13 +1,19 @@
 import { Client, escapeIdentifier } from 'pg';
 import { runMigrations } from '../../src/db/migrate';
 import {
+  configureAiReader,
   ensureIcuDatabase,
   ensureRole,
   grantDatabase,
   prepareDatabase,
   withDatabase,
 } from '../../src/db/provisioning';
-import { type DbProject, loadTestEnv, testDatabaseName } from './test-env';
+import {
+  type DbProject,
+  loadTestEnv,
+  TEST_AI_READER_CONNECTION_LIMIT,
+  testDatabaseName,
+} from './test-env';
 
 /**
  * Runs once per selected database project in the parent Jest process (ADR-0024 #7): provisions the
@@ -33,6 +39,8 @@ export default async function globalSetup(
   await admin.connect();
   try {
     for (const role of env.roles) await ensureRole(admin, role);
+    // Before the migrations: migrate.ts grants the ai views to an existing ai_reader only.
+    await configureAiReader(admin, TEST_AI_READER_CONNECTION_LIMIT);
     await admin.query(`DROP DATABASE IF EXISTS ${escapeIdentifier(template)} WITH (FORCE)`);
     await ensureIcuDatabase(admin, template);
     await grantDatabase(admin, template);

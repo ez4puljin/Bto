@@ -2,13 +2,13 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { PgBoss, type Queue, type UpdateQueueOptions } from 'pg-boss';
 import { z } from 'zod';
 import { loadDotEnvIfPresent } from '../common/config/dotenv';
 import { configurePgTypeParsers } from '../common/db/pg-types';
 import { JOB_QUEUES, PGBOSS_SCHEMA } from '../common/jobs/job-registry';
-import { APP_ROLE } from './provisioning';
+import { AI_READER_ROLE, APP_ROLE } from './provisioning';
 
 /** dist/db/migrations in the image (nest-cli assets), src/db/migrations under tsx. */
 export const MIGRATIONS_FOLDER = join(__dirname, 'migrations');
@@ -17,7 +17,8 @@ const MIGRATION_LOCK = 72_026_101;
 
 /**
  * `pnpm db:migrate` / container entrypoint, as role migrator (ADR-0024): drizzle migrations, then the
- * pg-boss schema, then app's grants on it, then the queues of the job registry.
+ * pg-boss schema, then app's grants on it, then the grants of schema ai (ADR-0045), then the queues
+ * of the job registry.
  */
 export async function runMigrations(
   migratorUrl: string,
@@ -47,6 +48,7 @@ export async function runMigrations(
     await client.query(
       `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${PGBOSS_SCHEMA} TO ${APP_ROLE}`,
     );
+    log(await grantAiSchema(client));
     await syncQueues(migratorUrl);
     log(`pg-boss: queues in sync (${Object.keys(JOB_QUEUES).join(', ')})`);
   } finally {
@@ -54,6 +56,21 @@ export async function runMigrations(
     client.release();
     await pool.end();
   }
+}
+
+/**
+ * Schema ai (ADR-0045): app's default privileges (0000_foundation) also reach the views, so they
+ * are taken back after every run; ai_reader reads every view, once `pnpm db:provision` created it.
+ */
+async function grantAiSchema(client: PoolClient): Promise<string> {
+  await client.query(`REVOKE ALL ON ALL TABLES IN SCHEMA ai FROM ${APP_ROLE}`);
+  const { rowCount } = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [
+    AI_READER_ROLE,
+  ]);
+  if (rowCount !== 1) return `ai: no ${AI_READER_ROLE} role yet (pnpm db:provision creates it)`;
+  await client.query(`GRANT USAGE ON SCHEMA ai TO ${AI_READER_ROLE}`);
+  await client.query(`GRANT SELECT ON ALL TABLES IN SCHEMA ai TO ${AI_READER_ROLE}`);
+  return `ai: views readable by ${AI_READER_ROLE}`;
 }
 
 /** Installs or upgrades the pg-boss schema with its own CLI (async index builds are inlined). */
