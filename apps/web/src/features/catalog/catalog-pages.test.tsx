@@ -132,6 +132,8 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
   fetchMock.mock.calls
     .map(([request]) => request)
     .filter((request) => request.method === method && new URL(request.url).pathname === path);
+/** The accessible name of a unit's «⋯» menu button. */
+const unitMenu = (unitName: string) => mn.catalog.units.menu.replace('{{unit}}', unitName);
 
 describe('catalog menu and access', () => {
   it('shows the catalog menu to every user, the e-Barimt page to its managers only', async () => {
@@ -528,7 +530,9 @@ describe('product page', () => {
     const user = userEvent.setup();
     const box = await screen.findByRole('region', { name: 'хайрцаг' });
     expect(within(box).getByText('1 хайрцаг = 24 ш')).toBeInTheDocument();
-    await user.click(within(box).getByRole('button', { name: mn.catalog.units.changeFactor }));
+    // The unit's actions sit in its «⋯» menu.
+    await user.click(within(box).getByRole('button', { name: unitMenu('хайрцаг') }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.catalog.units.changeFactor }));
     const dialog = within(await screen.findByRole('dialog'));
     await user.type(dialog.getByLabelText(mn.catalog.units.newFactor), '20');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
@@ -565,24 +569,70 @@ describe('product page', () => {
     renderApp('/catalog/products/7', fetchMock);
     const user = userEvent.setup();
     const box = within(await screen.findByRole('region', { name: 'хайрцаг' }));
+    await user.click(box.getByRole('button', { name: mn.catalog.units.addBarcode }));
+    const dialog = within(await screen.findByRole('dialog'));
     await user.type(
-      box.getByLabelText(mn.catalog.units.addBarcode),
+      dialog.getByLabelText(mn.catalog.units.addBarcode),
       `${ean('865000100009')}{Enter}`,
     );
     expect(
-      await screen.findByText(
+      await dialog.findByText(
         mn.errors.BARCODE_TAKEN.replace('{{name}}', 'Спрайт').replace('{{sku}}', '10099'),
       ),
     ).toBeInTheDocument();
-    expect(box.getByLabelText(mn.catalog.units.addBarcode)).not.toHaveValue('');
+    expect(dialog.getByLabelText(mn.catalog.units.addBarcode)).not.toHaveValue('');
 
-    await user.click(box.getByRole('button', { name: mn.catalog.units.internalBarcode }));
+    await user.click(dialog.getByRole('button', { name: mn.catalog.units.generateInternal }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.catalog.units.barcodeAdded);
+    // The focus goes back to the button that opened the dialog.
     await waitFor(() =>
-      expect(calls(fetchMock, 'POST', '/api/v1/product-units/71/internal-barcode')).toHaveLength(1),
+      expect(box.getByRole('button', { name: mn.catalog.units.addBarcode })).toHaveFocus(),
     );
-    const [internal] = calls(fetchMock, 'POST', '/api/v1/product-units/71/internal-barcode');
+    const [internal, ...more] = calls(
+      fetchMock,
+      'POST',
+      '/api/v1/product-units/71/internal-barcode',
+    );
+    expect(more).toHaveLength(0);
     expect(internal?.headers.get('Idempotency-Key')).toMatch(UUID);
-    await waitFor(() => expect(screen.queryByText(/«Спрайт»/)).toBeNull());
+    expect(screen.queryByText(/«Спрайт»/)).toBeNull();
+  });
+
+  it('retires a unit from its menu after asking', async () => {
+    const retired: (string | null)[] = [];
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      productRoutes({
+        'POST /api/v1/product-units/71/retire': (request: Request) => {
+          retired.push(request.headers.get('Idempotency-Key'));
+          return json({ ...unit({ id: 71, uomId: 3, factorToBase: '24' }), supersededAt: STAMP });
+        },
+      }),
+    );
+    renderApp('/catalog/products/7', fetchMock);
+    const user = userEvent.setup();
+    // The base unit cannot be retired or change its factor: its menu only edits.
+    const piece = within(await screen.findByRole('region', { name: 'ш' }));
+    await user.click(piece.getByRole('button', { name: unitMenu('ш') }));
+    expect(
+      await screen.findByRole('menuitem', { name: mn.catalog.units.edit }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: mn.catalog.units.retire })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    const box = within(screen.getByRole('region', { name: 'хайрцаг' }));
+    await user.click(box.getByRole('button', { name: unitMenu('хайрцаг') }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.catalog.units.retire }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(
+      dialog.getByText(mn.catalog.units.retireConfirm.replace('{{unit}}', 'хайрцаг')),
+    ).toBeInTheDocument();
+    expect(retired).toHaveLength(0);
+    await user.click(dialog.getByRole('button', { name: mn.catalog.units.retire }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(retired).toHaveLength(1);
+    expect(retired[0]).toMatch(UUID);
   });
 
   it('keeps the product read-only for a worker', async () => {
@@ -597,7 +647,9 @@ describe('product page', () => {
     expect(screen.queryByRole('button', { name: mn.common.save })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.product.addUnit })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.images.upload })).toBeNull();
-    expect(screen.queryByRole('button', { name: mn.catalog.units.changeFactor })).toBeNull();
+    expect(screen.queryByRole('button', { name: unitMenu('хайрцаг') })).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.catalog.units.addBarcode })).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.catalog.units.deleteBarcode })).toBeNull();
     expect(screen.getByText(COLA_CODE)).toBeInTheDocument();
   });
 
@@ -619,6 +671,12 @@ describe('product page', () => {
     const edit = `${mn.common.edit}: ${mn.catalog.product.info}`;
     await user.click(await screen.findByRole('button', { name: edit }));
     await user.selectOptions(await screen.findByLabelText(mn.catalog.product.cityTax), 'yes');
+    // The status is a switch, on while the product is active.
+    const status = screen.getByRole('switch', { name: mn.catalog.product.status });
+    expect(status).toBeChecked();
+    await user.click(status);
+    expect(status).not.toBeChecked();
+    expect(screen.getByText(mn.catalog.products.status.INACTIVE)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: mn.common.save }));
     // A toast says so and the card is read again.
     expect(await screen.findByRole('status')).toHaveTextContent(mn.catalog.product.saved);
@@ -633,7 +691,7 @@ describe('product page', () => {
       classificationCode: null,
       taxProductCode: null,
       weightKg: '0.55',
-      status: 'ACTIVE',
+      status: 'INACTIVE',
     });
   });
 });

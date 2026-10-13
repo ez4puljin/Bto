@@ -1,6 +1,7 @@
 import { Pencil } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,11 @@ export function DetailCard(props: {
     <Card role="region" aria-labelledby={titleId} className={props.className}>
       <CardHeader>
         <CardTitle id={titleId}>{props.title}</CardTitle>
+        {editing ? (
+          <CardAction>
+            <Badge>{t('common.editing')}</Badge>
+          </CardAction>
+        ) : null}
         {showActions ? (
           <CardAction className="flex flex-wrap justify-end gap-2">
             {props.actions}
@@ -76,26 +82,55 @@ export interface Field {
   value: ReactNode;
   /** A smaller line under the value (where it came from, a unit). */
   hint?: ReactNode;
-  /** Takes the whole width (notes, addresses). */
+  /** Kept for callers; every row already takes the whole width. */
   wide?: boolean;
 }
 
-/** Label-over-value pairs in two columns: the reading side of a DetailCard. */
-export function FieldList(props: { items: readonly Field[]; className?: string }) {
+/**
+ * The reading side of a DetailCard: rows of label and value inside a hairline box, like the
+ * form's `FormSection` / `FormRow`, so the card does not jump when «Засах» opens the form.
+ */
+export function FieldList(props: {
+  items: readonly Field[];
+  title?: string;
+  description?: string;
+  className?: string;
+}) {
   const { t } = useTranslation();
   return (
-    <dl className={cn('grid gap-x-8 gap-y-4 sm:grid-cols-2', props.className)}>
-      {props.items.map((item) => (
-        <div key={item.label} className={cn('min-w-0', item.wide && 'sm:col-span-2')}>
-          <dt className="text-xs font-medium text-muted-foreground">{item.label}</dt>
-          <dd className="mt-1 text-sm break-words">
-            {item.value === null || item.value === undefined || item.value === ''
-              ? t('common.none')
-              : item.value}
-          </dd>
-          {item.hint ? <dd className="mt-0.5 text-xs text-muted-foreground">{item.hint}</dd> : null}
+    <section className={cn('flex flex-col gap-2', props.className)}>
+      {props.title || props.description ? (
+        <div className="px-1">
+          {props.title ? (
+            <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {props.title}
+            </h3>
+          ) : null}
+          {props.description ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p>
+          ) : null}
         </div>
-      ))}
-    </dl>
+      ) : null}
+      <dl className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
+        {props.items.map((item) => (
+          <div
+            key={item.label}
+            className="grid gap-1 px-3.5 py-2.5 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4"
+          >
+            <dt className="text-[13px] leading-snug text-muted-foreground">{item.label}</dt>
+            <div className="min-w-0">
+              <dd className="text-sm break-words">
+                {item.value === null || item.value === undefined || item.value === ''
+                  ? t('common.none')
+                  : item.value}
+              </dd>
+              {item.hint ? (
+                <dd className="mt-0.5 text-xs text-muted-foreground">{item.hint}</dd>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

@@ -226,7 +226,8 @@
     "editRecord": "Засах: {{name}}",
     "viewRecord": "Харах: {{name}}",
     "clearFilters": "Шүүлтүүр арилгах",
-    "created": "Үүсгэлээ"
+    "created": "Үүсгэлээ",
+    "editing": "Засаж байна"
   },
   "validation": {
     "required": "Заавал бөглөнө",
@@ -635,7 +636,11 @@
       "removeBarcode": "{{code}} баркодыг хасах",
       "unitBarcodes": "Баркод",
       "viewStock": "Үлдэгдэл харах",
-      "viewMovements": "Хөдөлгөөн харах"
+      "viewMovements": "Хөдөлгөөн харах",
+      "sectionGeneral": "Ерөнхий",
+      "sectionBaseUnit": "Суурь нэгж ба баркод",
+      "extraUnitsHint": "Хайрцаг, блок зэрэг том нэгжийг суурь нэгжийн тоогоор тодорхойлно.",
+      "noExtraUnits": "Нэмэлт нэгж алга"
     },
     "units": {
       "title": "Нэгж ба баркод",
@@ -659,7 +664,19 @@
       "deleteBarcode": "Баркод устгах",
       "edit": "Нэгж засах",
       "addBarcode": "Баркод нэмэх",
-      "supersededAt": "{{time}}"
+      "supersededAt": "{{time}}",
+      "menu": "{{unit}}: үйлдэл",
+      "columns": {
+        "unit": "Нэгж",
+        "barcodes": "Баркод"
+      },
+      "barcodeAdded": "Баркод нэмэгдлээ",
+      "generateInternal": "Дотоод баркод үүсгэх",
+      "or": "эсвэл",
+      "defaultFor": {
+        "sales": "Борлуулалт",
+        "purchase": "Худалдан авалт"
+      }
     },
     "images": {
       "title": "Зураг",
@@ -730,7 +747,8 @@
       "preview": "БҮНА код: {{classificationCode}}, татварын код: {{taxProductCode}}, НХАТ: {{cityTax}} бараа",
       "done": "Оноолоо",
       "empty": "Дутуу шинжтэй бараа алга",
-      "category": "Ангилал"
+      "category": "Ангилал",
+      "complete": "Бүрэн"
     }
   },
   "scan": {
@@ -748,7 +766,9 @@
     "cameraNeedsHttps": "Камер зөвхөн HTTPS эсвэл localhost хаягаар нээгдэнэ; гар сканнер, гараар бичих нь ажиллана.",
     "notFound": "«{{code}}» баркодтой бараа олдсонгүй",
     "recent": "Сүүлд шалгасан",
-    "unit": "Нэгж"
+    "unit": "Нэгж",
+    "openProduct": "Бараа нээх",
+    "cardTitle": "Баркод уншуулах"
   },
   "partners": {
     "kinds": {

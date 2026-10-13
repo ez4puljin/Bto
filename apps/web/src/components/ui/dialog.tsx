@@ -103,7 +103,7 @@ function DialogFooter({
   children,
   ...props
 }: React.ComponentProps<"div"> & {
-  /** Adds a close button with this (translated) label. */
+  /** Adds a close button with this (translated) label, left of the main button (ADR-0042). */
   closeLabel?: string
 }) {
   return (
@@ -115,12 +115,12 @@ function DialogFooter({
       )}
       {...props}
     >
-      {children}
       {closeLabel && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">{closeLabel}</Button>
+          <Button variant="ghost">{closeLabel}</Button>
         </DialogPrimitive.Close>
       )}
+      {children}
     </div>
   )
 }

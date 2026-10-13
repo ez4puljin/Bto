@@ -19,11 +19,14 @@ export function PageHeader({
   title,
   meta,
   actions,
+  media,
   crumbs = [],
 }: {
   title: string;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** A picture beside the title (a product's photo). */
+  media?: ReactNode;
   crumbs?: readonly Crumb[];
 }) {
   const { t } = useTranslation();
@@ -74,14 +77,19 @@ export function PageHeader({
             </ol>
           )
         ) : null}
-        <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-balance">
-          {title}
-        </h1>
-        {meta ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-            {meta}
+        <div className="flex items-center gap-4">
+          {media ? <div className="shrink-0">{media}</div> : null}
+          <div className="min-w-0">
+            <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-balance">
+              {title}
+            </h1>
+            {meta ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+                {meta}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
       {actions ? (
         <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>

@@ -39,6 +39,7 @@
   --warning-soft: #fff1de;
   --info-soft: #e8f0fb;
   --fill: #e8e8ed;
+  --toggle: #34c759;
   --border: #e5e5ea;
   --input: #c7c7cc;
   --ring: #0071e3;
@@ -90,6 +91,7 @@
   --color-warning-soft: var(--warning-soft);
   --color-info-soft: var(--info-soft);
   --color-fill: var(--fill);
+  --color-toggle: var(--toggle);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

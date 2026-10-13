@@ -1,13 +1,15 @@
 import type { ProblemDetails } from '@tugeel/api-client';
-import { ImageOff } from 'lucide-react';
+import { ArrowRight, ImageOff, ScanBarcode } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { ListCard } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
@@ -31,7 +33,8 @@ const RECENT_SCANS = 10;
 
 /**
  * Scan or type a barcode and see the product and unit it belongs to (SPEC §5.2): the check for
- * scanners and the camera before receiving and counting use them.
+ * scanners and the camera before receiving and counting use them. The scan box sits in its own
+ * card, the latest result below it and the earlier scans in a list.
  */
 export function BarcodeLookupPage() {
   const { t } = useTranslation();
@@ -49,9 +52,22 @@ export function BarcodeLookupPage() {
   const [latest, ...older] = scans;
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('scan.title')} meta={t('scan.hint')} />
-      <ScanBox onScan={scan} />
+    <div className="flex max-w-3xl flex-col gap-4">
+      <PageHeader title={t('scan.title')} />
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-info-soft text-link">
+              <ScanBarcode aria-hidden className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-semibold">{t('scan.cardTitle')}</h2>
+              <p className="text-[13px] text-muted-foreground">{t('scan.hint')}</p>
+            </div>
+          </div>
+          <ScanBox onScan={scan} />
+        </CardContent>
+      </Card>
       {lookup.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
           {t('common.loading')}
@@ -59,42 +75,46 @@ export function BarcodeLookupPage() {
       ) : null}
       {latest && !lookup.isPending ? <ScanResult entry={latest} /> : null}
       {older.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <h2 className="font-medium">{t('scan.recent')}</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('scan.label')}</TableHead>
-                <TableHead>{t('catalog.products.columns.name')}</TableHead>
-                <TableHead>{t('scan.unit')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {older.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-mono">{entry.code}</TableCell>
-                  <TableCell className="whitespace-normal">
-                    {entry.found ? (
-                      <Link
-                        to={`/catalog/products/${entry.found.product.id}`}
-                        className="underline-offset-4 hover:underline"
-                      >
-                        {entry.found.product.name}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        {entry.problem?.code === 'NOT_FOUND'
-                          ? t('scan.notFound', { code: entry.code })
-                          : t(`errors.${entry.problem?.code ?? 'INTERNAL_ERROR'}`)}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{entry.found?.unit.uomName ?? t('common.none')}</TableCell>
+        <section className="flex flex-col gap-2">
+          <h2 className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            {t('scan.recent')}
+          </h2>
+          <ListCard>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('scan.label')}</TableHead>
+                  <TableHead>{t('catalog.products.columns.name')}</TableHead>
+                  <TableHead>{t('scan.unit')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {older.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-mono">{entry.code}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {entry.found ? (
+                        <Link
+                          to={`/catalog/products/${entry.found.product.id}`}
+                          className="font-medium text-link underline-offset-4 hover:underline"
+                        >
+                          {entry.found.product.name}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {entry.problem?.code === 'NOT_FOUND'
+                            ? t('scan.notFound', { code: entry.code })
+                            : t(`errors.${entry.problem?.code ?? 'INTERNAL_ERROR'}`)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{entry.found?.unit.uomName ?? t('common.none')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ListCard>
+        </section>
       ) : null}
     </div>
   );
@@ -114,44 +134,56 @@ function ScanResult({ entry }: { entry: ScanEntry }) {
   const { product, unit, barcode } = entry.found;
   return (
     <Card>
-      <CardContent className="flex gap-4">
-        {product.thumbUrl ? (
-          <img src={product.thumbUrl} alt="" className="size-24 shrink-0 rounded-md object-cover" />
-        ) : (
-          <div className="flex size-24 shrink-0 items-center justify-center rounded-md bg-muted">
-            <ImageOff className="size-6 text-muted-foreground" />
-          </div>
-        )}
-        <div className="flex min-w-0 flex-col gap-1">
-          <Link
-            to={`/catalog/products/${product.id}`}
-            className="text-lg font-medium underline-offset-4 hover:underline"
-          >
-            {product.name}
-          </Link>
-          <span className="font-mono text-sm text-muted-foreground">{product.sku}</span>
-          <span>
-            {unit.isBase
-              ? unit.uomName
-              : t('catalog.units.factorOf', {
-                  unit: unit.uomName,
-                  factor: unit.factorToBase,
-                  base: product.baseUnit.uomName,
-                })}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-sm">{barcode.code}</span>
-            {barcode.isPrimary ? (
-              <Badge variant="secondary">{t('catalog.units.primary')}</Badge>
-            ) : null}
-            {barcode.isInternal ? (
-              <Badge variant="outline">{t('catalog.units.internal')}</Badge>
-            ) : null}
-            {product.status === 'INACTIVE' ? (
-              <Badge variant="outline">{t('catalog.products.status.INACTIVE')}</Badge>
-            ) : null}
+      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 gap-4">
+          {product.thumbUrl ? (
+            <img
+              src={product.thumbUrl}
+              alt=""
+              className="size-24 shrink-0 rounded-xl object-cover ring-1 ring-black/[0.06]"
+            />
+          ) : (
+            <div className="grid size-24 shrink-0 place-items-center rounded-xl bg-fill">
+              <ImageOff aria-hidden className="size-6 text-muted-foreground" />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col gap-1">
+            <Link
+              to={`/catalog/products/${product.id}`}
+              className="text-lg leading-snug font-semibold underline-offset-4 hover:underline"
+            >
+              {product.name}
+            </Link>
+            <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+              <span className="font-mono">{product.sku}</span>
+              {product.status === 'INACTIVE' ? (
+                <Badge variant="secondary">{t('catalog.products.status.INACTIVE')}</Badge>
+              ) : null}
+            </div>
+            <span className="text-sm">
+              {unit.isBase
+                ? unit.uomName
+                : t('catalog.units.factorOf', {
+                    unit: unit.uomName,
+                    factor: unit.factorToBase,
+                    base: product.baseUnit.uomName,
+                  })}
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-[13px]">{barcode.code}</span>
+              {barcode.isPrimary ? <Badge>{t('catalog.units.primary')}</Badge> : null}
+              {barcode.isInternal ? (
+                <Badge variant="secondary">{t('catalog.units.internal')}</Badge>
+              ) : null}
+            </div>
           </div>
         </div>
+        <Button variant="secondary" className="self-start sm:self-center" asChild>
+          <Link to={`/catalog/products/${product.id}`}>
+            {t('scan.openProduct')}
+            <ArrowRight />
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );

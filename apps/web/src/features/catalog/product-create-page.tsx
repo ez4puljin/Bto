@@ -9,8 +9,9 @@ import { ProductForm } from './product-form';
 import { createBody, emptyProduct, type ProductFormValues } from './product-schema';
 
 /**
- * A new product with its base unit, other units and barcodes in one step (SPEC §5.2). The SKU field
- * starts with the next free number; the admin may type the code from the Excel sheet instead.
+ * A new product with its base unit, other units and barcodes in one step (SPEC §5.2), in the same
+ * sections as the product's card. The SKU field starts with the next free number; the admin may
+ * type the code from the Excel sheet instead. «Болих» goes back to the list.
  */
 export function ProductCreatePage() {
   const { t } = useTranslation();
@@ -34,7 +35,7 @@ export function ProductCreatePage() {
   const pieces = uoms.data?.find((uom) => uom.code === 'PCS') ?? uoms.data?.[0];
 
   return (
-    <div>
+    <div className="max-w-3xl">
       <PageHeader title={t('catalog.product.newTitle')} />
       <ProblemAlert problem={loadProblem} />
       {uoms.data && categories.data && brands.data && !nextSku.isPending ? (
@@ -47,6 +48,7 @@ export function ProductCreatePage() {
               categories={categories.data}
               brands={brands.data}
               submitLabel={t('common.save')}
+              onCancel={() => void navigate('/catalog/products')}
               onSubmit={create}
             />
           </CardContent>

@@ -1,22 +1,45 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FolderTree, Plus, Tag } from 'lucide-react';
+import {
+  Check,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  FolderTree,
+  Pencil,
+  Plus,
+  Tag,
+  Trash2,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FieldError } from '@/components/field-error';
+import { FormField } from '@/components/form';
+import {
+  EmptyState,
+  ListCard,
+  RowAction,
+  RowActionSpacer,
+  RowActions,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
-import { EmptyState, ListCard } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -68,7 +91,31 @@ function useDeleteConfirm<T extends { id: number; name: string }>(
   };
 }
 
-/** The category tree (SPEC §5.2): any depth, a default БҮНА code per category (ADR-0015 #3). */
+/** «Болих» then «Хадгалах» at the foot of a master dialog. */
+function SaveFooter({ pending, onCancel }: { pending: boolean; onCancel: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <DialogFooter>
+      <Button type="button" variant="ghost" onClick={onCancel}>
+        {t('common.cancel')}
+      </Button>
+      <Button type="submit" disabled={pending}>
+        {t('common.save')}
+      </Button>
+    </DialogFooter>
+  );
+}
+
+/** A muted «—» for an empty cell. */
+function None() {
+  const { t } = useTranslation();
+  return <span className="text-muted-foreground">{t('common.none')}</span>;
+}
+
+/**
+ * The category tree (SPEC §5.2): any depth, a default БҮНА code per category (ADR-0015 #3). Rows
+ * show the tree with folders; a category with subcategories or products cannot be deleted.
+ */
 export function CategoriesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('catalog.products.manage');
@@ -105,38 +152,66 @@ export function CategoriesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tree.map(({ category, depth }) => (
-              <TableRow key={category.id}>
-                <TableCell style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}>
-                  {category.name}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {category.defaultClassificationCode ?? t('common.none')}
-                </TableCell>
-                <TableCell>
-                  {t('catalog.categories.products', { count: category.productCount })}
-                </TableCell>
-                {canManage ? (
-                  <TableCell className="flex flex-wrap justify-end gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditing({ parentId: category.id })}
+            {categories.isPending ? <SkeletonRows columns={canManage ? 4 : 3} /> : null}
+            {tree.map(({ category, depth }) => {
+              const Icon = category.childCount > 0 ? FolderOpen : Folder;
+              return (
+                <TableRow key={category.id}>
+                  <TableCell>
+                    <span
+                      className="flex items-center gap-2"
+                      style={{ paddingLeft: `${depth * 1.5}rem` }}
                     >
-                      {t('catalog.categories.addChild')}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditing({ category })}>
-                      {t('common.edit')}
-                    </Button>
-                    {category.childCount === 0 && category.productCount === 0 ? (
-                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(category)}>
-                        {t('common.delete')}
-                      </Button>
-                    ) : null}
+                      <Icon
+                        aria-hidden
+                        className={
+                          depth === 0
+                            ? 'size-4 shrink-0 text-primary'
+                            : 'size-4 shrink-0 text-muted-foreground'
+                        }
+                      />
+                      <span className={depth === 0 ? 'font-medium' : undefined}>
+                        {category.name}
+                      </span>
+                    </span>
                   </TableCell>
-                ) : null}
-              </TableRow>
-            ))}
+                  <TableCell>
+                    {category.defaultClassificationCode ? (
+                      <span className="font-mono">{category.defaultClassificationCode}</span>
+                    ) : (
+                      <None />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground tabular-nums">
+                    {t('catalog.categories.products', { count: category.productCount })}
+                  </TableCell>
+                  {canManage ? (
+                    <RowActions>
+                      <RowAction
+                        icon={FolderPlus}
+                        label={t('catalog.categories.addChild')}
+                        onClick={() => setEditing({ parentId: category.id })}
+                      />
+                      <RowAction
+                        icon={Pencil}
+                        label={t('common.edit')}
+                        onClick={() => setEditing({ category })}
+                      />
+                      {category.childCount === 0 && category.productCount === 0 ? (
+                        <RowAction
+                          icon={Trash2}
+                          label={t('common.delete')}
+                          destructive
+                          onClick={() => deletion.ask(category)}
+                        />
+                      ) : (
+                        <RowActionSpacer />
+                      )}
+                    </RowActions>
+                  ) : null}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         {categories.data?.length === 0 ? (
@@ -220,14 +295,15 @@ function CategoryDialog(props: {
           </DialogTitle>
         </DialogHeader>
         <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="category-name">{t('catalog.categories.name')}</Label>
+        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+          <FormField
+            label={t('catalog.categories.name')}
+            htmlFor="category-name"
+            error={errors.name?.message}
+          >
             <Input id="category-name" autoComplete="off" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="category-parent">{t('catalog.categories.parent')}</Label>
+          </FormField>
+          <FormField label={t('catalog.categories.parent')} htmlFor="category-parent">
             <NativeSelect id="category-parent" {...form.register('parentId')}>
               <option value="">{t('catalog.categories.root')}</option>
               {options.map((node) => (
@@ -236,23 +312,21 @@ function CategoryDialog(props: {
                 </option>
               ))}
             </NativeSelect>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="category-code">{t('catalog.categories.defaultCode')}</Label>
+          </FormField>
+          <FormField
+            label={t('catalog.categories.defaultCode')}
+            htmlFor="category-code"
+            error={errors.defaultClassificationCode?.message}
+          >
             <Input
               id="category-code"
               inputMode="numeric"
               autoComplete="off"
-              className="font-mono"
+              className="font-mono sm:w-44"
               {...form.register('defaultClassificationCode')}
             />
-            <FieldError message={errors.defaultClassificationCode?.message} />
-          </div>
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          </FormField>
+          <SaveFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>
       </DialogContent>
     </Dialog>
@@ -292,21 +366,41 @@ export function BrandsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {brands.isPending ? <SkeletonRows columns={canManage ? 3 : 2} /> : null}
             {(brands.data ?? []).map((brand) => (
               <TableRow key={brand.id}>
-                <TableCell>{brand.name}</TableCell>
-                <TableCell>{t('catalog.brands.products', { count: brand.productCount })}</TableCell>
+                <TableCell>
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      aria-hidden
+                      className="grid size-7 shrink-0 place-items-center rounded-lg bg-fill text-xs font-semibold text-muted-foreground"
+                    >
+                      {brand.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="font-medium">{brand.name}</span>
+                  </span>
+                </TableCell>
+                <TableCell className="text-muted-foreground tabular-nums">
+                  {t('catalog.brands.products', { count: brand.productCount })}
+                </TableCell>
                 {canManage ? (
-                  <TableCell className="flex flex-wrap justify-end gap-1">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(brand)}>
-                      {t('common.edit')}
-                    </Button>
+                  <RowActions>
+                    <RowAction
+                      icon={Pencil}
+                      label={t('common.edit')}
+                      onClick={() => setEditing(brand)}
+                    />
                     {brand.productCount === 0 ? (
-                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(brand)}>
-                        {t('common.delete')}
-                      </Button>
-                    ) : null}
-                  </TableCell>
+                      <RowAction
+                        icon={Trash2}
+                        label={t('common.delete')}
+                        destructive
+                        onClick={() => deletion.ask(brand)}
+                      />
+                    ) : (
+                      <RowActionSpacer />
+                    )}
+                  </RowActions>
                 ) : null}
               </TableRow>
             ))}
@@ -362,17 +456,15 @@ function BrandDialog({ brand, onClose }: { brand: Brand | 'new'; onClose: () => 
           </DialogTitle>
         </DialogHeader>
         <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="brand-name">{t('catalog.brands.name')}</Label>
+        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+          <FormField
+            label={t('catalog.brands.name')}
+            htmlFor="brand-name"
+            error={errors.name?.message}
+          >
             <Input id="brand-name" autoComplete="off" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          </FormField>
+          <SaveFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>
@@ -417,27 +509,49 @@ export function UomsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {uoms.isPending ? <SkeletonRows columns={canManage ? 5 : 4} /> : null}
             {(uoms.data ?? []).map((uom) => (
               <TableRow key={uom.id}>
-                <TableCell>{uom.name}</TableCell>
+                <TableCell className="font-medium">{uom.name}</TableCell>
                 <TableCell>
-                  <Badge variant={uom.code ? 'secondary' : 'outline'}>
+                  <Badge variant={uom.code ? 'secondary' : 'default'}>
                     {uom.code ? t('catalog.uoms.system') : t('catalog.uoms.custom')}
                   </Badge>
                 </TableCell>
-                <TableCell>{uom.fractional ? t('common.yes') : t('common.no')}</TableCell>
-                <TableCell>{uom.measureUnit ?? t('common.none')}</TableCell>
+                <TableCell>
+                  {uom.fractional ? (
+                    <>
+                      <Check aria-hidden className="size-4 text-success" />
+                      <span className="sr-only">{t('common.yes')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span aria-hidden className="text-muted-foreground">
+                        {t('common.none')}
+                      </span>
+                      <span className="sr-only">{t('common.no')}</span>
+                    </>
+                  )}
+                </TableCell>
+                <TableCell>{uom.measureUnit ?? <None />}</TableCell>
                 {canManage ? (
-                  <TableCell className="flex flex-wrap justify-end gap-1">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(uom)}>
-                      {t('common.edit')}
-                    </Button>
-                    {uom.code ? null : (
-                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(uom)}>
-                        {t('common.delete')}
-                      </Button>
+                  <RowActions>
+                    <RowAction
+                      icon={Pencil}
+                      label={t('common.edit')}
+                      onClick={() => setEditing(uom)}
+                    />
+                    {uom.code ? (
+                      <RowActionSpacer />
+                    ) : (
+                      <RowAction
+                        icon={Trash2}
+                        label={t('common.delete')}
+                        destructive
+                        onClick={() => deletion.ask(uom)}
+                      />
                     )}
-                  </TableCell>
+                  </RowActions>
                 ) : null}
               </TableRow>
             ))}
@@ -499,42 +613,38 @@ function UomDialog({ uom, onClose }: { uom: Uom | 'new'; onClose: () => void }) 
           <DialogTitle>{isNew ? t('catalog.uoms.create') : t('catalog.uoms.edit')}</DialogTitle>
         </DialogHeader>
         <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="uom-name">{t('catalog.uoms.name')}</Label>
+        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+          <FormField label={t('catalog.uoms.name')} htmlFor="uom-name" error={errors.name?.message}>
             <Input id="uom-name" autoComplete="off" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
+          </FormField>
           <Controller
             control={form.control}
             name="fractional"
             render={({ field }) => (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="uom-fractional"
-                    checked={field.value}
-                    disabled={!isNew}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                  <Label htmlFor="uom-fractional" className="font-normal">
-                    {t('catalog.uoms.fractional')}
-                  </Label>
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-border/90 px-3.5 py-3">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="uom-fractional">{t('catalog.uoms.fractional')}</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t('catalog.uoms.fractionalHint')}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">{t('catalog.uoms.fractionalHint')}</p>
+                <Switch
+                  id="uom-fractional"
+                  checked={field.value}
+                  disabled={!isNew}
+                  onCheckedChange={field.onChange}
+                />
               </div>
             )}
           />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="uom-measure">{t('catalog.uoms.measureUnit')}</Label>
+          <FormField
+            label={t('catalog.uoms.measureUnit')}
+            htmlFor="uom-measure"
+            error={errors.measureUnit?.message}
+          >
             <Input id="uom-measure" autoComplete="off" {...form.register('measureUnit')} />
-            <FieldError message={errors.measureUnit?.message} />
-          </div>
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          </FormField>
+          <SaveFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>

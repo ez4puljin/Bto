@@ -1,4 +1,4 @@
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '@/app/api-client-context';
@@ -18,6 +18,8 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
 /**
  * Product photos (ADR-0030): each file is scaled down in the browser to a photo and a thumbnail,
  * both uploaded through presigned URLs, then attached in one call. Phones offer the camera here.
+ * The photos form a square grid; «Үндсэн» sits on the primary one and the photo's own actions show
+ * on hover or focus (always on a touch screen).
  */
 export function ImagesCard({ product, canManage }: { product: ProductDetail; canManage: boolean }) {
   const { t } = useTranslation();
@@ -81,7 +83,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
             />
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={uploading}
               onClick={() => input.current?.click()}
             >
@@ -99,41 +101,56 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
         ) : null}
         <ProblemAlert problem={action.problem} />
         {product.images.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('catalog.images.empty')}</p>
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            <ImagePlus aria-hidden className="size-6 opacity-60" />
+            {t('catalog.images.empty')}
+          </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-3">
             {product.images.map((image) => (
-              <li key={image.id} className="flex flex-col gap-2 rounded-lg border p-2">
+              <li
+                key={image.id}
+                className="group/image relative overflow-hidden rounded-xl bg-fill ring-1 ring-black/[0.06]"
+              >
                 {image.url ? (
-                  <a href={image.url} target="_blank" rel="noreferrer">
+                  <a href={image.url} target="_blank" rel="noreferrer" className="block">
                     <img
                       src={image.thumbUrl ?? image.url}
                       alt={t('catalog.images.alt', { name: product.name })}
                       loading="lazy"
-                      className="aspect-square w-full rounded-md object-cover"
+                      className="aspect-square w-full object-cover transition-transform duration-200 group-hover/image:scale-[1.03]"
                     />
                   </a>
+                ) : (
+                  <div className="aspect-square" />
+                )}
+                {image.isPrimary ? (
+                  <Badge className="absolute top-1.5 left-1.5 bg-white/90 text-foreground shadow-sm backdrop-blur-sm">
+                    {t('catalog.images.primary')}
+                  </Badge>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-1">
-                  {image.isPrimary ? (
-                    <Badge variant="secondary">{t('catalog.images.primary')}</Badge>
-                  ) : canManage ? (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() =>
-                        void action.run(() => mutations.primaryImage.mutateAsync(image.id))
-                      }
-                    >
-                      {t('catalog.images.makePrimary')}
-                    </Button>
-                  ) : null}
-                  {canManage ? (
+                {canManage ? (
+                  <div className="absolute right-1.5 bottom-1.5 flex gap-1 transition-opacity pointer-fine:opacity-0 pointer-fine:group-focus-within/image:opacity-100 pointer-fine:group-hover/image:opacity-100">
+                    {image.isPrimary ? null : (
+                      <Button
+                        size="icon-xs"
+                        variant="secondary"
+                        className="bg-white/90 shadow-sm backdrop-blur-sm"
+                        aria-label={t('catalog.images.makePrimary')}
+                        title={t('catalog.images.makePrimary')}
+                        onClick={() =>
+                          void action.run(() => mutations.primaryImage.mutateAsync(image.id))
+                        }
+                      >
+                        <Star />
+                      </Button>
+                    )}
                     <Button
                       size="icon-xs"
-                      variant="ghost"
-                      className="ml-auto"
+                      variant="secondary"
+                      className="bg-white/90 text-destructive shadow-sm backdrop-blur-sm"
                       aria-label={t('catalog.images.delete')}
+                      title={t('catalog.images.delete')}
                       onClick={() => {
                         deleteAction.clear();
                         setDeleting(image);
@@ -141,8 +158,8 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
                     >
                       <Trash2 />
                     </Button>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -201,6 +201,47 @@ export function ChevronHead() {
   return <TableHead aria-hidden className="w-9 pl-0" />;
 }
 
+/**
+ * The actions cell at the end of a row of a list without its own record pages (categories, brands,
+ * units of measure): quiet icon buttons, each named for screen readers and shown as a tooltip.
+ */
+export function RowActions({ children }: { children: ReactNode }) {
+  return (
+    <TableCell className="w-px py-1 whitespace-nowrap">
+      <div className="flex justify-end gap-0.5">{children}</div>
+    </TableCell>
+  );
+}
+
+export function RowAction(props: {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  const Icon = props.icon;
+  return (
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      className={cn(
+        'text-muted-foreground hover:text-foreground',
+        props.destructive && 'hover:bg-danger-soft hover:text-destructive',
+      )}
+      aria-label={props.label}
+      title={props.label}
+      onClick={props.onClick}
+    >
+      <Icon />
+    </Button>
+  );
+}
+
+/** Keeps a missing action's place, so each action stays in its own column down the list. */
+export function RowActionSpacer() {
+  return <span aria-hidden className="inline-block size-8" />;
+}
+
 /** What an empty list says, with the action that fills it when there is one. */
 export function EmptyState(props: { title: string; icon?: LucideIcon; action?: ReactNode }) {
   const Icon = props.icon ?? Inbox;

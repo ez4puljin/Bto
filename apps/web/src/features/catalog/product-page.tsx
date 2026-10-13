@@ -1,4 +1,4 @@
-import { Boxes, History } from 'lucide-react';
+import { Boxes, History, Package } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
@@ -8,14 +8,12 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { ProductLocationCard } from '@/features/inventory/product-location-card';
 import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card';
 import { ProductPricesCard } from '@/features/pricing/product-prices-card';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import {
-  type Brand,
   type ProductDetail,
   useBrands,
   useCatalogMutations,
@@ -56,6 +54,8 @@ export function ProductPage() {
   const loadedUoms = uoms.data;
   const loadedCategories = categories.data;
   const loadedBrands = brands.data;
+  const categoryPath = paths.get(detail.categoryId);
+  const brandName = loadedBrands.find((brand) => brand.id === detail.brandId)?.name;
 
   const save = async (values: ProductFormValues, close: () => void) => {
     try {
@@ -72,9 +72,25 @@ export function ProductPage() {
     <div>
       <PageHeader
         title={detail.name}
+        media={<ProductThumb detail={detail} />}
         meta={
           <>
             <span className="font-mono">{detail.sku}</span>
+            {(
+              [
+                ['category', categoryPath],
+                ['brand', brandName],
+              ] as const
+            ).map(([key, part]) =>
+              part ? (
+                <span key={key} className="flex items-center gap-2">
+                  <span aria-hidden className="opacity-50">
+                    {'·'}
+                  </span>
+                  {part}
+                </span>
+              ) : null,
+            )}
             <Badge variant={detail.status === 'ACTIVE' ? 'success' : 'secondary'}>
               {t(`catalog.products.status.${detail.status}`)}
             </Badge>
@@ -103,11 +119,7 @@ export function ProductPage() {
             title={t('catalog.product.info')}
             canEdit={canManage}
             view={
-              <ProductFacts
-                detail={detail}
-                categoryPath={paths.get(detail.categoryId)}
-                brands={loadedBrands}
-              />
+              <ProductFacts detail={detail} categoryPath={categoryPath} brandName={brandName} />
             }
             edit={(close) => (
               <ProductForm
@@ -139,14 +151,14 @@ export function ProductPage() {
 function ProductFacts(props: {
   detail: ProductDetail;
   categoryPath: string | undefined;
-  brands: readonly Brand[];
+  brandName: string | undefined;
 }) {
   const { t } = useTranslation();
   const { detail } = props;
-  const brand = props.brands.find((item) => item.id === detail.brandId);
   return (
     <div className="flex flex-col gap-5">
       <FieldList
+        title={t('catalog.product.sectionGeneral')}
         items={[
           {
             label: t('catalog.product.sku'),
@@ -154,7 +166,7 @@ function ProductFacts(props: {
           },
           { label: t('catalog.product.name'), value: detail.name },
           { label: t('catalog.product.category'), value: props.categoryPath },
-          { label: t('catalog.product.brand'), value: brand?.name },
+          { label: t('catalog.product.brand'), value: props.brandName },
           {
             label: t('catalog.product.weight'),
             value: detail.weightKg ? <span className="font-mono">{detail.weightKg}</span> : null,
@@ -165,34 +177,49 @@ function ProductFacts(props: {
           },
         ]}
       />
-      <Separator />
-      <div className="flex flex-col gap-3">
-        <p className="text-[13px] font-semibold">{t('catalog.product.ebarimt')}</p>
-        <FieldList
-          items={[
-            {
-              label: t('catalog.product.vatType'),
-              value: t(`catalog.product.vatTypes.${detail.vatType}`),
-            },
-            {
-              label: t('catalog.product.cityTax'),
-              value: t(`catalog.product.cityTaxValues.${cityTaxChoice(detail.cityTax)}`),
-            },
-            {
-              label: t('catalog.product.classificationCode'),
-              value: detail.classificationCode ? (
-                <span className="font-mono">{detail.classificationCode}</span>
-              ) : null,
-            },
-            {
-              label: t('catalog.product.taxProductCode'),
-              value: detail.taxProductCode ? (
-                <span className="font-mono">{detail.taxProductCode}</span>
-              ) : null,
-            },
-          ]}
-        />
-      </div>
+      <FieldList
+        title={t('catalog.product.ebarimt')}
+        items={[
+          {
+            label: t('catalog.product.vatType'),
+            value: t(`catalog.product.vatTypes.${detail.vatType}`),
+          },
+          {
+            label: t('catalog.product.cityTax'),
+            value: t(`catalog.product.cityTaxValues.${cityTaxChoice(detail.cityTax)}`),
+          },
+          {
+            label: t('catalog.product.classificationCode'),
+            value: detail.classificationCode ? (
+              <span className="font-mono">{detail.classificationCode}</span>
+            ) : null,
+          },
+          {
+            label: t('catalog.product.taxProductCode'),
+            value: detail.taxProductCode ? (
+              <span className="font-mono">{detail.taxProductCode}</span>
+            ) : null,
+          },
+        ]}
+      />
     </div>
+  );
+}
+
+/** The product's primary photo beside its name, or a quiet placeholder. */
+function ProductThumb({ detail }: { detail: ProductDetail }) {
+  const { t } = useTranslation();
+  const primary = detail.images.find((image) => image.isPrimary) ?? detail.images[0];
+  const src = primary?.thumbUrl ?? primary?.url;
+  return src ? (
+    <img
+      src={src}
+      alt={t('catalog.images.alt', { name: detail.name })}
+      className="size-14 rounded-xl object-cover shadow-card ring-1 ring-black/[0.06]"
+    />
+  ) : (
+    <span className="grid size-14 place-items-center rounded-xl bg-fill text-muted-foreground">
+      <Package aria-hidden className="size-6" />
+    </span>
   );
 }

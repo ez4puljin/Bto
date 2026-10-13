@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { z } from 'zod';
-import { FieldError } from '@/components/field-error';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -22,9 +22,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -34,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { cn } from '@/lib/utils';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -76,20 +76,15 @@ export function ReadinessPage() {
       <PageHeader title={t('catalog.readiness.title')} meta={t('catalog.readiness.hint')} />
       <ProblemAlert problem={problemFromError(report.error ?? products.error)} />
       {report.data ? (
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Card size="sm">
-            <CardHeader>
-              <CardDescription>{t('catalog.readiness.active')}</CardDescription>
-              <CardTitle className="text-2xl">{report.data.activeProducts}</CardTitle>
-            </CardHeader>
-          </Card>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <Kpi label={t('catalog.readiness.active')} value={report.data.activeProducts} />
           {GAPS.map((item) => (
-            <Card key={item} size="sm">
-              <CardHeader>
-                <CardDescription>{t(`catalog.readiness.gaps.${item}`)}</CardDescription>
-                <CardTitle className="text-2xl">{report.data.missing[item]}</CardTitle>
-              </CardHeader>
-            </Card>
+            <Kpi
+              key={item}
+              label={t(`catalog.readiness.gaps.${item}`)}
+              value={report.data.missing[item]}
+              tone={report.data.missing[item] === 0 ? 'good' : 'warn'}
+            />
           ))}
         </div>
       ) : null}
@@ -169,6 +164,35 @@ export function ReadinessPage() {
         ) : null}
         <LoadMore query={products} />
       </ListCard>
+    </div>
+  );
+}
+
+/** A number tile: green with «Бүрэн» at zero, amber while products still miss the attribute. */
+function Kpi(props: { label: string; value: number; tone?: 'good' | 'warn' }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-1 rounded-xl bg-card p-4 shadow-card ring-1 ring-black/[0.06]">
+      <span className="flex items-start gap-1.5 text-[13px] leading-snug text-muted-foreground">
+        {props.tone === 'good' ? (
+          <CircleCheck aria-hidden className="mt-px size-3.5 shrink-0 text-success" />
+        ) : null}
+        {props.tone === 'warn' ? (
+          <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0 text-warning" />
+        ) : null}
+        {props.label}
+      </span>
+      <span
+        className={cn(
+          'text-2xl font-semibold tracking-tight tabular-nums',
+          props.tone === 'warn' && 'text-warning',
+        )}
+      >
+        {props.value}
+      </span>
+      {props.tone === 'good' ? (
+        <span className="text-xs text-success">{t('catalog.readiness.complete')}</span>
+      ) : null}
     </div>
   );
 }
@@ -271,15 +295,18 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
       </CardHeader>
       <CardContent>
         <form
-          className="flex flex-col gap-3"
+          className="flex flex-col gap-4"
           noValidate
           onChange={() => setPreview(null)}
           onSubmit={(event) => void count(event)}
         >
           <ProblemAlert problem={action.problem} />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="assign-category">{t('catalog.readiness.category')}</Label>
+          <FormSection>
+            <FormRow
+              label={t('catalog.readiness.category')}
+              htmlFor="assign-category"
+              error={errors.categoryId?.message}
+            >
               <NativeSelect id="assign-category" {...categoryField}>
                 <option value="">{t('catalog.product.chooseCategory')}</option>
                 {tree.map((node) => (
@@ -288,74 +315,63 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
                   </option>
                 ))}
               </NativeSelect>
-              <FieldError message={errors.categoryId?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="assign-classification">
-                {t('catalog.product.classificationCode')}
-              </Label>
+            </FormRow>
+            <FormRow
+              label={t('catalog.readiness.includeSubcategories')}
+              htmlFor="assign-subcategories"
+              align="center"
+            >
+              <Controller
+                control={form.control}
+                name="includeSubcategories"
+                render={({ field }) => (
+                  <Switch
+                    id="assign-subcategories"
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      setPreview(null);
+                      field.onChange(checked);
+                    }}
+                  />
+                )}
+              />
+            </FormRow>
+            <FormRow
+              label={t('catalog.product.classificationCode')}
+              htmlFor="assign-classification"
+              error={errors.classificationCode?.message}
+            >
               <Input
                 id="assign-classification"
                 inputMode="numeric"
                 autoComplete="off"
-                className="font-mono"
+                className="font-mono sm:w-44"
                 {...form.register('classificationCode')}
               />
-              <FieldError message={errors.classificationCode?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="assign-tax-code">{t('catalog.product.taxProductCode')}</Label>
+            </FormRow>
+            <FormRow
+              label={t('catalog.product.taxProductCode')}
+              htmlFor="assign-tax-code"
+              error={errors.taxProductCode?.message}
+            >
               <Input
                 id="assign-tax-code"
                 inputMode="numeric"
                 autoComplete="off"
-                className="font-mono"
+                className="font-mono sm:w-28"
                 {...form.register('taxProductCode')}
               />
-              <FieldError message={errors.taxProductCode?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="assign-city-tax">{t('catalog.product.cityTax')}</Label>
-              <NativeSelect id="assign-city-tax" {...form.register('cityTax')}>
+            </FormRow>
+            <FormRow label={t('catalog.product.cityTax')} htmlFor="assign-city-tax">
+              <NativeSelect id="assign-city-tax" className="sm:w-56" {...form.register('cityTax')}>
                 <option value="keep">{t('catalog.readiness.keep')}</option>
                 <option value="yes">{t('catalog.product.cityTaxValues.yes')}</option>
                 <option value="no">{t('catalog.product.cityTaxValues.no')}</option>
               </NativeSelect>
-            </div>
-          </div>
-          <Controller
-            control={form.control}
-            name="includeSubcategories"
-            render={({ field }) => (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="assign-subcategories"
-                  checked={field.value}
-                  onCheckedChange={(checked) => {
-                    setPreview(null);
-                    field.onChange(checked === true);
-                  }}
-                />
-                <Label htmlFor="assign-subcategories" className="font-normal">
-                  {t('catalog.readiness.includeSubcategories')}
-                </Label>
-              </div>
-            )}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="outline" disabled={isSubmitting}>
-              {t('catalog.readiness.count')}
-            </Button>
-            <Button
-              type="button"
-              disabled={!preview || mutations.assign.isPending}
-              onClick={() => void apply()}
-            >
-              {t('catalog.readiness.apply')}
-            </Button>
-          </div>
+            </FormRow>
+          </FormSection>
           {preview ? (
-            <p role="status" className="text-sm">
+            <p role="status" className="px-1 text-sm">
               {t('catalog.readiness.preview', preview.counts)}
             </p>
           ) : null}
@@ -368,6 +384,18 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
               </AlertDescription>
             </Alert>
           ) : null}
+          <FormFooter>
+            <Button type="submit" variant="secondary" disabled={isSubmitting}>
+              {t('catalog.readiness.count')}
+            </Button>
+            <Button
+              type="button"
+              disabled={!preview || mutations.assign.isPending}
+              onClick={() => void apply()}
+            >
+              {t('catalog.readiness.apply')}
+            </Button>
+          </FormFooter>
         </form>
       </CardContent>
     </Card>
