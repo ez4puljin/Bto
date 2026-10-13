@@ -33,6 +33,7 @@ import {
   DiscountProgramEditPage,
 } from '@/features/pricing/discount-form';
 import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/discount-pages';
+import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -76,6 +77,15 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'catalog/products/:id', element: <ProductPage /> },
+          {
+            path: 'catalog/pending',
+            element: (
+              <RequirePermission permission="pricing.prices.manage">
+                <PendingProductsPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
           { path: 'catalog/categories', element: <CategoriesPage /> },
           { path: 'catalog/uoms', element: <UomsPage /> },
           { path: 'catalog/scan', element: <BarcodeLookupPage /> },

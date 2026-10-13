@@ -422,3 +422,111 @@ describe('price calculator', () => {
     });
   });
 });
+
+describe('products waiting for their prices', () => {
+  const waiting = (id: number, sku: string, name: string): Schemas['ProductListItem'] => ({
+    ...COLA_ROW,
+    id,
+    sku,
+    name,
+    saleReadyAt: null,
+  });
+  const ROWS = [waiting(7, '10023', 'Кока кола'), waiting(8, '10024', 'Цай')];
+  /** Cola has its wholesale prices and no supermarket price yet. */
+  const missingRetail = PRICES;
+
+  it('lists the waiting products, completes one from its prices and refuses one without them', async () => {
+    let completions = 0;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/products': (request) => {
+        const query = new URL(request.url).searchParams;
+        expect([query.get('saleReady'), query.get('status')]).toEqual(['false', 'ACTIVE']);
+        return list(ROWS);
+      },
+      'GET /api/v1/unit-prices/current': () =>
+        json([{ productId: 7, list: 'WHOLESALE', productUnitId: 70, price: '1000' }]),
+      'GET /api/v1/unit-prices': () => json(missingRetail),
+      'POST /api/v1/unit-prices': () =>
+        json({
+          ...missingRetail,
+          retail: [
+            priceView(70, 'ш', '1', {
+              price: '1200',
+              source: 'UNIT',
+              period: { id: 5, price: '1200', validFrom: TODAY, validTo: null },
+            }),
+            priceView(72, 'хайрцаг', '24', { price: '28800', source: 'DERIVED', period: null }),
+          ],
+        }),
+      'POST /api/v1/pricing/sale-ready': () => {
+        completions += 1;
+        return completions === 1
+          ? json({ completed: [7], alreadyComplete: [] })
+          : json(
+              {
+                type: 'https://tugeel.local/errors/PRICE_MISSING',
+                title: 'PRICE_MISSING',
+                status: 409,
+                code: 'PRICE_MISSING',
+                params: { count: 1 },
+                errors: [{ path: 'productIds.0', constraint: 'price', message: '10024' }],
+              },
+              409,
+            );
+      },
+    });
+    renderApp('/catalog/pending', fetchMock);
+    const user = userEvent.setup();
+
+    expect(
+      await screen.findByRole('heading', { name: mn.pricing.pending.title }),
+    ).toBeInTheDocument();
+    expect(
+      within(await findSidebar()).getByRole('link', { name: mn.nav.pendingProducts }),
+    ).toBeInTheDocument();
+    const cola = (await screen.findByText('Кока кола')).closest('tr');
+    if (!cola) throw new Error('no row');
+    expect(within(cola).getByText('1,000₮')).toBeInTheDocument();
+    expect(within(cola).getByText(mn.pricing.card.none)).toBeInTheDocument();
+
+    // The price dialog starts today and saves the supermarket price before completing.
+    await user.click(screen.getByRole('button', { name: 'Үнэ оруулах: 10023' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(`Өнөөдрөөс (${TODAY}) эхэлнэ`)).toBeInTheDocument();
+    await user.type(await within(dialog).findByLabelText(`${mn.pricing.lists.RETAIL}: ш`), '1200');
+    await user.click(within(dialog).getByRole('button', { name: mn.pricing.saleReady.complete }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.pricing.saleReady.completed);
+    const [saved] = calls(fetchMock, 'POST', '/api/v1/unit-prices');
+    expect(await saved?.clone().json()).toEqual({
+      productId: 7,
+      validFrom: TODAY,
+      entries: [{ list: 'RETAIL', productUnitId: 70, price: '1200' }],
+    });
+    const [completed] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
+    expect(await completed?.clone().json()).toEqual({ productIds: [7] });
+    expect(completed?.headers.get('Idempotency-Key')).toMatch(UUID);
+
+    // The ticked rows complete at once; a product without both prices is named.
+    const bulk = screen.getByRole('button', { name: mn.pricing.saleReady.complete });
+    expect(bulk).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: '10024 сонгох' }));
+    await user.click(screen.getByRole('button', { name: 'Сонгосон 1 барааг бүрэн болгох' }));
+    expect(
+      await screen.findByText(mn.pricing.pending.missing.replace('{{skus}}', '10024')),
+    ).toBeInTheDocument();
+    const [, refused] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
+    expect(await refused?.clone().json()).toEqual({ productIds: [8] });
+  }, 15_000);
+
+  it('keeps the list from a user who does not enter prices', async () => {
+    const fetchMock = signedIn(WORKER_ME, MASTERS);
+    renderApp('/catalog/pending', fetchMock);
+    expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
+    expect(
+      within(await findSidebar()).queryByRole('link', { name: mn.nav.pendingProducts }),
+    ).toBeNull();
+    expect(calls(fetchMock, 'GET', '/api/v1/products')).toHaveLength(0);
+  });
+});

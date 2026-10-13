@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   FolderTree,
   History,
+  Hourglass,
   LayoutGrid,
   type LucideIcon,
   Move,
@@ -55,13 +56,20 @@ export interface NavGroup {
  * are read by every user (without costs); transfers, moves, adjustments, stocktakes and shelves only
  * by the people who make them (every user may still open a transfer or a stocktake by its link).
  * Discount programs and the price calculator are read by every user; pricing.manage changes them
- * (ADR-0041).
+ * (ADR-0041). The products waiting for their prices are the price clerk's list
+ * (pricing.prices.manage, ADR-0044).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.catalog',
     items: [
       { to: '/catalog/products', label: 'nav.products', icon: Package },
+      {
+        to: '/catalog/pending',
+        label: 'nav.pendingProducts',
+        icon: Hourglass,
+        permission: 'pricing.prices.manage',
+      },
       { to: '/catalog/categories', label: 'nav.categories', icon: FolderTree },
       { to: '/catalog/uoms', label: 'nav.uoms', icon: Ruler },
       { to: '/catalog/scan', label: 'nav.scan', icon: ScanBarcode },
