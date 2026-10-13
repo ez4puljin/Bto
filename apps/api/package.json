@@ -43,6 +43,7 @@
     "drizzle-orm": "0.45.4",
     "exceljs": "4.4.0",
     "helmet": "8.3.0",
+    "libpg-query": "18.1.5",
     "nestjs-pino": "5.3.1",
     "pg": "8.23.1",
     "pg-boss": "12.37.1",

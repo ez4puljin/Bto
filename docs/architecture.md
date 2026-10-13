@@ -18,7 +18,7 @@ Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: ca
 
 ### 0.1 Version pins
 
-Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision; exact versions were confirmed on 2026-10-10 and are recorded in the `CLAUDE.md` pin table (Vite 8.3.4, React Router 7.18.4, pg-boss 12.37.1, decimal.js 10.6.0, i18next 26.4.2, nestjs-pino 5.3.1, openapi-typescript 7.13.0 / openapi-fetch 0.17.0; argon2 0.45.1 was pinned with identity; pdfmake, ExcelJS, throttler and receipt-printer-encoder are pinned when first installed; TanStack Table is not used in delivery 1 (§2); the web camera fallback is `barcode-detector` 3.2.2 with `zxing-wasm` 3.1.3, ADR-0031; the AI assistant's SQL guard uses `libpg-query` 18.1.5 with `@pgsql/types` 18.0.0, ADR-0045). Never upgrade a major inside a delivery session (§12).
+Left column: verified against primary sources on 2026-10-09. Right column: pinned by decision; exact versions were confirmed on 2026-10-10 and are recorded in the `CLAUDE.md` pin table (Vite 8.3.4, React Router 7.18.4, pg-boss 12.37.1, decimal.js 10.6.0, i18next 26.4.2, nestjs-pino 5.3.1, openapi-typescript 7.13.0 / openapi-fetch 0.17.0; argon2 0.45.1 was pinned with identity; pdfmake, ExcelJS, throttler and receipt-printer-encoder are pinned when first installed; TanStack Table is not used in delivery 1 (§2); the web camera fallback is `barcode-detector` 3.2.2 with `zxing-wasm` 3.1.3, ADR-0031; the AI assistant's SQL guard uses `libpg-query` 18.1.5, whose `@pgsql/types` resolves to 18.0.0, ADR-0045). Never upgrade a major inside a delivery session (§12).
 
 | Verified pins (source-backed) | Pins to confirm on day 1 (`npm view`) |
 |---|---|
@@ -35,7 +35,7 @@ Left column: verified against primary sources on 2026-10-09. Right column: pinne
 | **TanStack Query 5.104.x** (5.104.1, 2026-10-02; no React v6). | **@nestjs/throttler** |
 | **shadcn/ui CLI 4.21.x**; Base UI became the default base in July 2026, Radix remains supported: `npx shadcn init -b radix` (decided; no revisit). Tailwind 4 baseline. | **openapi-typescript** + **openapi-fetch** |
 | **DO Managed PostgreSQL**: Standard 1 GiB $15.15, 2 GiB $30.45, 4 GiB $60.90; from 2026-10-15 (new accounts) / 2026-11-30 (all) Standard clusters cap at 4 GiB and cannot add standby nodes. Droplet 4 GiB / 2 vCPU $24. | **@point-of-sale/receipt-printer-encoder** (raster path) |
-| **libpg-query 18.1.5** (2026-09-17): the PostgreSQL 18 parser compiled to WebAssembly, no install scripts; its `@pgsql/types` 18.0.0 is pinned directly. The AI assistant parses every model-written query with it (ADR-0045). | **LLM providers**: no SDK; the model names live in env (`LLM_MODEL`), never in code |
+| **libpg-query 18.1.5** (2026-09-17): the PostgreSQL 18 parser compiled to WebAssembly, no install scripts; parse-tree types are imported from it (its `@pgsql/types` dependency resolves to 18.0.0, the only 18.x). The AI assistant parses every model-written query with it (ADR-0045). | **LLM providers**: no SDK; the model names live in env (`LLM_MODEL`), never in code |
 | **EAS**: Free = 15+15 builds/month, EAS Update 1,000 MAU hard cap; Starter $19/mo (3,000 MAU, $0.005 per extra MAU). Budget Starter from the customer-app launch. | **barcode-detector** 3.2.2 with self-hosted `zxing-wasm` 3.1.3 (web camera fallback when `BarcodeDetector` is absent; ADR-0031) |
 
 ---
