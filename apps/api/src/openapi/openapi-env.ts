@@ -10,5 +10,10 @@ process.env.AUTH_PEPPER ??= 'openapi-export-placeholder-0123456789abcdef';
 // Never written: the export builds the module graph only.
 process.env.STORAGE_DRIVER = 'local';
 process.env.STORAGE_LOCAL_DIR ??= 'openapi-export-storage';
+// The AI assistant's settings do not change the document (ADR-0045); CI sets AI_DATABASE_URL for
+// the tests without the api's AI_POOL_MAX, so the export runs with the assistant off.
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith('LLM_') || key.startsWith('AI_')) delete process.env[key];
+}
 
 export {};
