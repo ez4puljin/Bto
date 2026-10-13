@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useBarcodeLookup } from '@/features/catalog/api';
-import { type SupplierSummary, useSuppliers } from '@/features/partners/api';
+import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
@@ -215,7 +215,7 @@ export function ReceiptCreatePage() {
   const action = useAction();
   const [key] = useState(randomUuid);
   const [warehouseId, setWarehouseId] = useState<number | undefined>();
-  const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
+  const [supplier, setSupplier] = useState<PickedSupplier | null>(null);
   const [docNo, setDocNo] = useState('');
   const [docDate, setDocDate] = useState('');
   const [note, setNote] = useState('');
@@ -251,7 +251,10 @@ export function ReceiptCreatePage() {
             />
             <p className="text-xs text-muted-foreground">{t('inventory.receipt.wholesaleOnly')}</p>
           </div>
-          <SupplierPicker value={supplier} onChange={setSupplier} />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="receipt-supplier">{t('inventory.receipts.supplier')}</Label>
+            <SupplierPicker id="receipt-supplier" value={supplier} onChange={setSupplier} />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="receipt-doc-no">{t('inventory.receipt.supplierDocNo')}</Label>
@@ -290,59 +293,6 @@ export function ReceiptCreatePage() {
           </Button>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function SupplierPicker(props: {
-  value: SupplierSummary | null;
-  onChange: (supplier: SupplierSummary | null) => void;
-}) {
-  const { t } = useTranslation();
-  const [search, setSearch] = useState('');
-  const q = useDeferredValue(search.trim());
-  const suppliers = useSuppliers({ q, status: 'ACTIVE' });
-  const rows = (suppliers.data?.pages[0]?.data ?? []).slice(0, 8);
-
-  if (props.value) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Label>{t('inventory.receipts.supplier')}</Label>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-muted-foreground">{props.value.code}</span>
-          <span className="font-medium">{props.value.name}</span>
-          <Button size="xs" variant="ghost" onClick={() => props.onChange(null)}>
-            {t('inventory.receipt.supplierChange')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor="receipt-supplier">{t('inventory.receipts.supplier')}</Label>
-      <Input
-        id="receipt-supplier"
-        type="search"
-        placeholder={t('inventory.receipt.supplierSearch')}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-      <ProblemAlert problem={problemFromError(suppliers.error)} />
-      <ul className="flex flex-col divide-y rounded-md border">
-        {rows.map((supplier) => (
-          <li key={supplier.id}>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
-              onClick={() => props.onChange(supplier)}
-            >
-              <span className="font-mono text-muted-foreground">{supplier.code}</span>
-              <span>{supplier.name}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

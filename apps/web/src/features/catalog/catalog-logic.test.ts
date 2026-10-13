@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Uom } from './api';
 import { categoryPaths, categoryTree, subtreeIds } from './category-tree';
-import { createBody, emptyProduct, productSchema } from './product-schema';
+import { type PendingPhoto, photosMessage } from './photo-uploads';
+import { productSchema } from './product-schema';
+import { emptyRegistration, registrationBody, registrationSchema } from './registration-schema';
 
 const category = (id: number, name: string, parentId: number | null = null): Category => ({
   id,
@@ -22,6 +24,7 @@ const CATEGORIES = [
 ];
 const UOMS: Uom[] = [
   { id: 1, code: 'PCS', name: 'ш', fractional: false, measureUnit: null },
+  { id: 2, code: 'BLOCK', name: 'блок', fractional: false, measureUnit: null },
   { id: 3, code: 'BOX', name: 'хайрцаг', fractional: false, measureUnit: null },
   { id: 4, code: 'KG', name: 'кг', fractional: true, measureUnit: null },
 ];
@@ -44,81 +47,127 @@ describe('category tree', () => {
   });
 });
 
-describe('product form schema', () => {
-  const valid = {
-    ...emptyProduct('10024', '1'),
-    name: 'Кока кола 0.5 л',
+describe('registration form schema', () => {
+  const sticky = {
     categoryId: '3',
-    units: [
-      {
-        uomId: '3',
-        factorToBase: '24',
-        isDefaultSales: true,
-        isDefaultPurchase: true,
-        barcodes: [],
-      },
-    ],
+    supplier: { id: 9, code: 'S0009', name: 'МСМ ХХК' },
+    homeWarehouseId: '2',
+    baseUomId: '1',
   };
-  const messages = (values: unknown, mode: 'create' | 'edit' = 'create') => {
-    const result = productSchema(mode, UOMS).safeParse(values);
+  const valid = {
+    ...emptyRegistration(sticky),
+    sku: '10024',
+    name: 'Кока кола 0.5 л',
+    boxFactor: '24',
+    baseBarcodes: ['4870001000011'],
+    units: [{ uomId: '2', factorToBase: '6', barcodes: [] }],
+    fixedBinCode: 'A-01-03',
+  };
+  const messages = (values: unknown) => {
+    const result = registrationSchema(UOMS).safeParse(values);
     return result.success
       ? []
       : result.error.issues.map((issue) => [issue.path.join('.'), issue.message]);
   };
+  const photo = (key: string, status: PendingPhoto['status'], ids: [number, number] | null) => ({
+    key,
+    preview: `blob:${key}`,
+    status,
+    files: ids ? { imageFileId: ids[0], thumbFileId: ids[1] } : null,
+  });
 
-  it('accepts a product with a box unit and maps it to the API body', () => {
+  it('accepts a registration and maps it to the API body with the uploaded photos', () => {
     expect(messages(valid)).toEqual([]);
-    expect(createBody(valid)).toEqual({
+    const photos = [
+      photo('a', 'ready', [11, 12]),
+      photo('b', 'failed', null),
+      photo('c', 'ready', [13, 14]),
+    ];
+    expect(registrationBody(valid, photos)).toEqual({
       sku: '10024',
       name: 'Кока кола 0.5 л',
       categoryId: 3,
-      vatType: 'VAT_ABLE',
-      cityTax: null,
-      classificationCode: null,
-      taxProductCode: null,
-      weightKg: null,
       baseUomId: 1,
-      baseBarcodes: [],
-      units: [
-        {
-          uomId: 3,
-          factorToBase: '24',
-          isDefaultSales: true,
-          isDefaultPurchase: true,
-          barcodes: [],
-        },
+      weightKg: null,
+      baseBarcodes: ['4870001000011'],
+      boxFactor: '24',
+      boxBarcodes: [],
+      units: [{ uomId: 2, factorToBase: '6', barcodes: [] }],
+      supplierId: 9,
+      homeWarehouseId: 2,
+      fixedBinCode: 'A-01-03',
+      images: [
+        { imageFileId: 11, thumbFileId: 12 },
+        { imageFileId: 13, thumbFileId: 14 },
       ],
     });
+    expect(registrationBody({ ...valid, fixedBinCode: '' }, photos).fixedBinCode).toBeNull();
   });
 
   it('wants whole factors for piece products and allows grams for kilogram products', () => {
-    const half = { ...valid, units: [{ ...valid.units[0], factorToBase: '2.5' }] };
-    expect(messages(half)).toEqual([['units.0.factorToBase', 'validation.factor']]);
-    expect(messages({ ...half, baseUomId: '4' })).toEqual([]);
+    expect(messages({ ...valid, boxFactor: '2.5' })).toEqual([['boxFactor', 'validation.factor']]);
+    expect(messages({ ...valid, boxFactor: '2.5', baseUomId: '4' })).toEqual([]);
     const grams = {
-      ...half,
+      ...valid,
       baseUomId: '4',
-      units: [{ ...valid.units[0], factorToBase: '0.0005' }],
+      units: [{ uomId: '2', factorToBase: '0.0005', barcodes: [] }],
     };
     expect(messages(grams)).toEqual([['units.0.factorToBase', 'validation.factor']]);
-    const garbage = { ...valid, units: [{ ...valid.units[0], factorToBase: 'abc' }] };
-    expect(messages(garbage)).toEqual([['units.0.factorToBase', 'validation.factor']]);
+    expect(messages({ ...valid, boxFactor: '' })).toEqual([['boxFactor', 'validation.factor']]);
   });
 
-  it('refuses a unit of measure twice, bad codes and a zero weight', () => {
-    expect(messages({ ...valid, units: [{ ...valid.units[0], uomId: '1' }] })).toEqual([
-      ['units.0.uomId', 'validation.unitRepeated'],
+  it('needs a category, a supplier and a home, and refuses a unit twice and a zero weight', () => {
+    expect(
+      messages({ ...valid, categoryId: '', supplier: null, homeWarehouseId: '' }).sort(),
+    ).toEqual([
+      ['categoryId', 'validation.required'],
+      ['homeWarehouseId', 'validation.required'],
+      ['supplier', 'validation.required'],
     ]);
     expect(
-      messages({ ...valid, sku: 'A1', classificationCode: '123', weightKg: '0' }).sort(),
-    ).toEqual([
-      ['classificationCode', 'validation.classificationCode'],
+      messages({ ...valid, units: [{ uomId: '1', factorToBase: '6', barcodes: [] }] }),
+    ).toEqual([['units.0.uomId', 'validation.unitRepeated']]);
+    expect(messages({ ...valid, sku: 'A1', weightKg: '0' }).sort()).toEqual([
       ['sku', 'validation.sku'],
       ['weightKg', 'validation.weight'],
     ]);
   });
 
-  it('ignores the unit fields when editing', () => {
-    expect(messages({ ...valid, baseUomId: '', units: [] }, 'edit')).toEqual([]);
+  it('keeps the category, supplier, home and base unit for the next product', () => {
+    expect(emptyRegistration(sticky)).toEqual({
+      ...sticky,
+      sku: '',
+      name: '',
+      boxFactor: '',
+      weightKg: '',
+      baseBarcodes: [],
+      boxBarcodes: [],
+      units: [],
+      fixedBinCode: '',
+    });
+  });
+
+  it('wants one uploaded photo and every upload finished', () => {
+    expect(photosMessage([])).toBe('validation.photoRequired');
+    expect(photosMessage([photo('a', 'failed', null)])).toBe('validation.photoRequired');
+    expect(photosMessage([photo('a', 'ready', [1, 2]), photo('b', 'uploading', null)])).toBe(
+      'validation.photosUploading',
+    );
+    expect(photosMessage([photo('a', 'ready', [1, 2])])).toBeNull();
+  });
+});
+
+describe('product card schema', () => {
+  it('checks the code, the name and the weight', () => {
+    const result = productSchema.safeParse({
+      sku: 'A1',
+      name: '',
+      categoryId: '3',
+      weightKg: '0',
+      status: 'ACTIVE',
+    });
+    expect(
+      result.success ? [] : result.error.issues.map((issue) => issue.path.join('.')).sort(),
+    ).toEqual(['name', 'sku', 'weightKg']);
   });
 });

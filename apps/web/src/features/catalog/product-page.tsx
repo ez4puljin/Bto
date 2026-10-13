@@ -12,7 +12,7 @@ import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card
 import { ProductPricesCard } from '@/features/pricing/product-prices-card';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
-import { type ProductDetail, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
+import { type ProductDetail, useCatalogMutations, useCategories, useProduct } from './api';
 import { categoryPaths } from './category-tree';
 import { EbarimtCard } from './ebarimt-card';
 import { ImagesCard } from './images-card';
@@ -33,18 +33,16 @@ export function ProductPage() {
   const id = Number.parseInt(useParams().id ?? '', 10);
   const canManage = useHasPermission('catalog.products.manage');
   const product = useProduct(id);
-  const uoms = useUoms();
   const categories = useCategories();
   const mutations = useCatalogMutations();
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
 
-  const loadProblem = problemFromError(product.error ?? uoms.error ?? categories.error);
+  const loadProblem = problemFromError(product.error ?? categories.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
-  if (!product.data || !uoms.data || !categories.data) {
+  if (!product.data || !categories.data) {
     return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   }
   const detail = product.data;
-  const loadedUoms = uoms.data;
   const loadedCategories = categories.data;
   const categoryPath = paths.get(detail.categoryId);
 
@@ -103,9 +101,7 @@ export function ProductPage() {
             view={<ProductFacts detail={detail} categoryPath={categoryPath} />}
             edit={(close) => (
               <ProductForm
-                mode="edit"
                 defaultValues={productValues(detail)}
-                uoms={loadedUoms}
                 categories={loadedCategories}
                 submitLabel={t('common.save')}
                 onCancel={close}

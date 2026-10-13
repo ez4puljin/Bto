@@ -70,7 +70,7 @@ export const routes: RouteObject[] = [
           {
             path: 'catalog/products/new',
             element: (
-              <RequirePermission permission="catalog.products.manage">
+              <RequirePermission permission="catalog.products.register">
                 <ProductCreatePage />
               </RequirePermission>
             ),

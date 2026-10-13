@@ -19,7 +19,8 @@ export type ProductDetail = Schemas['ProductDetail'];
 export type ProductUnit = Schemas['ProductUnit'];
 export type Barcode = Schemas['Barcode'];
 export type ProductImage = Schemas['ProductImage'];
-export type ProductCreate = Schemas['ProductCreateRequest'];
+export type RegistrationRequest = Schemas['ProductRegistrationRequest'];
+export type RegisteredProduct = Schemas['RegisteredProduct'];
 export type ProductUpdate = Schemas['ProductUpdateRequest'];
 export type ProductEbarimt = Schemas['ProductEbarimtRequest'];
 export type UnitRequest = Schemas['UnitRequest'];
@@ -105,14 +106,18 @@ export function useProduct(id: number) {
   });
 }
 
-export function useNextSku(enabled: boolean) {
+/** The code to suggest for a new product of the category, from its range (ADR-0044 #1). */
+export function useNextSku(categoryId: number | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.products, 'next-sku'],
-    enabled,
+    queryKey: [...KEYS.products, 'next-sku', categoryId],
+    enabled: categoryId !== undefined,
     staleTime: 0,
+    retry: false,
     queryFn: async ({ signal }) =>
-      unwrap(await api.GET('/api/v1/products/next-sku', { signal })).sku,
+      unwrap(
+        await api.GET('/api/v1/products/next-sku', { params: { query: { categoryId } }, signal }),
+      ).sku,
   });
 }
 
@@ -191,9 +196,14 @@ export function useCatalogMutations() {
         unwrap(await api.DELETE('/api/v1/categories/{id}', { params: { path: { id } } })),
       onSuccess: () => invalidate(KEYS.categories),
     }),
-    createProduct: useMutation({
-      mutationFn: async (body: ProductCreate) =>
-        unwrap(await api.POST('/api/v1/products', { body })),
+    register: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<RegistrationRequest>) =>
+        unwrap(
+          await api.POST('/api/v1/product-registrations', {
+            params: { header: idempotencyKey(key) },
+            body,
+          }),
+        ),
       onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories),
     }),
     updateProduct: useMutation({

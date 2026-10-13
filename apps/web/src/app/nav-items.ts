@@ -224,7 +224,7 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
     to: '/catalog/products/new',
     label: 'home.actions.newProduct',
     icon: Package,
-    permission: 'catalog.products.manage',
+    permission: 'catalog.products.register',
   },
   { to: '/catalog/scan', label: 'home.actions.scan', icon: ScanBarcode },
   { to: '/pricing/quote', label: 'home.actions.quote', icon: Calculator },

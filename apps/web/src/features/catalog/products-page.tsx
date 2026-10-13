@@ -42,7 +42,7 @@ const NO_PAGES: readonly { data: never[] }[] = [];
  */
 export function ProductsPage() {
   const { t } = useTranslation();
-  const canManage = useHasPermission('catalog.products.manage');
+  const canRegister = useHasPermission('catalog.products.register');
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
@@ -91,7 +91,7 @@ export function ProductsPage() {
       <PageHeader
         title={t('catalog.products.title')}
         actions={
-          canManage ? (
+          canRegister ? (
             <Button asChild>
               <Link to="/catalog/products/new">
                 <Plus />
