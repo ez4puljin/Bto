@@ -24,6 +24,7 @@ In-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog
 2. `pnpm install`, then copy `apps/api/.env.example` to `apps/api/.env`.
 3. `docker compose up -d --wait` (PostgreSQL 18 on `127.0.0.1:15432`), `pnpm db:provision`, `pnpm db:migrate`.
 4. `pnpm dev` (http://localhost:5173) or `pnpm check` (everything CI runs).
+5. To test from another PC on the same network, double-click `start.bat` (it prints `http://<this PC>:5173`) and `stop.bat` afterwards. Windows Firewall must allow Node.js on private networks.
 
 Stack: TypeScript end-to-end, Node 26, pnpm 11, NestJS 12, PostgreSQL 18 + Drizzle, pg-boss 12, Vite 8 + React 19, one Expo codebase for two apps (from delivery 4); developed and accepted locally until one go-live after the last delivery (ADR-0026), then hosted on DigitalOcean SGP1; e-Barimt PosAPI 3.0 on an office mini-PC reached over Tailscale. Source: github.com/ez4puljin/Bto (public).
 

@@ -1,5 +1,7 @@
 # Normalise line endings: LF in the repository and in every working tree (Windows included).
 * text=auto eol=lf
+# cmd.exe reads labels and goto reliably only with CRLF.
+*.bat text eol=crlf
 *.png binary
 *.jpg binary
 *.pdf binary

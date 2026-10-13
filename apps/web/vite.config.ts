@@ -24,6 +24,10 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // start.bat sets DEV_LAN=1: Vite then listens on every interface, so a PC on the same network
+    // opens http://<this PC's address>:5173. The proxy below keeps the Host header, so the api's
+    // same-origin check on cookie routes passes for that address too.
+    host: process.env.DEV_LAN === '1' ? true : 'localhost',
     // SPA routes never start with /api or /health: these prefixes always go to the API.
     proxy: { '/api': { target: API_ORIGIN }, '/health': { target: API_ORIGIN } },
   },
