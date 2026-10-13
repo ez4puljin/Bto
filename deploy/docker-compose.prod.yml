@@ -43,8 +43,8 @@ services:
 
   api:
     <<: *app
-    # Pool budget per process (docs/architecture.md §10.2): api 6 + pg-boss 2.
-    environment: { ROLE: api, DB_POOL_MAX: '6', PGBOSS_POOL_MAX: '2' }
+    # Pool budget per process (docs/architecture.md §10.2): api 6 + pg-boss 2 + the AI reader 2.
+    environment: { ROLE: api, DB_POOL_MAX: '6', PGBOSS_POOL_MAX: '2', AI_POOL_MAX: '2' }
     networks: [edge_prod]
     mem_limit: 768m
 

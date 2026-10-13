@@ -27,11 +27,19 @@ const GUARDS = {
   G3: { ruleId: 'no-restricted-syntax', marker: 'Number()/parseFloat()' },
   G4: { ruleId: 'no-restricted-syntax', marker: 'No Cyrillic in .tsx' },
   G5: { ruleId: 'no-restricted-syntax', marker: 'No literal text in JSX' },
+  TX: {
+    ruleId: 'no-restricted-syntax',
+    marker: 'No HTTP or model call inside a database transaction',
+  },
 };
-const [G1, G2, G3, G4, G5] = ['G1', 'G2', 'G3', 'G4', 'G5'];
+const [G1, G2, G3, G4, G5, TX] = ['G1', 'G2', 'G3', 'G4', 'G5', 'TX'];
 const M = 'apps/api/src/modules';
 const WEB = 'apps/web/src/features/demo/page.tsx';
 const INTEGRATION = "'../../../integrations/ebarimt/client'";
+const ASK_FLOW = `${M}/ai/services/ask-flow.service.ts`;
+const DB_AND_LLM = `declare const db: { transaction<T>(work: () => Promise<T>): Promise<T> };
+declare const llm: { complete(): Promise<string> };
+`;
 
 /** [name, guard, fixture path, code, must fire] */
 const CASES = [
@@ -92,7 +100,42 @@ const CASES = [
     `import { reporting } from '../../reporting';\nexport const x = reporting;`,
     true,
   ],
+  [
+    'nobody imports ai (ADR-0045)',
+    G1,
+    `${M}/catalog/services/catalog.service.ts`,
+    `import { ai } from '../../ai';\nexport const x = ai;`,
+    true,
+  ],
+  [
+    'ai -> identity index',
+    G1,
+    ASK_FLOW,
+    `import { identity } from '../../identity';\nexport const x = identity;`,
+    false,
+  ],
+  [
+    'ai reads other modules only through its views',
+    G1,
+    ASK_FLOW,
+    `import { catalog } from '../../catalog';\nexport const x = catalog;`,
+    true,
+  ],
   // G1b integrations
+  [
+    'the composition root provides an integration module',
+    G1,
+    'apps/api/src/app.module.ts',
+    `import { LlmModule } from './integrations/llm';\nexport const x = LlmModule;`,
+    false,
+  ],
+  [
+    'the LLM client from a flow service',
+    G1,
+    ASK_FLOW,
+    `import { LlmModule } from '../../../integrations/llm';\nexport const x = LlmModule;`,
+    false,
+  ],
   [
     'integration client from a service',
     G1,
@@ -232,6 +275,52 @@ export const x = stockValuationAdjustments;`,
     'export const port = Number(process.env.PORT);',
     false,
   ],
+  // TX no outbound call inside a transaction callback (ADR-0045)
+  [
+    'fetch inside inTransaction',
+    TX,
+    ASK_FLOW,
+    `declare function inTransaction<T>(db: unknown, work: () => Promise<T>): Promise<T>;
+export const run = () => inTransaction({}, async () => (await fetch('https://example.test')).ok);`,
+    true,
+  ],
+  [
+    'a model call inside db.transaction outside modules',
+    TX,
+    'apps/api/src/common/env.ts',
+    `${DB_AND_LLM}export const run = () => db.transaction(async () => llm.complete());`,
+    true,
+  ],
+  [
+    'this.llm inside this.db.transaction',
+    TX,
+    ASK_FLOW,
+    `${DB_AND_LLM}export class Flow {
+  private readonly db = db;
+  private readonly llm = llm;
+  run() {
+    return this.db.transaction(() => this.llm.complete());
+  }
+}`,
+    true,
+  ],
+  [
+    'a model call between transactions',
+    TX,
+    ASK_FLOW,
+    `${DB_AND_LLM}export async function run() {
+  const answer = await llm.complete();
+  return db.transaction(() => Promise.resolve(answer));
+}`,
+    false,
+  ],
+  [
+    'Number() stays banned next to TX in modules',
+    G3,
+    ASK_FLOW,
+    'declare const v: string;\nexport const n = Number(v);',
+    true,
+  ],
   // G6 inline disable comments are ignored
   [
     'eslint-disable comments are ignored',
@@ -317,7 +406,7 @@ for (const [name, guard, file, code, mustFire] of CASES) {
 }
 
 test('every guard keeps a firing and a non-firing case', () => {
-  for (const guard of [G1, G2, G3, G4, G5]) {
+  for (const guard of [G1, G2, G3, G4, G5, TX]) {
     assert.ok(
       CASES.some((c) => c[1] === guard && c[4]),
       `${guard} has no firing case`,

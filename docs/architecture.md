@@ -679,7 +679,7 @@ Keyboard-wedge first everywhere (web global keydown detector; mobile hidden Text
   - **OpenAI** (default): `POST {LLM_BASE_URL or https://api.openai.com}/v1/responses`, `Authorization: Bearer`, `text.format` = JSON schema with `strict: true`, `store: false`; a refusal or an `incomplete` status is an error.
   - **Anthropic**: `POST /v1/messages`, `x-api-key`, `anthropic-version: 2023-06-01`, `output_config.format` = JSON schema.
   - **Ollama** (local): `POST {LLM_BASE_URL or http://127.0.0.1:11434}/api/chat`, `format` = JSON schema, `stream: false`, no key.
-- Errors are `LlmError` with a reason (`TIMEOUT`, `HTTP` with the status, `REFUSED`, `INCOMPLETE`, `INVALID_RESPONSE`); no automatic retry — the person asks again. Only the reason and the HTTP status are logged, never a request or response body.
+- Errors are `LlmError` with a reason (`TIMEOUT`, `NETWORK`, `HTTP` with the status and the provider's short error code such as `invalid_api_key`, `REFUSED`, `INCOMPLETE`, `INVALID_RESPONSE`); no automatic retry — the person asks again. Only the reason and the HTTP status are logged, never a request or response body.
 - `LlmModule` (global) provides `LLM_CLIENT`, or `null` when `LLM_PROVIDER` is empty; `app.module.ts` imports it, `AskFlowService` injects it. Tests replace it with a scripted fake; the harness removes every `LLM_*` variable, so a real key is never used by a test.
 - Data that leaves the company: the question, the dataset descriptions, earlier steps of the conversation and up to 50 result rows (names, phones, TINs, addresses and amounts included, by the owner's decision; SPEC §6.14, §11 #24). Credentials, sessions, files and audit data never do.
 

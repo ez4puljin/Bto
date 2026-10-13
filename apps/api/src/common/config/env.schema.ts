@@ -6,6 +6,18 @@ export type ProcessRole = (typeof PROCESS_ROLES)[number];
 
 export const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
+/** Providers of the AI assistant (ADR-0045); the clients live in src/integrations/llm. */
+export const LLM_PROVIDERS = ['openai', 'anthropic', 'ollama'] as const;
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
+
+/** The read-only role of the AI assistant; provisioning creates it under this name only. */
+export const AI_READER_ROLE = 'ai_reader';
+
+/** `KEY=` in a .env file counts as unset. */
+function unsetWhenEmpty<T extends z.ZodType>(schema: T) {
+  return z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+}
+
 /**
  * Environment of the api and worker processes (docs/architecture.md §10.2). The process refuses to
  * start on a missing or malformed value. ADMIN_DATABASE_URL (db:provision) and TEST_ADMIN_DATABASE_URL
@@ -46,6 +58,22 @@ export const EnvSchema = z.object({
   STORAGE_DRIVER: z.enum(['spaces', 'local']).default('spaces'),
   /** Root directory of the local driver; a relative path resolves from the working directory. */
   STORAGE_LOCAL_DIR: z.string().trim().min(1).optional(),
+  /** The AI assistant (ADR-0045), api only. Without a provider the assistant is off. */
+  LLM_PROVIDER: unsetWhenEmpty(z.enum(LLM_PROVIDERS)),
+  LLM_MODEL: unsetWhenEmpty(z.string().trim().min(1)),
+  /** A secret like JWT_SECRET: never logged, sent only to the provider. Ollama needs none. */
+  LLM_API_KEY: unsetWhenEmpty(z.string().trim().min(1)),
+  /** Everything before the endpoint name; each provider has a default (src/integrations/llm). */
+  LLM_BASE_URL: unsetWhenEmpty(z.url({ protocol: /^https?$/ })),
+  /** One model call, the answer included. */
+  LLM_TIMEOUT_MS: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().int().min(5_000).max(300_000).default(60_000),
+  ),
+  /** Role ai_reader: the assistant's queries and saved reports run only through it. */
+  AI_DATABASE_URL: unsetWhenEmpty(postgresUrl),
+  /** The assistant's own pool (§10.2); at most the role's CONNECTION LIMIT 4. */
+  AI_POOL_MAX: unsetWhenEmpty(z.coerce.number().int().min(1).max(4)),
 });
 
 export type Env = Omit<z.infer<typeof EnvSchema>, 'COOKIE_SECURE' | 'STORAGE_LOCAL_DIR'> & {
@@ -84,9 +112,36 @@ export function parseEnv(raw: Record<string, unknown>, role: ProcessRole): Env {
       `Invalid environment (${role}): STORAGE_LOCAL_DIR is required when STORAGE_DRIVER=local`,
     );
   }
+  if (role === 'api') assertAiAssistant(data);
   return {
     ...data,
     COOKIE_SECURE: data.COOKIE_SECURE ?? data.NODE_ENV === 'production',
     STORAGE_LOCAL_DIR: resolve(data.STORAGE_LOCAL_DIR),
   };
+}
+
+/**
+ * The assistant is on when LLM_PROVIDER is set; it then needs its model, key (not Ollama) and
+ * read-only database. AI_DATABASE_URL alone runs saved reports, which need no model.
+ */
+function assertAiAssistant(data: z.infer<typeof EnvSchema>): void {
+  if (data.LLM_PROVIDER) {
+    const missing = [
+      !data.LLM_MODEL && 'LLM_MODEL',
+      data.LLM_PROVIDER !== 'ollama' && !data.LLM_API_KEY && 'LLM_API_KEY',
+      !data.AI_DATABASE_URL && 'AI_DATABASE_URL',
+    ].filter(Boolean);
+    if (missing.length) {
+      throw new Error(
+        `Invalid environment (api): LLM_PROVIDER=${data.LLM_PROVIDER} needs ${missing.join(', ')}`,
+      );
+    }
+  }
+  if (!data.AI_DATABASE_URL) return;
+  if (decodeURIComponent(new URL(data.AI_DATABASE_URL).username) !== AI_READER_ROLE) {
+    throw new Error(`Invalid environment (api): AI_DATABASE_URL must connect as ${AI_READER_ROLE}`);
+  }
+  if (!data.AI_POOL_MAX) {
+    throw new Error('Invalid environment (api): AI_POOL_MAX is required with AI_DATABASE_URL');
+  }
 }

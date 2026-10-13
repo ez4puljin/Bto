@@ -36,7 +36,7 @@ services:
 
   api-staging:
     <<: *app
-    environment: { ROLE: api, DB_POOL_MAX: '2', PGBOSS_POOL_MAX: '2' }
+    environment: { ROLE: api, DB_POOL_MAX: '2', PGBOSS_POOL_MAX: '2', AI_POOL_MAX: '2' }
     networks: [default, edge_staging]
     mem_limit: 512m
     depends_on:

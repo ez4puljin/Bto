@@ -9,10 +9,10 @@
 //   G4 no-restricted-syntax          no Cyrillic literals or JSX text in .tsx (ADR-0011)
 //   G5 no-restricted-syntax          no literal text in JSX (any letter) in .tsx (ADR-0011)
 //   G6 linterOptions.noInlineConfig  eslint-disable comments are ignored: exceptions live in this file
+//   TX no-restricted-syntax          no fetch/axios/LLM call inside a transaction callback (ADR-0045)
 // Flat config REPLACES a rule's options when a later object sets the same rule for the same file, so
-// no-restricted-syntax and no-restricted-imports are each set once per file group.
-// Delivery 3: add the "no fetch/axios/integration call inside db.transaction(...)" selectors as TX_GUARD,
-// add an apps/api/src/** object with them and spread TX_GUARD into the G3 object as well.
+// no-restricted-syntax and no-restricted-imports are each set once per file group: TX_GUARD has its
+// own apps/api/src/** object and is spread into the G3 object, which wins for module files.
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier/flat';
 import boundaries from 'eslint-plugin-boundaries';
@@ -49,6 +49,7 @@ const MODULE_DEPS = {
   notifications: ['identity', 'partners'],
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
+  ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai
 };
 const MOD = { type: 'api-module' };
 const INT = { type: 'api-integration' };
@@ -91,6 +92,11 @@ const POLICIES = [
     from: { element: MOD },
     disallow: { to: { element: { ...MOD, captured: { module: 'reporting' } } } },
     message: 'Nothing imports the reporting module (§3.1 rule 4).',
+  },
+  {
+    from: { element: MOD },
+    disallow: { to: { element: { ...MOD, captured: { module: 'ai' } } } },
+    message: 'Nothing imports the ai module (§3.1 rule 4, ADR-0045).',
   },
   // G1b §3.1 rule 6: integration clients only from jobs and flow services (ADR-0002 #8).
   {
@@ -148,6 +154,23 @@ const NUMBER_PARSE_BAN = [
     message: NUMERIC_MESSAGE,
   },
   { selector: "NewExpression[callee.name='Number']", message: NUMERIC_MESSAGE },
+];
+// TX (§3.1 rule 6, ADR-0045): a transaction holds locks and a pooled connection, so the network waits
+// outside it. Matches calls lexically inside inTransaction(...) / <anything>.transaction(...).
+const TRANSACTION_CALL =
+  ":matches(CallExpression[callee.name='inTransaction'], CallExpression[callee.property.name='transaction'])";
+const OUTBOUND_CALL = [
+  'CallExpression[callee.name=/^(fetch|axios)$/]',
+  "CallExpression[callee.object.name='axios']",
+  'CallExpression[callee.object.name=/^llm/]',
+  'CallExpression[callee.object.property.name=/^llm/]',
+].join(', ');
+const TX_GUARD = [
+  {
+    selector: `${TRANSACTION_CALL} :matches(${OUTBOUND_CALL})`,
+    message:
+      'No HTTP or model call inside a database transaction: make it between transactions, in a *-flow.service.ts or a job (§3.1 rule 6, ADR-0045).',
+  },
 ];
 const CYRILLIC = '/[\\u0400-\\u04FF]/';
 const CYRILLIC_MESSAGE =
@@ -316,9 +339,14 @@ export default defineConfig([
     },
   },
   {
+    name: 'guard/TX',
+    files: ['apps/api/src/**/*.{ts,mts,cts}'],
+    rules: { 'no-restricted-syntax': ['error', ...TX_GUARD] },
+  },
+  {
     name: 'guard/G3',
     files: ['apps/api/src/modules/**/*.{ts,mts,cts}'],
-    rules: { 'no-restricted-syntax': ['error', ...NUMBER_PARSE_BAN] },
+    rules: { 'no-restricted-syntax': ['error', ...NUMBER_PARSE_BAN, ...TX_GUARD] },
   },
   {
     name: 'guard/G4-G5',

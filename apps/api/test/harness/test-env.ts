@@ -75,6 +75,12 @@ export function applyWorkerEnv(project: DbProject): void {
     STORAGE_LOCAL_DIR: join(tmpdir(), `${database}_storage`),
   });
   delete process.env.ROLE;
+  // Tests never reach a model provider or see a real key (ADR-0045): a scripted fake LLM_CLIENT answers.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('LLM_')) delete process.env[key];
+  }
+  delete process.env.AI_DATABASE_URL;
+  delete process.env.AI_POOL_MAX;
   if (project === 'integrity') {
     // node-postgres reads PGOPTIONS for every new connection: deadlocks fail fast and loudly.
     process.env.PGOPTIONS = '-c statement_timeout=5s';

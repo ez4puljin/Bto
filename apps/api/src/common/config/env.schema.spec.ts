@@ -82,4 +82,69 @@ describe('parseEnv', () => {
     expect(isAbsolute(dir)).toBe(true);
     expect(dir).toBe(resolve('../../.data/storage'));
   });
+
+  describe('AI assistant (ADR-0045)', () => {
+    const ai = {
+      LLM_PROVIDER: 'openai',
+      LLM_MODEL: 'test-model',
+      LLM_API_KEY: 'sk-test-not-a-real-key',
+      AI_DATABASE_URL: 'postgres://ai_reader:pw@127.0.0.1:15432/tugeel',
+      AI_POOL_MAX: '2',
+    };
+
+    it('is off by default; empty values count as unset', () => {
+      const off = parseEnv(base, 'api');
+      expect(off.LLM_PROVIDER).toBeUndefined();
+      expect(off.LLM_TIMEOUT_MS).toBe(60_000);
+      const blank = parseEnv(
+        { ...base, LLM_PROVIDER: '', LLM_API_KEY: '', AI_DATABASE_URL: '', LLM_TIMEOUT_MS: '' },
+        'api',
+      );
+      expect(blank).toMatchObject({ LLM_PROVIDER: undefined, AI_DATABASE_URL: undefined });
+      expect(blank.LLM_TIMEOUT_MS).toBe(60_000);
+    });
+
+    it('accepts a complete configuration', () => {
+      expect(parseEnv({ ...base, ...ai, LLM_TIMEOUT_MS: '90000' }, 'api')).toMatchObject({
+        LLM_PROVIDER: 'openai',
+        LLM_MODEL: 'test-model',
+        AI_POOL_MAX: 2,
+        LLM_TIMEOUT_MS: 90_000,
+      });
+    });
+
+    it('names what an enabled provider is missing', () => {
+      const { LLM_MODEL: _model, LLM_API_KEY: _key, AI_DATABASE_URL: _url, ...partial } = ai;
+      expect(() => parseEnv({ ...base, ...partial }, 'api')).toThrow(
+        'LLM_PROVIDER=openai needs LLM_MODEL, LLM_API_KEY, AI_DATABASE_URL',
+      );
+      expect(() => parseEnv({ ...base, ...ai, LLM_PROVIDER: 'gemini' }, 'api')).toThrow(
+        'LLM_PROVIDER',
+      );
+    });
+
+    it('runs Ollama without a key', () => {
+      const { LLM_API_KEY: _key, ...local } = ai;
+      expect(parseEnv({ ...base, ...local, LLM_PROVIDER: 'ollama' }, 'api').LLM_API_KEY).toBe(
+        undefined,
+      );
+    });
+
+    it('connects only as ai_reader, with an explicit pool', () => {
+      expect(() =>
+        parseEnv(
+          { ...base, ...ai, AI_DATABASE_URL: 'postgres://app:pw@127.0.0.1:15432/tugeel' },
+          'api',
+        ),
+      ).toThrow('AI_DATABASE_URL must connect as ai_reader');
+      expect(() => parseEnv({ ...base, ...ai, AI_POOL_MAX: undefined }, 'api')).toThrow(
+        'AI_POOL_MAX is required with AI_DATABASE_URL',
+      );
+      expect(() => parseEnv({ ...base, ...ai, AI_POOL_MAX: '5' }, 'api')).toThrow('AI_POOL_MAX');
+    });
+
+    it('asks nothing of the worker', () => {
+      expect(parseEnv({ ...base, LLM_PROVIDER: 'openai' }, 'worker').LLM_PROVIDER).toBe('openai');
+    });
+  });
 });

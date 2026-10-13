@@ -14,7 +14,9 @@ case "${ROLE:-}" in
     exec env -u MIGRATOR_DATABASE_URL -u ADMIN_DATABASE_URL node dist/main.js
     ;;
   worker)
-    exec env -u MIGRATOR_DATABASE_URL -u ADMIN_DATABASE_URL node dist/worker.js
+    # The worker never asks the AI assistant (ADR-0045): its key and read-only role stay with the api.
+    exec env -u MIGRATOR_DATABASE_URL -u ADMIN_DATABASE_URL -u LLM_API_KEY -u AI_DATABASE_URL \
+      node dist/worker.js
     ;;
   *)
     echo "tugeel-entrypoint: ROLE must be api or worker (got '${ROLE:-}')" >&2
