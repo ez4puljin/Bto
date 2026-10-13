@@ -20,6 +20,7 @@ import { UserDetailPage } from '@/features/identity/user-detail-page';
 import { UsersPage } from '@/features/identity/users-page';
 import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
 import { BinsPage } from '@/features/inventory/bins-page';
+import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { ReceiptCostingPage } from '@/features/inventory/costing-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
@@ -114,6 +115,7 @@ export const routes: RouteObject[] = [
       { path: 'inventory/stock', element: <StockPage /> },
       { path: 'inventory/stock/:id', element: <StockProductPage /> },
       { path: 'inventory/movements', element: <MovementsPage />, handle: { wide: true } },
+      { path: 'inventory/low-stock', element: <LowStockPage /> },
       { path: 'inventory/receipts', element: <ReceiptsPage /> },
       {
         path: 'inventory/receipts/new',

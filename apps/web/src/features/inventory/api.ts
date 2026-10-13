@@ -18,6 +18,7 @@ export type BinRangeRequest = Schemas['BinRangeRequest'];
 export type BinRangeResult = Schemas['BinRangeResult'];
 export type ProductLocation = Schemas['ProductLocation'];
 export type StockMovement = Schemas['StockMovement'];
+export type LowStockRow = Schemas['LowStockRow'];
 export type MovementDocType = NonNullable<
   NonNullable<
     NonNullable<paths['/api/v1/stock/movements']['get']['parameters']['query']>['docType']
@@ -134,6 +135,24 @@ export function useStockMovements(filter: MovementFilter) {
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** The low-stock list of a warehouse (ADR-0039), 100 rows at a time; off without a warehouse. */
+export function useLowStock(warehouseId: number | undefined) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.stock, 'low', warehouseId],
+    enabled: warehouseId !== undefined,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/stock/low', {
+          params: { query: { warehouseId: warehouseId ?? 0, cursor: pageParam, limit: 100 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 }
 
