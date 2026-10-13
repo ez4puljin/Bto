@@ -65,7 +65,7 @@ export function PhotoPicker(props: {
               </div>
             ) : null}
             {photo.status === 'failed' ? (
-              <div className="absolute inset-x-0 bottom-0 bg-danger-soft px-1.5 py-1 text-center text-xs text-destructive">
+              <div className="absolute inset-x-0 bottom-0 bg-danger-soft py-1 pr-8 pl-1.5 text-xs text-destructive">
                 {t('catalog.registration.photoFailed')}
               </div>
             ) : null}
@@ -73,7 +73,7 @@ export function PhotoPicker(props: {
               type="button"
               size="icon-xs"
               variant="secondary"
-              className="absolute top-1.5 right-1.5 bg-white/90 shadow-sm backdrop-blur-sm"
+              className="absolute right-1.5 bottom-1.5 bg-white/90 shadow-sm backdrop-blur-sm"
               aria-label={t('catalog.registration.removePhoto', { number: index + 1 })}
               title={t('catalog.registration.removePhoto', { number: index + 1 })}
               onClick={() => remove(photo.key)}

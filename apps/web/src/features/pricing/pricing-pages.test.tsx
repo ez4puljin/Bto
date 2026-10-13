@@ -459,10 +459,11 @@ describe('products waiting for their prices', () => {
             priceView(72, 'хайрцаг', '24', { price: '28800', source: 'DERIVED', period: null }),
           ],
         }),
-      'POST /api/v1/pricing/sale-ready': () => {
+      'POST /api/v1/pricing/sale-ready': async (request) => {
         completions += 1;
-        return completions === 1
-          ? json({ completed: [7], alreadyComplete: [] })
+        const { productIds } = (await request.clone().json()) as { productIds: number[] };
+        return completions === 2
+          ? json({ completed: productIds, alreadyComplete: [] })
           : json(
               {
                 type: 'https://tugeel.local/errors/PRICE_MISSING',
@@ -470,7 +471,13 @@ describe('products waiting for their prices', () => {
                 status: 409,
                 code: 'PRICE_MISSING',
                 params: { count: 1 },
-                errors: [{ path: 'productIds.0', constraint: 'price', message: '10024' }],
+                errors: [
+                  {
+                    path: 'productIds.0',
+                    constraint: 'price',
+                    message: productIds[0] === 7 ? '10023' : '10024',
+                  },
+                ],
               },
               409,
             );
@@ -490,11 +497,16 @@ describe('products waiting for their prices', () => {
     expect(within(cola).getByText('1,000₮')).toBeInTheDocument();
     expect(within(cola).getByText(mn.pricing.card.none)).toBeInTheDocument();
 
-    // The price dialog starts today and saves the supermarket price before completing.
+    // The price dialog starts today; completing without the supermarket price says what it needs.
     await user.click(screen.getByRole('button', { name: 'Үнэ оруулах: 10023' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(`Өнөөдрөөс (${TODAY}) эхэлнэ`)).toBeInTheDocument();
-    await user.type(await within(dialog).findByLabelText(`${mn.pricing.lists.RETAIL}: ш`), '1200');
+    const retail = await within(dialog).findByLabelText(`${mn.pricing.lists.RETAIL}: ш`);
+    await user.click(within(dialog).getByRole('button', { name: mn.pricing.saleReady.complete }));
+    expect(await within(dialog).findByText(mn.pricing.dialog.bothRequired)).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/unit-prices')).toHaveLength(0);
+    // The supermarket price is saved, then the product completed with the dialog's key.
+    await user.type(retail, '1200');
     await user.click(within(dialog).getByRole('button', { name: mn.pricing.saleReady.complete }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(await screen.findByRole('status')).toHaveTextContent(mn.pricing.saleReady.completed);
@@ -504,9 +516,12 @@ describe('products waiting for their prices', () => {
       validFrom: TODAY,
       entries: [{ list: 'RETAIL', productUnitId: 70, price: '1200' }],
     });
-    const [completed] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
+    const [refusedFirst, completed] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
     expect(await completed?.clone().json()).toEqual({ productIds: [7] });
     expect(completed?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(completed?.headers.get('Idempotency-Key')).toBe(
+      refusedFirst?.headers.get('Idempotency-Key'),
+    );
 
     // The ticked rows complete at once; a product without both prices is named.
     const bulk = screen.getByRole('button', { name: mn.pricing.saleReady.complete });
@@ -516,7 +531,7 @@ describe('products waiting for their prices', () => {
     expect(
       await screen.findByText(mn.pricing.pending.missing.replace('{{skus}}', '10024')),
     ).toBeInTheDocument();
-    const [, refused] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
+    const [, , refused] = calls(fetchMock, 'POST', '/api/v1/pricing/sale-ready');
     expect(await refused?.clone().json()).toEqual({ productIds: [8] });
   }, 15_000);
 

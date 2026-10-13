@@ -99,6 +99,7 @@ function PriceEntryForm(props: { prices: ProductPrices; pending: boolean; onClos
     ),
   );
   const busy = mutations.setPrices.isPending || mutations.completeProducts.isPending;
+  const pricesMissing = action.problem?.code === 'PRICE_MISSING';
 
   /** The changed prices, or null after naming what is wrong. */
   const changes = (): PriceEntry[] | null => {
@@ -172,7 +173,11 @@ function PriceEntryForm(props: { prices: ProductPrices; pending: boolean; onClos
         void (pending ? complete() : save());
       }}
     >
-      <ProblemAlert problem={action.problem} />
+      {/* A refused completion says which prices it needs rather than the generic message. */}
+      <ProblemAlert problem={pricesMissing ? null : action.problem} />
+      {pricesMissing ? (
+        <p className="text-sm text-destructive">{t('pricing.dialog.bothRequired')}</p>
+      ) : null}
       {issue ? <p className="text-sm text-destructive">{t(issue)}</p> : null}
       {pending ? (
         <p className="text-sm text-muted-foreground">
@@ -219,7 +224,7 @@ function PriceEntryForm(props: { prices: ProductPrices; pending: boolean; onClos
                       aria-label={`${t(`pricing.lists.${list}`)}: ${unitLabel(unit)}`}
                       inputMode="numeric"
                       autoComplete="off"
-                      className="w-32"
+                      className="w-24 sm:w-32"
                       value={values[field] ?? ''}
                       onChange={(event) =>
                         setValues((current) => ({ ...current, [field]: event.target.value }))
