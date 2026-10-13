@@ -1,11 +1,11 @@
 # Tugeel (Түгээл) — agent contract
 
-Tugeel is an in-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog with multi-unit barcodes,
+Tugeel is an in-house ERP for the wholesale distribution of Бүтэн-Оргил ХХК (the owner named the main branch «Оргил Бөөний төв» in Mörön, Khövsgöl, and the branch «Боломж бөөний төв» in Kharkhorin, Övörkhangai, on 2026-10-13; older documents assume one centre in Ulaanbaatar — STATUS pending #23): product catalog with multi-unit barcodes,
 multi-warehouse stock with bins on an append-only ledger, customer orders (web, customer app, sales reps), picking,
 zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay
 payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
 reporting, HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
-Repo `tugeel`, packages `@tugeel/*`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
+Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Бүтэн-Оргил ХХК's internal system, owner 2026-10-13, ADR-0042 #11); code names stay `tugeel`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
 ## Start of every session
 
@@ -38,7 +38,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | vite, @vitejs/plugin-react, vitest | 8.3.4, 6.1.2, 5.0.3 | |
 | react, react-router, @tanstack/react-query | 19.3.0, 7.18.4, 5.104.1 | v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
-| i18next, react-i18next, @fontsource-variable/noto-sans | 26.4.2, 17.0.16, 5.3.0 | |
+| i18next, react-i18next, @fontsource-variable/inter | 26.4.2, 17.0.16, 5.3.0 | Inter is the web font (ADR-0042); PDFs embed Noto Sans (ADR-0011) |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |
 | Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
@@ -82,6 +82,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 - Every route carries exactly one of `@Public()`, `@Authenticated()` or `@RequirePermission(...)` (the global guard answers 403 otherwise); the caller is `@CurrentUser() ctx: AuthContext`, passed explicitly to services; warehouse writes call `ScopeService.assertCanWriteWarehouse` (ADR-0027, `docs/modules/identity.md`).
 - ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config). From delivery 3: no `fetch` / `axios` / `integrations/*` calls inside `db.transaction(...)`.
 - Workspace packages are CommonJS with a `@tugeel/source` export condition (ADR-0025): the api uses their built `dist`, Vite/Vitest/Jest read the source; `pnpm check` builds them first.
+- Web screens follow `docs/ui.md` (ADR-0042): `PageHeader` with the menu breadcrumb (no «Буцах» buttons), the list kit (filter bar, list card, rows that open their record), read-first `DetailCard`s, create dialogs on `?new=1`, toasts for confirmations, tokens instead of colour literals. `components/ui` keeps shadcn formatting: run prettier from the repo root only.
 
 ## ALWAYS
 
@@ -116,6 +117,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX`): production api 6, worker
 | `docs/architecture.md` | pins (§0), stack (§2), repo layout + boundaries (§3), module ownership (§4), domain model (§5), API (§6), auth (§7), mobile (§8), integrations (§9), deploy (§10), observability (§11), conventions (§12), assumptions + TODO-VERIFY (§13) |
 | `docs/decisions/README.md` + `ADR-*.md` | why a decision stands; before starting a module and before proposing any stack change |
 | `docs/modules/<module>.md` | the module's contract (owned tables, public services, invariants, status); created with the module |
+| `docs/ui.md` | before building or changing a screen: tokens, building blocks, page patterns, do/don't, test notes (ADR-0042) |
 | `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt / QPay outages (written from delivery 1 on) |
 
 `CLAUDE.local.md` is gitignored and holds personal settings (local paths, tailnet addresses, preferences); it never overrides the rules in this file.

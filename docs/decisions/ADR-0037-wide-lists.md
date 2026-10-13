@@ -6,6 +6,7 @@
 | Date | 2026-10-12 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | — (adds to ADR-0004 #3, architecture §6) |
+| Amended by | ADR-0042 (#4: rows of lists whose records have their own page open them on a click anywhere and end with a chevron; the «Засах» / «Харах» button is gone; lists edited in dialogs keep their row buttons) |
 
 ## Context
 
