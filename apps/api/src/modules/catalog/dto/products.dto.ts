@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { SKU_PATTERN } from '@tugeel/shared/catalog';
 import { BARCODE_TYPES } from '@tugeel/shared/gtin';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -26,7 +27,7 @@ const queryBoolean = ({ value }: { value: unknown }) => {
   if (value === 'false') return false;
   return value;
 };
-const SKU = /^[0-9]{1,20}$/;
+const SKU = SKU_PATTERN;
 const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
 const WEIGHT = /^\d{1,8}(\.\d{1,4})?$/;
 const CLASSIFICATION_CODE = /^[0-9]{7}$/;
@@ -404,6 +405,15 @@ export class ProductDetailDto {
   })
   units: ProductUnitDto[];
   @ApiProperty({ type: [ProductImageDto] }) images: ProductImageDto[];
+}
+
+export class NextSkuQueryDto {
+  @ApiPropertyOptional({ description: 'The category whose code range applies (ADR-0044)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
 }
 
 @ApiSchema({ name: 'NextSku' })

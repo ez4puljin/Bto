@@ -33,6 +33,7 @@ import {
   type VatType,
 } from '../schema';
 import { type Barcode, BarcodeService } from './barcode.service';
+import { SkuRangesService } from './sku-ranges.service';
 import { escapeLike, invalid, notFound } from './support';
 
 export type Product = typeof products.$inferSelect;
@@ -154,18 +155,8 @@ export class ProductsService {
     private readonly audit: AuditService,
     private readonly storage: StorageService,
     private readonly barcodes: BarcodeService,
+    private readonly ranges: SkuRangesService,
   ) {}
-
-  /** The next free numeric SKU: the largest one plus one, keeping its width (leading zeros). */
-  async nextSku(executor: Db | Tx = this.db): Promise<string> {
-    const [last] = await executor
-      .select({ sku: products.sku })
-      .from(products)
-      .orderBy(desc(sql`length(${products.sku})`), desc(products.sku))
-      .limit(1);
-    if (!last) return '1';
-    return (BigInt(last.sku) + 1n).toString().padStart(last.sku.length, '0');
-  }
 
   create(actor: Actor, input: ProductInput): Promise<ProductDetail> {
     return inTransaction(this.db, async (tx) => {
@@ -173,7 +164,9 @@ export class ProductsService {
       const baseUom = await this.uom(tx, input.baseUomId, 'baseUomId');
       const extra = input.units ?? [];
       await this.assertUnits(tx, baseUom, extra);
-      const sku = input.sku ?? (await this.nextSku(tx));
+      // A typed code keeps to the category's range (ADR-0044 #1); an omitted one is suggested.
+      if (input.sku !== undefined) await this.ranges.assertAllowed(tx, input.categoryId, input.sku);
+      const sku = input.sku ?? (await this.ranges.suggest(input.categoryId, tx));
       const name = normalizeName(input.name);
       const keys = searchKeys(name, [sku]);
       const [product] = await tx
@@ -247,6 +240,10 @@ export class ProductsService {
     const [before] = await tx.select().from(products).where(eq(products.id, id)).for('update');
     if (!before) throw notFound('product', id);
     await this.assertReferences(tx, patch);
+    // Only a changed code is checked: old codes outside a range stay editable (ADR-0044 #1).
+    if (patch.sku !== undefined && patch.sku !== before.sku) {
+      await this.ranges.assertAllowed(tx, patch.categoryId ?? before.categoryId, patch.sku, id);
+    }
     const name = patch.name === undefined ? before.name : normalizeName(patch.name);
     const sku = patch.sku ?? before.sku;
     const keys = searchKeys(name, [sku]);

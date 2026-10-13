@@ -87,6 +87,11 @@
       "types": "./dist/pricing/index.d.ts",
       "default": "./dist/pricing/index.js"
     },
+    "./catalog": {
+      "@tugeel/source": "./src/catalog/index.ts",
+      "types": "./dist/catalog/index.d.ts",
+      "default": "./dist/catalog/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },

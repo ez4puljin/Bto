@@ -7,6 +7,7 @@ import {
   check,
   index,
   integer,
+  numeric,
   pgSequence,
   pgTable,
   smallint,
@@ -74,6 +75,13 @@ export const categories = pgTable(
     nameKey: text('name_key').notNull(),
     /** БҮНА code the e-Barimt bulk-assign tool gives products of this subtree (ADR-0015 #3). */
     defaultClassificationCode: text('default_classification_code'),
+    /**
+     * The category's block of product codes (ADR-0044 #1), both or neither; subcategories without
+     * one use the nearest ancestor's. The laminar rule (nested only down the tree) is checked in
+     * CategoriesService with @tugeel/shared/catalog.
+     */
+    skuFrom: numeric('sku_from', { precision: 20, scale: 0 }),
+    skuTo: numeric('sku_to', { precision: 20, scale: 0 }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -85,6 +93,11 @@ export const categories = pgTable(
     check(
       'categories_classification_code',
       sql`${t.defaultClassificationCode} IS NULL OR ${t.defaultClassificationCode} ~ '^[0-9]{7}$'`,
+    ),
+    check('categories_sku_range_pair', sql`(${t.skuFrom} IS NULL) = (${t.skuTo} IS NULL)`),
+    check(
+      'categories_sku_range',
+      sql`${t.skuFrom} IS NULL OR (${t.skuFrom} >= 0 AND ${t.skuFrom} <= ${t.skuTo})`,
     ),
   ],
 );

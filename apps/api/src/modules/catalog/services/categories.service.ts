@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ownRange, type RangedCategory, rangeConflict } from '@tugeel/shared/catalog';
 import { nameKey, normalizeName } from '@tugeel/shared/text';
 import { asc, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -16,6 +17,9 @@ export interface CategoryInput {
   parentId?: number | null;
   name: string;
   defaultClassificationCode?: string | null;
+  /** The category's block of product codes, both ends or neither (ADR-0044 #1). */
+  skuFrom?: string | null;
+  skuTo?: string | null;
 }
 
 export type CategoryPatch = Partial<CategoryInput>;
@@ -26,7 +30,11 @@ export const MAX_CATEGORY_DEPTH = 8;
 /** pg_advisory_xact_lock key serialising tree moves, so two moves cannot form a cycle together. */
 const CATEGORY_TREE_LOCK = 72_026_104;
 
-/** The category tree (SPEC §5.2): moves never create a cycle; only empty categories are deleted. */
+/**
+ * The category tree (SPEC §5.2): moves never create a cycle; only empty categories are deleted.
+ * Code ranges stay laminar (ADR-0044 #1): two ranges that meet are nested, the outer one an
+ * ancestor's; a range change or a move is checked against every range under the tree lock.
+ */
 @Injectable()
 export class CategoriesService {
   constructor(
@@ -73,6 +81,7 @@ export class CategoriesService {
   create(actor: Actor, input: CategoryInput): Promise<Category> {
     return inTransaction(this.db, async (tx) => {
       const parentId = input.parentId ?? null;
+      const range = rangeOf(input);
       if (parentId !== null) {
         await this.get(parentId, tx);
         if ((await this.depthOf(tx, parentId)) + 1 > MAX_CATEGORY_DEPTH) {
@@ -91,9 +100,12 @@ export class CategoriesService {
           name,
           nameKey: nameKey(name),
           defaultClassificationCode: input.defaultClassificationCode ?? null,
+          skuFrom: range.skuFrom,
+          skuTo: range.skuTo,
         })
         .returning();
       if (!row) throw new Error('category insert returned no row');
+      if (range.skuFrom !== null) await this.assertRanges(tx, row.id);
       await this.audit.record(tx, actor, {
         action: 'CREATE',
         entity: 'categories',
@@ -109,6 +121,10 @@ export class CategoriesService {
       const before = await this.get(id, tx);
       const moving = patch.parentId !== undefined && patch.parentId !== before.parentId;
       if (moving) await this.assertMove(tx, id, patch.parentId ?? null);
+      const ranging = patch.skuFrom !== undefined || patch.skuTo !== undefined;
+      const range = ranging
+        ? rangeOf({ skuFrom: patch.skuFrom ?? null, skuTo: patch.skuTo ?? null })
+        : null;
       const name = patch.name === undefined ? undefined : normalizeName(patch.name);
       const [row] = await tx
         .update(categories)
@@ -118,11 +134,13 @@ export class CategoriesService {
           ...(patch.defaultClassificationCode === undefined
             ? {}
             : { defaultClassificationCode: patch.defaultClassificationCode }),
+          ...(range ? { skuFrom: range.skuFrom, skuTo: range.skuTo } : {}),
           updatedAt: sql`now()`,
         })
         .where(eq(categories.id, id))
         .returning();
       if (!row) throw notFound('category', id);
+      if (moving || (range && range.skuFrom !== null)) await this.assertRanges(tx, id);
       await this.audit.record(tx, actor, {
         action: 'UPDATE',
         entity: 'categories',
@@ -157,6 +175,33 @@ export class CategoriesService {
         entityId: id,
         before,
       });
+    });
+  }
+
+  /**
+   * The tree's ranges after a change of `changedId` (its range, or a move of its subtree) must
+   * stay laminar; SKU_RANGE_OVERLAP names the category it collides with. Runs after the write,
+   * inside the transaction, under the tree lock.
+   */
+  private async assertRanges(tx: Tx, changedId: number): Promise<void> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${CATEGORY_TREE_LOCK})`);
+    const all: RangedCategory[] = await tx
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        name: categories.name,
+        skuFrom: categories.skuFrom,
+        skuTo: categories.skuTo,
+      })
+      .from(categories);
+    const conflict = rangeConflict(all);
+    if (!conflict) return;
+    const other = conflict.category.id === changedId ? conflict.other : conflict.category;
+    const otherRange = ownRange(other);
+    throw new AppError('SKU_RANGE_OVERLAP', `the code range meets category ${other.id}`, {
+      category: other.name,
+      from: otherRange?.from.toString() ?? '',
+      to: otherRange?.to.toString() ?? '',
     });
   }
 
@@ -203,4 +248,23 @@ export class CategoriesService {
       SELECT max(height)::int AS height FROM down`);
     return result.rows[0]?.height ?? 1;
   }
+}
+
+/** Both ends or neither, the first not above the last (the DTOs check the digit format). */
+function rangeOf(input: { skuFrom?: string | null; skuTo?: string | null }): {
+  skuFrom: string | null;
+  skuTo: string | null;
+} {
+  const from = input.skuFrom ?? null;
+  const to = input.skuTo ?? null;
+  if ((from === null) !== (to === null)) {
+    throw invalid(from === null ? 'skuFrom' : 'skuTo', 'pair', 'a code range needs both ends');
+  }
+  if (from !== null && to !== null && BigInt(from) > BigInt(to)) {
+    throw invalid('skuTo', 'order', 'the first code of a range is above the last');
+  }
+  return {
+    skuFrom: from === null ? null : BigInt(from).toString(),
+    skuTo: to === null ? null : BigInt(to).toString(),
+  };
 }

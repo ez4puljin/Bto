@@ -8,6 +8,8 @@ const category = (id: number, name: string, parentId: number | null = null): Cat
   parentId,
   name,
   defaultClassificationCode: null,
+  skuFrom: null,
+  skuTo: null,
   productCount: 0,
   childCount: 0,
 });

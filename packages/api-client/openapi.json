@@ -1967,7 +1967,18 @@
     "/api/v1/products/next-sku": {
       "get": {
         "operationId": "Products_nextSku",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "The category whose code range applies (ADR-0044)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -1995,7 +2006,7 @@
             "bearer": []
           }
         ],
-        "summary": "Declared before `:id`, so \"next-sku\" never reaches ParseIntPipe.",
+        "summary": "The code to suggest for a new product of a category (ADR-0044 #1): from its range, else past\nevery range. Declared before `:id`, so \"next-sku\" never reaches ParseIntPipe.",
         "tags": [
           "catalog"
         ]
@@ -10723,6 +10734,15 @@
             "nullable": true,
             "description": "Default БҮНА code (7 digits)"
           },
+          "skuFrom": {
+            "type": "string",
+            "nullable": true,
+            "description": "Own block of product codes; null: the nearest ancestor range applies (ADR-0044)"
+          },
+          "skuTo": {
+            "type": "string",
+            "nullable": true
+          },
           "productCount": {
             "type": "number",
             "description": "Products directly in this category"
@@ -10736,6 +10756,8 @@
           "parentId",
           "name",
           "defaultClassificationCode",
+          "skuFrom",
+          "skuTo",
           "productCount",
           "childCount"
         ]
@@ -10776,6 +10798,17 @@
             "type": "string",
             "nullable": true,
             "pattern": "^[0-9]{7}$"
+          },
+          "skuFrom": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$",
+            "description": "First code of the block of the category (ADR-0044); both ends or neither"
+          },
+          "skuTo": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$"
           }
         },
         "required": [
@@ -10799,6 +10832,17 @@
             "type": "string",
             "nullable": true,
             "pattern": "^[0-9]{7}$"
+          },
+          "skuFrom": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$",
+            "description": "First code of the block of the category (ADR-0044); both ends or neither"
+          },
+          "skuTo": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$"
           }
         }
       },
@@ -17111,6 +17155,10 @@
           "CUSTOMER_INACTIVE",
           "SUPPLIER_INACTIVE",
           "PRODUCT_INACTIVE",
+          "SKU_OUT_OF_RANGE",
+          "SKU_RESERVED",
+          "SKU_RANGE_FULL",
+          "SKU_RANGE_OVERLAP",
           "DOC_ALREADY_POSTED",
           "ALREADY_POSTED",
           "STOCK_INSUFFICIENT",

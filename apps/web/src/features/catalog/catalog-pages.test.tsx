@@ -34,6 +34,8 @@ const CATEGORIES: Schemas['Category'][] = [
     parentId: null,
     name: 'Хүнс',
     defaultClassificationCode: null,
+    skuFrom: null,
+    skuTo: null,
     productCount: 0,
     childCount: 1,
   },
@@ -42,6 +44,8 @@ const CATEGORIES: Schemas['Category'][] = [
     parentId: 10,
     name: 'Гурил',
     defaultClassificationCode: '2111100',
+    skuFrom: null,
+    skuTo: null,
     productCount: 2,
     childCount: 0,
   },
@@ -50,6 +54,8 @@ const CATEGORIES: Schemas['Category'][] = [
     parentId: null,
     name: 'Ундаа',
     defaultClassificationCode: null,
+    skuFrom: null,
+    skuTo: null,
     productCount: 1,
     childCount: 0,
   },
@@ -803,7 +809,13 @@ describe('categories', () => {
     await user.clear(dialog.getByLabelText(mn.catalog.categories.defaultCode));
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() =>
-      expect(posted).toEqual({ name: 'Будаа', parentId: 10, defaultClassificationCode: null }),
+      expect(posted).toEqual({
+        name: 'Будаа',
+        parentId: 10,
+        defaultClassificationCode: null,
+        skuFrom: null,
+        skuTo: null,
+      }),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
@@ -815,6 +827,56 @@ describe('categories', () => {
       .getAllByRole('option')
       .map((option) => option.textContent);
     expect(parents).toEqual([mn.catalog.categories.root, 'Ундаа']);
+  });
+});
+
+describe('category code ranges', () => {
+  it('shows a range a subcategory uses from its parent and sets one with both ends', async () => {
+    let patched: unknown;
+    const ranged = CATEGORIES.map((category) =>
+      category.id === 10 ? { ...category, skuFrom: '20000', skuTo: '29999' } : category,
+    );
+    renderApp(
+      '/catalog/categories',
+      signedIn(ADMIN_ME, {
+        ...MASTER_ROUTES,
+        'GET /api/v1/categories': () => list(ranged),
+        'PATCH /api/v1/categories/12': async (request) => {
+          patched = await request.json();
+          return json({ ...CATEGORIES[2], skuFrom: '10000', skuTo: '19999' });
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    const flour = (await screen.findByText('Гурил')).closest('tr');
+    if (!flour) throw new Error('no row');
+    expect(within(flour).getByText('20000–29999')).toBeInTheDocument();
+    expect(
+      within(flour).getByText(mn.catalog.categories.inheritedFrom.replace('{{name}}', 'Хүнс')),
+    ).toBeInTheDocument();
+
+    const drinks = screen.getByText('Ундаа').closest('tr');
+    if (!drinks) throw new Error('no row');
+    await user.click(within(drinks).getByRole('button', { name: mn.common.edit }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(mn.catalog.categories.skuFrom), '10000');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.validation.skuRangePair)).toBeInTheDocument();
+    await user.type(dialog.getByLabelText(mn.catalog.categories.skuTo), '9999');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.validation.skuRangeOrder)).toBeInTheDocument();
+    await user.clear(dialog.getByLabelText(mn.catalog.categories.skuTo));
+    await user.type(dialog.getByLabelText(mn.catalog.categories.skuTo), '19999');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(patched).toEqual({
+        name: 'Ундаа',
+        parentId: null,
+        defaultClassificationCode: null,
+        skuFrom: '10000',
+        skuTo: '19999',
+      }),
+    );
   });
 });
 

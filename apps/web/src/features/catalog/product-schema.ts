@@ -1,3 +1,4 @@
+import { SKU_PATTERN } from '@tugeel/shared/catalog';
 import { Decimal } from '@tugeel/shared/money';
 import { isExactFactor } from '@tugeel/shared/units';
 import { z } from 'zod';
@@ -13,7 +14,7 @@ import type {
 } from './api';
 
 /** The API's patterns (catalog DTOs); the API stays authoritative. */
-export const SKU = /^[0-9]{1,20}$/;
+export const SKU = SKU_PATTERN;
 export const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
 const WEIGHT = /^\d{1,8}(\.\d{1,4})?$/;
 export const CLASSIFICATION_CODE = /^[0-9]{7}$/;

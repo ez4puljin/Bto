@@ -29,6 +29,8 @@ export const toCategoryDto = (row: CategoryView): CategoryDto => ({
   parentId: row.parentId,
   name: row.name,
   defaultClassificationCode: row.defaultClassificationCode,
+  skuFrom: row.skuFrom,
+  skuTo: row.skuTo,
   productCount: row.productCount,
   childCount: row.childCount,
 });

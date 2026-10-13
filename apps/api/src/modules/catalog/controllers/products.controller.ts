@@ -24,6 +24,7 @@ import {
   CreateProductDto,
   NewUnitDto,
   NextSkuDto,
+  NextSkuQueryDto,
   ProductDetailDto,
   ProductListQueryDto,
   ProductPageDto,
@@ -35,6 +36,7 @@ import {
 } from '../dto/products.dto';
 import { BarcodeService } from '../services/barcode.service';
 import { ProductEbarimtService } from '../services/product-ebarimt.service';
+import { SkuRangesService } from '../services/sku-ranges.service';
 import {
   type NewUnitInput,
   type ProductPatch,
@@ -46,6 +48,7 @@ import { toBarcodeDto, toProductDetailDto, toProductListItemDto, toUnitDto } fro
 
 const MANAGE = 'catalog.products.manage';
 const EBARIMT = 'catalog.ebarimt.manage';
+const REGISTER = 'catalog.products.register';
 
 const toUnitInput = (unit: NewUnitDto): NewUnitInput => ({
   ...unit,
@@ -58,6 +61,7 @@ export class ProductsController {
   constructor(
     private readonly products: ProductsService,
     private readonly ebarimt: ProductEbarimtService,
+    private readonly ranges: SkuRangesService,
   ) {}
 
   @Get()
@@ -68,12 +72,15 @@ export class ProductsController {
     return { data: page.data.map(toProductListItemDto), nextCursor: page.nextCursor };
   }
 
-  /** Declared before `:id`, so "next-sku" never reaches ParseIntPipe. */
+  /**
+   * The code to suggest for a new product of a category (ADR-0044 #1): from its range, else past
+   * every range. Declared before `:id`, so "next-sku" never reaches ParseIntPipe.
+   */
   @Get('next-sku')
-  @RequirePermission(MANAGE)
+  @RequirePermission(REGISTER)
   @ApiOkResponse({ type: NextSkuDto })
-  async nextSku(): Promise<NextSkuDto> {
-    return { sku: await this.products.nextSku() };
+  async nextSku(@Query() query: NextSkuQueryDto): Promise<NextSkuDto> {
+    return { sku: await this.ranges.suggest(query.categoryId) };
   }
 
   @Get(':id')

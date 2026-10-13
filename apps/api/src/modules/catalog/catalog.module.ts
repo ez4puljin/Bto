@@ -17,6 +17,7 @@ import { ProductEbarimtService } from './services/product-ebarimt.service';
 import { ProductImagesService } from './services/product-images.service';
 import { ProductLifecycleService } from './services/product-lifecycle.service';
 import { ProductsService } from './services/products.service';
+import { SkuRangesService } from './services/sku-ranges.service';
 import { TaxService } from './services/tax.service';
 import { UnitConversionService } from './services/unit-conversion.service';
 import { UnitsService } from './services/units.service';
@@ -32,6 +33,7 @@ const CORE_SERVICES = [
   ProductImagesService,
   ProductLifecycleService,
   ProductsService,
+  SkuRangesService,
   TaxService,
   UnitConversionService,
   UnitsService,

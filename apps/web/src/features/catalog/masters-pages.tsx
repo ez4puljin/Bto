@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { rangeOwner, SKU_PATTERN } from '@tugeel/shared/catalog';
 import {
   Check,
   Folder,
@@ -138,12 +139,13 @@ export function CategoriesPage() {
             <TableRow>
               <TableHead>{t('catalog.categories.name')}</TableHead>
               <TableHead>{t('catalog.categories.defaultCode')}</TableHead>
+              <TableHead>{t('catalog.categories.skuRange')}</TableHead>
               <TableHead>{t('catalog.products.title')}</TableHead>
               {canManage ? <TableHead /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.isPending ? <SkeletonRows columns={canManage ? 4 : 3} /> : null}
+            {categories.isPending ? <SkeletonRows columns={canManage ? 5 : 4} /> : null}
             {tree.map(({ category, depth }) => {
               const Icon = category.childCount > 0 ? FolderOpen : Folder;
               return (
@@ -172,6 +174,9 @@ export function CategoriesPage() {
                     ) : (
                       <None />
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <RangeCell categories={categories.data ?? []} category={category} />
                   </TableCell>
                   <TableCell className="text-muted-foreground tabular-nums">
                     {t('catalog.categories.products', { count: category.productCount })}
@@ -230,11 +235,49 @@ export function CategoriesPage() {
   );
 }
 
-const categorySchema = z.object({
-  name: z.string().trim().min(1, 'validation.required').max(100, 'validation.tooLong'),
-  parentId: z.string(),
-  defaultClassificationCode: optionalCode,
-});
+/** A category's own code range, or the one it uses from an ancestor, muted (ADR-0044 #1). */
+function RangeCell(props: { categories: readonly Category[]; category: Category }) {
+  const { t } = useTranslation();
+  const owner = rangeOwner(props.categories, props.category.id);
+  if (!owner) return <None />;
+  const text = `${owner.skuFrom ?? ''}–${owner.skuTo ?? ''}`;
+  return owner.id === props.category.id ? (
+    <span className="font-mono">{text}</span>
+  ) : (
+    <span className="flex flex-col text-muted-foreground">
+      <span className="font-mono">{text}</span>
+      <span className="text-xs">{t('catalog.categories.inheritedFrom', { name: owner.name })}</span>
+    </span>
+  );
+}
+
+const optionalSku = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || SKU_PATTERN.test(value), 'validation.sku');
+
+const categorySchema = z
+  .object({
+    name: z.string().trim().min(1, 'validation.required').max(100, 'validation.tooLong'),
+    parentId: z.string(),
+    defaultClassificationCode: optionalCode,
+    skuFrom: optionalSku,
+    skuTo: optionalSku,
+  })
+  .superRefine((values, context) => {
+    if ((values.skuFrom === '') !== (values.skuTo === '')) {
+      const path = values.skuFrom === '' ? 'skuFrom' : 'skuTo';
+      context.addIssue({ code: 'custom', path: [path], message: 'validation.skuRangePair' });
+      return;
+    }
+    if (
+      SKU_PATTERN.test(values.skuFrom) &&
+      SKU_PATTERN.test(values.skuTo) &&
+      BigInt(values.skuFrom) > BigInt(values.skuTo)
+    ) {
+      context.addIssue({ code: 'custom', path: ['skuTo'], message: 'validation.skuRangeOrder' });
+    }
+  });
 type CategoryValues = z.infer<typeof categorySchema>;
 
 function CategoryDialog(props: {
@@ -260,6 +303,8 @@ function CategoryDialog(props: {
       name: existing?.name ?? '',
       parentId: parentId === null ? '' : String(parentId),
       defaultClassificationCode: existing?.defaultClassificationCode ?? '',
+      skuFrom: existing?.skuFrom ?? '',
+      skuTo: existing?.skuTo ?? '',
     },
   });
   const submit = form.handleSubmit(async (values) => {
@@ -267,6 +312,8 @@ function CategoryDialog(props: {
       name: values.name,
       parentId: values.parentId ? Number.parseInt(values.parentId, 10) : null,
       defaultClassificationCode: values.defaultClassificationCode || null,
+      skuFrom: values.skuFrom || null,
+      skuTo: values.skuTo || null,
     };
     const ok = await action.run(() =>
       existing
@@ -316,6 +363,33 @@ function CategoryDialog(props: {
               className="font-mono sm:w-44"
               {...form.register('defaultClassificationCode')}
             />
+          </FormField>
+          <FormField
+            label={t('catalog.categories.skuRange')}
+            htmlFor="category-sku-from"
+            hint={t('catalog.categories.skuRangeHint')}
+            error={errors.skuFrom?.message ?? errors.skuTo?.message}
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                id="category-sku-from"
+                aria-label={t('catalog.categories.skuFrom')}
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono sm:w-36"
+                {...form.register('skuFrom')}
+              />
+              <span aria-hidden className="text-muted-foreground">
+                {'–'}
+              </span>
+              <Input
+                aria-label={t('catalog.categories.skuTo')}
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono sm:w-36"
+                {...form.register('skuTo')}
+              />
+            </div>
           </FormField>
           <SaveFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>

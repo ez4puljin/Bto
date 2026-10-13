@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SKU_PATTERN } from '@tugeel/shared/catalog';
 import { classifyBarcode } from '@tugeel/shared/gtin';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { splitList } from '@tugeel/shared/imports';
@@ -49,7 +50,7 @@ import {
   warehouseFinder,
 } from './lookups';
 
-const SKU = /^[0-9]{1,20}$/;
+const SKU = SKU_PATTERN;
 const NAME_MAX = 200;
 /** Above this many units a "box" is not a box: refuse it as a likely typo. */
 const BOX_MAX = 100_000;

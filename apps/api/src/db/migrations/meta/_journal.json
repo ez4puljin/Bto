@@ -113,6 +113,13 @@
       "when": 1791885396657,
       "tag": "0015_sale_ready",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791887583871,
+      "tag": "0016_category_sku_ranges",
+      "breakpoints": true
     }
   ]
 }

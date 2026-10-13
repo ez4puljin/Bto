@@ -97,7 +97,7 @@ describe('products: create, update, list (SPEC §5.2)', () => {
     expect(audit.rowCount).toBe(1);
   });
 
-  it('suggests the next numeric SKU, keeping its width, and refuses duplicates', async () => {
+  it('suggests the next numeric SKU and refuses duplicates, leading zeros included', async () => {
     const api = catalogApi(app, admin);
     const next = await http().get('/api/v1/products/next-sku').set(bearer(admin)).expect(200);
     expect(next.body).toEqual({ sku: '10024' });
@@ -112,6 +112,13 @@ describe('products: create, update, list (SPEC §5.2)', () => {
       code: 'DUPLICATE_VALUE',
       params: { constraint: 'products_sku_key' },
     });
+    // «010024» is the same number (ADR-0044 #1).
+    const padded = await http()
+      .post('/api/v1/products')
+      .set(bearer(admin))
+      .send({ sku: '010024', name: 'Тэгтэй', categoryId: drinks, baseUomId: pcs })
+      .expect(409);
+    expect(padded.body).toMatchObject({ params: { constraint: 'products_sku_key' } });
     await http().get('/api/v1/products/next-sku').set(bearer(worker)).expect(403);
   });
 

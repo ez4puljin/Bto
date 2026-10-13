@@ -22,6 +22,8 @@ const CATEGORIES: Schemas['Category'][] = [
     parentId: null,
     name: 'Ундаа',
     defaultClassificationCode: null,
+    skuFrom: null,
+    skuTo: null,
     productCount: 1,
     childCount: 0,
   },

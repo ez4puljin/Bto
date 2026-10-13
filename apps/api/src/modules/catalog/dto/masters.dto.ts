@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { SKU_PATTERN } from '@tugeel/shared/catalog';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
@@ -84,6 +85,13 @@ export class CategoryDto {
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true, description: 'Default БҮНА code (7 digits)' })
   defaultClassificationCode: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Own block of product codes; null: the nearest ancestor range applies (ADR-0044)',
+  })
+  skuFrom: string | null;
+  @ApiProperty({ type: String, nullable: true }) skuTo: string | null;
   @ApiProperty({ description: 'Products directly in this category' }) productCount: number;
   @ApiProperty() childCount: number;
 }
@@ -114,6 +122,21 @@ export class CreateCategoryDto {
   @IsOptional()
   @Matches(CLASSIFICATION_CODE)
   defaultClassificationCode?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    pattern: SKU_PATTERN.source,
+    description: 'First code of the block of the category (ADR-0044); both ends or neither',
+  })
+  @IsOptional()
+  @Matches(SKU_PATTERN)
+  skuFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, pattern: SKU_PATTERN.source })
+  @IsOptional()
+  @Matches(SKU_PATTERN)
+  skuTo?: string | null;
 }
 
 @ApiSchema({ name: 'CategoryUpdateRequest' })
@@ -136,4 +159,19 @@ export class UpdateCategoryDto {
   @IsOptional()
   @Matches(CLASSIFICATION_CODE)
   defaultClassificationCode?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    pattern: SKU_PATTERN.source,
+    description: 'First code of the block of the category (ADR-0044); both ends or neither',
+  })
+  @IsOptional()
+  @Matches(SKU_PATTERN)
+  skuFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, pattern: SKU_PATTERN.source })
+  @IsOptional()
+  @Matches(SKU_PATTERN)
+  skuTo?: string | null;
 }
