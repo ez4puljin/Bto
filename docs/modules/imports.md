@@ -1,13 +1,14 @@
 # Module `imports` — contract
 
-Status: **built** in delivery 1 (week 4), session of 2026-10-11; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/imports/`, shared rules in `packages/shared/src/imports`, screens in `apps/web/src/features/imports/`. Decisions: ADR-0015 (pipeline), ADR-0036 (as built: all or nothing, parsed by the worker), ADR-0013 (pg-boss), ADR-0030 (local file storage), ADR-0027 (access control), ADR-0040 (housekeeping), architecture §4 (imports row).
+Status: **built** in delivery 1 (week 4), session of 2026-10-11; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/imports/`, shared rules in `packages/shared/src/imports`, screens in `apps/web/src/features/imports/`. Decisions: ADR-0015 (pipeline), ADR-0036 (as built: all or nothing, parsed by the worker), ADR-0013 (pg-boss), ADR-0030 (local file storage), ADR-0027 (access control), ADR-0040 (housekeeping), ADR-0044 (no brands, new products wait for their prices, the table order of product writers), architecture §4 (imports row).
 
 imports depends on `identity` (files, audit, warehouses, actors), `catalog`, `partners` and `inventory`, always through their `index.ts` and their `*InTx` / bulk methods inside its own transaction; it never writes another module's tables. Nothing imports `imports` in-process.
 
 ## 1. Owner's answers behind the design (interview of 2026-10-11)
 
 - **A file with any error is refused entirely.** The owner fixes the sheet in Excel and uploads it again; nothing is half-imported.
-- **References are created by hand first.** A category, brand, supplier, warehouse or shelf missing from the system is an error, so typos never create new master data.
+- **References are created by hand first.** A category, supplier, warehouse or shelf missing from the system is an error, so typos never create new master data. (Brands were removed on 2026-10-13, ADR-0044.)
+- **New products wait for their prices (2026-10-13, ADR-0044).** A product the import creates is «Үнэ хүлээгдэж буй» until a price clerk completes it, also in bulk from `/catalog/pending`. Codes from the sheet are kept as they are: the category code ranges do not apply to imports.
 - **Opening stock** comes from today's spreadsheets per warehouse, without shelves and without costs (costs stay 0 until a later decision).
 - **Sheets.** The product sheet has one box-quantity column and several barcodes in one cell; the customer sheet has no company/individual column. The owner fills the system's templates (columns found by their headers), saves `.xlsx`, and only admins import.
 - **Public repository.** The owner's real files never enter the repository; tests use synthetic data and logs carry counts only.
@@ -58,7 +59,7 @@ Every route needs `imports.manage` (ADMIN; assignable to custom roles).
 
 | Kind | Key | What a row does |
 |---|---|---|
-| PRODUCTS | SKU | category (full path `Хүнс / Гурил` or a leaf name only one category has; `AMBIGUOUS` otherwise), brand, base unit (default the piece unit), barcodes of the base unit and of the box (several per cell, split on spaces, `,`, `;` or new lines), box quantity → a box unit (a different factor on an existing product is `MISMATCH`: factors change only on the product page), VAT type (code or Mongolian label), weight, home warehouse (WHOLESALE, code or name), fixed shelf (an active STORAGE/PICKING bin of the given or current home warehouse; without one `REQUIRED` on the home column), supplier (code, else name) → main supplier link. Existing products get only the fields that differ; empty cells never clear anything |
+| PRODUCTS | SKU | category (full path `Хүнс / Гурил` or a leaf name only one category has; `AMBIGUOUS` otherwise), base unit (default the piece unit), barcodes of the base unit and of the box (several per cell, split on spaces, `,`, `;` or new lines), box quantity → a box unit (a different factor on an existing product is `MISMATCH`: factors change only on the product page), VAT type (code or Mongolian label), weight, home warehouse (WHOLESALE, code or name), fixed shelf (an active STORAGE/PICKING bin of the given or current home warehouse; without one `REQUIRED` on the home column), supplier (code, else name) → main supplier link. Existing products get only the fields that differ; empty cells never clear anything |
 | CUSTOMERS | code | kind from the registration number, else the TIN's length, else company with `KIND_GUESSED`; TIN, consumer number, phone, address with the GPS point of a Google Maps link (added when the customer does not have that address yet; the first becomes the default), credit limit and payment term (blank limit = not decided); an inactive customer is reactivated with `REACTIVATED` |
 | SUPPLIERS | code, else name | TIN, phone, email, address, bank, payment term; a contact person is added when the supplier does not have them yet |
 | OPENING_STOCK | warehouse + SKU + bin | one `OPENING` adjustment per warehouse posted at commit (`AdjustmentsService.postSystemInTx`); quantity in the row's unit (default the base unit; must be exact in base units); bin optional: the product's fixed shelf, else SALESFLOOR at the supermarket, else the warehouse's `NOSHELF` storage shelf «Тавиургүй» (sellable, created on demand) with `NO_SHELF`; cost optional (per row unit, ex-VAT): empty = 0 with `NO_COST`; a RECEIVING bin warns `NOT_SELLABLE`; the home rule applies (`NOT_ALLOWED`); a warehouse with an active opening import refuses another (`ALREADY_IMPORTED`); more lines than one posting allows (`MAX_MOVEMENTS_PER_POST`) is `OUT_OF_RANGE` |
@@ -68,10 +69,12 @@ Row error codes: `REQUIRED`, `FORMAT`, `TOO_LONG`, `DATE_IN_CELL`, `FORMULA_WITH
 
 ## 7. Revert per kind
 
-- products: created products become INACTIVE and release their barcodes (refused while one holds stock, `IMPORT_REVERT_BLOCKED` with the first SKU); the supplier links the import added are removed and home warehouses and fixed shelves return to what they were; on existing products the updated fields go back only where they still hold the imported value, and the barcodes and box unit the import added are removed / retired if still there;
+- products: created products become INACTIVE, wait for their prices again (`sale_ready_at` cleared) and release their barcodes (refused while one holds stock, `IMPORT_REVERT_BLOCKED` with the first SKU); the supplier links the import added are removed and home warehouses and fixed shelves return to what they were; on existing products the updated fields go back only where they still hold the imported value, and the barcodes and box unit the import added are removed / retired if still there;
 - customers and suppliers: created ones become INACTIVE; updated fields and credit terms go back only where they still hold the imported value;
 - levels: the previous minimum and maximum go back where the imported ones still stand (`restoreLevelsInTx`); a location row the import created and left empty is removed;
 - opening stock: an `OPENING_REVERSAL` adjustment per document (`AdjustmentsService.reverseOpeningInTx`, `adjustments.reverses_adjustment_id` unique, so never twice); refused when the stock has moved on and the reversal would overdraw (`STOCK_INSUFFICIENT`).
+
+**Lock order (ADR-0044 #5).** A products commit locks the existing products it changes by id (`CatalogImportService.lockManyInTx`) before touching them, then writes `product_locations` (`setManyInTx`), then `product_suppliers` (`linkManyInTx`). A revert does the same: products first (by id), then locations, then links. A registration takes the tables in this order too, so neither ever waits for the other in a circle (`registration-races`).
 
 ## 8. Error codes introduced
 

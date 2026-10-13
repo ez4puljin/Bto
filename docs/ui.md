@@ -56,6 +56,11 @@ Radius: cards `rounded-xl` (12px), buttons and fields `rounded-lg` (10px), dialo
 
 Also: `ConfirmDialog` for irreversible steps, `ProblemAlert` for API errors, `ColumnChooser` for wide lists (ADR-0037), `ScanBox` for scanning.
 
+Feature pieces other screens reuse (ADR-0044):
+
+- `features/partners/supplier-picker.tsx` — `SupplierPicker({ id, value, onChange })`: a search box over the first active suppliers, then the chosen one read-only with «Солих». Only the control; the caller labels it (`FormRow htmlFor`). Receipts and the product registration use it.
+- `features/catalog/photo-uploads.ts` + `photo-picker.tsx` — `usePhotoUploads()` and `PhotoPicker({ id, uploads, error })`: photos of a record that does not exist yet. Each file is scaled and uploaded as soon as it is chosen; the grid shows uploading and failed states, the first photo is primary, a tile adds more (10 at most). `photosMessage(photos)` is the form's check (at least one uploaded, none still uploading). Object URLs are released on remove, reset and unmount.
+
 ## 4. Page patterns
 
 - **List page.** The pieces go in this order:
@@ -75,7 +80,9 @@ Also: `ConfirmDialog` for irreversible steps, `ProblemAlert` for API errors, `Co
 - **Creating.**
   - A short header form (warehouse, kind, note) opens a dialog from the page header (`useCreateParam`). It has one column, «Болих» (ghost) and the submit button. Afterwards, `navigate(newRecordUrl, { replace: true })`.
   - A long form (product, customer, supplier, receipt) has its own `/new` page.
+  - A form people fill many times in a row (product registration, ADR-0044) stays on its page after a save: a green line on top names the record with «Харах», the fields that repeat (category, supplier, warehouse) are kept, the rest is cleared, and a new `Idempotency-Key` is drawn. Server refusals that belong to a field (a code taken meanwhile, an unknown shelf) show on that field; the others in a `ProblemAlert` above the footer.
   - Never put a create form above a list.
+- **Lists with a bulk action** (`/catalog/pending`): a checkbox column with «Бүгдийг сонгох» in the header (indeterminate while some rows are ticked), each row's checkbox named after its code, ticked rows tinted (`data-state="selected"`); the bulk action is the page's main button in the header, disabled until something is ticked and counting the rows («Сонгосон 2 барааг бүрэн болгох»). Rows keep their name link and `RowActions`.
 - **Record page.** `PageHeader` with the title (name or number), `meta` (code, status badges, dates) and `actions` (links to related pages, print). Below it, `DetailCard`s that are read first, then the related cards. Use two columns on `lg` when there is a natural side column (photos, suppliers, locations).
 - **Document page** (draft → posted). The status sits in the header meta. While the document is a draft, an editor card (scan box, product search, quantities). After posting, a read-only lines card. Irreversible steps go through `ConfirmDialog`. (The flows are simplified in the next UI session.)
 - **Tool page** (barcode lookup, price calculator): a `PageHeader`, then cards: the input card with an icon and a hint, the result card with its next step («Бараа нээх»), earlier results in a `ListCard`. Counts on a report page are tiles (green with «Бүрэн» at zero, amber while something is missing).

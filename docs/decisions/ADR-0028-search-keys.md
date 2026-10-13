@@ -6,6 +6,7 @@
 | Date | 2026-10-11 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0011 #4 (one `search_text` with a fixed look-alike list) |
+| Amended by | ADR-0044 (#7: brands are removed, so #5 covers categories and units) |
 
 ## Context
 

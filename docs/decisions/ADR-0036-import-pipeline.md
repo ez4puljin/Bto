@@ -7,6 +7,7 @@
 | Deciders | Owner, Claude (Claude Code session) |
 | Revised | 2026-10-11, same session, before the code: the worker loads the workbook instead of streaming it, because ExcelJS 4.4's streaming reader loses shared strings in some files and never sees hyperlink targets (GPS links) |
 | Amends | ADR-0015 #2 (batched commits), #4 (customer kind and TIN lookup), #5 (opening-stock cost required) |
+| Amended by | ADR-0044 (#2, #5: new imported products wait for their prices and a revert clears that again; commit and revert take products by id, then product_locations, then product_suppliers; brands are gone from the template) |
 
 ## Context
 

@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0044`.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0045`.
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -59,6 +59,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0041](ADR-0041-prices-and-stacked-discounts.md) | One price per list, dated unit prices and stacked discount programs | Accepted | 2026-10-13 |
 | [ADR-0042](ADR-0042-web-design-system.md) | An Apple-like design system for the web; records read first, rows open their record | Accepted | 2026-10-13 |
 | [ADR-0043](ADR-0043-forms-and-row-actions.md) | Settings-style forms, switches and row actions | Accepted | 2026-10-13 |
+| [ADR-0044](ADR-0044-product-registration.md) | Product registration: code ranges, products waiting for their prices, no brands | Accepted | 2026-10-13 |
 
 ## Template
 

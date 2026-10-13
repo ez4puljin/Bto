@@ -1,6 +1,6 @@
 # Module `pricing` — contract
 
-Status: **built** in delivery 2 (first session), 2026-10-13; accepted locally with the rest of delivery 2. Code: `apps/api/src/modules/pricing/`, the resolver in `packages/shared/src/pricing`, screens in `apps/web/src/features/pricing/`. Decisions: ADR-0041 (one price per list, dated unit prices, stacked discount programs; replaces parts of ADR-0009 and ADR-0008 #4), ADR-0010 (money), architecture §4 (pricing row) and §5.4.
+Status: **built** in delivery 2 (first session), 2026-10-13; accepted locally with the rest of delivery 2. Same day (ADR-0044): the price clerk's permission, completing products that wait for their prices, and the «Үнэ хүлээгдэж буй» list. Code: `apps/api/src/modules/pricing/`, the resolver in `packages/shared/src/pricing`, screens in `apps/web/src/features/pricing/`. Decisions: ADR-0041 (one price per list, dated unit prices, stacked discount programs; replaces parts of ADR-0009 and ADR-0008 #4), ADR-0010 (money), architecture §4 (pricing row) and §5.4.
 
 pricing depends on `identity` (audit, access decorators) and `catalog` (products, units, categories, units of measure, the `UNIT_SUPERSEDED_HOOK`). `partners` is not needed while every customer pays the same price. sales (next session) and imports (the price sheet) import its `index.ts`.
 
@@ -10,6 +10,7 @@ pricing depends on `identity` (audit, access decorators) and `catalog` (products
 - **Discounts.** By the quantity of one product, by a category (boxes counted, or the amount; every box is one, pieces in boxes) and by the order's amount; as a percentage, a new price or tugriks off. All of them stack, in order, each threshold checked on the amount after the earlier discounts. Promotions with dates happen sometimes.
 - **Orders.** No manual discounts by staff; a shortfall at confirmation is confirmed in part and delivered later (SPEC §11 #9, #18).
 - **VAT.** Whether some prices exclude VAT is for the accountant; until then every price includes VAT and city tax.
+- **New products (2026-10-13, ADR-0044).** A registered or imported product waits for its prices. A price clerk («Үнэ оруулах») enters the wholesale and the supermarket price and completes it; only then do orders see it. Discounts stay with the admin.
 
 ## 2. Owned tables (migration `0013_pricing`)
 
@@ -30,6 +31,7 @@ pricing depends on `identity` (audit, access decorators) and `catalog` (products
 | `UnitPricesService.closeUnitInTx(tx, actor, unitId, today)` | a superseded unit's prices end today, planned ones are voided |
 | `DiscountProgramsService.list / get / create / update / stop / remove`, `inForce(list, date, executor?)`, `closeForUnitInTx` | programs; edits and deletes only before the start (`DISCOUNT_PROGRAM_STARTED`), a second PRICE program on a unit and dates → `DISCOUNT_PROGRAM_OVERLAP` |
 | `PriceQuoteService.quote({ list, date, lines }, executor?)` → `Quote` | a cart priced as ADR-0041 #3 says; orders call it with their transaction at SUBMIT |
+| `SaleReadinessService.complete(actor, productIds)` → `{ completed, alreadyComplete }` | ADR-0044 #3: 1–200 products locked by id (catalog's `ProductLifecycleService`), each ACTIVE (`PRODUCT_INACTIVE`) with a WHOLESALE and a RETAIL base price in force today (`PRICE_MISSING`, `errors[]` naming the SKUs); all or nothing |
 | `@tugeel/shared/pricing` | `resolveQuote`, `allocate`, `reachedStep`, `discountShapeIssue`, `discountStepsIssue`, the list, scope, measure and effect codes — the web uses the same checks in its form |
 
 Other modules never read or write pricing tables.
@@ -40,7 +42,8 @@ Other modules never read or write pricing tables.
 |---|---|---|
 | `GET /unit-prices?productId` | authenticated | `{ productId, today, wholesale[], retail[] }` per current unit: `current { price, source, period }`, `scheduled[]`, `history[]` |
 | `GET /unit-prices/current?productIds=…` | authenticated | base unit prices in force, both lists (ADR-0037 batch read, up to 200 ids) |
-| `POST /unit-prices` | `pricing.manage`, Idempotency-Key | `{ productId, validFrom, entries: [{ list, productUnitId, price \| null }] }` → the product's prices; 200 |
+| `POST /unit-prices` | `pricing.prices.manage`, Idempotency-Key | `{ productId, validFrom, entries: [{ list, productUnitId, price \| null }] }` → the product's prices; 200 |
+| `POST /pricing/sale-ready` | `pricing.prices.manage`, Idempotency-Key | `{ productIds }` (1–200) → `{ completed, alreadyComplete }`, 200; `PRODUCT_INACTIVE` (409), `PRICE_MISSING` (409) with `params.count` and `errors[]` (`productIds.N`, the SKU) |
 | `GET /discount-programs?list&scope&status&productId` | authenticated | newest first, keyset; `status` SCHEDULED / ACTIVE / ENDED relative to today |
 | `GET /discount-programs/:id` | authenticated | with product, units (name, factor) and steps |
 | `POST /discount-programs` | `pricing.manage`, Idempotency-Key | 201; thresholds in canonical units (PRODUCT QTY: base units) |
@@ -55,14 +58,15 @@ Other modules never read or write pricing tables.
 - **Quote order** (ADR-0041 #3): list price → the product's programs (PRICE, never above the price so far; PERCENT; AMOUNT per unit) → whole MNT → line subtotal → category programs → order programs; a stage's programs are measured on the stage's starting amounts, then percentages and amounts apply by id; a percentage comes off each line in whole MNT, an amount is split in proportion (largest remainder). A product's thresholds count its quantity in the whole cart; a category counts its subtree.
 - **Superseded units.** Nothing is copied to the new unit (ADR-0041 #6); its price is derived until set.
 - **Taxes.** Not in the quote; prices include VAT (SPEC §6.1 #1) until the accountant answers.
+- **Completion (ADR-0044 #3).** Both base prices must be in force on the Ulaanbaatar date of the call; a price from tomorrow does not count. A base price cannot be removed, so nothing changes between the check and the update. Permissions: `pricing.prices.manage` «Үнэ оруулах» sets prices and completes; `pricing.manage` keeps the discount programs.
 
 ## 6. Error codes introduced
 
-`DISCOUNT_PROGRAM_STARTED` (409), `DISCOUNT_PROGRAM_OVERLAP` (409). Also used: `PRICE_MISSING` (per quote line), `UNIT_SUPERSEDED`, `UNIT_FACTOR_INEXACT`, `VALIDATION_FAILED` (paths `validFrom`, `entries.N.price`, `steps.N`, `effect`, …), `NOT_FOUND`, `FORBIDDEN`. SQLSTATE 23P01 (an EXCLUDE) maps to 409 `CONFLICT` everywhere.
+`DISCOUNT_PROGRAM_STARTED` (409), `DISCOUNT_PROGRAM_OVERLAP` (409), `PRODUCT_INACTIVE` (409, ADR-0044). Also used: `PRICE_MISSING` (per quote line), `UNIT_SUPERSEDED`, `UNIT_FACTOR_INEXACT`, `VALIDATION_FAILED` (paths `validFrom`, `entries.N.price`, `steps.N`, `effect`, …), `NOT_FOUND`, `FORBIDDEN`. SQLSTATE 23P01 (an EXCLUDE) maps to 409 `CONFLICT` everywhere.
 
 ## 7. Audit
 
-`unit_prices` UPDATE (entity id = product: the changes with before and after) and CLOSE (a superseded unit, system actor `unit-superseded`); `discount_programs` CREATE, UPDATE, DELETE, STOP (also by `unit-superseded`).
+`unit_prices` UPDATE (entity id = product: the changes with before and after) and CLOSE (a superseded unit, system actor `unit-superseded`); `discount_programs` CREATE, UPDATE, DELETE, STOP (also by `unit-superseded`); `products` COMPLETE (one row per completed product, written through catalog).
 
 ## 8. Screens (`apps/web`)
 
@@ -71,7 +75,8 @@ Other modules never read or write pricing tables.
   - planned changes («2026-11-01-с 1,100₮»);
   - past prices, folded.
 
-  `pricing.manage` opens «Үнэ тохируулах»: a day (today or later) and a field per unit and list, prefilled with the units' own prices. Only changed fields are sent; an emptied field returns a unit to its derived price; the base unit cannot be emptied.
+  `pricing.prices.manage` opens «Үнэ тохируулах» (`price-entry-dialog.tsx`): a day (today or later) and a field per unit and list, prefilled with the units' own prices. Only changed fields are sent; an emptied field returns a unit to its derived price; the base unit cannot be emptied. While the product waits for its prices, the card says so with «Бүрэн болгох», and the dialog sets prices from today with «Болих», «Хадгалах» and «Бүрэн болгох» (saves what changed, then completes).
+- **«Үнэ хүлээгдэж буй»** (`/catalog/pending`, menu «Бараа», `pricing.prices.manage`; `pending-products-page.tsx`): the waiting products (search, category) with their wholesale and supermarket base price today, «Үнэ оруулах» per row (the dialog above), and the ticked rows completed at once («Сонгосон N барааг бүрэн болгох»); a refusal lists the SKUs without both prices.
 - **Product list** → columns «Бөөний үнэ» and «Супермаркетын үнэ» (the base unit's price today), read per page only while shown (ADR-0037).
 - **Menu «Үнэ»** (every user):
   - «Хямдрал» (`/pricing/discounts`): programs in force by default, filters Идэвхтэй / Төлөвлөсөн / Дууссан / Бүгд. Each row shows its target, effect, steps in the unit they were typed in (`10 хайрцаг+ → 22,800₮`) and dates (the last day shown inclusive). On one program's page (`/pricing/discounts/:id`): «Засах» and «Устгах» before the start, «Зогсоох» while in force.
@@ -87,10 +92,11 @@ Verified in the browser on 2026-10-13 against the dev database, signed in as the
 
 ## 9. Tests
 
-Shared (Vitest): `pricing` (list and derived prices, PRICE_MISSING, every stage, stacking, rounding, the owner's example, allocation, shapes and steps). Integration: `pricing.int-spec.ts` (the timeline: planned changes slotting in, same-day replacement voided, derived boxes, refusals and rights; list columns; programs: overlap, shape and step checks, edits before the start, stop after, audit; quotes through every stage, RETAIL, a planned price, bad lines; a superseded unit). Integrity: `pricing-guards.spec.ts` (only `valid_to` earlier, no delete even by the migrator for rewrites, no overlapping prices, one PRICE program per unit and day, concurrent changes serialised), `catalog-supersede.spec.ts` (the hook in the supersede transaction). Web: `features/pricing/pricing-pages.test.tsx` (the menu for every user; the product card and its dialog sending only the changed price with an Idempotency-Key; no change button without the right; the programs list in boxes, percentages and tugriks; a product program typed in boxes and sent in pieces; the calculator and its explanation), `features/catalog/catalog-pages.test.tsx` (the price columns, read only while shown).
+Shared (Vitest): `pricing` (list and derived prices, PRICE_MISSING, every stage, stacking, rounding, the owner's example, allocation, shapes and steps). Integration: `sale-readiness.int-spec.ts` (both prices today, a future price, all or nothing, already complete, rights), `pricing.int-spec.ts` (the timeline: planned changes slotting in, same-day replacement voided, derived boxes, refusals and rights; list columns; programs: overlap, shape and step checks, edits before the start, stop after, audit; quotes through every stage, RETAIL, a planned price, bad lines; a superseded unit). Integrity: `pricing-guards.spec.ts` (only `valid_to` earlier, no delete even by the migrator for rewrites, no overlapping prices, one PRICE program per unit and day, concurrent changes serialised), `catalog-supersede.spec.ts` (the hook in the supersede transaction). Web: `features/pricing/pricing-pages.test.tsx` (the menu for every user; the product card and its dialog sending only the changed price with an Idempotency-Key; no change button without the right; the programs list in boxes, percentages and tugriks; a product program typed in boxes and sent in pieces; the calculator and its explanation), `features/catalog/catalog-pages.test.tsx` (the price columns, read only while shown).
 
 ## 10. Open items
 
-- Next session: the price sheet import (a template pre-filled with the products and units); `sales` freezes the quote at SUBMIT.
+- Next session: the price sheet import (a template pre-filled with the products and units; it may complete the products it prices today); `sales` freezes the quote at SUBMIT and takes only complete products.
+- A menu badge with the number of waiting products (ADR-0044 follow-up).
 - Delivery 3: how e-Barimt lines carry `discountAmount`; the accountant's VAT answer.
 - Delivery 9: RETAIL at the POS.
