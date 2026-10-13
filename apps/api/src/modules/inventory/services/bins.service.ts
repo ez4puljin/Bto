@@ -107,13 +107,21 @@ export class BinsService {
 
   /** The bin of a scanned label in a warehouse (404 when the warehouse has no such code). */
   async lookup(warehouseId: number, code: string, executor: Db | Tx = this.db): Promise<Bin> {
-    const normalised = normalizeBinCode(code);
+    const row = await this.find(warehouseId, code, executor);
+    if (!row) {
+      const normalised = normalizeBinCode(code);
+      throw new AppError('NOT_FOUND', `no bin ${normalised}`, { code: normalised });
+    }
+    return row;
+  }
+
+  /** The bin with a typed or scanned code in a warehouse, or null. */
+  async find(warehouseId: number, code: string, executor: Db | Tx = this.db): Promise<Bin | null> {
     const [row] = await executor
       .select()
       .from(bins)
-      .where(and(eq(bins.warehouseId, warehouseId), eq(bins.code, normalised)));
-    if (!row) throw new AppError('NOT_FOUND', `no bin ${normalised}`, { code: normalised });
-    return row;
+      .where(and(eq(bins.warehouseId, warehouseId), eq(bins.code, normalizeBinCode(code))));
+    return row ?? null;
   }
 
   /** Every bin of these warehouses, archived ones included (imports match codes in bulk). */

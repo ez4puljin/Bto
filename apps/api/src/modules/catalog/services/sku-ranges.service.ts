@@ -16,6 +16,9 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
 import { categories, products } from '../schema';
 
+/** Two-key pg_advisory_xact_lock (this, hashtext of the number): one check of a number at a time. */
+export const SKU_NUMBER_LOCK = 72_026_105;
+
 /** The codes of every product, as numbers, inside a range and outside its holes. */
 function codesIn(range: SkuRange, holes: readonly SkuRange[]): SQL {
   const value = sql`${products.sku}::numeric`;
@@ -94,12 +97,7 @@ export class SkuRangesService {
    * category's (SKU_OUT_OF_RANGE, SKU_RESERVED), and no other product has the same number (a
    * leading zero makes no new code: DUPLICATE_VALUE like the unique key).
    */
-  async assertAllowed(
-    tx: Db | Tx,
-    categoryId: number,
-    sku: string,
-    selfId?: number,
-  ): Promise<void> {
+  async assertAllowed(tx: Tx, categoryId: number, sku: string, selfId?: number): Promise<void> {
     const verdict = checkSku(await this.categories(tx), categoryId, sku);
     if (!verdict.ok) {
       throw new AppError(
@@ -112,12 +110,18 @@ export class SkuRangesService {
         },
       );
     }
+    // "10000" and "010000" registered at once would both pass the check below: the number's lock
+    // makes the second wait for the first and then see it.
+    const number = BigInt(sku).toString();
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(${SKU_NUMBER_LOCK}::int, hashtext(${number}))`,
+    );
     const [twin] = await tx
       .select({ id: products.id })
       .from(products)
       .where(
         and(
-          sql`${products.sku}::numeric = ${BigInt(sku).toString()}::numeric`,
+          sql`${products.sku}::numeric = ${number}::numeric`,
           ...(selfId === undefined ? [] : [ne(products.id, selfId)]),
         ),
       )

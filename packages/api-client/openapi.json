@@ -5103,6 +5103,62 @@
         ]
       }
     },
+    "/api/v1/product-registrations": {
+      "post": {
+        "operationId": "ProductRegistrations_register",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredProduct"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/receipts": {
       "get": {
         "operationId": "Receipts_list",
@@ -13348,6 +13404,166 @@
         "required": [
           "productId",
           "warehouseId"
+        ]
+      },
+      "RegistrationUnitRequest": {
+        "type": "object",
+        "properties": {
+          "uomId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "10",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Base units in one of this unit"
+          },
+          "barcodes": {
+            "maxItems": 10,
+            "description": "Barcodes as printed or scanned",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        },
+        "required": [
+          "uomId",
+          "factorToBase"
+        ]
+      },
+      "RegistrationImageRequest": {
+        "type": "object",
+        "properties": {
+          "imageFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.product_image"
+          },
+          "thumbFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Uploaded file of kind catalog.product_thumb"
+          }
+        },
+        "required": [
+          "imageFileId",
+          "thumbFileId"
+        ]
+      },
+      "ProductRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "pattern": "^[0-9]{1,20}$",
+            "description": "The suggested code (GET /products/next-sku) or a typed one in the range"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "baseUomId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^\\d{1,8}(\\.\\d{1,4})?$",
+            "description": "kg per base unit"
+          },
+          "baseBarcodes": {
+            "maxItems": 10,
+            "description": "Barcodes as printed or scanned",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "boxFactor": {
+            "type": "string",
+            "example": "12",
+            "pattern": "^\\d{1,12}(\\.\\d{1,6})?$",
+            "description": "Base units in one box"
+          },
+          "boxBarcodes": {
+            "maxItems": 10,
+            "description": "Barcodes as printed or scanned",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "units": {
+            "maxItems": 10,
+            "description": "Other units, never the box",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationUnitRequest"
+            }
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An active wholesale warehouse"
+          },
+          "fixedBinCode": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "Label code of a storage or picking shelf of the home warehouse"
+          },
+          "images": {
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "The first becomes the primary photo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationImageRequest"
+            }
+          }
+        },
+        "required": [
+          "sku",
+          "name",
+          "categoryId",
+          "baseUomId",
+          "boxFactor",
+          "supplierId",
+          "homeWarehouseId",
+          "images"
+        ]
+      },
+      "RegisteredProduct": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name"
         ]
       },
       "ReceiptSummary": {

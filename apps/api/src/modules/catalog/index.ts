@@ -10,8 +10,14 @@ export {
   type CreatedProduct,
   type ImportProduct,
 } from './services/catalog-import.service';
+export {
+  type CatalogRegistration,
+  CatalogRegistrationService,
+  type RegisteredProduct,
+} from './services/catalog-registration.service';
 export { CatalogService } from './services/catalog.service';
 export { type Category, CategoriesService } from './services/categories.service';
+export { type ImageFiles, MAX_PRODUCT_IMAGES } from './services/product-images.service';
 export {
   ProductLifecycleService,
   type SaleReadyCandidate,

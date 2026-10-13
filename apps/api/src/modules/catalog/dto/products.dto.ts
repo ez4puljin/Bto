@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { SKU_PATTERN } from '@tugeel/shared/catalog';
+import { SKU_PATTERN, WEIGHT_PATTERN } from '@tugeel/shared/catalog';
 import { BARCODE_TYPES } from '@tugeel/shared/gtin';
+import { FACTOR_PATTERN } from '@tugeel/shared/units';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -28,8 +29,8 @@ const queryBoolean = ({ value }: { value: unknown }) => {
   return value;
 };
 const SKU = SKU_PATTERN;
-const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
-const WEIGHT = /^\d{1,8}(\.\d{1,4})?$/;
+const FACTOR = FACTOR_PATTERN;
+const WEIGHT = WEIGHT_PATTERN;
 const CLASSIFICATION_CODE = /^[0-9]{7}$/;
 const TAX_PRODUCT_CODE = /^[0-9]{3}$/;
 

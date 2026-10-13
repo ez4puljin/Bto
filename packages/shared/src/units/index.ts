@@ -8,6 +8,8 @@ import { Decimal, type DecimalInput } from '../money';
  */
 export const QTY_SCALE = 3;
 export const FACTOR_SCALE = 6;
+/** A factor as typed: up to 12 digits and FACTOR_SCALE decimals (NUMERIC(18,6)). */
+export const FACTOR_PATTERN = /^\d{1,12}(\.\d{1,6})?$/;
 
 /**
  * Whether a factor keeps conversions exact: an integer for piece-based products, at most three

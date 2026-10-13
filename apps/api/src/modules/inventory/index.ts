@@ -38,6 +38,10 @@ export {
   ProductLocationsService,
 } from './services/product-locations.service';
 export {
+  ProductRegistrationService,
+  type RegistrationInput,
+} from './services/product-registration.service';
+export {
   type CostLineInput,
   type ReceiptCosting,
   type ReceiptDetail,

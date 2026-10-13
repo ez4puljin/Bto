@@ -256,6 +256,23 @@ export class CatalogImportService {
     return created;
   }
 
+  /**
+   * Locks existing products in id order before an import changes them one by one: every writer
+   * of several products (the price clerk's completion among them) locks in this order, so they
+   * wait for each other instead of deadlocking (architecture §5.3).
+   */
+  async lockManyInTx(tx: Tx, productIds: readonly number[]): Promise<void> {
+    const ids = [...new Set(productIds)].sort((a, b) => a - b);
+    for (let start = 0; start < ids.length; start += CHUNK) {
+      await tx
+        .select({ id: products.id })
+        .from(products)
+        .where(inArray(products.id, ids.slice(start, start + CHUNK)))
+        .orderBy(asc(products.id))
+        .for('update');
+    }
+  }
+
   /** Changes one product's fields (ProductsService.updateInTx); returns the row before. */
   updateProductInTx(tx: Tx, actor: Actor, id: number, patch: ProductPatch): Promise<Product> {
     return this.products.updateInTx(tx, actor, id, patch);

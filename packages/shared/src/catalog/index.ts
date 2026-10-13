@@ -10,6 +10,8 @@
 export const SKU_PATTERN = /^[0-9]{1,20}$/;
 /** The largest code that fits 20 digits. */
 export const SKU_MAX = 10n ** 20n - 1n;
+/** Kilograms per base unit as typed: up to 8 digits and 4 decimals (NUMERIC(12,4)). */
+export const WEIGHT_PATTERN = /^\d{1,8}(\.\d{1,4})?$/;
 
 export interface SkuRange {
   from: bigint;

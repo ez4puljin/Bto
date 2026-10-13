@@ -159,73 +159,78 @@ export class ProductsService {
   ) {}
 
   create(actor: Actor, input: ProductInput): Promise<ProductDetail> {
-    return inTransaction(this.db, async (tx) => {
-      await this.assertReferences(tx, input);
-      const baseUom = await this.uom(tx, input.baseUomId, 'baseUomId');
-      const extra = input.units ?? [];
-      await this.assertUnits(tx, baseUom, extra);
-      // A typed code keeps to the category's range (ADR-0044 #1); an omitted one is suggested.
-      if (input.sku !== undefined) await this.ranges.assertAllowed(tx, input.categoryId, input.sku);
-      const sku = input.sku ?? (await this.ranges.suggest(input.categoryId, tx));
-      const name = normalizeName(input.name);
-      const keys = searchKeys(name, [sku]);
-      const [product] = await tx
-        .insert(products)
-        .values({
-          sku,
-          name,
-          searchText: keys.strict,
-          searchPhonetic: keys.phonetic,
-          searchVersion: keys.version,
-          categoryId: input.categoryId,
-          vatType: input.vatType ?? 'VAT_ABLE',
-          cityTax: input.cityTax ?? null,
-          classificationCode: input.classificationCode ?? null,
-          taxProductCode: input.taxProductCode ?? null,
-          weightKg: input.weightKg ?? null,
-        })
-        .returning();
-      if (!product) throw new Error('product insert returned no row');
-      const [base] = await tx
+    return inTransaction(this.db, (tx) => this.createInTx(tx, actor, input));
+  }
+
+  /**
+   * A new product with its units and barcodes in the caller's transaction (a registration,
+   * ADR-0044 #5); it waits for its prices until the price clerk completes it.
+   */
+  async createInTx(tx: Tx, actor: Actor, input: ProductInput): Promise<ProductDetail> {
+    await this.assertReferences(tx, input);
+    const baseUom = await this.uom(tx, input.baseUomId, 'baseUomId');
+    const extra = input.units ?? [];
+    await this.assertUnits(tx, baseUom, extra);
+    // A typed code keeps to the category's range (ADR-0044 #1); an omitted one is suggested.
+    if (input.sku !== undefined) await this.ranges.assertAllowed(tx, input.categoryId, input.sku);
+    const sku = input.sku ?? (await this.ranges.suggest(input.categoryId, tx));
+    const name = normalizeName(input.name);
+    const keys = searchKeys(name, [sku]);
+    const [product] = await tx
+      .insert(products)
+      .values({
+        sku,
+        name,
+        searchText: keys.strict,
+        searchPhonetic: keys.phonetic,
+        searchVersion: keys.version,
+        categoryId: input.categoryId,
+        vatType: input.vatType ?? 'VAT_ABLE',
+        cityTax: input.cityTax ?? null,
+        classificationCode: input.classificationCode ?? null,
+        taxProductCode: input.taxProductCode ?? null,
+        weightKg: input.weightKg ?? null,
+      })
+      .returning();
+    if (!product) throw new Error('product insert returned no row');
+    const [base] = await tx
+      .insert(productUnits)
+      .values({
+        productId: product.id,
+        uomId: baseUom.id,
+        factorToBase: new Decimal(1),
+        isBase: true,
+        isDefaultSales: !extra.some((unit) => unit.isDefaultSales),
+        isDefaultPurchase: !extra.some((unit) => unit.isDefaultPurchase),
+        measureUnit: input.baseMeasureUnit ?? null,
+      })
+      .returning();
+    if (!base) throw new Error('base unit insert returned no row');
+    for (const code of input.baseBarcodes ?? [])
+      await this.barcodes.addInTx(tx, actor, base.id, code);
+    for (const unit of extra) {
+      const [row] = await tx
         .insert(productUnits)
         .values({
           productId: product.id,
-          uomId: baseUom.id,
-          factorToBase: new Decimal(1),
-          isBase: true,
-          isDefaultSales: !extra.some((unit) => unit.isDefaultSales),
-          isDefaultPurchase: !extra.some((unit) => unit.isDefaultPurchase),
-          measureUnit: input.baseMeasureUnit ?? null,
+          uomId: unit.uomId,
+          factorToBase: unit.factorToBase,
+          isDefaultSales: unit.isDefaultSales ?? false,
+          isDefaultPurchase: unit.isDefaultPurchase ?? false,
+          measureUnit: unit.measureUnit ?? null,
         })
         .returning();
-      if (!base) throw new Error('base unit insert returned no row');
-      for (const code of input.baseBarcodes ?? [])
-        await this.barcodes.addInTx(tx, actor, base.id, code);
-      for (const unit of extra) {
-        const [row] = await tx
-          .insert(productUnits)
-          .values({
-            productId: product.id,
-            uomId: unit.uomId,
-            factorToBase: unit.factorToBase,
-            isDefaultSales: unit.isDefaultSales ?? false,
-            isDefaultPurchase: unit.isDefaultPurchase ?? false,
-            measureUnit: unit.measureUnit ?? null,
-          })
-          .returning();
-        if (!row) throw new Error('unit insert returned no row');
-        for (const code of unit.barcodes ?? [])
-          await this.barcodes.addInTx(tx, actor, row.id, code);
-      }
-      const created = await this.get(product.id, tx);
-      await this.audit.record(tx, actor, {
-        action: 'CREATE',
-        entity: 'products',
-        entityId: product.id,
-        after: auditView(created),
-      });
-      return created;
+      if (!row) throw new Error('unit insert returned no row');
+      for (const code of unit.barcodes ?? []) await this.barcodes.addInTx(tx, actor, row.id, code);
+    }
+    const created = await this.get(product.id, tx);
+    await this.audit.record(tx, actor, {
+      action: 'CREATE',
+      entity: 'products',
+      entityId: product.id,
+      after: auditView(created),
     });
+    return created;
   }
 
   update(actor: Actor, id: number, patch: ProductPatch): Promise<ProductDetail> {

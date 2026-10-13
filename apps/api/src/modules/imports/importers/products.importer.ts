@@ -297,6 +297,14 @@ export class ProductsImporter implements Importer<ProductPlan> {
     progress: Progress,
   ): Promise<AppliedRow[]> {
     const plans = rows.flatMap((row) => (row.plan ? [{ row, plan: row.plan }] : []));
+    // One table order for every product writer: products (by id), product_locations,
+    // product_suppliers (architecture §5.3).
+    await this.catalog.lockManyInTx(
+      tx,
+      plans.flatMap(({ plan }) =>
+        plan.create === null && plan.productId !== null ? [plan.productId] : [],
+      ),
+    );
     const creates = plans.filter(({ plan }) => plan.create !== null);
     const created = await this.catalog.createManyInTx(
       tx,
@@ -406,7 +414,8 @@ export class ProductsImporter implements Importer<ProductPlan> {
   /**
    * Takes the import back: created products become inactive and free their barcodes (refused while
    * any holds stock); on updated products, fields still holding the imported value get their old
-   * value back, added barcodes, units and supplier links are removed, locations restored.
+   * value back, added barcodes, units and supplier links are removed, locations restored. Tables
+   * in the order of every product writer: products (by id), product_locations, product_suppliers.
    */
   async revert(
     tx: Tx,
@@ -429,31 +438,10 @@ export class ProductsImporter implements Importer<ProductPlan> {
         count: held.size,
       });
     }
-    await this.links.unlinkManyInTx(
+    await this.catalog.lockManyInTx(
       tx,
-      actor,
-      entries.flatMap(({ changes }) => (changes.linkId === null ? [] : [changes.linkId])),
+      entries.map(({ changes }) => changes.productId),
     );
-    const restore: LocationChange[] = [];
-    for (const { changes } of entries) {
-      if (!changes.location) continue;
-      const { before, home, fixedBin } = changes.location;
-      restore.push({
-        productId: changes.productId,
-        ...(home === null ? {} : { homeWarehouseId: before.homeWarehouseId }),
-        ...(fixedBin === null
-          ? {}
-          : {
-              fixedBin: {
-                warehouseId: fixedBin.warehouseId,
-                binId:
-                  before.fixedBins.find((entry) => entry.warehouseId === fixedBin.warehouseId)
-                    ?.binId ?? null,
-              },
-            }),
-      });
-    }
-    await this.locations.setManyInTx(tx, actor, restore);
     const current = new Map(
       (
         await this.catalog.productsByIds(
@@ -486,6 +474,31 @@ export class ProductsImporter implements Importer<ProductPlan> {
       }
     }
     await this.catalog.deactivateManyInTx(tx, actor, createdIds);
+    const restore: LocationChange[] = [];
+    for (const { changes } of entries) {
+      if (!changes.location) continue;
+      const { before, home, fixedBin } = changes.location;
+      restore.push({
+        productId: changes.productId,
+        ...(home === null ? {} : { homeWarehouseId: before.homeWarehouseId }),
+        ...(fixedBin === null
+          ? {}
+          : {
+              fixedBin: {
+                warehouseId: fixedBin.warehouseId,
+                binId:
+                  before.fixedBins.find((entry) => entry.warehouseId === fixedBin.warehouseId)
+                    ?.binId ?? null,
+              },
+            }),
+      });
+    }
+    await this.locations.setManyInTx(tx, actor, restore);
+    await this.links.unlinkManyInTx(
+      tx,
+      actor,
+      entries.flatMap(({ changes }) => (changes.linkId === null ? [] : [changes.linkId])),
+    );
   }
 
   // -------------------------------------------------------------------------------------------

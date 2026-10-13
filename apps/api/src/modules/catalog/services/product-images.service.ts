@@ -13,6 +13,12 @@ export const MAX_PRODUCT_IMAGES = 10;
 
 type ProductImage = typeof productImages.$inferSelect;
 
+/** A photo and its thumbnail, uploaded through identity's storage. */
+export interface ImageFiles {
+  imageFileId: number;
+  thumbFileId: number;
+}
+
 /**
  * Product photos (ADR-0030): the web uploads a full image and a thumbnail through identity's
  * storage, then attaches both here. The first photo becomes the primary one.
@@ -25,51 +31,79 @@ export class ProductImagesService {
     private readonly storage: StorageService,
   ) {}
 
-  async attach(
+  async attach(actor: Actor, productId: number, files: ImageFiles): Promise<ImageView> {
+    await this.verify([files]);
+    const [row] = await inTransaction(this.db, (tx) =>
+      this.attachManyInTx(tx, actor, productId, [files]),
+    );
+    if (!row) throw new Error('image insert returned no row');
+    return this.view(row);
+  }
+
+  /**
+   * Checks, before the attaching transaction, that every photo and thumbnail arrived: with the
+   * Spaces driver this is an HTTP HEAD (CLAUDE.md NEVER list).
+   */
+  async verify(files: readonly ImageFiles[]): Promise<void> {
+    for (const pair of files) {
+      await this.storage.verifyUploaded(pair.imageFileId, 'catalog.product_image');
+      await this.storage.verifyUploaded(pair.thumbFileId, 'catalog.product_thumb');
+    }
+  }
+
+  /**
+   * Attaches verified photos in the caller's transaction (a registration, ADR-0044 #5), in order
+   * after the product's existing ones; the first becomes primary when the product has none.
+   */
+  async attachManyInTx(
+    tx: Tx,
     actor: Actor,
     productId: number,
-    files: { imageFileId: number; thumbFileId: number },
-  ): Promise<ImageView> {
-    // Outside the transaction: with the Spaces driver this is an HTTP HEAD (CLAUDE.md NEVER list).
-    await this.storage.verifyUploaded(files.imageFileId, 'catalog.product_image');
-    await this.storage.verifyUploaded(files.thumbFileId, 'catalog.product_thumb');
-    const row = await inTransaction(this.db, async (tx) => {
-      const [product] = await tx
-        .select({ id: products.id })
-        .from(products)
-        .where(eq(products.id, productId))
-        .for('update');
-      if (!product) throw notFound('product', productId);
-      const [stats] = await tx
-        .select({ total: count(productImages.id), last: max(productImages.sortOrder) })
-        .from(productImages)
-        .where(eq(productImages.productId, productId));
-      const total = stats?.total ?? 0;
-      if (total >= MAX_PRODUCT_IMAGES) {
-        throw invalid('images', 'max', `a product has at most ${MAX_PRODUCT_IMAGES} images`);
-      }
-      await this.storage.confirm(tx, files.imageFileId, 'catalog.product_image');
-      await this.storage.confirm(tx, files.thumbFileId, 'catalog.product_thumb');
-      const [inserted] = await tx
-        .insert(productImages)
-        .values({
+    files: readonly ImageFiles[],
+  ): Promise<ProductImage[]> {
+    if (files.length === 0) return [];
+    const [product] = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.id, productId))
+      .for('update');
+    if (!product) throw notFound('product', productId);
+    const [stats] = await tx
+      .select({ total: count(productImages.id), last: max(productImages.sortOrder) })
+      .from(productImages)
+      .where(eq(productImages.productId, productId));
+    const total = stats?.total ?? 0;
+    if (total + files.length > MAX_PRODUCT_IMAGES) {
+      throw invalid('images', 'max', `a product has at most ${MAX_PRODUCT_IMAGES} images`);
+    }
+    for (const pair of files) {
+      await this.storage.confirm(tx, pair.imageFileId, 'catalog.product_image');
+      await this.storage.confirm(tx, pair.thumbFileId, 'catalog.product_thumb');
+    }
+    const first = (stats?.last ?? -1) + 1;
+    const rows = await tx
+      .insert(productImages)
+      .values(
+        files.map((pair, index) => ({
           productId,
-          imageFileId: files.imageFileId,
-          thumbFileId: files.thumbFileId,
-          sortOrder: (stats?.last ?? -1) + 1,
-          isPrimary: total === 0,
-        })
-        .returning();
-      if (!inserted) throw new Error('image insert returned no row');
-      await this.audit.record(tx, actor, {
+          imageFileId: pair.imageFileId,
+          thumbFileId: pair.thumbFileId,
+          sortOrder: first + index,
+          isPrimary: total === 0 && index === 0,
+        })),
+      )
+      .returning();
+    await this.audit.recordMany(
+      tx,
+      actor,
+      rows.map((row) => ({
         action: 'CREATE',
         entity: 'product_images',
-        entityId: inserted.id,
-        after: inserted,
-      });
-      return inserted;
-    });
-    return this.view(row);
+        entityId: row.id,
+        after: row,
+      })),
+    );
+    return rows;
   }
 
   /** Makes a photo the one lists show (old primary cleared first). */

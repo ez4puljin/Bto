@@ -420,39 +420,42 @@ export class ProductLocationsService {
   /** The fixed shelf and levels of a product in one warehouse (created on first use). */
   async set(ctx: AuthContext, input: LocationInput): Promise<ProductLocation> {
     this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
-    return inTransaction(this.db, async (tx) => {
-      await this.assertProduct(input.productId, tx);
-      await this.assertMayReceive(tx, input.warehouseId, [input.productId]);
-      if (input.defaultBinId !== undefined && input.defaultBinId !== null) {
-        await this.assertShelf(tx, input.warehouseId, input.defaultBinId);
-      }
-      if (input.minQty && input.maxQty && input.minQty.gt(input.maxQty)) {
-        throw invalid('maxQty', 'range', 'the maximum is below the minimum');
-      }
-      const before = await this.find(tx, input.warehouseId, input.productId);
-      const values = {
-        ...(input.defaultBinId === undefined ? {} : { defaultBinId: input.defaultBinId }),
-        ...(input.minQty === undefined ? {} : { minQty: input.minQty }),
-        ...(input.maxQty === undefined ? {} : { maxQty: input.maxQty }),
-      };
-      await tx
-        .insert(productLocations)
-        .values({ warehouseId: input.warehouseId, productId: input.productId, ...values })
-        .onConflictDoUpdate({
-          target: [productLocations.warehouseId, productLocations.productId],
-          set: { ...values, updatedAt: sql`now()` },
-        });
-      const after = await this.find(tx, input.warehouseId, input.productId);
-      if (!after) throw new Error('product location upsert returned no row');
-      await this.audit.record(tx, ctx, {
-        action: before ? 'UPDATE' : 'CREATE',
-        entity: 'product_locations',
-        entityId: after.id,
-        before,
-        after,
+    return inTransaction(this.db, (tx) => this.setInTx(tx, ctx, input));
+  }
+
+  /** `set` in the caller's transaction (a registration, ADR-0044 #5); the caller checks the scope. */
+  async setInTx(tx: Tx, actor: Actor, input: LocationInput): Promise<ProductLocation> {
+    await this.assertProduct(input.productId, tx);
+    await this.assertMayReceive(tx, input.warehouseId, [input.productId]);
+    if (input.defaultBinId !== undefined && input.defaultBinId !== null) {
+      await this.assertShelf(tx, input.warehouseId, input.defaultBinId);
+    }
+    if (input.minQty && input.maxQty && input.minQty.gt(input.maxQty)) {
+      throw invalid('maxQty', 'range', 'the maximum is below the minimum');
+    }
+    const before = await this.find(tx, input.warehouseId, input.productId);
+    const values = {
+      ...(input.defaultBinId === undefined ? {} : { defaultBinId: input.defaultBinId }),
+      ...(input.minQty === undefined ? {} : { minQty: input.minQty }),
+      ...(input.maxQty === undefined ? {} : { maxQty: input.maxQty }),
+    };
+    await tx
+      .insert(productLocations)
+      .values({ warehouseId: input.warehouseId, productId: input.productId, ...values })
+      .onConflictDoUpdate({
+        target: [productLocations.warehouseId, productLocations.productId],
+        set: { ...values, updatedAt: sql`now()` },
       });
-      return after;
+    const after = await this.find(tx, input.warehouseId, input.productId);
+    if (!after) throw new Error('product location upsert returned no row');
+    await this.audit.record(tx, actor, {
+      action: before ? 'UPDATE' : 'CREATE',
+      entity: 'product_locations',
+      entityId: after.id,
+      before,
+      after,
     });
+    return after;
   }
 
   /** Makes a WHOLESALE warehouse the product's home (null: no home); one home per product. */
@@ -463,45 +466,54 @@ export class ProductLocationsService {
   ): Promise<ProductLocation[]> {
     if (warehouseId !== null) this.scope.assertCanWriteWarehouse(ctx, warehouseId);
     return inTransaction(this.db, async (tx) => {
-      await this.assertProduct(productId, tx);
-      await advisoryLock(tx, LOCKS.productHome, productId);
-      if (warehouseId !== null) {
-        const warehouse = await this.org.getWarehouse(warehouseId, tx);
-        if (warehouse.kind !== 'WHOLESALE') {
-          throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'a home warehouse is a wholesale one', {
-            kind: warehouse.kind,
-          });
-        }
+      await this.setHomeInTx(tx, ctx, productId, warehouseId);
+      return this.ofProduct(productId, tx);
+    });
+  }
+
+  /** `setHome` in the caller's transaction (a registration); the caller checks the scope. */
+  async setHomeInTx(
+    tx: Tx,
+    actor: Actor,
+    productId: number,
+    warehouseId: number | null,
+  ): Promise<void> {
+    await this.assertProduct(productId, tx);
+    await advisoryLock(tx, LOCKS.productHome, productId);
+    if (warehouseId !== null) {
+      const warehouse = await this.org.getWarehouse(warehouseId, tx);
+      if (warehouse.kind !== 'WHOLESALE') {
+        throw new AppError('WAREHOUSE_KIND_NOT_ALLOWED', 'a home warehouse is a wholesale one', {
+          kind: warehouse.kind,
+        });
       }
-      const before = await this.ofProduct(productId, tx);
+    }
+    const before = await this.ofProduct(productId, tx);
+    await tx
+      .update(productLocations)
+      .set({ isHome: false, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(productLocations.productId, productId),
+          eq(productLocations.isHome, true),
+          ...(warehouseId === null ? [] : [ne(productLocations.warehouseId, warehouseId)]),
+        ),
+      );
+    if (warehouseId !== null) {
       await tx
-        .update(productLocations)
-        .set({ isHome: false, updatedAt: sql`now()` })
-        .where(
-          and(
-            eq(productLocations.productId, productId),
-            eq(productLocations.isHome, true),
-            ...(warehouseId === null ? [] : [ne(productLocations.warehouseId, warehouseId)]),
-          ),
-        );
-      if (warehouseId !== null) {
-        await tx
-          .insert(productLocations)
-          .values({ warehouseId, productId, isHome: true })
-          .onConflictDoUpdate({
-            target: [productLocations.warehouseId, productLocations.productId],
-            set: { isHome: true, updatedAt: sql`now()` },
-          });
-      }
-      const after = await this.ofProduct(productId, tx);
-      await this.audit.record(tx, ctx, {
-        action: 'UPDATE',
-        entity: 'product_locations',
-        entityId: productId,
-        before: { productId, home: before.find((row) => row.isHome)?.warehouseId ?? null },
-        after: { productId, home: warehouseId },
-      });
-      return after;
+        .insert(productLocations)
+        .values({ warehouseId, productId, isHome: true })
+        .onConflictDoUpdate({
+          target: [productLocations.warehouseId, productLocations.productId],
+          set: { isHome: true, updatedAt: sql`now()` },
+        });
+    }
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'product_locations',
+      entityId: productId,
+      before: { productId, home: before.find((row) => row.isHome)?.warehouseId ?? null },
+      after: { productId, home: warehouseId },
     });
   }
 

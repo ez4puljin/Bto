@@ -1221,6 +1221,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/product-registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ProductRegistrations_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/receipts": {
         parameters: {
             query?: never;
@@ -3267,6 +3283,54 @@ export interface components {
             productId: number;
             /** @description A wholesale warehouse; null: no home */
             warehouseId: number | null;
+        };
+        RegistrationUnitRequest: {
+            uomId: number;
+            /**
+             * @description Base units in one of this unit
+             * @example 10
+             */
+            factorToBase: string;
+            /** @description Barcodes as printed or scanned */
+            barcodes?: string[];
+        };
+        RegistrationImageRequest: {
+            /** @description Uploaded file of kind catalog.product_image */
+            imageFileId: number;
+            /** @description Uploaded file of kind catalog.product_thumb */
+            thumbFileId: number;
+        };
+        ProductRegistrationRequest: {
+            /** @description The suggested code (GET /products/next-sku) or a typed one in the range */
+            sku: string;
+            name: string;
+            categoryId: number;
+            baseUomId: number;
+            /** @description kg per base unit */
+            weightKg?: string | null;
+            /** @description Barcodes as printed or scanned */
+            baseBarcodes?: string[];
+            /**
+             * @description Base units in one box
+             * @example 12
+             */
+            boxFactor: string;
+            /** @description Barcodes as printed or scanned */
+            boxBarcodes?: string[];
+            /** @description Other units, never the box */
+            units?: components["schemas"]["RegistrationUnitRequest"][];
+            supplierId: number;
+            /** @description An active wholesale warehouse */
+            homeWarehouseId: number;
+            /** @description Label code of a storage or picking shelf of the home warehouse */
+            fixedBinCode?: string | null;
+            /** @description The first becomes the primary photo */
+            images: components["schemas"]["RegistrationImageRequest"][];
+        };
+        RegisteredProduct: {
+            productId: number;
+            sku: string;
+            name: string;
         };
         ReceiptSummary: {
             id: number;
@@ -7705,6 +7769,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ProductRegistrations_register: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductRegistrationRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisteredProduct"];
+                };
             };
             /** @description RFC 9457 problem details */
             default: {
