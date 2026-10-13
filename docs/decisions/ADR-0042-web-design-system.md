@@ -6,6 +6,8 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0037 #4 (rows of lists with a record page lose their «Засах» / «Харах» button); ADR-0011 (the web font is Inter; PDFs keep Noto Sans) |
+| Amended by | ADR-0043 (settings-style forms, switches and row actions) |
+| Errata | 2026-10-13: #11 now describes the aimag map that was built; the first text described an earlier hand-drawn border |
 
 ## Context
 
@@ -41,8 +43,8 @@ The web app had 50 routes on shadcn's neutral black-and-white theme: a text-only
    - Above the table, a filter bar: a search pill; filter pills that are still native `<select>`s (tinted while they narrow the list); yes/no pills that are still checkboxes; the column chooser at the end.
    - The table sits in a white card with an empty state, «Цааш үзэх» and skeleton rows while loading.
    - Rows of lists whose records have their own page are **link rows**: a click anywhere opens the record. Exceptions: the row's own controls, a modifier key, or selected text. The record's name or number stays a link (the keyboard and screen-reader path) and a chevron ends the row.
-   - The per-row «Засах» / «Харах» button of ADR-0037 #4 is removed. Lists edited in dialogs (categories, brands, units, roles, branches, warehouses, shelves) keep their row buttons (icon buttons since #12).
-7. **Records are read first.** A detail card shows its fields (in #12's rows); «Засах» (named «Засах: {card}») turns that card into its form; «Болих» or a save turns it back, with a toast. Applied this session to the product's data, the customer's data and credit terms, and the supplier's data. The product page has two columns on wide screens and links to its stock and movements.
+   - The per-row «Засах» / «Харах» button of ADR-0037 #4 is removed. Lists edited in dialogs (categories, brands, units, roles, branches, warehouses, shelves) keep their row buttons.
+7. **Records are read first.** A detail card shows label-over-value fields; «Засах» (named «Засах: {card}») turns that card into its form; «Болих» or a save turns it back, with a toast. Applied this session to the product's data, the customer's data and credit terms, and the supplier's data. The product page has two columns on wide screens and links to its stock and movements.
 8. **Creating.** Create cards placed above a list become dialogs opened from the page header (transfers, adjustments, stocktakes). The open state is `?new=1`, so the home page and the search can open it and the browser's back button closes it. After creating, the new document replaces the dialog in the history.
 9. **Feedback.** Short confirmations are toasts (`lib/toast`): a `status` message at the bottom (at the top on phones) for 4 s, the same message never stacked, at most three. Errors stay in ProblemAlert next to what failed.
 10. **Status colours.** Done or posted: green. In progress: blue. Draft or inactive: grey. Needs attention: orange. Refused or broken: red.
@@ -54,12 +56,6 @@ The web app had 50 routes on shadcn's neutral black-and-white theme: a text-only
       - right, the form.
     - The borders come from Natural Earth 1:10m admin-1 (public domain, downloaded with the owner's permission), simplified by `tools/maps/ne-aimags.cjs` into `features/auth/mongolia-aimags.ts` (22 shapes, about 1,400 points); `features/auth/mongolia.ts` holds the shared projection and the three places.
     - Phones show only the form under the mark; motion stops for reduced-motion users.
-12. **Forms and row actions** (the catalog screens, the same day; `docs/ui.md` §4).
-    - Forms read like settings (`components/form.tsx`). `FormSection` groups rows in a hairline box under a small uppercase title. `FormRow` puts the label in an 11rem column on the left and the field on the right; phones stack them, but a switch stays at the end of its label's line. `FormFooter` ends the form with «Болих» (ghost), then the main button, on the right. `FieldList` reads in the same rows, so a card keeps its shape when «Засах» opens its form.
-    - On/off values are switches (`components/ui/switch.tsx`, Radix Switch, green when on): product status, default units, fractional units, «include subcategories». Checkboxes stay for choices in a list.
-    - Dialogs stack their fields and end with «Болих», then the main button (`DialogFooter`'s own close button now comes first).
-    - Rows of lists edited in dialogs (categories, brands, units of measure) carry quiet icon buttons instead of text buttons (`RowActions`, `RowAction`; named for screen readers and shown as tooltips; `RowActionSpacer` keeps each action in its column).
-    - Sub-items with several actions (a product's units) show the frequent action as an icon button and the rest in a «⋯» menu named «{item}: үйлдэл». A dialog opened from either gives the focus back to the button that opened it.
 
 ## Alternatives considered
 
@@ -72,8 +68,6 @@ The web app had 50 routes on shadcn's neutral black-and-white theme: a text-only
 | Dark mode now | Doubles the visual checking of every screen; the tokens allow it later |
 | Custom pop-up selects for filters | Native selects keep forms, tests, phones and screen readers simple |
 | Sticky columns in wide lists | Not needed once the whole row opens; a column registry class can add it later |
-| Text buttons on the rows of master lists and units (#12) | Three or four buttons per row were the clutter the owner named; icons with names and tooltips, and a «⋯» menu for the rarer actions, keep everything one or two clicks away |
-| Checkboxes for single on/off values (#12) | A switch reads as a setting, is a larger target on phones and keeps its label |
 
 ## Consequences
 

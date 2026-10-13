@@ -80,7 +80,7 @@ Actions `CREATE`, `UPDATE`, `DELETE`, `SUPERSEDE`, `RETIRE`, `ASSIGN` on the ent
 
 ## 8. Screens (`apps/web`)
 
-Menu group «Бараа» (layout and patterns: `docs/ui.md`, ADR-0042 #12):
+Menu group «Бараа» (layout and patterns: `docs/ui.md`, ADR-0043):
 
 - `/catalog/products`: search and filters in the URL. Every piece of product information is a column (image, SKU, name, category, brand, base unit, other units «1 хайрцаг = 24 ш», base and other-unit barcodes, VAT, city tax, weight, home warehouse and fixed shelves from inventory, main supplier «+N» from partners, e-Barimt codes, status), read per page with `productIds` only for visible columns. «Баганууд» hides and shows columns (SKU and name stay), remembered per browser in `localStorage` `tugeel.catalog.products.hiddenColumns.v1`; the shared `components/column-chooser.tsx` serves the customer and supplier lists too (ADR-0037). A click anywhere on a row opens the product, whose name stays a link (ADR-0042 #6). The page uses the full width (route `handle: { wide: true }`).
 - `/catalog/products/new` (`catalog.products.manage`): sections «Ерөнхий», «e-Barimt шинж», «Суурь нэгж ба баркод» and «Нэмэлт нэгж» (each extra unit with its factor, default switches and barcodes); «Болих» goes back to the list.

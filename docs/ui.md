@@ -65,7 +65,7 @@ Also: `ConfirmDialog` for irreversible steps, `ProblemAlert` for API errors, `Co
   4. `ListCard` holding the `Table`, the `EmptyState` and `LoadMore`.
 
   When the record has its own page, each row is a `LinkRow` that keeps its name or number `Link`, with `ChevronHead` as the last header cell. Lists edited in dialogs end each row with `RowActions` (icon buttons named like the old text buttons; a `RowActionSpacer` where a row lacks one, so the icons stay in columns). Filters live in the URL.
-- **Forms** (ADR-0042 #12). Settings-style:
+- **Forms** (ADR-0043). Settings-style:
   - `FormSection`s (a small uppercase title, an optional hint and a header `action`) hold `FormRow`s: label left in 11rem, field right, hint and error under the field. Phones stack them; `align="center"` keeps a switch or a short control on its label's line.
   - Short fields get a width (`sm:w-44` for codes, `sm:w-28` for 3-digit codes); names and selects take the row.
   - On/off values are `Switch`es, never a lone checkbox.
