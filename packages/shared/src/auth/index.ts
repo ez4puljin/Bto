@@ -33,6 +33,9 @@ export const PERMISSIONS = [
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
+  // The AI assistant (ADR-0045): asking shows costs, credit and personal data to the holder.
+  'ai.ask',
+  'ai.reports.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

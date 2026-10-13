@@ -18,6 +18,32 @@ export const AI_ANSWER_STATUSES = [
 ] as const;
 export type AiAnswerStatus = (typeof AI_ANSWER_STATUSES)[number];
 
+/** Why a question was REFUSED or FAILED, as people read it (mn.json `ai.reasons.*`). */
+export const AI_FAILURE_REASONS = [
+  'GUARD',
+  'TIMEOUT',
+  'RESOURCES',
+  'CONNECTION',
+  'DATABASE',
+] as const;
+export type AiFailureReason = (typeof AI_FAILURE_REASONS)[number];
+
+/**
+ * The reason behind a stored error code: a guard reason for REFUSED; for FAILED an SQLSTATE
+ * (57014 statement timeout, classes 53 and 54 resources), CONNECTION, or a provider failure.
+ */
+export function failureReasonOf(
+  status: AiAnswerStatus,
+  errorCode: string | null,
+): AiFailureReason | null {
+  if (status === 'REFUSED') return 'GUARD';
+  if (status !== 'FAILED') return null;
+  if (errorCode === '57014') return 'TIMEOUT';
+  if (errorCode !== null && /^5[34]/.test(errorCode)) return 'RESOURCES';
+  if (errorCode === 'CONNECTION') return 'CONNECTION';
+  return 'DATABASE';
+}
+
 /** A question as typed; longer ones are refused before any model call. */
 export const AI_QUESTION_MAX_LENGTH = 1_000;
 export const AI_REPORT_NAME_MAX_LENGTH = 120;

@@ -30,6 +30,7 @@ import { RolesService } from './services/roles.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
 import { StorageService } from './services/storage.service';
+import { UserNamesService } from './services/user-names.service';
 import { UsersService } from './services/users.service';
 import { StorageUrlSigner } from './storage/url-signer';
 
@@ -40,6 +41,7 @@ const CORE_SERVICES = [
   ScopeService,
   SettingsService,
   StorageService,
+  UserNamesService,
 ];
 
 /** Identity services every process may use (api, worker jobs, CLIs). */

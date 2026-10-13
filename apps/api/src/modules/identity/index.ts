@@ -16,3 +16,4 @@ export {
 export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';
 export { StorageService, type StoredFile } from './services/storage.service';
+export { UserNamesService } from './services/user-names.service';

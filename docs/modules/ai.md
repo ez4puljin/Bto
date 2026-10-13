@@ -101,7 +101,7 @@ None: nothing imports `modules/ai`. Inside the module:
 
 ## 6. Error codes introduced
 
-`AI_NOT_CONFIGURED` (503: no provider, or no `AI_DATABASE_URL`), `AI_PROVIDER_FAILED` (502: timeout, HTTP error, refusal, unreadable answer; `params.reason`). Also used: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_IN_PROGRESS`.
+`AI_NOT_CONFIGURED` (503: no provider, or no `AI_DATABASE_URL`), `AI_PROVIDER_FAILED` (502: timeout, network, HTTP error, refusal, unreadable answer; `params.reason`, `status`, `providerCode`), `AI_QUERY_FAILED` (422: a question or report run again, or exported, no longer runs; `params.code`). Also used: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_FAILED`, `IDEMPOTENCY_KEY_IN_PROGRESS`.
 
 ## 7. Audit
 

@@ -9366,6 +9366,584 @@
           "pricing"
         ]
       }
+    },
+    "/api/v1/ai/status": {
+      "get": {
+        "operationId": "Ai_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/questions": {
+      "post": {
+        "operationId": "Ai_ask",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiAskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiAnswer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/conversations": {
+      "get": {
+        "operationId": "Ai_conversationList",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConversationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/conversations/{id}": {
+      "get": {
+        "operationId": "Ai_conversation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConversationDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/questions/{id}/run": {
+      "post": {
+        "operationId": "Ai_run",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/questions/{id}/export": {
+      "get": {
+        "operationId": "Ai_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/reports": {
+      "get": {
+        "operationId": "AiReports_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReportPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      },
+      "post": {
+        "operationId": "AiReports_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiReportCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/reports/{id}": {
+      "patch": {
+        "operationId": "AiReports_rename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiReportRenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      },
+      "delete": {
+        "operationId": "AiReports_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/reports/{id}/run": {
+      "post": {
+        "operationId": "AiReports_run",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/reports/{id}/export": {
+      "get": {
+        "operationId": "AiReports_export",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "ai"
+        ]
+      }
     }
   },
   "info": {
@@ -9472,7 +10050,9 @@
           "inventory.transfers.manage",
           "imports.manage",
           "pricing.manage",
-          "pricing.prices.manage"
+          "pricing.prices.manage",
+          "ai.ask",
+          "ai.reports.manage"
         ]
       },
       "RoleRef": {
@@ -17324,6 +17904,383 @@
           "total"
         ]
       },
+      "AiStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "Questions can be asked (a provider and the read-only database)"
+          },
+          "database": {
+            "type": "boolean",
+            "description": "Saved reports can run (the read-only database)"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true,
+            "example": "openai"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "configured",
+          "database",
+          "provider",
+          "model"
+        ]
+      },
+      "AiAskRequest": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Continue this conversation; omitted: a new one"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "In Mongolian"
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "AiQuestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "conversationId": {
+            "type": "number"
+          },
+          "question": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ANSWERED",
+              "CLARIFY",
+              "UNSUPPORTED",
+              "REFUSED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "nullable": true,
+            "enum": [
+              "QUERY",
+              "CLARIFY",
+              "UNSUPPORTED"
+            ],
+            "type": "string"
+          },
+          "sql": {
+            "type": "string",
+            "nullable": true,
+            "description": "The query that ran or was refused"
+          },
+          "explanation": {
+            "type": "string",
+            "nullable": true,
+            "description": "The model’s note, Mongolian"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plain text, Mongolian"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "REFUSED / FAILED: a guard reason, an SQLSTATE or CONNECTION"
+          },
+          "rowCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "repaired": {
+            "type": "boolean",
+            "description": "The model’s first query failed and was rewritten once"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "question",
+          "status",
+          "kind",
+          "sql",
+          "explanation",
+          "summary",
+          "errorCode",
+          "rowCount",
+          "truncated",
+          "repaired",
+          "createdAt"
+        ]
+      },
+      "AiColumn": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The output column name (usually Mongolian)"
+          },
+          "kind": {
+            "enum": [
+              "number",
+              "text",
+              "date",
+              "datetime",
+              "boolean"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ]
+      },
+      "AiResult": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiColumn"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "description": "Database text per cell: numbers keep their scale, booleans are t / f"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More rows exist than shown (500 on screen)"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated"
+        ]
+      },
+      "AiAnswer": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "number"
+          },
+          "question": {
+            "$ref": "#/components/schemas/AiQuestion"
+          },
+          "result": {
+            "nullable": true,
+            "description": "The rows; absent in an idempotent replay (run the question again)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AiResult"
+              }
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "question"
+        ]
+      },
+      "AiConversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AiConversationPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiConversation"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "AiConversationDetail": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/AiConversation"
+          },
+          "questions": {
+            "description": "Oldest first, without rows",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiQuestion"
+            }
+          }
+        },
+        "required": [
+          "conversation",
+          "questions"
+        ]
+      },
+      "AiReportAuthor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "AiReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "sourceQuestionId": {
+            "type": "number"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/AiReportAuthor"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "canChange": {
+            "type": "boolean",
+            "description": "The caller may rename or delete it"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sql",
+          "sourceQuestionId",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "canChange"
+        ]
+      },
+      "AiReportPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiReport"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "AiReportCreateRequest": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "One of the caller’s answered questions; its SQL is copied"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "questionId",
+          "name"
+        ]
+      },
+      "AiReportRenameRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -17393,6 +18350,9 @@
           "IMPORT_REVERT_BLOCKED",
           "DISCOUNT_PROGRAM_STARTED",
           "DISCOUNT_PROGRAM_OVERLAP",
+          "AI_NOT_CONFIGURED",
+          "AI_PROVIDER_FAILED",
+          "AI_QUERY_FAILED",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

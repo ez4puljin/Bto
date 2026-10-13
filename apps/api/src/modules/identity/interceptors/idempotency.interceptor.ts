@@ -12,7 +12,7 @@ import { Reflector } from '@nestjs/core';
 import { ApiHeader } from '@nestjs/swagger';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
-import { catchError, from, mergeMap, type Observable, of, throwError } from 'rxjs';
+import { catchError, from, map, mergeMap, type Observable, of, throwError } from 'rxjs';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
@@ -24,20 +24,38 @@ export const IDEMPOTENT_KEY = 'tugeel:idempotent';
 const HTTP_CODE_METADATA = '__httpCode__';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export interface IdempotentOptions {
+  /**
+   * Top-level response fields left out of the stored replay (ADR-0045 #8: an AI answer's rows are
+   * never stored; a replay without them makes the client run the query again).
+   */
+  storeWithout?: readonly string[];
+}
+
 /**
  * Marks a document-creating route (ADR-0002 #6, ADR-0004 #5): the client sends a UUID
  * `Idempotency-Key`; a retry with the same key and body gets the stored response instead of a
  * second document. Use on authenticated routes only.
  */
-export const Idempotent = () =>
+export const Idempotent = (options: IdempotentOptions = {}) =>
   applyDecorators(
-    SetMetadata(IDEMPOTENT_KEY, true),
+    SetMetadata(IDEMPOTENT_KEY, options),
     ApiHeader({
       name: 'Idempotency-Key',
       required: true,
       description: 'Client-generated UUID, kept until a response arrives',
     }),
   );
+
+/** The response as stored for replays: without the fields the route keeps out of storage. */
+function storable(body: unknown, without: readonly string[] = []): unknown {
+  if (without.length === 0 || body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return body;
+  }
+  return Object.fromEntries(
+    Object.entries(body as Record<string, unknown>).filter(([key]) => !without.includes(key)),
+  );
+}
 
 /** JSON with sorted object keys, so equal bodies hash equally whatever the key order. */
 export function canonicalJson(value: unknown): string {
@@ -66,9 +84,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
   async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
     const handler = context.getHandler();
-    if (!this.reflector.getAllAndOverride<boolean>(IDEMPOTENT_KEY, [handler, context.getClass()])) {
-      return next.handle();
-    }
+    const options = this.reflector.getAllAndOverride<IdempotentOptions | undefined>(
+      IDEMPOTENT_KEY,
+      [handler, context.getClass()],
+    );
+    if (!options) return next.handle();
     const http = context.switchToHttp();
     const request = http.getRequest<Request & AuthenticatedRequest>();
     const response = http.getResponse<Response>();
@@ -99,7 +119,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
       this.reflector.get<number | undefined>(HTTP_CODE_METADATA, handler) ??
       (request.method === 'POST' ? 201 : 200);
     return next.handle().pipe(
-      mergeMap((body: unknown) => from(this.complete(claimed.id, status, body))),
+      mergeMap((body: unknown) =>
+        from(this.complete(claimed.id, status, storable(body, options.storeWithout))).pipe(
+          map(() => body),
+        ),
+      ),
       catchError((error: unknown) =>
         from(this.release(claimed.id)).pipe(mergeMap(() => throwError(() => error))),
       ),

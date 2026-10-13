@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client } from 'pg';
 import { businessDate } from '@tugeel/shared/time';
 import { AppConfig } from '../../src/common/config/app-config';
+import { EXAMPLES } from '../../src/modules/ai/semantic/prompt';
 import {
   AiQueryError,
   AiReaderService,
@@ -97,6 +98,13 @@ describe('AiReaderService', () => {
     expect(outcome).toEqual({ rowCount: 25, truncated: true });
     expect(batches.flat()).toHaveLength(25);
   });
+
+  it.each(Object.entries(EXAMPLES))(
+    'runs the worked example %s of the prompt',
+    async (_key, sql) => {
+      await expect(reader.run(sql)).resolves.toMatchObject({ truncated: false });
+    },
+  );
 
   it('uses the Ulaanbaatar business date', async () => {
     const result = await reader.run('SELECT current_date::text AS today');

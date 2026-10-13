@@ -66,7 +66,7 @@ The system so far has no outbound HTTP call and no integration. The database has
    4. with rows, the model writes a short Mongolian summary from at most 50 rows (cells cut at 200 characters, 20 KB in all); without rows, the web says so from `mn.json`;
    5. the question is logged.
 
-   Answers have a status: `ANSWERED`, `CLARIFY`, `UNSUPPORTED`, `REFUSED` or `FAILED`. Only the infrastructure raises errors: `AI_NOT_CONFIGURED` (503) and `AI_PROVIDER_FAILED` (502).
+   Answers have a status: `ANSWERED`, `CLARIFY`, `UNSUPPORTED`, `REFUSED` or `FAILED`. Only the infrastructure raises errors: `AI_NOT_CONFIGURED` (503) and `AI_PROVIDER_FAILED` (502); a saved query that no longer runs (run again, Excel) is `AI_QUERY_FAILED` (422).
 7. **Privacy** (the owner's decisions, 2026-10-13). The provider receives the question, the schema, earlier steps of the conversation and up to 50 result rows, which may contain names, phones, TINs, addresses and amounts. Secrets never reach it. The web shows summaries as plain text (no markdown, so a summary cannot load an image from elsewhere). Nothing logs prompts, answers or rows. Whether sending customer data abroad needs consent under Mongolia's personal data law is an open question for the owner (SPEC §11).
 8. **History and reports.**
    - `ai_conversations` (per user); `ai_questions` (append-only like `audit_log`: who, when, the question, the SQL, the status, row count, duration, provider, model, tokens; never rows).

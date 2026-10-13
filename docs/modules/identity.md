@@ -39,7 +39,8 @@ Planned additions owned by identity: `print_stations` and `print_jobs` in delive
 | `SettingsService.get(key, onDate)` / `find(key, onDate)` | value in force on an Ulaanbaatar business date (`businessDate()` from `@tugeel/shared/time`); `get` throws `SETTING_MISSING` |
 | `OrgService` (`getBranch`, `getWarehouse`, `getTransitWarehouse(tx)`, lists) | organisation lookups |
 | `WAREHOUSE_CREATED_HOOK` / `WarehouseCreatedHook` | optional provider called inside the transaction that creates a warehouse, including the TRANSIT warehouse created at the first boot; bound by `InventoryModule` to `SystemBinsService` (system bins, 2026-10-11), which also backfills the warehouses that existed before at boot (`InventoryBootstrap`) |
-| `Idempotent()` | marks a document-creating POST; the global `IdempotencyInterceptor` requires `Idempotency-Key` (UUID), replays the stored response and answers `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_KEY_IN_PROGRESS` |
+| `Idempotent(options?)` | marks a document-creating POST; the global `IdempotencyInterceptor` requires `Idempotency-Key` (UUID), replays the stored response and answers `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_KEY_IN_PROGRESS`. `{ storeWithout: [field] }` keeps top-level response fields out of the stored replay (the AI answer's rows, ADR-0045) |
+| `UserNamesService.namesOf(userIds)` | id → full name for other modules' lists ("saved by"); nothing else about the user (ADR-0045) |
 
 Rules for other modules: never read or write identity tables directly (G1 boundaries); every new route carries exactly one access decorator, otherwise the guard answers 403 `params.reason = 'NO_ACCESS_RULE'`.
 

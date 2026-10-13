@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import mn from '../i18n/mn.json';
+import { AI_ANSWER_STATUSES, AI_FAILURE_REASONS } from './ai';
 import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
@@ -34,6 +35,13 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   });
 
   it.each(SETTING_KEYS.map((key) => `settings.keys.${key}`))('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...AI_ANSWER_STATUSES.map((status) => `ai.statuses.${status}`),
+    ...AI_FAILURE_REASONS.map((reason) => `ai.reasons.${reason}`),
+  ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });
 
