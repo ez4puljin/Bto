@@ -198,3 +198,43 @@ export class StockMovementPageDto {
   @ApiProperty({ type: [StockMovementDto] }) data: StockMovementDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
+
+const LOW_STOCK_STATUSES = ['OUT', 'LOW'] as const;
+
+export class LowStockQueryDto extends PageQueryDto {
+  @ApiProperty() @Type(() => Number) @IsInt() @Min(1) warehouseId: number;
+}
+
+/** A row of a warehouse's low-stock list (ADR-0039); quantities in the base unit. */
+@ApiSchema({ name: 'LowStockRow' })
+export class LowStockRowDto {
+  @ApiProperty({ type: StockProductDto }) product: StockProductDto;
+  @ApiProperty({ description: 'The base unit: every quantity here is in it' }) baseUnitId: number;
+  @ApiProperty({
+    enum: LOW_STOCK_STATUSES,
+    description: 'OUT: none left; LOW: at or below the minimum',
+  })
+  status: (typeof LOW_STOCK_STATUSES)[number];
+  @ApiProperty({ example: '12' }) onHand: string;
+  @ApiProperty({ type: String, nullable: true, example: '20' }) minQty: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '100' }) maxQty: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '88',
+    description: 'Up to the maximum, else the minimum; null without a level',
+  })
+  suggestedQty: string | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The product’s home (wholesale) warehouse',
+  })
+  homeWarehouseId: number | null;
+}
+
+@ApiSchema({ name: 'LowStockPage' })
+export class LowStockPageDto {
+  @ApiProperty({ type: [LowStockRowDto] }) data: LowStockRowDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}

@@ -3,6 +3,8 @@ import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
 import {
   BinContentDto,
+  LowStockPageDto,
+  LowStockQueryDto,
   ProductStockDetailDto,
   ProductStockPageDto,
   ReconciliationStatusDto,
@@ -13,6 +15,7 @@ import {
 import { StockQueryService } from '../services/stock-query.service';
 import {
   toBinContentDto,
+  toLowStockRowDto,
   toProductStockDetailDto,
   toProductStockDto,
   toReconciliationRunDto,
@@ -56,6 +59,15 @@ export class StockController {
       data: page.data.map((row) => toStockMovementDto(row, withCosts)),
       nextCursor: page.nextCursor,
     };
+  }
+
+  /** The low-stock list of a warehouse (SPEC §8.2 #4, ADR-0039): out of stock first. */
+  @Get('low')
+  @Authenticated()
+  @ApiOkResponse({ type: LowStockPageDto })
+  async low(@Query() query: LowStockQueryDto): Promise<LowStockPageDto> {
+    const page = await this.stock.lowStock(query);
+    return { data: page.data.map(toLowStockRowDto), nextCursor: page.nextCursor };
   }
 
   @Get('products/:id')

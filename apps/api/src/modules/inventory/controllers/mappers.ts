@@ -5,6 +5,7 @@ import type { BinMoveDetailDto, BinMoveSummaryDto } from '../dto/bin-moves.dto';
 import type { BinDto, ProductLocationDto } from '../dto/bins.dto';
 import type {
   BinContentDto,
+  LowStockRowDto,
   ProductStockDetailDto,
   ProductStockDto,
   ReconciliationRunDto,
@@ -32,6 +33,7 @@ import type { Bin } from '../services/bins.service';
 import type { ProductLocation } from '../services/product-locations.service';
 import type {
   BinContent,
+  LowStockRow,
   ProductStock,
   ProductStockDetail,
   ReconciliationSummary,
@@ -289,6 +291,20 @@ export function toStockMovementDto(row: StockMovement, withCosts: boolean): Stoc
     ...(withCosts
       ? { unitCost: row.unitCost.toFixed(), value: valueOf(row.qtyBase, row.unitCost).toFixed(2) }
       : {}),
+  };
+}
+
+/** A low-stock row (ADR-0039): quantities in the product's base unit, never a cost. */
+export function toLowStockRowDto(row: LowStockRow): LowStockRowDto {
+  return {
+    product: toStockProductDto(row.product),
+    baseUnitId: row.product.baseUnit.id,
+    status: row.status,
+    onHand: row.onHand.toFixed(),
+    minQty: row.minQty?.toFixed() ?? null,
+    maxQty: row.maxQty?.toFixed() ?? null,
+    suggestedQty: row.suggestedQty?.toFixed() ?? null,
+    homeWarehouseId: row.homeWarehouseId,
   };
 }
 

@@ -1558,6 +1558,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stock/low": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The low-stock list of a warehouse (SPEC §8.2 #4, ADR-0039): out of stock first. */
+        get: operations["Stock_low"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stock/products/{id}": {
         parameters: {
             query?: never;
@@ -3540,6 +3557,33 @@ export interface components {
         };
         StockMovementPage: {
             data: components["schemas"]["StockMovement"][];
+            nextCursor: string | null;
+        };
+        LowStockRow: {
+            product: components["schemas"]["StockProduct"];
+            /** @description The base unit: every quantity here is in it */
+            baseUnitId: number;
+            /**
+             * @description OUT: none left; LOW: at or below the minimum
+             * @enum {string}
+             */
+            status: "OUT" | "LOW";
+            /** @example 12 */
+            onHand: string;
+            /** @example 20 */
+            minQty: string | null;
+            /** @example 100 */
+            maxQty: string | null;
+            /**
+             * @description Up to the maximum, else the minimum; null without a level
+             * @example 88
+             */
+            suggestedQty: string | null;
+            /** @description The product’s home (wholesale) warehouse */
+            homeWarehouseId: number | null;
+        };
+        LowStockPage: {
+            data: components["schemas"]["LowStockRow"][];
             nextCursor: string | null;
         };
         BinBalance: {
@@ -8308,6 +8352,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockMovementPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Stock_low: {
+        parameters: {
+            query: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LowStockPage"];
                 };
             };
             /** @description RFC 9457 problem details */

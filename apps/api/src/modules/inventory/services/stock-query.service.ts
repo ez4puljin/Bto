@@ -5,7 +5,12 @@ import { and, desc, eq, gt, inArray, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { notFound } from '../../../common/errors/app-error';
-import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import {
+  DEFAULT_PAGE_LIMIT,
+  decodeCursor,
+  encodeCursor,
+  toPage,
+} from '../../../common/pagination/page';
 import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
 import {
   binStock,
@@ -23,6 +28,8 @@ import {
 } from './stock-posting.service';
 
 const ZERO = new Decimal(0);
+/** Reads of one low-stock page at most: inactive products in a row cannot stall a page forever. */
+const LOW_STOCK_ROUNDS = 5;
 
 export interface StockQuery {
   q?: string;
@@ -77,6 +84,22 @@ export interface BinContent {
 export interface StockMovement extends LedgerMovement {
   product: ProductSummary;
   unitName: string;
+}
+
+/** Why a product is on the low-stock list (ADR-0039): out of stock, or at or below its minimum. */
+export type LowStockStatus = 'OUT' | 'LOW';
+
+/** A row of the low-stock list of one warehouse. */
+export interface LowStockRow {
+  product: ProductSummary;
+  status: LowStockStatus;
+  onHand: Decimal;
+  minQty: Decimal | null;
+  maxQty: Decimal | null;
+  /** Up to the maximum (else the minimum); null when there is no level or nothing to add. */
+  suggestedQty: Decimal | null;
+  /** The product's home (wholesale) warehouse, where a store asks for it. */
+  homeWarehouseId: number | null;
 }
 
 export interface ReconciliationSummary {
@@ -161,6 +184,118 @@ export class StockQueryService {
     });
     lines.sort((a, b) => a.product.name.localeCompare(b.product.name, 'mn'));
     return { bin, lines };
+  }
+
+  /**
+   * The low-stock list of a warehouse (SPEC §8.2 #4, ADR-0039): products at or below their minimum
+   * there, and products the warehouse held that are now out of stock even without a minimum. Out of
+   * stock first, then by product. Inactive products are left out; a page is filled past them with
+   * a few more reads.
+   */
+  async lowStock(query: {
+    warehouseId: number;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ data: LowStockRow[]; nextCursor: string | null }> {
+    const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const start = decodeCursor(query.cursor);
+    let after =
+      typeof start?.rank === 'number' && typeof start.id === 'number'
+        ? { rank: start.rank, id: start.id }
+        : null;
+    const data: LowStockRow[] = [];
+    for (let round = 0; round < LOW_STOCK_ROUNDS; round += 1) {
+      const need = limit - data.length;
+      const rows = await this.lowStockRows(query.warehouseId, after, need + 1);
+      const taken = rows.slice(0, need);
+      data.push(...(await this.toLowStock(taken)));
+      const last = taken.at(-1);
+      if (!last || rows.length <= need) return { data, nextCursor: null };
+      after = { rank: last.rank, id: Number.parseInt(last.product_id, 10) };
+      if (data.length >= limit) break;
+    }
+    return { data, nextCursor: after ? encodeCursor(after) : null };
+  }
+
+  /** Rows of the low-stock list after a keyset position, raw. */
+  private async lowStockRows(
+    warehouseId: number,
+    after: { rank: number; id: number } | null,
+    take: number,
+  ) {
+    const keyset = after
+      ? sql`WHERE (x.rank, x.product_id) > (${after.rank}::int, ${after.id}::bigint)`
+      : sql``;
+    const result = await this.db.execute<{
+      product_id: string;
+      on_hand: string;
+      min_qty: string | null;
+      max_qty: string | null;
+      home_warehouse_id: string | null;
+      rank: number;
+    }>(sql`
+      SELECT x.* FROM (
+        SELECT p.product_id,
+               COALESCE(s.on_hand, 0) AS on_hand,
+               l.min_qty,
+               l.max_qty,
+               (SELECT h.warehouse_id FROM product_locations h
+                 WHERE h.product_id = p.product_id AND h.is_home) AS home_warehouse_id,
+               CASE WHEN COALESCE(s.on_hand, 0) = 0 THEN 0 ELSE 1 END AS rank
+          FROM (SELECT pl.product_id FROM product_locations pl
+                 WHERE pl.warehouse_id = ${warehouseId} AND pl.min_qty IS NOT NULL
+                UNION
+                SELECT ws.product_id FROM warehouse_stock ws
+                 WHERE ws.warehouse_id = ${warehouseId}) p
+          LEFT JOIN product_locations l
+            ON l.warehouse_id = ${warehouseId} AND l.product_id = p.product_id
+          LEFT JOIN (SELECT ws.product_id, sum(ws.on_hand) AS on_hand FROM warehouse_stock ws
+                      WHERE ws.warehouse_id = ${warehouseId} GROUP BY ws.product_id) s
+            ON s.product_id = p.product_id
+         WHERE (l.min_qty IS NOT NULL AND COALESCE(s.on_hand, 0) <= l.min_qty)
+            OR (l.min_qty IS NULL AND s.product_id IS NOT NULL AND s.on_hand = 0)
+      ) x
+      ${keyset}
+      ORDER BY x.rank, x.product_id
+      LIMIT ${take}`);
+    return result.rows;
+  }
+
+  /** Raw low-stock rows with their products; inactive products dropped. */
+  private async toLowStock(
+    rows: readonly {
+      product_id: string;
+      on_hand: string;
+      min_qty: string | null;
+      max_qty: string | null;
+      home_warehouse_id: string | null;
+    }[],
+  ): Promise<LowStockRow[]> {
+    const products = new Map(
+      (await this.catalog.getMany(rows.map((row) => Number.parseInt(row.product_id, 10)))).map(
+        (product) => [product.id, product],
+      ),
+    );
+    return rows.flatMap((row): LowStockRow[] => {
+      const product = products.get(Number.parseInt(row.product_id, 10));
+      if (product?.status !== 'ACTIVE') return [];
+      const onHand = new Decimal(row.on_hand);
+      const minQty = row.min_qty === null ? null : new Decimal(row.min_qty);
+      const maxQty = row.max_qty === null ? null : new Decimal(row.max_qty);
+      const target = maxQty ?? minQty;
+      return [
+        {
+          product,
+          status: onHand.isZero() ? 'OUT' : 'LOW',
+          onHand,
+          minQty,
+          maxQty,
+          suggestedQty: target?.gt(onHand) ? target.minus(onHand) : null,
+          homeWarehouseId:
+            row.home_warehouse_id === null ? null : Number.parseInt(row.home_warehouse_id, 10),
+        },
+      ];
+    });
   }
 
   /**

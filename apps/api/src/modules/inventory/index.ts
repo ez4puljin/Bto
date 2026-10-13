@@ -28,6 +28,9 @@ export {
   NO_SHELF_CODE,
 } from './services/bins.service';
 export {
+  type LevelChange,
+  type LevelRestore,
+  type LevelState,
   type LocationChange,
   type LocationInput,
   type LocationState,
@@ -57,6 +60,8 @@ export {
 } from './services/stock-posting.service';
 export {
   type BinContent,
+  type LowStockRow,
+  type LowStockStatus,
   type ProductStock,
   type ProductStockDetail,
   type StockQuery,

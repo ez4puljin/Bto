@@ -317,4 +317,120 @@ describe('stock queries', () => {
     expect(second.data.map((row) => row.movementType)).toEqual(['BIN_MOVE_OUT', 'RECEIPT']);
     expect(second.data.map((row) => row.warehouseBalance)).toEqual(['38', '48']);
   });
+
+  it('lists what is out of stock or at its minimum, out of stock first (ADR-0039)', async () => {
+    interface LowJson {
+      product: { id: number; sku: string };
+      baseUnitId: number;
+      status: string;
+      onHand: string;
+      minQty: string | null;
+      maxQty: string | null;
+      suggestedQty: string | null;
+      homeWarehouseId: number | null;
+    }
+    const low = async (warehouseId: number, query: Record<string, unknown> = {}) =>
+      (
+        await http()
+          .get('/api/v1/stock/low')
+          .query({ warehouseId, ...query })
+          .set(bearer(worker))
+          .expect(200)
+      ).body as { data: LowJson[]; nextCursor: string | null };
+    const levels = (warehouseId: number, productId: number, minQty: string, maxQty?: string) =>
+      http()
+        .put('/api/v1/product-locations')
+        .set(bearer(worker))
+        .send({ warehouseId, productId, minQty, ...(maxQty ? { maxQty } : {}) })
+        .expect(200);
+    const catalog = catalogApi(app, admin);
+    const category = cola.categoryId as number;
+    const pcs = await catalog.uomId('PCS');
+    const coffee = (
+      (await http().get('/api/v1/products').query({ q: '12' }).set(bearer(admin)).expect(200))
+        .body as { data: { id: number; sku: string }[] }
+    ).data.find((product) => product.sku === '12');
+    if (!coffee) throw new Error('no coffee');
+    const tea = await catalog.product({
+      sku: '13',
+      name: 'Цай',
+      categoryId: category,
+      baseUomId: pcs,
+    });
+
+    // Nothing is low before any level, and nothing is out yet.
+    expect((await low(wh1.id)).data).toEqual([]);
+    await http().put('/api/v1/product-locations/home').set(bearer(admin)).send({
+      productId: cola.id,
+      warehouseId: wh1.id,
+    });
+    await levels(wh1.id, cola.id, '50', '100');
+    await levels(wh1.id, coffee.id, '5');
+    await levels(wh1.id, tea.id, '1');
+    // Tea is discontinued: it leaves the list.
+    await http()
+      .patch(`/api/v1/products/${tea.id}`)
+      .set(bearer(admin))
+      .send({ status: 'INACTIVE' })
+      .expect(200);
+    // The last 10 rice of WH2 are written off: out of stock there without any level.
+    const riceShelf = (await inventoryApi(app, admin).bins(wh2.id)).find(
+      (bin) => bin.code === 'B-01-01',
+    );
+    const writeOff = await http()
+      .post('/api/v1/adjustments')
+      .set(bearer(worker))
+      .set(idempotency())
+      .send({
+        warehouseId: wh2.id,
+        reason: 'DAMAGED',
+        lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10', binId: riceShelf?.id }],
+      })
+      .expect(201);
+    const writeOffId = (writeOff.body as { id: number }).id;
+    await http().post(`/api/v1/adjustments/${writeOffId}/submit`).set(bearer(worker)).expect(200);
+    await http()
+      .post(`/api/v1/adjustments/${writeOffId}/post`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({})
+      .expect(200);
+
+    const wh1Low = await low(wh1.id);
+    expect(
+      wh1Low.data.map((row) => [
+        row.product.sku,
+        row.status,
+        row.onHand,
+        row.minQty,
+        row.maxQty,
+        row.suggestedQty,
+      ]),
+    ).toEqual([
+      ['12', 'OUT', '0', '5', null, '5'],
+      ['10', 'LOW', '44', '50', '100', '56'],
+    ]);
+    expect(wh1Low.data[1]).toMatchObject({
+      baseUnitId: unitOf(cola, 'PCS').id,
+      homeWarehouseId: wh1.id,
+    });
+    expect((await low(wh2.id)).data).toEqual([
+      expect.objectContaining({
+        product: expect.objectContaining({ sku: '11' }),
+        status: 'OUT',
+        onHand: '0',
+        minQty: null,
+        suggestedQty: null,
+      }),
+    ]);
+
+    // Keyset pages; a level above the stock again takes the product off.
+    const first = await low(wh1.id, { limit: 1 });
+    expect(first.data.map((row) => row.product.sku)).toEqual(['12']);
+    const second = await low(wh1.id, { limit: 1, cursor: first.nextCursor ?? '' });
+    expect(second.data.map((row) => row.product.sku)).toEqual(['10']);
+    await levels(wh1.id, cola.id, '40', '100');
+    expect((await low(wh1.id)).data.map((row) => row.product.sku)).toEqual(['12']);
+    await http().get('/api/v1/stock/low').set(bearer(worker)).expect(422);
+  });
 });

@@ -45,6 +45,33 @@ const stateOf = (productId: number, fixedBins: LocationState['fixedBins']): Loca
   fixedBins,
 });
 
+/** Low-stock levels of a product in one warehouse in a bulk call; a null level stays as it is. */
+export interface LevelChange {
+  warehouseId: number;
+  productId: number;
+  minQty: Decimal | null;
+  maxQty: Decimal | null;
+}
+
+/** A product's levels in a warehouse (null: none, or no location row). */
+export interface LevelState {
+  warehouseId: number;
+  productId: number;
+  minQty: Decimal | null;
+  maxQty: Decimal | null;
+}
+
+/** Levels to put back where a bulk change left them untouched since (an import revert). */
+export interface LevelRestore {
+  warehouseId: number;
+  productId: number;
+  /** What the change set: a row whose levels differ now was edited since and stays. */
+  expected: { minQty: Decimal | null; maxQty: Decimal | null };
+  restore: { minQty: Decimal | null; maxQty: Decimal | null };
+}
+
+const levelKey = (warehouseId: number, productId: number) => `${warehouseId}:${productId}`;
+
 export interface ProductLocation extends LocationRow {
   /** Code of the fixed bin, for display and scanning. */
   defaultBinCode: string | null;
@@ -276,6 +303,118 @@ export class ProductLocationsService {
       })),
     );
     return before;
+  }
+
+  /**
+   * Low-stock levels of many products in the caller's transaction (the levels import, ADR-0039):
+   * locked like `setManyInTx`; a null level keeps the stored one, so an import never clears a
+   * level. The caller has checked the products, the home rule and min ≤ max (the table's CHECK
+   * stays the last word). Returns the levels before, keyed `warehouseId:productId`.
+   */
+  async setLevelsManyInTx(
+    tx: Tx,
+    actor: Actor,
+    changes: readonly LevelChange[],
+  ): Promise<Map<string, LevelState>> {
+    const before = new Map<string, LevelState>();
+    if (changes.length === 0) return before;
+    await tx.execute(sql`LOCK TABLE product_locations IN SHARE ROW EXCLUSIVE MODE`);
+    for (const change of changes) {
+      before.set(levelKey(change.warehouseId, change.productId), {
+        warehouseId: change.warehouseId,
+        productId: change.productId,
+        minQty: null,
+        maxQty: null,
+      });
+    }
+    const productIds = [...new Set(changes.map((change) => change.productId))];
+    for (const row of await this.ofProducts(productIds, tx)) {
+      const state = before.get(levelKey(row.warehouseId, row.productId));
+      if (state) Object.assign(state, { minQty: row.minQty, maxQty: row.maxQty });
+    }
+    for (let start = 0; start < changes.length; start += CHUNK) {
+      await tx.execute(sql`
+        INSERT INTO product_locations (warehouse_id, product_id, min_qty, max_qty)
+        SELECT * FROM (VALUES ${sql.join(
+          changes
+            .slice(start, start + CHUNK)
+            .map(
+              (change) =>
+                sql`(${change.warehouseId}::bigint, ${change.productId}::bigint, ${
+                  change.minQty?.toFixed() ?? null
+                }::numeric, ${change.maxQty?.toFixed() ?? null}::numeric)`,
+            ),
+          sql`, `,
+        )}) AS v (warehouse_id, product_id, min_qty, max_qty)
+        ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
+          min_qty = COALESCE(excluded.min_qty, product_locations.min_qty),
+          max_qty = COALESCE(excluded.max_qty, product_locations.max_qty),
+          updated_at = now()`);
+    }
+    await this.audit.recordMany(
+      tx,
+      actor,
+      changes.map((change) => ({
+        action: 'UPDATE',
+        entity: 'product_locations',
+        entityId: change.productId,
+        before: before.get(levelKey(change.warehouseId, change.productId)),
+        after: change,
+      })),
+    );
+    return before;
+  }
+
+  /**
+   * Puts levels back after a bulk change (an import revert): only where the row still holds what
+   * the change set; a row left without home, shelf or levels is removed.
+   */
+  async restoreLevelsInTx(tx: Tx, actor: Actor, entries: readonly LevelRestore[]): Promise<void> {
+    if (entries.length === 0) return;
+    await tx.execute(sql`LOCK TABLE product_locations IN SHARE ROW EXCLUSIVE MODE`);
+    const rows = new Map(
+      (await this.ofProducts([...new Set(entries.map((entry) => entry.productId))], tx)).map(
+        (row) => [levelKey(row.warehouseId, row.productId), row],
+      ),
+    );
+    const same = (a: Decimal | null, b: Decimal | null) =>
+      a === null || b === null ? a === b : a.equals(b);
+    const restored: LevelRestore[] = [];
+    for (const entry of entries) {
+      const row = rows.get(levelKey(entry.warehouseId, entry.productId));
+      if (!row) continue;
+      if (!same(row.minQty, entry.expected.minQty) || !same(row.maxQty, entry.expected.maxQty)) {
+        continue;
+      }
+      await tx
+        .update(productLocations)
+        .set({
+          minQty: entry.restore.minQty,
+          maxQty: entry.restore.maxQty,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(productLocations.id, row.id));
+      if (
+        !row.isHome &&
+        row.defaultBinId === null &&
+        entry.restore.minQty === null &&
+        entry.restore.maxQty === null
+      ) {
+        await tx.delete(productLocations).where(eq(productLocations.id, row.id));
+      }
+      restored.push(entry);
+    }
+    await this.audit.recordMany(
+      tx,
+      actor,
+      restored.map((entry) => ({
+        action: 'UPDATE',
+        entity: 'product_locations',
+        entityId: entry.productId,
+        before: { warehouseId: entry.warehouseId, ...entry.expected },
+        after: { warehouseId: entry.warehouseId, ...entry.restore },
+      })),
+    );
   }
 
   /** The fixed shelf and levels of a product in one warehouse (created on first use). */

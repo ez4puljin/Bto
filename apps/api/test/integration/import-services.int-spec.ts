@@ -239,6 +239,84 @@ describe('services for imports', () => {
     ).toBe('VALIDATION_FAILED');
   });
 
+  it('sets low-stock levels in bulk, keeps what a null leaves alone and restores them (ADR-0039)', async () => {
+    const created = await tx((t) =>
+      catalogImport.createManyInTx(t, actor, [input('501', [], null), input('502', [], null)]),
+    );
+    const first = created.get('501')?.productId ?? 0;
+    const second = created.get('502')?.productId ?? 0;
+    const locations = app.get(ProductLocationsService);
+    const levelsOf = async (productId: number) =>
+      (await locations.ofProducts([productId])).map((row) => [
+        row.warehouseId,
+        row.minQty?.toFixed() ?? null,
+        row.maxQty?.toFixed() ?? null,
+      ]);
+    await tx((t) =>
+      locations.setManyInTx(t, actor, [
+        { productId: first, fixedBin: { warehouseId: wh1.id, binId: shelf } },
+      ]),
+    );
+    const d = (value: string) => new Decimal(value);
+    const before = await tx((t) =>
+      locations.setLevelsManyInTx(t, actor, [
+        { warehouseId: wh1.id, productId: first, minQty: d('10'), maxQty: d('50') },
+        { warehouseId: store.id, productId: second, minQty: d('2'), maxQty: null },
+      ]),
+    );
+    expect(before.get(`${wh1.id}:${first}`)).toMatchObject({ minQty: null, maxQty: null });
+    expect(await levelsOf(first)).toEqual([[wh1.id, '10', '50']]);
+    expect(await levelsOf(second)).toEqual([[store.id, '2', null]]);
+    // A null keeps the stored level; min ≤ max stays the table's rule.
+    await tx((t) =>
+      locations.setLevelsManyInTx(t, actor, [
+        { warehouseId: wh1.id, productId: first, minQty: null, maxQty: d('60') },
+      ]),
+    );
+    expect(await levelsOf(first)).toEqual([[wh1.id, '10', '60']]);
+    expect(
+      await codeOf(
+        tx((t) =>
+          locations.setLevelsManyInTx(t, actor, [
+            { warehouseId: wh1.id, productId: first, minQty: d('70'), maxQty: null },
+          ]),
+        ),
+      ),
+    ).toBe('VALIDATION_FAILED');
+
+    // Restoring puts back only what still holds the expected levels; an emptied row goes.
+    await tx((t) =>
+      locations.restoreLevelsInTx(t, actor, [
+        {
+          warehouseId: wh1.id,
+          productId: first,
+          expected: { minQty: d('10'), maxQty: d('60') },
+          restore: { minQty: null, maxQty: null },
+        },
+        {
+          warehouseId: store.id,
+          productId: second,
+          expected: { minQty: d('3'), maxQty: null },
+          restore: { minQty: null, maxQty: null },
+        },
+      ]),
+    );
+    // The fixed shelf keeps the first row; the second still held 2, not 3, so it stays.
+    expect(await levelsOf(first)).toEqual([[wh1.id, null, null]]);
+    expect(await levelsOf(second)).toEqual([[store.id, '2', null]]);
+    await tx((t) =>
+      locations.restoreLevelsInTx(t, actor, [
+        {
+          warehouseId: store.id,
+          productId: second,
+          expected: { minQty: d('2'), maxQty: null },
+          restore: { minQty: null, maxQty: null },
+        },
+      ]),
+    );
+    expect(await levelsOf(second)).toEqual([]);
+  });
+
   it('posts opening stock as a system adjustment and reverses it once', async () => {
     const created = await tx((t) =>
       catalogImport.createManyInTx(t, actor, [
