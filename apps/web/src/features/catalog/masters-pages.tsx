@@ -7,7 +7,6 @@ import {
   FolderTree,
   Pencil,
   Plus,
-  Tag,
   Trash2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -50,15 +49,7 @@ import {
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
-import {
-  type Brand,
-  type Category,
-  type Uom,
-  useBrands,
-  useCatalogMutations,
-  useCategories,
-  useUoms,
-} from './api';
+import { type Category, type Uom, useCatalogMutations, useCategories, useUoms } from './api';
 import { categoryTree, subtreeIds } from './category-tree';
 import { CLASSIFICATION_CODE } from './product-schema';
 
@@ -327,144 +318,6 @@ function CategoryDialog(props: {
             />
           </FormField>
           <SaveFooter pending={isSubmitting} onCancel={props.onClose} />
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** Brands: a name per brand; one in use by products cannot be deleted. */
-export function BrandsPage() {
-  const { t } = useTranslation();
-  const canManage = useHasPermission('catalog.products.manage');
-  const brands = useBrands();
-  const mutations = useCatalogMutations();
-  const [editing, setEditing] = useState<Brand | 'new' | null>(null);
-  const deletion = useDeleteConfirm<Brand>((id) => mutations.deleteBrand.mutateAsync(id));
-
-  return (
-    <div>
-      <PageHeader
-        title={t('catalog.brands.title')}
-        actions={
-          canManage ? (
-            <Button onClick={() => setEditing('new')}>
-              <Plus />
-              {t('catalog.brands.create')}
-            </Button>
-          ) : null
-        }
-      />
-      <ProblemAlert problem={problemFromError(brands.error)} />
-      <ListCard>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('catalog.brands.name')}</TableHead>
-              <TableHead>{t('catalog.products.title')}</TableHead>
-              {canManage ? <TableHead /> : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {brands.isPending ? <SkeletonRows columns={canManage ? 3 : 2} /> : null}
-            {(brands.data ?? []).map((brand) => (
-              <TableRow key={brand.id}>
-                <TableCell>
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      aria-hidden
-                      className="grid size-7 shrink-0 place-items-center rounded-lg bg-fill text-xs font-semibold text-muted-foreground"
-                    >
-                      {brand.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="font-medium">{brand.name}</span>
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground tabular-nums">
-                  {t('catalog.brands.products', { count: brand.productCount })}
-                </TableCell>
-                {canManage ? (
-                  <RowActions>
-                    <RowAction
-                      icon={Pencil}
-                      label={t('common.edit')}
-                      onClick={() => setEditing(brand)}
-                    />
-                    {brand.productCount === 0 ? (
-                      <RowAction
-                        icon={Trash2}
-                        label={t('common.delete')}
-                        destructive
-                        onClick={() => deletion.ask(brand)}
-                      />
-                    ) : (
-                      <RowActionSpacer />
-                    )}
-                  </RowActions>
-                ) : null}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {brands.data?.length === 0 ? (
-          <EmptyState icon={Tag} title={t('catalog.brands.empty')} />
-        ) : null}
-      </ListCard>
-      {editing ? <BrandDialog brand={editing} onClose={() => setEditing(null)} /> : null}
-      <ConfirmDialog
-        open={deletion.target !== null}
-        title={t('common.delete')}
-        description={t('catalog.brands.deleteConfirm', { name: deletion.target?.name ?? '' })}
-        confirmLabel={t('common.delete')}
-        pending={mutations.deleteBrand.isPending}
-        problem={deletion.problem}
-        onClose={deletion.close}
-        onConfirm={deletion.confirm}
-      />
-    </div>
-  );
-}
-
-const brandSchema = z.object({
-  name: z.string().trim().min(1, 'validation.required').max(100, 'validation.tooLong'),
-});
-
-function BrandDialog({ brand, onClose }: { brand: Brand | 'new'; onClose: () => void }) {
-  const { t } = useTranslation();
-  const mutations = useCatalogMutations();
-  const action = useAction();
-  const form = useForm<z.infer<typeof brandSchema>>({
-    resolver: zodResolver(brandSchema),
-    defaultValues: { name: brand === 'new' ? '' : brand.name },
-  });
-  const submit = form.handleSubmit(async ({ name }) => {
-    const ok = await action.run(() =>
-      brand === 'new'
-        ? mutations.createBrand.mutateAsync({ name })
-        : mutations.updateBrand.mutateAsync({ id: brand.id, body: { name } }),
-    );
-    if (ok) onClose();
-  });
-  const { errors, isSubmitting } = form.formState;
-
-  return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
-        <DialogHeader>
-          <DialogTitle>
-            {brand === 'new' ? t('catalog.brands.create') : t('catalog.brands.edit')}
-          </DialogTitle>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
-          <FormField
-            label={t('catalog.brands.name')}
-            htmlFor="brand-name"
-            error={errors.name?.message}
-          >
-            <Input id="brand-name" autoComplete="off" {...form.register('name')} />
-          </FormField>
-          <SaveFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>

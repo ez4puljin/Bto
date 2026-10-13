@@ -11,7 +11,6 @@ import { AppError } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type Actor, AuditService, StorageService } from '../../identity';
 import {
-  brands,
   categories,
   PRODUCT_STATUSES,
   productBarcodes,
@@ -55,7 +54,6 @@ export interface ProductSummary {
   sku: string;
   name: string;
   categoryId: number;
-  brandId: number | null;
   status: ProductStatus;
   vatType: VatType;
   cityTax: boolean | null;
@@ -101,7 +99,6 @@ export interface ProductInput {
   sku?: string;
   name: string;
   categoryId: number;
-  brandId?: number | null;
   vatType?: VatType;
   cityTax?: boolean | null;
   classificationCode?: string | null;
@@ -117,7 +114,6 @@ export interface ProductPatch {
   sku?: string;
   name?: string;
   categoryId?: number;
-  brandId?: number | null;
   vatType?: VatType;
   cityTax?: boolean | null;
   classificationCode?: string | null;
@@ -129,7 +125,6 @@ export interface ProductPatch {
 export interface ProductQuery {
   q?: string;
   categoryId?: number;
-  brandId?: number;
   status?: ProductStatus;
   cursor?: string;
   limit?: number;
@@ -174,7 +169,6 @@ export class ProductsService {
           searchPhonetic: keys.phonetic,
           searchVersion: keys.version,
           categoryId: input.categoryId,
-          brandId: input.brandId ?? null,
           vatType: input.vatType ?? 'VAT_ABLE',
           cityTax: input.cityTax ?? null,
           classificationCode: input.classificationCode ?? null,
@@ -249,7 +243,6 @@ export class ProductsService {
         searchPhonetic: keys.phonetic,
         searchVersion: keys.version,
         ...(patch.categoryId === undefined ? {} : { categoryId: patch.categoryId }),
-        ...(patch.brandId === undefined ? {} : { brandId: patch.brandId }),
         ...(patch.vatType === undefined ? {} : { vatType: patch.vatType }),
         ...(patch.cityTax === undefined ? {} : { cityTax: patch.cityTax }),
         ...(patch.classificationCode === undefined
@@ -412,7 +405,6 @@ export class ProductsService {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
     if (query.status) filters.push(eq(products.status, query.status));
-    if (query.brandId !== undefined) filters.push(eq(products.brandId, query.brandId));
     if (query.categoryId !== undefined) {
       filters.push(sql`${products.categoryId} IN (
         WITH RECURSIVE down(id) AS (
@@ -508,7 +500,6 @@ export class ProductsService {
         sku: row.sku,
         name: row.name,
         categoryId: row.categoryId,
-        brandId: row.brandId,
         status: row.status,
         vatType: row.vatType,
         cityTax: row.cityTax,
@@ -551,10 +542,7 @@ export class ProductsService {
     return sql`CASE WHEN ${exact} THEN 0 WHEN ${and(...strict) ?? sql`false`} THEN 1 ELSE 2 END`;
   }
 
-  private async assertReferences(
-    tx: Tx,
-    input: { categoryId?: number; brandId?: number | null },
-  ): Promise<void> {
+  private async assertReferences(tx: Tx, input: { categoryId?: number }): Promise<void> {
     if (input.categoryId !== undefined) {
       const [category] = await tx
         .select({ id: categories.id })
@@ -562,13 +550,6 @@ export class ProductsService {
         .where(eq(categories.id, input.categoryId));
       if (!category)
         throw invalid('categoryId', 'exists', `category ${input.categoryId} not found`);
-    }
-    if (input.brandId !== undefined && input.brandId !== null) {
-      const [brand] = await tx
-        .select({ id: brands.id })
-        .from(brands)
-        .where(eq(brands.id, input.brandId));
-      if (!brand) throw invalid('brandId', 'exists', `brand ${input.brandId} not found`);
     }
   }
 

@@ -40,7 +40,6 @@ describe('services for imports', () => {
   let store: WarehouseJson;
   let shelf: number;
   let categoryId: number;
-  let brandId: number;
   let pcs: number;
   let box: number;
   const http = () => request(app.getHttpServer());
@@ -61,15 +60,6 @@ describe('services for imports', () => {
     categoryId = await catalog.category('Ундаа');
     pcs = await catalog.uomId('PCS');
     box = await catalog.uomId('BOX');
-    brandId = (
-      (
-        await http()
-          .post('/api/v1/brands')
-          .set(bearer(admin))
-          .send({ name: 'Coca-Cola' })
-          .expect(201)
-      ).body as { id: number }
-    ).id;
   });
   afterAll(async () => {
     await expectReconciled(app);
@@ -81,7 +71,6 @@ describe('services for imports', () => {
     sku,
     name: `Бараа ${sku}`,
     categoryId,
-    brandId,
     vatType: 'VAT_ABLE' as const,
     weightKg: new Decimal('0.5'),
     baseUomId: pcs,
@@ -103,7 +92,6 @@ describe('services for imports', () => {
       sku: '101',
       name: 'Бараа 101',
       categoryId,
-      brandId,
       status: 'ACTIVE',
     });
     expect(cola?.units.map((unit) => [unit.isBase, unit.factorToBase.toFixed()])).toEqual([

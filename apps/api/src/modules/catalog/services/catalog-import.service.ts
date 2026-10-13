@@ -8,15 +8,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
 import { type Actor, AuditService } from '../../identity';
-import {
-  brands,
-  categories,
-  productBarcodes,
-  products,
-  productUnits,
-  uoms,
-  type VatType,
-} from '../schema';
+import { categories, productBarcodes, products, productUnits, uoms, type VatType } from '../schema';
 import { type Product, type ProductPatch, ProductsService } from './products.service';
 import { invalid } from './support';
 
@@ -25,7 +17,6 @@ const CHUNK = 1_000;
 
 export interface CatalogReference {
   categories: { id: number; parentId: number | null; name: string; nameKey: string }[];
-  brands: { id: number; name: string; nameKey: string }[];
   uoms: { id: number; code: string | null; name: string; nameKey: string; fractional: boolean }[];
 }
 
@@ -35,7 +26,6 @@ export interface ImportProduct {
   sku: string;
   name: string;
   categoryId: number;
-  brandId: number | null;
   vatType: VatType;
   weightKg: Decimal | null;
   status: Product['status'];
@@ -52,7 +42,6 @@ export interface BulkProductInput {
   sku: string;
   name: string;
   categoryId: number;
-  brandId: number | null;
   vatType: VatType;
   weightKg: Decimal | null;
   baseUomId: number;
@@ -80,7 +69,7 @@ export class CatalogImportService {
     private readonly products: ProductsService,
   ) {}
 
-  /** Every category, brand and unit of measure (a few hundred rows each). */
+  /** Every category and unit of measure (a few hundred rows each). */
   async reference(executor: Db | Tx = this.db): Promise<CatalogReference> {
     return {
       categories: await executor
@@ -92,10 +81,6 @@ export class CatalogImportService {
         })
         .from(categories)
         .orderBy(asc(categories.id)),
-      brands: await executor
-        .select({ id: brands.id, name: brands.name, nameKey: brands.nameKey })
-        .from(brands)
-        .orderBy(asc(brands.id)),
       uoms: await executor
         .select({
           id: uoms.id,
@@ -194,7 +179,6 @@ export class CatalogImportService {
               searchPhonetic: keys.phonetic,
               searchVersion: keys.version,
               categoryId: input.categoryId,
-              brandId: input.brandId,
               vatType: input.vatType,
               weightKg: input.weightKg,
             };
@@ -260,7 +244,6 @@ export class CatalogImportService {
             sku: input.sku,
             name: normalizeName(input.name),
             categoryId: input.categoryId,
-            brandId: input.brandId,
             vatType: input.vatType,
             weightKg: input.weightKg,
             baseUomId: input.baseUomId,
@@ -387,7 +370,6 @@ export class CatalogImportService {
       sku: row.sku,
       name: row.name,
       categoryId: row.categoryId,
-      brandId: row.brandId,
       vatType: row.vatType,
       weightKg: row.weightKg,
       status: row.status,
@@ -395,7 +377,7 @@ export class CatalogImportService {
     }));
   }
 
-  /** Every referenced category, brand and unit of measure exists; box factors are exact. */
+  /** Every referenced category and unit of measure exists; box factors are exact. */
   private async assertReferences(tx: Tx, inputs: readonly BulkProductInput[]): Promise<void> {
     const categoryIds = [...new Set(inputs.map((input) => input.categoryId))];
     const foundCategories = await tx
@@ -404,16 +386,6 @@ export class CatalogImportService {
       .where(inArray(categories.id, categoryIds));
     if (foundCategories.length !== categoryIds.length) {
       throw invalid('categoryId', 'exists', 'unknown category');
-    }
-    const brandIds = [
-      ...new Set(inputs.flatMap((input) => (input.brandId === null ? [] : [input.brandId]))),
-    ];
-    if (brandIds.length > 0) {
-      const found = await tx
-        .select({ id: brands.id })
-        .from(brands)
-        .where(inArray(brands.id, brandIds));
-      if (found.length !== brandIds.length) throw invalid('brandId', 'exists', 'unknown brand');
     }
     const uomIds = [
       ...new Set(

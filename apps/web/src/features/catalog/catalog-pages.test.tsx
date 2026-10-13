@@ -54,11 +54,9 @@ const CATEGORIES: Schemas['Category'][] = [
     childCount: 0,
   },
 ];
-const BRANDS: Schemas['Brand'][] = [{ id: 5, name: 'Coca-Cola', productCount: 1 }];
 const MASTER_ROUTES = {
   'GET /api/v1/uoms': () => list(UOMS),
   'GET /api/v1/categories': () => list(CATEGORIES),
-  'GET /api/v1/brands': () => list(BRANDS),
 };
 
 const summary = (id: number, sku: string, name: string): Schemas['ProductSummary'] => ({
@@ -66,7 +64,6 @@ const summary = (id: number, sku: string, name: string): Schemas['ProductSummary
   sku,
   name,
   categoryId: 12,
-  brandId: 5,
   status: 'ACTIVE',
   vatType: 'VAT_ABLE',
   cityTax: null,
@@ -96,7 +93,6 @@ const COLA: Schemas['ProductDetail'] = {
   sku: '10023',
   name: 'Кока кола 0.5 л',
   categoryId: 12,
-  brandId: 5,
   vatType: 'VAT_ABLE',
   cityTax: null,
   classificationCode: null,
@@ -139,7 +135,7 @@ describe('catalog menu and access', () => {
   it('shows the catalog menu to every user, the e-Barimt page to its managers only', async () => {
     renderApp('/system/status', signedIn(WORKER_ME));
     const nav = await findSidebar();
-    for (const label of [mn.nav.products, mn.nav.categories, mn.nav.brands, mn.nav.uoms]) {
+    for (const label of [mn.nav.products, mn.nav.categories, mn.nav.uoms]) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
     }
     expect(within(nav).queryByRole('link', { name: mn.nav.ebarimt })).toBeNull();
@@ -290,7 +286,6 @@ describe('products list', () => {
     expect(await within(table).findByText('990₮')).toBeInTheDocument();
     expect(within(table).getByText('1,200₮')).toBeInTheDocument();
     for (const text of [
-      'Coca-Cola',
       '1 хайрцаг = 24 ш',
       COLA_CODE,
       'BOX-1 (хайрцаг)',
@@ -318,20 +313,20 @@ describe('products list', () => {
       await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.sku }),
     ).toHaveAttribute('aria-disabled', 'true');
     await user.click(
-      screen.getByRole('menuitemcheckbox', { name: mn.catalog.products.columns.brand }),
+      screen.getByRole('menuitemcheckbox', { name: mn.catalog.products.columns.category }),
     );
     await user.keyboard('{Escape}');
-    expect(columnHeader('brand')).toBeNull();
-    expect(JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]')).toEqual(['brand']);
+    expect(columnHeader('category')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]')).toEqual(['category']);
 
     // A new visit keeps the choice until every column is shown again.
     cleanup();
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
-    expect(columnHeader('brand')).toBeNull();
+    expect(columnHeader('category')).toBeNull();
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
     await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
-    expect(columnHeader('brand')).toBeInTheDocument();
+    expect(columnHeader('category')).toBeInTheDocument();
     expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBeNull();
   });
 
@@ -358,15 +353,15 @@ describe('products list', () => {
     localStorage.setItem(HIDDEN_COLUMNS_KEY, '{not json');
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
-    expect(columnHeader('brand')).toBeInTheDocument();
+    expect(columnHeader('category')).toBeInTheDocument();
 
     cleanup();
-    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(['sku', 'name', 'price', 'brand']));
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(['sku', 'name', 'price', 'category']));
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(columnHeader('sku')).toBeInTheDocument();
     expect(columnHeader('name')).toBeInTheDocument();
-    expect(columnHeader('brand')).toBeNull();
+    expect(columnHeader('category')).toBeNull();
 
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('full', 'QuotaExceededError');
@@ -391,7 +386,7 @@ describe('products list', () => {
     cleanup();
     const second = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const table = await screen.findByRole('table');
-    await user.click(await within(table).findByText('Coca-Cola'));
+    await user.click(await within(table).findByText('1 хайрцаг = 24 ш'));
     await waitFor(() => expect(second.router.state.location.pathname).toBe('/catalog/products/1'));
 
     cleanup();
@@ -468,7 +463,6 @@ describe('product create', () => {
       sku: '10025',
       name: 'Гурил 1 кг',
       categoryId: 11,
-      brandId: null,
       vatType: 'VAT_FREE',
       cityTax: false,
       classificationCode: '2111100',
@@ -685,7 +679,6 @@ describe('product page', () => {
       sku: '10023',
       name: 'Кока кола 0.5 л',
       categoryId: 12,
-      brandId: 5,
       vatType: 'VAT_ABLE',
       cityTax: true,
       classificationCode: null,

@@ -83,7 +83,6 @@ const COLA: Schemas['ProductSummary'] = {
   sku: '10',
   name: 'Кока кола',
   categoryId: 1,
-  brandId: null,
   status: 'ACTIVE',
   vatType: 'VAT_ABLE',
   cityTax: null,

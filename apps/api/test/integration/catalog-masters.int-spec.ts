@@ -6,7 +6,7 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 
-describe('catalog masters: units of measure, categories, brands', () => {
+describe('catalog masters: units of measure and categories', () => {
   let app: NestExpressApplication;
   let sql: Client;
   let admin: string;
@@ -125,32 +125,22 @@ describe('catalog masters: units of measure, categories, brands', () => {
     );
   });
 
-  it('refuses duplicate brand names and deleting brands in use', async () => {
+  it('has no brands any more (ADR-0043): no route, no column, no product field', async () => {
     const api = catalogApi(app, admin);
-    const brand = await http()
-      .post('/api/v1/brands')
+    await http().get('/api/v1/brands').set(bearer(admin)).expect(404);
+    const { rows } = await sql.query<{ brands: string | null; column: string | null }>(
+      `SELECT to_regclass('public.brands')::text AS brands,
+              (SELECT column_name::text FROM information_schema.columns
+                WHERE table_name = 'products' AND column_name = 'brand_id') AS column`,
+    );
+    expect(rows[0]).toEqual({ brands: null, column: null });
+    const categoryId = await api.category('Брэндгүй');
+    const baseUomId = await api.uomId('PCS');
+    const refused = await http()
+      .post('/api/v1/products')
       .set(bearer(admin))
-      .send({ name: 'Coca-Cola' })
-      .expect(201);
-    const twin = await http()
-      .post('/api/v1/brands')
-      .set(bearer(admin))
-      .send({ name: ' coca-cola ' })
-      .expect(409);
-    expect(twin.body.params).toMatchObject({ constraint: 'brands_name_key_key' });
-    const category = await api.category('Брэндийн тест');
-    await api.product({
-      name: 'Кока кола 0.5л',
-      categoryId: category,
-      baseUomId: await api.uomId('PCS'),
-      brandId: brand.body.id,
-    });
-    const inUse = await http()
-      .delete(`/api/v1/brands/${brand.body.id}`)
-      .set(bearer(admin))
-      .expect(409);
-    expect(inUse.body).toMatchObject({ code: 'IN_USE', params: { resource: 'brands' } });
-    const listed = await http().get('/api/v1/brands').set(bearer(worker)).expect(200);
-    expect(listed.body.data).toEqual([{ id: brand.body.id, name: 'Coca-Cola', productCount: 1 }]);
+      .send({ name: 'Кока кола 0.5л', categoryId, baseUomId, brandId: 1 })
+      .expect(422);
+    expect(refused.body.code).toBe('VALIDATION_FAILED');
   });
 });

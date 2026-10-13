@@ -53,7 +53,6 @@ const baseSchema = z.object({
   sku: z.string().trim().regex(SKU, 'validation.sku'),
   name: z.string().trim().min(1, 'validation.required').max(200, 'validation.tooLong'),
   categoryId: z.string().min(1, 'validation.required'),
-  brandId: z.string(),
   weightKg: z
     .string()
     .trim()
@@ -115,7 +114,6 @@ export function emptyProduct(sku: string, baseUomId: string): ProductFormValues 
     sku,
     name: '',
     categoryId: '',
-    brandId: '',
     weightKg: '',
     vatType: 'VAT_ABLE',
     cityTax: 'unknown',
@@ -133,7 +131,6 @@ export function productValues(product: ProductDetail): ProductFormValues {
     sku: product.sku,
     name: product.name,
     categoryId: String(product.categoryId),
-    brandId: product.brandId === null ? '' : String(product.brandId),
     weightKg: product.weightKg ?? '',
     vatType: product.vatType,
     cityTax: cityTaxChoice(product.cityTax),
@@ -151,7 +148,6 @@ function common(values: ProductFormValues) {
     sku: values.sku,
     name: values.name,
     categoryId: id(values.categoryId),
-    brandId: values.brandId ? id(values.brandId) : null,
     vatType: values.vatType satisfies VatType,
     cityTax: cityTaxValue(values.cityTax),
     classificationCode: values.classificationCode || null,

@@ -63,7 +63,6 @@ describe('imports', () => {
     const food = await catalog.category('Хүнс');
     await catalog.category('Хийжүүлсэн', food);
     await catalog.category('Ус');
-    await http().post('/api/v1/brands').set(bearer(admin)).send({ name: 'Coca-Cola' }).expect(201);
     await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' });
   });
   afterAll(async () => {
@@ -139,7 +138,6 @@ describe('imports', () => {
         sku: '1001',
         name: 'Кока кола 0.5л',
         category: 'Ундаа / Хийжүүлсэн',
-        brand: 'coca-cola',
         barcodes: COLA_BARCODE,
         boxQty: 24,
         boxBarcodes: COLA_BOX_BARCODE,

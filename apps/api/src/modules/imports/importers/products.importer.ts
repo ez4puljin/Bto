@@ -62,7 +62,6 @@ export interface ProductPlan {
   create: {
     name: string;
     categoryId: number;
-    brandId: number | null;
     vatType: VatType;
     weightKg: string | null;
     baseUomId: number;
@@ -91,7 +90,6 @@ export interface ProductPlan {
 interface SerializedPatch {
   name?: string;
   categoryId?: number;
-  brandId?: number | null;
   vatType?: VatType;
   weightKg?: string | null;
   status?: 'ACTIVE' | 'INACTIVE';
@@ -118,7 +116,6 @@ interface Parsed {
   sku: string | null;
   name: string | null;
   categoryId: number | null;
-  brandId: number | null | undefined;
   baseUom: { id: number; fractional: boolean; name: string } | null | undefined;
   barcodes: string[];
   boxQty: Decimal | null;
@@ -138,7 +135,7 @@ const keysOf = (codes: readonly string[]) =>
   });
 
 /**
- * Products (SPEC §5.5, ADR-0036): keyed on the SKU; categories, brands, units, warehouses, shelves
+ * Products (SPEC §5.5, ADR-0036): keyed on the SKU; categories, units, warehouses, shelves
  * and suppliers must exist. A new product is created with its base unit, an optional box unit and
  * barcodes; an existing one gets only what differs (unit factors never change through an import).
  */
@@ -164,7 +161,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
   ): Promise<CheckedRow<ProductPlan>[]> {
     const reference = await this.catalog.reference(executor);
     const categories = new CategoryIndex(reference.categories);
-    const findBrand = byNameKey(reference.brands, (brand) => brand.nameKey);
     const uomByKey = byNameKey(reference.uoms, (uom) => uom.nameKey);
     const findUom = (text: string): Found<CatalogReference['uoms'][number]> => {
       const code = text.trim().toUpperCase();
@@ -181,7 +177,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
     const parsed = rows.map((row) =>
       this.parse(new RowCheck(row), {
         categories,
-        findBrand,
         findUom,
         findWarehouse,
       }),
@@ -498,7 +493,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
     check: RowCheck,
     lookups: {
       categories: CategoryIndex;
-      findBrand: (text: string) => Found<CatalogReference['brands'][number]>;
       findUom: (text: string) => Found<CatalogReference['uoms'][number]>;
       findWarehouse: (text: string) => Found<Warehouse>;
     },
@@ -515,13 +509,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
       const found = lookups.categories.find(categoryText);
       if (found.ok) categoryId = found.value;
       else check.error('category', found.code, { value: categoryText });
-    }
-    const brandText = check.text('brand');
-    let brandId: number | null | undefined;
-    if (brandText !== null) {
-      const found = lookups.findBrand(brandText);
-      if (found.ok) brandId = found.value.id;
-      else check.error('brand', found.code, { value: brandText });
     }
     const unitText = check.text('baseUnit');
     let baseUom: Parsed['baseUom'];
@@ -574,7 +561,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
       sku,
       name,
       categoryId,
-      brandId,
       baseUom,
       barcodes,
       boxQty,
@@ -602,7 +588,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
       create: {
         name: entry.name ?? '',
         categoryId: entry.categoryId ?? 0,
-        brandId: entry.brandId ?? null,
         vatType: entry.vatType ?? 'VAT_ABLE',
         weightKg: entry.weightKg?.toFixed() ?? null,
         baseUomId: base.id,
@@ -641,7 +626,6 @@ export class ProductsImporter implements Importer<ProductPlan> {
     };
     if (entry.name !== null) set('name', entry.name, product.name);
     if (entry.categoryId !== null) set('categoryId', entry.categoryId, product.categoryId);
-    if (entry.brandId !== undefined) set('brandId', entry.brandId, product.brandId);
     if (entry.vatType !== undefined) set('vatType', entry.vatType, product.vatType);
     if (entry.weightKg !== undefined) {
       set('weightKg', entry.weightKg?.toFixed() ?? null, product.weightKg?.toFixed() ?? null);
@@ -715,7 +699,6 @@ function toBulkInput(plan: ProductPlan): BulkProductInput {
     sku: plan.sku,
     name: create.name,
     categoryId: create.categoryId,
-    brandId: create.brandId,
     vatType: create.vatType,
     weightKg: create.weightKg === null ? null : new Decimal(create.weightKg),
     baseUomId: create.baseUomId,
@@ -734,7 +717,6 @@ function toPatch(patch: SerializedPatch): ProductPatch {
   return {
     ...(patch.name === undefined ? {} : { name: patch.name }),
     ...(patch.categoryId === undefined ? {} : { categoryId: patch.categoryId }),
-    ...(patch.brandId === undefined ? {} : { brandId: patch.brandId }),
     ...(patch.vatType === undefined ? {} : { vatType: patch.vatType }),
     ...(patch.weightKg === undefined
       ? {}

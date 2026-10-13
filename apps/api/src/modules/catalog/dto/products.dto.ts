@@ -78,12 +78,6 @@ export class CreateProductDto {
 
   @ApiProperty() @IsInt() @Min(1) categoryId: number;
 
-  @ApiPropertyOptional({ type: Number, nullable: true })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  brandId?: number | null;
-
   @ApiPropertyOptional({ enum: VAT_TYPES, default: 'VAT_ABLE' })
   @IsOptional()
   @IsIn(VAT_TYPES)
@@ -155,12 +149,6 @@ export class UpdateProductDto {
 
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) categoryId?: number;
 
-  @ApiPropertyOptional({ type: Number, nullable: true })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  brandId?: number | null;
-
   @ApiPropertyOptional({ enum: VAT_TYPES }) @IsOptional() @IsIn(VAT_TYPES) vatType?: VatType;
 
   @ApiPropertyOptional({ type: Boolean, nullable: true })
@@ -202,8 +190,6 @@ export class ProductListQueryDto extends PageQueryDto {
   @IsInt()
   @Min(1)
   categoryId?: number;
-
-  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) brandId?: number;
 
   @ApiPropertyOptional({ enum: PRODUCT_STATUSES })
   @IsOptional()
@@ -300,7 +286,6 @@ export class ProductSummaryDto {
   @ApiProperty() sku: string;
   @ApiProperty() name: string;
   @ApiProperty() categoryId: number;
-  @ApiProperty({ type: Number, nullable: true }) brandId: number | null;
   @ApiProperty({ enum: PRODUCT_STATUSES }) status: ProductStatus;
   @ApiProperty({ enum: VAT_TYPES }) vatType: VatType;
   @ApiProperty({ type: Boolean, nullable: true }) cityTax: boolean | null;
@@ -344,7 +329,6 @@ export class ProductDetailDto {
   @ApiProperty() sku: string;
   @ApiProperty() name: string;
   @ApiProperty() categoryId: number;
-  @ApiProperty({ type: Number, nullable: true }) brandId: number | null;
   @ApiProperty({ enum: VAT_TYPES }) vatType: VatType;
   @ApiProperty({ type: Boolean, nullable: true }) cityTax: boolean | null;
   @ApiProperty({ type: String, nullable: true }) classificationCode: string | null;

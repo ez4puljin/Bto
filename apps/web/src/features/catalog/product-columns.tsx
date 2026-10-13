@@ -15,7 +15,6 @@ export const PRODUCT_COLUMN_KEYS = [
   'sku',
   'name',
   'category',
-  'brand',
   'baseUnit',
   'units',
   'wholesalePrice',
@@ -41,7 +40,6 @@ export const LOCKED_PRODUCT_COLUMNS: readonly ProductColumnKey[] = ['sku', 'name
 export interface ProductCellContext {
   t: TFunction;
   categoryPath: (id: number) => string | undefined;
-  brandName: (id: number) => string | undefined;
   warehouseName: (id: number) => string;
   suppliers: ReadonlyMap<number, readonly ProductSupplierLink[]> | undefined;
   locations: ReadonlyMap<number, readonly ProductLocation[]> | undefined;
@@ -114,10 +112,6 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
     key: 'category',
     className: 'whitespace-normal text-muted-foreground',
     cell: (row, ctx) => text(ctx.categoryPath(row.categoryId), ctx),
-  },
-  {
-    key: 'brand',
-    cell: (row, ctx) => text(row.brandId === null ? null : ctx.brandName(row.brandId), ctx),
   },
   { key: 'baseUnit', cell: (row) => row.baseUnit.uomName },
   {

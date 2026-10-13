@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import type { Brand, Category, Uom } from './api';
+import type { Category, Uom } from './api';
 import { BarcodeList } from './barcode-entry';
 import { barcodeKey } from './barcodes';
 import { categoryTree } from './category-tree';
@@ -36,7 +36,6 @@ export function ProductForm(props: {
   defaultValues: ProductFormValues;
   uoms: readonly Uom[];
   categories: readonly Category[];
-  brands: readonly Brand[];
   readOnly?: boolean;
   submitLabel: string;
   /** Resolves to the API problem, or null when saved. */
@@ -132,16 +131,6 @@ export function ProductForm(props: {
               {tree.map((node) => (
                 <option key={node.category.id} value={String(node.category.id)}>
                   {node.path}
-                </option>
-              ))}
-            </NativeSelect>
-          </FormRow>
-          <FormRow label={t('catalog.product.brand')} htmlFor="product-brand">
-            <NativeSelect id="product-brand" {...form.register('brandId')}>
-              <option value="">{t('catalog.product.noBrand')}</option>
-              {props.brands.map((brand) => (
-                <option key={brand.id} value={String(brand.id)}>
-                  {brand.name}
                 </option>
               ))}
             </NativeSelect>

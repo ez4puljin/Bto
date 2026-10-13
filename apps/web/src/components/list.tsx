@@ -202,8 +202,8 @@ export function ChevronHead() {
 }
 
 /**
- * The actions cell at the end of a row of a list without its own record pages (categories, brands,
- * units of measure): quiet icon buttons, each named for screen readers and shown as a tooltip.
+ * The actions cell at the end of a row of a list without its own record pages (categories, units
+ * of measure): quiet icon buttons, each named for screen readers and shown as a tooltip.
  */
 export function RowActions({ children }: { children: ReactNode }) {
   return (

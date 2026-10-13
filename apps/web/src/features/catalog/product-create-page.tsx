@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { problemFromError } from '@/lib/problem';
-import { useBrands, useCatalogMutations, useCategories, useNextSku, useUoms } from './api';
+import { useCatalogMutations, useCategories, useNextSku, useUoms } from './api';
 import { ProductForm } from './product-form';
 import { createBody, emptyProduct, type ProductFormValues } from './product-schema';
 
@@ -18,7 +18,6 @@ export function ProductCreatePage() {
   const navigate = useNavigate();
   const uoms = useUoms();
   const categories = useCategories();
-  const brands = useBrands();
   const nextSku = useNextSku(true);
   const mutations = useCatalogMutations();
 
@@ -31,14 +30,14 @@ export function ProductCreatePage() {
       return problemFromError(error);
     }
   };
-  const loadProblem = problemFromError(uoms.error ?? categories.error ?? brands.error);
+  const loadProblem = problemFromError(uoms.error ?? categories.error);
   const pieces = uoms.data?.find((uom) => uom.code === 'PCS') ?? uoms.data?.[0];
 
   return (
     <div className="max-w-3xl">
       <PageHeader title={t('catalog.product.newTitle')} />
       <ProblemAlert problem={loadProblem} />
-      {uoms.data && categories.data && brands.data && !nextSku.isPending ? (
+      {uoms.data && categories.data && !nextSku.isPending ? (
         <Card>
           <CardContent>
             <ProductForm
@@ -46,7 +45,6 @@ export function ProductCreatePage() {
               defaultValues={emptyProduct(nextSku.data ?? '', pieces ? String(pieces.id) : '')}
               uoms={uoms.data}
               categories={categories.data}
-              brands={brands.data}
               submitLabel={t('common.save')}
               onCancel={() => void navigate('/catalog/products')}
               onSubmit={create}

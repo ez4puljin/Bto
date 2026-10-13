@@ -7,7 +7,7 @@ import { AccountPage } from '@/features/auth/account-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { SetPasswordPage } from '@/features/auth/set-password-page';
 import { BarcodeLookupPage } from '@/features/catalog/barcode-lookup-page';
-import { BrandsPage, CategoriesPage, UomsPage } from '@/features/catalog/masters-pages';
+import { CategoriesPage, UomsPage } from '@/features/catalog/masters-pages';
 import { ProductCreatePage } from '@/features/catalog/product-create-page';
 import { ProductPage } from '@/features/catalog/product-page';
 import { ProductsPage } from '@/features/catalog/products-page';
@@ -77,7 +77,6 @@ export const routes: RouteObject[] = [
           },
           { path: 'catalog/products/:id', element: <ProductPage /> },
           { path: 'catalog/categories', element: <CategoriesPage /> },
-          { path: 'catalog/brands', element: <BrandsPage /> },
           { path: 'catalog/uoms', element: <UomsPage /> },
           { path: 'catalog/scan', element: <BarcodeLookupPage /> },
           {

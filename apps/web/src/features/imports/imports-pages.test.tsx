@@ -50,7 +50,6 @@ const ROWS: Schemas['ImportRow'][] = [
     raw: {
       sku: '1002',
       name: 'Цэвэр ус',
-      brand: 'Bonaqua',
       boxQty: '0',
       category: 'Цай',
       supplier: null,

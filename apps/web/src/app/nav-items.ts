@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Store,
-  Tag,
   Users,
   Warehouse,
 } from 'lucide-react';
@@ -64,7 +63,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/catalog/products', label: 'nav.products', icon: Package },
       { to: '/catalog/categories', label: 'nav.categories', icon: FolderTree },
-      { to: '/catalog/brands', label: 'nav.brands', icon: Tag },
       { to: '/catalog/uoms', label: 'nav.uoms', icon: Ruler },
       { to: '/catalog/scan', label: 'nav.scan', icon: ScanBarcode },
       {

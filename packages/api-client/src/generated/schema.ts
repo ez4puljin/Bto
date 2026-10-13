@@ -468,38 +468,6 @@ export interface paths {
         patch: operations["Categories_update"];
         trace?: never;
     };
-    "/api/v1/brands": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["Brands_list"];
-        put?: never;
-        post: operations["Brands_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/brands/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["Brands_remove"];
-        options?: never;
-        head?: never;
-        patch: operations["Brands_update"];
-        trace?: never;
-    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -2561,19 +2529,6 @@ export interface components {
             name?: string;
             defaultClassificationCode?: string | null;
         };
-        Brand: {
-            id: number;
-            name: string;
-            productCount: number;
-        };
-        BrandList: {
-            data: components["schemas"]["Brand"][];
-            /** @description Always null: the list is short */
-            nextCursor: string | null;
-        };
-        BrandRequest: {
-            name: string;
-        };
         ProductBaseUnit: {
             id: number;
             uomId: number;
@@ -2594,7 +2549,6 @@ export interface components {
             sku: string;
             name: string;
             categoryId: number;
-            brandId: number | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /** @enum {string} */
@@ -2663,7 +2617,6 @@ export interface components {
             sku: string;
             name: string;
             categoryId: number;
-            brandId: number | null;
             /** @enum {string} */
             vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
             cityTax: boolean | null;
@@ -2700,7 +2653,6 @@ export interface components {
             sku?: string;
             name: string;
             categoryId: number;
-            brandId?: number | null;
             /**
              * @default VAT_ABLE
              * @enum {string}
@@ -2721,7 +2673,6 @@ export interface components {
             sku?: string;
             name?: string;
             categoryId?: number;
-            brandId?: number | null;
             /** @enum {string} */
             vatType?: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
             cityTax?: boolean | null;
@@ -2748,7 +2699,6 @@ export interface components {
             sku: string;
             name: string;
             categoryId: number;
-            brandId: number | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /** @enum {string} */
@@ -5692,128 +5642,6 @@ export interface operations {
             };
         };
     };
-    Brands_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BrandList"];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    Brands_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BrandRequest"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Brand"];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    Brands_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    Brands_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BrandRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Brand"];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
     Products_list: {
         parameters: {
             query?: {
@@ -5824,7 +5652,6 @@ export interface operations {
                 q?: string;
                 /** @description Includes its subcategories */
                 categoryId?: number;
-                brandId?: number;
                 status?: "ACTIVE" | "INACTIVE";
             };
             header?: never;

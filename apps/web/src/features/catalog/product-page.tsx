@@ -13,14 +13,7 @@ import { ProductSuppliersCard } from '@/features/partners/product-suppliers-card
 import { ProductPricesCard } from '@/features/pricing/product-prices-card';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
-import {
-  type ProductDetail,
-  useBrands,
-  useCatalogMutations,
-  useCategories,
-  useProduct,
-  useUoms,
-} from './api';
+import { type ProductDetail, useCatalogMutations, useCategories, useProduct, useUoms } from './api';
 import { categoryPaths } from './category-tree';
 import { ImagesCard } from './images-card';
 import { ProductForm } from './product-form';
@@ -39,23 +32,18 @@ export function ProductPage() {
   const product = useProduct(id);
   const uoms = useUoms();
   const categories = useCategories();
-  const brands = useBrands();
   const mutations = useCatalogMutations();
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
 
-  const loadProblem = problemFromError(
-    product.error ?? uoms.error ?? categories.error ?? brands.error,
-  );
+  const loadProblem = problemFromError(product.error ?? uoms.error ?? categories.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
-  if (!product.data || !uoms.data || !categories.data || !brands.data) {
+  if (!product.data || !uoms.data || !categories.data) {
     return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   }
   const detail = product.data;
   const loadedUoms = uoms.data;
   const loadedCategories = categories.data;
-  const loadedBrands = brands.data;
   const categoryPath = paths.get(detail.categoryId);
-  const brandName = loadedBrands.find((brand) => brand.id === detail.brandId)?.name;
 
   const save = async (values: ProductFormValues, close: () => void) => {
     try {
@@ -76,21 +64,14 @@ export function ProductPage() {
         meta={
           <>
             <span className="font-mono">{detail.sku}</span>
-            {(
-              [
-                ['category', categoryPath],
-                ['brand', brandName],
-              ] as const
-            ).map(([key, part]) =>
-              part ? (
-                <span key={key} className="flex items-center gap-2">
-                  <span aria-hidden className="opacity-50">
-                    {'·'}
-                  </span>
-                  {part}
+            {categoryPath ? (
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="opacity-50">
+                  {'·'}
                 </span>
-              ) : null,
-            )}
+                {categoryPath}
+              </span>
+            ) : null}
             <Badge variant={detail.status === 'ACTIVE' ? 'success' : 'secondary'}>
               {t(`catalog.products.status.${detail.status}`)}
             </Badge>
@@ -118,16 +99,13 @@ export function ProductPage() {
           <DetailCard
             title={t('catalog.product.info')}
             canEdit={canManage}
-            view={
-              <ProductFacts detail={detail} categoryPath={categoryPath} brandName={brandName} />
-            }
+            view={<ProductFacts detail={detail} categoryPath={categoryPath} />}
             edit={(close) => (
               <ProductForm
                 mode="edit"
                 defaultValues={productValues(detail)}
                 uoms={loadedUoms}
                 categories={loadedCategories}
-                brands={loadedBrands}
                 submitLabel={t('common.save')}
                 onCancel={close}
                 onSubmit={(values) => save(values, close)}
@@ -148,11 +126,7 @@ export function ProductPage() {
 }
 
 /** The reading side of the product's card: its data, then its e-Barimt attributes. */
-function ProductFacts(props: {
-  detail: ProductDetail;
-  categoryPath: string | undefined;
-  brandName: string | undefined;
-}) {
+function ProductFacts(props: { detail: ProductDetail; categoryPath: string | undefined }) {
   const { t } = useTranslation();
   const { detail } = props;
   return (
@@ -166,7 +140,6 @@ function ProductFacts(props: {
           },
           { label: t('catalog.product.name'), value: detail.name },
           { label: t('catalog.product.category'), value: props.categoryPath },
-          { label: t('catalog.product.brand'), value: props.brandName },
           {
             label: t('catalog.product.weight'),
             value: detail.weightKg ? <span className="font-mono">{detail.weightKg}</span> : null,

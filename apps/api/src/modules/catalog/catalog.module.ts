@@ -4,16 +4,11 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { IdentityModule } from '../identity';
 import { BarcodesController } from './controllers/barcodes.controller';
-import {
-  BrandsController,
-  CategoriesController,
-  UomsController,
-} from './controllers/masters.controller';
+import { CategoriesController, UomsController } from './controllers/masters.controller';
 import { ProductsController, ProductUnitsController } from './controllers/products.controller';
 import { ProductImagesController, ReadinessController } from './controllers/readiness.controller';
 import { syncSystemUoms } from './reference-data';
 import { BarcodeService } from './services/barcode.service';
-import { BrandsService } from './services/brands.service';
 import { CatalogImportService } from './services/catalog-import.service';
 import { CatalogService } from './services/catalog.service';
 import { CategoriesService } from './services/categories.service';
@@ -27,7 +22,6 @@ import { UomsService } from './services/uoms.service';
 
 const CORE_SERVICES = [
   BarcodeService,
-  BrandsService,
   CatalogImportService,
   CatalogService,
   CategoriesService,
@@ -60,7 +54,6 @@ export class CatalogBootstrap implements OnApplicationBootstrap {
   controllers: [
     UomsController,
     CategoriesController,
-    BrandsController,
     ProductsController,
     ProductUnitsController,
     BarcodesController,

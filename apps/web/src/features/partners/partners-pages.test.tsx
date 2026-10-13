@@ -703,7 +703,6 @@ describe('product suppliers card', () => {
     sku: '10023',
     name: 'Кока кола 0.5 л',
     categoryId: 12,
-    brandId: null,
     vatType: 'VAT_ABLE',
     cityTax: null,
     classificationCode: null,
@@ -751,7 +750,6 @@ describe('product suppliers card', () => {
           childCount: 0,
         },
       ]),
-    'GET /api/v1/brands': () => list([]),
     'GET /api/v1/products/7': () => json(PRODUCT),
     'GET /api/v1/product-suppliers': () =>
       list([

@@ -64,7 +64,6 @@ export const toProductDetailDto = (row: ProductDetail): ProductDetailDto => ({
   sku: row.sku,
   name: row.name,
   categoryId: row.categoryId,
-  brandId: row.brandId,
   vatType: row.vatType,
   cityTax: row.cityTax,
   classificationCode: row.classificationCode,

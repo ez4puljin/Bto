@@ -13,7 +13,6 @@ import { unwrap } from '@/lib/problem';
 type Schemas = components['schemas'];
 export type Uom = Schemas['Uom'];
 export type Category = Schemas['Category'];
-export type Brand = Schemas['Brand'];
 export type ProductSummary = Schemas['ProductSummary'];
 export type ProductListItem = Schemas['ProductListItem'];
 export type ProductDetail = Schemas['ProductDetail'];
@@ -34,7 +33,6 @@ export type ProductStatus = ProductDetail['status'];
 export const KEYS = {
   uoms: ['catalog', 'uoms'] as const,
   categories: ['catalog', 'categories'] as const,
-  brands: ['catalog', 'brands'] as const,
   products: ['catalog', 'products'] as const,
   readiness: ['catalog', 'readiness'] as const,
 };
@@ -61,18 +59,9 @@ export function useCategories() {
   });
 }
 
-export function useBrands() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: KEYS.brands,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/brands', { signal })).data,
-  });
-}
-
 export interface ProductFilter {
   q?: string;
   categoryId?: number;
-  brandId?: number;
   status?: ProductStatus;
 }
 
@@ -90,7 +79,6 @@ export function useProducts(filter: ProductFilter, options: ListReadOptions = {}
             query: {
               q: filter.q || undefined,
               categoryId: filter.categoryId,
-              brandId: filter.brandId,
               status: filter.status,
               cursor: pageParam,
               limit,
@@ -199,30 +187,15 @@ export function useCatalogMutations() {
         unwrap(await api.DELETE('/api/v1/categories/{id}', { params: { path: { id } } })),
       onSuccess: () => invalidate(KEYS.categories),
     }),
-    createBrand: useMutation({
-      mutationFn: async (body: Schemas['BrandRequest']) =>
-        unwrap(await api.POST('/api/v1/brands', { body })),
-      onSuccess: () => invalidate(KEYS.brands),
-    }),
-    updateBrand: useMutation({
-      mutationFn: async ({ id, body }: { id: number; body: Schemas['BrandRequest'] }) =>
-        unwrap(await api.PATCH('/api/v1/brands/{id}', { params: { path: { id } }, body })),
-      onSuccess: () => invalidate(KEYS.brands),
-    }),
-    deleteBrand: useMutation({
-      mutationFn: async (id: number) =>
-        unwrap(await api.DELETE('/api/v1/brands/{id}', { params: { path: { id } } })),
-      onSuccess: () => invalidate(KEYS.brands),
-    }),
     createProduct: useMutation({
       mutationFn: async (body: ProductCreate) =>
         unwrap(await api.POST('/api/v1/products', { body })),
-      onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories, KEYS.brands),
+      onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories),
     }),
     updateProduct: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: ProductUpdate }) =>
         unwrap(await api.PATCH('/api/v1/products/{id}', { params: { path: { id } }, body })),
-      onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories, KEYS.brands),
+      onSuccess: () => invalidate(KEYS.products, KEYS.readiness, KEYS.categories),
     }),
     addUnit: useMutation({
       mutationFn: async ({ productId, body }: { productId: number; body: UnitRequest }) =>

@@ -99,6 +99,13 @@
       "when": 1791866172690,
       "tag": "0013_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791884622088,
+      "tag": "0014_drop_brands",
+      "breakpoints": true
     }
   ]
 }

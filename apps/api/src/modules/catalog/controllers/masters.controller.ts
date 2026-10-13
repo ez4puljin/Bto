@@ -12,9 +12,6 @@ import {
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
 import {
-  BrandDto,
-  BrandInputDto,
-  BrandListDto,
   CategoryDto,
   CategoryListDto,
   CreateCategoryDto,
@@ -24,17 +21,11 @@ import {
   UpdateCategoryDto,
   UpdateUomDto,
 } from '../dto/masters.dto';
-import { type BrandView, BrandsService } from '../services/brands.service';
 import { CategoriesService } from '../services/categories.service';
 import { UomsService } from '../services/uoms.service';
 import { toCategoryDto, toUomDto } from './mappers';
 
 const MANAGE = 'catalog.products.manage';
-const toBrandDto = (row: BrandView): BrandDto => ({
-  id: row.id,
-  name: row.name,
-  productCount: row.productCount,
-});
 
 @ApiTags('catalog')
 @Controller('uoms')
@@ -124,50 +115,5 @@ export class CategoriesController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     await this.categories.remove(ctx, id);
-  }
-}
-
-@ApiTags('catalog')
-@Controller('brands')
-export class BrandsController {
-  constructor(private readonly brands: BrandsService) {}
-
-  @Get()
-  @Authenticated()
-  @ApiOkResponse({ type: BrandListDto })
-  async list(): Promise<BrandListDto> {
-    return { data: (await this.brands.list()).map(toBrandDto), nextCursor: null };
-  }
-
-  @Post()
-  @RequirePermission(MANAGE)
-  @ApiCreatedResponse({ type: BrandDto })
-  async create(@CurrentUser() ctx: AuthContext, @Body() body: BrandInputDto): Promise<BrandDto> {
-    return toBrandDto({ ...(await this.brands.create(ctx, body)), productCount: 0 });
-  }
-
-  @Patch(':id')
-  @RequirePermission(MANAGE)
-  @ApiOkResponse({ type: BrandDto })
-  async update(
-    @CurrentUser() ctx: AuthContext,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: BrandInputDto,
-  ): Promise<BrandDto> {
-    await this.brands.update(ctx, id, body);
-    const view = (await this.brands.list()).find((row) => row.id === id);
-    if (!view) throw new Error(`brand ${id} vanished`);
-    return toBrandDto(view);
-  }
-
-  @Delete(':id')
-  @HttpCode(204)
-  @RequirePermission(MANAGE)
-  @ApiNoContentResponse()
-  async remove(
-    @CurrentUser() ctx: AuthContext,
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<void> {
-    await this.brands.remove(ctx, id);
   }
 }

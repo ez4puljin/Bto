@@ -89,21 +89,6 @@ export const categories = pgTable(
   ],
 );
 
-export const brands = pgTable(
-  'brands',
-  {
-    id: id(),
-    name: text('name').notNull(),
-    nameKey: text('name_key').notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    unique('brands_name_key_key').on(t.nameKey),
-    check('brands_name', sql`length(${t.name}) BETWEEN 1 AND 100`),
-  ],
-);
-
 export const VAT_TYPES = ['VAT_ABLE', 'VAT_FREE', 'VAT_ZERO', 'NO_VAT'] as const;
 export type VatType = (typeof VAT_TYPES)[number];
 export const PRODUCT_STATUSES = ['ACTIVE', 'INACTIVE'] as const;
@@ -123,7 +108,6 @@ export const products = pgTable(
     categoryId: ref('category_id')
       .notNull()
       .references(() => categories.id),
-    brandId: ref('brand_id').references(() => brands.id),
     vatType: text('vat_type', { enum: VAT_TYPES }).notNull().default('VAT_ABLE'),
     /** City tax (НХАТ); NULL = not decided yet (SPEC §11 #3a), so receipts refuse the product. */
     cityTax: boolean('city_tax'),
@@ -141,7 +125,6 @@ export const products = pgTable(
     unique('products_sku_key').on(t.sku),
     index('products_name_idx').on(t.name, t.id),
     index('products_category_idx').on(t.categoryId),
-    index('products_brand_idx').on(t.brandId),
     index('products_search_text_idx').using('gin', t.searchText.op('gin_trgm_ops')),
     index('products_search_phonetic_idx').using('gin', t.searchPhonetic.op('gin_trgm_ops')),
     check('products_sku_format', sql`${t.sku} ~ '^[0-9]{1,20}$'`),

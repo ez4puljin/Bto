@@ -166,7 +166,7 @@ export function searchKeys(name: string, extra: readonly string[] = []): SearchK
   };
 }
 
-/** A unique key for names that must not repeat (categories, brands, units): the strict form. */
+/** A unique key for names that must not repeat (categories, units): the strict form. */
 export function nameKey(name: string): string {
   return searchKeys(name).strict.trim();
 }

@@ -45,7 +45,6 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('sku', 'code', true),
     column('name', 'text', true),
     column('category', 'text', true),
-    column('brand', 'text'),
     column('baseUnit', 'text'),
     column('barcodes', 'list'),
     column('boxQty', 'decimal'),

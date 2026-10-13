@@ -1822,177 +1822,6 @@
         ]
       }
     },
-    "/api/v1/brands": {
-      "get": {
-        "operationId": "Brands_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BrandList"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "catalog"
-        ]
-      },
-      "post": {
-        "operationId": "Brands_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BrandRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Brand"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "catalog"
-        ]
-      }
-    },
-    "/api/v1/brands/{id}": {
-      "patch": {
-        "operationId": "Brands_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BrandRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Brand"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "catalog"
-        ]
-      },
-      "delete": {
-        "operationId": "Brands_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "catalog"
-        ]
-      }
-    },
     "/api/v1/products": {
       "get": {
         "operationId": "Products_list",
@@ -2032,15 +1861,6 @@
             "required": false,
             "in": "query",
             "description": "Includes its subcategories",
-            "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "brandId",
-            "required": false,
-            "in": "query",
             "schema": {
               "minimum": 1,
               "type": "number"
@@ -10858,57 +10678,6 @@
           }
         }
       },
-      "Brand": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "name": {
-            "type": "string"
-          },
-          "productCount": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "productCount"
-        ]
-      },
-      "BrandList": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Brand"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true,
-            "description": "Always null: the list is short"
-          }
-        },
-        "required": [
-          "data",
-          "nextCursor"
-        ]
-      },
-      "BrandRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
       "ProductBaseUnit": {
         "type": "object",
         "properties": {
@@ -10979,10 +10748,6 @@
           "categoryId": {
             "type": "number"
           },
-          "brandId": {
-            "type": "number",
-            "nullable": true
-          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -11036,7 +10801,6 @@
           "sku",
           "name",
           "categoryId",
-          "brandId",
           "status",
           "vatType",
           "cityTax",
@@ -11238,10 +11002,6 @@
           "categoryId": {
             "type": "number"
           },
-          "brandId": {
-            "type": "number",
-            "nullable": true
-          },
           "vatType": {
             "enum": [
               "VAT_ABLE",
@@ -11305,7 +11065,6 @@
           "sku",
           "name",
           "categoryId",
-          "brandId",
           "vatType",
           "cityTax",
           "classificationCode",
@@ -11372,11 +11131,6 @@
           },
           "categoryId": {
             "type": "number",
-            "minimum": 1
-          },
-          "brandId": {
-            "type": "number",
-            "nullable": true,
             "minimum": 1
           },
           "vatType": {
@@ -11454,11 +11208,6 @@
           },
           "categoryId": {
             "type": "number",
-            "minimum": 1
-          },
-          "brandId": {
-            "type": "number",
-            "nullable": true,
             "minimum": 1
           },
           "vatType": {
@@ -11554,10 +11303,6 @@
           "categoryId": {
             "type": "number"
           },
-          "brandId": {
-            "type": "number",
-            "nullable": true
-          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -11591,7 +11336,6 @@
           "sku",
           "name",
           "categoryId",
-          "brandId",
           "status",
           "vatType",
           "cityTax",

@@ -19,7 +19,6 @@ export {
   warehouses,
 } from '../modules/identity/schema';
 export {
-  brands,
   categories,
   internalBarcodeSeq,
   productBarcodes,

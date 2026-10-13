@@ -29,7 +29,6 @@ const CATEGORIES: Schemas['Category'][] = [
 const MASTERS = {
   'GET /api/v1/uoms': () => list(UOMS),
   'GET /api/v1/categories': () => list(CATEGORIES),
-  'GET /api/v1/brands': () => list([]),
 };
 
 const unit = (
@@ -58,7 +57,6 @@ const COLA: Schemas['ProductDetail'] = {
   sku: '10023',
   name: 'Кока кола',
   categoryId: 12,
-  brandId: null,
   vatType: 'VAT_ABLE',
   cityTax: null,
   classificationCode: null,
@@ -76,7 +74,6 @@ const COLA_ROW: Schemas['ProductListItem'] = {
   sku: '10023',
   name: 'Кока кола',
   categoryId: 12,
-  brandId: null,
   status: 'ACTIVE',
   vatType: 'VAT_ABLE',
   cityTax: null,

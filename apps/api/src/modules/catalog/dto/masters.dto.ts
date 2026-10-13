@@ -137,27 +137,3 @@ export class UpdateCategoryDto {
   @Matches(CLASSIFICATION_CODE)
   defaultClassificationCode?: string | null;
 }
-
-@ApiSchema({ name: 'Brand' })
-export class BrandDto {
-  @ApiProperty() id: number;
-  @ApiProperty() name: string;
-  @ApiProperty() productCount: number;
-}
-
-@ApiSchema({ name: 'BrandList' })
-export class BrandListDto {
-  @ApiProperty({ type: [BrandDto] }) data: BrandDto[];
-  @ApiProperty({ type: String, nullable: true, description: 'Always null: the list is short' })
-  nextCursor: null;
-}
-
-@ApiSchema({ name: 'BrandRequest' })
-export class BrandInputDto {
-  @ApiProperty({ maxLength: 100 })
-  @Transform(trimmed)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  name: string;
-}

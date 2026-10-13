@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
-import { type ProductStatus, useBrands, useCategories, useProducts } from './api';
+import { type ProductStatus, useCategories, useProducts } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
 import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMN_KEYS, PRODUCT_COLUMNS } from './product-columns';
 import { PRODUCT_STATUSES } from './product-schema';
@@ -30,7 +30,7 @@ const NO_PAGES: readonly { data: never[] }[] = [];
 
 /**
  * Products: search by name in either script, SKU or barcode, filter by category (with its
- * subcategories), brand and status. Filters live in the URL so "back" keeps them (SPEC §5.2).
+ * subcategories) and status. Filters live in the URL so "back" keeps them (SPEC §5.2).
  * Every piece of product information has a column; the user picks which ones show (ADR-0037).
  */
 export function ProductsPage() {
@@ -40,18 +40,12 @@ export function ProductsPage() {
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const categoryId = positiveId(params.get('category'));
-  const brandId = positiveId(params.get('brand'));
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
-  const products = useProducts({ q, categoryId, brandId, status });
+  const products = useProducts({ q, categoryId, status });
   const categories = useCategories();
-  const brands = useBrands();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
-  const brandNames = useMemo(
-    () => new Map((brands.data ?? []).map((brand) => [brand.id, brand.name])),
-    [brands.data],
-  );
   const warehouseName = useWarehouseName();
   const columnState = useHiddenColumns(
     COLUMNS_STORAGE_KEY,
@@ -67,10 +61,9 @@ export function ProductsPage() {
     () => ({
       t,
       categoryPath: (id) => paths.get(id),
-      brandName: (id) => brandNames.get(id),
       warehouseName,
     }),
-    [t, paths, brandNames, warehouseName],
+    [t, paths, warehouseName],
   );
   const pages = products.data?.pages ?? NO_PAGES;
   const empty = !products.isPending && pages.every((page) => page.data.length === 0);
@@ -132,19 +125,6 @@ export function ProductsPage() {
           {tree.map((node) => (
             <option key={node.category.id} value={String(node.category.id)}>
               {node.path}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          variant="filter"
-          aria-label={t('catalog.product.brand')}
-          value={brandId === undefined ? '' : String(brandId)}
-          onChange={(event) => setParam('brand', event.target.value)}
-        >
-          <option value="">{t('catalog.products.allBrands')}</option>
-          {(brands.data ?? []).map((brand) => (
-            <option key={brand.id} value={String(brand.id)}>
-              {brand.name}
             </option>
           ))}
         </NativeSelect>

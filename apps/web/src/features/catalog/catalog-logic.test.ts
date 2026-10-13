@@ -70,7 +70,6 @@ describe('product form schema', () => {
       sku: '10024',
       name: 'Кока кола 0.5 л',
       categoryId: 3,
-      brandId: null,
       vatType: 'VAT_ABLE',
       cityTax: null,
       classificationCode: null,
