@@ -10,6 +10,7 @@ export type AiQuestion = Schemas['AiQuestion'];
 export type AiResult = Schemas['AiResult'];
 export type AiColumn = Schemas['AiColumn'];
 export type AiConversation = Schemas['AiConversation'];
+export type AiConversationDetail = Schemas['AiConversationDetail'];
 export type AiReport = Schemas['AiReport'];
 
 export const KEYS = {
@@ -98,7 +99,26 @@ export function useAiMutations() {
             body,
           }),
         ),
-      onSuccess: () => invalidate(KEYS.conversations),
+      onSuccess: (answer) => {
+        // The conversation shows the new step at once (a new one has no cached detail yet);
+        // the refetch below then brings the server's copy.
+        queryClient.setQueryData<AiConversationDetail>(
+          [...KEYS.conversations, answer.conversationId],
+          (old) => ({
+            conversation: old?.conversation ?? {
+              id: answer.conversationId,
+              title: answer.question.question,
+              createdAt: answer.question.createdAt,
+              updatedAt: answer.question.createdAt,
+            },
+            questions: [
+              ...(old?.questions ?? []).filter((step) => step.id !== answer.question.id),
+              answer.question,
+            ],
+          }),
+        );
+        return invalidate(KEYS.conversations);
+      },
     }),
     runQuestion: useMutation({
       mutationFn: async (id: number): Promise<AiResult> =>

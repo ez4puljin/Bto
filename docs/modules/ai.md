@@ -1,6 +1,6 @@
 # Module `ai` — contract
 
-Status: **being built** in delivery 2, 2026-10-13 (ADR-0045). The owner asked for an assistant that answers questions in Mongolian from the company's own data, makes reports and keeps them.
+Status: **built** 2026-10-13 within delivery 2 (ADR-0045); off until a provider is configured (§10), a real provider not yet tried (the owner tests with their own key). The owner asked for an assistant that answers questions in Mongolian from the company's own data, makes reports and keeps them.
 
 ai depends on `identity` (access decorators, audit, idempotency) in code and on `integrations/llm` for the model. It reads catalog, inventory, partners and pricing data only through its own views in schema `ai`, connected as the read-only role `ai_reader`. Nobody imports it.
 
@@ -105,7 +105,7 @@ None: nothing imports `modules/ai`. Inside the module:
 
 ## 7. Audit
 
-`ai_reports` CREATE, RENAME, DELETE. Questions are their own log (`ai_questions`).
+`ai_reports` CREATE (name, source question), UPDATE (the name, before and after), DELETE (soft). Questions are their own log (`ai_questions`).
 
 ## 8. Screens (`apps/web`)
 
@@ -118,17 +118,20 @@ None: nothing imports `modules/ai`. Inside the module:
 - **«Тайлангууд»** (`/ai/reports`): the saved reports with «Ажиллуулах», «Excel татах», rename and delete.
 - Home: the quick action «AI-аас асуух».
 
+Verified in the browser on 2026-10-13 at phone width (the dev database, no provider configured): the notice, the examples and the 16 datasets; a labelled test conversation inserted by hand showed its rows through `ai_reader` («42», «29,278.79»), was saved as a report, run and deleted on «Тайлангууд»; `nyarav` sees no AI menu and `/ai` answers «Энэ үйлдлийг хийх эрх танд алга». The test rows were removed afterwards.
+
 ## 9. Tests
 
-To be written with slices B–F:
-
-- **Unit.** The LLM adapters (request shapes, parsing, errors) with a fake `fetch`; the guard (allowed and refused queries).
-- **Integration.**
-  - The views (every column; prices, low stock and discount status against their services) and the view contract.
-  - The reader: timeout, the 500-row cut, the Ulaanbaatar date, the destroyed connection.
-  - The flow with a scripted fake `LLM_CLIENT`, the API, reports and export.
-- **Integrity.** `ai-reader-role` (what `ai_reader` cannot do) and the append-only `ai_questions`.
-- **Web.** The pages.
+- **Unit (Jest).**
+  - `integrations/llm/llm-clients.spec.ts`: request shapes of the three providers (`store: false`, `output_config.format`, `stream: false`), parsing, refusals, cut answers, HTTP errors with the provider code but never the body, timeouts, unreachable hosts.
+  - `sql/sql-guard.spec.ts`: report-shaped queries pass; about 60 refusals (DML and DDL, data-modifying and recursive CTEs, INTO, locking, `$1`, catalogs and business tables, CTE names behind a schema, dangerous and value-building functions, functions in FROM, JSON, XML and arrays, casts, regular expressions, `^`, qualified operators, ORDER BY USING, size limits).
+  - `semantic/prompt.spec.ts`: mn.json covers the glossary, examples and datasets; the instructions describe every column; every worked example passes the guard; answer parsing; history as data; the summary limits.
+  - `services/ask-flow.service.spec.ts`: no repair after a timeout, the first failure kept when the repair call fails, an answer without its summary, no summary for no rows, an answer outside the schema.
+  - `common/config/env.schema.spec.ts`: the assistant's variables.
+- **Shared (Vitest).** `ai/ai.test.ts` (`failureReasonOf`), `i18n.test.ts` (statuses and reasons).
+- **Integration.** `ai-views.int-spec.ts` (the views equal `AI_DATASETS` column by column, only `ai_reader` reads them, no credential tables or user columns but the name; prices, stock values, low stock and discount status equal their services), `ai-reader.int-spec.ts` (typed columns and database text, the cut, batches, the Ulaanbaatar date, refusals before the database, repairable mistakes, the 300 ms timeout, no connection left; every worked example runs), `ai.int-spec.ts` (status and rights, an answer with rows and summary logged without rows, follow-ups with the earlier steps as data, repairs and refusals, clarify and unsupported, the idempotent replay without rows, owners only, Excel with numbers as numbers, reports and their rights and audit, a provider failure as 502 logging nothing; the assistant off answers 503).
+- **Integrity.** `ai-reader-role.spec.ts`: what `ai_reader` cannot do even in a read-write transaction, no SECURITY DEFINER function it may run, PUBLIC without database or schema-public privileges, app without the views, the role's stored defaults, `ai_questions` append-only for app (42501) and migrator (23001).
+- **Web (Vitest).** `features/ai/ai-pages.test.tsx`: the menu and the shortcut for `ai.ask` only, the not-configured notice, asking with an example and Enter (summary, formatted table, folded SQL, the key), «still working» on `IDEMPOTENCY_KEY_IN_PROGRESS`, rows fetched again for an older step and a timeout explained, saving a report, the reports list (run, author-only rename and delete, empty state).
 
 ## 10. Configuration
 
@@ -146,6 +149,8 @@ A migration that changes a column an `ai.*` view uses recreates the view in the 
 
 ## 12. Open items
 
+- The owner's first real questions with their own key: collect wrong answers and improve the glossary, the examples or the views.
 - SPEC §11 #24 (legal advice on sending personal data abroad) and #25 (provider retention terms, monthly budget).
+- `sales` and `finance` add their views (§11).
 - `temp_file_limit` on the managed database at go-live (architecture A6).
 - Later, if asked: charts, scheduled reports, a monthly cost limit.

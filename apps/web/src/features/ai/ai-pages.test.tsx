@@ -142,6 +142,8 @@ describe('AI assistant pages (ADR-0045)', () => {
     expect(within(table).getByRole('cell', { name: '48,000' })).toBeInTheDocument();
     expect(screen.getByText(mn.ai.answer.howComputed)).toBeInTheDocument();
     expect(screen.getByText(SQL)).toBeInTheDocument();
+    // The new conversation shows its step at once: the empty page never comes back.
+    expect(screen.queryByText(mn.ai.examplesTitle)).toBeNull();
     expect(box).toHaveValue('');
   });
 
