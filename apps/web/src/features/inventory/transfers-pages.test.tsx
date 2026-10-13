@@ -4,7 +4,15 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, type Me, problem, renderApp, signedIn } from '@/test/render-app';
+import {
+  ADMIN_ME,
+  findSidebar,
+  json,
+  type Me,
+  problem,
+  renderApp,
+  signedIn,
+} from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-11T02:00:00.000Z';
@@ -172,14 +180,14 @@ const bodyOf = async (request: Request | undefined) =>
 describe('transfers menu', () => {
   it('shows transfers to the supermarket clerk and the warehouse, not to accountants', async () => {
     renderApp('/system/status', signedIn(CLERK_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.transfers })).toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: mn.nav.adjustments })).toBeNull();
   });
 
   it('keeps the entry from accountants', async () => {
     renderApp('/system/status', signedIn(ACCOUNTANT_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).queryByRole('link', { name: mn.nav.transfers })).toBeNull();
   });
 });
@@ -208,16 +216,19 @@ describe('transfer request', () => {
     });
     renderApp('/inventory/transfers', fetchMock);
     const user = userEvent.setup();
-    const from = await screen.findByRole('combobox', { name: mn.inventory.transfers.from });
+    // The new transfer is made in a dialog opened from the page header (ADR-0042).
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.newTitle }));
+    const createDialog = within(await screen.findByRole('dialog'));
+    const from = await createDialog.findByRole('combobox', { name: mn.inventory.transfers.from });
     await waitFor(() =>
       expect(within(from).getByRole('option', { name: WH1.name })).toBeInTheDocument(),
     );
     await user.selectOptions(from, String(WH1.id));
-    const to = screen.getByRole('combobox', { name: mn.inventory.transfers.to });
+    const to = createDialog.getByRole('combobox', { name: mn.inventory.transfers.to });
     // The clerk asks only for the store.
     expect(within(to).queryByRole('option', { name: WH1.name })).toBeNull();
     await user.selectOptions(to, String(STORE.id));
-    await user.click(screen.getByRole('button', { name: mn.inventory.transfer.createDraft }));
+    await user.click(createDialog.getByRole('button', { name: mn.inventory.transfer.createDraft }));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/transfers')).toHaveLength(1));
     const created = calls(fetchMock, 'POST', '/api/v1/transfers')[0];
     expect(await bodyOf(created)).toEqual({

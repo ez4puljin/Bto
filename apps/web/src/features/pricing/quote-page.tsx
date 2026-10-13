@@ -2,10 +2,12 @@ import { businessDate } from '@tugeel/shared/time';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ListCard } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -63,117 +65,127 @@ export function PriceQuotePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t('pricing.quote.title')} />
-      <p className="-mt-2 max-w-3xl text-sm text-muted-foreground">{t('pricing.quote.hint')}</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="quote-list">{t('pricing.quote.list')}</Label>
-          <NativeSelect
-            id="quote-list"
-            className="w-48"
-            value={list}
-            onChange={(event) => {
-              setList(event.target.value === 'RETAIL' ? 'RETAIL' : 'WHOLESALE');
-              setResult(null);
-            }}
-          >
-            <option value="WHOLESALE">{t('pricing.lists.WHOLESALE')}</option>
-            <option value="RETAIL">{t('pricing.lists.RETAIL')}</option>
-          </NativeSelect>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="quote-date">{t('pricing.quote.date')}</Label>
-          <Input
-            id="quote-date"
-            type="date"
-            className="w-48"
-            value={date}
-            onChange={(event) => {
-              setDate(event.target.value);
-              setResult(null);
-            }}
-          />
-        </div>
-      </div>
-      <ProductSearch
-        onPick={(product) =>
-          change([
-            ...lines,
-            {
-              key: randomUuid(),
-              productId: product.id,
-              sku: product.sku,
-              name: product.name,
-              unitId: product.baseUnit.id,
-              qty: '1',
-            },
-          ])
-        }
+      <PageHeader
+        title={t('pricing.quote.title')}
+        meta={<p className="max-w-3xl">{t('pricing.quote.hint')}</p>}
       />
-      {lines.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('pricing.quote.empty')}</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('pricing.quote.columns.product')}</TableHead>
-              <TableHead>{t('pricing.quote.unit')}</TableHead>
-              <TableHead>{t('pricing.quote.qty')}</TableHead>
-              <TableHead>
-                <span className="sr-only">{t('pricing.quote.remove')}</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lines.map((line) => (
-              <TableRow key={line.key}>
-                <TableCell>
-                  <span className="mr-2 font-mono text-muted-foreground">{line.sku}</span>
-                  {line.name}
-                </TableCell>
-                <TableCell>
-                  <UnitSelect
-                    line={line}
-                    onChange={(unitId) =>
-                      change(lines.map((row) => (row.key === line.key ? { ...row, unitId } : row)))
-                    }
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    aria-label={`${t('pricing.quote.qty')}: ${line.name}`}
-                    inputMode="decimal"
-                    className="w-28"
-                    value={line.qty}
-                    onChange={(event) =>
-                      change(
-                        lines.map((row) =>
-                          row.key === line.key ? { ...row, qty: event.target.value.trim() } : row,
-                        ),
-                      )
-                    }
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`${t('pricing.quote.remove')}: ${line.name}`}
-                    onClick={() => change(lines.filter((row) => row.key !== line.key))}
-                  >
-                    <Trash2 />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-      <div>
-        <Button disabled={lines.length === 0 || quote.isPending} onClick={calculate}>
-          {t('pricing.quote.calculate')}
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="quote-list">{t('pricing.quote.list')}</Label>
+              <NativeSelect
+                id="quote-list"
+                className="w-48"
+                value={list}
+                onChange={(event) => {
+                  setList(event.target.value === 'RETAIL' ? 'RETAIL' : 'WHOLESALE');
+                  setResult(null);
+                }}
+              >
+                <option value="WHOLESALE">{t('pricing.lists.WHOLESALE')}</option>
+                <option value="RETAIL">{t('pricing.lists.RETAIL')}</option>
+              </NativeSelect>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="quote-date">{t('pricing.quote.date')}</Label>
+              <Input
+                id="quote-date"
+                type="date"
+                className="w-48"
+                value={date}
+                onChange={(event) => {
+                  setDate(event.target.value);
+                  setResult(null);
+                }}
+              />
+            </div>
+          </div>
+          <ProductSearch
+            onPick={(product) =>
+              change([
+                ...lines,
+                {
+                  key: randomUuid(),
+                  productId: product.id,
+                  sku: product.sku,
+                  name: product.name,
+                  unitId: product.baseUnit.id,
+                  qty: '1',
+                },
+              ])
+            }
+          />
+          {lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('pricing.quote.empty')}</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('pricing.quote.columns.product')}</TableHead>
+                  <TableHead>{t('pricing.quote.unit')}</TableHead>
+                  <TableHead>{t('pricing.quote.qty')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('pricing.quote.remove')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lines.map((line) => (
+                  <TableRow key={line.key}>
+                    <TableCell className="whitespace-normal">
+                      <span className="mr-2 font-mono text-muted-foreground">{line.sku}</span>
+                      {line.name}
+                    </TableCell>
+                    <TableCell>
+                      <UnitSelect
+                        line={line}
+                        onChange={(unitId) =>
+                          change(
+                            lines.map((row) => (row.key === line.key ? { ...row, unitId } : row)),
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        aria-label={`${t('pricing.quote.qty')}: ${line.name}`}
+                        inputMode="decimal"
+                        className="w-28 text-right font-mono"
+                        value={line.qty}
+                        onChange={(event) =>
+                          change(
+                            lines.map((row) =>
+                              row.key === line.key
+                                ? { ...row, qty: event.target.value.trim() }
+                                : row,
+                            ),
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={`${t('pricing.quote.remove')}: ${line.name}`}
+                        onClick={() => change(lines.filter((row) => row.key !== line.key))}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div>
+            <Button disabled={lines.length === 0 || quote.isPending} onClick={calculate}>
+              {t('pricing.quote.calculate')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
       <ProblemAlert problem={action.problem} />
       {result ? <QuoteResult result={result} lines={lines} /> : null}
     </div>
@@ -226,7 +238,7 @@ function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
     });
 
   return (
-    <div className="flex flex-col gap-2">
+    <ListCard>
       <Table>
         <TableHeader>
           <TableRow>
@@ -279,13 +291,13 @@ function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
           ))}
         </TableBody>
       </Table>
-      <p className="text-right font-medium">
+      <p className="border-t border-border/80 px-4 py-3 text-right font-medium">
         {t('pricing.quote.totals', {
           subtotal: formatMnt(result.subtotal),
           discount: formatMnt(result.discountTotal),
           total: formatMnt(result.total),
         })}
       </p>
-    </div>
+    </ListCard>
   );
 }

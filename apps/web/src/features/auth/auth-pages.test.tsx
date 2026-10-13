@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
@@ -14,6 +14,26 @@ import {
 } from '@/test/render-app';
 
 describe('login', () => {
+  it('shows Bto, its owner, the two wholesale centres and the capital beside the form', async () => {
+    renderApp('/login', signedOut());
+    expect(await screen.findByRole('heading', { name: mn.auth.login.title })).toBeInTheDocument();
+    expect(screen.getByText(mn.auth.login.welcome)).toBeInTheDocument();
+    expect(screen.getAllByText(mn.app.name).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(mn.brand.owner).length).toBeGreaterThan(0);
+    // The legend under the map says in text what the map shows (owner, 2026-10-13).
+    const legend = within(screen.getByRole('list'));
+    expect(legend.getAllByRole('listitem')).toHaveLength(3);
+    const [main, branch, capital] = legend.getAllByRole('listitem');
+    expect(main).toHaveTextContent(mn.brand.centers.orgil);
+    expect(main).toHaveTextContent(mn.brand.mainBranch);
+    expect(main).toHaveTextContent(mn.brand.places.muron);
+    expect(branch).toHaveTextContent(mn.brand.centers.bolomj);
+    expect(branch).toHaveTextContent(mn.brand.places.kharkhorin);
+    expect(capital).toHaveTextContent(mn.brand.places.ulaanbaatar);
+    expect(capital).toHaveTextContent(mn.brand.capital);
+    expect(document.title).toBe(`${mn.auth.login.title} · ${mn.app.name}`);
+  });
+
   it('logs in, then shows the requested page with the user name', async () => {
     const fetchMock = signedOut({
       'POST /api/v1/auth/login': () => json({ ...TOKENS, me: ADMIN_ME }),
@@ -62,7 +82,7 @@ describe('login', () => {
     await user.type(await screen.findByLabelText(mn.auth.login.username), 'admin');
     await user.type(screen.getByLabelText(mn.auth.login.password), 'correct-horse-9');
     await user.click(screen.getByRole('button', { name: mn.auth.login.submit }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/system/status'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 });
 
@@ -88,7 +108,7 @@ describe('password setup with a one-time code', () => {
       'my-own-password-1',
     );
     await user.click(screen.getByRole('button', { name: mn.auth.setPassword.submit }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/system/status'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(await screen.findByText(WORKER_ME.fullName)).toBeInTheDocument();
   });
 });

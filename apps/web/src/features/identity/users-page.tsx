@@ -1,10 +1,20 @@
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { Plus } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { CodeDialog } from '@/components/code-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RoleName } from '@/components/role-name';
@@ -17,7 +27,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -96,78 +105,75 @@ export function UsersPage() {
           ) : null
         }
       />
-      <Input
-        className="mb-4 max-w-sm"
-        type="search"
-        aria-label={t('common.search')}
-        placeholder={t('users.searchPlaceholder')}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
+      <FilterBar>
+        <SearchField
+          aria-label={t('common.search')}
+          placeholder={t('users.searchPlaceholder')}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </FilterBar>
       <ProblemAlert problem={problemFromError(users.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('users.columns.username')}</TableHead>
-            <TableHead>{t('users.columns.fullName')}</TableHead>
-            <TableHead>{t('users.columns.roles')}</TableHead>
-            <TableHead>{t('users.columns.status')}</TableHead>
-            <TableHead>{t('users.columns.lastLogin')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>
-                <Link
-                  to={`/users/${user.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {user.username}
-                </Link>
-              </TableCell>
-              <TableCell>{user.fullName}</TableCell>
-              <TableCell>
-                {user.roleIds.map((id, index) => {
-                  const role = roleById.get(id);
-                  return (
-                    <span key={id}>
-                      {index > 0 ? ', ' : ''}
-                      {role ? <RoleName role={role} /> : null}
-                    </span>
-                  );
-                })}
-              </TableCell>
-              <TableCell className="flex flex-wrap gap-1">
-                <Badge variant={user.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                  {t(`users.status.${user.status}`)}
-                </Badge>
-                {user.lockedUntil && Date.parse(user.lockedUntil) > Date.now() ? (
-                  <Badge variant="destructive">{t('users.locked')}</Badge>
-                ) : null}
-              </TableCell>
-              <TableCell>
-                {user.lastLoginAt
-                  ? formatUbDateTime(Date.parse(user.lastLoginAt))
-                  : t('common.none')}
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('users.columns.username')}</TableHead>
+              <TableHead>{t('users.columns.fullName')}</TableHead>
+              <TableHead>{t('users.columns.roles')}</TableHead>
+              <TableHead>{t('users.columns.status')}</TableHead>
+              <TableHead>{t('users.columns.lastLogin')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!users.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('users.empty')}</p>
-      ) : null}
-      {users.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={users.isFetchingNextPage}
-          onClick={() => void users.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {users.isPending ? <SkeletonRows columns={6} /> : null}
+            {rows.map((user) => (
+              <LinkRow key={user.id} to={`/users/${user.id}`}>
+                <TableCell>
+                  <Link
+                    to={`/users/${user.id}`}
+                    className="font-mono font-medium underline-offset-4 hover:underline"
+                  >
+                    {user.username}
+                  </Link>
+                </TableCell>
+                <TableCell>{user.fullName}</TableCell>
+                <TableCell className="whitespace-normal">
+                  {user.roleIds.map((id, index) => {
+                    const role = roleById.get(id);
+                    return (
+                      <span key={id}>
+                        {index > 0 ? ', ' : ''}
+                        {role ? <RoleName role={role} /> : null}
+                      </span>
+                    );
+                  })}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={user.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                      {t(`users.status.${user.status}`)}
+                    </Badge>
+                    {user.lockedUntil && Date.parse(user.lockedUntil) > Date.now() ? (
+                      <Badge variant="destructive">{t('users.locked')}</Badge>
+                    ) : null}
+                  </div>
+                </TableCell>
+                <TableCell className="font-mono">
+                  {user.lastLoginAt
+                    ? formatUbDateTime(Date.parse(user.lastLoginAt))
+                    : t('common.none')}
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!users.isPending && rows.length === 0 ? (
+          <EmptyState icon={Users} title={t('users.empty')} />
+        ) : null}
+        <LoadMore query={users} />
+      </ListCard>
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">

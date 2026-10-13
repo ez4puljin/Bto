@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { problemFromError } from '@/lib/problem';
 import { randomUuid } from '@/lib/uuid';
@@ -39,14 +38,7 @@ export function CustomerCreatePage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('partners.customer.newTitle')}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/partners/customers">{t('common.back')}</Link>
-          </Button>
-        }
-      />
+      <PageHeader title={t('partners.customer.newTitle')} />
       <ProblemAlert problem={loadProblem} />
       {nextCode.isPending ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>

@@ -1,17 +1,26 @@
-import { ImageOff, Plus } from 'lucide-react';
+import { Factory, ImageOff, Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ColumnChooser } from '@/components/column-chooser';
+import { DetailCard } from '@/components/detail';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -21,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -45,7 +55,7 @@ import {
   SUPPLIER_COLUMN_KEYS,
   SUPPLIER_COLUMNS,
 } from './supplier-columns';
-import { SupplierForm } from './supplier-form';
+import { SupplierFacts, SupplierForm } from './supplier-form';
 
 const COLUMNS_STORAGE_KEY = 'tugeel.partners.suppliers.hiddenColumns.v1';
 
@@ -90,32 +100,31 @@ export function SuppliersPage() {
       <PageHeader
         title={t('partners.suppliers.title')}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <ColumnChooser
-              keys={SUPPLIER_COLUMN_KEYS}
-              locked={LOCKED_SUPPLIER_COLUMNS}
-              label={(key) => t(`partners.suppliers.columns.${key}`)}
-              hidden={hidden}
-              toggle={columnState.toggle}
-              showAll={columnState.showAll}
-            />
-            {canManage ? (
-              <Button asChild>
-                <Link to="/partners/suppliers/new">
-                  <Plus />
-                  {t('partners.suppliers.create')}
-                </Link>
-              </Button>
-            ) : null}
-          </div>
+          canManage ? (
+            <Button asChild>
+              <Link to="/partners/suppliers/new">
+                <Plus />
+                {t('partners.suppliers.create')}
+              </Link>
+            </Button>
+          ) : null
         }
       />
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input
-          type="search"
+      <FilterBar
+        end={
+          <ColumnChooser
+            keys={SUPPLIER_COLUMN_KEYS}
+            locked={LOCKED_SUPPLIER_COLUMNS}
+            label={(key) => t(`partners.suppliers.columns.${key}`)}
+            hidden={hidden}
+            toggle={columnState.toggle}
+            showAll={columnState.showAll}
+          />
+        }
+      >
+        <SearchField
           aria-label={t('common.search')}
           placeholder={t('partners.suppliers.searchPlaceholder')}
-          className="lg:col-span-2"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -123,6 +132,7 @@ export function SuppliersPage() {
           }}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('partners.supplier.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -134,49 +144,38 @@ export function SuppliersPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(suppliers.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <RecordActionsHead />
-            {columns.map((column) => (
-              <TableHead key={column.key}>
-                {t(`partners.suppliers.columns.${column.key}`)}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((supplier) => (
-            <RecordRow
-              key={supplier.id}
-              href={`/partners/suppliers/${supplier.id}`}
-              name={supplier.name}
-              canManage={canManage}
-            >
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
               {columns.map((column) => (
-                <TableCell key={column.key} className={column.className}>
-                  {column.cell(supplier, t)}
-                </TableCell>
+                <TableHead key={column.key}>
+                  {t(`partners.suppliers.columns.${column.key}`)}
+                </TableHead>
               ))}
-            </RecordRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!suppliers.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('partners.suppliers.empty')}</p>
-      ) : null}
-      {suppliers.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={suppliers.isFetchingNextPage}
-          onClick={() => void suppliers.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+              <ChevronHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {suppliers.isPending ? <SkeletonRows columns={columns.length + 1} /> : null}
+            {rows.map((supplier) => (
+              <LinkRow key={supplier.id} to={`/partners/suppliers/${supplier.id}`}>
+                {columns.map((column) => (
+                  <TableCell key={column.key} className={column.className}>
+                    {column.cell(supplier, t)}
+                  </TableCell>
+                ))}
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!suppliers.isPending && rows.length === 0 ? (
+          <EmptyState icon={Factory} title={t('partners.suppliers.empty')} />
+        ) : null}
+        <LoadMore query={suppliers} />
+      </ListCard>
     </div>
   );
 }
@@ -204,14 +203,7 @@ export function SupplierCreatePage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('partners.supplier.newTitle')}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/partners/suppliers">{t('common.back')}</Link>
-          </Button>
-        }
-      />
+      <PageHeader title={t('partners.supplier.newTitle')} />
       <ProblemAlert problem={problemFromError(nextCode.error)} />
       {nextCode.isPending ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -238,18 +230,17 @@ export function SupplierPage() {
   const canManage = useHasPermission('partners.suppliers.manage');
   const supplier = useSupplier(id);
   const mutations = usePartnersMutations();
-  const [saved, setSaved] = useState(false);
 
   const loadProblem = problemFromError(supplier.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
   if (!supplier.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   const detail = supplier.data;
 
-  const save = async (values: SupplierFormValues) => {
-    setSaved(false);
+  const save = async (values: SupplierFormValues, close: () => void) => {
     try {
       await mutations.updateSupplier.mutateAsync({ id, body: supplierUpdateBody(values) });
-      setSaved(true);
+      toast.success(t('partners.supplier.saved'));
+      close();
       return null;
     } catch (error) {
       return problemFromError(error);
@@ -260,34 +251,29 @@ export function SupplierPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.name}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/partners/suppliers">{t('common.back')}</Link>
-          </Button>
+        meta={
+          <>
+            <span className="font-mono">{detail.code}</span>
+            <Badge variant={detail.status === 'ACTIVE' ? 'success' : 'secondary'}>
+              {t(`partners.status.${detail.status}`)}
+            </Badge>
+          </>
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-mono text-muted-foreground">{detail.code}</span>
-        <Badge variant={detail.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-          {t(`partners.status.${detail.status}`)}
-        </Badge>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('partners.supplier.info')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <DetailCard
+        title={t('partners.supplier.info')}
+        canEdit={canManage}
+        view={<SupplierFacts detail={detail} />}
+        edit={(close) => (
           <SupplierForm
-            key={detail.updatedAt}
             mode="edit"
             defaultValues={supplierValues(detail)}
-            readOnly={!canManage}
             submitLabel={t('common.save')}
-            saved={saved}
-            onSubmit={save}
+            onCancel={close}
+            onSubmit={(values) => save(values, close)}
           />
-        </CardContent>
-      </Card>
+        )}
+      />
       <ContactsCard
         contacts={detail.contacts}
         canManage={canManage}

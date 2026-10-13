@@ -4,6 +4,7 @@ import { CUSTOMER_KINDS, regNoShape } from '@tugeel/shared/taxpayer';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { FieldList } from '@/components/detail';
 import { FieldError } from '@/components/field-error';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -21,6 +22,7 @@ import {
   fieldOfDuplicate,
   PARTNER_STATUSES,
 } from './partner-schema';
+import { localPhone } from './phone';
 
 type PayerFlag = 'vatPayer' | 'cityPayer';
 const PAYER_FLAGS: readonly PayerFlag[] = ['vatPayer', 'cityPayer'];
@@ -39,7 +41,8 @@ export function CustomerForm(props: {
   submitLabel: string;
   /** Resolves to the API problem, or null when saved. */
   onSubmit: (values: CustomerFormValues) => Promise<ProblemDetails | null>;
-  saved?: boolean;
+  /** Editing in a card: «Болих» returns to reading (ADR-0042). */
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const { mode, customer } = props;
@@ -242,17 +245,54 @@ export function CustomerForm(props: {
         ) : null}
       </fieldset>
       {props.readOnly ? null : (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting}>
             {props.submitLabel}
           </Button>
-          {props.saved ? (
-            <span role="status" className="text-sm text-muted-foreground">
-              {t('partners.customer.saved')}
-            </span>
+          {props.onCancel ? (
+            <Button type="button" variant="ghost" onClick={props.onCancel}>
+              {t('common.cancel')}
+            </Button>
           ) : null}
         </div>
       )}
     </form>
+  );
+}
+
+/** The reading side of a customer's card: the form's fields, label over value (ADR-0042). */
+export function CustomerFacts({ customer }: { customer: CustomerDetail }) {
+  const { t } = useTranslation();
+  const mono = (value: string | null) =>
+    value ? <span className="font-mono">{value}</span> : null;
+  return (
+    <FieldList
+      items={[
+        { label: t('partners.customer.code'), value: mono(customer.code) },
+        { label: t('partners.customer.name'), value: customer.name },
+        { label: t('partners.customer.kind'), value: t(`partners.kinds.${customer.kind}`) },
+        { label: t('partners.customer.regNo'), value: mono(customer.regNo) },
+        {
+          label: t('partners.customer.tin'),
+          value: mono(customer.tin),
+          hint: customer.tinSource ? t(`partners.customer.tinSource.${customer.tinSource}`) : null,
+        },
+        ...(customer.kind === 'INDIVIDUAL'
+          ? [{ label: t('partners.customer.consumerNo'), value: mono(customer.consumerNo) }]
+          : []),
+        {
+          label: t('partners.customer.phone'),
+          value: customer.phone ? localPhone(customer.phone) : null,
+        },
+        ...PAYER_FLAGS.map((flag) => ({
+          label: t(`partners.customer.${flag}`),
+          value: customer[flag] ? t('common.yes') : t('common.no'),
+          hint:
+            customer.taxStatusSource === null ? t('partners.customer.payerUnchecked') : undefined,
+        })),
+        { label: t('partners.customer.status'), value: t(`partners.status.${customer.status}`) },
+        { label: t('partners.customer.note'), value: customer.note, wide: true },
+      ]}
+    />
   );
 }

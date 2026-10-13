@@ -4,7 +4,7 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, type Me, renderApp, signedIn } from '@/test/render-app';
+import { ADMIN_ME, getSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-13T02:00:00.000Z';
@@ -95,7 +95,7 @@ describe('low-stock list', () => {
     expect(await screen.findByText(COLA.product.name)).toBeInTheDocument();
     const read = calls(fetchMock, 'GET', '/api/v1/stock/low').at(-1);
     expect(new URL(read!.url).searchParams.get('warehouseId')).toBe('1');
-    const nav = screen.getByRole('navigation');
+    const nav = getSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.lowStock })).toBeInTheDocument();
     expect(screen.getByText(mn.inventory.lowStock.statuses.OUT)).toBeInTheDocument();
     expect(screen.getByText(mn.inventory.lowStock.statuses.LOW)).toBeInTheDocument();

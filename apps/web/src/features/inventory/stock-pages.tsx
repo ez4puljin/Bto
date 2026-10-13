@@ -1,16 +1,24 @@
-import { History } from 'lucide-react';
+import { Boxes, History } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -62,12 +70,10 @@ export function StockPage() {
     <div>
       <PageHeader title={t('inventory.stock.title')} />
       {isAdmin ? <DriftBanner /> : null}
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input
-          type="search"
+      <FilterBar>
+        <SearchField
           aria-label={t('common.search')}
           placeholder={t('inventory.stock.searchPlaceholder')}
-          className="lg:col-span-2"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -75,71 +81,61 @@ export function StockPage() {
           }}
         />
         <WarehouseSelect
+          variant="filter"
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={t('inventory.allWarehouses')}
           onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
         />
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="stock-in-stock"
-            checked={inStock}
-            onCheckedChange={(checked) => setParam('all', checked === true ? '' : '1')}
-          />
-          <Label htmlFor="stock-in-stock">{t('inventory.stock.inStock')}</Label>
-        </div>
-      </div>
+        <FilterToggle
+          label={t('inventory.stock.inStock')}
+          checked={inStock}
+          onCheckedChange={(checked) => setParam('all', checked ? '' : '1')}
+        />
+      </FilterBar>
       <ProblemAlert problem={problemFromError(stock.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.sku')}</TableHead>
-            <TableHead>{t('inventory.product')}</TableHead>
-            <TableHead className="text-right">{t('inventory.stock.onHand')}</TableHead>
-            <TableHead className="text-right">{t('inventory.stock.available')}</TableHead>
-            {canSeeCosts ? (
-              <TableHead className="text-right">{t('inventory.stock.value')}</TableHead>
-            ) : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.product.id}>
-              <TableCell className="font-mono">{row.product.sku}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/inventory/stock/${row.product.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {row.product.name}
-                </Link>
-              </TableCell>
-              <TableCell className="text-right font-mono">
-                {t('inventory.qtyWithUnit', { qty: row.onHand, unit: row.product.baseUnitName })}
-              </TableCell>
-              <TableCell className="text-right font-mono">{row.available}</TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.sku')}</TableHead>
+              <TableHead>{t('inventory.product')}</TableHead>
+              <TableHead className="text-right">{t('inventory.stock.onHand')}</TableHead>
+              <TableHead className="text-right">{t('inventory.stock.available')}</TableHead>
               {canSeeCosts ? (
-                <TableCell className="text-right font-mono">
-                  {row.value === undefined ? t('common.none') : formatMnt(row.value)}
-                </TableCell>
+                <TableHead className="text-right">{t('inventory.stock.value')}</TableHead>
               ) : null}
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!stock.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('inventory.stock.empty')}</p>
-      ) : null}
-      {stock.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={stock.isFetchingNextPage}
-          onClick={() => void stock.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {stock.isPending ? <SkeletonRows columns={canSeeCosts ? 6 : 5} /> : null}
+            {rows.map((row) => (
+              <LinkRow key={row.product.id} to={`/inventory/stock/${row.product.id}`}>
+                <TableCell className="font-mono">{row.product.sku}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <Link to={`/inventory/stock/${row.product.id}`} className="font-medium">
+                    {row.product.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {t('inventory.qtyWithUnit', { qty: row.onHand, unit: row.product.baseUnitName })}
+                </TableCell>
+                <TableCell className="text-right font-mono">{row.available}</TableCell>
+                {canSeeCosts ? (
+                  <TableCell className="text-right font-mono">
+                    {row.value === undefined ? t('common.none') : formatMnt(row.value)}
+                  </TableCell>
+                ) : null}
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!stock.isPending && rows.length === 0 ? (
+          <EmptyState icon={Boxes} title={t('inventory.stock.empty')} />
+        ) : null}
+        <LoadMore query={stock} />
+      </ListCard>
     </div>
   );
 }
@@ -179,6 +175,7 @@ export function StockProductPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.product.name}
+        meta={<span className="font-mono">{detail.product.sku}</span>}
         actions={
           <>
             <Button variant="outline" asChild>
@@ -192,13 +189,9 @@ export function StockProductPage() {
                 {t('inventory.stock.productCard')}
               </Link>
             </Button>
-            <Button variant="outline" asChild>
-              <Link to="/inventory/stock">{t('common.back')}</Link>
-            </Button>
           </>
         }
       />
-      <div className="-mt-2 font-mono text-sm text-muted-foreground">{detail.product.sku}</div>
       <Card>
         <CardHeader>
           <CardTitle>{t('inventory.stock.byWarehouse')}</CardTitle>
@@ -282,7 +275,7 @@ export function StockProductPage() {
                     <TableCell>
                       <Link
                         to={`/inventory/movements?product=${detail.product.id}&warehouse=${row.warehouseId}&bin=${row.binId}`}
-                        className="text-sm text-primary underline-offset-4 hover:underline"
+                        className="text-sm text-link underline-offset-4 hover:underline"
                         aria-label={`${t('inventory.movements.history')}: ${row.binCode}`}
                       >
                         {t('inventory.movements.binHistory')}

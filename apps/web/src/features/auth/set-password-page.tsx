@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { z } from 'zod';
 import { useAuthSession } from '@/app/auth-context';
-import { AuthLayout } from '@/components/auth-layout';
+import { AuthLayout } from './auth-layout';
 import { FieldError } from '@/components/field-error';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -99,10 +99,10 @@ export function SetPasswordPage() {
           />
           <FieldError message={errors.confirmPassword?.message} />
         </div>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" size="lg" className="mt-1 w-full" disabled={isSubmitting}>
           {t('auth.setPassword.submit')}
         </Button>
-        <Link to="/login" className="text-center text-sm text-muted-foreground underline">
+        <Link to="/login" className="text-center text-[13px] text-link hover:underline">
           {t('auth.setPassword.backToLogin')}
         </Link>
       </form>

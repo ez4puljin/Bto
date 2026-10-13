@@ -5,7 +5,16 @@ import { isAssignablePermission, PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { businessDate } from '@tugeel/shared/time';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, problem, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
+import {
+  ADMIN_ME,
+  findSidebar,
+  getSidebar,
+  json,
+  problem,
+  renderApp,
+  signedIn,
+  WORKER_ME,
+} from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-01T02:00:00.000Z';
@@ -104,7 +113,7 @@ const calledWith = (fetchMock: ReturnType<typeof signedIn>, method: string, path
 describe('menu and page access', () => {
   it('shows every admin menu to an admin', async () => {
     renderApp('/system/status', signedIn(ADMIN_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     for (const label of ADMIN_MENU) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
     }
@@ -114,7 +123,7 @@ describe('menu and page access', () => {
     const fetchMock = signedIn(WORKER_ME);
     renderApp('/users', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
-    const nav = screen.getByRole('navigation');
+    const nav = getSidebar();
     for (const label of ADMIN_MENU) {
       expect(within(nav).queryByRole('link', { name: label })).toBeNull();
     }

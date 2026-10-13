@@ -5,6 +5,8 @@ import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
 import {
   ADMIN_ME,
+  findSidebar,
+  getSidebar,
   json,
   type Me,
   problem,
@@ -157,7 +159,7 @@ describe('partners menu and access', () => {
     const fetchMock = signedIn(WORKER_ME);
     renderApp('/partners/customers', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
-    const nav = screen.getByRole('navigation');
+    const nav = getSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.suppliers })).toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: mn.nav.customers })).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/customers')).toHaveLength(0);
@@ -165,7 +167,7 @@ describe('partners menu and access', () => {
 
   it('shows customers to the office', async () => {
     renderApp('/system/status', signedIn(OFFICE_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.customers })).toHaveAttribute(
       'href',
       '/partners/customers',
@@ -281,7 +283,7 @@ describe('customers list', () => {
       expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
     }
     const user = userEvent.setup();
-    await user.click(screen.getByRole('link', { name: `${mn.common.edit}: Номин дэлгүүр` }));
+    await user.click(screen.getByRole('link', { name: 'Номин дэлгүүр' }));
     await waitFor(() => expect(first.router.state.location.pathname).toBe('/partners/customers/1'));
 
     cleanup();
@@ -439,9 +441,20 @@ describe('customer page', () => {
       '/partners/customers/9',
       signedIn(OFFICE_ME, { 'GET /api/v1/customers/9': () => json(CUSTOMER) }),
     );
+    // Read first (ADR-0042); the office may open the form with «Засах».
+    const info = within(await screen.findByRole('region', { name: mn.partners.customer.info }));
+    expect(info.getByText(mn.partners.customer.tinSource.MANUAL)).toBeInTheDocument();
+    expect(info.getByText('9911 2233')).toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(info.getByRole('button', { name: `${mn.common.edit}: ${mn.partners.customer.info}` }));
     expect(await screen.findByLabelText(mn.partners.customer.name)).toBeEnabled();
     expect(screen.getByLabelText(mn.partners.customer.phone)).toHaveValue('99112233');
     expect(screen.getByText(mn.partners.customer.tinSource.MANUAL)).toBeInTheDocument();
+    // The credit terms stay read-only for the office.
+    expect(
+      screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.partners.credit.title}` }),
+    ).toBeNull();
     expect(screen.queryByLabelText(mn.partners.credit.limit)).toBeNull();
     expect(screen.getByText(mn.partners.credit.limitUndecided)).toBeInTheDocument();
     expect(
@@ -484,6 +497,8 @@ describe('customer page', () => {
       }),
     );
     const user = userEvent.setup();
+    const edit = `${mn.common.edit}: ${mn.partners.credit.title}`;
+    await user.click(await screen.findByRole('button', { name: edit }));
     const limit = await screen.findByLabelText(mn.partners.credit.limit);
     expect(limit).toHaveValue('');
     expect(screen.queryByLabelText(mn.partners.credit.holdReason)).toBeNull();
@@ -494,14 +509,18 @@ describe('customer page', () => {
     const card = within(limit.closest<HTMLElement>('form') ?? document.body);
     await user.click(card.getByRole('button', { name: mn.common.save }));
 
-    expect(await screen.findByText(mn.common.saved)).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.common.saved);
     expect(put).toEqual({
       creditLimit: '5000000',
       paymentTermDays: 45,
       creditHold: true,
       creditHoldReason: 'Хугацаа хэтэрсэн',
     });
-    expect(screen.getByLabelText(mn.partners.credit.limit)).toHaveValue('5000000');
+    // The card is read again, with the stored terms.
+    const credit = within(screen.getByRole('region', { name: mn.partners.credit.title }));
+    expect(await credit.findByText('5,000,000')).toBeInTheDocument();
+    expect(credit.getByText('Хугацаа хэтэрсэн')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: edit })).toBeInTheDocument();
     expect(screen.getAllByText(mn.partners.credit.held).length).toBeGreaterThan(0);
   });
 
@@ -593,7 +612,7 @@ describe('suppliers', () => {
     for (const label of Object.values(mn.partners.suppliers.columns)) {
       expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
     }
-    await userEvent.setup().click(screen.getByRole('link', { name: `${mn.common.view}: МСМ ХХК` }));
+    await userEvent.setup().click(screen.getByRole('link', { name: 'МСМ ХХК' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/partners/suppliers/3'));
   });
 
@@ -619,10 +638,13 @@ describe('suppliers', () => {
           ]),
       }),
     );
-    expect(await screen.findByLabelText(mn.partners.supplier.name)).toBeDisabled();
-    expect(screen.getByLabelText(mn.partners.supplier.bankAccount)).toHaveValue(
-      'MN120005005012345678',
-    );
+    // Read first (ADR-0042): the worker sees the data and no «Засах», no form.
+    const info = within(await screen.findByRole('region', { name: mn.partners.supplier.info }));
+    expect(info.getByText('MN120005005012345678')).toBeInTheDocument();
+    expect(info.queryByRole('textbox')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.partners.supplier.info}` }),
+    ).toBeNull();
     expect(screen.queryByRole('button', { name: mn.common.save })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.partners.contacts.add })).toBeNull();
     expect(await screen.findByRole('link', { name: 'Кока кола 0.5 л' })).toHaveAttribute(

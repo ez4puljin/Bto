@@ -1,10 +1,19 @@
 import { Decimal } from '@tugeel/shared/money';
-import { Printer } from 'lucide-react';
+import { ArrowLeftRight, Plus, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -12,6 +21,14 @@ import { ScanBox } from '@/components/scan-box';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,6 +43,7 @@ import { useBarcodeLookup } from '@/features/catalog/api';
 import { problemFromError } from '@/lib/problem';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { useAction } from '@/lib/use-action';
+import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -97,6 +115,7 @@ export function TransfersPage() {
   const status = isStatus(statusParam) ? statusParam : undefined;
   const transfers = useTransfers({ warehouseId, direction, status });
   const rows = transfers.data?.pages.flatMap((page) => page.data) ?? [];
+  const [creating, setCreating] = useCreateParam();
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -110,17 +129,34 @@ export function TransfersPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('inventory.transfers.title')} />
-      {canManage ? <TransferCreateCard /> : null}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <PageHeader
+        title={t('inventory.transfers.title')}
+        actions={
+          canManage ? (
+            <Button onClick={() => setCreating(true)}>
+              <Plus />
+              {t('inventory.transfer.newTitle')}
+            </Button>
+          ) : null
+        }
+      />
+      {canManage ? (
+        <Dialog open={creating} onOpenChange={setCreating}>
+          {creating ? <TransferCreateDialog onCancel={() => setCreating(false)} /> : null}
+        </Dialog>
+      ) : null}
+      <FilterBar>
         <WarehouseSelect
+          variant="filter"
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={t('inventory.allWarehouses')}
           onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
         />
         <NativeSelect
+          variant="filter"
+          active={false}
           aria-label={t('inventory.transfers.direction')}
           disabled={warehouseId === undefined}
           value={direction}
@@ -130,6 +166,7 @@ export function TransfersPage() {
           <option value="OUTGOING">{t('inventory.transfers.outgoing')}</option>
         </NativeSelect>
         <NativeSelect
+          variant="filter"
           aria-label={t('inventory.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -141,60 +178,52 @@ export function TransfersPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(transfers.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.number')}</TableHead>
-            <TableHead>{t('inventory.transfers.from')}</TableHead>
-            <TableHead>{t('inventory.transfers.to')}</TableHead>
-            <TableHead>{t('inventory.transfer.origin')}</TableHead>
-            <TableHead className="text-right">{t('inventory.lines')}</TableHead>
-            <TableHead>{t('inventory.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="font-mono">
-                <Link
-                  to={`/inventory/transfers/${row.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {row.number ?? t('inventory.draftNo', { id: row.id })}
-                </Link>
-              </TableCell>
-              <TableCell>{warehouseName(row.sourceWarehouseId)}</TableCell>
-              <TableCell>{warehouseName(row.destWarehouseId)}</TableCell>
-              <TableCell>{t(`inventory.transfer.origins.${row.origin}`)}</TableCell>
-              <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
-              <TableCell>
-                <DocStatusBadge status={row.status} />
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.number')}</TableHead>
+              <TableHead>{t('inventory.transfers.from')}</TableHead>
+              <TableHead>{t('inventory.transfers.to')}</TableHead>
+              <TableHead>{t('inventory.transfer.origin')}</TableHead>
+              <TableHead className="text-right">{t('inventory.lines')}</TableHead>
+              <TableHead>{t('inventory.status')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!transfers.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('inventory.transfers.empty')}</p>
-      ) : null}
-      {transfers.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={transfers.isFetchingNextPage}
-          onClick={() => void transfers.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {transfers.isPending ? <SkeletonRows columns={7} /> : null}
+            {rows.map((row) => (
+              <LinkRow key={row.id} to={`/inventory/transfers/${row.id}`}>
+                <TableCell className="font-mono">
+                  <Link to={`/inventory/transfers/${row.id}`} className="font-medium">
+                    {row.number ?? t('inventory.draftNo', { id: row.id })}
+                  </Link>
+                </TableCell>
+                <TableCell>{warehouseName(row.sourceWarehouseId)}</TableCell>
+                <TableCell>{warehouseName(row.destWarehouseId)}</TableCell>
+                <TableCell>{t(`inventory.transfer.origins.${row.origin}`)}</TableCell>
+                <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
+                <TableCell>
+                  <DocStatusBadge status={row.status} />
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!transfers.isPending && rows.length === 0 ? (
+          <EmptyState icon={ArrowLeftRight} title={t('inventory.transfers.empty')} />
+        ) : null}
+        <LoadMore query={transfers} />
+      </ListCard>
     </div>
   );
 }
 
 /** A request is made by the receiving warehouse, a push by the sending one (supermarket returns). */
-function TransferCreateCard() {
+function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const all = useWarehouseOptions(TRANSFER_KINDS);
@@ -218,17 +247,18 @@ function TransferCreateCard() {
         destWarehouseId: dest,
         ...(note.trim() ? { note: note.trim() } : {}),
       });
-      await navigate(`/inventory/transfers/${transfer.id}`);
+      await navigate(`/inventory/transfers/${transfer.id}`, { replace: true });
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.transfer.newTitle')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <DialogContent closeLabel={t('common.close')}>
+      <DialogHeader>
+        <DialogTitle>{t('inventory.transfer.newTitle')}</DialogTitle>
+        <DialogDescription>{t(`inventory.transfer.originHints.${origin}`)}</DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-3">
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3">
           <NativeSelect
             aria-label={t('inventory.transfer.origin')}
             value={origin}
@@ -268,18 +298,16 @@ function TransferCreateCard() {
             onChange={(event) => setNote(event.target.value)}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {t(`inventory.transfer.originHints.${origin}`)}
-        </p>
-        <Button
-          className="self-start"
-          disabled={!ready || mutations.create.isPending}
-          onClick={create}
-        >
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button disabled={!ready || mutations.create.isPending} onClick={create}>
           {t('inventory.transfer.createDraft')}
         </Button>
-      </CardContent>
-    </Card>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -319,38 +347,35 @@ export function TransferPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.number ?? t('inventory.draftNo', { id: detail.id })}
+        meta={
+          <>
+            <DocStatusBadge status={detail.status} />
+            <Badge variant="outline">{t(`inventory.transfer.origins.${detail.origin}`)}</Badge>
+            <span className="text-foreground">
+              {t('inventory.transfer.route', {
+                from: warehouseName(detail.sourceWarehouseId),
+                to: warehouseName(detail.destWarehouseId),
+              })}
+            </span>
+            {detail.shipDate ? (
+              <span className="font-mono">
+                {t('inventory.transfer.shippedOn', { date: detail.shipDate })}
+              </span>
+            ) : null}
+            {detail.receiveDate ? (
+              <span className="font-mono">
+                {t('inventory.transfer.receivedOn', { date: detail.receiveDate })}
+              </span>
+            ) : null}
+          </>
+        }
         actions={
-          <div className="flex gap-2 print:hidden">
-            <Button variant="outline" onClick={() => window.print()}>
-              <Printer />
-              {t('inventory.transfer.print')}
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/inventory/transfers">{t('common.back')}</Link>
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer />
+            {t('inventory.transfer.print')}
+          </Button>
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <DocStatusBadge status={detail.status} />
-        <Badge variant="outline">{t(`inventory.transfer.origins.${detail.origin}`)}</Badge>
-        <span>
-          {t('inventory.transfer.route', {
-            from: warehouseName(detail.sourceWarehouseId),
-            to: warehouseName(detail.destWarehouseId),
-          })}
-        </span>
-        {detail.shipDate ? (
-          <span className="font-mono text-muted-foreground">
-            {t('inventory.transfer.shippedOn', { date: detail.shipDate })}
-          </span>
-        ) : null}
-        {detail.receiveDate ? (
-          <span className="font-mono text-muted-foreground">
-            {t('inventory.transfer.receivedOn', { date: detail.receiveDate })}
-          </span>
-        ) : null}
-      </div>
       {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {detail.cancelReason ? (
         <p className="text-sm text-muted-foreground">

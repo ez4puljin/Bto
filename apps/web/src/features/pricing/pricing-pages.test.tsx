@@ -4,7 +4,7 @@ import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { businessDate } from '@tugeel/shared/time';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
+import { ADMIN_ME, findSidebar, json, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-13T02:00:00.000Z';
@@ -170,7 +170,7 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
 describe('pricing menu', () => {
   it('shows discounts and the calculator to every user', async () => {
     renderApp('/system/status', signedIn(WORKER_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.discounts })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: mn.nav.priceQuote })).toBeInTheDocument();
   });

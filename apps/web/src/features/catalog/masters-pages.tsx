@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { FolderTree, Plus, Tag } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FieldError } from '@/components/field-error';
 import { NativeSelect } from '@/components/native-select';
+import { EmptyState, ListCard } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -93,53 +94,55 @@ export function CategoriesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(categories.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('catalog.categories.name')}</TableHead>
-            <TableHead>{t('catalog.categories.defaultCode')}</TableHead>
-            <TableHead>{t('catalog.products.title')}</TableHead>
-            {canManage ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tree.map(({ category, depth }) => (
-            <TableRow key={category.id}>
-              <TableCell style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}>
-                {category.name}
-              </TableCell>
-              <TableCell className="font-mono">
-                {category.defaultClassificationCode ?? t('common.none')}
-              </TableCell>
-              <TableCell>
-                {t('catalog.categories.products', { count: category.productCount })}
-              </TableCell>
-              {canManage ? (
-                <TableCell className="flex flex-wrap justify-end gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditing({ parentId: category.id })}
-                  >
-                    {t('catalog.categories.addChild')}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditing({ category })}>
-                    {t('common.edit')}
-                  </Button>
-                  {category.childCount === 0 && category.productCount === 0 ? (
-                    <Button size="sm" variant="ghost" onClick={() => deletion.ask(category)}>
-                      {t('common.delete')}
-                    </Button>
-                  ) : null}
-                </TableCell>
-              ) : null}
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('catalog.categories.name')}</TableHead>
+              <TableHead>{t('catalog.categories.defaultCode')}</TableHead>
+              <TableHead>{t('catalog.products.title')}</TableHead>
+              {canManage ? <TableHead /> : null}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {categories.data?.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('catalog.categories.empty')}</p>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {tree.map(({ category, depth }) => (
+              <TableRow key={category.id}>
+                <TableCell style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}>
+                  {category.name}
+                </TableCell>
+                <TableCell className="font-mono">
+                  {category.defaultClassificationCode ?? t('common.none')}
+                </TableCell>
+                <TableCell>
+                  {t('catalog.categories.products', { count: category.productCount })}
+                </TableCell>
+                {canManage ? (
+                  <TableCell className="flex flex-wrap justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditing({ parentId: category.id })}
+                    >
+                      {t('catalog.categories.addChild')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditing({ category })}>
+                      {t('common.edit')}
+                    </Button>
+                    {category.childCount === 0 && category.productCount === 0 ? (
+                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(category)}>
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {categories.data?.length === 0 ? (
+          <EmptyState icon={FolderTree} title={t('catalog.categories.empty')} />
+        ) : null}
+      </ListCard>
       {editing ? (
         <CategoryDialog
           categories={categories.data ?? []}
@@ -279,38 +282,40 @@ export function BrandsPage() {
         }
       />
       <ProblemAlert problem={problemFromError(brands.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('catalog.brands.name')}</TableHead>
-            <TableHead>{t('catalog.products.title')}</TableHead>
-            {canManage ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(brands.data ?? []).map((brand) => (
-            <TableRow key={brand.id}>
-              <TableCell>{brand.name}</TableCell>
-              <TableCell>{t('catalog.brands.products', { count: brand.productCount })}</TableCell>
-              {canManage ? (
-                <TableCell className="flex flex-wrap justify-end gap-1">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(brand)}>
-                    {t('common.edit')}
-                  </Button>
-                  {brand.productCount === 0 ? (
-                    <Button size="sm" variant="ghost" onClick={() => deletion.ask(brand)}>
-                      {t('common.delete')}
-                    </Button>
-                  ) : null}
-                </TableCell>
-              ) : null}
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('catalog.brands.name')}</TableHead>
+              <TableHead>{t('catalog.products.title')}</TableHead>
+              {canManage ? <TableHead /> : null}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {brands.data?.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('catalog.brands.empty')}</p>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {(brands.data ?? []).map((brand) => (
+              <TableRow key={brand.id}>
+                <TableCell>{brand.name}</TableCell>
+                <TableCell>{t('catalog.brands.products', { count: brand.productCount })}</TableCell>
+                {canManage ? (
+                  <TableCell className="flex flex-wrap justify-end gap-1">
+                    <Button size="sm" variant="outline" onClick={() => setEditing(brand)}>
+                      {t('common.edit')}
+                    </Button>
+                    {brand.productCount === 0 ? (
+                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(brand)}>
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {brands.data?.length === 0 ? (
+          <EmptyState icon={Tag} title={t('catalog.brands.empty')} />
+        ) : null}
+      </ListCard>
       {editing ? <BrandDialog brand={editing} onClose={() => setEditing(null)} /> : null}
       <ConfirmDialog
         open={deletion.target !== null}
@@ -400,43 +405,45 @@ export function UomsPage() {
         }
       />
       <ProblemAlert problem={problemFromError(uoms.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('catalog.uoms.name')}</TableHead>
-            <TableHead>{t('catalog.uoms.kind')}</TableHead>
-            <TableHead>{t('catalog.uoms.fractional')}</TableHead>
-            <TableHead>{t('catalog.uoms.measureUnit')}</TableHead>
-            {canManage ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(uoms.data ?? []).map((uom) => (
-            <TableRow key={uom.id}>
-              <TableCell>{uom.name}</TableCell>
-              <TableCell>
-                <Badge variant={uom.code ? 'secondary' : 'outline'}>
-                  {uom.code ? t('catalog.uoms.system') : t('catalog.uoms.custom')}
-                </Badge>
-              </TableCell>
-              <TableCell>{uom.fractional ? t('common.yes') : t('common.no')}</TableCell>
-              <TableCell>{uom.measureUnit ?? t('common.none')}</TableCell>
-              {canManage ? (
-                <TableCell className="flex flex-wrap justify-end gap-1">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(uom)}>
-                    {t('common.edit')}
-                  </Button>
-                  {uom.code ? null : (
-                    <Button size="sm" variant="ghost" onClick={() => deletion.ask(uom)}>
-                      {t('common.delete')}
-                    </Button>
-                  )}
-                </TableCell>
-              ) : null}
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('catalog.uoms.name')}</TableHead>
+              <TableHead>{t('catalog.uoms.kind')}</TableHead>
+              <TableHead>{t('catalog.uoms.fractional')}</TableHead>
+              <TableHead>{t('catalog.uoms.measureUnit')}</TableHead>
+              {canManage ? <TableHead /> : null}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {(uoms.data ?? []).map((uom) => (
+              <TableRow key={uom.id}>
+                <TableCell>{uom.name}</TableCell>
+                <TableCell>
+                  <Badge variant={uom.code ? 'secondary' : 'outline'}>
+                    {uom.code ? t('catalog.uoms.system') : t('catalog.uoms.custom')}
+                  </Badge>
+                </TableCell>
+                <TableCell>{uom.fractional ? t('common.yes') : t('common.no')}</TableCell>
+                <TableCell>{uom.measureUnit ?? t('common.none')}</TableCell>
+                {canManage ? (
+                  <TableCell className="flex flex-wrap justify-end gap-1">
+                    <Button size="sm" variant="outline" onClick={() => setEditing(uom)}>
+                      {t('common.edit')}
+                    </Button>
+                    {uom.code ? null : (
+                      <Button size="sm" variant="ghost" onClick={() => deletion.ask(uom)}>
+                        {t('common.delete')}
+                      </Button>
+                    )}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ListCard>
       {editing ? <UomDialog uom={editing} onClose={() => setEditing(null)} /> : null}
       <ConfirmDialog
         open={deletion.target !== null}

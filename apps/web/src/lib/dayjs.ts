@@ -13,3 +13,8 @@ export const BUSINESS_TZ = 'Asia/Ulaanbaatar';
 export function formatUbDateTime(epochMs: number): string {
   return dayjs(epochMs).tz(BUSINESS_TZ).format('YYYY-MM-DD HH:mm:ss');
 }
+
+/** Today in Ulaanbaatar with its weekday, e.g. "2026-10-13, Мягмар" (the home page). */
+export function formatUbToday(): string {
+  return dayjs().tz(BUSINESS_TZ).format('YYYY-MM-DD, dddd');
+}

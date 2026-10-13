@@ -1,133 +1,115 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, Menu, UserRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Menu, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router';
-import { useAuthSession, useAuthState } from '@/app/auth-context';
-import { visibleNav } from '@/app/nav-items';
+import { Outlet, useLocation, useMatches } from 'react-router';
+import { CommandPalette } from '@/app/command-palette';
+import { navTrail } from '@/app/nav-items';
+import { Sidebar } from '@/app/sidebar';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { rememberRecentPage } from '@/lib/recent-pages';
 import { cn } from '@/lib/utils';
 
 /** A route's `handle` asks for the full width with `{ wide: true }`. */
 const isWide = (handle: unknown): boolean =>
   typeof handle === 'object' && handle !== null && 'wide' in handle && handle.wide === true;
 
-/** Top bar with the account menu, a grouped sidebar (a toggled panel on phones) and the page. */
+/**
+ * The frame of every signed-in page (ADR-0042): the sidebar menu on the grey canvas, the page in
+ * the reading width (or the whole width for wide lists), the Ctrl/⌘+K search and, on phones, a
+ * slim top bar whose menu button slides the sidebar in. The shell itself makes no API calls.
+ */
 export function AppShell() {
   const { t } = useTranslation();
-  const session = useAuthSession();
-  const state = useAuthState();
-  const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
-  // Wide tables (the product list) take the whole width instead of the reading width.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const firstLink = useRef<HTMLAnchorElement>(null);
   const wide = useMatches().some((match) => isWide(match.handle));
-  useEffect(() => {
-    document.title = t('app.name');
-  }, [t]);
+
   useEffect(() => {
     setMenuOpen(false);
+    const trail = navTrail(location.pathname);
+    if (trail) rememberRecentPage(trail.item.to);
   }, [location.pathname]);
-  const groups = visibleNav(state.status === 'authenticated' ? state.me.permissions : []);
-  const logout = async () => {
-    await session.logout();
-    queryClient.clear();
-    await navigate('/login?reason=logout', { replace: true });
+
+  // Ctrl/⌘+K anywhere opens the search. Matched on the physical key too: with the Mongolian
+  // keyboard layout active, `key` is a Cyrillic letter.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (event.code !== 'KeyK' && event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      setMenuOpen(false);
+      setPaletteOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // The phone drawer: Escape closes it; focus moves into it and back to the menu button.
+  useEffect(() => {
+    if (!menuOpen) return;
+    firstLink.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const button = menuButton.current;
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      button?.focus();
+    };
+  }, [menuOpen]);
+
+  const openSearch = () => {
+    setMenuOpen(false);
+    setPaletteOpen(true);
   };
 
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4 print:hidden">
+    <div className="min-h-svh bg-canvas md:flex">
+      <header className="sticky top-0 z-40 flex h-13 items-center gap-1 border-b border-sidebar-border bg-sidebar/90 px-2 backdrop-blur-md md:hidden print:hidden">
         <Button
+          ref={menuButton}
           variant="ghost"
           size="icon"
-          className="md:hidden"
           aria-label={t('nav.menu')}
-          aria-controls="app-nav"
+          aria-controls="app-sidebar"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
           <Menu />
         </Button>
-        <Link to="/" className="text-lg font-semibold">
+        <span className="flex-1 truncate text-[15px] font-semibold tracking-tight">
           {t('app.name')}
-        </Link>
-        <div className="flex-1" />
-        {state.status === 'authenticated' ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <UserRound />
-                <span className="max-w-40 truncate">{state.me.fullName}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{state.me.username}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => void navigate('/account')}>
-                <UserRound />
-                {t('nav.account')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void logout()}>
-                <LogOut />
-                {t('auth.logout')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+        </span>
+        <Button variant="ghost" size="icon" aria-label={t('palette.title')} onClick={openSearch}>
+          <Search />
+        </Button>
       </header>
-      <div className="md:flex">
-        <nav
-          id="app-nav"
-          aria-label={t('nav.menu')}
-          className={cn(
-            'border-b px-2 py-3 md:sticky md:top-14 md:block md:h-[calc(100svh-3.5rem)] md:w-56 md:shrink-0 md:overflow-y-auto md:border-r md:border-b-0',
-            menuOpen ? 'block' : 'hidden',
-            'print:hidden!',
-          )}
-        >
-          {groups.map((group) => (
-            <div key={group.label} className="mb-4">
-              <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">
-                {t(group.label)}
-              </p>
-              <ul className="flex flex-col gap-0.5">
-                {group.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      className={({ isActive }) =>
-                        cn(
-                          'block rounded-md px-2 py-1.5 text-sm hover:bg-muted hover:text-foreground',
-                          isActive
-                            ? 'bg-muted font-medium text-foreground'
-                            : 'text-muted-foreground',
-                        )
-                      }
-                    >
-                      {t(item.label)}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-        <main className="min-w-0 flex-1 p-4">
-          <div className={cn('mx-auto', wide ? 'max-w-none' : 'max-w-6xl')}>
-            <Outlet />
-          </div>
-        </main>
-      </div>
+      {menuOpen ? (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          onClick={() => setMenuOpen(false)}
+        />
+      ) : null}
+      <Sidebar
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onSearch={openSearch}
+        firstLinkRef={firstLink}
+      />
+      <main
+        inert={menuOpen ? true : undefined}
+        className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 md:pt-7 print:p-0"
+      >
+        <div className={cn('mx-auto', wide ? 'max-w-none' : 'max-w-6xl')}>
+          <Outlet />
+        </div>
+      </main>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

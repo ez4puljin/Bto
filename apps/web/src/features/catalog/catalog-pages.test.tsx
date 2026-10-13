@@ -4,7 +4,15 @@ import type { components } from '@tugeel/api-client';
 import { gtinCheckDigit } from '@tugeel/shared/gtin';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it, vi } from 'vitest';
-import { ADMIN_ME, json, problem, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
+import {
+  ADMIN_ME,
+  findSidebar,
+  json,
+  problem,
+  renderApp,
+  signedIn,
+  WORKER_ME,
+} from '@/test/render-app';
 import { PRODUCT_COLUMN_KEYS } from './product-columns';
 
 type Schemas = components['schemas'];
@@ -128,7 +136,7 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
 describe('catalog menu and access', () => {
   it('shows the catalog menu to every user, the e-Barimt page to its managers only', async () => {
     renderApp('/system/status', signedIn(WORKER_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     for (const label of [mn.nav.products, mn.nav.categories, mn.nav.brands, mn.nav.uoms]) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
     }
@@ -371,15 +379,11 @@ describe('products list', () => {
     setItem.mockRestore();
   });
 
-  it('opens a product from its edit button or anywhere on its row', async () => {
+  it('opens a product from its name or anywhere on its row', async () => {
     const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
     const first = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole('link', {
-        name: `${mn.common.edit}: Кока кола`,
-      }),
-    );
+    await user.click(await screen.findByRole('link', { name: 'Кока кола' }));
     await waitFor(() => expect(first.router.state.location.pathname).toBe('/catalog/products/1'));
 
     cleanup();
@@ -390,9 +394,10 @@ describe('products list', () => {
 
     cleanup();
     renderApp('/catalog/products', signedIn(WORKER_ME, routes));
-    expect(
-      await screen.findByRole('link', { name: `${mn.common.view}: Кока кола` }),
-    ).toHaveAttribute('href', '/catalog/products/1');
+    expect(await screen.findByRole('link', { name: 'Кока кола' })).toHaveAttribute(
+      'href',
+      '/catalog/products/1',
+    );
   });
 });
 
@@ -582,9 +587,13 @@ describe('product page', () => {
 
   it('keeps the product read-only for a worker', async () => {
     renderApp('/catalog/products/7', signedIn(WORKER_ME, productRoutes()));
-    const name = await screen.findByLabelText(mn.catalog.product.name);
-    expect(name).toHaveValue(COLA.name);
-    expect(name).toBeDisabled();
+    // The card is read first (ADR-0042); a worker gets no «Засах» and no form.
+    const info = within(await screen.findByRole('region', { name: mn.catalog.product.info }));
+    expect(info.getByText(COLA.name)).toBeInTheDocument();
+    expect(info.queryByRole('textbox')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: `${mn.common.edit}: ${mn.catalog.product.info}` }),
+    ).toBeNull();
     expect(screen.queryByRole('button', { name: mn.common.save })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.product.addUnit })).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.images.upload })).toBeNull();
@@ -607,9 +616,13 @@ describe('product page', () => {
       ),
     );
     const user = userEvent.setup();
+    const edit = `${mn.common.edit}: ${mn.catalog.product.info}`;
+    await user.click(await screen.findByRole('button', { name: edit }));
     await user.selectOptions(await screen.findByLabelText(mn.catalog.product.cityTax), 'yes');
     await user.click(screen.getByRole('button', { name: mn.common.save }));
-    expect(await screen.findByText(mn.catalog.product.saved)).toBeInTheDocument();
+    // A toast says so and the card is read again.
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.catalog.product.saved);
+    expect(await screen.findByRole('button', { name: edit })).toBeInTheDocument();
     expect(patched).toEqual({
       sku: '10023',
       name: 'Кока кола 0.5 л',

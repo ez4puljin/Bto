@@ -1,14 +1,23 @@
+import { LayoutGrid } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { type Bin, type BinRangeResult, useBins, useInventoryMutations } from './api';
 import { type RangeForm, rangeNumbers, useWarehouseOptions } from './helpers';
@@ -60,125 +70,119 @@ export function BinsPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div>
       <PageHeader title={t('inventory.bins.title')} />
-      <WarehouseSelect
-        className="max-w-xs"
-        options={warehouses.options}
-        value={warehouseId}
-        emptyLabel={t('inventory.pickWarehouse')}
-        onChange={setWarehouse}
-      />
+      <FilterBar>
+        <WarehouseSelect
+          variant="filter"
+          options={warehouses.options}
+          value={warehouseId}
+          emptyLabel={t('inventory.pickWarehouse')}
+          onChange={setWarehouse}
+        />
+      </FilterBar>
       {warehouseId === undefined ? null : (
         <>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="mb-6 grid gap-4 lg:grid-cols-2">
             <BinCreateCard key={`one-${warehouseId}`} warehouseId={warehouseId} />
             <BinRangeCard key={`range-${warehouseId}`} warehouseId={warehouseId} />
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <Input
-              type="search"
+          <FilterBar>
+            <SearchField
               aria-label={t('common.search')}
               placeholder={t('inventory.bins.searchPlaceholder')}
-              className="max-w-xs font-mono"
+              className="font-mono"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="bins-archived"
-                checked={archived}
-                onCheckedChange={(checked) => setArchived(checked === true)}
-              />
-              <Label htmlFor="bins-archived">{t('inventory.bins.showArchived')}</Label>
-            </div>
-          </div>
+            <FilterToggle
+              label={t('inventory.bins.showArchived')}
+              checked={archived}
+              onCheckedChange={setArchived}
+            />
+          </FilterBar>
           <ProblemAlert
             problem={deleting ? null : (action.problem ?? problemFromError(bins.error))}
           />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('inventory.bins.code')}</TableHead>
-                <TableHead>{t('inventory.bins.type')}</TableHead>
-                <TableHead>{t('inventory.bins.name')}</TableHead>
-                <TableHead>{t('inventory.status')}</TableHead>
-                <TableHead>
-                  <span className="sr-only">{t('common.actions')}</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((bin) => (
-                <TableRow key={bin.id}>
-                  <TableCell className="font-mono">{bin.code}</TableCell>
-                  <TableCell>{t(`inventory.binTypes.${bin.type}`)}</TableCell>
-                  <TableCell>{bin.name ?? t('common.none')}</TableCell>
-                  <TableCell className="flex flex-wrap gap-1">
-                    <Badge variant={bin.status === 'ACTIVE' ? 'secondary' : 'default'}>
-                      {t(`inventory.binStatus.${bin.status}`)}
-                    </Badge>
-                    {bin.isSystem ? (
-                      <Badge variant="outline">{t('inventory.bins.system')}</Badge>
-                    ) : null}
-                    {bin.archivedAt ? (
-                      <Badge variant="outline">{t('inventory.bins.archived')}</Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {bin.isSystem ? null : (
-                      <span className="flex justify-end gap-1">
-                        {bin.archivedAt ? (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() =>
-                              void action.run(() => mutations.restoreBin.mutateAsync(bin.id))
-                            }
-                          >
-                            {t('inventory.bins.restore')}
-                          </Button>
-                        ) : (
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            onClick={() =>
-                              void action.run(() => mutations.archiveBin.mutateAsync(bin.id))
-                            }
-                          >
-                            {t('inventory.bins.archive')}
-                          </Button>
-                        )}
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => {
-                            action.clear();
-                            setDeleting(bin);
-                          }}
-                        >
-                          {t('inventory.bins.delete')}
-                        </Button>
-                      </span>
-                    )}
-                  </TableCell>
+          <ListCard>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('inventory.bins.code')}</TableHead>
+                  <TableHead>{t('inventory.bins.type')}</TableHead>
+                  <TableHead>{t('inventory.bins.name')}</TableHead>
+                  <TableHead>{t('inventory.status')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {!bins.isPending && rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('inventory.bins.empty')}</p>
-          ) : null}
-          {bins.hasNextPage ? (
-            <Button
-              className="self-start"
-              variant="outline"
-              disabled={bins.isFetchingNextPage}
-              onClick={() => void bins.fetchNextPage()}
-            >
-              {t('common.loadMore')}
-            </Button>
-          ) : null}
+              </TableHeader>
+              <TableBody>
+                {bins.isPending ? <SkeletonRows columns={5} /> : null}
+                {rows.map((bin) => (
+                  <TableRow key={bin.id}>
+                    <TableCell className="font-mono">{bin.code}</TableCell>
+                    <TableCell>{t(`inventory.binTypes.${bin.type}`)}</TableCell>
+                    <TableCell>{bin.name ?? t('common.none')}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Badge variant={bin.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                          {t(`inventory.binStatus.${bin.status}`)}
+                        </Badge>
+                        {bin.isSystem ? (
+                          <Badge variant="outline">{t('inventory.bins.system')}</Badge>
+                        ) : null}
+                        {bin.archivedAt ? (
+                          <Badge variant="outline">{t('inventory.bins.archived')}</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {bin.isSystem ? null : (
+                        <span className="flex justify-end gap-1">
+                          {bin.archivedAt ? (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() =>
+                                void action.run(() => mutations.restoreBin.mutateAsync(bin.id))
+                              }
+                            >
+                              {t('inventory.bins.restore')}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() =>
+                                void action.run(() => mutations.archiveBin.mutateAsync(bin.id))
+                              }
+                            >
+                              {t('inventory.bins.archive')}
+                            </Button>
+                          )}
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => {
+                              action.clear();
+                              setDeleting(bin);
+                            }}
+                          >
+                            {t('inventory.bins.delete')}
+                          </Button>
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {!bins.isPending && rows.length === 0 ? (
+              <EmptyState icon={LayoutGrid} title={t('inventory.bins.empty')} />
+            ) : null}
+            <LoadMore query={bins} />
+          </ListCard>
         </>
       )}
       <ConfirmDialog
@@ -246,7 +250,7 @@ function BinCreateCard({ warehouseId }: { warehouseId: number }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           <Input
             aria-label={t('inventory.bins.code')}
             placeholder={t('inventory.bins.codePlaceholder')}
@@ -259,6 +263,7 @@ function BinCreateCard({ warehouseId }: { warehouseId: number }) {
           <Input
             aria-label={t('inventory.bins.name')}
             placeholder={t('inventory.bins.name')}
+            className="sm:col-span-2"
             maxLength={100}
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -290,7 +295,6 @@ function BinRangeCard({ warehouseId }: { warehouseId: number }) {
     levelTo: '3',
   });
   const [preview, setPreview] = useState<BinRangeResult | null>(null);
-  const [created, setCreated] = useState<number | null>(null);
   const numbers = rangeNumbers(form);
   const field = (key: keyof RangeForm, label: string) => (
     <Input
@@ -299,7 +303,6 @@ function BinRangeCard({ warehouseId }: { warehouseId: number }) {
       value={form[key]}
       onChange={(event) => {
         setPreview(null);
-        setCreated(null);
         setForm((previous) => ({ ...previous, [key]: event.target.value }));
       }}
     />
@@ -318,7 +321,7 @@ function BinRangeCard({ warehouseId }: { warehouseId: number }) {
         setPreview(result);
       } else {
         setPreview(null);
-        setCreated(result.created);
+        toast.success(t('inventory.bins.created', { count: result.created }));
       }
     });
 
@@ -359,11 +362,6 @@ function BinRangeCard({ warehouseId }: { warehouseId: number }) {
             {preview.existing.length > 0
               ? `; ${t('inventory.bins.previewExisting', { count: preview.existing.length })}`
               : ''}
-          </p>
-        ) : null}
-        {created !== null ? (
-          <p className="text-sm text-emerald-700">
-            {t('inventory.bins.created', { count: created })}
           </p>
         ) : null}
         <div className="flex gap-2">

@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { problemFromError } from '@/lib/problem';
 import { useBrands, useCatalogMutations, useCategories, useNextSku, useUoms } from './api';
@@ -36,14 +35,7 @@ export function ProductCreatePage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('catalog.product.newTitle')}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/catalog/products">{t('common.back')}</Link>
-          </Button>
-        }
-      />
+      <PageHeader title={t('catalog.product.newTitle')} />
       <ProblemAlert problem={loadProblem} />
       {uoms.data && categories.data && brands.data && !nextSku.isPending ? (
         <Card>

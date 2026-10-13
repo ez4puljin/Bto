@@ -1,12 +1,21 @@
 import { MAX_STOCKTAKE_BINS } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
-import { X } from 'lucide-react';
+import { ClipboardCheck, Plus, X } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { CheckboxGroup } from '@/components/checkbox-group';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -14,6 +23,14 @@ import { ScanBox } from '@/components/scan-box';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -27,6 +44,7 @@ import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
@@ -81,6 +99,7 @@ export function StocktakesPage() {
   const status = isStatus(statusParam) ? statusParam : undefined;
   const stocktakes = useStocktakes({ warehouseId, status });
   const rows = stocktakes.data?.pages.flatMap((page) => page.data) ?? [];
+  const [creating, setCreating] = useCreateParam();
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -94,17 +113,33 @@ export function StocktakesPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('inventory.stocktakes.title')} />
-      {canManage ? <StocktakeCreateCard /> : null}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <PageHeader
+        title={t('inventory.stocktakes.title')}
+        actions={
+          canManage ? (
+            <Button onClick={() => setCreating(true)}>
+              <Plus />
+              {t('inventory.stocktake.newTitle')}
+            </Button>
+          ) : null
+        }
+      />
+      {canManage ? (
+        <Dialog open={creating} onOpenChange={setCreating}>
+          {creating ? <StocktakeCreateDialog onCancel={() => setCreating(false)} /> : null}
+        </Dialog>
+      ) : null}
+      <FilterBar>
         <WarehouseSelect
+          variant="filter"
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={t('inventory.allWarehouses')}
           onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('inventory.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -116,65 +151,58 @@ export function StocktakesPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(stocktakes.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.number')}</TableHead>
-            <TableHead>{t('inventory.warehouse')}</TableHead>
-            <TableHead className="text-right">{t('inventory.stocktakes.shelves')}</TableHead>
-            <TableHead>{t('inventory.status')}</TableHead>
-            <TableHead>{t('inventory.date')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="font-mono">
-                <Link
-                  to={`/inventory/stocktakes/${row.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {row.number ?? t('inventory.stocktake.noNumber', { id: row.id })}
-                </Link>
-              </TableCell>
-              <TableCell>{warehouseName(row.warehouseId)}</TableCell>
-              <TableCell className="text-right font-mono">
-                {t('inventory.stocktakes.shelvesProgress', {
-                  finished: row.finishedBinCount,
-                  total: row.binCount,
-                })}
-              </TableCell>
-              <TableCell>
-                <DocStatusBadge status={row.status} />
-              </TableCell>
-              <TableCell className="font-mono">
-                {row.effectiveDate ?? formatUbDateTime(Date.parse(row.startedAt ?? row.createdAt))}
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.number')}</TableHead>
+              <TableHead>{t('inventory.warehouse')}</TableHead>
+              <TableHead className="text-right">{t('inventory.stocktakes.shelves')}</TableHead>
+              <TableHead>{t('inventory.status')}</TableHead>
+              <TableHead>{t('inventory.date')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!stocktakes.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('inventory.stocktakes.empty')}</p>
-      ) : null}
-      {stocktakes.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={stocktakes.isFetchingNextPage}
-          onClick={() => void stocktakes.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {stocktakes.isPending ? <SkeletonRows columns={6} /> : null}
+            {rows.map((row) => (
+              <LinkRow key={row.id} to={`/inventory/stocktakes/${row.id}`}>
+                <TableCell className="font-mono">
+                  <Link to={`/inventory/stocktakes/${row.id}`} className="font-medium">
+                    {row.number ?? t('inventory.stocktake.noNumber', { id: row.id })}
+                  </Link>
+                </TableCell>
+                <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {t('inventory.stocktakes.shelvesProgress', {
+                    finished: row.finishedBinCount,
+                    total: row.binCount,
+                  })}
+                </TableCell>
+                <TableCell>
+                  <DocStatusBadge status={row.status} />
+                </TableCell>
+                <TableCell className="font-mono">
+                  {row.effectiveDate ??
+                    formatUbDateTime(Date.parse(row.startedAt ?? row.createdAt))}
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!stocktakes.isPending && rows.length === 0 ? (
+          <EmptyState icon={ClipboardCheck} title={t('inventory.stocktakes.empty')} />
+        ) : null}
+        <LoadMore query={stocktakes} />
+      </ListCard>
     </div>
   );
 }
 
 /** A draft names its warehouse and shelves: a code prefix, every shelf, or scanned labels. */
-function StocktakeCreateCard() {
+function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mine = useWarehouseOptions(SHELF_KINDS, true);
@@ -230,7 +258,7 @@ function StocktakeCreateCard() {
               : { binIds: scanned.map((bin) => bin.id) }),
           ...(note.trim() ? { note: note.trim() } : {}),
         });
-        await navigate(`/inventory/stocktakes/${created.id}`);
+        await navigate(`/inventory/stocktakes/${created.id}`, { replace: true });
       })
       .then((done) => {
         // A refused draft is a new intent once the form changes.
@@ -238,13 +266,15 @@ function StocktakeCreateCard() {
       });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.stocktake.newTitle')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    // Wider than the default: the label scan box and its camera button share a row.
+    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>{t('inventory.stocktake.newTitle')}</DialogTitle>
+        <DialogDescription>{t(`inventory.stocktake.scopeHints.${scope}`)}</DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-3">
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3">
           <WarehouseSelect
             options={mine.options}
             value={warehouseId}
@@ -287,9 +317,6 @@ function StocktakeCreateCard() {
             onChange={(event) => setNote(event.target.value)}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {t(`inventory.stocktake.scopeHints.${scope}`)}
-        </p>
         {scope === 'scan' ? (
           warehouseId === undefined ? null : (
             <div className="flex flex-col gap-2">
@@ -330,15 +357,16 @@ function StocktakeCreateCard() {
             preview={warehouseId === undefined ? undefined : preview.data}
           />
         )}
-        <Button
-          className="self-start"
-          disabled={!ready || mutations.create.isPending}
-          onClick={create}
-        >
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button disabled={!ready || mutations.create.isPending} onClick={create}>
           {t('inventory.stocktake.createDraft')}
         </Button>
-      </CardContent>
-    </Card>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -437,27 +465,24 @@ export function StocktakePage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/inventory/stocktakes">{t('common.back')}</Link>
-          </Button>
+        meta={
+          <>
+            <DocStatusBadge status={detail.status} />
+            <span className="text-foreground">{warehouseName(detail.warehouseId)}</span>
+            {/* The counter's shelf list shows the progress itself. */}
+            {detail.status === 'COUNTING' && !counter ? (
+              <span>
+                {t('inventory.stocktake.progress', { finished, total: detail.bins.length })}
+              </span>
+            ) : null}
+            {detail.effectiveDate ? (
+              <span className="font-mono">
+                {t('inventory.stocktake.approvedOn', { date: detail.effectiveDate })}
+              </span>
+            ) : null}
+          </>
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <DocStatusBadge status={detail.status} />
-        <span>{warehouseName(detail.warehouseId)}</span>
-        {/* The counter's shelf list shows the progress itself. */}
-        {detail.status === 'COUNTING' && !counter ? (
-          <span className="text-muted-foreground">
-            {t('inventory.stocktake.progress', { finished, total: detail.bins.length })}
-          </span>
-        ) : null}
-        {detail.effectiveDate ? (
-          <span className="font-mono text-muted-foreground">
-            {t('inventory.stocktake.approvedOn', { date: detail.effectiveDate })}
-          </span>
-        ) : null}
-      </div>
       {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {body}
     </div>

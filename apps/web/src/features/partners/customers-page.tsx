@@ -1,18 +1,25 @@
 import { CUSTOMER_KINDS } from '@tugeel/shared/taxpayer';
-import { Plus } from 'lucide-react';
+import { Plus, Store } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ColumnChooser } from '@/components/column-chooser';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -92,32 +99,31 @@ export function CustomersPage() {
       <PageHeader
         title={t('partners.customers.title')}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <ColumnChooser
-              keys={CUSTOMER_COLUMN_KEYS}
-              locked={LOCKED_CUSTOMER_COLUMNS}
-              label={(key) => t(`partners.customers.columns.${key}`)}
-              hidden={hidden}
-              toggle={columnState.toggle}
-              showAll={columnState.showAll}
-            />
-            {canManage ? (
-              <Button asChild>
-                <Link to="/partners/customers/new">
-                  <Plus />
-                  {t('partners.customers.create')}
-                </Link>
-              </Button>
-            ) : null}
-          </div>
+          canManage ? (
+            <Button asChild>
+              <Link to="/partners/customers/new">
+                <Plus />
+                {t('partners.customers.create')}
+              </Link>
+            </Button>
+          ) : null
         }
       />
-      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input
-          type="search"
+      <FilterBar
+        end={
+          <ColumnChooser
+            keys={CUSTOMER_COLUMN_KEYS}
+            locked={LOCKED_CUSTOMER_COLUMNS}
+            label={(key) => t(`partners.customers.columns.${key}`)}
+            hidden={hidden}
+            toggle={columnState.toggle}
+            showAll={columnState.showAll}
+          />
+        }
+      >
+        <SearchField
           aria-label={t('common.search')}
           placeholder={t('partners.customers.searchPlaceholder')}
-          className="lg:col-span-2"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -125,6 +131,7 @@ export function CustomersPage() {
           }}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('partners.customer.kind')}
           value={kind ?? ''}
           onChange={(event) => setParam('kind', event.target.value)}
@@ -137,6 +144,7 @@ export function CustomersPage() {
           ))}
         </NativeSelect>
         <NativeSelect
+          variant="filter"
           aria-label={t('partners.customer.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -148,63 +156,46 @@ export function CustomersPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
-      <div className="mb-4 flex flex-wrap gap-4">
         {FLAGS.map((name) => (
-          <div key={name} className="flex items-center gap-2">
-            <Checkbox
-              id={`customers-${name}`}
-              checked={flag(name) === true}
-              onCheckedChange={(checked) => setParam(name, checked === true ? '1' : '')}
-            />
-            <Label htmlFor={`customers-${name}`} className="font-normal">
-              {t(`partners.customers.filters.${name}`)}
-            </Label>
-          </div>
+          <FilterToggle
+            key={name}
+            label={t(`partners.customers.filters.${name}`)}
+            checked={flag(name) === true}
+            onCheckedChange={(checked) => setParam(name, checked ? '1' : '')}
+          />
         ))}
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(customers.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <RecordActionsHead />
-            {columns.map((column) => (
-              <TableHead key={column.key}>
-                {t(`partners.customers.columns.${column.key}`)}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((customer) => (
-            <RecordRow
-              key={customer.id}
-              href={`/partners/customers/${customer.id}`}
-              name={customer.name}
-              canManage={canManage}
-            >
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
               {columns.map((column) => (
-                <TableCell key={column.key} className={column.className}>
-                  {column.cell(customer, t)}
-                </TableCell>
+                <TableHead key={column.key}>
+                  {t(`partners.customers.columns.${column.key}`)}
+                </TableHead>
               ))}
-            </RecordRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!customers.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('partners.customers.empty')}</p>
-      ) : null}
-      {customers.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={customers.isFetchingNextPage}
-          onClick={() => void customers.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+              <ChevronHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {customers.isPending ? <SkeletonRows columns={columns.length + 1} /> : null}
+            {rows.map((customer) => (
+              <LinkRow key={customer.id} to={`/partners/customers/${customer.id}`}>
+                {columns.map((column) => (
+                  <TableCell key={column.key} className={column.className}>
+                    {column.cell(customer, t)}
+                  </TableCell>
+                ))}
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!customers.isPending && rows.length === 0 ? (
+          <EmptyState icon={Store} title={t('partners.customers.empty')} />
+        ) : null}
+        <LoadMore query={customers} />
+      </ListCard>
     </div>
   );
 }

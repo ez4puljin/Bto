@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { ApiClientProvider } from '@/app/api-context';
 import { AuthProvider } from '@/app/auth-provider';
+import { Toaster } from '@/components/toaster';
 import type { AuthSession } from '@/lib/auth/auth-session';
 import { i18n } from '@/lib/i18n';
 
@@ -18,6 +19,7 @@ export function AppProviders(props: {
           <ApiClientProvider client={props.session.client}>{props.children}</ApiClientProvider>
         </AuthProvider>
       </QueryClientProvider>
+      <Toaster />
     </I18nextProvider>
   );
 }

@@ -1,7 +1,8 @@
 import { QueryClient } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { components } from '@tugeel/api-client';
 import { PERMISSIONS } from '@tugeel/shared/auth';
+import mn from '@tugeel/shared/i18n/mn.json';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { vi } from 'vitest';
@@ -83,6 +84,10 @@ export function signedOut(extra: Record<string, Handler> = {}) {
     ...extra,
   });
 }
+
+/** The sidebar menu; the breadcrumb trail is a second, separately named navigation landmark. */
+export const findSidebar = () => screen.findByRole('navigation', { name: mn.nav.menu });
+export const getSidebar = () => screen.getByRole('navigation', { name: mn.nav.menu });
 
 export function renderApp(path: string, fetchMock: (request: Request) => Promise<Response>) {
   const session = new AuthSession({

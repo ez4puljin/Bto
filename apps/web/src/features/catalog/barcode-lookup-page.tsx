@@ -50,8 +50,7 @@ export function BarcodeLookupPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t('scan.title')} />
-      <p className="-mt-2 text-sm text-muted-foreground">{t('scan.hint')}</p>
+      <PageHeader title={t('scan.title')} meta={t('scan.hint')} />
       <ScanBox onScan={scan} />
       {lookup.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">

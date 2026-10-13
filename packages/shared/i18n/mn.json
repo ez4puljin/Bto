@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Түгээл"
+    "name": "Bto"
   },
   "nav": {
     "systemStatus": "Системийн төлөв",
@@ -38,7 +38,8 @@
     "movements": "Хөдөлгөөний түүх",
     "lowStock": "Бага үлдэгдэл",
     "discounts": "Хямдрал",
-    "priceQuote": "Үнэ тооцоолох"
+    "priceQuote": "Үнэ тооцоолох",
+    "home": "Нүүр"
   },
   "systemStatus": {
     "title": "Системийн төлөв",
@@ -223,7 +224,9 @@
     "showAllColumns": "Бүгдийг харуулах",
     "view": "Харах",
     "editRecord": "Засах: {{name}}",
-    "viewRecord": "Харах: {{name}}"
+    "viewRecord": "Харах: {{name}}",
+    "clearFilters": "Шүүлтүүр арилгах",
+    "created": "Үүсгэлээ"
   },
   "validation": {
     "required": "Заавал бөглөнө",
@@ -278,7 +281,8 @@
       "submit": "Нэвтрэх",
       "setPasswordLink": "Нэг удаагийн кодоор нууц үг тохируулах",
       "expired": "Нэвтрэлтийн хугацаа дууссан тул дахин нэвтэрнэ үү",
-      "loggedOut": "Та системээс гарлаа"
+      "loggedOut": "Та системээс гарлаа",
+      "welcome": "Ажлын бүртгэлээрээ нэвтэрнэ үү"
     },
     "setPassword": {
       "title": "Нууц үг тохируулах",
@@ -629,7 +633,9 @@
       "defaultPurchase": "Худалдан авалтын анхдагч",
       "saved": "Хадгалагдлаа",
       "removeBarcode": "{{code}} баркодыг хасах",
-      "unitBarcodes": "Баркод"
+      "unitBarcodes": "Баркод",
+      "viewStock": "Үлдэгдэл харах",
+      "viewMovements": "Хөдөлгөөн харах"
     },
     "units": {
       "title": "Нэгж ба баркод",
@@ -1089,7 +1095,8 @@
       "return": "Засуулахаар буцаах",
       "cancel": "Цуцлах",
       "cancelTitle": "Залруулгыг цуцлах уу?",
-      "posted": "{{number}} батлагдлаа"
+      "posted": "{{number}} батлагдлаа",
+      "createDraft": "Ноорог үүсгэх"
     },
     "transfers": {
       "title": "Шилжүүлэг",
@@ -1831,6 +1838,77 @@
       "applied": "{{name}}: {{value}}",
       "appliedAmount": "{{name}}: {{value}} (−{{amount}}₮)",
       "totals": "Нийт: {{subtotal}}₮ − {{discount}}₮ хямдрал = {{total}}₮"
+    }
+  },
+  "shell": {
+    "breadcrumb": "Зам",
+    "search": "Хайх…",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
+    "closeMenu": "Цэс хаах",
+    "userMenu": "Хэрэглэгчийн цэс"
+  },
+  "palette": {
+    "title": "Хурдан хайлт",
+    "label": "Хурдан хайлт",
+    "placeholder": "Хуудас, бараа, харилцагч хайх…",
+    "empty": "Илэрц олдсонгүй",
+    "searching": "Хайж байна…",
+    "hint": "↑↓ сонгох · Enter нээх · Esc хаах",
+    "groups": {
+      "recent": "Сүүлд нээсэн",
+      "pages": "Хуудас",
+      "actions": "Үйлдэл",
+      "products": "Бараа",
+      "customers": "Харилцагч",
+      "suppliers": "Нийлүүлэгч"
+    }
+  },
+  "home": {
+    "greeting": "Сайн байна уу, {{name}}",
+    "quickActions": "Түргэн үйлдэл",
+    "recent": "Сүүлд нээсэн",
+    "actions": {
+      "newReceipt": "Шинэ орлого",
+      "newTransfer": "Шилжүүлэг үүсгэх",
+      "newStocktake": "Тооллого эхлүүлэх",
+      "newProduct": "Шинэ бараа",
+      "scan": "Баркодоор хайх",
+      "quote": "Үнэ бодох"
+    },
+    "attention": {
+      "title": "Анхаарах",
+      "seeAll": "Бүгдийг харах",
+      "more": "{{count}}+",
+      "adjustments": "Батлах залруулга",
+      "stocktakes": "Хянах тооллого",
+      "transfersToShip": "Илгээх шилжүүлэг",
+      "transfersToReceive": "Хүлээн авах шилжүүлэг"
+    }
+  },
+  "toast": {
+    "region": "Мэдэгдэл",
+    "dismiss": "Мэдэгдэл хаах"
+  },
+  "brand": {
+    "tagline": "Дотоод систем",
+    "owner": "© 2026 Бүтэн-Оргил ХХК-ийн өмч",
+    "mapTitle": "Салбарын сүлжээ",
+    "branch": "Салбар",
+    "places": {
+      "ulaanbaatar": "Улаанбаатар",
+      "muron": "Мөрөн",
+      "kharkhorin": "Хархорин"
+    },
+    "aimags": {
+      "khovsgol": "Хөвсгөл",
+      "uvurkhangai": "Өвөрхангай"
+    },
+    "capital": "Нийслэл",
+    "mainBranch": "Төв салбар",
+    "centers": {
+      "orgil": "Оргил Бөөний төв",
+      "bolomj": "Боломж бөөний төв"
     }
   }
 }

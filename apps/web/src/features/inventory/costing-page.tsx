@@ -1,7 +1,7 @@
 import { Decimal } from '@tugeel/shared/money';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type ReceiptCosting, useInventoryMutations, useReceiptCosting } from './api';
@@ -33,8 +34,6 @@ export function ReceiptCostingPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
   const costing = useReceiptCosting(id);
-  // Kept here: a successful costing refetches a new version and remounts the form.
-  const [saved, setSaved] = useState(false);
 
   const loadProblem = problemFromError(costing.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
@@ -44,28 +43,20 @@ export function ReceiptCostingPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={t('inventory.costing.title', { number: costing.data.number ?? '' })}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to={`/inventory/receipts/${id}`}>{t('common.back')}</Link>
-          </Button>
-        }
+        crumbs={[
+          {
+            label: costing.data.number ?? t('inventory.draftNo', { id }),
+            to: `/inventory/receipts/${id}`,
+          },
+        ]}
       />
-      <CostingForm
-        key={costing.data.costingVersion}
-        costing={costing.data}
-        saved={saved}
-        onSaved={setSaved}
-      />
+      <CostingForm key={costing.data.costingVersion} costing={costing.data} />
     </div>
   );
 }
 
-function CostingForm(props: {
-  costing: ReceiptCosting;
-  saved: boolean;
-  onSaved: (saved: boolean) => void;
-}) {
-  const { costing, saved, onSaved } = props;
+function CostingForm(props: { costing: ReceiptCosting }) {
+  const { costing } = props;
   const { t } = useTranslation();
   const mutations = useInventoryMutations();
   const action = useAction();
@@ -86,7 +77,6 @@ function CostingForm(props: {
   const complete = amounts.every((amount) => amount !== null);
   const total = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
   const set = (lineId: number, patch: Partial<CostingValue>) => {
-    onSaved(false);
     setValues((previous) => ({ ...previous, [lineId]: { ...entryOf(lineId), ...patch } }));
   };
 
@@ -107,7 +97,7 @@ function CostingForm(props: {
         },
       });
       setKey(randomUuid());
-      onSaved(true);
+      toast.success(t('inventory.costing.saved'));
     });
 
   return (
@@ -200,7 +190,6 @@ function CostingForm(props: {
         {!complete ? (
           <p className="text-sm text-muted-foreground">{t('inventory.costing.missing')}</p>
         ) : null}
-        {saved ? <p className="text-sm text-emerald-700">{t('inventory.costing.saved')}</p> : null}
         <Button
           className="self-start"
           disabled={!complete || mutations.costReceipt.isPending}

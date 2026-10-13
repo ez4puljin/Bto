@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
+import type { ListReadOptions } from '@/lib/list-read';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -57,10 +58,12 @@ export interface CustomerFilter {
   gpsMissing?: boolean;
 }
 
-export function useCustomers(filter: CustomerFilter) {
+export function useCustomers(filter: CustomerFilter, options: ListReadOptions = {}) {
   const api = useApiClient();
+  const limit = options.limit ?? 50;
   return useInfiniteQuery({
-    queryKey: [...KEYS.customers, 'list', filter],
+    queryKey: [...KEYS.customers, 'list', filter, limit],
+    enabled: options.enabled ?? true,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
@@ -74,7 +77,7 @@ export function useCustomers(filter: CustomerFilter) {
               tinPending: filter.tinPending,
               gpsMissing: filter.gpsMissing,
               cursor: pageParam,
-              limit: 50,
+              limit,
             },
           },
           signal,
@@ -104,10 +107,15 @@ export function useNextCustomerCode() {
   });
 }
 
-export function useSuppliers(filter: { q?: string; status?: PartnerStatus }) {
+export function useSuppliers(
+  filter: { q?: string; status?: PartnerStatus },
+  options: ListReadOptions = {},
+) {
   const api = useApiClient();
+  const limit = options.limit ?? 50;
   return useInfiniteQuery({
-    queryKey: [...KEYS.suppliers, 'list', filter],
+    queryKey: [...KEYS.suppliers, 'list', filter, limit],
+    enabled: options.enabled ?? true,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
@@ -117,7 +125,7 @@ export function useSuppliers(filter: { q?: string; status?: PartnerStatus }) {
               q: filter.q || undefined,
               status: filter.status,
               cursor: pageParam,
-              limit: 50,
+              limit,
             },
           },
           signal,

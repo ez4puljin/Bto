@@ -4,7 +4,7 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it, vi } from 'vitest';
-import { ADMIN_ME, json, type Me, renderApp, signedIn } from '@/test/render-app';
+import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-11T02:00:00.000Z';
@@ -73,13 +73,13 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
 describe('imports menu', () => {
   it('shows imports to admins only', async () => {
     renderApp('/system/status', signedIn(ADMIN_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.imports })).toBeInTheDocument();
   });
 
   it('keeps imports from the warehouse', async () => {
     renderApp('/system/status', signedIn(WAREHOUSE_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).queryByRole('link', { name: mn.nav.imports })).toBeNull();
   });
 });

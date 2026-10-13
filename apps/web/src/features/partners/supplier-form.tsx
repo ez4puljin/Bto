@@ -3,6 +3,7 @@ import type { ProblemDetails } from '@tugeel/api-client';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { FieldList } from '@/components/detail';
 import { FieldError } from '@/components/field-error';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -10,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import type { SupplierDetail } from './api';
 import {
   fieldOfDuplicate,
   PARTNER_STATUSES,
   type SupplierFormValues,
   supplierSchema,
 } from './partner-schema';
+import { localPhone } from './phone';
 
 type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note'>;
 const FIELDS: readonly {
@@ -58,7 +61,8 @@ export function SupplierForm(props: {
   submitLabel: string;
   /** Resolves to the API problem, or null when saved. */
   onSubmit: (values: SupplierFormValues) => Promise<ProblemDetails | null>;
-  saved?: boolean;
+  /** Editing in a card: «Болих» returns to reading (ADR-0042). */
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const form = useForm<SupplierFormValues>({
@@ -126,17 +130,49 @@ export function SupplierForm(props: {
         </div>
       </fieldset>
       {props.readOnly ? null : (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting}>
             {props.submitLabel}
           </Button>
-          {props.saved ? (
-            <span role="status" className="text-sm text-muted-foreground">
-              {t('partners.supplier.saved')}
-            </span>
+          {props.onCancel ? (
+            <Button type="button" variant="ghost" onClick={props.onCancel}>
+              {t('common.cancel')}
+            </Button>
           ) : null}
         </div>
       )}
     </form>
+  );
+}
+
+/** The reading side of a supplier's card: the form's fields, label over value (ADR-0042). */
+export function SupplierFacts({ detail }: { detail: SupplierDetail }) {
+  const { t } = useTranslation();
+  const value = (name: TextField) => {
+    switch (name) {
+      case 'phone':
+        return detail.phone ? localPhone(detail.phone) : null;
+      case 'paymentTermDays':
+        return detail.paymentTermDays === null
+          ? null
+          : t('partners.credit.termCustomer', { days: detail.paymentTermDays });
+      default:
+        return detail[name];
+    }
+  };
+  return (
+    <FieldList
+      items={[
+        ...FIELDS.map((field) => {
+          const shown = value(field.name);
+          return {
+            label: t(LABELS[field.name]),
+            value: field.mono && shown ? <span className="font-mono">{shown}</span> : shown,
+          };
+        }),
+        { label: t('partners.supplier.status'), value: t(`partners.status.${detail.status}`) },
+        { label: t('partners.supplier.note'), value: detail.note, wide: true },
+      ]}
+    />
   );
 }

@@ -43,7 +43,8 @@ export function ProductForm(props: {
   submitLabel: string;
   /** Resolves to the API problem, or null when saved. */
   onSubmit: (values: ProductFormValues) => Promise<ProblemDetails | null>;
-  saved?: boolean;
+  /** Editing in a card: «Болих» returns to reading (ADR-0042). */
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const { mode, uoms, categories } = props;
@@ -359,14 +360,14 @@ export function ProductForm(props: {
         ) : null}
       </fieldset>
       {props.readOnly ? null : (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting}>
             {props.submitLabel}
           </Button>
-          {props.saved ? (
-            <span role="status" className="text-sm text-muted-foreground">
-              {t('catalog.product.saved')}
-            </span>
+          {props.onCancel ? (
+            <Button type="button" variant="ghost" onClick={props.onCancel}>
+              {t('common.cancel')}
+            </Button>
           ) : null}
         </div>
       )}

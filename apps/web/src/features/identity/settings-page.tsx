@@ -33,8 +33,10 @@ export function SettingsPage() {
   const settings = useSettings();
   return (
     <div>
-      <PageHeader title={t('settings.title')} />
-      <p className="mb-4 text-sm text-muted-foreground">{t('settings.hint')}</p>
+      <PageHeader
+        title={t('settings.title')}
+        meta={<p className="max-w-3xl">{t('settings.hint')}</p>}
+      />
       <ProblemAlert problem={problemFromError(settings.error)} />
       <div className="grid gap-4 lg:grid-cols-2">
         {(settings.data ?? []).map((view) => (
@@ -120,13 +122,13 @@ function SettingCard({ view }: { view: SettingView }) {
                 const inForce = entry.id === inForceId;
                 return (
                   <TableRow key={entry.id}>
-                    <TableCell>{entry.effectiveFrom}</TableCell>
+                    <TableCell className="font-mono">{entry.effectiveFrom}</TableCell>
                     <TableCell>
                       <SettingValue settingKey={settingKey} value={entry.value} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge variant={inForce ? 'secondary' : 'outline'}>
+                        <Badge variant={upcoming ? 'default' : inForce ? 'success' : 'secondary'}>
                           {upcoming
                             ? t('settings.upcoming')
                             : inForce

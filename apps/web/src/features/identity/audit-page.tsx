@@ -1,11 +1,18 @@
+import { ScrollText } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  DateFilter,
+  EmptyState,
+  FilterBar,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -47,116 +54,112 @@ export function AuditPage() {
   return (
     <div>
       <PageHeader title={t('audit.title')} />
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-entity">{t('audit.entity')}</Label>
-          <NativeSelect
-            id="audit-entity"
-            value={filter.entity ?? ''}
-            onChange={(event) => setFilter({ ...filter, entity: event.target.value })}
-          >
-            <option value="">{t('audit.allEntities')}</option>
-            {AUDIT_ENTITIES.map((entity) => (
-              <option key={entity} value={entity}>
-                {t(`audit.entities.${entity}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-from">{t('audit.from')}</Label>
-          <Input
-            id="audit-from"
-            type="date"
-            value={filter.from ?? ''}
-            onChange={(event) => setFilter({ ...filter, from: event.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="audit-to">{t('audit.to')}</Label>
-          <Input
-            id="audit-to"
-            type="date"
-            value={filter.to ?? ''}
-            onChange={(event) => setFilter({ ...filter, to: event.target.value })}
-          />
-        </div>
-      </div>
+      <FilterBar>
+        <NativeSelect
+          variant="filter"
+          aria-label={t('audit.entity')}
+          value={filter.entity ?? ''}
+          onChange={(event) => setFilter({ ...filter, entity: event.target.value })}
+        >
+          <option value="">{t('audit.allEntities')}</option>
+          {AUDIT_ENTITIES.map((entity) => (
+            <option key={entity} value={entity}>
+              {t(`audit.entities.${entity}`)}
+            </option>
+          ))}
+        </NativeSelect>
+        <DateFilter
+          label={t('audit.from')}
+          value={filter.from}
+          onChange={(from) => setFilter({ ...filter, from })}
+        />
+        <DateFilter
+          label={t('audit.to')}
+          value={filter.to}
+          onChange={(to) => setFilter({ ...filter, to })}
+        />
+      </FilterBar>
       <ProblemAlert problem={problemFromError(audit.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('audit.time')}</TableHead>
-            <TableHead>{t('audit.actor')}</TableHead>
-            <TableHead>{t('audit.action')}</TableHead>
-            <TableHead>{t('audit.entity')}</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((entry) => (
-            <Fragment key={entry.id}>
-              <TableRow>
-                <TableCell>{formatUbDateTime(Date.parse(entry.occurredAt))}</TableCell>
-                <TableCell>
-                  <Actor entry={entry} />
-                </TableCell>
-                <TableCell>
-                  <ActionLabel action={entry.action} />
-                </TableCell>
-                <TableCell>
-                  <EntityLabel entity={entry.entity} />
-                  {` #${entry.entityId}`}
-                </TableCell>
-                <TableCell>
-                  {entry.before !== null || entry.after !== null ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setOpen(open === entry.id ? null : entry.id)}
-                    >
-                      {t('audit.details')}
-                    </Button>
-                  ) : null}
-                </TableCell>
-              </TableRow>
-              {open === entry.id ? (
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('audit.time')}</TableHead>
+              <TableHead>{t('audit.actor')}</TableHead>
+              <TableHead>{t('audit.action')}</TableHead>
+              <TableHead>{t('audit.entity')}</TableHead>
+              <TableHead>
+                <span className="sr-only">{t('audit.details')}</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {audit.isPending ? <SkeletonRows columns={5} /> : null}
+            {rows.map((entry) => (
+              <Fragment key={entry.id}>
                 <TableRow>
-                  <TableCell colSpan={5}>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <div>
-                        <p className="text-xs font-medium">{t('audit.before')}</p>
-                        <pre className="max-h-64 overflow-auto rounded bg-muted p-2 text-xs">
-                          {JSON.stringify(entry.before, null, 2)}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium">{t('audit.after')}</p>
-                        <pre className="max-h-64 overflow-auto rounded bg-muted p-2 text-xs">
-                          {JSON.stringify(entry.after, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
+                  <TableCell className="font-mono">
+                    {formatUbDateTime(Date.parse(entry.occurredAt))}
+                  </TableCell>
+                  <TableCell>
+                    <Actor entry={entry} />
+                  </TableCell>
+                  <TableCell>
+                    <ActionLabel action={entry.action} />
+                  </TableCell>
+                  <TableCell className="min-w-64 whitespace-normal">
+                    <EntityLabel entity={entry.entity} />
+                    {/* Session ids are long UUIDs: they wrap (in two lines at most) instead of
+                        pushing the details off the card. */}
+                    <span className="font-mono break-all text-muted-foreground">{` #${entry.entityId}`}</span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {entry.before !== null || entry.after !== null ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-link"
+                        aria-expanded={open === entry.id}
+                        onClick={() => setOpen(open === entry.id ? null : entry.id)}
+                      >
+                        {t('audit.details')}
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
-              ) : null}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table>
-      {!audit.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('audit.empty')}</p>
-      ) : null}
-      {audit.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={audit.isFetchingNextPage}
-          onClick={() => void audit.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+                {open === entry.id ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="whitespace-normal">
+                      <div className="grid gap-3 pb-1 md:grid-cols-2">
+                        <div>
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">
+                            {t('audit.before')}
+                          </p>
+                          <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-2.5 text-xs whitespace-pre-wrap wrap-anywhere">
+                            {JSON.stringify(entry.before, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">
+                            {t('audit.after')}
+                          </p>
+                          <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-2.5 text-xs whitespace-pre-wrap wrap-anywhere">
+                            {JSON.stringify(entry.after, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
+        {!audit.isPending && rows.length === 0 ? (
+          <EmptyState icon={ScrollText} title={t('audit.empty')} />
+        ) : null}
+        <LoadMore query={audit} />
+      </ListCard>
     </div>
   );
 }

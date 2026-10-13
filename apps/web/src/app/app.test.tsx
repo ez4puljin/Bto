@@ -7,7 +7,8 @@ describe('web shell', () => {
   it('renders the shell in Mongolian for a signed-in user', async () => {
     renderApp('/', signedIn());
     expect(await screen.findByRole('link', { name: mn.app.name })).toBeInTheDocument();
-    expect(mn.app.name).toMatch(/[Ѐ-ӿ]/u);
+    // The brand is «Bto» (owner, 2026-10-13); the menu around it is Mongolian.
+    expect(mn.nav.systemStatus).toMatch(/[Ѐ-ӿ]/u);
     expect(screen.getByRole('link', { name: mn.nav.systemStatus })).toBeInTheDocument();
   });
 

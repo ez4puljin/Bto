@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronHead, LinkRow } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
-import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import {
   Table,
   TableBody,
@@ -23,23 +23,22 @@ export type ProductTableContext = Omit<ProductCellContext, 'suppliers' | 'locati
 /**
  * The product list (ADR-0037): one body for every loaded page; each page reads the supplier links
  * and locations of its own products, only while a column shows them. Rows open the product
- * (`RecordRow`).
+ * (`LinkRow`, ADR-0042).
  */
 export const ProductTable = memo(function ProductTable(props: {
   pages: readonly { data: ProductListItem[] }[];
   columns: readonly ProductColumn[];
   context: ProductTableContext;
-  canManage: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <RecordActionsHead />
           {props.columns.map((column) => (
             <TableHead key={column.key}>{t(`catalog.products.columns.${column.key}`)}</TableHead>
           ))}
+          <ChevronHead />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -50,7 +49,6 @@ export const ProductTable = memo(function ProductTable(props: {
             rows={page.data}
             columns={props.columns}
             context={props.context}
-            canManage={props.canManage}
           />
         ))}
       </TableBody>
@@ -62,9 +60,8 @@ const ProductPageRows = memo(function ProductPageRows(props: {
   rows: ProductListItem[];
   columns: readonly ProductColumn[];
   context: ProductTableContext;
-  canManage: boolean;
 }) {
-  const { rows, columns, context, canManage } = props;
+  const { rows, columns, context } = props;
   const ids = useMemo(() => rows.map((row) => row.id), [rows]);
   const suppliers = useProductSuppliersOf(
     ids,
@@ -102,18 +99,13 @@ const ProductPageRows = memo(function ProductPageRows(props: {
         </TableRow>
       ) : null}
       {rows.map((row) => (
-        <RecordRow
-          key={row.id}
-          href={`/catalog/products/${row.id}`}
-          name={row.name}
-          canManage={canManage}
-        >
+        <LinkRow key={row.id} to={`/catalog/products/${row.id}`}>
           {columns.map((column) => (
             <TableCell key={column.key} className={column.className}>
               {column.cell(row, cellContext)}
             </TableCell>
           ))}
-        </RecordRow>
+        </LinkRow>
       ))}
     </>
   );

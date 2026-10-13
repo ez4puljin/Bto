@@ -1,14 +1,21 @@
-import { X } from 'lucide-react';
+import { History } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import {
+  DateFilter,
+  EmptyState,
+  FilterBar,
+  FilterChip,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -105,83 +112,77 @@ export function MovementsPage() {
     );
   };
 
+  const columns = 7 + (withBalances ? 2 : 0) + (canSeeCosts ? 2 : 0);
+
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('inventory.movements.title')} />
-      <p className="-mt-2 text-sm text-muted-foreground">{t('inventory.movements.intro')}</p>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="flex flex-col gap-2">
+    <div>
+      <PageHeader
+        title={t('inventory.movements.title')}
+        meta={<p className="max-w-3xl">{t('inventory.movements.intro')}</p>}
+      />
+      {productId === undefined ? (
+        <div className="mb-3 flex flex-col gap-2">
           <Label>{t('inventory.movements.product')}</Label>
-          {productId === undefined ? (
-            <ProductSearch
-              pickLabel={t('inventory.movements.pick')}
-              onPick={(picked) => update({ product: String(picked.id) })}
-            />
-          ) : (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-mono text-muted-foreground">{product.data?.product.sku}</span>
-              <span className="font-medium">{product.data?.product.name}</span>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={t('inventory.movements.clearProduct')}
-                onClick={() => update({ product: undefined })}
-              >
-                <X />
-              </Button>
-            </div>
-          )}
-        </div>
-        <div className="grid content-start gap-2 sm:grid-cols-2">
-          <WarehouseSelect
-            options={warehouses.options}
-            value={warehouseId}
-            emptyLabel={t('inventory.allWarehouses')}
-            onChange={(id) =>
-              update({ warehouse: id === undefined ? undefined : String(id), bin: undefined })
-            }
+          <ProductSearch
+            pickLabel={t('inventory.movements.pick')}
+            onPick={(picked) => update({ product: String(picked.id) })}
           />
-          <NativeSelect
-            aria-label={t('inventory.movements.docType')}
-            value={docType ?? ''}
-            onChange={(event) => update({ doc: event.target.value || undefined })}
+        </div>
+      ) : null}
+      <FilterBar>
+        {productId !== undefined ? (
+          <FilterChip
+            clearLabel={t('inventory.movements.clearProduct')}
+            onClear={() => update({ product: undefined })}
           >
-            <option value="">{t('inventory.movements.allDocTypes')}</option>
-            {DOC_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {t(`inventory.movements.docTypes.${type}`)}
-              </option>
-            ))}
-          </NativeSelect>
-          <Input
-            type="date"
-            aria-label={t('inventory.movements.from')}
-            value={from ?? ''}
-            onChange={(event) => update({ from: event.target.value || undefined })}
-          />
-          <Input
-            type="date"
-            aria-label={t('inventory.movements.to')}
-            value={to ?? ''}
-            onChange={(event) => update({ to: event.target.value || undefined })}
-          />
-        </div>
-      </div>
-      {binId !== undefined ? (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">{t('inventory.movements.bin')}</span>
-          <span className="font-mono font-medium">{bin.data?.code}</span>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t('inventory.movements.clearBin')}
-            onClick={() => update({ bin: undefined })}
+            <span className="font-mono text-muted-foreground">{product.data?.product.sku}</span>{' '}
+            <span>{product.data?.product.name}</span>
+          </FilterChip>
+        ) : null}
+        <WarehouseSelect
+          variant="filter"
+          options={warehouses.options}
+          value={warehouseId}
+          emptyLabel={t('inventory.allWarehouses')}
+          onChange={(id) =>
+            update({ warehouse: id === undefined ? undefined : String(id), bin: undefined })
+          }
+        />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('inventory.movements.docType')}
+          value={docType ?? ''}
+          onChange={(event) => update({ doc: event.target.value || undefined })}
+        >
+          <option value="">{t('inventory.movements.allDocTypes')}</option>
+          {DOC_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(`inventory.movements.docTypes.${type}`)}
+            </option>
+          ))}
+        </NativeSelect>
+        <DateFilter
+          label={t('inventory.movements.from')}
+          value={from}
+          onChange={(value) => update({ from: value })}
+        />
+        <DateFilter
+          label={t('inventory.movements.to')}
+          value={to}
+          onChange={(value) => update({ to: value })}
+        />
+        {binId !== undefined ? (
+          <FilterChip
+            clearLabel={t('inventory.movements.clearBin')}
+            onClear={() => update({ bin: undefined })}
           >
-            <X />
-          </Button>
-        </div>
-      ) : warehouseId !== undefined ? (
-        <div className="flex flex-col gap-1">
+            <span className="text-muted-foreground">{t('inventory.movements.bin')}</span>{' '}
+            <span className="font-mono">{bin.data?.code}</span>
+          </FilterChip>
+        ) : null}
+      </FilterBar>
+      {binId === undefined && warehouseId !== undefined ? (
+        <div className="mb-4 flex flex-col gap-1">
           <ScanBox
             letters
             label={t('inventory.movements.bin')}
@@ -196,132 +197,128 @@ export function MovementsPage() {
         </div>
       ) : null}
       <ProblemAlert problem={problemFromError(movements.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.movements.columns.postedAt')}</TableHead>
-            <TableHead>{t('inventory.movements.columns.document')}</TableHead>
-            <TableHead>{t('inventory.movements.columns.movement')}</TableHead>
-            <TableHead>{t('inventory.movements.columns.warehouse')}</TableHead>
-            <TableHead>{t('inventory.movements.columns.bin')}</TableHead>
-            <TableHead>{t('inventory.movements.columns.product')}</TableHead>
-            <TableHead className="text-right">{t('inventory.movements.columns.qty')}</TableHead>
-            {withBalances ? (
-              <>
-                <TableHead className="text-right">
-                  {t('inventory.movements.columns.warehouseBalance')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('inventory.movements.columns.binBalance')}
-                </TableHead>
-              </>
-            ) : null}
-            {canSeeCosts ? (
-              <>
-                <TableHead className="text-right">
-                  {t('inventory.movements.columns.unitCost')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('inventory.movements.columns.value')}
-                </TableHead>
-              </>
-            ) : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => {
-            const docPage = DOC_PAGES[row.docType];
-            const number = row.docNumber ?? t('common.none');
-            return (
-              <TableRow key={row.id}>
-                <TableCell className="font-mono">
-                  {formatUbDateTime(Date.parse(row.postedAt))}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="text-muted-foreground">
-                      {t(`inventory.movements.docTypes.${row.docType}`)}
-                    </span>
-                    {docPage ? (
-                      <Link
-                        to={`${docPage}/${row.docId}`}
-                        className="font-mono underline-offset-4 hover:underline"
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.movements.columns.postedAt')}</TableHead>
+              <TableHead>{t('inventory.movements.columns.document')}</TableHead>
+              <TableHead>{t('inventory.movements.columns.movement')}</TableHead>
+              <TableHead>{t('inventory.movements.columns.warehouse')}</TableHead>
+              <TableHead>{t('inventory.movements.columns.bin')}</TableHead>
+              <TableHead>{t('inventory.movements.columns.product')}</TableHead>
+              <TableHead className="text-right">{t('inventory.movements.columns.qty')}</TableHead>
+              {withBalances ? (
+                <>
+                  <TableHead className="text-right">
+                    {t('inventory.movements.columns.warehouseBalance')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('inventory.movements.columns.binBalance')}
+                  </TableHead>
+                </>
+              ) : null}
+              {canSeeCosts ? (
+                <>
+                  <TableHead className="text-right">
+                    {t('inventory.movements.columns.unitCost')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('inventory.movements.columns.value')}
+                  </TableHead>
+                </>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {movements.isPending ? <SkeletonRows columns={columns} /> : null}
+            {rows.map((row) => {
+              const docPage = DOC_PAGES[row.docType];
+              const number = row.docNumber ?? t('common.none');
+              return (
+                <TableRow key={row.id}>
+                  <TableCell className="font-mono">
+                    {formatUbDateTime(Date.parse(row.postedAt))}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">
+                        {t(`inventory.movements.docTypes.${row.docType}`)}
+                      </span>
+                      {docPage ? (
+                        <Link
+                          to={`${docPage}/${row.docId}`}
+                          className="font-mono text-link underline-offset-4 hover:underline"
+                        >
+                          {number}
+                        </Link>
+                      ) : (
+                        <span className="font-mono">{number}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{t(`inventory.movements.types.${row.movementType}`)}</TableCell>
+                  <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+                  <TableCell className="font-mono">{row.binCode}</TableCell>
+                  <TableCell className="min-w-48 whitespace-normal">
+                    <Link
+                      to={`/inventory/stock/${row.product.id}`}
+                      className="text-link underline-offset-4 hover:underline"
+                    >
+                      <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
+                      {row.product.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    <div className="flex flex-col items-end">
+                      <span
+                        className={row.qtyBase.startsWith('-') ? 'text-destructive' : undefined}
                       >
-                        {number}
-                      </Link>
-                    ) : (
-                      <span className="font-mono">{number}</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{t(`inventory.movements.types.${row.movementType}`)}</TableCell>
-                <TableCell>{warehouseName(row.warehouseId)}</TableCell>
-                <TableCell className="font-mono">{row.binCode}</TableCell>
-                <TableCell className="min-w-48 whitespace-normal">
-                  <Link
-                    to={`/inventory/stock/${row.product.id}`}
-                    className="underline-offset-4 hover:underline"
-                  >
-                    <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
-                    {row.product.name}
-                  </Link>
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  <div className="flex flex-col items-end">
-                    <span className={row.qtyBase.startsWith('-') ? 'text-destructive' : undefined}>
-                      {t('inventory.qtyWithUnit', {
-                        qty: signed(row.qtyBase),
-                        unit: row.product.baseUnitName,
-                      })}
-                    </span>
-                    {row.unitName !== row.product.baseUnitName ? (
-                      <span className="text-xs text-muted-foreground">
-                        {t('inventory.movements.entered', {
-                          qty: row.enteredQty,
-                          unit: row.unitName,
+                        {t('inventory.qtyWithUnit', {
+                          qty: signed(row.qtyBase),
+                          unit: row.product.baseUnitName,
                         })}
                       </span>
-                    ) : null}
-                  </div>
-                </TableCell>
-                {withBalances ? (
-                  <>
-                    <TableCell className="text-right font-mono">
-                      {row.warehouseBalance ?? t('common.none')}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.binBalance ?? t('common.none')}
-                    </TableCell>
-                  </>
-                ) : null}
-                {canSeeCosts ? (
-                  <>
-                    <TableCell className="text-right font-mono">
-                      {row.unitCost === undefined ? t('common.none') : formatMnt(row.unitCost)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.value === undefined ? t('common.none') : formatMnt(row.value)}
-                    </TableCell>
-                  </>
-                ) : null}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-      {!movements.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('inventory.movements.empty')}</p>
-      ) : null}
-      {movements.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={movements.isFetchingNextPage}
-          onClick={() => void movements.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+                      {row.unitName !== row.product.baseUnitName ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t('inventory.movements.entered', {
+                            qty: row.enteredQty,
+                            unit: row.unitName,
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  {withBalances ? (
+                    <>
+                      <TableCell className="text-right font-mono">
+                        {row.warehouseBalance ?? t('common.none')}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {row.binBalance ?? t('common.none')}
+                      </TableCell>
+                    </>
+                  ) : null}
+                  {canSeeCosts ? (
+                    <>
+                      <TableCell className="text-right font-mono">
+                        {row.unitCost === undefined ? t('common.none') : formatMnt(row.unitCost)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {row.value === undefined ? t('common.none') : formatMnt(row.value)}
+                      </TableCell>
+                    </>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        {!movements.isPending && rows.length === 0 ? (
+          <EmptyState icon={History} title={t('inventory.movements.empty')} />
+        ) : null}
+        <LoadMore query={movements} />
+      </ListCard>
     </div>
   );
 }

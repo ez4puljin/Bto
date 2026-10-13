@@ -4,7 +4,7 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, type Me, renderApp, signedIn } from '@/test/render-app';
+import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-13T02:00:00.000Z';
@@ -112,13 +112,13 @@ const bodyOf = async (request: Request | undefined) =>
 describe('stocktakes menu', () => {
   it('shows stocktakes to the warehouse, not to accountants', async () => {
     renderApp('/system/status', signedIn(WAREHOUSE_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.stocktakes })).toBeInTheDocument();
   });
 
   it('keeps the entry from accountants', async () => {
     renderApp('/system/status', signedIn(ACCOUNTANT_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).queryByRole('link', { name: mn.nav.stocktakes })).toBeNull();
   });
 });
@@ -134,14 +134,19 @@ describe('a new stocktake', () => {
       'POST /api/v1/stocktakes': () => json(draft, 201),
       'GET /api/v1/stocktakes/5': () => json(draft),
     });
-    renderApp('/inventory/stocktakes', fetchMock);
+    const { router } = renderApp('/inventory/stocktakes', fetchMock);
     const user = userEvent.setup();
+    // The draft is made in a dialog opened from the page header; it lives in the address, so the
+    // home page's shortcut (`?new=1`) opens it too (ADR-0042).
+    await user.click(await screen.findByRole('button', { name: mn.inventory.stocktake.newTitle }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(router.state.location.search).toBe('?new=1');
     // The worker writes for one warehouse only: it is chosen already.
-    const prefix = await screen.findByRole('textbox', { name: mn.inventory.stocktake.prefix });
+    const prefix = await dialog.findByRole('textbox', { name: mn.inventory.stocktake.prefix });
     await user.type(prefix, 'a-01');
-    expect(await screen.findByText('2 тавиур: A-01-01 … A-01-02')).toBeInTheDocument();
+    expect(await dialog.findByText('2 тавиур: A-01-01 … A-01-02')).toBeInTheDocument();
     expect(
-      screen.getByText('1 нь өөр тооллогод тоологдож байгаа тул эхлүүлэх боломжгүй'),
+      dialog.getByText('1 нь өөр тооллогод тоологдож байгаа тул эхлүүлэх боломжгүй'),
     ).toBeInTheDocument();
     const preview = calls(fetchMock, 'GET', '/api/v1/stocktakes/bin-preview').at(-1);
     expect(Object.fromEntries(new URL(preview!.url).searchParams)).toEqual({
@@ -149,8 +154,9 @@ describe('a new stocktake', () => {
       prefix: 'a-01',
     });
 
-    await user.click(screen.getByRole('button', { name: mn.inventory.stocktake.createDraft }));
+    await user.click(dialog.getByRole('button', { name: mn.inventory.stocktake.createDraft }));
     expect(await screen.findByRole('heading', { name: 'Тооллого №5' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/inventory/stocktakes/5');
     const created = calls(fetchMock, 'POST', '/api/v1/stocktakes');
     expect(created).toHaveLength(1);
     expect(await bodyOf(created[0])).toEqual({ warehouseId: 1, prefix: 'a-01' });

@@ -1,7 +1,9 @@
+import { Move } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
@@ -20,6 +22,7 @@ import {
 import { useBarcodeLookup } from '@/features/catalog/api';
 import { problemFromError } from '@/lib/problem';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type Bin, useBinLookup, useBinMoves, useInventoryMutations } from './api';
@@ -63,54 +66,52 @@ export function BinMovesPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div>
       <PageHeader title={t('inventory.moves.title')} />
-      <WarehouseSelect
-        className="max-w-xs"
-        options={warehouses.options}
-        value={warehouseId}
-        emptyLabel={canMove ? t('inventory.pickWarehouse') : t('inventory.allWarehouses')}
-        onChange={setWarehouse}
-      />
+      <FilterBar>
+        <WarehouseSelect
+          variant="filter"
+          options={warehouses.options}
+          value={warehouseId}
+          emptyLabel={canMove ? t('inventory.pickWarehouse') : t('inventory.allWarehouses')}
+          onChange={setWarehouse}
+        />
+      </FilterBar>
       {canMove && warehouseId !== undefined ? (
-        <MoveForm key={warehouseId} warehouseId={warehouseId} />
+        <div className="mb-4">
+          <MoveForm key={warehouseId} warehouseId={warehouseId} />
+        </div>
       ) : null}
       <ProblemAlert problem={problemFromError(moves.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.number')}</TableHead>
-            <TableHead>{t('inventory.date')}</TableHead>
-            <TableHead>{t('inventory.warehouse')}</TableHead>
-            <TableHead className="text-right">{t('inventory.lines')}</TableHead>
-            <TableHead>{t('inventory.note')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((move) => (
-            <TableRow key={move.id}>
-              <TableCell className="font-mono">{move.number}</TableCell>
-              <TableCell className="font-mono">{move.effectiveDate}</TableCell>
-              <TableCell>{warehouseName(move.warehouseId)}</TableCell>
-              <TableCell className="text-right font-mono">{move.lineCount}</TableCell>
-              <TableCell className="whitespace-normal">{move.note ?? t('common.none')}</TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.number')}</TableHead>
+              <TableHead>{t('inventory.date')}</TableHead>
+              <TableHead>{t('inventory.warehouse')}</TableHead>
+              <TableHead className="text-right">{t('inventory.lines')}</TableHead>
+              <TableHead>{t('inventory.note')}</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!moves.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('inventory.moves.empty')}</p>
-      ) : null}
-      {moves.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={moves.isFetchingNextPage}
-          onClick={() => void moves.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {moves.isPending ? <SkeletonRows columns={5} /> : null}
+            {rows.map((move) => (
+              <TableRow key={move.id}>
+                <TableCell className="font-mono">{move.number}</TableCell>
+                <TableCell className="font-mono">{move.effectiveDate}</TableCell>
+                <TableCell>{warehouseName(move.warehouseId)}</TableCell>
+                <TableCell className="text-right font-mono">{move.lineCount}</TableCell>
+                <TableCell className="whitespace-normal">{move.note ?? t('common.none')}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!moves.isPending && rows.length === 0 ? (
+          <EmptyState icon={Move} title={t('inventory.moves.empty')} />
+        ) : null}
+        <LoadMore query={moves} />
+      </ListCard>
     </div>
   );
 }
@@ -132,7 +133,6 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
   const [qty, setQty] = useState('1');
   const [lines, setLines] = useState<PendingLine[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
   const guard = useScanGuard((code) => onScan(code), { letters: true });
 
   const reset = () => {
@@ -146,7 +146,6 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
   function onScan(code: string) {
     void action.run(async () => {
       setMissing(null);
-      setDone(null);
       const findBin = async () => {
         try {
           return await lookupBin.mutateAsync({ warehouseId, code });
@@ -206,7 +205,7 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
       });
       setKey(randomUuid());
       reset();
-      setDone(move.number);
+      toast.success(t('inventory.moves.done', { number: move.number }));
     });
 
   return (
@@ -226,9 +225,6 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
           <p className="text-sm text-destructive">
             {t('inventory.scanNotFound', { code: missing })}
           </p>
-        ) : null}
-        {done ? (
-          <p className="text-sm text-emerald-700">{t('inventory.moves.done', { number: done })}</p>
         ) : null}
         <ProblemAlert problem={action.problem} />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

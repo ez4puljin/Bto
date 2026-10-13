@@ -1,10 +1,21 @@
 import { Decimal } from '@tugeel/shared/money';
-import { Plus } from 'lucide-react';
+import { PackagePlus, Plus } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -12,7 +23,6 @@ import { ScanBox } from '@/components/scan-box';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -102,9 +112,8 @@ export function ReceiptsPage() {
           ) : null
         }
       />
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input
-          type="search"
+      <FilterBar>
+        <SearchField
           aria-label={t('common.search')}
           placeholder={t('inventory.receipts.searchPlaceholder')}
           value={search}
@@ -114,12 +123,14 @@ export function ReceiptsPage() {
           }}
         />
         <WarehouseSelect
+          variant="filter"
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={t('inventory.allWarehouses')}
           onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('inventory.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -132,74 +143,65 @@ export function ReceiptsPage() {
           ))}
         </NativeSelect>
         {canCost ? (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="receipts-costing"
-              checked={costingPending}
-              onCheckedChange={(checked) => setParam('costing', checked === true ? 'pending' : '')}
-            />
-            <Label htmlFor="receipts-costing">{t('inventory.receipts.costingPending')}</Label>
-          </div>
+          <FilterToggle
+            label={t('inventory.receipts.costingPending')}
+            checked={costingPending}
+            onCheckedChange={(checked) => setParam('costing', checked ? 'pending' : '')}
+          />
         ) : null}
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(receipts.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.number')}</TableHead>
-            <TableHead>{t('inventory.date')}</TableHead>
-            <TableHead>{t('inventory.warehouse')}</TableHead>
-            <TableHead>{t('inventory.receipts.supplier')}</TableHead>
-            <TableHead>{t('inventory.receipts.supplierDoc')}</TableHead>
-            <TableHead className="text-right">{t('inventory.lines')}</TableHead>
-            <TableHead>{t('inventory.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((receipt) => (
-            <TableRow key={receipt.id}>
-              <TableCell className="font-mono">
-                <Link
-                  to={`/inventory/receipts/${receipt.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {receipt.number ?? t('inventory.draftNo', { id: receipt.id })}
-                </Link>
-              </TableCell>
-              <TableCell className="font-mono">
-                {receipt.effectiveDate ?? t('common.none')}
-              </TableCell>
-              <TableCell>{warehouseName(receipt.warehouseId)}</TableCell>
-              <TableCell className="whitespace-normal">{receipt.supplierName}</TableCell>
-              <TableCell className="font-mono">
-                {receipt.supplierDocNo ?? t('common.none')}
-              </TableCell>
-              <TableCell className="text-right font-mono">{receipt.lineCount}</TableCell>
-              <TableCell className="flex flex-wrap gap-1">
-                <DocStatusBadge status={receipt.status} />
-                {receipt.costingStatus ? (
-                  <Badge variant={receipt.costingStatus === 'PENDING' ? 'default' : 'outline'}>
-                    {t(`inventory.costingStatus.${receipt.costingStatus}`)}
-                  </Badge>
-                ) : null}
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.number')}</TableHead>
+              <TableHead>{t('inventory.date')}</TableHead>
+              <TableHead>{t('inventory.warehouse')}</TableHead>
+              <TableHead>{t('inventory.receipts.supplier')}</TableHead>
+              <TableHead>{t('inventory.receipts.supplierDoc')}</TableHead>
+              <TableHead className="text-right">{t('inventory.lines')}</TableHead>
+              <TableHead>{t('inventory.status')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!receipts.isPending && rows.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('inventory.receipts.empty')}</p>
-      ) : null}
-      {receipts.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={receipts.isFetchingNextPage}
-          onClick={() => void receipts.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {receipts.isPending ? <SkeletonRows columns={8} /> : null}
+            {rows.map((receipt) => (
+              <LinkRow key={receipt.id} to={`/inventory/receipts/${receipt.id}`}>
+                <TableCell className="font-mono">
+                  <Link to={`/inventory/receipts/${receipt.id}`} className="font-medium">
+                    {receipt.number ?? t('inventory.draftNo', { id: receipt.id })}
+                  </Link>
+                </TableCell>
+                <TableCell className="font-mono">
+                  {receipt.effectiveDate ?? t('common.none')}
+                </TableCell>
+                <TableCell>{warehouseName(receipt.warehouseId)}</TableCell>
+                <TableCell className="whitespace-normal">{receipt.supplierName}</TableCell>
+                <TableCell className="font-mono">
+                  {receipt.supplierDocNo ?? t('common.none')}
+                </TableCell>
+                <TableCell className="text-right font-mono">{receipt.lineCount}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <DocStatusBadge status={receipt.status} />
+                    {receipt.costingStatus ? (
+                      <Badge variant={receipt.costingStatus === 'PENDING' ? 'default' : 'outline'}>
+                        {t(`inventory.costingStatus.${receipt.costingStatus}`)}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!receipts.isPending && rows.length === 0 ? (
+          <EmptyState icon={PackagePlus} title={t('inventory.receipts.empty')} />
+        ) : null}
+        <LoadMore query={receipts} />
+      </ListCard>
     </div>
   );
 }
@@ -235,16 +237,9 @@ export function ReceiptCreatePage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('inventory.receipt.newTitle')}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/inventory/receipts">{t('common.back')}</Link>
-          </Button>
-        }
-      />
-      <Card>
-        <CardContent className="flex max-w-xl flex-col gap-4">
+      <PageHeader title={t('inventory.receipt.newTitle')} />
+      <Card className="max-w-xl">
+        <CardContent className="flex flex-col gap-4">
           <ProblemAlert problem={action.problem ?? problemFromError(warehouses.error)} />
           <div className="flex flex-col gap-2">
             <Label>{t('inventory.warehouse')}</Label>
@@ -370,39 +365,36 @@ export function ReceiptPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.number ?? t('inventory.draftNo', { id: detail.id })}
-        actions={
+        meta={
           <>
-            {detail.status === 'POSTED' && canCost ? (
-              <Button asChild>
-                <Link to={`/inventory/receipts/${detail.id}/costing`}>
-                  {detail.costingStatus === 'COSTED'
-                    ? t('inventory.receipt.recost')
-                    : t('inventory.receipt.cost')}
-                </Link>
-              </Button>
+            <DocStatusBadge status={detail.status} />
+            {detail.costingStatus ? (
+              <Badge variant={detail.costingStatus === 'PENDING' ? 'default' : 'outline'}>
+                {t(`inventory.costingStatus.${detail.costingStatus}`)}
+              </Badge>
             ) : null}
-            <Button variant="outline" asChild>
-              <Link to="/inventory/receipts">{t('common.back')}</Link>
-            </Button>
+            <span className="text-foreground">{warehouseName(detail.warehouseId)}</span>
+            <span>{detail.supplierName}</span>
+            {detail.supplierDocNo ? (
+              <span className="font-mono">{detail.supplierDocNo}</span>
+            ) : null}
+            {detail.effectiveDate ? (
+              <span className="font-mono">{detail.effectiveDate}</span>
+            ) : null}
           </>
         }
+        actions={
+          detail.status === 'POSTED' && canCost ? (
+            <Button asChild>
+              <Link to={`/inventory/receipts/${detail.id}/costing`}>
+                {detail.costingStatus === 'COSTED'
+                  ? t('inventory.receipt.recost')
+                  : t('inventory.receipt.cost')}
+              </Link>
+            </Button>
+          ) : null
+        }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <DocStatusBadge status={detail.status} />
-        {detail.costingStatus ? (
-          <Badge variant={detail.costingStatus === 'PENDING' ? 'default' : 'outline'}>
-            {t(`inventory.costingStatus.${detail.costingStatus}`)}
-          </Badge>
-        ) : null}
-        <span>{warehouseName(detail.warehouseId)}</span>
-        <span className="text-muted-foreground">{detail.supplierName}</span>
-        {detail.supplierDocNo ? (
-          <span className="font-mono text-muted-foreground">{detail.supplierDocNo}</span>
-        ) : null}
-        {detail.effectiveDate ? (
-          <span className="font-mono text-muted-foreground">{detail.effectiveDate}</span>
-        ) : null}
-      </div>
       {detail.status === 'DRAFT' && canManage ? (
         <ReceiptEditor key={detail.id} detail={detail} />
       ) : (

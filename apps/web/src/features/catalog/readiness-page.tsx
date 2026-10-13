@@ -1,10 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CircleCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { z } from 'zod';
 import { FieldError } from '@/components/field-error';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -63,8 +73,7 @@ export function ReadinessPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t('catalog.readiness.title')} />
-      <p className="-mt-2 text-sm text-muted-foreground">{t('catalog.readiness.hint')}</p>
+      <PageHeader title={t('catalog.readiness.title')} meta={t('catalog.readiness.hint')} />
       <ProblemAlert problem={problemFromError(report.error ?? products.error)} />
       {report.data ? (
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -88,8 +97,9 @@ export function ReadinessPage() {
 
       <AssignCard categories={categories.data ?? []} />
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <FilterBar className="mb-0">
         <NativeSelect
+          variant="filter"
           aria-label={t('catalog.readiness.missing')}
           value={gap ?? ''}
           onChange={(event) => setGap(isGap(event.target.value) ? event.target.value : undefined)}
@@ -102,6 +112,7 @@ export function ReadinessPage() {
           ))}
         </NativeSelect>
         <NativeSelect
+          variant="filter"
           aria-label={t('catalog.readiness.category')}
           value={categoryId === undefined ? '' : String(categoryId)}
           onChange={(event) =>
@@ -115,56 +126,49 @@ export function ReadinessPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('catalog.products.columns.sku')}</TableHead>
-            <TableHead>{t('catalog.products.columns.name')}</TableHead>
-            <TableHead>{t('catalog.products.columns.category')}</TableHead>
-            <TableHead>{t('catalog.readiness.missing')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.product.id}>
-              <TableCell className="font-mono">{row.product.sku}</TableCell>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/catalog/products/${row.product.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {row.product.name}
-                </Link>
-              </TableCell>
-              <TableCell className="whitespace-normal text-muted-foreground">
-                {paths.get(row.product.categoryId) ?? t('common.none')}
-              </TableCell>
-              <TableCell className="flex flex-wrap gap-1 whitespace-normal">
-                {row.missing.map((item) => (
-                  <Badge key={item} variant="outline">
-                    {t(`catalog.readiness.gaps.${item}`)}
-                  </Badge>
-                ))}
-              </TableCell>
+      </FilterBar>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('catalog.products.columns.sku')}</TableHead>
+              <TableHead>{t('catalog.products.columns.name')}</TableHead>
+              <TableHead>{t('catalog.products.columns.category')}</TableHead>
+              <TableHead>{t('catalog.readiness.missing')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!products.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('catalog.readiness.empty')}</p>
-      ) : null}
-      {products.hasNextPage ? (
-        <div>
-          <Button
-            variant="outline"
-            disabled={products.isFetchingNextPage}
-            onClick={() => void products.fetchNextPage()}
-          >
-            {t('common.loadMore')}
-          </Button>
-        </div>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {products.isPending ? <SkeletonRows columns={5} /> : null}
+            {rows.map((row) => (
+              <LinkRow key={row.product.id} to={`/catalog/products/${row.product.id}`}>
+                <TableCell className="font-mono">{row.product.sku}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <Link to={`/catalog/products/${row.product.id}`} className="font-medium">
+                    {row.product.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="whitespace-normal text-muted-foreground">
+                  {paths.get(row.product.categoryId) ?? t('common.none')}
+                </TableCell>
+                <TableCell className="whitespace-normal">
+                  <div className="flex flex-wrap gap-1">
+                    {row.missing.map((item) => (
+                      <Badge key={item} variant="warning">
+                        {t(`catalog.readiness.gaps.${item}`)}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!products.isPending && rows.length === 0 ? (
+          <EmptyState icon={CircleCheck} title={t('catalog.readiness.empty')} />
+        ) : null}
+        <LoadMore query={products} />
+      </ListCard>
     </div>
   );
 }

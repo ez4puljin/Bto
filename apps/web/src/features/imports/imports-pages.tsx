@@ -1,9 +1,19 @@
 import { IMPORT_COLUMNS, IMPORT_KINDS, type ImportKind } from '@tugeel/shared/imports';
-import { Download, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, ListChecks, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SegmentedControl,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -43,7 +53,7 @@ function StatusBadge({ status }: { status: ImportStatus }) {
   const { t } = useTranslation();
   const variant =
     status === 'COMMITTED' || status === 'VALIDATED'
-      ? 'secondary'
+      ? 'success'
       : status === 'INVALID' || status === 'FAILED'
         ? 'destructive'
         : RUNNING.includes(status)
@@ -52,6 +62,7 @@ function StatusBadge({ status }: { status: ImportStatus }) {
   return <Badge variant={variant}>{t(`imports.statuses.${status}`)}</Badge>;
 }
 
+/** The rows filter as a segmented control (ADR-0042); still tabs for keyboards and tests. */
 /** Imports (ADR-0036): a card per kind for the template and the upload, then the history. */
 export function ImportsPage() {
   const { t } = useTranslation();
@@ -59,62 +70,61 @@ export function ImportsPage() {
   const rows = imports.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('imports.title')} />
-      <p className="text-sm text-muted-foreground">{t('imports.intro')}</p>
-      <div className="grid gap-3 md:grid-cols-2">
+    <div>
+      <PageHeader
+        title={t('imports.title')}
+        meta={<p className="max-w-3xl">{t('imports.intro')}</p>}
+      />
+      <div className="grid gap-4 md:grid-cols-2">
         {IMPORT_KINDS.map((kind) => (
           <ImportKindCard key={kind} kind={kind} />
         ))}
       </div>
-      <h2 className="text-lg font-semibold">{t('imports.history')}</h2>
+      <h2 className="mt-8 mb-3 text-[17px] leading-tight font-semibold tracking-tight">
+        {t('imports.history')}
+      </h2>
       <ProblemAlert problem={problemFromError(imports.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('imports.fileName')}</TableHead>
-            <TableHead>{t('imports.kind')}</TableHead>
-            <TableHead className="text-right">{t('imports.rows')}</TableHead>
-            <TableHead>{t('imports.createdAt')}</TableHead>
-            <TableHead>{t('imports.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((job) => (
-            <TableRow key={job.id}>
-              <TableCell className="whitespace-normal">
-                <Link
-                  to={`/imports/${job.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {job.fileName}
-                </Link>
-              </TableCell>
-              <TableCell>{t(`imports.kinds.${job.kind}`)}</TableCell>
-              <TableCell className="text-right font-mono">{job.totalRows}</TableCell>
-              <TableCell className="font-mono">
-                {formatUbDateTime(Date.parse(job.createdAt))}
-              </TableCell>
-              <TableCell>
-                <StatusBadge status={job.status} />
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('imports.fileName')}</TableHead>
+              <TableHead>{t('imports.kind')}</TableHead>
+              <TableHead className="text-right">{t('imports.rows')}</TableHead>
+              <TableHead>{t('imports.createdAt')}</TableHead>
+              <TableHead>{t('imports.status')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!imports.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('imports.empty')}</p>
-      ) : null}
-      {imports.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={imports.isFetchingNextPage}
-          onClick={() => void imports.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {imports.isPending ? <SkeletonRows columns={6} /> : null}
+            {rows.map((job) => (
+              <LinkRow key={job.id} to={`/imports/${job.id}`}>
+                <TableCell className="whitespace-normal">
+                  <Link
+                    to={`/imports/${job.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {job.fileName}
+                  </Link>
+                </TableCell>
+                <TableCell>{t(`imports.kinds.${job.kind}`)}</TableCell>
+                <TableCell className="text-right font-mono">{job.totalRows}</TableCell>
+                <TableCell className="font-mono">
+                  {formatUbDateTime(Date.parse(job.createdAt))}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge status={job.status} />
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!imports.isPending && rows.length === 0 ? (
+          <EmptyState icon={FileSpreadsheet} title={t('imports.empty')} />
+        ) : null}
+        <LoadMore query={imports} />
+      </ListCard>
     </div>
   );
 }
@@ -205,42 +215,31 @@ export function ImportPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.fileName}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/imports">{t('common.back')}</Link>
-          </Button>
+        meta={
+          <>
+            <StatusBadge status={detail.status} />
+            <Badge variant="outline">{t(`imports.kinds.${detail.kind}`)}</Badge>
+            <span className="font-mono">{formatUbDateTime(Date.parse(detail.createdAt))}</span>
+          </>
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <StatusBadge status={detail.status} />
-        <Badge variant="outline">{t(`imports.kinds.${detail.kind}`)}</Badge>
-        <span className="text-muted-foreground">
-          {formatUbDateTime(Date.parse(detail.createdAt))}
-        </span>
-      </div>
       {running ? <Progress job={detail} /> : null}
       <JobSummary job={detail} />
       {!running ? <JobActions job={detail} /> : null}
       {detail.totalRows > 0 && detail.summary?.rowsPruned ? (
         <p className="text-sm text-muted-foreground">{t('imports.rowsPruned')}</p>
       ) : detail.totalRows > 0 ? (
-        <>
-          <div className="flex flex-wrap gap-2" role="tablist">
-            {FILTERS.map((value) => (
-              <Button
-                key={value}
-                role="tab"
-                aria-selected={shown === value}
-                size="sm"
-                variant={shown === value ? 'default' : 'outline'}
-                onClick={() => setFilter(value)}
-              >
-                {t(`imports.filters.${value}`)}
-              </Button>
-            ))}
-          </div>
+        <div>
+          <FilterBar>
+            <SegmentedControl
+              options={FILTERS}
+              value={shown}
+              label={(value) => t(`imports.filters.${value}`)}
+              onChange={setFilter}
+            />
+          </FilterBar>
           <RowsTable job={detail} filter={shown} />
-        </>
+        </div>
       ) : null}
     </div>
   );
@@ -260,8 +259,11 @@ function Progress({ job }: { job: ImportJob }) {
           ? ` ${t('imports.progress', { done: job.processedRows, total: job.totalRows })}`
           : null}
       </span>
-      <div className="h-2 w-full max-w-md overflow-hidden rounded bg-muted">
-        <div className="h-full bg-primary transition-all" style={{ width: `${share}%` }} />
+      <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-fill">
+        <div
+          className="h-full rounded-full bg-primary transition-all"
+          style={{ width: `${share}%` }}
+        />
       </div>
     </div>
   );
@@ -335,6 +337,8 @@ function JobActions({ job }: { job: ImportJob }) {
     action.clear();
     setConfirm(step);
   };
+  // A refused, failed or reverted import has nothing left to do: no empty gap on the page.
+  if (job.status !== 'VALIDATED' && job.status !== 'COMMITTED') return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -382,44 +386,39 @@ function RowsTable({ job, filter }: { job: ImportJob; filter: RowFilter }) {
   const rows = useImportRows(job.id, filter, job.validatedAt ?? undefined);
   const data = rows.data?.pages.flatMap((page) => page.data) ?? [];
   return (
-    <div className="flex flex-col gap-2">
+    <>
       <ProblemAlert problem={problemFromError(rows.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-right">{t('imports.rowNo')}</TableHead>
-            <TableHead>{t('imports.row')}</TableHead>
-            <TableHead>{t('imports.result')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row) => (
-            <TableRow key={row.rowNo}>
-              <TableCell className="text-right align-top font-mono">{row.rowNo}</TableCell>
-              <TableCell className="align-top whitespace-normal">
-                <RowCells job={job} row={row} />
-              </TableCell>
-              <TableCell className="align-top whitespace-normal">
-                <RowResult job={job} row={row} />
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-right">{t('imports.rowNo')}</TableHead>
+              <TableHead>{t('imports.row')}</TableHead>
+              <TableHead>{t('imports.result')}</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!rows.isPending && data.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('imports.noRows')}</p>
-      ) : null}
-      {rows.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={rows.isFetchingNextPage}
-          onClick={() => void rows.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
-    </div>
+          </TableHeader>
+          <TableBody>
+            {/* isLoading, not isPending: before the first check the rows query waits, idle. */}
+            {rows.isLoading ? <SkeletonRows columns={3} /> : null}
+            {data.map((row) => (
+              <TableRow key={row.rowNo}>
+                <TableCell className="text-right align-top font-mono">{row.rowNo}</TableCell>
+                <TableCell className="align-top whitespace-normal">
+                  <RowCells job={job} row={row} />
+                </TableCell>
+                <TableCell className="align-top whitespace-normal">
+                  <RowResult job={job} row={row} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!rows.isPending && data.length === 0 ? (
+          <EmptyState icon={ListChecks} title={t('imports.noRows')} />
+        ) : null}
+        <LoadMore query={rows} />
+      </ListCard>
+    </>
   );
 }
 

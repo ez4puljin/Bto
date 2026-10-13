@@ -3,9 +3,9 @@ import type { DiscountEffect, DiscountMeasure, DiscountScope } from '@tugeel/sha
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { NativeSelect } from '@/components/native-select';
-import { PageHeader } from '@/components/page-header';
+import { type Crumb, PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,7 +97,12 @@ export function DiscountProgramEditPage() {
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
   if (!program.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   return (
-    <ProgramForm initial={draftOf(program.data)} product={program.data.product} programId={id} />
+    <ProgramForm
+      initial={draftOf(program.data)}
+      product={program.data.product}
+      programId={id}
+      crumbs={[{ label: program.data.name, to: `/pricing/discounts/${id}` }]}
+    />
   );
 }
 
@@ -105,6 +110,8 @@ function ProgramForm(props: {
   initial: ProgramDraft;
   product: PickedProduct | null;
   programId: number | null;
+  /** The program being edited, between «Хямдрал» and the title (ADR-0042). */
+  crumbs?: readonly Crumb[];
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -167,19 +174,7 @@ function ProgramForm(props: {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={t(props.programId === null ? 'pricing.programs.new' : 'pricing.programs.edit')}
-        actions={
-          <Button variant="outline" asChild>
-            <Link
-              to={
-                props.programId === null
-                  ? '/pricing/discounts'
-                  : `/pricing/discounts/${props.programId}`
-              }
-            >
-              {t('common.back')}
-            </Link>
-          </Button>
-        }
+        crumbs={props.crumbs}
       />
       <ProblemAlert problem={action.problem} />
       {shown ? (
@@ -187,10 +182,10 @@ function ProgramForm(props: {
           {t(`pricing.programs.issues.${shown.issue}`, { step: shown.step ?? 0 })}
         </p>
       ) : null}
-      <Card>
+      <Card className="max-w-3xl">
         <CardContent>
           <form
-            className="grid max-w-3xl gap-4 sm:grid-cols-2"
+            className="grid gap-4 sm:grid-cols-2"
             noValidate
             onSubmit={(event) => {
               event.preventDefault();

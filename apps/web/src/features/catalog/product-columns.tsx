@@ -231,7 +231,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
     key: 'status',
     cell: (row, ctx) => (
-      <Badge variant={row.status === 'ACTIVE' ? 'secondary' : 'outline'}>
+      <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
         {ctx.t(`catalog.products.status.${row.status}`)}
       </Badge>
     ),

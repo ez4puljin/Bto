@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { FieldError } from '@/components/field-error';
+import { EmptyState, ListCard, SkeletonRows } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -74,43 +75,57 @@ export function BranchesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(branches.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('org.branches.code')}</TableHead>
-            <TableHead>{t('org.branches.name')}</TableHead>
-            <TableHead>{t('org.branches.branchNo')}</TableHead>
-            <TableHead>{t('org.branches.districtCode')}</TableHead>
-            <TableHead>{t('users.columns.status')}</TableHead>
-            {canManage ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(branches.data ?? []).map((branch) => (
-            <TableRow key={branch.id}>
-              <TableCell className="font-mono">{branch.code}</TableCell>
-              <TableCell>{branch.name}</TableCell>
-              <TableCell>{branch.branchNo ?? t('common.none')}</TableCell>
-              <TableCell>{branch.districtCode ?? t('common.none')}</TableCell>
-              <TableCell>
-                <Badge variant={branch.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                  {t(`org.status.${branch.status}`)}
-                </Badge>
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('org.branches.code')}</TableHead>
+              <TableHead>{t('org.branches.name')}</TableHead>
+              <TableHead>{t('org.branches.branchNo')}</TableHead>
+              <TableHead>{t('org.branches.districtCode')}</TableHead>
+              <TableHead>{t('users.columns.status')}</TableHead>
               {canManage ? (
-                <TableCell>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(branch)}>
-                    {t('common.edit')}
-                  </Button>
-                </TableCell>
+                <TableHead>
+                  <span className="sr-only">{t('common.actions')}</span>
+                </TableHead>
               ) : null}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {branches.data?.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('org.branches.empty')}</p>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {branches.isPending ? <SkeletonRows columns={canManage ? 6 : 5} /> : null}
+            {(branches.data ?? []).map((branch) => (
+              <TableRow key={branch.id}>
+                <TableCell className="font-mono">{branch.code}</TableCell>
+                <TableCell className="font-medium">{branch.name}</TableCell>
+                <TableCell className="font-mono">{branch.branchNo ?? t('common.none')}</TableCell>
+                <TableCell className="font-mono">
+                  {branch.districtCode ?? t('common.none')}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={branch.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                    {t(`org.status.${branch.status}`)}
+                  </Badge>
+                </TableCell>
+                {canManage ? (
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-label={t('common.editRecord', { name: branch.name })}
+                      onClick={() => setEditing(branch)}
+                    >
+                      {t('common.edit')}
+                    </Button>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {branches.data?.length === 0 ? (
+          <EmptyState icon={Building2} title={t('org.branches.empty')} />
+        ) : null}
+      </ListCard>
       {editing ? <BranchDialog branch={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
@@ -245,51 +260,62 @@ export function WarehousesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(warehouses.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('org.warehouses.code')}</TableHead>
-            <TableHead>{t('org.warehouses.name')}</TableHead>
-            <TableHead>{t('org.warehouses.kind')}</TableHead>
-            <TableHead>{t('org.warehouses.branch')}</TableHead>
-            <TableHead>{t('users.columns.status')}</TableHead>
-            {canManage ? <TableHead /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(warehouses.data ?? []).map((warehouse) => {
-            const editable = warehouse.kind === 'WHOLESALE' || warehouse.kind === 'STORE';
-            return (
-              <TableRow key={warehouse.id}>
-                <TableCell className="font-mono">{warehouse.code}</TableCell>
-                <TableCell>
-                  {editable ? warehouse.name : t(`org.kinds.${warehouse.kind}`)}
-                </TableCell>
-                <TableCell>{t(`org.kinds.${warehouse.kind}`)}</TableCell>
-                <TableCell>{branchName(warehouse.branchId)}</TableCell>
-                <TableCell>
-                  <Badge variant={warehouse.status === 'ACTIVE' ? 'secondary' : 'outline'}>
-                    {t(`org.status.${warehouse.status}`)}
-                  </Badge>
-                </TableCell>
-                {canManage ? (
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('org.warehouses.code')}</TableHead>
+              <TableHead>{t('org.warehouses.name')}</TableHead>
+              <TableHead>{t('org.warehouses.kind')}</TableHead>
+              <TableHead>{t('org.warehouses.branch')}</TableHead>
+              <TableHead>{t('users.columns.status')}</TableHead>
+              {canManage ? (
+                <TableHead>
+                  <span className="sr-only">{t('common.actions')}</span>
+                </TableHead>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {warehouses.isPending ? <SkeletonRows columns={canManage ? 6 : 5} /> : null}
+            {(warehouses.data ?? []).map((warehouse) => {
+              const editable = warehouse.kind === 'WHOLESALE' || warehouse.kind === 'STORE';
+              const name = editable ? warehouse.name : t(`org.kinds.${warehouse.kind}`);
+              return (
+                <TableRow key={warehouse.id}>
+                  <TableCell className="font-mono">{warehouse.code}</TableCell>
+                  <TableCell className="font-medium">{name}</TableCell>
+                  <TableCell>{t(`org.kinds.${warehouse.kind}`)}</TableCell>
+                  <TableCell>{branchName(warehouse.branchId)}</TableCell>
                   <TableCell>
-                    {editable ? (
-                      <Button size="sm" variant="outline" onClick={() => setEditing(warehouse)}>
-                        {t('common.edit')}
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {t('org.warehouses.systemNote')}
-                      </span>
-                    )}
+                    <Badge variant={warehouse.status === 'ACTIVE' ? 'success' : 'secondary'}>
+                      {t(`org.status.${warehouse.status}`)}
+                    </Badge>
                   </TableCell>
-                ) : null}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  {canManage ? (
+                    <TableCell className="text-right">
+                      {editable ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={t('common.editRecord', { name })}
+                          onClick={() => setEditing(warehouse)}
+                        >
+                          {t('common.edit')}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {t('org.warehouses.systemNote')}
+                        </span>
+                      )}
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </ListCard>
       {editing ? <WarehouseDialog warehouse={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );

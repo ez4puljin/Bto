@@ -1,11 +1,21 @@
+import { BadgePercent, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SegmentedControl,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { RecordActionsHead, RecordRow } from '@/components/record-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +44,11 @@ type Filter = (typeof FILTERS)[number];
 export function ProgramStatusBadge({ status }: { status: ProgramStatus }) {
   const { t } = useTranslation();
   const variant =
-    status === 'ACTIVE' ? 'default' : status === 'SCHEDULED' ? 'secondary' : 'outline';
+    status === 'ACTIVE' ? 'success' : status === 'SCHEDULED' ? 'default' : 'secondary';
   return <Badge variant={variant}>{t(`pricing.programs.status.${status}`)}</Badge>;
 }
 
+/** The status filter as a segmented control (ADR-0042); still tabs for keyboards and tests. */
 /** «Үнэ» → «Хямдрал»: programs in force by default, newest first (ADR-0041 #2). */
 export function DiscountProgramsPage() {
   const { t } = useTranslation();
@@ -50,88 +61,81 @@ export function DiscountProgramsPage() {
   const rows = programs.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div>
       <PageHeader
         title={t('pricing.programs.title')}
+        meta={<p className="max-w-3xl">{t('pricing.programs.intro')}</p>}
         actions={
           canManage ? (
             <Button asChild>
-              <Link to="/pricing/discounts/new">{t('pricing.programs.new')}</Link>
+              <Link to="/pricing/discounts/new">
+                <Plus />
+                {t('pricing.programs.new')}
+              </Link>
             </Button>
-          ) : undefined
+          ) : null
         }
       />
-      <p className="-mt-2 max-w-3xl text-sm text-muted-foreground">{t('pricing.programs.intro')}</p>
-      <div className="flex flex-wrap gap-2" role="tablist">
-        {FILTERS.map((value) => (
-          <Button
-            key={value}
-            role="tab"
-            aria-selected={filter === value}
-            size="sm"
-            variant={filter === value ? 'default' : 'outline'}
-            onClick={() =>
-              setParams(value === 'ACTIVE' ? {} : { status: value }, { replace: true })
-            }
-          >
-            {t(`pricing.programs.filters.${value}`)}
-          </Button>
-        ))}
-      </div>
+      <FilterBar>
+        <SegmentedControl
+          options={FILTERS}
+          label={(value) => t(`pricing.programs.filters.${value}`)}
+          value={filter}
+          onChange={(value) =>
+            setParams(value === 'ACTIVE' ? {} : { status: value }, { replace: true })
+          }
+        />
+      </FilterBar>
       <ProblemAlert problem={problemFromError(programs.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <RecordActionsHead />
-            <TableHead>{t('pricing.programs.columns.name')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.list')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.scope')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.effect')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.steps')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.period')}</TableHead>
-            <TableHead>{t('pricing.programs.columns.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((program) => (
-            <RecordRow
-              key={program.id}
-              href={`/pricing/discounts/${program.id}`}
-              name={program.name}
-              canManage={canManage && program.status === 'SCHEDULED'}
-            >
-              <TableCell className="font-medium whitespace-normal">{program.name}</TableCell>
-              <TableCell>{t(`pricing.lists.${program.list}`)}</TableCell>
-              <TableCell className="whitespace-normal">{text.target(program)}</TableCell>
-              <TableCell>{t(`pricing.programs.effects.${program.effect}`)}</TableCell>
-              <TableCell className="whitespace-normal">
-                <div className="flex flex-col">
-                  {program.steps.map((step) => (
-                    <span key={step.threshold}>{text.step(program, step)}</span>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell>{text.period(program)}</TableCell>
-              <TableCell>
-                <ProgramStatusBadge status={program.status} />
-              </TableCell>
-            </RecordRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!programs.isPending && rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('pricing.programs.empty')}</p>
-      ) : null}
-      {programs.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={programs.isFetchingNextPage}
-          onClick={() => void programs.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('pricing.programs.columns.name')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.list')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.scope')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.effect')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.steps')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.period')}</TableHead>
+              <TableHead>{t('pricing.programs.columns.status')}</TableHead>
+              <ChevronHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {programs.isPending ? <SkeletonRows columns={8} /> : null}
+            {rows.map((program) => (
+              <LinkRow key={program.id} to={`/pricing/discounts/${program.id}`}>
+                <TableCell className="whitespace-normal">
+                  <Link
+                    to={`/pricing/discounts/${program.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {program.name}
+                  </Link>
+                </TableCell>
+                <TableCell>{t(`pricing.lists.${program.list}`)}</TableCell>
+                <TableCell className="whitespace-normal">{text.target(program)}</TableCell>
+                <TableCell>{t(`pricing.programs.effects.${program.effect}`)}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <div className="flex flex-col">
+                    {program.steps.map((step) => (
+                      <span key={step.threshold}>{text.step(program, step)}</span>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell className="font-mono">{text.period(program)}</TableCell>
+                <TableCell>
+                  <ProgramStatusBadge status={program.status} />
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!programs.isPending && rows.length === 0 ? (
+          <EmptyState icon={BadgePercent} title={t('pricing.programs.empty')} />
+        ) : null}
+        <LoadMore query={programs} />
+      </ListCard>
     </div>
   );
 }
@@ -172,34 +176,37 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={program.name}
-        actions={
+        meta={
           <>
-            {canManage && scheduled ? (
-              <Button variant="outline" asChild>
-                <Link to={`/pricing/discounts/${program.id}/edit`}>{t('common.edit')}</Link>
-              </Button>
-            ) : null}
-            {canManage && program.status !== 'ENDED' ? (
+            <ProgramStatusBadge status={program.status} />
+            <Badge variant="outline">{t(`pricing.lists.${program.list}`)}</Badge>
+            <span className="font-mono">{text.period(program)}</span>
+          </>
+        }
+        actions={
+          // An ended program has nothing left to change.
+          canManage && program.status !== 'ENDED' ? (
+            <>
+              {scheduled ? (
+                <Button variant="outline" asChild>
+                  <Link to={`/pricing/discounts/${program.id}/edit`}>
+                    <Pencil />
+                    {t('common.edit')}
+                  </Link>
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={() => setConfirm('stop')}>
                 {t('pricing.programs.stop')}
               </Button>
-            ) : null}
-            {canManage && scheduled ? (
-              <Button variant="outline" onClick={() => setConfirm('delete')}>
-                {t('pricing.programs.delete')}
-              </Button>
-            ) : null}
-            <Button variant="outline" asChild>
-              <Link to="/pricing/discounts">{t('common.back')}</Link>
-            </Button>
-          </>
+              {scheduled ? (
+                <Button variant="destructive" onClick={() => setConfirm('delete')}>
+                  {t('pricing.programs.delete')}
+                </Button>
+              ) : null}
+            </>
+          ) : null
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <ProgramStatusBadge status={program.status} />
-        <Badge variant="outline">{t(`pricing.lists.${program.list}`)}</Badge>
-        <span className="text-muted-foreground">{text.period(program)}</span>
-      </div>
       {canManage && program.status === 'ACTIVE' ? (
         <p className="text-sm text-muted-foreground">{t('pricing.programs.startedHint')}</p>
       ) : null}

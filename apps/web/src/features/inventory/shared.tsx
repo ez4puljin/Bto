@@ -29,12 +29,15 @@ export function WarehouseSelect(props: {
   emptyLabel: string;
   label?: string;
   className?: string;
+  /** `filter`: a pill in a list's filter bar (ADR-0042). */
+  variant?: 'default' | 'filter';
 }) {
   const { t } = useTranslation();
   return (
     <NativeSelect
       aria-label={props.label ?? t('inventory.warehouse')}
       className={props.className}
+      variant={props.variant}
       value={props.value ?? ''}
       onChange={(event) =>
         props.onChange(event.target.value ? Number.parseInt(event.target.value, 10) : undefined)
@@ -54,14 +57,16 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
   const { t } = useTranslation();
   const variant =
     status === 'POSTED' || status === 'RECEIVED' || status === 'APPROVED'
-      ? 'secondary'
+      ? 'success'
       : status === 'SUBMITTED' ||
           status === 'REQUESTED' ||
           status === 'SHIPPED' ||
           status === 'COUNTING' ||
           status === 'REVIEW'
         ? 'default'
-        : 'outline';
+        : status === 'DRAFT'
+          ? 'secondary'
+          : 'outline';
   return <Badge variant={variant}>{t(`inventory.docStatus.${status}`)}</Badge>;
 }
 

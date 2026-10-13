@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
-import { AuthLayout } from '@/components/auth-layout';
+import { AuthLayout } from './auth-layout';
 import { FieldError } from '@/components/field-error';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -46,8 +46,8 @@ export function LoginPage() {
   const { errors, isSubmitting } = form.formState;
 
   return (
-    <AuthLayout title={t('auth.login.title')}>
-      <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+    <AuthLayout title={t('auth.login.title')} description={t('auth.login.welcome')}>
+      <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
         {reason === 'expired' ? (
           <Alert>
             <AlertDescription>{t('auth.login.expired')}</AlertDescription>
@@ -63,6 +63,7 @@ export function LoginPage() {
           <Label htmlFor="username">{t('auth.login.username')}</Label>
           <Input
             id="username"
+            className="h-10"
             autoComplete="username"
             autoCapitalize="none"
             autoFocus
@@ -75,6 +76,7 @@ export function LoginPage() {
           <Label htmlFor="password">{t('auth.login.password')}</Label>
           <Input
             id="password"
+            className="h-10"
             type="password"
             autoComplete="current-password"
             aria-invalid={Boolean(errors.password)}
@@ -82,10 +84,10 @@ export function LoginPage() {
           />
           <FieldError message={errors.password?.message} />
         </div>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" size="lg" className="mt-1 w-full" disabled={isSubmitting}>
           {t('auth.login.submit')}
         </Button>
-        <Link to="/set-password" className="text-center text-sm text-muted-foreground underline">
+        <Link to="/set-password" className="text-center text-[13px] text-link hover:underline">
           {t('auth.login.setPasswordLink')}
         </Link>
       </form>

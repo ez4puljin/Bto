@@ -1,10 +1,20 @@
 import { USER_ADJUSTMENT_REASONS } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ChevronHead,
+  EmptyState,
+  FilterBar,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -12,6 +22,14 @@ import { ScanBox } from '@/components/scan-box';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -24,6 +42,7 @@ import {
 import { useBarcodeLookup } from '@/features/catalog/api';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { useCreateParam } from '@/lib/use-create-param';
 import { randomUuid } from '@/lib/uuid';
 import {
   type AdjustmentDetail,
@@ -59,6 +78,7 @@ export function AdjustmentsPage() {
   const warehouseName = useWarehouseName();
   const adjustments = useAdjustments({ warehouseId, status });
   const rows = adjustments.data?.pages.flatMap((page) => page.data) ?? [];
+  const [creating, setCreating] = useCreateParam();
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -72,17 +92,33 @@ export function AdjustmentsPage() {
     );
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title={t('inventory.adjustments.title')} />
-      {canManage ? <AdjustmentCreateCard /> : null}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <PageHeader
+        title={t('inventory.adjustments.title')}
+        actions={
+          canManage ? (
+            <Button onClick={() => setCreating(true)}>
+              <Plus />
+              {t('inventory.adjustment.newTitle')}
+            </Button>
+          ) : null
+        }
+      />
+      {canManage ? (
+        <Dialog open={creating} onOpenChange={setCreating}>
+          {creating ? <AdjustmentCreateDialog onCancel={() => setCreating(false)} /> : null}
+        </Dialog>
+      ) : null}
+      <FilterBar>
         <WarehouseSelect
+          variant="filter"
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={t('inventory.allWarehouses')}
           onChange={(id) => setParam('warehouseId', id === undefined ? '' : String(id))}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('inventory.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -94,59 +130,52 @@ export function AdjustmentsPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(adjustments.error)} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('inventory.number')}</TableHead>
-            <TableHead>{t('inventory.date')}</TableHead>
-            <TableHead>{t('inventory.warehouse')}</TableHead>
-            <TableHead>{t('inventory.adjustments.reason')}</TableHead>
-            <TableHead className="text-right">{t('inventory.lines')}</TableHead>
-            <TableHead>{t('inventory.status')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="font-mono">
-                <Link
-                  to={`/inventory/adjustments/${row.id}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {row.number ?? t('inventory.draftNo', { id: row.id })}
-                </Link>
-              </TableCell>
-              <TableCell className="font-mono">{row.effectiveDate ?? t('common.none')}</TableCell>
-              <TableCell>{warehouseName(row.warehouseId)}</TableCell>
-              <TableCell>{t(`inventory.reasons.${row.reason}`)}</TableCell>
-              <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
-              <TableCell>
-                <DocStatusBadge status={row.status} />
-              </TableCell>
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('inventory.number')}</TableHead>
+              <TableHead>{t('inventory.date')}</TableHead>
+              <TableHead>{t('inventory.warehouse')}</TableHead>
+              <TableHead>{t('inventory.adjustments.reason')}</TableHead>
+              <TableHead className="text-right">{t('inventory.lines')}</TableHead>
+              <TableHead>{t('inventory.status')}</TableHead>
+              <ChevronHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {!adjustments.isPending && rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{t('inventory.adjustments.empty')}</p>
-      ) : null}
-      {adjustments.hasNextPage ? (
-        <Button
-          className="self-start"
-          variant="outline"
-          disabled={adjustments.isFetchingNextPage}
-          onClick={() => void adjustments.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+          </TableHeader>
+          <TableBody>
+            {adjustments.isPending ? <SkeletonRows columns={7} /> : null}
+            {rows.map((row) => (
+              <LinkRow key={row.id} to={`/inventory/adjustments/${row.id}`}>
+                <TableCell className="font-mono">
+                  <Link to={`/inventory/adjustments/${row.id}`} className="font-medium">
+                    {row.number ?? t('inventory.draftNo', { id: row.id })}
+                  </Link>
+                </TableCell>
+                <TableCell className="font-mono">{row.effectiveDate ?? t('common.none')}</TableCell>
+                <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+                <TableCell>{t(`inventory.reasons.${row.reason}`)}</TableCell>
+                <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
+                <TableCell>
+                  <DocStatusBadge status={row.status} />
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!adjustments.isPending && rows.length === 0 ? (
+          <EmptyState icon={SlidersHorizontal} title={t('inventory.adjustments.empty')} />
+        ) : null}
+        <LoadMore query={adjustments} />
+      </ListCard>
     </div>
   );
 }
 
-function AdjustmentCreateCard() {
+/** A draft names its warehouse and reason; the goods are scanned on its page. */
+function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const canApprove = useHasPermission('inventory.adjustments.approve');
@@ -170,51 +199,63 @@ function AdjustmentCreateCard() {
         reason,
         ...(note.trim() ? { note: note.trim() } : {}),
       });
-      await navigate(`/inventory/adjustments/${adjustment.id}`);
+      await navigate(`/inventory/adjustments/${adjustment.id}`, { replace: true });
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.adjustment.newTitle')}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <DialogContent closeLabel={t('common.close')}>
+      <DialogHeader>
+        <DialogTitle>{t('inventory.adjustment.newTitle')}</DialogTitle>
+        <DialogDescription>
+          {isInbound(reason)
+            ? t('inventory.adjustment.increases')
+            : t('inventory.adjustment.decreases')}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-3">
         <ProblemAlert problem={action.problem} />
-        <WarehouseSelect
-          options={warehouses.options}
-          value={warehouseId}
-          emptyLabel={t('inventory.pickWarehouse')}
-          onChange={setWarehouseId}
-        />
-        <NativeSelect
-          aria-label={t('inventory.adjustments.reason')}
-          value={reason}
-          onChange={(event) => {
-            const picked = reasons.find((value) => value === event.target.value);
-            if (picked) setReason(picked);
-          }}
-        >
-          {reasons.map((value) => (
-            <option key={value} value={value}>
-              {t(`inventory.reasons.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
-        <Input
-          aria-label={t('inventory.note')}
-          placeholder={t('inventory.note')}
-          maxLength={500}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
+        <div className="grid gap-3">
+          <WarehouseSelect
+            options={warehouses.options}
+            value={warehouseId}
+            emptyLabel={t('inventory.pickWarehouse')}
+            onChange={setWarehouseId}
+          />
+          <NativeSelect
+            aria-label={t('inventory.adjustments.reason')}
+            value={reason}
+            onChange={(event) => {
+              const picked = reasons.find((value) => value === event.target.value);
+              if (picked) setReason(picked);
+            }}
+          >
+            {reasons.map((value) => (
+              <option key={value} value={value}>
+                {t(`inventory.reasons.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
+          <Input
+            aria-label={t('inventory.note')}
+            placeholder={t('inventory.note')}
+            maxLength={500}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
         <Button
           disabled={warehouseId === undefined || mutations.createAdjustment.isPending}
           onClick={create}
         >
-          {t('inventory.adjustments.create')}
+          {t('inventory.adjustment.createDraft')}
         </Button>
-      </CardContent>
-    </Card>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -237,25 +278,22 @@ export function AdjustmentPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={detail.number ?? t('inventory.draftNo', { id: detail.id })}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/inventory/adjustments">{t('common.back')}</Link>
-          </Button>
+        meta={
+          <>
+            <DocStatusBadge status={detail.status} />
+            <Badge variant="outline">{t(`inventory.reasons.${detail.reason}`)}</Badge>
+            <span>
+              {isInbound(detail.reason)
+                ? t('inventory.adjustment.increases')
+                : t('inventory.adjustment.decreases')}
+            </span>
+            <span className="text-foreground">{warehouseName(detail.warehouseId)}</span>
+            {detail.effectiveDate ? (
+              <span className="font-mono">{detail.effectiveDate}</span>
+            ) : null}
+          </>
         }
       />
-      <div className="-mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <DocStatusBadge status={detail.status} />
-        <Badge variant="outline">{t(`inventory.reasons.${detail.reason}`)}</Badge>
-        <span className="text-muted-foreground">
-          {isInbound(detail.reason)
-            ? t('inventory.adjustment.increases')
-            : t('inventory.adjustment.decreases')}
-        </span>
-        <span>{warehouseName(detail.warehouseId)}</span>
-        {detail.effectiveDate ? (
-          <span className="font-mono text-muted-foreground">{detail.effectiveDate}</span>
-        ) : null}
-      </div>
       {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {detail.status === 'DRAFT' && canManage ? (
         <AdjustmentEditor key={detail.id} detail={detail} />

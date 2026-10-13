@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
+import type { ListReadOptions } from '@/lib/list-read';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -75,10 +76,12 @@ export interface ProductFilter {
   status?: ProductStatus;
 }
 
-export function useProducts(filter: ProductFilter) {
+export function useProducts(filter: ProductFilter, options: ListReadOptions = {}) {
   const api = useApiClient();
+  const limit = options.limit ?? 50;
   return useInfiniteQuery({
-    queryKey: [...KEYS.products, 'list', filter],
+    queryKey: [...KEYS.products, 'list', filter, limit],
+    enabled: options.enabled ?? true,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
@@ -90,7 +93,7 @@ export function useProducts(filter: ProductFilter) {
               brandId: filter.brandId,
               status: filter.status,
               cursor: pageParam,
-              limit: 50,
+              limit,
             },
           },
           signal,

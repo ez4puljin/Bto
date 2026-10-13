@@ -8,9 +8,9 @@ import { useNavigate } from 'react-router';
 import { z } from 'zod';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
 import { FieldError } from '@/components/field-error';
+import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RoleName } from '@/components/role-name';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { passwordMessage } from '@/lib/forms';
 import { problemOf } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 
 function passwordSchema(username: string) {
   return z
@@ -48,7 +49,6 @@ export function AccountPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
-  const [changed, setChanged] = useState(false);
   const username = state.status === 'authenticated' ? state.me.username : '';
   const form = useForm<PasswordValues>({
     resolver: zodResolver(passwordSchema(username)),
@@ -59,12 +59,11 @@ export function AccountPage() {
 
   const submit = form.handleSubmit(async (values) => {
     setProblem(null);
-    setChanged(false);
     const result = await session.client.POST('/api/v1/auth/password', {
       body: { currentPassword: values.currentPassword, newPassword: values.newPassword },
     });
     if (result.response.ok) {
-      setChanged(true);
+      toast.success(t('auth.account.changed'));
       form.reset();
     } else {
       setProblem(problemOf(result.error));
@@ -80,7 +79,7 @@ export function AccountPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{t('auth.account.title')}</h1>
+      <PageHeader title={t('auth.account.title')} />
       <Card>
         <CardHeader>
           <CardTitle>{me.fullName}</CardTitle>
@@ -116,11 +115,6 @@ export function AccountPage() {
             noValidate
             onSubmit={(event) => void submit(event)}
           >
-            {changed ? (
-              <Alert>
-                <AlertDescription>{t('auth.account.changed')}</AlertDescription>
-              </Alert>
-            ) : null}
             <ProblemAlert problem={problem} />
             <div className="flex flex-col gap-2">
               <Label htmlFor="currentPassword">{t('auth.account.currentPassword')}</Label>

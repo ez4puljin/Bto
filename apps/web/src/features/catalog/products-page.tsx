@@ -1,14 +1,14 @@
-import { Plus } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ColumnChooser } from '@/components/column-chooser';
+import { EmptyState, FilterBar, ListCard, LoadMore, SearchField } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
@@ -91,29 +91,29 @@ export function ProductsPage() {
       <PageHeader
         title={t('catalog.products.title')}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <ColumnChooser
-              keys={PRODUCT_COLUMN_KEYS}
-              locked={LOCKED_PRODUCT_COLUMNS}
-              label={(key) => t(`catalog.products.columns.${key}`)}
-              hidden={hidden}
-              toggle={columnState.toggle}
-              showAll={columnState.showAll}
-            />
-            {canManage ? (
-              <Button asChild>
-                <Link to="/catalog/products/new">
-                  <Plus />
-                  {t('catalog.products.create')}
-                </Link>
-              </Button>
-            ) : null}
-          </div>
+          canManage ? (
+            <Button asChild>
+              <Link to="/catalog/products/new">
+                <Plus />
+                {t('catalog.products.create')}
+              </Link>
+            </Button>
+          ) : null
         }
       />
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input
-          type="search"
+      <FilterBar
+        end={
+          <ColumnChooser
+            keys={PRODUCT_COLUMN_KEYS}
+            locked={LOCKED_PRODUCT_COLUMNS}
+            label={(key) => t(`catalog.products.columns.${key}`)}
+            hidden={hidden}
+            toggle={columnState.toggle}
+            showAll={columnState.showAll}
+          />
+        }
+      >
+        <SearchField
           aria-label={t('common.search')}
           placeholder={t('catalog.products.searchPlaceholder')}
           value={search}
@@ -123,6 +123,7 @@ export function ProductsPage() {
           }}
         />
         <NativeSelect
+          variant="filter"
           aria-label={t('catalog.product.category')}
           value={categoryId === undefined ? '' : String(categoryId)}
           onChange={(event) => setParam('category', event.target.value)}
@@ -135,6 +136,7 @@ export function ProductsPage() {
           ))}
         </NativeSelect>
         <NativeSelect
+          variant="filter"
           aria-label={t('catalog.product.brand')}
           value={brandId === undefined ? '' : String(brandId)}
           onChange={(event) => setParam('brand', event.target.value)}
@@ -147,6 +149,7 @@ export function ProductsPage() {
           ))}
         </NativeSelect>
         <NativeSelect
+          variant="filter"
           aria-label={t('catalog.product.status')}
           value={status ?? ''}
           onChange={(event) => setParam('status', event.target.value)}
@@ -158,22 +161,13 @@ export function ProductsPage() {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FilterBar>
       <ProblemAlert problem={problemFromError(products.error)} />
-      <ProductTable pages={pages} columns={columns} context={context} canManage={canManage} />
-      {empty ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('catalog.products.empty')}</p>
-      ) : null}
-      {products.hasNextPage ? (
-        <Button
-          className="mt-4"
-          variant="outline"
-          disabled={products.isFetchingNextPage}
-          onClick={() => void products.fetchNextPage()}
-        >
-          {t('common.loadMore')}
-        </Button>
-      ) : null}
+      <ListCard>
+        <ProductTable pages={pages} columns={columns} context={context} />
+        {empty ? <EmptyState icon={Package} title={t('catalog.products.empty')} /> : null}
+        <LoadMore query={products} />
+      </ListCard>
     </div>
   );
 }

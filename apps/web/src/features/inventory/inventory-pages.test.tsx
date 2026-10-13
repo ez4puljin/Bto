@@ -4,7 +4,15 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { ADMIN_ME, json, type Me, problem, renderApp, signedIn } from '@/test/render-app';
+import {
+  ADMIN_ME,
+  findSidebar,
+  json,
+  type Me,
+  problem,
+  renderApp,
+  signedIn,
+} from '@/test/render-app';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-11T02:00:00.000Z';
@@ -122,7 +130,7 @@ const bodyOf = async (request: Request | undefined) =>
 describe('inventory menu', () => {
   it('shows the warehouse its documents and keeps the shelf setup for admins', async () => {
     renderApp('/system/status', signedIn(WAREHOUSE_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByText(mn.nav.groups.inventory)).toBeInTheDocument();
     for (const label of [mn.nav.stock, mn.nav.receipts, mn.nav.binMoves, mn.nav.adjustments]) {
       expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
@@ -132,7 +140,7 @@ describe('inventory menu', () => {
 
   it('lets an accountant reach stock and receipts but not moves', async () => {
     renderApp('/system/status', signedIn(ACCOUNTANT_ME));
-    const nav = await screen.findByRole('navigation');
+    const nav = await findSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.receipts })).toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: mn.nav.binMoves })).toBeNull();
   });
