@@ -265,33 +265,36 @@ describe('inventory schema constraints', () => {
     expect(await sqlStateOf(version({ version: 2, free_goods: true }))).toBe(CHECK);
   });
 
-  it('partitions the snapshots by month, at least three months ahead', async () => {
-    const { rows } = await app.query<{ parent: string; partitions: string }>(
-      `SELECT p.relname AS parent, count(i.inhrelid)::text AS partitions
+  it('partitions the snapshots by month, kept 24 months ahead by the monthly maintenance', async () => {
+    // 0006 made 24 months from 2026-10; the monthly job keeps them ahead of the clock (ADR-0040).
+    await app.query('SELECT maintain_stock_snapshot_partitions()');
+    const { rows } = await app.query<{ parent: string; partitions: number }>(
+      `SELECT p.relname AS parent, count(i.inhrelid)::int AS partitions
          FROM pg_partitioned_table pt
          JOIN pg_class p ON p.oid = pt.partrelid
          LEFT JOIN pg_inherits i ON i.inhparent = p.oid
         WHERE p.relname IN ('stock_snapshot_daily', 'stock_snapshot_bin_monthly')
         GROUP BY p.relname ORDER BY p.relname`,
     );
-    expect(rows).toEqual([
-      { parent: 'stock_snapshot_bin_monthly', partitions: '24' },
-      { parent: 'stock_snapshot_daily', partitions: '24' },
+    expect(rows.map((row) => row.parent)).toEqual([
+      'stock_snapshot_bin_monthly',
+      'stock_snapshot_daily',
     ]);
+    for (const row of rows) expect(row.partitions).toBeGreaterThanOrEqual(25);
     const ahead = await app.query<{ ok: boolean }>(
-      `SELECT to_regclass('stock_snapshot_daily_p' || to_char(now() + interval '3 months', 'YYYY_MM')) IS NOT NULL AS ok`,
+      `SELECT to_regclass('stock_snapshot_daily_p' || to_char(now() + interval '24 months', 'YYYY_MM')) IS NOT NULL AS ok`,
     );
     expect(ahead.rows[0]?.ok).toBe(true);
     await app.query(
       `INSERT INTO stock_snapshot_daily (snapshot_date, warehouse_id, product_id, on_hand, sellable_on_hand, reserved, avg_cost)
-       VALUES ('2026-10-11', $1, $2, 1, 1, 0, 1000)`,
+       VALUES (current_date, $1, $2, 1, 1, 0, 1000)`,
       [wh1, product],
     );
     expect(
       await sqlStateOf(
         app.query(
           `INSERT INTO stock_snapshot_daily (snapshot_date, warehouse_id, product_id, on_hand, sellable_on_hand, reserved, avg_cost)
-           VALUES ('2026-10-11', $1, $2, 1, 1, 0, 1000)`,
+           VALUES (current_date, $1, $2, 1, 1, 0, 1000)`,
           [wh1, product],
         ),
       ),

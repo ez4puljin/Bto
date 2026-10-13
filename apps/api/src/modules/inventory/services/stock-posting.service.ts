@@ -10,7 +10,7 @@ import {
   valueOf,
 } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate, businessYear } from '@tugeel/shared/time';
+import { businessDate, businessMonthStart, businessYear, isIsoDate } from '@tugeel/shared/time';
 import { and, desc, eq, gte, inArray, lt, lte, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -29,6 +29,7 @@ import {
   stocktakes,
   transfers,
 } from '../schema';
+import { advisoryLock, LOCKS } from './support';
 
 /** Inventory's own stock documents; other modules guard their documents themselves (ADR-0034 #5). */
 export type PostedDocType = Extract<StockDocType, 'GR' | 'BM' | 'TR' | 'ADJ' | 'ST'>;
@@ -158,6 +159,18 @@ export interface ReconciliationRun {
   diffCount: number;
   diffs: ReconciliationDiff[];
   snapshotDate: string;
+}
+
+/** What the monthly partition maintenance did (D9, ADR-0040). */
+export interface SnapshotPartitions {
+  created: number;
+  dropped: number;
+}
+
+/** A written monthly bin snapshot: its date and the rows written or rewritten. */
+export interface BinSnapshot {
+  snapshotDate: string;
+  rows: number;
 }
 
 interface WarehouseRow {
@@ -713,6 +726,54 @@ export class StockPostingService {
       },
       'repeatable read',
     );
+  }
+
+  /**
+   * The snapshot tables' monthly partitions (D9, ADR-0040): this Ulaanbaatar month to 24 months
+   * ahead exist afterwards, months more than 13 back are dropped. `app` cannot create tables, so a
+   * migrator-owned SECURITY DEFINER function does the work; the lock keeps two callers apart.
+   */
+  maintainSnapshotPartitions(): Promise<SnapshotPartitions> {
+    return inTransaction(this.db, async (tx) => {
+      await advisoryLock(tx, LOCKS.snapshotPartitions);
+      const { rows } = await tx.execute<{ created: number; dropped: number }>(
+        sql`SELECT created, dropped FROM maintain_stock_snapshot_partitions()`,
+      );
+      const [result] = rows;
+      if (!result) throw new Error('maintain_stock_snapshot_partitions returned no row');
+      return { created: result.created, dropped: result.dropped };
+    });
+  }
+
+  /**
+   * The monthly bin snapshot (D9): every bin's balance at the start of `asOf`, the first day of a
+   * month (default: this Ulaanbaatar month), summed from the ledger's movements dated before it,
+   * so a run days late is still exact. Running a month again rewrites it, a balance gone to zero
+   * since then as 0 (`app` may not delete snapshot rows). The month's partition must exist.
+   */
+  snapshotBins(asOf?: string): Promise<BinSnapshot> {
+    return inTransaction(this.db, async (tx) => {
+      const snapshotDate = asOf ?? businessMonthStart(await transactionTime(tx));
+      if (!isIsoDate(snapshotDate) || !snapshotDate.endsWith('-01')) {
+        throw new Error(`a bin snapshot is taken on the first day of a month, not ${snapshotDate}`);
+      }
+      const written = await tx.execute(sql`
+        INSERT INTO stock_snapshot_bin_monthly
+          (snapshot_date, warehouse_id, bin_id, product_id, lot_id, on_hand)
+        SELECT ${snapshotDate}::date, l.warehouse_id, l.bin_id, l.product_id, l.lot_id, sum(l.qty_base)
+          FROM stock_ledger l
+         WHERE l.effective_date < ${snapshotDate}::date
+         GROUP BY l.warehouse_id, l.bin_id, l.product_id, l.lot_id
+        HAVING sum(l.qty_base) <> 0
+            OR EXISTS (
+              SELECT 1 FROM stock_snapshot_bin_monthly s
+               WHERE s.snapshot_date = ${snapshotDate}::date
+                 AND s.warehouse_id = l.warehouse_id AND s.bin_id = l.bin_id
+                 AND s.product_id = l.product_id AND s.lot_id IS NOT DISTINCT FROM l.lot_id)
+        ON CONFLICT ON CONSTRAINT stock_snapshot_bin_monthly_key DO UPDATE
+          SET on_hand = excluded.on_hand`);
+      return { snapshotDate, rows: written.rowCount ?? 0 };
+    });
   }
 
   /**

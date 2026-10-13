@@ -2,7 +2,7 @@
 // file; named exports only (ESLint G2 rejects `export *`).
 export { type Actor, actorUserId, type AuthContext, systemActor } from './auth-context';
 export { Authenticated, CurrentUser, RequirePermission } from './decorators/access.decorators';
-export { IdentityHttpModule, IdentityModule } from './identity.module';
+export { IdentityHttpModule, IdentityModule, IdentityWorkerModule } from './identity.module';
 export { Idempotent } from './interceptors/idempotency.interceptor';
 export { type AuditEntry, AuditService } from './services/audit.service';
 export { NumberingService } from './services/numbering.service';

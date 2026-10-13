@@ -16,7 +16,18 @@ export interface JobPayloads {
   'imports.commit': { jobId: number };
   /** Take back the most recent committed import (ADR-0036 #7). */
   'imports.revert': { jobId: number };
+  /** Nightly: the ledger against both balance caches and the day's warehouse snapshot (D10). */
+  'inventory.reconcile': ScheduledPayload;
+  /** First night of a month: the snapshot partitions and the bin snapshot (D9). */
+  'inventory.snapshotMonthly': ScheduledPayload;
+  /** Nightly: old sessions, password codes and idempotency keys; abandoned and deleted files. */
+  'identity.housekeeping': ScheduledPayload;
+  /** Nightly: the rows of old unsuccessful imports and sheets past their retention. */
+  'imports.housekeeping': ScheduledPayload;
 }
+
+/** Scheduled jobs carry no data: the schedule sends null (ADR-0040). */
+export type ScheduledPayload = null;
 
 export type JobName = keyof JobPayloads;
 
@@ -29,6 +40,23 @@ function importQueue(retryLimit: number, expireInSeconds: number): Omit<Queue, '
     heartbeatSeconds: 60,
     retentionSeconds: 7 * 86_400,
     deleteAfterSeconds: 7 * 86_400,
+  };
+}
+
+/**
+ * Scheduled maintenance (ADR-0040): one run at a time, one retry ten minutes later, a crashed worker
+ * noticed by the heartbeat, a run not started within a day dropped (the schedule catches up) and
+ * 30 days of history.
+ */
+function scheduledQueue(): Omit<Queue, 'name'> {
+  return {
+    policy: 'exclusive',
+    retryLimit: 1,
+    retryDelay: 600,
+    expireInSeconds: 1_800,
+    heartbeatSeconds: 60,
+    retentionSeconds: 86_400,
+    deleteAfterSeconds: 30 * 86_400,
   };
 }
 
@@ -45,6 +73,10 @@ export const JOB_QUEUES: Readonly<Record<JobName, Omit<Queue, 'name'>>> = {
   'imports.validate': importQueue(2, 900),
   'imports.commit': importQueue(1, 3_600),
   'imports.revert': importQueue(1, 3_600),
+  'inventory.reconcile': scheduledQueue(),
+  'inventory.snapshotMonthly': scheduledQueue(),
+  'identity.housekeeping': scheduledQueue(),
+  'imports.housekeeping': scheduledQueue(),
 };
 
 export const JOB_NAME_PATTERN = /^[a-z]+\.[a-z][A-Za-z]*$/;

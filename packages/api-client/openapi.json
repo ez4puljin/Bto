@@ -15550,6 +15550,14 @@
           "advisoryLocks": {
             "type": "number",
             "description": "Advisory locks the commit held at its end (diagnostics)"
+          },
+          "rowsPruned": {
+            "type": "boolean",
+            "description": "The rows were deleted 90 days after the import was refused, failed or reverted"
+          },
+          "sheetDeleted": {
+            "type": "boolean",
+            "description": "The uploaded sheet was deleted a year after the upload"
           }
         }
       },

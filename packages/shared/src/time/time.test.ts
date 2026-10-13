@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  addMonths,
   BUSINESS_TZ,
   businessDate,
   businessDateTime,
+  businessMonthStart,
   businessYear,
   isIsoDate,
 } from './index';
@@ -36,5 +38,17 @@ describe('business dates in Asia/Ulaanbaatar', () => {
   it('moves plain dates by calendar days', () => {
     expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
     expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+  });
+
+  it('starts the month at Ulaanbaatar midnight', () => {
+    expect(businessMonthStart(new Date('2026-10-31T15:59:59Z'))).toBe('2026-10-01');
+    expect(businessMonthStart(new Date('2026-10-31T16:00:00Z'))).toBe('2026-11-01');
+    expect(businessMonthStart(new Date('2026-12-31T16:00:00Z'))).toBe('2027-01-01');
+  });
+
+  it('moves plain dates by calendar months', () => {
+    expect(addMonths('2026-10-01', 24)).toBe('2028-10-01');
+    expect(addMonths('2026-10-01', -13)).toBe('2025-09-01');
+    expect(addMonths('2027-01-31', 1)).toBe('2027-02-28');
   });
 });

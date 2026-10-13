@@ -12,9 +12,11 @@ import { OpeningStockImporter } from './importers/opening-stock.importer';
 import { ProductsImporter } from './importers/products.importer';
 import { SuppliersImporter } from './importers/suppliers.importer';
 import { CommitImportJob } from './jobs/commit-import.job';
+import { ImportsHousekeepingJob } from './jobs/housekeeping.job';
 import { RevertImportJob } from './jobs/revert-import.job';
 import { ValidateImportJob } from './jobs/validate-import.job';
 import { ImportPipelineService } from './services/import-pipeline.service';
+import { ImportsHousekeepingService } from './services/imports-housekeeping.service';
 import { ImportsService } from './services/imports.service';
 
 const CORE_SERVICES = [
@@ -39,7 +41,7 @@ export class ImportsModule {}
 @Module({ imports: [ImportsModule], controllers: [ImportsController] })
 export class ImportsHttpModule {}
 
-/** Registers the import jobs with pg-boss once the worker has started (worker only). */
+/** Registers the import jobs (and the housekeeping schedule) once the worker has started. */
 @Injectable()
 export class ImportsJobsBootstrap implements OnApplicationBootstrap {
   constructor(
@@ -47,18 +49,27 @@ export class ImportsJobsBootstrap implements OnApplicationBootstrap {
     private readonly validate: ValidateImportJob,
     private readonly commit: CommitImportJob,
     private readonly revert: RevertImportJob,
+    private readonly housekeeping: ImportsHousekeepingJob,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.worker.register(this.validate);
     await this.worker.register(this.commit);
     await this.worker.register(this.revert);
+    await this.worker.register(this.housekeeping);
   }
 }
 
-/** The worker side of imports: the three job handlers. */
+/** The worker side of imports: the three pipeline jobs and the nightly housekeeping (ADR-0040). */
 @Module({
-  imports: [ImportsModule, JobsWorkerModule],
-  providers: [ValidateImportJob, CommitImportJob, RevertImportJob, ImportsJobsBootstrap],
+  imports: [ImportsModule, IdentityModule, JobsWorkerModule],
+  providers: [
+    ValidateImportJob,
+    CommitImportJob,
+    RevertImportJob,
+    ImportsHousekeepingService,
+    ImportsHousekeepingJob,
+    ImportsJobsBootstrap,
+  ],
 })
 export class ImportsWorkerModule {}

@@ -8,7 +8,7 @@ import {
   isFileKind,
   matchesMagicBytes,
 } from '@tugeel/shared/files';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -19,6 +19,7 @@ import {
   isObjectName,
   LocalFileStore,
   ObjectTooLargeError,
+  type Visibility,
   type WrittenObject,
 } from '../storage/local-file-store';
 
@@ -26,6 +27,9 @@ export type StoredFile = typeof files.$inferSelect;
 
 /** Path of public objects under the API prefix; the go-live Spaces driver swaps in the CDN prefix. */
 export const PUBLIC_FILES_PATH = '/api/v1/files/public';
+
+/** DELETED files read per round of `purgeDeleted`. */
+const PURGE_BATCH = 200;
 
 /**
  * Files of every module (ADR-0014, ADR-0030). Identity owns the `files` table: other modules attach a
@@ -180,7 +184,58 @@ export class StorageService {
     await tx
       .update(files)
       .set({ status: 'DELETED', updatedAt: sql`now()` })
-      .where(eq(files.id, fileId));
+      .where(and(eq(files.id, fileId), ne(files.status, 'DELETED')));
+  }
+
+  /**
+   * Upload slots nobody attached within `olderThanHours` (housekeeping, ADR-0040): a row whose
+   * bytes never arrived is removed, one with bytes is marked DELETED for `purgeDeleted`.
+   */
+  async abandonPending(olderThanHours: number): Promise<{ removed: number; abandoned: number }> {
+    const stale = and(
+      eq(files.status, 'PENDING'),
+      lt(files.createdAt, sql`now() - make_interval(hours => ${olderThanHours})`),
+    );
+    const removed = await this.db
+      .delete(files)
+      .where(and(stale, isNull(files.uploadedAt)))
+      .returning({ id: files.id });
+    const abandoned = await this.db
+      .update(files)
+      .set({ status: 'DELETED', updatedAt: sql`now()` })
+      .where(and(stale, isNotNull(files.uploadedAt)))
+      .returning({ id: files.id });
+    return { removed: removed.length, abandoned: abandoned.length };
+  }
+
+  /**
+   * Removes the bytes of every DELETED file and stamps `purged_at`; the row stays for the documents
+   * that still name it. One file at a time and outside any transaction, since the Spaces driver
+   * will delete over HTTP. Returns how many files were purged.
+   */
+  async purgeDeleted(): Promise<number> {
+    let purged = 0;
+    for (;;) {
+      const batch = await this.db
+        .select({ id: files.id, key: files.key, kind: files.kind })
+        .from(files)
+        .where(and(eq(files.status, 'DELETED'), isNull(files.purgedAt)))
+        .orderBy(asc(files.id))
+        .limit(PURGE_BATCH);
+      for (const file of batch) {
+        // A kind no longer registered may have been stored under either prefix.
+        const places: Visibility[] = isFileKind(file.kind)
+          ? [fileKind(file.kind).visibility]
+          : ['public', 'private'];
+        for (const place of places) await this.store.remove(place, file.key);
+        await this.db
+          .update(files)
+          .set({ purgedAt: sql`now()`, updatedAt: sql`now()` })
+          .where(and(eq(files.id, file.id), isNull(files.purgedAt)));
+        purged += 1;
+      }
+      if (batch.length < PURGE_BATCH) return purged;
+    }
   }
 
   /** The stable URL of a public file (READY files only are served). */

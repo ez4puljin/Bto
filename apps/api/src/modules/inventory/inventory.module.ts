@@ -1,4 +1,6 @@
 import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
+import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
+import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
 import { IdentityModule, WAREHOUSE_CREATED_HOOK } from '../identity';
 import { PartnersModule } from '../partners';
@@ -12,6 +14,8 @@ import { ReceiptLinesController, ReceiptsController } from './controllers/receip
 import { StockController } from './controllers/stock.controller';
 import { StocktakesController } from './controllers/stocktakes.controller';
 import { TransferLinesController, TransfersController } from './controllers/transfers.controller';
+import { ReconcileJob } from './jobs/reconcile.job';
+import { SnapshotMonthlyJob } from './jobs/snapshot-monthly.job';
 import { AdjustmentsService } from './services/adjustments.service';
 import { BinMovesService } from './services/bin-moves.service';
 import { BinsService } from './services/bins.service';
@@ -80,3 +84,25 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
   providers: [InventoryBootstrap],
 })
 export class InventoryHttpModule {}
+
+/** Registers the inventory jobs and their schedules once the worker has started (worker only). */
+@Injectable()
+export class InventoryJobsBootstrap implements OnApplicationBootstrap {
+  constructor(
+    private readonly worker: JobWorkerService,
+    private readonly reconcile: ReconcileJob,
+    private readonly snapshotMonthly: SnapshotMonthlyJob,
+  ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.worker.register(this.reconcile);
+    await this.worker.register(this.snapshotMonthly);
+  }
+}
+
+/** The worker side of inventory: the nightly reconciliation and the monthly snapshot (ADR-0040). */
+@Module({
+  imports: [InventoryModule, JobsWorkerModule],
+  providers: [ReconcileJob, SnapshotMonthlyJob, InventoryJobsBootstrap],
+})
+export class InventoryWorkerModule {}

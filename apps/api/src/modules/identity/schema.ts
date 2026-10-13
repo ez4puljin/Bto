@@ -384,6 +384,8 @@ export const files = pgTable(
       onDelete: 'set null',
     }),
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+    /** When the housekeeping job removed the bytes of a DELETED file (ADR-0040); the row stays. */
+    purgedAt: timestamp('purged_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -392,6 +394,10 @@ export const files = pgTable(
     index('files_pending_idx')
       .on(t.createdAt)
       .where(sql`${t.status} = 'PENDING'`),
+    index('files_unpurged_idx')
+      .on(t.id)
+      .where(sql`${t.status} = 'DELETED' AND ${t.purgedAt} IS NULL`),
+    check('files_purged', sql`${t.purgedAt} IS NULL OR ${t.status} = 'DELETED'`),
     check('files_kind_format', sql`${t.kind} ~ '^[a-z]+[.][a-z_]+$'`),
     check('files_key_format', sql`${t.key} ~ '^[0-9a-f-]{36}[.][a-z]{3,4}$'`),
     check('files_size', sql`${t.sizeBytes} > 0`),

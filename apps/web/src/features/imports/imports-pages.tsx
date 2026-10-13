@@ -221,7 +221,9 @@ export function ImportPage() {
       {running ? <Progress job={detail} /> : null}
       <JobSummary job={detail} />
       {!running ? <JobActions job={detail} /> : null}
-      {detail.totalRows > 0 ? (
+      {detail.totalRows > 0 && detail.summary?.rowsPruned ? (
+        <p className="text-sm text-muted-foreground">{t('imports.rowsPruned')}</p>
+      ) : detail.totalRows > 0 ? (
         <>
           <div className="flex flex-wrap gap-2" role="tablist">
             {FILTERS.map((value) => (

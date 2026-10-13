@@ -1637,6 +1637,7 @@
     "row": "Excel-ийн мөр",
     "result": "Үр дүн",
     "noRows": "Мөр алга",
+    "rowsPruned": "Энэ импортын мөрүүдийг 90 хоногийн дараа цэвэрлэсэн; дээрх тоо хэвээр.",
     "cell": "{{column}}: {{value}}",
     "issue": "{{column}}: {{message}}",
     "changedFields": "Өөрчлөгдөх: {{fields}}",

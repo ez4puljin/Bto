@@ -5,6 +5,8 @@ import { AppConfig } from '../../common/config/app-config';
 import { DB } from '../../common/db/db.tokens';
 import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
+import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
+import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
 import { FilesController } from './controllers/files.controller';
@@ -14,10 +16,12 @@ import { UsersController } from './controllers/users.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { ensureTransitWarehouse, syncAccessCatalog } from './reference-data';
 import { IdempotencyInterceptor } from './interceptors/idempotency.interceptor';
+import { HousekeepingJob } from './jobs/housekeeping.job';
 import { AccessService } from './services/access.service';
 import { AuditQueryService } from './services/audit-query.service';
 import { AuditService } from './services/audit.service';
 import { AuthService } from './services/auth.service';
+import { HousekeepingService } from './services/housekeeping.service';
 import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/login-limiter.service';
 import { NumberingService } from './services/numbering.service';
 import { OrgService } from './services/org.service';
@@ -111,3 +115,23 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   exports: [AccessService, AuthService, PasswordHasher],
 })
 export class IdentityHttpModule {}
+
+/** Registers identity's nightly housekeeping and its schedule once the worker has started. */
+@Injectable()
+export class IdentityJobsBootstrap implements OnApplicationBootstrap {
+  constructor(
+    private readonly worker: JobWorkerService,
+    private readonly housekeeping: HousekeepingJob,
+  ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.worker.register(this.housekeeping);
+  }
+}
+
+/** The worker side of identity: the nightly housekeeping (ADR-0040). */
+@Module({
+  imports: [IdentityModule, JobsWorkerModule],
+  providers: [HousekeepingService, HousekeepingJob, IdentityJobsBootstrap],
+})
+export class IdentityWorkerModule {}

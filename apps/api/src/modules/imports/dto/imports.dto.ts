@@ -54,6 +54,12 @@ export class ImportSummaryDto {
   refreshed?: boolean;
   @ApiPropertyOptional({ description: 'Advisory locks the commit held at its end (diagnostics)' })
   advisoryLocks?: number;
+  @ApiPropertyOptional({
+    description: 'The rows were deleted 90 days after the import was refused, failed or reverted',
+  })
+  rowsPruned?: boolean;
+  @ApiPropertyOptional({ description: 'The uploaded sheet was deleted a year after the upload' })
+  sheetDeleted?: boolean;
 }
 
 @ApiSchema({ name: 'ImportJob' })

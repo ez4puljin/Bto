@@ -5,9 +5,11 @@ import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
+import { IdentityWorkerModule } from './modules/identity';
 import { ImportsWorkerModule } from './modules/imports';
+import { InventoryWorkerModule } from './modules/inventory';
 
-/** The pg-boss worker (ROLE=worker): job handlers and cron, no public HTTP. */
+/** The pg-boss worker (ROLE=worker): job handlers and their schedules (ADR-0040), no public HTTP. */
 @Module({
   imports: [
     CoreModule.forRoot('worker'),
@@ -15,6 +17,8 @@ import { ImportsWorkerModule } from './modules/imports';
     JobsModule,
     JobsWorkerModule,
     HealthCoreModule,
+    IdentityWorkerModule,
+    InventoryWorkerModule,
     ImportsWorkerModule,
   ],
   providers: [WorkerHealthServer],

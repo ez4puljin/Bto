@@ -90,7 +90,6 @@ describe('integrity: inventory guards', () => {
       'lots',
       'stock_snapshot_daily',
       'stock_snapshot_bin_monthly',
-      'stock_snapshot_daily_p2026_10',
     ];
     const { rows } = await app.query<{ table: string; can_delete: boolean; can_insert: boolean }>(
       `SELECT t AS table, has_table_privilege(t, 'DELETE') AS can_delete,
@@ -107,5 +106,48 @@ describe('integrity: inventory guards', () => {
                            'bins', 'product_locations']) AS t`,
     );
     expect(deletable.rows[0]?.ok).toBe(true);
+  });
+
+  it('keeps app out of every snapshot partition, those of the monthly maintenance too', async () => {
+    await app.query('SELECT maintain_stock_snapshot_partitions()');
+    const { rows } = await app.query<{ name: string; can_delete: boolean; can_truncate: boolean }>(
+      `SELECT c.relname AS name, has_table_privilege(c.oid, 'DELETE') AS can_delete,
+              has_table_privilege(c.oid, 'TRUNCATE') AS can_truncate
+         FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
+        WHERE i.inhparent IN ('stock_snapshot_daily'::regclass, 'stock_snapshot_bin_monthly'::regclass)`,
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(50);
+    expect(rows.filter((row) => row.can_delete || row.can_truncate)).toEqual([]);
+    expect(
+      await sqlStateOf(
+        app.query(
+          `CREATE TABLE stock_snapshot_daily_p2099_01 PARTITION OF stock_snapshot_daily
+             FOR VALUES FROM ('2099-01-01') TO ('2099-02-01')`,
+        ),
+      ),
+    ).toBe(DENIED);
+  });
+
+  it('runs the partition maintenance as the migrator, for app alone, on a fixed search path', async () => {
+    const { rows } = await migrator.query<{
+      owner: string;
+      definer: boolean;
+      config: string[] | null;
+      acl: string[] | null;
+    }>(
+      `SELECT pg_get_userbyid(p.proowner) AS owner, p.prosecdef AS definer, p.proconfig AS config,
+              p.proacl::text[] AS acl
+         FROM pg_proc p WHERE p.proname = 'maintain_stock_snapshot_partitions'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      owner: 'migrator',
+      definer: true,
+      config: ['search_path=pg_catalog, public, pg_temp'],
+    });
+    // No PUBLIC entry ("=X/…"): only app, besides the owner, may run it.
+    const acl = rows[0]?.acl ?? [];
+    expect(acl.filter((entry) => entry.startsWith('='))).toEqual([]);
+    expect(acl.some((entry) => entry.startsWith('app=X/'))).toBe(true);
   });
 });

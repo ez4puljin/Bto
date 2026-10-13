@@ -4017,6 +4017,10 @@ export interface components {
             refreshed?: boolean;
             /** @description Advisory locks the commit held at its end (diagnostics) */
             advisoryLocks?: number;
+            /** @description The rows were deleted 90 days after the import was refused, failed or reverted */
+            rowsPruned?: boolean;
+            /** @description The uploaded sheet was deleted a year after the upload */
+            sheetDeleted?: boolean;
         };
         ImportProblem: {
             /** @example IMPORT_REVERT_BLOCKED */

@@ -32,3 +32,13 @@ export function isIsoDate(value: string): boolean {
 export function addDays(date: string, days: number): string {
   return dayjs.utc(date).add(days, 'day').format('YYYY-MM-DD');
 }
+
+/** The first day of the Ulaanbaatar month of an instant, e.g. the date of a monthly snapshot. */
+export function businessMonthStart(at: Date = new Date()): string {
+  return dayjs(at).tz(BUSINESS_TZ).startOf('month').format('YYYY-MM-DD');
+}
+
+/** A plain `YYYY-MM-DD` date moved by whole calendar months (the 31st becomes a shorter month's last day). */
+export function addMonths(date: string, months: number): string {
+  return dayjs.utc(date).add(months, 'month').format('YYYY-MM-DD');
+}

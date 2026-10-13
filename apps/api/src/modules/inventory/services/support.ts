@@ -6,6 +6,8 @@ export const LOCKS = {
   systemBins: 72_028_001,
   /** Two-key form (this, product id): one home warehouse per product. */
   productHome: 72_028_002,
+  /** One caller of maintain_stock_snapshot_partitions() at a time (ADR-0040). */
+  snapshotPartitions: 72_028_003,
 } as const;
 
 export async function advisoryLock(tx: Tx, key: number, id?: number): Promise<void> {

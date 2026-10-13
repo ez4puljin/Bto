@@ -166,6 +166,18 @@ describe('import check', () => {
     expect(screen.queryByRole('button', { name: mn.imports.commit })).toBeNull();
   });
 
+  it('says the rows of an old refused import were cleaned up and keeps its counts', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports/5': () =>
+        json({ ...JOB, summary: { ...JOB.summary, rowsPruned: true } }),
+    });
+    renderApp('/imports/5', fetchMock);
+    expect(await screen.findByText(mn.imports.rowsPruned)).toBeInTheDocument();
+    expect(screen.getByText(/^3 мөр:/)).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(calls(fetchMock, 'GET', '/api/v1/imports/5/rows')).toHaveLength(0);
+  });
+
   it('commits a checked import once after confirmation', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       'GET /api/v1/imports/5': () => json({ ...JOB, status: 'VALIDATED', errorRows: 0 }),

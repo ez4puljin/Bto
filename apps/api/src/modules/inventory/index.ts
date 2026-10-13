@@ -1,6 +1,6 @@
 // Public API of the inventory module (docs/modules/inventory.md). Other modules import only this
 // file; named exports only (ESLint G2 rejects `export *`).
-export { InventoryHttpModule, InventoryModule } from './inventory.module';
+export { InventoryHttpModule, InventoryModule, InventoryWorkerModule } from './inventory.module';
 export {
   type AdjustmentDetail,
   type AdjustmentInput,
@@ -47,6 +47,7 @@ export {
   type ReceiptSummary,
 } from './services/receipts.service';
 export {
+  type BinSnapshot,
   type CostedLine,
   MAX_MOVEMENTS_PER_POST,
   type Movement,
@@ -55,6 +56,7 @@ export {
   type PostingResult,
   type ReconciliationDiff,
   type ReconciliationRun,
+  type SnapshotPartitions,
   StockPostingService,
   type Valuation,
 } from './services/stock-posting.service';
