@@ -59,3 +59,4 @@ export {
   warehouseStock,
 } from '../modules/inventory/schema';
 export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
+export { discountPrograms, discountSteps, unitPrices } from '../modules/pricing/schema';

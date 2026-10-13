@@ -11,6 +11,7 @@ export {
   type ImportProduct,
 } from './services/catalog-import.service';
 export { CatalogService } from './services/catalog.service';
+export { type Category, CategoriesService } from './services/categories.service';
 export type {
   NewUnitInput,
   ProductDetail,
@@ -26,3 +27,4 @@ export {
   UnitConversionService,
 } from './services/unit-conversion.service';
 export { UnitsService } from './services/units.service';
+export { type Uom, UomsService } from './services/uoms.service';

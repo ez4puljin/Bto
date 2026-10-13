@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
 import { isValidEnteredQty, toBase } from '@tugeel/shared/units';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
@@ -20,6 +20,7 @@ export interface ConvertedQty {
 export interface UnitInfo {
   unitId: number;
   productId: number;
+  uomId: number;
   uomName: string;
   factorToBase: Decimal;
   isBase: boolean;
@@ -81,6 +82,7 @@ export class UnitConversionService {
       .select({
         unitId: productUnits.id,
         productId: productUnits.productId,
+        uomId: productUnits.uomId,
         uomName: uoms.name,
         factorToBase: productUnits.factorToBase,
         isBase: productUnits.isBase,
@@ -112,5 +114,35 @@ export class UnitConversionService {
       executor,
     );
     return new Map([...units.values()].map((unit) => [unit.productId, unit]));
+  }
+
+  /** The current units of each product, base first, then by factor (prices, counted boxes). */
+  async currentUnits(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, UnitInfo[]>> {
+    const result = new Map<number, UnitInfo[]>();
+    if (productIds.length === 0) return result;
+    const rows = await executor
+      .select({ unitId: productUnits.id })
+      .from(productUnits)
+      .where(
+        and(inArray(productUnits.productId, [...productIds]), isNull(productUnits.supersededAt)),
+      )
+      .orderBy(
+        asc(productUnits.productId),
+        desc(productUnits.isBase),
+        asc(productUnits.factorToBase),
+      );
+    const units = await this.describe(
+      rows.map((row) => row.unitId),
+      executor,
+    );
+    for (const row of rows) {
+      const unit = units.get(row.unitId);
+      if (!unit) continue;
+      result.set(unit.productId, [...(result.get(unit.productId) ?? []), unit]);
+    }
+    return result;
   }
 }

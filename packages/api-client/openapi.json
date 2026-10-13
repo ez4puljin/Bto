@@ -8815,6 +8815,548 @@
           "imports"
         ]
       }
+    },
+    "/api/v1/unit-prices": {
+      "get": {
+        "operationId": "UnitPrices_view",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPrices"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "post": {
+        "operationId": "UnitPrices_set",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPricesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPrices"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Idempotent: a retried change must not close the price it just inserted.",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/unit-prices/current": {
+      "get": {
+        "operationId": "UnitPrices_current",
+        "parameters": [
+          {
+            "name": "productIds",
+            "required": true,
+            "in": "query",
+            "description": "Repeated: productIds=1&productIds=2",
+            "schema": {
+              "minItems": 1,
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CurrentPrice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Base unit prices of many products, for list columns (ADR-0037).",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/discount-programs": {
+      "get": {
+        "operationId": "DiscountPrograms_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "list",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "WHOLESALE",
+                "RETAIL"
+              ]
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCT",
+                "CATEGORY",
+                "ORDER"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SCHEDULED",
+                "ACTIVE",
+                "ENDED"
+              ]
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgramPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "post": {
+        "operationId": "DiscountPrograms_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscountProgramRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/discount-programs/{id}": {
+      "get": {
+        "operationId": "DiscountPrograms_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "put": {
+        "operationId": "DiscountPrograms_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscountProgramRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Only before the program starts.",
+        "tags": [
+          "pricing"
+        ]
+      },
+      "delete": {
+        "operationId": "DiscountPrograms_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Only before the program starts.",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/discount-programs/{id}/stop": {
+      "post": {
+        "operationId": "DiscountPrograms_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountProgram"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/quote": {
+      "post": {
+        "operationId": "Pricing_quote",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
     }
   },
   "info": {
@@ -8918,7 +9460,8 @@
           "inventory.stocktakes.approve",
           "inventory.costs.manage",
           "inventory.transfers.manage",
-          "imports.manage"
+          "imports.manage",
+          "pricing.manage"
         ]
       },
       "RoleRef": {
@@ -15837,6 +16380,728 @@
           "fileName"
         ]
       },
+      "PricePeriod": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "price": {
+            "type": "string",
+            "example": "22800",
+            "description": "Whole MNT, VAT included"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-13"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          }
+        },
+        "required": [
+          "id",
+          "price",
+          "validFrom",
+          "validTo"
+        ]
+      },
+      "CurrentUnitPrice": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "string",
+            "example": "22800"
+          },
+          "source": {
+            "enum": [
+              "UNIT",
+              "DERIVED"
+            ],
+            "type": "string",
+            "description": "UNIT: the unit's own price; DERIVED: the base unit's price × factor"
+          },
+          "period": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PricePeriod"
+              }
+            ]
+          }
+        },
+        "required": [
+          "price",
+          "source",
+          "period"
+        ]
+      },
+      "UnitPriceView": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24"
+          },
+          "isBase": {
+            "type": "boolean"
+          },
+          "current": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CurrentUnitPrice"
+              }
+            ]
+          },
+          "scheduled": {
+            "description": "Starting after today, earliest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PricePeriod"
+            }
+          },
+          "history": {
+            "description": "Ended, latest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PricePeriod"
+            }
+          }
+        },
+        "required": [
+          "productUnitId",
+          "uomName",
+          "factorToBase",
+          "isBase",
+          "current",
+          "scheduled",
+          "history"
+        ]
+      },
+      "ProductPrices": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "today": {
+            "type": "string",
+            "description": "The Ulaanbaatar business date the view is for"
+          },
+          "wholesale": {
+            "description": "Every channel but the supermarket",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitPriceView"
+            }
+          },
+          "retail": {
+            "description": "The supermarket",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitPriceView"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "today",
+          "wholesale",
+          "retail"
+        ]
+      },
+      "CurrentPrice": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number",
+            "description": "The base unit"
+          },
+          "price": {
+            "type": "string",
+            "example": "1000"
+          }
+        },
+        "required": [
+          "productId",
+          "list",
+          "productUnitId",
+          "price"
+        ]
+      },
+      "PriceEntryRequest": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "example": "22800",
+            "description": "Whole MNT; null takes the unit back to its base unit's price × factor"
+          }
+        },
+        "required": [
+          "list",
+          "productUnitId",
+          "price"
+        ]
+      },
+      "SetPricesRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-13",
+            "description": "Today or later (Ulaanbaatar)"
+          },
+          "entries": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceEntryRequest"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "validFrom",
+          "entries"
+        ]
+      },
+      "ProgramProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name"
+        ]
+      },
+      "ProgramUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "24"
+          }
+        },
+        "required": [
+          "id",
+          "uomName",
+          "factorToBase"
+        ]
+      },
+      "DiscountStep": {
+        "type": "object",
+        "properties": {
+          "threshold": {
+            "type": "string",
+            "example": "240",
+            "description": "PRODUCT QTY: base units; CATEGORY QTY: counted units; AMOUNT: MNT"
+          },
+          "value": {
+            "type": "string",
+            "example": "22800",
+            "description": "PRICE, AMOUNT: whole MNT; PERCENT: a percentage"
+          }
+        },
+        "required": [
+          "threshold",
+          "value"
+        ]
+      },
+      "DiscountProgram": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "ORDER"
+            ],
+            "type": "string"
+          },
+          "measure": {
+            "enum": [
+              "QTY",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "product": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgramProduct"
+              }
+            ]
+          },
+          "productUnit": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgramUnit"
+              }
+            ]
+          },
+          "thresholdUnit": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProgramUnit"
+              }
+            ]
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "countUomId": {
+            "type": "number",
+            "nullable": true
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "SCHEDULED",
+              "ACTIVE",
+              "ENDED"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscountStep"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "list",
+          "scope",
+          "measure",
+          "effect",
+          "product",
+          "productUnit",
+          "thresholdUnit",
+          "categoryId",
+          "countUomId",
+          "validFrom",
+          "validTo",
+          "status",
+          "steps",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DiscountProgramPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscountProgram"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "DiscountProgramRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "ORDER"
+            ],
+            "type": "string"
+          },
+          "measure": {
+            "enum": [
+              "QTY",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "productId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "thresholdUnitId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "countUomId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-11-01"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          },
+          "steps": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscountStep"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "list",
+          "scope",
+          "measure",
+          "effect",
+          "validFrom",
+          "steps"
+        ]
+      },
+      "QuoteLineRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "10",
+            "description": "In the unit"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "QuoteRequest": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string",
+            "default": "WHOLESALE"
+          },
+          "date": {
+            "type": "string",
+            "description": "Ulaanbaatar business date; default today"
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteLineRequest"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "AppliedDiscount": {
+        "type": "object",
+        "properties": {
+          "programId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "ORDER"
+            ],
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "threshold": {
+            "type": "string",
+            "description": "The step reached"
+          },
+          "value": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tugriks a category or order program took off the line"
+          }
+        },
+        "required": [
+          "programId",
+          "name",
+          "scope",
+          "effect",
+          "threshold",
+          "value",
+          "amount"
+        ]
+      },
+      "QuoteLine": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "priced": {
+            "type": "boolean"
+          },
+          "problem": {
+            "nullable": true,
+            "enum": [
+              "PRICE_MISSING"
+            ],
+            "type": "string"
+          },
+          "listPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceSource": {
+            "nullable": true,
+            "enum": [
+              "UNIT",
+              "DERIVED"
+            ],
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "After the product’s own discounts"
+          },
+          "subtotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedDiscount"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty",
+          "qtyBase",
+          "priced",
+          "problem",
+          "listPrice",
+          "priceSource",
+          "unitPrice",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "applied"
+        ]
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "enum": [
+              "WHOLESALE",
+              "RETAIL"
+            ],
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteLine"
+            }
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "discountTotal": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "list",
+          "date",
+          "lines",
+          "subtotal",
+          "discountTotal",
+          "total"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -15899,6 +17164,8 @@
           "IMPORT_HAS_ERRORS",
           "IMPORT_BUSY",
           "IMPORT_REVERT_BLOCKED",
+          "DISCOUNT_PROGRAM_STARTED",
+          "DISCOUNT_PROGRAM_OVERLAP",
           "UNIT_SUPERSEDED",
           "PRICE_MISSING",
           "DISCOUNT_OVER_CAP",

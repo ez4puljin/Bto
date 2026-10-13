@@ -9,6 +9,7 @@ import { IdentityHttpModule } from './modules/identity';
 import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
 import { PartnersHttpModule } from './modules/partners';
+import { PricingHttpModule } from './modules/pricing';
 
 /** The HTTP API (ROLE=api). Business modules are added here, one per session. */
 @Module({
@@ -23,6 +24,7 @@ import { PartnersHttpModule } from './modules/partners';
     PartnersHttpModule,
     InventoryHttpModule,
     ImportsHttpModule,
+    PricingHttpModule,
   ],
 })
 export class AppModule {}

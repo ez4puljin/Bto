@@ -36,7 +36,10 @@ describe('units, supersede, conversion and barcodes (ADR-0008, ADR-0029)', () =>
   const http = () => request(app.getHttpServer());
 
   beforeAll(async () => {
-    app = await createHttpApp({ providers: [{ provide: UNIT_SUPERSEDED_HOOK, useValue: hook }] });
+    // Pricing binds the real hook (ADR-0041); the probe replaces it.
+    app = await createHttpApp({
+      override: (builder) => builder.overrideProvider(UNIT_SUPERSEDED_HOOK).useValue(hook),
+    });
     admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
     const api = catalogApi(app, admin);
     pcs = await api.uomId('PCS');

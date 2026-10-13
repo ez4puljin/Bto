@@ -2057,6 +2057,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/unit-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["UnitPrices_view"];
+        put?: never;
+        /** Idempotent: a retried change must not close the price it just inserted. */
+        post: operations["UnitPrices_set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/unit-prices/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base unit prices of many products, for list columns (ADR-0037). */
+        get: operations["UnitPrices_current"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DiscountPrograms_list"];
+        put?: never;
+        post: operations["DiscountPrograms_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-programs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DiscountPrograms_get"];
+        /** Only before the program starts. */
+        put: operations["DiscountPrograms_update"];
+        post?: never;
+        /** Only before the program starts. */
+        delete: operations["DiscountPrograms_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-programs/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DiscountPrograms_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Pricing_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2081,7 +2181,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.ebarimt.manage" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.ebarimt.manage" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4096,8 +4196,209 @@ export interface components {
             /** @example Бараа.xlsx */
             fileName: string;
         };
+        PricePeriod: {
+            id: number;
+            /**
+             * @description Whole MNT, VAT included
+             * @example 22800
+             */
+            price: string;
+            /** @example 2026-10-13 */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+        };
+        CurrentUnitPrice: {
+            /** @example 22800 */
+            price: string;
+            /**
+             * @description UNIT: the unit's own price; DERIVED: the base unit's price × factor
+             * @enum {string}
+             */
+            source: "UNIT" | "DERIVED";
+            period: components["schemas"]["PricePeriod"] | null;
+        };
+        UnitPriceView: {
+            productUnitId: number;
+            uomName: string;
+            /** @example 24 */
+            factorToBase: string;
+            isBase: boolean;
+            current: components["schemas"]["CurrentUnitPrice"] | null;
+            /** @description Starting after today, earliest first */
+            scheduled: components["schemas"]["PricePeriod"][];
+            /** @description Ended, latest first */
+            history: components["schemas"]["PricePeriod"][];
+        };
+        ProductPrices: {
+            productId: number;
+            /** @description The Ulaanbaatar business date the view is for */
+            today: string;
+            /** @description Every channel but the supermarket */
+            wholesale: components["schemas"]["UnitPriceView"][];
+            /** @description The supermarket */
+            retail: components["schemas"]["UnitPriceView"][];
+        };
+        CurrentPrice: {
+            productId: number;
+            /** @enum {string} */
+            list: "WHOLESALE" | "RETAIL";
+            /** @description The base unit */
+            productUnitId: number;
+            /** @example 1000 */
+            price: string;
+        };
+        PriceEntryRequest: {
+            /** @enum {string} */
+            list: "WHOLESALE" | "RETAIL";
+            productUnitId: number;
+            /**
+             * @description Whole MNT; null takes the unit back to its base unit's price × factor
+             * @example 22800
+             */
+            price: string | null;
+        };
+        SetPricesRequest: {
+            productId: number;
+            /**
+             * @description Today or later (Ulaanbaatar)
+             * @example 2026-10-13
+             */
+            validFrom: string;
+            entries: components["schemas"]["PriceEntryRequest"][];
+        };
+        ProgramProduct: {
+            id: number;
+            sku: string;
+            name: string;
+        };
+        ProgramUnit: {
+            id: number;
+            uomName: string;
+            /** @example 24 */
+            factorToBase: string;
+        };
+        DiscountStep: {
+            /**
+             * @description PRODUCT QTY: base units; CATEGORY QTY: counted units; AMOUNT: MNT
+             * @example 240
+             */
+            threshold: string;
+            /**
+             * @description PRICE, AMOUNT: whole MNT; PERCENT: a percentage
+             * @example 22800
+             */
+            value: string;
+        };
+        DiscountProgram: {
+            id: number;
+            name: string;
+            /** @enum {string} */
+            list: "WHOLESALE" | "RETAIL";
+            /** @enum {string} */
+            scope: "PRODUCT" | "CATEGORY" | "ORDER";
+            /** @enum {string} */
+            measure: "QTY" | "AMOUNT";
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            product: components["schemas"]["ProgramProduct"] | null;
+            productUnit: components["schemas"]["ProgramUnit"] | null;
+            thresholdUnit: components["schemas"]["ProgramUnit"] | null;
+            categoryId: number | null;
+            countUomId: number | null;
+            validFrom: string;
+            validTo: string | null;
+            /** @enum {string} */
+            status: "SCHEDULED" | "ACTIVE" | "ENDED";
+            steps: components["schemas"]["DiscountStep"][];
+            createdAt: string;
+            updatedAt: string;
+        };
+        DiscountProgramPage: {
+            data: components["schemas"]["DiscountProgram"][];
+            nextCursor: string | null;
+        };
+        DiscountProgramRequest: {
+            name: string;
+            /** @enum {string} */
+            list: "WHOLESALE" | "RETAIL";
+            /** @enum {string} */
+            scope: "PRODUCT" | "CATEGORY" | "ORDER";
+            /** @enum {string} */
+            measure: "QTY" | "AMOUNT";
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            productId?: number | null;
+            productUnitId?: number | null;
+            thresholdUnitId?: number | null;
+            categoryId?: number | null;
+            countUomId?: number | null;
+            /** @example 2026-11-01 */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo?: string | null;
+            steps: components["schemas"]["DiscountStep"][];
+        };
+        QuoteLineRequest: {
+            productUnitId: number;
+            /**
+             * @description In the unit
+             * @example 10
+             */
+            qty: string;
+        };
+        QuoteRequest: {
+            /**
+             * @default WHOLESALE
+             * @enum {string}
+             */
+            list: "WHOLESALE" | "RETAIL";
+            /** @description Ulaanbaatar business date; default today */
+            date?: string;
+            lines: components["schemas"]["QuoteLineRequest"][];
+        };
+        AppliedDiscount: {
+            programId: number;
+            name: string;
+            /** @enum {string} */
+            scope: "PRODUCT" | "CATEGORY" | "ORDER";
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            /** @description The step reached */
+            threshold: string;
+            value: string;
+            /** @description Tugriks a category or order program took off the line */
+            amount: string | null;
+        };
+        QuoteLine: {
+            productId: number;
+            productUnitId: number;
+            qty: string;
+            qtyBase: string;
+            priced: boolean;
+            /** @enum {string|null} */
+            problem: "PRICE_MISSING" | null;
+            listPrice: string | null;
+            /** @enum {string|null} */
+            priceSource: "UNIT" | "DERIVED" | null;
+            /** @description After the product’s own discounts */
+            unitPrice: string | null;
+            subtotal: string | null;
+            discountAmount: string | null;
+            total: string | null;
+            applied: components["schemas"]["AppliedDiscount"][];
+        };
+        Quote: {
+            /** @enum {string} */
+            list: "WHOLESALE" | "RETAIL";
+            date: string;
+            lines: components["schemas"]["QuoteLine"][];
+            subtotal: string;
+            discountTotal: string;
+            total: string;
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -9511,6 +9812,327 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportJob"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnitPrices_view: {
+        parameters: {
+            query: {
+                productId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductPrices"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnitPrices_set: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPricesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductPrices"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UnitPrices_current: {
+        parameters: {
+            query: {
+                /** @description Repeated: productIds=1&productIds=2 */
+                productIds: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentPrice"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                list?: "WHOLESALE" | "RETAIL";
+                scope?: "PRODUCT" | "CATEGORY" | "ORDER";
+                status?: "SCHEDULED" | "ACTIVE" | "ENDED";
+                productId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgramPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountProgramRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountProgramRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscountPrograms_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Pricing_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quote"];
                 };
             };
             /** @description RFC 9457 problem details */

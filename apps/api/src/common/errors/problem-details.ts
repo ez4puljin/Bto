@@ -65,6 +65,8 @@ const CONSTRAINT_CODES: Readonly<Record<string, { code: ErrorCode; status: numbe
   '23505': { code: 'DUPLICATE_VALUE', status: 409 },
   '23503': { code: 'CONFLICT', status: 409 },
   '23514': { code: 'VALIDATION_FAILED', status: 422 },
+  // An EXCLUDE constraint: two rows for the same thing over overlapping dates.
+  '23P01': { code: 'CONFLICT', status: 409 },
 };
 
 /**

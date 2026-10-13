@@ -1,13 +1,15 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Decimal } from '@tugeel/shared/money';
+import { businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import { systemActor } from '../../src/modules/identity';
 import { BarcodeService, UnitsService } from '../../src/modules/catalog';
+import { UnitPricesService } from '../../src/modules/pricing';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, codeOf, unitOf } from '../harness/catalog';
 import { login, seedUser } from '../harness/identity';
 
-/** ADR-0008 #7: superseding a factor never orphans barcodes or default flags, even under concurrency. */
+/** ADR-0008 #7: superseding a factor never orphans barcodes, default flags or prices, even under concurrency. */
 describe('integrity: unit supersede', () => {
   let app: NestExpressApplication;
   let sql: Client;
@@ -48,7 +50,22 @@ describe('integrity: unit supersede', () => {
       ],
     });
     const old = unitOf(product, 'BOX');
+    await app.get(UnitPricesService).set(actor, {
+      productId: product.id,
+      validFrom: businessDate(),
+      entries: [
+        { list: 'WHOLESALE', productUnitId: unitOf(product, 'PCS').id, price: new Decimal(1000) },
+        { list: 'WHOLESALE', productUnitId: old.id, price: new Decimal(22_800) },
+      ],
+    });
     const next = await app.get(UnitsService).supersede(actor, old.id, new Decimal(20));
+    // Pricing's hook ran in the same transaction (ADR-0041 #1): the old box's price is gone and
+    // the new box takes the piece price × 20.
+    const prices = await app.get(UnitPricesService).view(product.id);
+    expect(prices.lists.WHOLESALE.map((unit) => unit.current?.price.toString())).toEqual([
+      '1000',
+      '20000',
+    ]);
     const [hit] = await app.get(BarcodeService).lookup('IB-40001');
     expect(hit?.unitId).toBe(next.id);
     expect(next).toMatchObject({ isDefaultSales: true, isDefaultPurchase: true });

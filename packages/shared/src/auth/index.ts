@@ -30,6 +30,7 @@ export const PERMISSIONS = [
   'inventory.costs.manage',
   'inventory.transfers.manage',
   'imports.manage',
+  'pricing.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
