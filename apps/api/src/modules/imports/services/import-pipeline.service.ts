@@ -17,6 +17,7 @@ import type {
   ImportJobRow,
   SourceRow,
 } from '../importers/importer';
+import { LevelsImporter } from '../importers/levels.importer';
 import { OpeningStockImporter } from '../importers/opening-stock.importer';
 import { ProductsImporter } from '../importers/products.importer';
 import { SuppliersImporter } from '../importers/suppliers.importer';
@@ -52,12 +53,14 @@ export class ImportPipelineService {
     customers: CustomersImporter,
     suppliers: SuppliersImporter,
     opening: OpeningStockImporter,
+    levels: LevelsImporter,
   ) {
     this.importers = new Map<ImportKind, Importer>([
       ['PRODUCTS', products],
       ['CUSTOMERS', customers],
       ['SUPPLIERS', suppliers],
       ['OPENING_STOCK', opening],
+      ['LEVELS', levels],
     ]);
   }
 

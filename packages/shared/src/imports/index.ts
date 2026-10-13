@@ -7,7 +7,13 @@ import { type CustomerKind, cleanTaxNumber, normalizeRegNo, regNoShape } from '.
  * (`imports.columns.<KIND>.<key>`, `imports.aliases.<KIND>.<key>` with `|` between aliases); the
  * header row of an uploaded sheet is matched against them, so the column order does not matter.
  */
-export const IMPORT_KINDS = ['PRODUCTS', 'CUSTOMERS', 'SUPPLIERS', 'OPENING_STOCK'] as const;
+export const IMPORT_KINDS = [
+  'PRODUCTS',
+  'CUSTOMERS',
+  'SUPPLIERS',
+  'OPENING_STOCK',
+  'LEVELS',
+] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 export function isImportKind(value: unknown): value is ImportKind {
@@ -86,6 +92,14 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('qty', 'decimal', true),
     column('unitCost', 'decimal'),
   ],
+  // Low-stock levels per warehouse (ADR-0039), in the row's unit.
+  LEVELS: [
+    column('warehouse', 'text', true),
+    column('sku', 'code', true),
+    column('unit', 'text'),
+    column('minQty', 'decimal'),
+    column('maxQty', 'decimal'),
+  ],
 };
 
 export const IMPORT_LIMITS = {
@@ -115,6 +129,7 @@ export const ROW_ERROR_CODES = [
   'NOT_POSITIVE',
   'OUT_OF_RANGE',
   'ALREADY_IMPORTED',
+  'MIN_ABOVE_MAX',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 

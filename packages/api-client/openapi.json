@@ -8396,7 +8396,8 @@
                 "PRODUCTS",
                 "CUSTOMERS",
                 "SUPPLIERS",
-                "OPENING_STOCK"
+                "OPENING_STOCK",
+                "LEVELS"
               ],
               "type": "string"
             }
@@ -8469,7 +8470,8 @@
                 "PRODUCTS",
                 "CUSTOMERS",
                 "SUPPLIERS",
-                "OPENING_STOCK"
+                "OPENING_STOCK",
+                "LEVELS"
               ]
             }
           },
@@ -15578,7 +15580,8 @@
               "PRODUCTS",
               "CUSTOMERS",
               "SUPPLIERS",
-              "OPENING_STOCK"
+              "OPENING_STOCK",
+              "LEVELS"
             ],
             "type": "string"
           },
@@ -15803,7 +15806,8 @@
               "PRODUCTS",
               "CUSTOMERS",
               "SUPPLIERS",
-              "OPENING_STOCK"
+              "OPENING_STOCK",
+              "LEVELS"
             ],
             "type": "string"
           },

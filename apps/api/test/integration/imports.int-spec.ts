@@ -1,7 +1,9 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client } from 'pg';
+import type { PgBoss } from 'pg-boss';
 import request from 'supertest';
+import { PG_BOSS } from '../../src/common/jobs/pg-boss.provider';
 import { ImportPipelineService } from '../../src/modules/imports';
 import { StocktakesService } from '../../src/modules/inventory';
 import { connectAs, createHttpApp, createWorker, waitFor } from '../harness/apps';
@@ -350,6 +352,73 @@ describe('imports', () => {
     expect(codes(await imports.rows(again.id, 'ERRORS'))).toEqual(['warehouse:ALREADY_IMPORTED']);
   });
 
+  it('sets low-stock levels per warehouse in a unit and keeps what a cell leaves empty (ADR-0039)', async () => {
+    const levels = async () =>
+      (
+        await sql.query(
+          `SELECT w.code AS wh, p.sku, pl.min_qty::text AS min, pl.max_qty::text AS max
+             FROM product_locations pl JOIN warehouses w ON w.id = pl.warehouse_id
+             JOIN products p ON p.id = pl.product_id
+            WHERE pl.min_qty IS NOT NULL OR pl.max_qty IS NOT NULL ORDER BY w.code, p.sku`,
+        )
+      ).rows;
+    const bad = await imports.check('LEVELS', [
+      { warehouse: 'WH2', sku: '1001', minQty: 1 },
+      { warehouse: 'WH1', sku: '9999', minQty: 1 },
+      { warehouse: 'WH1', sku: '1001', minQty: 10, maxQty: 5 },
+      { warehouse: 'STORE1', sku: '1002', unit: null, minQty: null },
+      { warehouse: 'STORE1', sku: '1001', unit: 'хайрцаг', minQty: '0.3' },
+      { warehouse: 'STORE1', sku: '1001', minQty: 2 },
+    ]);
+    expect(bad.status).toBe('INVALID');
+    expect(codes(await imports.rows(bad.id, 'ERRORS'))).toEqual([
+      'warehouse:NOT_ALLOWED',
+      'sku:NOT_FOUND',
+      'maxQty:MIN_ABOVE_MAX',
+      'minQty:REQUIRED',
+      'minQty:INEXACT',
+      'sku:DUPLICATE_IN_FILE',
+    ]);
+
+    // Boxes of 24 become pieces; a level of 0 is allowed.
+    const ok = await imports.check('LEVELS', [
+      { warehouse: 'WH1', sku: '1001', unit: 'хайрцаг', minQty: 1, maxQty: 4 },
+      { warehouse: 'STORE1', sku: '1002', minQty: 0 },
+    ]);
+    expect(ok.status).toBe('VALIDATED');
+    expect((await imports.rows(ok.id)).map((row) => [row.action, row.changed])).toEqual([
+      ['CREATE', ['minQty', 'maxQty']],
+      ['CREATE', ['minQty']],
+    ]);
+    expect((await imports.commit(ok.id)).status).toBe('COMMITTED');
+    committed.push(ok.id);
+    expect(await levels()).toEqual([
+      { wh: 'STORE1', sku: '1002', min: '0.000', max: null },
+      { wh: 'WH1', sku: '1001', min: '24.000', max: '96.000' },
+    ]);
+
+    // An empty cell keeps the stored level; the same level again changes nothing.
+    const update = await imports.check('LEVELS', [
+      { warehouse: 'WH1', sku: '1001', maxQty: 120 },
+      { warehouse: 'Супермаркет STORE1', sku: '1002', minQty: 0 },
+    ]);
+    expect(codes(await imports.rows(update.id, 'ERRORS'))).toEqual(['warehouse:NOT_FOUND']);
+    const fixed = await imports.check('LEVELS', [
+      { warehouse: 'WH1', sku: '1001', maxQty: 120 },
+      { warehouse: 'STORE1', sku: '1002', minQty: 0 },
+    ]);
+    expect((await imports.rows(fixed.id)).map((row) => [row.action, row.changed])).toEqual([
+      ['UPDATE', ['maxQty']],
+      ['UNCHANGED', []],
+    ]);
+    expect((await imports.commit(fixed.id)).status).toBe('COMMITTED');
+    committed.push(fixed.id);
+    expect(await levels()).toEqual([
+      { wh: 'STORE1', sku: '1002', min: '0.000', max: null },
+      { wh: 'WH1', sku: '1001', min: '24.000', max: '120.000' },
+    ]);
+  });
+
   it('shows the new preview instead when the data changed after the check', async () => {
     const job = await imports.check('PRODUCTS', [
       { sku: '2001', name: 'Шүүс', category: 'Ус', barcodes: '4870001000011' },
@@ -419,9 +488,22 @@ describe('imports', () => {
               (SELECT string_agg(name || ':' || coalesce(bank_account, '-'), ',' ORDER BY id) FROM suppliers WHERE status = 'ACTIVE') AS suppliers`,
     );
     expect(partners[0]).toEqual({ customers: 0, suppliers: 'МСМ ХХК:-' });
+    // The levels went back in two steps; the supermarket row the import made is gone.
+    const { rows: levels } = await sql.query(
+      `SELECT count(*)::int AS n FROM product_locations
+        WHERE min_qty IS NOT NULL OR max_qty IS NOT NULL OR warehouse_id IN
+              (SELECT id FROM warehouses WHERE code = 'STORE1')`,
+    );
+    expect(levels[0]).toEqual({ n: 0 });
   });
 
   it('runs the check in the worker through pg-boss', async () => {
+    // The other tests ran their jobs in-process: what their requests queued would keep the worker
+    // busy for a polling interval each before it reached this one.
+    const boss = app.get<PgBoss>(PG_BOSS);
+    for (const queue of ['imports.validate', 'imports.commit', 'imports.revert']) {
+      await boss.deleteQueuedJobs(queue);
+    }
     const context: INestApplicationContext = await createWorker();
     try {
       const fileId = await imports.upload(

@@ -7,6 +7,7 @@ import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
 import { ImportsController } from './controllers/imports.controller';
 import { CustomersImporter } from './importers/customers.importer';
+import { LevelsImporter } from './importers/levels.importer';
 import { OpeningStockImporter } from './importers/opening-stock.importer';
 import { ProductsImporter } from './importers/products.importer';
 import { SuppliersImporter } from './importers/suppliers.importer';
@@ -18,6 +19,7 @@ import { ImportsService } from './services/imports.service';
 
 const CORE_SERVICES = [
   CustomersImporter,
+  LevelsImporter,
   ImportPipelineService,
   ImportsService,
   OpeningStockImporter,
