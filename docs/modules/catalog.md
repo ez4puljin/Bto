@@ -80,7 +80,21 @@ Actions `CREATE`, `UPDATE`, `DELETE`, `SUPERSEDE`, `RETIRE`, `ASSIGN` on the ent
 
 ## 8. Screens (`apps/web`)
 
-Menu group «Бараа»: `/catalog/products` (search, filters in the URL; every piece of product information as a column — image, SKU, name, category, brand, base unit, other units «1 хайрцаг = 24 ш», base and other-unit barcodes, VAT, city tax, weight, home warehouse and fixed shelves from inventory, main supplier «+N» from partners, e-Barimt codes, status — read per page with `productIds` only for visible columns; «Баганууд» hides and shows columns (SKU and name stay), remembered per browser in `localStorage` `tugeel.catalog.products.hiddenColumns.v1`; a sticky «Засах» / «Харах» button and a click anywhere on the row open the product; the page uses the full width (route `handle: { wide: true }`); the chooser and the row button are the shared `components/column-chooser.tsx` and `components/record-row.tsx`, used by the customer and supplier lists too; ADR-0037), `/catalog/products/new` (`catalog.products.manage`), `/catalog/products/:id` (data and e-Barimt attributes, units and barcodes, photos; read-only without `catalog.products.manage`; the suppliers card below comes from `features/partners`, `docs/modules/partners.md` §8, and the «Байршил ба үлдэгдэл» card from `features/inventory`, `docs/modules/inventory.md` §9), `/catalog/categories`, `/catalog/brands`, `/catalog/uoms`, `/catalog/scan` (barcode lookup: wedge scanner, typing, camera), `/catalog/ebarimt` (`catalog.ebarimt.manage`). Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
+Menu group «Бараа» (layout and patterns: `docs/ui.md`, ADR-0042 #12):
+
+- `/catalog/products`: search and filters in the URL. Every piece of product information is a column (image, SKU, name, category, brand, base unit, other units «1 хайрцаг = 24 ш», base and other-unit barcodes, VAT, city tax, weight, home warehouse and fixed shelves from inventory, main supplier «+N» from partners, e-Barimt codes, status), read per page with `productIds` only for visible columns. «Баганууд» hides and shows columns (SKU and name stay), remembered per browser in `localStorage` `tugeel.catalog.products.hiddenColumns.v1`; the shared `components/column-chooser.tsx` serves the customer and supplier lists too (ADR-0037). A click anywhere on a row opens the product, whose name stays a link (ADR-0042 #6). The page uses the full width (route `handle: { wide: true }`).
+- `/catalog/products/new` (`catalog.products.manage`): sections «Ерөнхий», «e-Barimt шинж», «Суурь нэгж ба баркод» and «Нэмэлт нэгж» (each extra unit with its factor, default switches and barcodes); «Болих» goes back to the list.
+- `/catalog/products/:id`, read-only without `catalog.products.manage`:
+  - the header shows the primary photo, then SKU · category · brand · status;
+  - «Үндсэн мэдээлэл» is read in the form's sections, «Засах» opens the form, and the status is a switch;
+  - «Нэгж ба баркод» has one row per unit: the unit, its factor, its e-Barimt measure unit and default tags; its barcodes tagged «Үндсэн» / «Дотоод», with icon buttons to make one primary or delete it; «Баркод нэмэх» opens a dialog (scan or type, or «Дотоод баркод үүсгэх» while the unit has none); a «⋯» menu «{unit}: үйлдэл» edits the unit, changes its factor or retires it (the base unit only edits); earlier units fold away;
+  - photos form a square grid with «Үндсэн» on the primary one and their actions on hover;
+  - then prices, the suppliers card from `features/partners` (`docs/modules/partners.md` §8) and the «Байршил ба үлдэгдэл» card from `features/inventory` (`docs/modules/inventory.md` §9).
+- `/catalog/categories` (the tree with folders; row icons «Дэд ангилал», «Засах», «Устгах»), `/catalog/brands`, `/catalog/uoms` (a system / own pill, ✓ for fractional units; the fractional switch is fixed after creation).
+- `/catalog/scan`: the scan card (wedge scanner, typing, camera), the result card with «Бараа нээх», the earlier scans.
+- `/catalog/ebarimt` (`catalog.ebarimt.manage`): count tiles (green with «Бүрэн» at zero, amber otherwise), the bulk assignment form, the products still missing something.
+
+Idempotent actions send one `Idempotency-Key` per user intent (a dialog or a click) and resend it on a retry.
 
 ## 9. Tests
 
