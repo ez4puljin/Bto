@@ -1,9 +1,9 @@
 import { USER_ADJUSTMENT_REASONS } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
@@ -14,6 +14,8 @@ import {
   LinkRow,
   ListCard,
   LoadMore,
+  RowAction,
+  RowActions,
   SkeletonRows,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
@@ -57,7 +59,13 @@ import {
   useBinLookup,
   useInventoryMutations,
 } from './api';
-import { isInbound, looksLikeLabel, useWarehouseName, useWarehouseOptions } from './helpers';
+import {
+  isInbound,
+  looksLikeLabel,
+  useWarehouseName,
+  useWarehouseOptions,
+  wantsScanFocus,
+} from './helpers';
 import { useDefaultWarehouse } from './last-warehouse';
 import { DocStatusBadge, ProductSearch, QtyInput, WarehouseSelect } from './shared';
 
@@ -206,7 +214,10 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
         ...(note.trim() ? { note: note.trim() } : {}),
       });
       remember(warehouseId);
-      await navigate(`/inventory/adjustments/${adjustment.id}`, { replace: true });
+      await navigate(`/inventory/adjustments/${adjustment.id}`, {
+        replace: true,
+        state: { focusScan: true },
+      });
     });
 
   return (
@@ -280,6 +291,7 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
 export function AdjustmentPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
+  const location = useLocation();
   const canManage = useHasPermission('inventory.adjustments.manage');
   const adjustment = useAdjustment(id);
   const warehouseName = useWarehouseName();
@@ -313,7 +325,11 @@ export function AdjustmentPage() {
       />
       {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {detail.status === 'DRAFT' && canManage ? (
-        <AdjustmentEditor key={detail.id} detail={detail} />
+        <AdjustmentEditor
+          key={detail.id}
+          detail={detail}
+          focusScan={wantsScanFocus(location.state)}
+        />
       ) : (
         <AdjustmentReview key={detail.id} detail={detail} />
       )}
@@ -321,7 +337,7 @@ export function AdjustmentPage() {
   );
 }
 
-function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
+function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; focusScan: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mutations = useInventoryMutations();
@@ -405,6 +421,7 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
         <CardContent className="flex flex-col gap-4">
           <ScanBox
             letters
+            autoFocus={focusScan}
             label={t('inventory.scanLabel')}
             placeholder={t('inventory.scanPlaceholder')}
             onScan={onScan}
@@ -443,7 +460,7 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
                     <TableCell className="text-right">
                       <QtyInput
                         key={line.enteredQty}
-                        label={`${t('inventory.qty')}: ${line.productName}`}
+                        label={`${t('inventory.qty')}: ${t('inventory.productUnit', { product: line.productName, unit: line.unitName })}`}
                         value={line.enteredQty}
                         onScan={onScan}
                         onSave={(enteredQty) =>
@@ -457,18 +474,16 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
                       />
                     </TableCell>
                     <TableCell className="font-mono">{line.binCode}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        aria-label={`${t('inventory.remove')}: ${line.productName}`}
+                    <RowActions>
+                      <RowAction
+                        label={`${t('inventory.remove')}: ${t('inventory.productUnit', { product: line.productName, unit: line.unitName })}`}
+                        icon={Trash2}
+                        destructive
                         onClick={() =>
                           void action.run(() => mutations.removeAdjustmentLine.mutateAsync(line.id))
                         }
-                      >
-                        {t('inventory.remove')}
-                      </Button>
-                    </TableCell>
+                      />
+                    </RowActions>
                   </TableRow>
                 ))}
               </TableBody>
@@ -582,7 +597,7 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
                   {withCosts ? (
                     <TableCell>
                       <Input
-                        aria-label={`${t('inventory.adjustment.unitCost')}: ${line.productName}`}
+                        aria-label={`${t('inventory.adjustment.unitCost')}: ${t('inventory.productUnit', { product: line.productName, unit: line.unitName })}`}
                         placeholder={t('inventory.adjustment.unitCostHint')}
                         inputMode="decimal"
                         className="w-40 font-mono"

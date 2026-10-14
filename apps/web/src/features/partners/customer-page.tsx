@@ -141,7 +141,7 @@ function CreditCard(props: { customer: CustomerDetail; canEdit: boolean }) {
               },
               { label: t('partners.credit.term'), value: termText(customer.paymentTerm) },
               {
-                label: t('partners.credit.hold'),
+                label: t('partners.credit.status'),
                 value: customer.creditHold ? (
                   <Badge variant="destructive">{t('partners.credit.held')}</Badge>
                 ) : (

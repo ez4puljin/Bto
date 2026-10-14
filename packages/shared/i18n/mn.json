@@ -445,7 +445,7 @@
     "entity": "Юуг",
     "details": "Дэлгэрэнгүй",
     "system": "Систем ({{label}})",
-    "allEntities": "Бүгд",
+    "allEntities": "Бүх зүйл",
     "from": "Эхлэх огноо",
     "to": "Дуусах огноо",
     "before": "Өмнө",
@@ -915,7 +915,7 @@
       "status": "Төлөв",
       "saved": "Хадгалагдлаа",
       "firstAddress": "Хүргэлтийн хаяг",
-      "sectionGeneral": "Үндсэн мэдээлэл",
+      "sectionGeneral": "Ерөнхий",
       "sectionTax": "Татвар"
     },
     "credit": {
@@ -932,7 +932,8 @@
       "holdReason": "Хаасан шалтгаан",
       "held": "Зээл хаасан",
       "open": "Нээлттэй",
-      "readOnly": "Зээлийн нөхцөлийг нягтлан, админ өөрчилнө"
+      "readOnly": "Зээлийн нөхцөлийг нягтлан, админ өөрчилнө",
+      "status": "Зээлийн төлөв"
     },
     "addresses": {
       "title": "Хаяг",
@@ -1009,7 +1010,7 @@
       "products": "Бараа",
       "productsEmpty": "Энэ нийлүүлэгчид холбогдсон бараа алга",
       "main": "Үндсэн",
-      "sectionGeneral": "Үндсэн мэдээлэл",
+      "sectionGeneral": "Ерөнхий",
       "sectionMoney": "Татвар ба тооцоо"
     },
     "productSuppliers": {
@@ -1215,8 +1216,6 @@
       "empty": "Шилжүүлэг алга",
       "from": "Хаанаас",
       "to": "Хаашаа",
-      "pickFrom": "Хаанаас: агуулах сонгоно уу",
-      "pickTo": "Хаашаа: агуулах сонгоно уу",
       "anyDirection": "Бүх чиглэл"
     },
     "transfer": {
@@ -1554,7 +1553,8 @@
     "scanQtyHint": "Дараагийн уншуулсан бараа энэ тоогоор нэмэгдэнэ",
     "scanQtyInvalid": "«Тоо» 0-ээс их байна (бутархай 3 оронтой хүртэл)",
     "scanAdded": "+{{qty}} {{unit}} · {{name}}",
-    "scanAddedBase": "+{{qty}} {{unit}} ({{base}} {{baseUnit}}) · {{name}}"
+    "scanAddedBase": "+{{qty}} {{unit}} ({{base}} {{baseUnit}}) · {{name}}",
+    "qtyWithBase": "{{qty}} {{unit}} ({{base}} {{baseUnit}})"
   },
   "imports": {
     "kinds": {
@@ -1915,7 +1915,8 @@
         "PRICE": "Шинэ үнэ, ₮",
         "PERCENT": "Хямдрал, %",
         "AMOUNT_UNIT": "Нэгж тутмаас хасах, ₮",
-        "AMOUNT_TOTAL": "Нийт дүнгээс хасах, ₮"
+        "AMOUNT_TOTAL": "Нийт дүнгээс хасах, ₮",
+        "qtyAny": "Хэдээс"
       },
       "addStep": "Шат нэмэх",
       "removeStep": "Шат хасах",

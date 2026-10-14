@@ -153,6 +153,13 @@ export function inUnit(qtyBase: string, factor: string): string {
   return fromBase(qtyBase, factor).toFixed();
 }
 
+/** Whether a page was opened by its create dialog, which asks for the scan box's focus. */
+export function wantsScanFocus(state: unknown): boolean {
+  return (
+    typeof state === 'object' && state !== null && 'focusScan' in state && state.focusScan === true
+  );
+}
+
 /** Whether the user writes documents for a warehouse (ADR-0027 #7). */
 export function useCanWrite(): (warehouseId: number) => boolean {
   const state = useAuthState();

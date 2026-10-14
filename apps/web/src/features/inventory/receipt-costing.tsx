@@ -272,6 +272,7 @@ const CostRow = memo(function CostRow(props: {
 }) {
   const { t } = useTranslation();
   const { line, entry, amount } = props;
+  const name = t('inventory.productUnit', { product: line.productName, unit: line.unitName });
   const unitPrice =
     amount === null || new Decimal(line.enteredQty).isZero()
       ? null
@@ -283,7 +284,7 @@ const CostRow = memo(function CostRow(props: {
     return (
       <Input
         data-cost={column}
-        aria-label={`${t(column === 'amount' ? 'inventory.costing.amount' : 'inventory.costing.unitPrice')}: ${line.productName}`}
+        aria-label={`${t(column === 'amount' ? 'inventory.costing.amount' : 'inventory.costing.unitPrice')}: ${name}`}
         inputMode="decimal"
         autoComplete="off"
         className="ml-auto w-32 text-right font-mono"
@@ -317,7 +318,7 @@ const CostRow = memo(function CostRow(props: {
           <TableCell className="text-right">{field('amount')}</TableCell>
           <TableCell>
             <Switch
-              aria-label={`${t('inventory.costing.freeGoods')}: ${line.productName}`}
+              aria-label={`${t('inventory.costing.freeGoods')}: ${name}`}
               checked={entry.free}
               onCheckedChange={(checked) => props.onChange(line.lineId, { free: checked })}
             />

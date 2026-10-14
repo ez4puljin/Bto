@@ -325,7 +325,7 @@ describe('adjustment approval', () => {
     const user = userEvent.setup();
     await user.type(
       await screen.findByRole('textbox', {
-        name: `${mn.inventory.adjustment.unitCost}: ${COLA.name}`,
+        name: `${mn.inventory.adjustment.unitCost}: ${COLA.name} (ш)`,
       }),
       '1550',
     );

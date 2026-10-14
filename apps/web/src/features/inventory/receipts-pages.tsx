@@ -71,6 +71,7 @@ import {
   useCanWrite,
   useWarehouseName,
   useWarehouseOptions,
+  wantsScanFocus,
 } from './helpers';
 import { useDefaultWarehouse } from './last-warehouse';
 import { ReceiptCostingCard } from './receipt-costing';
@@ -373,9 +374,7 @@ export function ReceiptPage() {
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
   if (!receipt.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   const detail = receipt.data;
-  const state: unknown = location.state;
-  const focusScan =
-    typeof state === 'object' && state !== null && 'focusScan' in state && state.focusScan === true;
+  const focusScan = wantsScanFocus(location.state);
 
   const body =
     detail.status === 'DRAFT' && canManage ? (
@@ -784,7 +783,7 @@ function ReceiptEditor({ detail, focusScan }: { detail: ReceiptDetail; focusScan
                     <TableCell className="text-right">
                       <QtyInput
                         key={line.enteredQty}
-                        label={`${t('inventory.qty')}: ${line.productName}`}
+                        label={`${t('inventory.qty')}: ${t('inventory.productUnit', { product: line.productName, unit: line.unitName })}`}
                         value={line.enteredQty}
                         onScan={onScan}
                         onSave={(enteredQty) =>
@@ -820,7 +819,7 @@ function ReceiptEditor({ detail, focusScan }: { detail: ReceiptDetail; focusScan
                     </TableCell>
                     <RowActions>
                       <RowAction
-                        label={`${t('inventory.remove')}: ${line.productName}`}
+                        label={`${t('inventory.remove')}: ${t('inventory.productUnit', { product: line.productName, unit: line.unitName })}`}
                         icon={Trash2}
                         destructive
                         onClick={() =>

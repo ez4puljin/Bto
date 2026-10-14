@@ -1,8 +1,9 @@
 import { Decimal } from '@tugeel/shared/money';
 import { ArrowLeftRight, Plus, Printer, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
@@ -74,6 +75,7 @@ import {
   useCanWrite,
   useWarehouseName,
   useWarehouseOptions,
+  wantsScanFocus,
 } from './helpers';
 import { useDefaultWarehouse } from './last-warehouse';
 import { DocStatusBadge, ProductSearch, QtyInput, WarehouseSelect } from './shared';
@@ -284,7 +286,10 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
       });
       if (origin === 'REQUEST') asking.remember(dest);
       else pushing.remember(source);
-      await navigate(`/inventory/transfers/${transfer.id}`, { replace: true });
+      await navigate(`/inventory/transfers/${transfer.id}`, {
+        replace: true,
+        state: { focusScan: true },
+      });
     });
 
   return (
@@ -325,7 +330,7 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
             id="transfer-from"
             options={origin === 'REQUEST' ? all.options : mine.options}
             value={source}
-            emptyLabel={t('inventory.transfers.pickFrom')}
+            emptyLabel={t('inventory.pickWarehouse')}
             onChange={setPickedSource}
           />
         </FormField>
@@ -334,7 +339,7 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
             id="transfer-to"
             options={origin === 'REQUEST' ? mine.options : all.options}
             value={dest}
-            emptyLabel={t('inventory.transfers.pickTo')}
+            emptyLabel={t('inventory.pickWarehouse')}
             onChange={setPickedDest}
           />
         </FormField>
@@ -367,6 +372,7 @@ export function TransferPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const canManage = useHasPermission('inventory.transfers.manage');
   const canWrite = useCanWrite();
   const transfer = useTransfer(id);
@@ -389,6 +395,7 @@ export function TransferPage() {
       <TransferDraftEditor
         key={`draft-${detail.id}`}
         detail={detail}
+        focusScan={wantsScanFocus(location.state)}
         onShip={() => setParams({ ship: '1' })}
       />
     ) : (detail.status === 'REQUESTED' || pushShipping) && atSource ? (
@@ -521,7 +528,12 @@ function RequestOwnerActions({ detail }: { detail: TransferDetail }) {
 }
 
 /** The lines of a draft: products scanned or searched, quantities in the unit asked for. */
-function TransferDraftEditor({ detail, onShip }: { detail: TransferDetail; onShip: () => void }) {
+function TransferDraftEditor(props: {
+  detail: TransferDetail;
+  focusScan: boolean;
+  onShip: () => void;
+}) {
+  const { detail, onShip } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mutations = useTransferMutations();
@@ -573,6 +585,7 @@ function TransferDraftEditor({ detail, onShip }: { detail: TransferDetail; onShi
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <ScanBox
+            autoFocus={props.focusScan}
             label={t('inventory.transfer.scanProduct')}
             placeholder={t('inventory.transfer.scanProductPlaceholder')}
             onScan={onScan}
@@ -1020,13 +1033,7 @@ function TransferShipEditor({
                     difference.isNegative()
                       ? 'inventory.transfer.shipShort'
                       : 'inventory.transfer.shipExtra',
-                    {
-                      name: line.productName,
-                      qty: t('inventory.qtyWithUnit', {
-                        qty: difference.abs().toFixed(),
-                        unit: line.baseUnitName,
-                      }),
-                    },
+                    { name: line.productName, qty: differenceText(t, line, difference) },
                   )}
             </li>
           ))}
@@ -1238,13 +1245,7 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
             <li key={line.id}>
               {t(
                 difference.isNegative() ? 'inventory.transfer.short' : 'inventory.transfer.extra',
-                {
-                  name: line.productName,
-                  qty: t('inventory.qtyWithUnit', {
-                    qty: difference.abs().toFixed(),
-                    unit: line.baseUnitName,
-                  }),
-                },
+                { name: line.productName, qty: differenceText(t, line, difference) },
               )}
             </li>
           ))}
@@ -1266,6 +1267,23 @@ function signed(value: Decimal): string {
 
 function requestedLabel(origin: TransferOrigin) {
   return origin === 'REQUEST' ? 'inventory.transfer.requested' : 'inventory.transfer.planned';
+}
+
+/**
+ * A count's difference from the plan: in the line's unit when it is a whole number of them, with
+ * the base units («1 хайрцаг (24 ш)»), else in base units.
+ */
+function differenceText(t: TFunction, line: TransferLine, difference: Decimal): string {
+  const base = difference.abs();
+  const inLineUnit = base.dividedBy(line.requestFactor);
+  return line.requestUnitId === line.baseUnitId || !inLineUnit.isInteger()
+    ? t('inventory.qtyWithUnit', { qty: base.toFixed(), unit: line.baseUnitName })
+    : t('inventory.qtyWithBase', {
+        qty: inLineUnit.toFixed(),
+        unit: line.unitName,
+        base: base.toFixed(),
+        baseUnit: line.baseUnitName,
+      });
 }
 
 /** A shipped quantity in the line's unit, with the base units when they differ. */

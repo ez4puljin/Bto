@@ -305,7 +305,7 @@ function RequestTransfer(props: {
           label={t('inventory.lowStock.source')}
           options={sources.options}
           value={source}
-          emptyLabel={t('inventory.transfers.pickFrom')}
+          emptyLabel={t('inventory.pickWarehouse')}
           onChange={setSource}
         />
       </ConfirmDialog>

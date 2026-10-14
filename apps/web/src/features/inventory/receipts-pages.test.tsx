@@ -290,7 +290,9 @@ describe('receipt editor', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup({ delay: null });
-    const qty = await screen.findByRole('textbox', { name: `${mn.inventory.qty}: ${COLA.name}` });
+    const qty = await screen.findByRole('textbox', {
+      name: `${mn.inventory.qty}: ${COLA.name} (хайрцаг)`,
+    });
     await user.click(qty);
     await user.keyboard('4006381333931{Enter}');
     await waitFor(() =>
@@ -392,17 +394,19 @@ describe('costs on the receipt (ADR-0047 #1)', () => {
     const { router } = renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const price = await screen.findByRole('textbox', {
-      name: `${mn.inventory.costing.unitPrice}: ${COLA.name}`,
+      name: `${mn.inventory.costing.unitPrice}: ${COLA.name} (хайрцаг)`,
     });
     const next = screen.getByRole('button', { name: mn.inventory.costing.saveAndNext });
     expect(next).toBeDisabled();
     await user.type(price, '24000');
     // The other field shows what the price comes to.
     expect(
-      screen.getByRole('textbox', { name: `${mn.inventory.costing.amount}: ${COLA.name}` }),
+      screen.getByRole('textbox', {
+        name: `${mn.inventory.costing.amount}: ${COLA.name} (хайрцаг)`,
+      }),
     ).toHaveAttribute('placeholder', '48,000');
     await user.click(
-      screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: Будаа` }),
+      screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: Будаа (ш)` }),
     );
     await user.click(next);
 
@@ -430,11 +434,11 @@ describe('costs on the receipt (ADR-0047 #1)', () => {
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
     const amount = await screen.findByRole('textbox', {
-      name: `${mn.inventory.costing.amount}: ${COLA.name}`,
+      name: `${mn.inventory.costing.amount}: ${COLA.name} (хайрцаг)`,
     });
     await user.type(amount, '48000');
     await user.click(
-      screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: Будаа` }),
+      screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: Будаа (ш)` }),
     );
     await user.click(screen.getByRole('button', { name: mn.common.save }));
     expect(await screen.findByText(mn.errors.CONFLICT)).toBeInTheDocument();

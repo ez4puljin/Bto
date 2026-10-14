@@ -1,9 +1,17 @@
-import { Move } from 'lucide-react';
-import { useState } from 'react';
+import { Move, Trash2 } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
+import {
+  EmptyState,
+  FilterBar,
+  ListCard,
+  LoadMore,
+  RowAction,
+  RowActions,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
@@ -24,6 +32,7 @@ import { problemFromError } from '@/lib/problem';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import { type Bin, useBinLookup, useBinMoves, useInventoryMutations } from './api';
 import { isQty, looksLikeLabel, useWarehouseName, useWarehouseOptions } from './helpers';
@@ -227,36 +236,35 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
           </p>
         ) : null}
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <Label>{t('inventory.moves.from')}</Label>
-            <span className="font-mono text-sm">{from?.code ?? t('inventory.moves.pickFrom')}</span>
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Picked term={t('inventory.moves.from')} mono>
+            {from?.code ?? t('inventory.moves.pickFrom')}
+          </Picked>
+          <Picked term={t('inventory.product')}>
+            {item
+              ? t('inventory.productUnit', { product: item.productName, unit: item.unitName })
+              : t('inventory.moves.pickProduct')}
+          </Picked>
+          <div className="flex flex-col gap-1.5">
+            <dt>
+              <Label htmlFor="move-qty">{t('inventory.qty')}</Label>
+            </dt>
+            <dd>
+              <Input
+                id="move-qty"
+                inputMode="decimal"
+                autoComplete="off"
+                className="w-28 font-mono"
+                value={qty}
+                onChange={(event) => setQty(event.target.value)}
+                onKeyDown={(event) => guard(event, qty, setQty)}
+              />
+            </dd>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label>{t('inventory.product')}</Label>
-            <span className="text-sm">
-              {item
-                ? t('inventory.productUnit', { product: item.productName, unit: item.unitName })
-                : t('inventory.moves.pickProduct')}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="move-qty">{t('inventory.qty')}</Label>
-            <Input
-              id="move-qty"
-              inputMode="decimal"
-              autoComplete="off"
-              className="w-28 font-mono"
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              onKeyDown={(event) => guard(event, qty, setQty)}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label>{t('inventory.moves.to')}</Label>
-            <span className="font-mono text-sm">{to?.code ?? t('inventory.moves.pickTo')}</span>
-          </div>
-        </div>
+          <Picked term={t('inventory.moves.to')} mono>
+            {to?.code ?? t('inventory.moves.pickTo')}
+          </Picked>
+        </dl>
         <ProductSearch
           onPick={(product) =>
             setItem({
@@ -276,7 +284,7 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
         </div>
         {lines.length > 0 ? (
           <>
-            <Label>{t('inventory.moves.pending')}</Label>
+            <h3 className="text-sm font-medium">{t('inventory.moves.pending')}</h3>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -298,17 +306,16 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
                     </TableCell>
                     <TableCell className="font-mono">{line.from.code}</TableCell>
                     <TableCell className="font-mono">{line.to.code}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="xs"
-                        variant="ghost"
+                    <RowActions>
+                      <RowAction
+                        label={`${t('inventory.remove')}: ${line.productName}`}
+                        icon={Trash2}
+                        destructive
                         onClick={() =>
                           setLines((previous) => previous.filter((_, other) => other !== index))
                         }
-                      >
-                        {t('inventory.remove')}
-                      </Button>
-                    </TableCell>
+                      />
+                    </RowActions>
                   </TableRow>
                 ))}
               </TableBody>
@@ -324,5 +331,15 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+/** A step the scans fill (the shelves, the product): a term over its value, read only. */
+function Picked(props: { term: string; mono?: boolean; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <dt className="text-sm leading-none font-medium">{props.term}</dt>
+      <dd className={cn('text-sm', props.mono ? 'font-mono' : null)}>{props.children}</dd>
+    </div>
   );
 }

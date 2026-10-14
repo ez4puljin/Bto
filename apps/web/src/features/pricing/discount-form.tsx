@@ -486,7 +486,9 @@ function StepsEditor(props: {
   const thresholdHead =
     draft.measure === 'AMOUNT'
       ? t('pricing.programs.stepHeads.amount')
-      : t('pricing.programs.stepHeads.qty', { unit: props.unitName });
+      : props.unitName
+        ? t('pricing.programs.stepHeads.qty', { unit: props.unitName })
+        : t('pricing.programs.stepHeads.qtyAny');
   const valueHead = t(
     draft.effect === 'AMOUNT'
       ? draft.scope === 'PRODUCT'

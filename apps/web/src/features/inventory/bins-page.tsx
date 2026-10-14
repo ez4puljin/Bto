@@ -262,7 +262,14 @@ function BinCreateDialog({ warehouseId, onClose }: { warehouseId: number; onClos
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('one');
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent
+      closeLabel={t('common.close')}
+      className="sm:max-w-lg"
+      onOpenAutoFocus={(event) => {
+        event.preventDefault();
+        document.getElementById('bin-code')?.focus();
+      }}
+    >
       <DialogHeader>
         <DialogTitle>{t('inventory.bins.createTitle')}</DialogTitle>
         <DialogDescription>
