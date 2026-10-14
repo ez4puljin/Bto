@@ -262,7 +262,7 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
               <TableBody>
                 {versions.map(({ version, status }) => (
                   <TableRow key={version.id}>
-                    <TableCell className="font-mono">
+                    <TableCell className="font-mono whitespace-normal">
                       {version.validTo
                         ? t('pricing.profiles.periodClosed', {
                             from: version.validFrom,

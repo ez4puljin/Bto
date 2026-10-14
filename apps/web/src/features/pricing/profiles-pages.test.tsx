@@ -145,6 +145,10 @@ describe('price profiles list', () => {
     await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.loose), '15');
     await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.retail), '30');
     await user.click(dialog.getByRole('switch', { name: mn.pricing.profiles.fields.bulk }));
+    // The example keeps its rows while the bulk price is still being typed.
+    const typing = within(dialog.getByRole('region', { name: 'Жишээ: агуулахын үнэ 1,000₮' }));
+    expect(typing.getByText('1,150₮')).toBeInTheDocument();
+    expect(typing.queryByText('Супермаркет бөөний (24+)')).toBeNull();
     await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.bulkQty), '24');
     const bulkPct = dialog.getByLabelText(mn.pricing.profiles.fields.bulkPct);
     await user.type(bulkPct, '35');

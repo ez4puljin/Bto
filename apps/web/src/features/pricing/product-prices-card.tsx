@@ -162,10 +162,16 @@ function PriceTermsView({ data }: { data: ProductPriceView }) {
           <TableHeader>
             <TableRow>
               <TableHead>{t('pricing.card.columns.unit')}</TableHead>
-              <TableHead className="text-right">{t('pricing.card.columns.wholesale')}</TableHead>
-              <TableHead className="text-right">{t('pricing.card.columns.retail')}</TableHead>
+              <TableHead className="text-right whitespace-normal">
+                {t('pricing.card.columns.wholesale')}
+              </TableHead>
+              <TableHead className="text-right whitespace-normal">
+                {t('pricing.card.columns.retail')}
+              </TableHead>
               {hasBulk ? (
-                <TableHead className="text-right">{t('pricing.card.columns.retailBulk')}</TableHead>
+                <TableHead className="text-right whitespace-normal">
+                  {t('pricing.card.columns.retailBulk')}
+                </TableHead>
               ) : null}
             </TableRow>
           </TableHeader>
@@ -176,8 +182,10 @@ function PriceTermsView({ data }: { data: ProductPriceView }) {
               );
               return (
                 <TableRow key={row.productUnitId}>
-                  <TableCell>{unit ? unitLabel(unit) : null}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="whitespace-normal">
+                    {unit ? unitLabel(unit) : null}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-normal">
                     <span className="font-mono">{money(row.wholesale)}</span>
                     <Badge variant="outline" className="ml-2">
                       {t(`pricing.card.bases.${row.wholesaleBasis}`)}

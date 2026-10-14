@@ -170,14 +170,16 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
   });
   const watched = useWatch({ control: form.control });
   const bulk = watched.bulk ?? false;
-  const typed = typedProfileValues({
+  const typing = {
     looseMarkupPct: watched.looseMarkupPct ?? '',
     retailMarkupPct: watched.retailMarkupPct ?? '',
     bulk,
     retailBulkMinQty: watched.retailBulkMinQty ?? '',
     retailBulkMarkupPct: watched.retailBulkMarkupPct ?? '',
     rounding: watched.rounding ?? 'WHOLE',
-  });
+  };
+  // While the bulk fields are being typed the example keeps its other rows.
+  const typed = typedProfileValues(typing) ?? typedProfileValues({ ...typing, bulk: false });
   const example = typed && !priceProfileIssue(typed) ? typed : null;
   const mutation = creating ? mutations.createProfile : mutations.setProfileVersion;
   const { errors, isSubmitting } = form.formState;
@@ -450,7 +452,7 @@ export function ProfileExample({ values }: { values: ProfileValues }) {
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.key}>
-              <TableCell>{row.basis}</TableCell>
+              <TableCell className="whitespace-normal">{row.basis}</TableCell>
               <TableCell className="text-right font-mono">
                 {row.markup ?? t('common.none')}
               </TableCell>

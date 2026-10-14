@@ -305,10 +305,14 @@ function PriceEntryForm(props: {
             <TableHeader>
               <TableRow>
                 <TableHead>{t('pricing.card.columns.unit')}</TableHead>
-                <TableHead className="text-right">{t('pricing.card.columns.wholesale')}</TableHead>
-                <TableHead className="text-right">{t('pricing.card.columns.retail')}</TableHead>
+                <TableHead className="text-right whitespace-normal">
+                  {t('pricing.card.columns.wholesale')}
+                </TableHead>
+                <TableHead className="text-right whitespace-normal">
+                  {t('pricing.card.columns.retail')}
+                </TableHead>
                 {hasBulk ? (
-                  <TableHead className="text-right">
+                  <TableHead className="text-right whitespace-normal">
                     {t('pricing.card.columns.retailBulk')}
                   </TableHead>
                 ) : null}
@@ -319,8 +323,10 @@ function PriceEntryForm(props: {
                 const unit = view.units.find((candidate) => candidate.productUnitId === row.unitId);
                 return (
                   <TableRow key={row.unitId}>
-                    <TableCell>{unit ? unitLabel(unit) : null}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="whitespace-normal">
+                      {unit ? unitLabel(unit) : null}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-normal">
                       <span className="font-mono">
                         {t('pricing.money', { amount: formatMnt(row.wholesale.toFixed(0)) })}
                       </span>
