@@ -148,6 +148,13 @@
       "when": 1791971813450,
       "tag": "0020_segments",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791986117435,
+      "tag": "0021_segment_lists",
+      "breakpoints": true
     }
   ]
 }

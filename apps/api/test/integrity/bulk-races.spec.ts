@@ -9,7 +9,7 @@ import { ProductLocationsService } from '../../src/modules/inventory';
 import { ProductSuppliersService } from '../../src/modules/partners';
 import { ProductPricesService } from '../../src/modules/pricing';
 import { connectAs, createHttpApp } from '../harness/apps';
-import { catalogApi } from '../harness/catalog';
+import { catalogApi, idempotency } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 import { inventoryApi, staffContext } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
@@ -21,7 +21,8 @@ const COUNT = 40;
  * Bulk product edits under concurrency (ADR-0051 #2): every writer takes its locks in id order, so
  * two bulk changes over the same products in opposite orders, or a bulk change beside a single
  * one, wait for each other instead of deadlocking, and the invariants hold after both: one main
- * supplier and one home per product, no overlapping price terms.
+ * supplier and one home per product, no overlapping price terms. Products added to a hand-picked
+ * segment (ADR-0052) take their share locks in the same order.
  */
 describe('integrity: bulk edits under concurrency', () => {
   let app: NestExpressApplication;
@@ -169,5 +170,46 @@ describe('integrity: bulk edits under concurrency', () => {
     );
     expect(rows).toHaveLength(COUNT);
     expect(rows.every((row) => row.homes === '1')).toBe(true);
+  });
+
+  it('adds products to a list segment while bulk changes lock the same ones (ADR-0052)', async () => {
+    // The members' foreign key share-locks each product in ascending order, as product writers
+    // lock them: an addition in the opposite order beside bulk and single changes never deadlocks.
+    const http = () => request(app.getHttpServer());
+    const created = await http()
+      .post('/api/v1/segments/lists')
+      .set(bearer(token))
+      .set(idempotency())
+      .send({ name: 'Зэрэг жагсаалт', productIds: [ids[0] ?? 0] })
+      .expect(201);
+    const segmentId = (created.body as { id: number }).id;
+    const bulk = app.get(ProductBulkService);
+    const reversed = [...ids].reverse();
+    const results = await Promise.allSettled([
+      http()
+        .post(`/api/v1/segments/${segmentId}/products`)
+        .set(bearer(token))
+        .set(idempotency())
+        .send({ productIds: reversed })
+        .expect(200),
+      bulk.setStatus(actor, reversed, 'ACTIVE'),
+      http()
+        .patch(`/api/v1/products/${ids[COUNT - 1] ?? 0}`)
+        .set(bearer(token))
+        .send({ name: 'Жагсаалтын зэрэг' })
+        .expect(200),
+      bulk.setCategory(actor, ids, categories[1] ?? 0),
+    ]);
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+    const { rows } = await sql.query<{ members: string }>(
+      'SELECT count(*)::text AS members FROM segment_products WHERE segment_id = $1',
+      [segmentId],
+    );
+    expect(rows[0]?.members).toBe(String(COUNT));
   });
 });

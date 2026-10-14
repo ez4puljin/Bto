@@ -11165,6 +11165,193 @@
         ]
       }
     },
+    "/api/v1/segments/lists": {
+      "post": {
+        "operationId": "Segments_createList",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentListRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A hand-picked product segment of the ticked products (ADR-0052): 1–20,000 ids, an unknown one\nrefused at `productIds`; a live name taken by any product segment is DUPLICATE_VALUE.",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/{id}/products": {
+      "post": {
+        "operationId": "Segments_addProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentProductsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentProductsResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Adds products to a hand-picked segment (ADR-0052); those already in are counted, never added\ntwice. 422 for a RULES segment, 409 SEGMENT_TOO_LARGE past 20,000 members.",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/{id}/products/remove": {
+      "post": {
+        "operationId": "Segments_removeProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentProductsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentProductsResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Takes products out of a hand-picked segment (ADR-0052); those not in it are counted.",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
     "/api/v1/exports/products": {
       "post": {
         "operationId": "Exports_products",
@@ -20557,6 +20744,14 @@
             ],
             "type": "string"
           },
+          "kind": {
+            "enum": [
+              "RULES",
+              "LIST"
+            ],
+            "type": "string",
+            "description": "RULES: saved conditions; LIST: hand-picked products (ADR-0052)"
+          },
           "name": {
             "type": "string"
           },
@@ -20565,7 +20760,14 @@
             "nullable": true
           },
           "definition": {
-            "$ref": "#/components/schemas/SegmentDefinition"
+            "nullable": true,
+            "description": "Null for a LIST segment",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -20579,6 +20781,7 @@
         "required": [
           "id",
           "entity",
+          "kind",
           "name",
           "description",
           "definition",
@@ -20667,9 +20870,6 @@
             "nullable": true,
             "maxLength": 500
           },
-          "definition": {
-            "$ref": "#/components/schemas/SegmentDefinition"
-          },
           "entity": {
             "enum": [
               "PRODUCT",
@@ -20677,12 +20877,82 @@
               "SUPPLIER"
             ],
             "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/SegmentDefinition"
           }
         },
         "required": [
           "name",
-          "definition",
-          "entity"
+          "entity",
+          "definition"
+        ]
+      },
+      "SegmentListRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "Бөөний бараа — Жиж ороогүй"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "productIds": {
+            "minItems": 1,
+            "description": "1–20000 products; repeats are dropped",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "name",
+          "productIds"
+        ]
+      },
+      "SegmentProductsRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "minItems": 1,
+            "description": "1–20000 products; repeats are dropped",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "productIds"
+        ]
+      },
+      "SegmentProductsResult": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "number",
+            "description": "Products added or removed"
+          },
+          "unchanged": {
+            "type": "number",
+            "description": "Products already in (adding) or not in (removing)"
+          },
+          "count": {
+            "type": "number",
+            "description": "The segment's size afterwards"
+          }
+        },
+        "required": [
+          "changed",
+          "unchanged",
+          "count"
         ]
       },
       "SegmentUpdateRequest": {
@@ -20699,12 +20969,16 @@
             "maxLength": 500
           },
           "definition": {
-            "$ref": "#/components/schemas/SegmentDefinition"
+            "description": "Required for a RULES segment; a LIST segment takes none (ADR-0052)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
           }
         },
         "required": [
-          "name",
-          "definition"
+          "name"
         ]
       },
       "ProductExportRequest": {
@@ -20857,6 +21131,7 @@
           "PRICE_PROFILE_IN_USE",
           "SEGMENT_INVALID",
           "EXPORT_TOO_LARGE",
+          "SEGMENT_TOO_LARGE",
           "AI_NOT_CONFIGURED",
           "AI_PROVIDER_FAILED",
           "AI_QUERY_FAILED",

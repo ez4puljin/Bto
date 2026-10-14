@@ -20,15 +20,19 @@ import {
 } from '../../identity';
 import {
   CreateSegmentDto,
+  CreateSegmentListDto,
   SegmentCountDto,
   SegmentCountsQueryDto,
   SegmentDto,
   SegmentPageDto,
   SegmentPreviewDto,
   SegmentPreviewRequestDto,
+  SegmentProductsDto,
+  SegmentProductsResultDto,
   SegmentQueryDto,
   UpdateSegmentDto,
 } from '../dto/segments.dto';
+import { SegmentListsService } from '../services/segment-lists.service';
 import { type Segment, SegmentsService } from '../services/segments.service';
 
 const MANAGE = 'segments.manage';
@@ -37,6 +41,7 @@ function toSegmentDto(segment: Segment): SegmentDto {
   return {
     id: segment.id,
     entity: segment.entity,
+    kind: segment.kind,
     name: segment.name,
     description: segment.description,
     definition: segment.definition,
@@ -45,11 +50,17 @@ function toSegmentDto(segment: Segment): SegmentDto {
   };
 }
 
-/** Segments (ADR-0049 #5): everyone reads them and their counts; admins change them. */
+/**
+ * Segments (ADR-0049 #5): everyone reads them and their counts; admins change them, and the
+ * members of hand-picked product segments (ADR-0052).
+ */
 @ApiTags('segments')
 @Controller('segments')
 export class SegmentsController {
-  constructor(private readonly segments: SegmentsService) {}
+  constructor(
+    private readonly segments: SegmentsService,
+    private readonly lists: SegmentListsService,
+  ) {}
 
   @Get()
   @Authenticated()
@@ -104,6 +115,52 @@ export class SegmentsController {
     @Body() body: CreateSegmentDto,
   ): Promise<SegmentDto> {
     return toSegmentDto(await this.segments.create(ctx, body.entity, body));
+  }
+
+  /**
+   * A hand-picked product segment of the ticked products (ADR-0052): 1–20,000 ids, an unknown one
+   * refused at `productIds`; a live name taken by any product segment is DUPLICATE_VALUE.
+   */
+  @Post('lists')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @ApiCreatedResponse({ type: SegmentDto })
+  async createList(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: CreateSegmentListDto,
+  ): Promise<SegmentDto> {
+    return toSegmentDto(await this.lists.create(ctx, body));
+  }
+
+  /**
+   * Adds products to a hand-picked segment (ADR-0052); those already in are counted, never added
+   * twice. 422 for a RULES segment, 409 SEGMENT_TOO_LARGE past 20,000 members.
+   */
+  @Post(':id/products')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: SegmentProductsResultDto })
+  addProducts(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SegmentProductsDto,
+  ): Promise<SegmentProductsResultDto> {
+    return this.lists.add(ctx, id, body.productIds);
+  }
+
+  /** Takes products out of a hand-picked segment (ADR-0052); those not in it are counted. */
+  @Post(':id/products/remove')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: SegmentProductsResultDto })
+  removeProducts(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SegmentProductsDto,
+  ): Promise<SegmentProductsResultDto> {
+    return this.lists.remove(ctx, id, body.productIds);
   }
 
   @Put(':id')

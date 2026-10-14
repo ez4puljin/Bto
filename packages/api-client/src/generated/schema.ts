@@ -2646,6 +2646,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/segments/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A hand-picked product segment of the ticked products (ADR-0052): 1–20,000 ids, an unknown one
+         *     refused at `productIds`; a live name taken by any product segment is DUPLICATE_VALUE.
+         */
+        post: operations["Segments_createList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/{id}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adds products to a hand-picked segment (ADR-0052); those already in are counted, never added
+         *     twice. 422 for a RULES segment, 409 SEGMENT_TOO_LARGE past 20,000 members.
+         */
+        post: operations["Segments_addProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/{id}/products/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Takes products out of a hand-picked segment (ADR-0052); those not in it are counted. */
+        post: operations["Segments_removeProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/products": {
         parameters: {
             query?: never;
@@ -5431,9 +5488,15 @@ export interface components {
             id: number;
             /** @enum {string} */
             entity: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+            /**
+             * @description RULES: saved conditions; LIST: hand-picked products (ADR-0052)
+             * @enum {string}
+             */
+            kind: "RULES" | "LIST";
             name: string;
             description: string | null;
-            definition: components["schemas"]["SegmentDefinition"];
+            /** @description Null for a LIST segment */
+            definition: components["schemas"]["SegmentDefinition"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -5461,15 +5524,35 @@ export interface components {
             /** @example Бөөний бараа — Жиж ороогүй */
             name: string;
             description?: string | null;
-            definition: components["schemas"]["SegmentDefinition"];
             /** @enum {string} */
             entity: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+            definition: components["schemas"]["SegmentDefinition"];
+        };
+        SegmentListRequest: {
+            /** @example Бөөний бараа — Жиж ороогүй */
+            name: string;
+            description?: string | null;
+            /** @description 1–20000 products; repeats are dropped */
+            productIds: number[];
+        };
+        SegmentProductsRequest: {
+            /** @description 1–20000 products; repeats are dropped */
+            productIds: number[];
+        };
+        SegmentProductsResult: {
+            /** @description Products added or removed */
+            changed: number;
+            /** @description Products already in (adding) or not in (removing) */
+            unchanged: number;
+            /** @description The segment's size afterwards */
+            count: number;
         };
         SegmentUpdateRequest: {
             /** @example Бөөний бараа — Жиж ороогүй */
             name: string;
             description?: string | null;
-            definition: components["schemas"]["SegmentDefinition"];
+            /** @description Required for a RULES segment; a LIST segment takes none (ADR-0052) */
+            definition?: components["schemas"]["SegmentDefinition"];
         };
         ProductExportRequest: {
             /** @description The ticked products (1–20000), without filters */
@@ -5490,7 +5573,7 @@ export interface components {
             columns: ("sku" | "name" | "category" | "baseUnit" | "units" | "warehousePrice" | "priceProfile" | "baseBarcodes" | "unitBarcodes" | "weight" | "homeWarehouse" | "fixedBins" | "supplier" | "status")[];
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -12339,6 +12422,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SegmentPreview"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_createList: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentListRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_addProducts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentProductsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentProductsResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_removeProducts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentProductsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentProductsResult"];
                 };
             };
             /** @description RFC 9457 problem details */

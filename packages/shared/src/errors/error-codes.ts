@@ -85,6 +85,7 @@ export const ErrorCode = {
   // segments (docs/modules/segments.md)
   SEGMENT_INVALID: 'SEGMENT_INVALID',
   EXPORT_TOO_LARGE: 'EXPORT_TOO_LARGE',
+  SEGMENT_TOO_LARGE: 'SEGMENT_TOO_LARGE',
   // ai (docs/modules/ai.md)
   AI_NOT_CONFIGURED: 'AI_NOT_CONFIGURED',
   AI_PROVIDER_FAILED: 'AI_PROVIDER_FAILED',

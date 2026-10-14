@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
@@ -19,6 +19,7 @@ const segment = (
 ): Schemas['Segment'] => ({
   id,
   entity,
+  kind: 'RULES',
   name,
   description: null,
   definition,
@@ -141,6 +142,59 @@ describe('segments (ADR-0049)', () => {
     expect(calls(fetchMock, 'DELETE', '/api/v1/segments/5')).toHaveLength(1);
   });
 
+  it('shows a hand-picked segment by its products and edits only its name (ADR-0052)', async () => {
+    const picked: Schemas['Segment'] = {
+      ...segment(6, 'Түмний бараа', { match: 'ALL', groups: [] }),
+      kind: 'LIST',
+      definition: null,
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LOOKUPS,
+      'GET /api/v1/segments': () => list([DRINKS, picked]),
+      'GET /api/v1/segments/6': () => json(picked),
+      'GET /api/v1/segments/counts': (request) =>
+        json(
+          new URL(request.url).searchParams
+            .getAll('segmentIds')
+            .map((id) => ({ segmentId: Number(id), count: 137 })),
+        ),
+      'PUT /api/v1/segments/6': async (request) => json({ ...picked, ...(await sent(request)) }),
+    });
+    renderApp('/segments', fetchMock);
+    const user = userEvent.setup();
+    const row = (await screen.findByRole('link', { name: picked.name })).closest('tr');
+    expect(row).toHaveTextContent(mn.segments.kinds.LIST);
+    expect(
+      (await screen.findByRole('link', { name: DRINKS.name })).closest('tr'),
+    ).not.toHaveTextContent(mn.segments.kinds.LIST);
+
+    // Its page names the kind and how its products change, no conditions.
+    cleanup();
+    renderApp('/segments/6', fetchMock);
+    expect(await screen.findByRole('heading', { level: 1, name: picked.name })).toBeInTheDocument();
+    expect(screen.getByText(mn.segments.list.hint)).toBeInTheDocument();
+    expect(screen.queryByText(mn.segments.conditions)).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByText(mn.segments.countOf.PRODUCT.replace('{{count}}', '137')),
+      ).toBeVisible(),
+    );
+
+    // The form keeps the name and description only and sends no conditions.
+    cleanup();
+    const edit = renderApp('/segments/6/edit', fetchMock);
+    const name = await screen.findByLabelText(mn.segments.name);
+    expect(
+      screen.queryByRole('region', { name: mn.segments.group.replace('{{n}}', '1') }),
+    ).toBeNull();
+    await user.clear(name);
+    await user.type(name, 'Түмний эх');
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(edit.router.state.location.pathname).toBe('/segments/6'));
+    const [request] = calls(fetchMock, 'PUT', '/api/v1/segments/6');
+    expect(request ? await sent(request) : {}).toEqual({ name: 'Түмний эх', description: null });
+  });
+
   it('creates a segment with groups of conditions and a live count', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...LOOKUPS,
@@ -150,7 +204,7 @@ describe('segments (ADR-0049)', () => {
           { ...segment(8, 'Кола', { match: 'ALL', groups: [] }), ...(await sent(request)) },
           201,
         ),
-      'GET /api/v1/segments/8': () => json(segment(8, 'Кола', DRINKS.definition)),
+      'GET /api/v1/segments/8': () => json({ ...DRINKS, id: 8, name: 'Кола' }),
       'GET /api/v1/segments/counts': () => json([{ segmentId: 8, count: 12 }]),
     });
     const { router } = renderApp('/segments/new?entity=PRODUCT', fetchMock);

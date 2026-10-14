@@ -146,6 +146,11 @@ export function SegmentsPage() {
                   >
                     {row.name}
                   </Link>
+                  {row.kind === 'LIST' ? (
+                    <Badge variant="secondary" className="ml-2">
+                      {t('segments.kinds.LIST')}
+                    </Badge>
+                  ) : null}
                 </TableCell>
                 <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell">
                   {row.description ?? t('common.none')}
@@ -212,6 +217,9 @@ export function SegmentPage() {
         meta={
           <>
             <Badge variant="secondary">{t(`segments.entities.${data.entity}`)}</Badge>
+            {data.kind === 'LIST' ? (
+              <Badge variant="secondary">{t('segments.kinds.LIST')}</Badge>
+            ) : null}
             <span className="tabular-nums">
               {countText(data.entity, counts.data ? (counts.data[0]?.count ?? null) : undefined)}
             </span>
@@ -244,13 +252,19 @@ export function SegmentPage() {
       <ProblemAlert problem={problemFromError(counts.error)} />
       <Card>
         <CardHeader>
-          <CardTitle>{t('segments.conditions')}</CardTitle>
+          <CardTitle>
+            {data.definition ? t('segments.conditions') : t('segments.list.title')}
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {data.description ? (
             <FieldList items={[{ label: t('segments.description'), value: data.description }]} />
           ) : null}
-          <DefinitionText entity={data.entity} definition={data.definition} />
+          {data.definition ? (
+            <DefinitionText entity={data.entity} definition={data.definition} />
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('segments.list.hint')}</p>
+          )}
         </CardContent>
       </Card>
       <ConfirmDialog
@@ -326,24 +340,36 @@ function useSettled<T>(value: T, delay = 400): T {
   return settled;
 }
 
+/**
+ * The segment form. A hand-picked segment (ADR-0052) shows its name and description only: its
+ * products change from the product list's ticks.
+ */
 function SegmentForm(props: {
   entity: SegmentEntity;
-  definition: SegmentDefinition;
+  /** Null for a hand-picked segment. */
+  definition: SegmentDefinition | null;
   segment?: Segment;
 }) {
   const { t } = useTranslation();
   const { entity, segment } = props;
+  const isList = props.definition === null;
   const navigate = useNavigate();
   const mutations = useSegmentMutations();
   const action = useAction();
   const [key] = useState(randomUuid);
   const [name, setName] = useState(segment?.name ?? '');
   const [description, setDescription] = useState(segment?.description ?? '');
-  const [definition, setDefinition] = useState<SegmentDefinition>(props.definition);
+  const [definition, setDefinition] = useState<SegmentDefinition>(
+    props.definition ?? newDefinition(entity),
+  );
   const [submitted, setSubmitted] = useState(false);
-  const issue = segmentIssue(entity, definition);
+  const issue = isList ? null : segmentIssue(entity, definition);
   const settled = useSettled(definition);
-  const preview = useSegmentPreview(entity, settled, segmentIssue(entity, settled) === null);
+  const preview = useSegmentPreview(
+    entity,
+    settled,
+    !isList && segmentIssue(entity, settled) === null,
+  );
   const pending = mutations.create.isPending || mutations.update.isPending;
   const nameMissing = submitted && name.trim() === '';
 
@@ -351,16 +377,19 @@ function SegmentForm(props: {
     event.preventDefault();
     setSubmitted(true);
     if (name.trim() === '' || issue) return;
-    const body = {
+    const details = {
       name: name.trim(),
       description: description.trim() === '' ? null : description.trim(),
-      definition,
     };
     let savedId = 0;
     const ok = await action.run(async () => {
       const saved = segment
-        ? await mutations.update.mutateAsync({ id: segment.id, ...body })
-        : await mutations.create.mutateAsync({ key, entity, ...body });
+        ? await mutations.update.mutateAsync({
+            id: segment.id,
+            ...details,
+            ...(isList ? {} : { definition }),
+          })
+        : await mutations.create.mutateAsync({ key, entity, ...details, definition });
       savedId = saved.id;
     });
     if (ok) {
@@ -395,23 +424,32 @@ function SegmentForm(props: {
           />
         </FormRow>
         <FormRow label={t('segments.entity')} align="center">
-          <span className="text-sm">{t(`segments.entities.${entity}`)}</span>
+          <span className="text-sm">
+            {t(`segments.entities.${entity}`)}
+            {isList ? ` · ${t('segments.kinds.LIST')}` : null}
+          </span>
         </FormRow>
       </FormSection>
-      <FormSection title={t('segments.conditions')} description={t('segments.conditionsHint')}>
-        <div className="p-3">
-          <DefinitionEditor entity={entity} value={definition} onChange={setDefinition} />
-        </div>
-      </FormSection>
-      <p role="status" className="text-sm tabular-nums">
-        {issue ? (
-          <span className="text-destructive">{t(`segments.issues.${issue.issue}`)}</span>
-        ) : preview.isFetching ? (
-          <span className="text-muted-foreground">{t('segments.counting')}</span>
-        ) : typeof preview.data === 'number' ? (
-          t('segments.liveCount', { count: formatCount(preview.data) })
-        ) : null}
-      </p>
+      {isList ? (
+        <p className="text-sm text-muted-foreground">{t('segments.list.hint')}</p>
+      ) : (
+        <>
+          <FormSection title={t('segments.conditions')} description={t('segments.conditionsHint')}>
+            <div className="p-3">
+              <DefinitionEditor entity={entity} value={definition} onChange={setDefinition} />
+            </div>
+          </FormSection>
+          <p role="status" className="text-sm tabular-nums">
+            {issue ? (
+              <span className="text-destructive">{t(`segments.issues.${issue.issue}`)}</span>
+            ) : preview.isFetching ? (
+              <span className="text-muted-foreground">{t('segments.counting')}</span>
+            ) : typeof preview.data === 'number' ? (
+              t('segments.liveCount', { count: formatCount(preview.data) })
+            ) : null}
+          </p>
+        </>
+      )}
       <ProblemAlert problem={action.problem ?? problemFromError(preview.error)} />
       <FormFooter>
         <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>

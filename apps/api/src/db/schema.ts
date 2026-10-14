@@ -66,4 +66,4 @@ export {
   productPrices,
 } from '../modules/pricing/schema';
 export { aiConversations, aiQuestions, aiReports } from '../modules/ai/schema';
-export { segments } from '../modules/segments/schema';
+export { segmentProducts, segments } from '../modules/segments/schema';

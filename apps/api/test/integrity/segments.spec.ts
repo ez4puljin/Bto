@@ -15,6 +15,7 @@ import { pricingApi } from '../harness/pricing';
 const DENIED = '42501';
 const UNIQUE = '23505';
 const CHECK = '23514';
+const FOREIGN_KEY = '23503';
 const COUNT = 20_000;
 
 const all = (...conditions: SegmentCondition[]): SegmentDefinition => ({
@@ -28,7 +29,10 @@ const all = (...conditions: SegmentCondition[]): SegmentDefinition => ({
  * owner's whole catalogue (20,000 products) a list page under three conditions answers within
  * 500 ms, the segments list counts ten segments within 2 s, the whole catalogue goes to Excel
  * (two files at a time, never more than 20,000 rows), and «Таарсан бүх N» gets 20,000 ids within
- * a second but never more (ADR-0052). Timings are logged.
+ * a second but never more. A hand-picked list (ADR-0052) holds only products, only in a product
+ * LIST segment, members inserted and deleted but never updated; it takes the whole catalogue,
+ * pages within 500 ms and refuses the 20,001st product, also when two additions race. Timings are
+ * logged.
  */
 describe('integrity: segments', () => {
   let app: NestExpressApplication;
@@ -193,6 +197,41 @@ describe('integrity: segments', () => {
     expect(countsMs).toBeLessThan(2000);
   }, 120_000);
 
+  it('keeps list members to products and lists to product segments (ADR-0052)', async () => {
+    const insert = (entity: string, kind: string, name: string, definition: string | null) =>
+      sql.query<{ id: string }>(
+        `INSERT INTO segments (entity, kind, name, name_key, definition)
+         VALUES ($1, $2, $3, lower($3), $4::jsonb) RETURNING id::text`,
+        [entity, kind, name, definition],
+      );
+    const conditions = '{"match":"ALL","groups":[]}';
+    // A list carries no conditions and lists only products; conditions need a definition.
+    expect(await sqlStateOf(insert('PRODUCT', 'LIST', 'Нөхцөлтэй жагсаалт', conditions))).toBe(
+      CHECK,
+    );
+    expect(await sqlStateOf(insert('CUSTOMER', 'LIST', 'Харилцагчид', null))).toBe(CHECK);
+    expect(await sqlStateOf(insert('PRODUCT', 'RULES', 'Нөхцөлгүй', null))).toBe(CHECK);
+    expect(await sqlStateOf(insert('PRODUCT', 'SET', 'Өөр төрөл', null))).toBe(CHECK);
+    const { rows } = await insert('PRODUCT', 'LIST', 'Сонгосон', null);
+    const segmentId = rows[0]?.id;
+    const product = (await sql.query<{ id: string }>('SELECT id::text FROM products LIMIT 1'))
+      .rows[0]?.id;
+    const member = (productId: string | undefined) =>
+      sql.query('INSERT INTO segment_products (segment_id, product_id) VALUES ($1, $2)', [
+        segmentId,
+        productId,
+      ]);
+    expect(await sqlStateOf(member('999999999'))).toBe(FOREIGN_KEY);
+    await member(product);
+    expect(await sqlStateOf(member(product))).toBe(UNIQUE);
+    // Members are inserted and deleted, never updated or truncated.
+    expect(await sqlStateOf(sql.query('UPDATE segment_products SET added_at = now()'))).toBe(
+      DENIED,
+    );
+    expect(await sqlStateOf(sql.query('TRUNCATE segment_products'))).toBe(DENIED);
+    await sql.query('DELETE FROM segment_products WHERE segment_id = $1', [segmentId]);
+  });
+
   it('exports the whole catalogue, two files at a time, and no more than 20,000 rows', async () => {
     const exportAll = () =>
       http()
@@ -262,4 +301,49 @@ describe('integrity: segments', () => {
     console.log(`segments at scale: ${COUNT} ids for «Таарсан бүх N» ${Math.round(idsMs)} ms`);
     expect(idsMs).toBeLessThan(1000);
   }, 60_000);
+
+  it('holds a hand-picked list of the whole catalogue and never more (ADR-0052)', async () => {
+    const ids = (
+      await sql.query<{ id: string }>('SELECT id::text FROM products ORDER BY id')
+    ).rows.map((row) => Number.parseInt(row.id, 10));
+    const catalogue = ids.slice(0, COUNT);
+    const extra = ids[COUNT] ?? 0;
+    const lists = (path: string, body: Record<string, unknown>) =>
+      http().post(`/api/v1/segments${path}`).set(bearer(token)).set(idempotency()).send(body);
+    const started = performance.now();
+    const created = await lists('/lists', { name: 'Бүх бараа', productIds: catalogue }).expect(201);
+    const createMs = performance.now() - started;
+    const segmentId = (created.body as { id: number }).id;
+    const page = async () => {
+      const at = performance.now();
+      const res = await http()
+        .post('/api/v1/products/query')
+        .set(bearer(token))
+        .send({ segmentId, limit: 50 })
+        .expect(200);
+      expect((res.body as { total: number }).total).toBe(COUNT);
+      return performance.now() - at;
+    };
+    await page(); // warms the route
+    const pageMs = await page();
+    // The 20,001st product does not fit.
+    const tooMany = await lists(`/${segmentId}/products`, { productIds: [extra] }).expect(409);
+    expect(tooMany.body).toMatchObject({
+      code: 'SEGMENT_TOO_LARGE',
+      params: { count: COUNT + 1, limit: COUNT },
+    });
+    // Two additions crossing the limit together: one fits, the other is refused.
+    await lists(`/${segmentId}/products/remove`, { productIds: [catalogue[0] ?? 0] }).expect(200);
+    const statuses = (
+      await Promise.all([
+        lists(`/${segmentId}/products`, { productIds: [catalogue[0] ?? 0] }),
+        lists(`/${segmentId}/products`, { productIds: [extra] }),
+      ])
+    ).map((res) => res.status);
+    expect(statuses.sort()).toEqual([200, 409]);
+    console.log(
+      `segments at scale: a list of ${COUNT} created in ${Math.round(createMs)} ms, its page ${Math.round(pageMs)} ms`,
+    );
+    expect(pageMs).toBeLessThan(500);
+  }, 120_000);
 });

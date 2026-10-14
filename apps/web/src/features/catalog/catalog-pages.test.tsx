@@ -363,6 +363,7 @@ describe('products list', () => {
     const segment: Schemas['Segment'] = {
       id: 5,
       entity: 'PRODUCT',
+      kind: 'RULES',
       name: 'Ундааны бараа',
       description: null,
       definition: { match: 'ALL', groups: [] },

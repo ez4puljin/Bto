@@ -12,6 +12,13 @@ import { addDays, isIsoDate } from '../time';
 export const SEGMENT_ENTITIES = ['PRODUCT', 'CUSTOMER', 'SUPPLIER'] as const;
 export type SegmentEntity = (typeof SEGMENT_ENTITIES)[number];
 
+/**
+ * RULES: saved conditions whose members follow the data (ADR-0049). LIST: products only, the
+ * members exactly the products put in, never new ones by themselves (ADR-0052).
+ */
+export const SEGMENT_KINDS = ['RULES', 'LIST'] as const;
+export type SegmentKind = (typeof SEGMENT_KINDS)[number];
+
 /** ALL: every part holds (intersection); ANY: at least one does (union). */
 export const SEGMENT_MATCHES = ['ALL', 'ANY'] as const;
 export type SegmentMatch = (typeof SEGMENT_MATCHES)[number];

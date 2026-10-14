@@ -9,7 +9,7 @@ import {
   segmentIssue,
 } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
-import { eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -28,7 +28,7 @@ import {
   SuppliersService,
 } from '../../partners';
 import { ProductPricesService } from '../../pricing';
-import { segments } from '../schema';
+import { segmentProducts, segments } from '../schema';
 import { ascendingUnique, difference, intersect, union } from './set-algebra';
 
 export type SegmentRow = typeof segments.$inferSelect;
@@ -37,8 +37,9 @@ export type SegmentRow = typeof segments.$inferSelect;
  * Turns segment conditions into ids (ADR-0049 #3). Each leaf is answered by the module that owns
  * its data, through that module's public services, as ascending ids; ALL intersects, ANY unites,
  * a negative operator subtracts from the entity's universe (read only when needed). Leaves run
- * one after another (the pool is small) and a condition repeated in a request is asked once.
- * Bound to catalog's PRODUCT_SET_RESOLVER and partners' PARTNER_SET_RESOLVER (ADR-0049 #4).
+ * one after another (the pool is small) and a condition repeated in a request is asked once. A
+ * hand-picked (LIST) segment answers with its members (ADR-0052). Bound to catalog's
+ * PRODUCT_SET_RESOLVER and partners' PARTNER_SET_RESOLVER (ADR-0049 #4).
  */
 @Injectable()
 export class SegmentEvaluator implements ProductSetResolver, PartnerSetResolver {
@@ -72,7 +73,10 @@ export class SegmentEvaluator implements ProductSetResolver, PartnerSetResolver 
     return this.ofSegment(ctx, entity, segmentId);
   }
 
-  /** The ids a live segment keeps; 404 when unknown or archived, 422 for another entity. */
+  /**
+   * The ids a live segment keeps: a RULES segment's conditions evaluated, a LIST segment's members
+   * (ADR-0052); 404 when unknown or archived, 422 for another entity.
+   */
   async ofSegment(
     ctx: AuthContext | null,
     entity: SegmentEntity,
@@ -83,12 +87,30 @@ export class SegmentEvaluator implements ProductSetResolver, PartnerSetResolver 
     if (row.entity !== entity) {
       throw invalid('segmentId', 'entity', `segment ${segmentId} is not a ${entity} segment`);
     }
+    if (row.kind === 'LIST') return this.members(row.id);
     return this.evaluate(ctx, entity, storedDefinition(row));
   }
 
   /** How many records a stored segment keeps (the segments list). */
   async count(ctx: AuthContext | null, row: SegmentRow): Promise<number> {
+    if (row.kind === 'LIST') {
+      const [counted] = await this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(segmentProducts)
+        .where(eq(segmentProducts.segmentId, row.id));
+      return counted?.count ?? 0;
+    }
     return (await this.evaluate(ctx, row.entity, storedDefinition(row))).length;
+  }
+
+  /** A list segment's members, ascending (ADR-0052). */
+  private async members(segmentId: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: segmentProducts.productId })
+      .from(segmentProducts)
+      .where(eq(segmentProducts.segmentId, segmentId))
+      .orderBy(asc(segmentProducts.productId));
+    return rows.map((row) => row.id);
   }
 
   /** The ids a checked definition keeps, ascending. Customer conditions need the caller. */

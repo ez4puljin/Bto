@@ -6,6 +6,7 @@ import {
   SEGMENT_DEFINITION_VERSION,
   type SegmentDefinition,
   type SegmentEntity,
+  type SegmentKind,
 } from '@tugeel/shared/segments';
 import type { Permission } from '@tugeel/shared/auth';
 import { nameKey } from '@tugeel/shared/text';
@@ -27,15 +28,18 @@ const CUSTOMERS_READ: Permission = 'partners.customers.read';
 export interface SegmentInput {
   name: string;
   description?: string | null;
-  definition: unknown;
+  /** A RULES segment's conditions; a LIST segment takes none (ADR-0052). */
+  definition?: unknown;
 }
 
 export interface Segment {
   id: number;
   entity: SegmentEntity;
+  kind: SegmentKind;
   name: string;
   description: string | null;
-  definition: SegmentDefinition;
+  /** Null for a LIST segment (ADR-0052). */
+  definition: SegmentDefinition | null;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -44,7 +48,9 @@ export interface Segment {
 /**
  * Segments (ADR-0049 #5): admins (`segments.manage`) create, change and archive them; every
  * signed-in user reads them and their counts. Customer segments, their counts and previews need
- * `partners.customers.read` as well. A segment is archived, never deleted.
+ * `partners.customers.read` as well. A segment is archived, never deleted. A hand-picked (LIST)
+ * segment changes only its name and description here; `SegmentListsService` creates it and
+ * changes its members (ADR-0052).
  */
 @Injectable()
 export class SegmentsService {
@@ -136,6 +142,7 @@ export class SegmentsService {
         .insert(segments)
         .values({
           entity,
+          kind: 'RULES',
           name: values.name,
           nameKey: nameKey(values.name),
           description: values.description,
@@ -162,16 +169,27 @@ export class SegmentsService {
       const [before] = await tx.select().from(segments).where(eq(segments.id, id)).for('update');
       if (!before || before.archivedAt) throw notFound('segment', id);
       this.assertEntityReadable(ctx, before.entity);
-      const definition = checkedDefinition(before.entity, input.definition, 'definition');
-      await this.assertReferences(before.entity, definition);
+      // A list changes its name and description only; its members have their own routes.
+      let rules: { definition: SegmentDefinition; definitionVersion: number } | null = null;
+      if (before.kind === 'LIST') {
+        if (input.definition !== undefined) {
+          throw invalid('definition', 'notAllowed', `segment ${id} is a list of products`);
+        }
+      } else {
+        if (input.definition === undefined) {
+          throw invalid('definition', 'required', `segment ${id} keeps conditions`);
+        }
+        const definition = checkedDefinition(before.entity, input.definition, 'definition');
+        await this.assertReferences(before.entity, definition);
+        rules = { definition: plain(definition), definitionVersion: SEGMENT_DEFINITION_VERSION };
+      }
       const [row] = await tx
         .update(segments)
         .set({
           name: values.name,
           nameKey: nameKey(values.name),
           description: values.description,
-          definition: plain(definition),
-          definitionVersion: SEGMENT_DEFINITION_VERSION,
+          ...(rules ?? {}),
           updatedBy: actorUserId(ctx),
           updatedAt: sql`now()`,
         })
@@ -263,7 +281,11 @@ export class SegmentsService {
   }
 }
 
-function checkedInput(input: SegmentInput): { name: string; description: string | null } {
+/** A segment's name and description, trimmed; 422 outside their lengths. */
+export function checkedInput(input: { name: string; description?: string | null }): {
+  name: string;
+  description: string | null;
+} {
   const name = input.name.trim();
   if (name.length === 0 || name.length > MAX_SEGMENT_NAME) {
     throw invalid('name', 'length', `1 to ${MAX_SEGMENT_NAME} characters`);
@@ -280,22 +302,24 @@ function plain(definition: SegmentDefinition): SegmentDefinition {
   return JSON.parse(JSON.stringify(definition)) as SegmentDefinition;
 }
 
-function toSegment(row: SegmentRow): Segment {
+export function toSegment(row: SegmentRow): Segment {
   return {
     id: row.id,
     entity: row.entity,
+    kind: row.kind,
     name: row.name,
     description: row.description,
-    definition: row.definition as SegmentDefinition,
+    definition: row.definition === null ? null : (row.definition as SegmentDefinition),
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
 }
 
-function auditView(row: SegmentRow) {
+export function auditView(row: SegmentRow) {
   return {
     entity: row.entity,
+    kind: row.kind,
     name: row.name,
     description: row.description,
     definition: row.definition,
