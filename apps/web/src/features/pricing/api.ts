@@ -8,6 +8,7 @@ import {
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
 import { KEYS as CATALOG_KEYS } from '@/features/catalog/api';
+import { ATTENTION_KEY } from '@/features/home/api';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -107,7 +108,11 @@ export function usePricingMutations() {
           }),
         ),
       onSuccess: () =>
-        Promise.all([invalidate(CATALOG_KEYS.products), invalidate(CATALOG_KEYS.readiness)]),
+        Promise.all([
+          invalidate(CATALOG_KEYS.products),
+          invalidate(CATALOG_KEYS.readiness),
+          invalidate(ATTENTION_KEY),
+        ]),
     }),
     setPrices: useMutation({
       mutationFn: async ({

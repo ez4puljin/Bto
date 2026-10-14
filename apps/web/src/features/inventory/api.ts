@@ -9,6 +9,7 @@ import {
 import { type components, idempotencyKey, type paths } from '@tugeel/api-client';
 import { useCallback } from 'react';
 import { useApiClient } from '@/app/api-client-context';
+import { ATTENTION_KEY } from '@/features/home/api';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -389,7 +390,7 @@ export function useInventoryMutations() {
   const invalidate = (...keys: (readonly unknown[])[]) =>
     Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
   const binsChanged = () => invalidate(KEYS.bins, KEYS.locations);
-  const receiptsChanged = () => invalidate(KEYS.receipts, KEYS.stock);
+  const receiptsChanged = () => invalidate(KEYS.receipts, KEYS.stock, ATTENTION_KEY);
   /** A draft's new copy goes into the cache at once; lists and stock refresh behind it. */
   const receiptLinesChanged = async (receipt: ReceiptDetail) => {
     const key = [...KEYS.receipts, receipt.id];
@@ -397,7 +398,7 @@ export function useInventoryMutations() {
     queryClient.setQueryData(key, receipt);
     void invalidate([...KEYS.receipts, 'list'], [...KEYS.receipts, 'pending'], KEYS.stock);
   };
-  const adjustmentsChanged = () => invalidate(KEYS.adjustments, KEYS.stock);
+  const adjustmentsChanged = () => invalidate(KEYS.adjustments, KEYS.stock, ATTENTION_KEY);
 
   return {
     createBin: useMutation({
@@ -633,7 +634,7 @@ export function useTransferMutations() {
   const queryClient = useQueryClient();
   const changed = (stock = false) =>
     Promise.all(
-      [KEYS.transfers, ...(stock ? [KEYS.stock] : [])].map((queryKey) =>
+      [KEYS.transfers, ATTENTION_KEY, ...(stock ? [KEYS.stock] : [])].map((queryKey) =>
         queryClient.invalidateQueries({ queryKey }),
       ),
     );
@@ -848,8 +849,11 @@ function putStocktakeBin(queryClient: QueryClient, id: number, bin: StocktakeBin
 export function useStocktakeMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
+  // Every step may change the approvers' count on the home page.
   const invalidate = (...keys: (readonly unknown[])[]) =>
-    Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+    Promise.all(
+      [...keys, ATTENTION_KEY].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
   // Starting, cancelling and approving lock or free bins; approving also changes stock.
   const binsChanged = () => invalidate(KEYS.stocktakes, KEYS.bins);
 

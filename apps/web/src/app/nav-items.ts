@@ -18,6 +18,7 @@ import {
   type LucideIcon,
   Move,
   Package,
+  PackageCheck,
   PackageMinus,
   PackagePlus,
   ReceiptText,
@@ -29,6 +30,8 @@ import {
   SlidersHorizontal,
   Sparkles,
   Store,
+  Tag,
+  Truck,
   Users,
   Warehouse,
 } from 'lucide-react';
@@ -36,6 +39,7 @@ import {
 type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'menu' | 'account'>}`;
 type NavGroupKey = `nav.groups.${keyof (typeof mn)['nav']['groups']}`;
 type QuickActionKey = `home.actions.${keyof (typeof mn)['home']['actions']}`;
+type AttentionLabel = `home.attention.${keyof (typeof mn)['home']['attention']}`;
 
 export interface NavItem {
   to: string;
@@ -259,3 +263,76 @@ export function visibleQuickActions(permissions: readonly Permission[]): QuickAc
     (action) => !action.permission || permissions.includes(action.permission),
   );
 }
+
+/** A count of the inventory or pricing attention endpoints (ADR-0047 #7). */
+export type AttentionCount =
+  | 'transfersToShip'
+  | 'transfersToReceive'
+  | 'adjustmentsToApprove'
+  | 'stocktakesToReview'
+  | 'receiptsToCost'
+  | 'lowStock'
+  | 'productsWaitingForPrices';
+
+export interface AttentionTile {
+  count: AttentionCount;
+  label: AttentionLabel;
+  icon: LucideIcon;
+  /** The right that does the work; without it the tile never shows. */
+  permission: Permission;
+  /** The list the tile opens, already filtered (the low-stock tile adds its warehouse). */
+  to: string;
+}
+
+/** The home page's «Анхаарах» tiles, in this order; each shows only while its count is above 0. */
+export const ATTENTION_TILES: readonly AttentionTile[] = [
+  {
+    count: 'transfersToReceive',
+    label: 'home.attention.transfersToReceive',
+    icon: PackageCheck,
+    permission: 'inventory.transfers.manage',
+    to: '/inventory/transfers?direction=INCOMING&status=SHIPPED',
+  },
+  {
+    count: 'transfersToShip',
+    label: 'home.attention.transfersToShip',
+    icon: Truck,
+    permission: 'inventory.transfers.manage',
+    to: '/inventory/transfers?direction=OUTGOING&status=REQUESTED',
+  },
+  {
+    count: 'adjustmentsToApprove',
+    label: 'home.attention.adjustments',
+    icon: SlidersHorizontal,
+    permission: 'inventory.adjustments.approve',
+    to: '/inventory/adjustments?status=SUBMITTED',
+  },
+  {
+    count: 'stocktakesToReview',
+    label: 'home.attention.stocktakes',
+    icon: ClipboardCheck,
+    permission: 'inventory.stocktakes.approve',
+    to: '/inventory/stocktakes?status=REVIEW',
+  },
+  {
+    count: 'receiptsToCost',
+    label: 'home.attention.receiptsToCost',
+    icon: ReceiptText,
+    permission: 'inventory.costs.manage',
+    to: '/inventory/receipts?costing=pending',
+  },
+  {
+    count: 'productsWaitingForPrices',
+    label: 'home.attention.productsWaitingForPrices',
+    icon: Tag,
+    permission: 'pricing.prices.manage',
+    to: '/catalog/pending',
+  },
+  {
+    count: 'lowStock',
+    label: 'home.attention.lowStock',
+    icon: PackageMinus,
+    permission: 'inventory.transfers.manage',
+    to: '/inventory/low-stock',
+  },
+];

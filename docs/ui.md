@@ -48,15 +48,22 @@ Radius: cards `rounded-xl` (12px), buttons and fields `rounded-lg` (10px), dialo
 | `components/list.tsx` | `FilterBar` (filters, `end` for the column chooser), `SearchField`, `FilterToggle` (yes/no pill, still a checkbox), `ListCard`, `LinkRow` + `ChevronHead`, `EmptyState`, `LoadMore`, `SkeletonRows`, `RowActions` + `RowAction` + `RowActionSpacer` (icon buttons at the end of a row) |
 | `components/native-select.tsx` | `NativeSelect variant="filter"` is a filter pill (tinted while it narrows, `active` overrides); `WarehouseSelect` passes `variant` |
 | `components/detail.tsx` | `DetailCard({ title, canEdit, view, edit: (close) => form, actions? })` (an «Засаж байна» pill while editing) and `FieldList({ items, title?, description? })`, the read view in `FormRow`'s rows |
-| `components/form.tsx` | `FormSection({ title?, description?, action?, children })`, `FormRow({ label, htmlFor, hint?, error?, align? })`, `FormField` (label over field, for dialogs and narrow places) and `FormFooter` |
+| `components/form.tsx` | `FormSection({ title?, description?, action?, children })`, `FormRow({ label, htmlFor, hint?, error?, align? })`, `FormField` (label over field, for dialogs and narrow places), `FormFooter` and `DialogFormFooter({ pending, onCancel, submitLabel? })` («Болих», then the submit button of a dialog's form) |
+| `components/sticky-actions.tsx` | `StickyActions({ summary?, children })`: a step's buttons at the foot of a long editor, sticking to the bottom of the window. Place it after the card, never inside (cards clip their content); toasts rise above it |
+| `components/leave-guard.tsx` | `LeaveGuard({ when, title, description, leaveLabel })`: asks before leaving a page with work not yet sent (a link or the back button inside the app opens the question; a reload or a closed tab gets the browser's own). Only a change of page asks. One per page |
+| `lib/use-delete-confirm.ts` | `useDeleteConfirm(remove)`: `ask(row)`, then a `ConfirmDialog` while `target` is set; refusals show in the dialog |
 | `components/ui/switch.tsx` | `Switch` (Radix): on/off values, green when on; tie a `Label htmlFor` or a `FormRow` to its `id` |
 | `lib/toast.ts` | `toast.success(text)` / `toast.info(text)`; rendered by `Toaster` (mounted in `AppProviders`) |
 | `lib/use-create-param.ts` | `const [creating, setCreating] = useCreateParam()`: a create dialog's open state in the URL (`?new=1`) |
-| `app/nav-items.ts` | the menu (`NAV_GROUPS`: path, label key, lucide icon, permission) and the home page's `QUICK_ACTIONS`; the search reads both |
+| `app/nav-items.ts` | the menu (`NAV_GROUPS`: path, label key, lucide icon, permission), the home page's `QUICK_ACTIONS` and `ATTENTION_TILES` (count, label, icon, permission, filtered list); the search reads the first two |
 
-Also: `ConfirmDialog` for irreversible steps, `ProblemAlert` for API errors, `ColumnChooser` for wide lists (ADR-0037), `ScanBox` for scanning.
+Also: `ConfirmDialog` for irreversible steps (a `default` one gives its main button the focus, so Enter confirms; a destructive one keeps «Болих» first; `initialFocus="first"` when the dialog holds a field to type), `ProblemAlert` for API errors, `ColumnChooser` for wide lists (ADR-0037), `ScanBox` for scanning (it reads nothing while a dialog that does not hold it is open, and a scan's Enter never presses a button, ADR-0047 #4).
 
-Feature pieces other screens reuse (ADR-0044):
+Feature pieces other screens reuse (ADR-0044, ADR-0047):
+
+- `features/inventory/last-warehouse.ts` — `useDefaultWarehouse(options, doc)`: the warehouse a create dialog starts with (the only one, else the one this user chose last for that kind of document, else the first); `remember(id)` after a create. `WarehouseSelect` and `ProductSearch` take an `id` for a `FormField`.
+- `features/inventory/scan-qty.ts` + `shared.tsx` — `useScanQty()` and `ScanQtyField({ id, qty, onScan })`: «Тоо», the quantity the next scan adds, read from a ref (`qty.read()`) because a scan that lands in the field restores it in the same event; back to 1 after each product.
+- `features/inventory/step-counts.ts` — `useStepCounts(detail, step, defaults)`: a transfer's ship or receive counts kept in this browser until sent (per user, transfer and step, checked line by line, a week at most), with `restored`, `dropped`, `reset`, `clear` and `dirty` for `LeaveGuard`.
 
 - `features/partners/supplier-picker.tsx` — `SupplierPicker({ id, value, onChange })`: a search box over the first active suppliers, then the chosen one read-only with «Солих». Only the control; the caller labels it (`FormRow htmlFor`). Receipts and the product registration use it.
 - `features/catalog/photo-uploads.ts` + `photo-picker.tsx` — `usePhotoUploads()` and `PhotoPicker({ id, uploads, error })`: photos of a record that does not exist yet. Each file is scaled and uploaded as soon as it is chosen; the grid shows uploading and failed states, the first photo is primary, a tile adds more (10 at most). `photosMessage(photos)` is the form's check (at least one uploaded, none still uploading). Object URLs are released on remove, reset and unmount.
@@ -79,15 +86,23 @@ Feature pieces other screens reuse (ADR-0044):
   - The read view of the same card is a `FieldList` with the same section titles.
 - **Sub-items with several actions** (a product's units): one row per item, the frequent action as an icon button, the rest in a «⋯» `DropdownMenu` (`modal={false}`) named «{item}: үйлдэл», destructive items last after a separator. A dialog opened from the menu gives the focus back to the menu button.
 - **Creating.**
-  - A short header form (warehouse, kind, note) opens a dialog from the page header (`useCreateParam`). It has one column, «Болих» (ghost) and the submit button. Afterwards, `navigate(newRecordUrl, { replace: true })`.
-  - A long form (product, customer, supplier, receipt) has its own `/new` page.
+  - A short header form (warehouse, kind, note; a receipt's supplier and delivery note) opens a dialog from the page header (`useCreateParam`). It is a `<form>` of `FormField`s in one column, the user's warehouse chosen already (`useDefaultWarehouse`), «Болих» (ghost, `type="button"`) and the submit button. Afterwards, `navigate(newRecordUrl, { replace: true })`; a scan editor opens with its scan box focused.
+  - A long form (product, customer, supplier) has its own `/new` page.
   - A form people fill many times in a row (product registration, ADR-0044) stays on its page after a save: a green line on top names the record with «Харах», the fields that repeat (category, supplier, warehouse) are kept, the rest is cleared, and a new `Idempotency-Key` is drawn. Server refusals that belong to a field (a code taken meanwhile, an unknown shelf) show on that field; the others in a `ProblemAlert` above the footer.
   - Never put a create form above a list.
 - **Lists with a bulk action** (`/catalog/pending`): a checkbox column with «Бүгдийг сонгох» in the header (indeterminate while some rows are ticked), each row's checkbox named after its code, ticked rows tinted (`data-state="selected"`); the bulk action is the page's main button in the header, disabled until something is ticked and counting the rows («Сонгосон 2 барааг бүрэн болгох»). Rows keep their name link and `RowActions`.
 - **Record page.** `PageHeader` with the title (name or number), `meta` (code, status badges, dates) and `actions` (links to related pages, print). Below it, `DetailCard`s that are read first, then the related cards. Use two columns on `lg` when there is a natural side column (photos, suppliers, locations).
-- **Document page** (draft → posted). The status sits in the header meta. While the document is a draft, an editor card (scan box, product search, quantities). After posting, a read-only lines card. Irreversible steps go through `ConfirmDialog`. (The flows are simplified in the next UI session.)
+- **Document page** (draft → posted, ADR-0047). The status sits in the header meta; a document's own header (a receipt's delivery note) is a read-first `DetailCard`, beside the lines on wide screens.
+  - While the document is a draft, an editor card: scan box with «Тоо», product search, quantities guarded against scans, row actions as icons. Scans run one after another against the latest copy of the document.
+  - The step's buttons sit in `StickyActions` after the card, with a short summary (lines, differences, total).
+  - Irreversible steps go through `ConfirmDialog`; Enter confirms. A step that can be taken back asks nothing (a transfer request), and a shipment or a receipt asks only when its counts differ from the plan, listing the differences. A refusal with a reason is one dialog with the field.
+  - Counts typed and not yet sent stay on the device (`useStepCounts`), restored with a note; `LeaveGuard` asks before leaving them.
+  - A toast after each step (posted, sent, received, approved).
+  - After posting, a read-only lines card; costs, for those who may see them, on the same page (a receipt's costing card with «Хадгалаад дараагийнх»).
 - **Tool page** (barcode lookup, price calculator): a `PageHeader`, then cards: the input card with an icon and a hint, the result card with its next step («Бараа нээх»), earlier results in a `ListCard`. Counts on a report page are tiles (green with «Бүрэн» at zero, amber while something is missing).
 - **Conversation page** (`/ai`, ADR-0045). The open conversation is in the URL (`?c=`). Its steps form an ordered list: the question as a tinted bubble on the right, the answer as a card (summary as plain text, never markdown; the table; «Excel татах», «Тайлан болгох»; the folded SQL). The question box sits under the list: Enter sends, Shift+Enter starts a new line, «Бодож байна…» while waiting, one `Idempotency-Key` per question kept for a retry, and `IDEMPOTENCY_KEY_IN_PROGRESS` reads as «still working», not as an error. The history is a side column on `lg` and follows the conversation on phones. Rows are never stored: older steps fetch theirs again with «Хүснэгтийг харуулах». An empty page shows example questions (they fill the box) and what can be asked.
+- **Home page.** The greeting, then «Анхаарах»: one tile per count above zero of the work waiting for this person (`ATTENTION_TILES`, read from `GET /inventory/attention` and `GET /pricing/attention` only when the user holds a tile's permission; «99+» at the cap; nothing while loading, after an error or when nothing waits), each opening its list already filtered. Then the quick actions and the recent pages.
+- **Spacing under the title.** `PageHeader` brings its own 20px. Never make it the first child of a flex column with a gap (the two add up to 36px): wrap the page in `space-y-4` or a plain `div` (a source test, `components/page-layout.test.ts`, guards it).
 - **A new menu page:** add it to `NAV_GROUPS` with an icon and its permission. It then appears in the menu, the breadcrumb and the search.
 
 ## 5. Do and don't
@@ -110,7 +125,10 @@ Feature pieces other screens reuse (ADR-0044):
 - Read-first cards: the card is a `region` named by its title. Edit with the button `` `${mn.common.edit}: ${title}` ``.
 - Switches: `getByRole('switch', { name })`, `toBeChecked()`. «⋯» menus: click the button named «{item}: үйлдэл», then `findByRole('menuitem', { name })`. Icon buttons keep their text names, so `getByRole('button', { name })` finds them.
 - Toasts: a single `role="status"` element holding the text; `clearToasts()` runs after each test.
-- Nothing in the shell calls the API; the home page reads nothing either.
+- Nothing in the shell calls the API; the home page reads only the attention counts the user may act on.
+- Confirmations: a `default` dialog's main button has the focus (`toHaveFocus()`), so `user.keyboard('{Enter}')` confirms.
+- Scans: `userEvent.setup({ delay: null }).keyboard('4006381333931{Enter}')` is a scanner burst; a person's typing needs a pause of 80 ms or more before it.
+- Kept counts: `localStorage` is cleared after each test; `cleanup()` then `renderApp` again is a reload.
 
 ## 7. Name and sign-in
 

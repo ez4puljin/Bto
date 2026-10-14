@@ -2009,7 +2009,10 @@
       "adjustments": "Батлах залруулга",
       "stocktakes": "Хянах тооллого",
       "transfersToShip": "Илгээх шилжүүлэг",
-      "transfersToReceive": "Хүлээн авах шилжүүлэг"
+      "transfersToReceive": "Хүлээн авах шилжүүлэг",
+      "receiptsToCost": "Өртөг оруулах орлого",
+      "productsWaitingForPrices": "Үнэ хүлээгдэж буй бараа",
+      "lowStock": "Бага үлдэгдэлтэй бараа"
     }
   },
   "toast": {

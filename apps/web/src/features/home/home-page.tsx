@@ -7,10 +7,12 @@ import { visibleNav, visibleQuickActions } from '@/app/nav-items';
 import { PageHeader } from '@/components/page-header';
 import { formatUbToday } from '@/lib/dayjs';
 import { readRecentPages } from '@/lib/recent-pages';
+import { AttentionTiles } from './attention-tiles';
 
 /**
- * «Нүүр» (ADR-0042): a greeting with today's date, shortcuts to the day's work (each behind the
- * right to do it) and the pages this browser opened last. «Системийн төлөв» lives in «Систем».
+ * «Нүүр» (ADR-0042): a greeting with today's date, the work waiting for this person («Анхаарах»,
+ * ADR-0047 #7), shortcuts to the day's work (each behind the right to do it) and the pages this
+ * browser opened last. «Системийн төлөв» lives in «Систем».
  */
 export function HomePage() {
   const { t } = useTranslation();
@@ -38,6 +40,7 @@ export function HomePage() {
   return (
     <div className="space-y-7">
       <PageHeader title={t('home.greeting', { name })} meta={formatUbToday()} />
+      <AttentionTiles permissions={permissions} />
       {actions.length > 0 ? (
         <section aria-labelledby="home-actions">
           <h2 id="home-actions" className="mb-2.5 text-[15px] font-semibold tracking-tight">
