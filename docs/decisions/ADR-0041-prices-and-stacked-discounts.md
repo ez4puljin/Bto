@@ -6,7 +6,7 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Supersedes | ADR-0009 #1 (price lists), #3 (rule overlap), #4 (precedence, one discount), #7 (manual discounts); ADR-0008 #4 (prices re-issued on supersede). ADR-0009 #2 (never updated), #5 (whole MNT), #6 (freeze at SUBMIT) stand |
-| Amended by | ADR-0044 (#3, #4: prices are set with `pricing.prices.manage`, the price clerk completes a waiting product once its wholesale and supermarket base prices are in force; discounts keep `pricing.manage`) |
+| Amended by | ADR-0044 (#3, #4: prices are set with `pricing.prices.manage`, the price clerk completes a waiting product once its wholesale and supermarket base prices are in force; discounts keep `pricing.manage`); ADR-0048 (supersedes #1, #3 step 1 and the line result, #6 for prices and #7's `/unit-prices`: one warehouse price per product and a central price profile; `WHOLESALE` / `RETAIL` remain the sales channel; #2, #4, #5, #8 stand) |
 
 ## Context
 

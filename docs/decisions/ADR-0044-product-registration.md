@@ -6,6 +6,7 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0041 (a price clerk's permission; a product is sold only once completed), ADR-0036 (new imported products wait for their prices; the revert takes the tables in the order below), ADR-0028 #5 (brands are gone) |
+| Amended by | ADR-0048 (#3: completion needs the warehouse price and a price profile in force today and a whole unit that resolves; #4: the price clerk uses `POST /product-prices`; #9: the price dialog takes the warehouse price, the profile and the whole unit, and the pending list shows «Агуулахын үнэ» and «Үнийн тохиргоо») |
 
 ## Context
 

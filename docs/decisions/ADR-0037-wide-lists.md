@@ -6,7 +6,7 @@
 | Date | 2026-10-12 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | — (adds to ADR-0004 #3, architecture §6) |
-| Amended by | ADR-0042 (#4: rows of lists whose records have their own page open them on a click anywhere and end with a chevron; the «Засах» / «Харах» button is gone; lists edited in dialogs keep their row buttons); ADR-0047 (#3: a device also keeps a transfer's unsent ship and receive counts and the last chosen warehouse) |
+| Amended by | ADR-0042 (#4: rows of lists whose records have their own page open them on a click anywhere and end with a chevron; the «Засах» / «Харах» button is gone; lists edited in dialogs keep their row buttons); ADR-0047 (#3: a device also keeps a transfer's unsent ship and receive counts and the last chosen warehouse); ADR-0048 (#2: the product list's price columns are «Агуулахын үнэ» and «Үнийн тохиргоо»; the supermarket price, VAT, city tax, БҮНА and tax code columns are gone) |
 
 ## Context
 
