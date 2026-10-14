@@ -6,6 +6,7 @@
 | Date | 2026-10-14 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0037 (Consequences: another module's data can now narrow a list on the server, through the owner's resolver hook); architecture §4 (a new `segments` module) |
+| Amended by | ADR-0052 (#1: a product segment may also be a hand-picked list, `kind` LIST, with members in `segment_products`; the product list's ticks stay across searches) |
 
 ## Context
 

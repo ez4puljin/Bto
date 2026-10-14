@@ -6,6 +6,7 @@
 | Date | 2026-10-14 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | — (adds to ADR-0037, ADR-0044, ADR-0048) |
+| Amended by | ADR-0052 (#3: the changes act on every ticked product, loaded or not, and their dialogs refuse more than 500; «Идэвхгүй болгох» and «Идэвхжүүлэх» both sit in «Засах»; «Таарсан бүх N-ийг сонгох» is built) |
 
 ## Context
 

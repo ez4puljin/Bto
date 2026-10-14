@@ -6,6 +6,7 @@
 | Date | 2026-10-14 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0037 #3 (column choices were kept per browser, shared by every user of that browser) |
+| Amended by | ADR-0052 (#6: the product list's ticks are screen state too, kept in `sessionStorage` per user and tab) |
 
 ## Context
 
