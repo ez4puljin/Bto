@@ -43,8 +43,9 @@ Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the sche
 | `ai.customer_addresses` | customer address, with GPS |
 | `ai.suppliers` | supplier, with contact and bank fields |
 | `ai.product_suppliers` | product × supplier link |
-| `ai.prices_today` | price list × current unit: today's price, its own or derived (base × factor) |
-| `ai.price_history` | unit price period |
+| `ai.price_profiles` | price profile version: the markups, the supermarket bulk threshold and the rounding, with the period (0019, ADR-0048) |
+| `ai.product_prices_today` | product with prices today: the warehouse price per base unit, the whole pack and its price, the loose, supermarket and supermarket bulk prices, computed as the price service does (0019) |
+| `ai.product_price_history` | a product's warehouse-price period with its profile (0019) |
 | `ai.discount_programs` | discount program, with its status today and its steps as text |
 
 The views never read `auth_sessions`, `password_resets`, `idempotency_keys`, `files`, `audit_log` or `import_rows`, and from `users` only `id` and `full_name`. `AI_DATASETS` (`semantic/datasets.ts`) describes every view and column in English. The prompt, the guard and the tests all use it. Mongolian names, the glossary and example questions live in `mn.json` (`ai.datasets`, `ai.glossary`, `ai.examples`).

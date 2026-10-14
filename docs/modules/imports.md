@@ -95,5 +95,5 @@ Shared (Vitest): `imports` (headers, cells, lists, decimals, kind guess). Api un
 ## 12. Open items
 
 - The owner's real sheets (products, customers, suppliers, opening stock) are run locally with the owner during the delivery-1 acceptance; they never enter the repository.
-- Price lists: delivery 2 (`pricing`). Opening receivables: delivery 3 (`finance`). The TIN lookup through PosAPI for customers: delivery 3.
+- Price sheet: next session, on the ADR-0048 model (SKU, warehouse price, price profile name, whole pack, day). Price lists of the old model were never imported. Opening receivables: delivery 3 (`finance`). The TIN lookup through PosAPI for customers: delivery 3.
 - Done 2026-10-13: the housekeeping of old rows and sheets (ADR-0040); the periods (90 days, one year) wait for the owner's review.
