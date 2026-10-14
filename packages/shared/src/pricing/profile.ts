@@ -30,6 +30,9 @@ export interface PriceProfileValues {
   rounding: PriceRounding;
 }
 
+/** A profile's name: 1 to 80 characters (the CHECK of `price_profiles`). */
+export const MAX_PRICE_PROFILE_NAME = 80;
+
 /** NUMERIC(5,2) percentages and NUMERIC(14,3) quantities. */
 export const MAX_MARKUP_PCT = new Decimal('999.99');
 const MAX_QTY = new Decimal('99999999999.999');

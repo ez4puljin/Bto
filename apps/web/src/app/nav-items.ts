@@ -31,6 +31,7 @@ import {
   Sparkles,
   Store,
   Tag,
+  Tags,
   Truck,
   Users,
   Warehouse,
@@ -61,9 +62,9 @@ export interface NavGroup {
  * people who manage them need the menu entry. Stock, its history, the low-stock list and receipts
  * are read by every user (without costs); transfers, moves, adjustments, stocktakes and shelves only
  * by the people who make them (every user may still open a transfer or a stocktake by its link).
- * Discount programs and the price calculator are read by every user; pricing.manage changes them
- * (ADR-0041). The products waiting for their prices are the price clerk's list
- * (pricing.prices.manage, ADR-0044). The AI assistant and its saved reports need ai.ask
+ * Price profiles, discount programs and the price calculator are read by every user;
+ * pricing.manage changes the profiles and the programs (ADR-0041, ADR-0048). The products waiting
+ * for their prices are the price clerk's list (pricing.prices.manage, ADR-0044). The AI assistant and its saved reports need ai.ask
  * (ADR-0045).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
@@ -142,6 +143,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.pricing',
     items: [
+      { to: '/pricing/profiles', label: 'nav.priceProfiles', icon: Tags },
       { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
       { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
     ],

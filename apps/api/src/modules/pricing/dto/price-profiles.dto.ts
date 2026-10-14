@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { PRICE_ROUNDINGS, type PriceRounding } from '@tugeel/shared/pricing';
+import {
+  MAX_PRICE_PROFILE_NAME,
+  PRICE_ROUNDINGS,
+  type PriceRounding,
+} from '@tugeel/shared/pricing';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
@@ -12,7 +16,6 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { MAX_PROFILE_NAME } from '../services/price-profiles.service';
 
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -57,11 +60,11 @@ export class PriceProfileValuesInputDto {
 
 @ApiSchema({ name: 'PriceProfileRequest' })
 export class CreatePriceProfileDto extends PriceProfileValuesInputDto {
-  @ApiProperty({ maxLength: MAX_PROFILE_NAME })
+  @ApiProperty({ maxLength: MAX_PRICE_PROFILE_NAME })
   @Transform(trimmed)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(MAX_PROFILE_NAME)
+  @MaxLength(MAX_PRICE_PROFILE_NAME)
   name: string;
   @ApiProperty({ example: '2026-10-14', description: 'The first values start this day' })
   @Matches(ISO_DATE)
@@ -77,11 +80,11 @@ export class PriceProfileVersionInputDto extends PriceProfileValuesInputDto {
 
 @ApiSchema({ name: 'RenamePriceProfileRequest' })
 export class RenamePriceProfileDto {
-  @ApiProperty({ maxLength: MAX_PROFILE_NAME })
+  @ApiProperty({ maxLength: MAX_PRICE_PROFILE_NAME })
   @Transform(trimmed)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(MAX_PROFILE_NAME)
+  @MaxLength(MAX_PRICE_PROFILE_NAME)
   name: string;
 }
 

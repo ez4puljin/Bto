@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
-import { type PriceProfileValues, priceProfileIssue } from '@tugeel/shared/pricing';
+import {
+  MAX_PRICE_PROFILE_NAME,
+  type PriceProfileValues,
+  priceProfileIssue,
+} from '@tugeel/shared/pricing';
 import { nameKey } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, count, eq, gt, inArray, isNull, lte, or, type SQL, sql } from 'drizzle-orm';
@@ -19,7 +23,6 @@ type ProfileRow = typeof priceProfiles.$inferSelect;
 
 /** How many ended versions a profile shows. */
 const HISTORY = 20;
-export const MAX_PROFILE_NAME = 80;
 
 /** A profile version: its values from `validFrom` up to (not including) `validTo`. */
 export interface PriceProfileVersion extends PriceProfileValues {
@@ -357,8 +360,8 @@ export class PriceProfilesService {
 
 function checkedName(raw: string): string {
   const name = raw.trim().replace(/\s+/g, ' ');
-  if (name.length === 0 || name.length > MAX_PROFILE_NAME) {
-    throw invalid('name', 'length', `1 to ${MAX_PROFILE_NAME} characters`);
+  if (name.length === 0 || name.length > MAX_PRICE_PROFILE_NAME) {
+    throw invalid('name', 'length', `1 to ${MAX_PRICE_PROFILE_NAME} characters`);
   }
   return name;
 }

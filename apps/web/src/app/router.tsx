@@ -33,6 +33,7 @@ import {
 } from '@/features/pricing/discount-form';
 import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/discount-pages';
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
+import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -148,6 +149,8 @@ export const routes: RouteObject[] = [
             path: 'inventory/receipts/:id/costing',
             element: <Navigate to=".." relative="path" replace />,
           },
+          { path: 'pricing/profiles', element: <PriceProfilesPage />, handle: { wide: true } },
+          { path: 'pricing/profiles/:id', element: <PriceProfilePage /> },
           { path: 'pricing/discounts', element: <DiscountProgramsPage />, handle: { wide: true } },
           {
             path: 'pricing/discounts/new',
