@@ -6,6 +6,14 @@ import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
 import { ADJUSTMENT_REASON_CODES } from './inventory';
 import { PRICE_BASES, PRICE_ROUNDINGS } from './pricing';
+import {
+  PRODUCT_MISSING,
+  SEGMENT_ENTITIES,
+  SEGMENT_FIELDS,
+  SEGMENT_ISSUES,
+  SEGMENT_MATCHES,
+  SEGMENT_OPERATORS,
+} from './segments';
 import { SETTING_KEYS } from './settings';
 
 function lookup(path: string): unknown {
@@ -53,6 +61,19 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   it.each([
     ...PRICE_ROUNDINGS.map((rounding) => `pricing.roundings.${rounding}`),
     ...PRICE_BASES.map((basis) => `pricing.bases.${basis}`),
+  ])('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...SEGMENT_ENTITIES.map((entity) => `segments.entities.${entity}`),
+    ...SEGMENT_MATCHES.map((match) => `segments.matches.${match}`),
+    ...SEGMENT_OPERATORS.map((op) => `segments.operators.${op}`),
+    ...PRODUCT_MISSING.map((kind) => `segments.missing.${kind}`),
+    ...SEGMENT_ENTITIES.flatMap((entity) =>
+      Object.keys(SEGMENT_FIELDS[entity]).map((field) => `segments.fields.${entity}.${field}`),
+    ),
+    ...SEGMENT_ISSUES.map((issue) => `segments.issues.${issue}`),
   ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });

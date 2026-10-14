@@ -87,6 +87,11 @@
       "types": "./dist/pricing/index.d.ts",
       "default": "./dist/pricing/index.js"
     },
+    "./segments": {
+      "@tugeel/source": "./src/segments/index.ts",
+      "types": "./dist/segments/index.d.ts",
+      "default": "./dist/segments/index.js"
+    },
     "./catalog": {
       "@tugeel/source": "./src/catalog/index.ts",
       "types": "./dist/catalog/index.d.ts",

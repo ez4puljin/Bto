@@ -10482,6 +10482,7 @@
           "catalog.products.manage",
           "catalog.products.register",
           "catalog.ebarimt.manage",
+          "catalog.products.export",
           "partners.customers.read",
           "partners.customers.manage",
           "partners.credit.manage",
@@ -10500,7 +10501,8 @@
           "pricing.manage",
           "pricing.prices.manage",
           "ai.ask",
-          "ai.reports.manage"
+          "ai.reports.manage",
+          "segments.manage"
         ]
       },
       "RoleRef": {
@@ -19280,6 +19282,8 @@
           "DISCOUNT_PROGRAM_OVERLAP",
           "PRICE_PROFILE_ARCHIVED",
           "PRICE_PROFILE_IN_USE",
+          "SEGMENT_INVALID",
+          "EXPORT_TOO_LARGE",
           "AI_NOT_CONFIGURED",
           "AI_PROVIDER_FAILED",
           "AI_QUERY_FAILED",

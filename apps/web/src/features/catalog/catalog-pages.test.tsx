@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import { gtinCheckDigit } from '@tugeel/shared/gtin';
+import { PRODUCT_LIST_COLUMNS } from '@tugeel/shared/catalog';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -13,7 +14,6 @@ import {
   signedIn,
   WORKER_ME,
 } from '@/test/render-app';
-import { PRODUCT_COLUMN_KEYS } from './product-columns';
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-01T02:00:00.000Z';
@@ -322,7 +322,7 @@ describe('products list', () => {
     ]) {
       expect(within(table).getByText(text)).toBeInTheDocument();
     }
-    for (const key of PRODUCT_COLUMN_KEYS) {
+    for (const key of PRODUCT_LIST_COLUMNS) {
       expect(columnHeader(key)).toBeInTheDocument();
     }
     // The tax data lives on the product's e-Barimt card, not in the list (ADR-0048).

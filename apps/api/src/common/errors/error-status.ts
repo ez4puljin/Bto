@@ -74,6 +74,9 @@ export const ERROR_HTTP_STATUS = {
   // pricing: an archived profile chosen; archiving a profile products still use (ADR-0048)
   PRICE_PROFILE_ARCHIVED: 409,
   PRICE_PROFILE_IN_USE: 409,
+  // segments: a stored definition that no longer validates; an export over its row limit (ADR-0049)
+  SEGMENT_INVALID: 409,
+  EXPORT_TOO_LARGE: 422,
   // ai: no provider or read-only database; the provider failed; a stored query failed (ADR-0045)
   AI_NOT_CONFIGURED: 503,
   AI_PROVIDER_FAILED: 502,

@@ -1,3 +1,4 @@
+import { PRODUCT_LIST_COLUMNS } from '@tugeel/shared/catalog';
 import { Package, Plus } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +15,7 @@ import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { type ProductStatus, useCategories, useProducts } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
-import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMN_KEYS, PRODUCT_COLUMNS } from './product-columns';
+import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMNS } from './product-columns';
 import { type ProductStage } from './product-stage';
 import { ProductTable, type ProductTableContext } from './product-table';
 
@@ -56,7 +57,7 @@ export function ProductsPage() {
   const warehouseName = useWarehouseName();
   const columnState = useHiddenColumns(
     COLUMNS_STORAGE_KEY,
-    PRODUCT_COLUMN_KEYS,
+    PRODUCT_LIST_COLUMNS,
     LOCKED_PRODUCT_COLUMNS,
   );
   const { hidden } = columnState;
@@ -104,7 +105,7 @@ export function ProductsPage() {
       <FilterBar
         end={
           <ColumnChooser
-            keys={PRODUCT_COLUMN_KEYS}
+            keys={PRODUCT_LIST_COLUMNS}
             locked={LOCKED_PRODUCT_COLUMNS}
             label={(key) => t(`catalog.products.columns.${key}`)}
             hidden={hidden}

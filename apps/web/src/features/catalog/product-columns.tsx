@@ -1,3 +1,4 @@
+import type { ProductListColumn } from '@tugeel/shared/catalog';
 import type { TFunction } from 'i18next';
 import { ImageOff } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -14,24 +15,8 @@ import { ProductStageBadge } from './product-stage-badge';
  * price columns are the warehouse price and the price profile, and the tax data lives on the
  * product's e-Barimt card, not here (ADR-0048).
  */
-export const PRODUCT_COLUMN_KEYS = [
-  'image',
-  'sku',
-  'name',
-  'category',
-  'baseUnit',
-  'units',
-  'warehousePrice',
-  'priceProfile',
-  'baseBarcodes',
-  'unitBarcodes',
-  'weight',
-  'homeWarehouse',
-  'fixedBins',
-  'supplier',
-  'status',
-] as const;
-export type ProductColumnKey = (typeof PRODUCT_COLUMN_KEYS)[number];
+/** The keys live in `@tugeel/shared/catalog` (`PRODUCT_LIST_COLUMNS`): the export uses them too. */
+export type ProductColumnKey = ProductListColumn;
 
 /** Columns that name the row; they cannot be hidden. */
 export const LOCKED_PRODUCT_COLUMNS: readonly ProductColumnKey[] = ['sku', 'name'];

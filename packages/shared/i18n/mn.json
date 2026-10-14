@@ -86,7 +86,8 @@
     "catalog": {
       "products": {
         "manage": "Бараа, ангилал, нэгж, баркод удирдах",
-        "register": "Бараа бүртгэх"
+        "register": "Бараа бүртгэх",
+        "export": "Бараа экспортлох"
       },
       "ebarimt": {
         "manage": "e-Barimt-ын барааны шинж бөөнөөр оноох"
@@ -146,6 +147,9 @@
       "reports": {
         "manage": "AI тайлан удирдах (бусдын тайланг нэр солих, устгах)"
       }
+    },
+    "segments": {
+      "manage": "Сегмент удирдах"
     }
   },
   "roles": {
@@ -489,7 +493,8 @@
       "discount_programs": "Хямдрал",
       "ai_reports": "AI тайлан",
       "price_profiles": "Үнийн тохиргоо",
-      "product_prices": "Агуулахын үнэ"
+      "product_prices": "Агуулахын үнэ",
+      "segments": "Сегмент"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -611,7 +616,9 @@
     "AI_PROVIDER_FAILED": "AI үйлчилгээ хариу өгсөнгүй. Дахин оролдоно уу.",
     "AI_QUERY_FAILED": "Тайланг ажиллуулж чадсангүй",
     "PRICE_PROFILE_ARCHIVED": "Энэ үнийн тохиргоо архивлагдсан тул сонгох боломжгүй",
-    "PRICE_PROFILE_IN_USE": "Энэ тохиргоог {{count}} бараа ашиглаж байгаа тул архивлах боломжгүй"
+    "PRICE_PROFILE_IN_USE": "Энэ тохиргоог {{count}} бараа ашиглаж байгаа тул архивлах боломжгүй",
+    "SEGMENT_INVALID": "Энэ сегментийн нөхцөл хүчингүй болсон байна. Сегментийг засна уу.",
+    "EXPORT_TOO_LARGE": "{{count}} мөр байна; Excel-д {{limit}} хүртэл мөр гарна. Шүүлтүүрээ нарийсгана уу."
   },
   "catalog": {
     "products": {
@@ -2336,6 +2343,91 @@
       "warehousePrice": "Агуулахын үнэ",
       "loosePrice": "Задгай үнэ",
       "priceProfile": "Үнийн тохиргоо"
+    }
+  },
+  "segments": {
+    "entities": {
+      "PRODUCT": "Бараа",
+      "CUSTOMER": "Харилцагч",
+      "SUPPLIER": "Нийлүүлэгч"
+    },
+    "matches": {
+      "ALL": "Бүгд биелэх",
+      "ANY": "Аль нэг нь биелэх"
+    },
+    "operators": {
+      "IN": "аль нэг нь",
+      "NOT_IN": "аль нь ч биш",
+      "MAIN_IN": "үндсэн нь",
+      "ANY": "байгаа",
+      "NONE": "байхгүй",
+      "IS": "нь",
+      "YES": "тийм",
+      "NO": "үгүй",
+      "BETWEEN": "хооронд",
+      "LAST_DAYS": "сүүлийн өдрүүдэд",
+      "CONTAINS": "агуулсан",
+      "IN_STOCK": "үлдэгдэлтэй",
+      "OUT_OF_STOCK": "дууссан",
+      "AT_OR_BELOW_MIN": "доод хэмжээнд хүрсэн"
+    },
+    "missing": {
+      "BASE_BARCODE": "Ширхэгт баркодгүй",
+      "ANY_BARCODE": "Огт баркодгүй",
+      "PHOTO": "Зураггүй",
+      "WEIGHT": "Жингүй",
+      "EBARIMT": "e-Barimt мэдээлэл дутуу"
+    },
+    "fields": {
+      "PRODUCT": {
+        "search": "Хайлт",
+        "category": "Ангилал",
+        "stage": "Төлөв",
+        "createdAt": "Бүртгэсэн огноо",
+        "updatedAt": "Шинэчилсэн огноо",
+        "missing": "Дутуу мэдээлэл",
+        "supplier": "Нийлүүлэгч",
+        "homeWarehouse": "Харьяа агуулах",
+        "stock": "Үлдэгдэл",
+        "priceProfile": "Үнийн тохиргоо",
+        "warehousePrice": "Агуулахын үнэ"
+      },
+      "CUSTOMER": {
+        "search": "Хайлт",
+        "kind": "Төрөл",
+        "status": "Төлөв",
+        "creditHold": "Зээл хаасан",
+        "tinPending": "ТТД дутуу",
+        "gpsMissing": "GPS байршилгүй",
+        "createdAt": "Бүртгэсэн огноо"
+      },
+      "SUPPLIER": {
+        "search": "Хайлт",
+        "status": "Төлөв",
+        "products": "Бараа",
+        "createdAt": "Бүртгэсэн огноо"
+      }
+    },
+    "issues": {
+      "NOT_AN_OBJECT": "Нөхцөлийн бүтэц буруу байна",
+      "MATCH_INVALID": "«Бүгд биелэх» эсвэл «Аль нэг нь биелэх»-ийг сонгоно уу",
+      "NO_GROUPS": "Дор хаяж нэг бүлэг нэмнэ үү",
+      "TOO_MANY_GROUPS": "Бүлэг 10-аас ихгүй байна",
+      "NO_CONDITIONS": "Бүлэгт дор хаяж нэг нөхцөл нэмнэ үү",
+      "TOO_MANY_CONDITIONS": "Бүлэгт 10, нийтдээ 30-аас ихгүй нөхцөл байна",
+      "FIELD_NOT_ALLOWED": "Энэ талбараар шүүх боломжгүй",
+      "OPERATOR_NOT_ALLOWED": "Энэ талбарт энэ нөхцөл тохирохгүй",
+      "VALUE_MISSING": "Утга сонгоно уу",
+      "VALUE_NOT_ALLOWED": "Энэ нөхцөлд илүү утга байна",
+      "IDS_INVALID": "Сонголт буруу байна",
+      "TOO_MANY_VALUES": "Хэт олон утга сонгосон байна",
+      "VALUES_INVALID": "Утга буруу байна",
+      "DATE_INVALID": "Огноо буруу байна",
+      "DATE_ORDER": "Эхлэх огноо дуусах огнооноос хойш байна",
+      "DAYS_RANGE": "1–3650 хоорондох өдөр оруулна уу",
+      "MONEY_INVALID": "Бүхэл төгрөг оруулна уу",
+      "MONEY_ORDER": "Доод үнэ дээд үнээс их байна",
+      "TEXT_INVALID": "1–100 тэмдэгт оруулна уу"
     }
   }
 }

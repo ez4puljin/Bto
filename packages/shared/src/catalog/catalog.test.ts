@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  categoryPaths,
+  categoryTree,
   checkSku,
+  EXPORTABLE_PRODUCT_COLUMNS,
+  PRODUCT_LIST_COLUMNS,
+  productStage,
   holesOf,
   innermostOwner,
   lowestFree,
@@ -105,5 +110,35 @@ describe('product codes and category ranges (ADR-0044 #1)', () => {
     const everything = range(1n, SKU_MAX);
     const all = holesOf(TREE, everything);
     expect(nextAfter(everything, all, 9_999n)).toBe(30_000n);
+  });
+});
+
+describe('product stage, list columns and category paths (ADR-0044, ADR-0049)', () => {
+  it('puts a product in one of three stages', () => {
+    expect(productStage({ status: 'INACTIVE', saleReadyAt: null })).toBe('INACTIVE');
+    expect(productStage({ status: 'ACTIVE', saleReadyAt: null })).toBe('PENDING');
+    expect(productStage({ status: 'ACTIVE', saleReadyAt: '2026-10-01T00:00:00Z' })).toBe('ACTIVE');
+  });
+
+  it('exports every list column but the photo, in the same order', () => {
+    expect(EXPORTABLE_PRODUCT_COLUMNS).toEqual(
+      PRODUCT_LIST_COLUMNS.filter((column) => column !== 'image'),
+    );
+  });
+
+  it('walks categories depth-first with their full paths', () => {
+    const categories = [
+      { id: 1, parentId: null, name: 'Хүнс' },
+      { id: 2, parentId: 1, name: 'Гурил' },
+      { id: 3, parentId: null, name: 'Ундаа' },
+      { id: 4, parentId: 1, name: 'Будаа' },
+    ];
+    expect(categoryTree(categories).map((node) => [node.depth, node.path])).toEqual([
+      [0, 'Ундаа'],
+      [0, 'Хүнс'],
+      [1, 'Хүнс / Будаа'],
+      [1, 'Хүнс / Гурил'],
+    ]);
+    expect(categoryPaths(categories).get(2)).toBe('Хүнс / Гурил');
   });
 });

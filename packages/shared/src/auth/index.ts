@@ -16,6 +16,8 @@ export const PERMISSIONS = [
   'catalog.products.manage',
   'catalog.products.register',
   'catalog.ebarimt.manage',
+  // The product list's Excel export (ADR-0049 #6): warehouse prices and suppliers leave the system.
+  'catalog.products.export',
   'partners.customers.read',
   'partners.customers.manage',
   'partners.credit.manage',
@@ -36,6 +38,8 @@ export const PERMISSIONS = [
   // The AI assistant (ADR-0045): asking shows costs, credit and personal data to the holder.
   'ai.ask',
   'ai.reports.manage',
+  // Segments (ADR-0049): creating, changing and archiving them; everyone reads and uses them.
+  'segments.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

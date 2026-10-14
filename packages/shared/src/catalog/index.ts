@@ -185,3 +185,111 @@ export function lowestFree(
   }
   return null;
 }
+
+/**
+ * Where a product stands (ADR-0044): in use and complete, in use but waiting for its prices (not
+ * on orders yet), or not in use. The status column, the product page, the filters and the
+ * segments (ADR-0049) use it.
+ */
+export const PRODUCT_STAGES = ['ACTIVE', 'PENDING', 'INACTIVE'] as const;
+export type ProductStage = (typeof PRODUCT_STAGES)[number];
+
+export function productStage(product: {
+  status: 'ACTIVE' | 'INACTIVE';
+  saleReadyAt: string | Date | null;
+}): ProductStage {
+  if (product.status === 'INACTIVE') return 'INACTIVE';
+  return product.saleReadyAt === null ? 'PENDING' : 'ACTIVE';
+}
+
+/**
+ * The product list's columns in the order of the owner's product sheet (ADR-0037); the price
+ * columns are the warehouse price and the price profile (ADR-0048). The list and its export
+ * (ADR-0049 #6) share these keys.
+ */
+export const PRODUCT_LIST_COLUMNS = [
+  'image',
+  'sku',
+  'name',
+  'category',
+  'baseUnit',
+  'units',
+  'warehousePrice',
+  'priceProfile',
+  'baseBarcodes',
+  'unitBarcodes',
+  'weight',
+  'homeWarehouse',
+  'fixedBins',
+  'supplier',
+  'status',
+] as const;
+export type ProductListColumn = (typeof PRODUCT_LIST_COLUMNS)[number];
+
+/** Columns an export carries: every list column but the photo. */
+export const EXPORTABLE_PRODUCT_COLUMNS = [
+  'sku',
+  'name',
+  'category',
+  'baseUnit',
+  'units',
+  'warehousePrice',
+  'priceProfile',
+  'baseBarcodes',
+  'unitBarcodes',
+  'weight',
+  'homeWarehouse',
+  'fixedBins',
+  'supplier',
+  'status',
+] as const satisfies readonly ProductListColumn[];
+export type ExportableProductColumn = (typeof EXPORTABLE_PRODUCT_COLUMNS)[number];
+
+/** Products one bulk change may take (ADR-0051). */
+export const MAX_BULK_PRODUCTS = 500;
+/** Rows one product export may hold (ADR-0049 #6). */
+export const MAX_EXPORT_ROWS = 20_000;
+
+/** A category as the tree helpers need it. */
+export interface CategoryLike {
+  id: number;
+  parentId: number | null;
+  name: string;
+}
+
+export interface CategoryNode<T extends CategoryLike> {
+  category: T;
+  depth: number;
+  /** Names from the root, e.g. "Хүнс / Гурил". */
+  path: string;
+}
+
+export const CATEGORY_PATH_SEPARATOR = ' / ';
+
+/** Categories depth-first, siblings by name, each with its depth and full path. */
+export function categoryTree<T extends CategoryLike>(categories: readonly T[]): CategoryNode<T>[] {
+  const children = new Map<number | null, T[]>();
+  for (const category of categories) {
+    const siblings = children.get(category.parentId) ?? [];
+    siblings.push(category);
+    children.set(category.parentId, siblings);
+  }
+  for (const siblings of children.values()) {
+    siblings.sort((a, b) => a.name.localeCompare(b.name, 'mn'));
+  }
+  const nodes: CategoryNode<T>[] = [];
+  const visit = (parentId: number | null, depth: number, prefix: string) => {
+    for (const category of children.get(parentId) ?? []) {
+      const path = prefix ? `${prefix}${CATEGORY_PATH_SEPARATOR}${category.name}` : category.name;
+      nodes.push({ category, depth, path });
+      visit(category.id, depth + 1, path);
+    }
+  };
+  visit(null, 0, '');
+  return nodes;
+}
+
+/** Category id → full path, for list cells and the export. */
+export function categoryPaths(categories: readonly CategoryLike[]): Map<number, string> {
+  return new Map(categoryTree(categories).map((node) => [node.category.id, node.path]));
+}
