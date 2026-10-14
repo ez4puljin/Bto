@@ -35,6 +35,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Waits of up to 5 s (src/test/setup.ts) need room inside a test; still no retries.
+    testTimeout: 15_000,
     include: ['src/**/*.test.{ts,tsx}'],
   },
 });

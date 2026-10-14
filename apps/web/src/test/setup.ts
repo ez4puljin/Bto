@@ -4,8 +4,9 @@ import { afterEach, vi } from 'vitest';
 import { clearToasts } from '@/lib/toast';
 
 // `pnpm check` runs every workspace's tests at once; a page that waits for sign-in, then its
-// data, can need more than the default 1 s under that load. A longer wait, not a retry.
-configure({ asyncUtilTimeout: 3000 });
+// data, can need more than the default 1 s under that load (the first test of a file booting the
+// app took 3.3 s on 2026-10-14). A longer wait, not a retry.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no ResizeObserver; Radix measures checkboxes inside a <form> with it.
 if (!('ResizeObserver' in globalThis)) {
