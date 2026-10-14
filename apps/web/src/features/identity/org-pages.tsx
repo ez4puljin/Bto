@@ -1,12 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Building2, Plus } from 'lucide-react';
+import { Building2, Pencil, Plus, Warehouse as WarehouseIcon } from 'lucide-react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
-import { FieldError } from '@/components/field-error';
-import { EmptyState, ListCard, SkeletonRows } from '@/components/list';
+import { DialogFormFooter, FormField } from '@/components/form';
+import {
+  EmptyState,
+  ListCard,
+  RowAction,
+  RowActions,
+  RowActionSpacer,
+  SkeletonRows,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -15,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -24,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError, settle } from '@/lib/problem';
+import { useCreateParam } from '@/lib/use-create-param';
 import {
   type Branch,
   useBranches,
@@ -54,12 +63,32 @@ const branchSchema = z.object({
 });
 type BranchValues = z.infer<typeof branchSchema>;
 
+/** «Идэвхтэй» as a switch beside its label, for the organisation's dialogs (ADR-0043). */
+function ActiveSwitch(props: {
+  id: string;
+  value: (typeof STATUS)[number];
+  onChange: (value: (typeof STATUS)[number]) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Label htmlFor={props.id}>{t('org.active')}</Label>
+      <Switch
+        id={props.id}
+        checked={props.value === 'ACTIVE'}
+        onCheckedChange={(checked) => props.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
+      />
+    </div>
+  );
+}
+
 /** Branches carry the e-Barimt branch number and district code (SPEC §5.1). */
 export function BranchesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('identity.org.manage');
   const branches = useBranches();
-  const [editing, setEditing] = useState<Branch | 'new' | null>(null);
+  const [creating, setCreating] = useCreateParam();
+  const [editing, setEditing] = useState<Branch | null>(null);
 
   return (
     <div>
@@ -67,7 +96,7 @@ export function BranchesPage() {
         title={t('org.branches.title')}
         actions={
           canManage ? (
-            <Button onClick={() => setEditing('new')}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               {t('org.branches.create')}
             </Button>
@@ -107,16 +136,13 @@ export function BranchesPage() {
                   </Badge>
                 </TableCell>
                 {canManage ? (
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      aria-label={t('common.editRecord', { name: branch.name })}
+                  <RowActions>
+                    <RowAction
+                      label={t('common.editRecord', { name: branch.name })}
+                      icon={Pencil}
                       onClick={() => setEditing(branch)}
-                    >
-                      {t('common.edit')}
-                    </Button>
-                  </TableCell>
+                    />
+                  </RowActions>
                 ) : null}
               </TableRow>
             ))}
@@ -126,6 +152,7 @@ export function BranchesPage() {
           <EmptyState icon={Building2} title={t('org.branches.empty')} />
         ) : null}
       </ListCard>
+      {creating ? <BranchDialog branch="new" onClose={() => setCreating(false)} /> : null}
       {editing ? <BranchDialog branch={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
@@ -171,56 +198,71 @@ function BranchDialog({ branch, onClose }: { branch: Branch | 'new'; onClose: ()
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent closeLabel={t('common.close')}>
-        <DialogHeader>
-          <DialogTitle>{isNew ? t('org.branches.create') : t('org.branches.edit')}</DialogTitle>
-        </DialogHeader>
-        <ProblemAlert
-          problem={problemFromError(mutations.createBranch.error ?? mutations.updateBranch.error)}
-        />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="branch-code">{t('org.branches.code')}</Label>
-            <Input id="branch-code" autoCapitalize="characters" {...form.register('code')} />
-            <FieldError message={errors.code?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="branch-name">{t('org.branches.name')}</Label>
+        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
+          <DialogHeader>
+            <DialogTitle>{isNew ? t('org.branches.create') : t('org.branches.edit')}</DialogTitle>
+          </DialogHeader>
+          <ProblemAlert
+            problem={problemFromError(mutations.createBranch.error ?? mutations.updateBranch.error)}
+          />
+          <FormField
+            label={t('org.branches.code')}
+            htmlFor="branch-code"
+            error={errors.code?.message}
+          >
+            <Input
+              id="branch-code"
+              autoCapitalize="characters"
+              className="font-mono"
+              {...form.register('code')}
+            />
+          </FormField>
+          <FormField
+            label={t('org.branches.name')}
+            htmlFor="branch-name"
+            error={errors.name?.message}
+          >
             <Input id="branch-name" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="branch-no">{t('org.branches.branchNo')}</Label>
-              <Input id="branch-no" inputMode="numeric" {...form.register('branchNo')} />
-              <FieldError message={errors.branchNo?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="branch-district">{t('org.branches.districtCode')}</Label>
-              <Input id="branch-district" inputMode="numeric" {...form.register('districtCode')} />
-              <FieldError message={errors.districtCode?.message} />
-            </div>
+            <FormField
+              label={t('org.branches.branchNo')}
+              htmlFor="branch-no"
+              error={errors.branchNo?.message}
+            >
+              <Input
+                id="branch-no"
+                inputMode="numeric"
+                className="font-mono"
+                {...form.register('branchNo')}
+              />
+            </FormField>
+            <FormField
+              label={t('org.branches.districtCode')}
+              htmlFor="branch-district"
+              error={errors.districtCode?.message}
+            >
+              <Input
+                id="branch-district"
+                inputMode="numeric"
+                className="font-mono"
+                {...form.register('districtCode')}
+              />
+            </FormField>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="branch-address">{t('org.branches.address')}</Label>
+          <FormField label={t('org.branches.address')} htmlFor="branch-address">
             <Input id="branch-address" {...form.register('address')} />
-          </div>
+          </FormField>
           {!isNew ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="branch-status">{t('users.columns.status')}</Label>
-              <NativeSelect id="branch-status" {...form.register('status')}>
-                {STATUS.map((status) => (
-                  <option key={status} value={status}>
-                    {t(`org.status.${status}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <Controller
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <ActiveSwitch id="branch-status" value={field.value} onChange={field.onChange} />
+              )}
+            />
           ) : null}
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          <DialogFormFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>
@@ -242,7 +284,8 @@ export function WarehousesPage() {
   const canManage = useHasPermission('identity.org.manage');
   const warehouses = useWarehouses();
   const branches = useBranches();
-  const [editing, setEditing] = useState<Warehouse | 'new' | null>(null);
+  const [creating, setCreating] = useCreateParam();
+  const [editing, setEditing] = useState<Warehouse | null>(null);
   const branchName = (id: number | null) =>
     branches.data?.find((branch) => branch.id === id)?.name ?? t('common.none');
 
@@ -252,7 +295,7 @@ export function WarehousesPage() {
         title={t('org.warehouses.title')}
         actions={
           canManage ? (
-            <Button onClick={() => setEditing('new')}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               {t('org.warehouses.create')}
             </Button>
@@ -284,7 +327,14 @@ export function WarehousesPage() {
               return (
                 <TableRow key={warehouse.id}>
                   <TableCell className="font-mono">{warehouse.code}</TableCell>
-                  <TableCell className="font-medium">{name}</TableCell>
+                  <TableCell className="font-medium">
+                    {name}
+                    {editable ? null : (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {t('org.warehouses.systemNote')}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{t(`org.kinds.${warehouse.kind}`)}</TableCell>
                   <TableCell>{branchName(warehouse.branchId)}</TableCell>
                   <TableCell>
@@ -293,29 +343,28 @@ export function WarehousesPage() {
                     </Badge>
                   </TableCell>
                   {canManage ? (
-                    <TableCell className="text-right">
+                    <RowActions>
                       {editable ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          aria-label={t('common.editRecord', { name })}
+                        <RowAction
+                          label={t('common.editRecord', { name })}
+                          icon={Pencil}
                           onClick={() => setEditing(warehouse)}
-                        >
-                          {t('common.edit')}
-                        </Button>
+                        />
                       ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {t('org.warehouses.systemNote')}
-                        </span>
+                        <RowActionSpacer />
                       )}
-                    </TableCell>
+                    </RowActions>
                   ) : null}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {warehouses.data?.length === 0 ? (
+          <EmptyState icon={WarehouseIcon} title={t('org.warehouses.empty')} />
+        ) : null}
       </ListCard>
+      {creating ? <WarehouseDialog warehouse="new" onClose={() => setCreating(false)} /> : null}
       {editing ? <WarehouseDialog warehouse={editing} onClose={() => setEditing(null)} /> : null}
     </div>
   );
@@ -366,35 +415,48 @@ function WarehouseDialog({
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent closeLabel={t('common.close')}>
-        <DialogHeader>
-          <DialogTitle>{isNew ? t('org.warehouses.create') : t('org.warehouses.edit')}</DialogTitle>
-        </DialogHeader>
-        <ProblemAlert
-          problem={problemFromError(
-            mutations.createWarehouse.error ?? mutations.updateWarehouse.error,
-          )}
-        />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="warehouse-code">{t('org.warehouses.code')}</Label>
-            <Input id="warehouse-code" autoCapitalize="characters" {...form.register('code')} />
-            <FieldError message={errors.code?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="warehouse-name">{t('org.warehouses.name')}</Label>
+        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
+          <DialogHeader>
+            <DialogTitle>
+              {isNew ? t('org.warehouses.create') : t('org.warehouses.edit')}
+            </DialogTitle>
+          </DialogHeader>
+          <ProblemAlert
+            problem={problemFromError(
+              mutations.createWarehouse.error ?? mutations.updateWarehouse.error,
+            )}
+          />
+          <FormField
+            label={t('org.warehouses.code')}
+            htmlFor="warehouse-code"
+            error={errors.code?.message}
+          >
+            <Input
+              id="warehouse-code"
+              autoCapitalize="characters"
+              className="font-mono"
+              {...form.register('code')}
+            />
+          </FormField>
+          <FormField
+            label={t('org.warehouses.name')}
+            htmlFor="warehouse-name"
+            error={errors.name?.message}
+          >
             <Input id="warehouse-name" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="warehouse-kind">{t('org.warehouses.kind')}</Label>
+            <FormField label={t('org.warehouses.kind')} htmlFor="warehouse-kind">
               <NativeSelect id="warehouse-kind" disabled={!isNew} {...form.register('kind')}>
                 <option value="WHOLESALE">{t('org.kinds.WHOLESALE')}</option>
                 <option value="STORE">{t('org.kinds.STORE')}</option>
               </NativeSelect>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="warehouse-branch">{t('org.warehouses.branch')}</Label>
+            </FormField>
+            <FormField
+              label={t('org.warehouses.branch')}
+              htmlFor="warehouse-branch"
+              error={errors.branchId?.message}
+            >
               <NativeSelect id="warehouse-branch" {...form.register('branchId')}>
                 <option value="">{t('common.none')}</option>
                 {(branches.data ?? []).map((branch) => (
@@ -403,26 +465,18 @@ function WarehouseDialog({
                   </option>
                 ))}
               </NativeSelect>
-              <FieldError message={errors.branchId?.message} />
-            </div>
+            </FormField>
           </div>
           {!isNew ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="warehouse-status">{t('users.columns.status')}</Label>
-              <NativeSelect id="warehouse-status" {...form.register('status')}>
-                {STATUS.map((status) => (
-                  <option key={status} value={status}>
-                    {t(`org.status.${status}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <Controller
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <ActiveSwitch id="warehouse-status" value={field.value} onChange={field.onChange} />
+              )}
+            />
           ) : null}
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          <DialogFormFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>

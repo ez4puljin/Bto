@@ -1,11 +1,16 @@
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { useState } from 'react';
+import { LogOut } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useAuthState, useHasPermission } from '@/app/auth-context';
 import { CodeDialog } from '@/components/code-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DetailCard, FieldList } from '@/components/detail';
+import { RowAction, RowActions } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { RoleName } from '@/components/role-name';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,14 +26,28 @@ import {
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, settle } from '@/lib/problem';
 import { toast } from '@/lib/toast';
-import { type PasswordCode, useIdentityMutations, useUser, useUserSessions } from './api';
+import { localPhone } from '@/features/partners/phone';
+import {
+  type PasswordCode,
+  type UserDetail,
+  useBranches,
+  useIdentityMutations,
+  useRoles,
+  useUser,
+  useUserSessions,
+  useWarehouses,
+} from './api';
 import { UserForm, type UserFormValues } from './user-form';
 
 const when = (iso: string) => formatUbDateTime(Date.parse(iso));
 
+type Asking = 'code' | 'disable' | 'revokeAll' | { sessionId: string } | null;
+
 /**
- * One staff account (SPEC §5.1): its username and state under the name, the password code, unlock
- * and disable at the top (ADR-0042), then roles and scopes, and the signed-in devices.
+ * One staff account (SPEC §5.1), read first (ADR-0042 #7): username and state under the name; the
+ * password code, unlock and disable at the top, each asked first where it changes access; the
+ * account with its roles and write scopes in one card, «Засах» for those who manage users; the
+ * signed-in devices.
  */
 export function UserDetailPage() {
   const { t } = useTranslation();
@@ -39,6 +58,7 @@ export function UserDetailPage() {
   const sessions = useUserSessions(id, canManage);
   const mutations = useIdentityMutations();
   const [code, setCode] = useState<PasswordCode | null>(null);
+  const [asking, setAsking] = useState<Asking>(null);
   const isSelf = auth.status === 'authenticated' && auth.me.id === id;
 
   if (user.isPending) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
@@ -63,6 +83,29 @@ export function UserDetailPage() {
       }),
     );
     if (updated) toast.success(t('common.saved'));
+    return updated !== null;
+  };
+  const confirm = () => {
+    if (asking === 'code') {
+      mutations.issueCode.mutate(id, {
+        onSuccess: (issued) => {
+          setAsking(null);
+          setCode(issued);
+        },
+      });
+    } else if (asking === 'disable') {
+      mutations.updateUser.mutate(
+        { id, body: { status: 'DISABLED' } },
+        { onSuccess: () => setAsking(null) },
+      );
+    } else if (asking === 'revokeAll') {
+      mutations.revokeSession.mutate({ id }, { onSuccess: () => setAsking(null) });
+    } else if (asking) {
+      mutations.revokeSession.mutate(
+        { id, sessionId: asking.sessionId },
+        { onSuccess: () => setAsking(null) },
+      );
+    }
   };
   const mutationProblem = problemFromError(
     mutations.updateUser.error ??
@@ -92,10 +135,7 @@ export function UserDetailPage() {
         actions={
           canManage ? (
             <>
-              <Button
-                variant="secondary"
-                onClick={() => mutations.issueCode.mutate(id, { onSuccess: setCode })}
-              >
+              <Button variant="secondary" onClick={() => setAsking('code')}>
                 {t('users.detail.issueCode')}
               </Button>
               {locked ? (
@@ -103,44 +143,43 @@ export function UserDetailPage() {
                   {t('users.detail.unlock')}
                 </Button>
               ) : null}
-              {!isSelf ? (
-                <Button
-                  variant={detail.status === 'ACTIVE' ? 'destructive' : 'outline'}
-                  onClick={() =>
-                    mutations.updateUser.mutate({
-                      id,
-                      body: { status: detail.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' },
-                    })
-                  }
-                >
-                  {detail.status === 'ACTIVE'
-                    ? t('users.detail.disable')
-                    : t('users.detail.enable')}
+              {isSelf ? null : detail.status === 'ACTIVE' ? (
+                <Button variant="outline" onClick={() => setAsking('disable')}>
+                  {t('users.detail.disable')}
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => mutations.updateUser.mutate({ id, body: { status: 'ACTIVE' } })}
+                >
+                  {t('users.detail.enable')}
+                </Button>
+              )}
             </>
           ) : null
         }
       />
-      <ProblemAlert problem={mutationProblem} />
+      <ProblemAlert problem={asking ? null : mutationProblem} />
 
-      {canManage ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('users.detail.access')}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+      <DetailCard
+        title={t('users.detail.profile')}
+        canEdit={canManage}
+        view={<UserFacts detail={detail} />}
+        edit={(close) => (
+          <div className="flex flex-col gap-4">
             {isSelf ? (
               <Alert>
                 <AlertDescription>{t('users.detail.selfNote')}</AlertDescription>
               </Alert>
             ) : null}
             <UserForm
-              key={detail.updatedAt}
               lockUsername
               lockAccess={isSelf}
               submitLabel={t('common.save')}
-              onSubmit={save}
+              onCancel={close}
+              onSubmit={async (values) => {
+                if (await save(values)) close();
+              }}
               defaultValues={{
                 username: detail.username,
                 fullName: detail.fullName,
@@ -150,9 +189,9 @@ export function UserDetailPage() {
                 warehouseIds: detail.scopes.warehouseIds,
               }}
             />
-          </CardContent>
-        </Card>
-      ) : null}
+          </div>
+        )}
+      />
 
       {canManage ? (
         <Card>
@@ -160,11 +199,7 @@ export function UserDetailPage() {
             <CardTitle>{t('users.detail.sessions')}</CardTitle>
             {sessions.data?.length ? (
               <CardAction>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => mutations.revokeSession.mutate({ id })}
-                >
+                <Button size="sm" variant="outline" onClick={() => setAsking('revokeAll')}>
                   {t('users.detail.revokeAll')}
                 </Button>
               </CardAction>
@@ -194,17 +229,14 @@ export function UserDetailPage() {
                       <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
                       <TableCell className="font-mono">{when(session.lastUsedAt)}</TableCell>
                       <TableCell className="font-mono">{when(session.expiresAt)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            mutations.revokeSession.mutate({ id, sessionId: session.id })
-                          }
-                        >
-                          {t('users.detail.revoke')}
-                        </Button>
-                      </TableCell>
+                      <RowActions>
+                        <RowAction
+                          label={`${t('users.detail.revoke')}: ${session.ip ?? session.id}`}
+                          icon={LogOut}
+                          destructive
+                          onClick={() => setAsking({ sessionId: session.id })}
+                        />
+                      </RowActions>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -215,7 +247,101 @@ export function UserDetailPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ConfirmDialog
+        open={asking === 'code'}
+        variant="default"
+        title={t('users.detail.issueCodeTitle')}
+        description={t('users.detail.issueCodeDescription')}
+        confirmLabel={t('users.detail.issueCode')}
+        pending={mutations.issueCode.isPending}
+        problem={problemFromError(mutations.issueCode.error)}
+        onConfirm={confirm}
+        onClose={() => setAsking(null)}
+      />
+      <ConfirmDialog
+        open={asking === 'disable'}
+        title={t('users.detail.disableTitle')}
+        description={t('users.detail.disableDescription')}
+        confirmLabel={t('users.detail.disable')}
+        pending={mutations.updateUser.isPending}
+        problem={problemFromError(mutations.updateUser.error)}
+        onConfirm={confirm}
+        onClose={() => setAsking(null)}
+      />
+      <ConfirmDialog
+        open={asking === 'revokeAll' || (typeof asking === 'object' && asking !== null)}
+        title={
+          asking === 'revokeAll' ? t('users.detail.revokeAllTitle') : t('users.detail.revokeTitle')
+        }
+        description={t('users.detail.revokeDescription')}
+        confirmLabel={
+          asking === 'revokeAll' ? t('users.detail.revokeAll') : t('users.detail.revoke')
+        }
+        pending={mutations.revokeSession.isPending}
+        problem={problemFromError(mutations.revokeSession.error)}
+        onConfirm={confirm}
+        onClose={() => setAsking(null)}
+      />
       <CodeDialog code={code} name={detail.fullName} onClose={() => setCode(null)} />
+    </div>
+  );
+}
+
+/** The account read first: who, which roles, where they may write. */
+function UserFacts({ detail }: { detail: UserDetail }) {
+  const { t } = useTranslation();
+  const roles = useRoles();
+  const branches = useBranches();
+  const warehouses = useWarehouses();
+  const roleList = useMemo(
+    () => (roles.data ?? []).filter((role) => detail.roleIds.includes(role.id)),
+    [roles.data, detail.roleIds],
+  );
+  const names = (rows: readonly { id: number; code: string; name: string }[], ids: number[]) =>
+    rows
+      .filter((row) => ids.includes(row.id))
+      .map((row) => `${row.code} · ${row.name}`)
+      .join(', ');
+  const branchNames = names(branches.data ?? [], detail.scopes.branchIds);
+  const warehouseNames = names(warehouses.data ?? [], detail.scopes.warehouseIds);
+  const everywhere =
+    detail.scopes.branchIds.length === 0 && detail.scopes.warehouseIds.length === 0;
+  return (
+    <div className="flex flex-col gap-5">
+      <FieldList
+        title={t('users.form.sectionAccount')}
+        items={[
+          {
+            label: t('users.form.username'),
+            value: <span className="font-mono">{detail.username}</span>,
+          },
+          { label: t('users.form.fullName'), value: detail.fullName },
+          { label: t('users.form.phone'), value: detail.phone ? localPhone(detail.phone) : null },
+        ]}
+      />
+      <FieldList
+        title={t('users.detail.access')}
+        items={[
+          {
+            label: t('users.form.roles'),
+            value: roleList.length
+              ? roleList.map((role, index) => (
+                  <span key={role.id}>
+                    {index > 0 ? ', ' : ''}
+                    <RoleName role={role} />
+                  </span>
+                ))
+              : null,
+          },
+          ...(everywhere
+            ? [{ label: t('users.form.scopes'), value: t('users.form.scopeAll') }]
+            : [
+                { label: t('users.form.scopeBranches'), value: branchNames || null },
+                { label: t('users.form.scopeWarehouses'), value: warehouseNames || null },
+              ]),
+        ]}
+      />
     </div>
   );
 }

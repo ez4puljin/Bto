@@ -7,14 +7,14 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
-import { FieldError } from '@/components/field-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FieldList } from '@/components/detail';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RoleName } from '@/components/role-name';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { passwordMessage } from '@/lib/forms';
 import { problemOf } from '@/lib/problem';
@@ -49,6 +49,7 @@ export function AccountPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [problem, setProblem] = useState<ProblemDetails | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const username = state.status === 'authenticated' ? state.me.username : '';
   const form = useForm<PasswordValues>({
     resolver: zodResolver(passwordSchema(username)),
@@ -80,89 +81,99 @@ export function AccountPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('auth.account.title')} />
-      <Card>
-        <CardHeader>
-          <CardTitle>{me.fullName}</CardTitle>
-          <CardDescription>
-            {t('auth.account.sessionEnds', {
-              time: formatUbDateTime(Date.parse(me.sessionExpiresAt)),
-            })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1 text-sm">
-          <p>
-            <span className="text-muted-foreground">{t('auth.account.username')}: </span>
-            {me.username}
-          </p>
-          <p>
-            <span className="text-muted-foreground">{t('auth.account.roles')}: </span>
-            {me.roles.map((role, index) => (
-              <span key={role.id}>
-                {index > 0 ? ', ' : ''}
-                <RoleName role={role} />
-              </span>
-            ))}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.account.changePassword')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex max-w-sm flex-col gap-4"
-            noValidate
-            onSubmit={(event) => void submit(event)}
-          >
-            <ProblemAlert problem={problem} />
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="currentPassword">{t('auth.account.currentPassword')}</Label>
+      <div className="flex max-w-3xl flex-col gap-5">
+        <FieldList
+          title={me.fullName}
+          items={[
+            {
+              label: t('auth.account.username'),
+              value: <span className="font-mono">{me.username}</span>,
+            },
+            {
+              label: t('auth.account.roles'),
+              value: me.roles.map((role, index) => (
+                <span key={role.id}>
+                  {index > 0 ? ', ' : ''}
+                  <RoleName role={role} />
+                </span>
+              )),
+            },
+            {
+              label: t('auth.account.session'),
+              value: t('auth.account.sessionEnds', {
+                time: formatUbDateTime(Date.parse(me.sessionExpiresAt)),
+              }),
+            },
+          ]}
+        />
+        <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
+          <ProblemAlert problem={problem} />
+          <FormSection title={t('auth.account.changePassword')}>
+            <FormRow
+              label={t('auth.account.currentPassword')}
+              htmlFor="currentPassword"
+              error={errors.currentPassword?.message}
+            >
               <Input
                 id="currentPassword"
                 type="password"
                 autoComplete="current-password"
+                className="sm:w-72"
                 {...form.register('currentPassword')}
               />
-              <FieldError message={errors.currentPassword?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="newPassword">{t('auth.account.newPassword')}</Label>
+            </FormRow>
+            <FormRow
+              label={t('auth.account.newPassword')}
+              htmlFor="newPassword"
+              error={errors.newPassword?.message}
+            >
               <Input
                 id="newPassword"
                 type="password"
                 autoComplete="new-password"
+                className="sm:w-72"
                 {...form.register('newPassword')}
               />
-              <FieldError message={errors.newPassword?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPassword">{t('auth.account.confirmPassword')}</Label>
+            </FormRow>
+            <FormRow
+              label={t('auth.account.confirmPassword')}
+              htmlFor="confirmPassword"
+              error={errors.confirmPassword?.message}
+            >
               <Input
                 id="confirmPassword"
                 type="password"
                 autoComplete="new-password"
+                className="sm:w-72"
                 {...form.register('confirmPassword')}
               />
-              <FieldError message={errors.confirmPassword?.message} />
-            </div>
+            </FormRow>
+          </FormSection>
+          <FormFooter>
             <Button type="submit" disabled={isSubmitting}>
               {t('auth.account.submit')}
             </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.account.logoutAll')}</CardTitle>
-          <CardDescription>{t('auth.account.logoutAllHint')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={() => void logoutEverywhere()}>
-            {t('auth.account.logoutAll')}
-          </Button>
-        </CardContent>
-      </Card>
+          </FormFooter>
+        </form>
+        <FormSection
+          title={t('auth.account.logoutAll')}
+          description={t('auth.account.logoutAllHint')}
+        >
+          <div className="px-3.5 py-3">
+            <Button variant="outline" onClick={() => setLeaving(true)}>
+              {t('auth.account.logoutAll')}
+            </Button>
+          </div>
+        </FormSection>
+      </div>
+      <ConfirmDialog
+        open={leaving}
+        title={t('auth.account.logoutAllTitle')}
+        description={t('auth.account.logoutAllHint')}
+        confirmLabel={t('auth.account.logoutAll')}
+        onConfirm={() => void logoutEverywhere()}
+        onClose={() => setLeaving(false)}
+      />
     </div>
   );
 }

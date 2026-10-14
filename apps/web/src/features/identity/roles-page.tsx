@@ -1,19 +1,27 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PERMISSIONS, type Permission } from '@tugeel/shared/auth';
-import { Plus } from 'lucide-react';
+import { isSystemRole, PERMISSIONS, type Permission } from '@tugeel/shared/auth';
+import { Eye, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { CheckboxGroup } from '@/components/checkbox-group';
-import { FieldError } from '@/components/field-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DialogFormFooter, FormField } from '@/components/form';
+import {
+  EmptyState,
+  ListCard,
+  RowAction,
+  RowActions,
+  RowActionSpacer,
+  SkeletonRows,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RoleName } from '@/components/role-name';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -23,8 +31,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { problemFromError, settle } from '@/lib/problem';
+import { useCreateParam } from '@/lib/use-create-param';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type Role, useIdentityMutations, usePermissionCatalog, useRoles } from './api';
 
 const roleSchema = z.object({
@@ -38,14 +55,23 @@ function PermissionLabel({ code }: { code: Permission }) {
   return <>{t(`permissions.${code}`)}</>;
 }
 
-/** System roles (read-only) and custom roles an admin builds from permissions (ADR-0027 #5). */
+/**
+ * System roles (read-only) and custom roles an admin builds from permissions (ADR-0027 #5): a list
+ * whose rows end with their icon actions (ADR-0043); the role opens in a dialog.
+ */
 export function RolesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('identity.roles.manage');
   const roles = useRoles();
   const mutations = useIdentityMutations();
-  const [editing, setEditing] = useState<Role | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<Role | null>(null);
+  const [creating, setCreating] = useCreateParam();
+  const [open, setOpen] = useState<Role | null>(null);
+  const deletion = useDeleteConfirm<Role>((id) => mutations.deleteRole.mutateAsync(id));
+  const rows = roles.data ?? [];
+  const nameOf = (role: Role) =>
+    role.code && isSystemRole(role.code)
+      ? t(`roles.system.${role.code}`)
+      : (role.name ?? role.code ?? '');
 
   return (
     <div>
@@ -53,83 +79,127 @@ export function RolesPage() {
         title={t('roles.title')}
         actions={
           canManage ? (
-            <Button onClick={() => setEditing('new')}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               {t('roles.create')}
             </Button>
           ) : null
         }
       />
-      <ProblemAlert problem={problemFromError(roles.error ?? mutations.deleteRole.error)} />
-      <div className="grid gap-4 md:grid-cols-2">
-        {(roles.data ?? []).map((role) => (
-          <Card key={role.id}>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                <RoleName role={role} />
-                <Badge variant={role.isSystem ? 'secondary' : 'outline'}>
-                  {role.isSystem ? t('roles.systemBadge') : t('roles.customBadge')}
-                </Badge>
-              </CardTitle>
-              <CardDescription>{t('roles.userCount', { count: role.userCount })}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              {role.permissions.length ? (
-                <ul className="list-inside list-disc">
-                  {role.permissions.map((code) => (
-                    <li key={code}>
-                      <PermissionLabel code={code} />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground">{t('roles.noPermissions')}</p>
-              )}
-              {role.isSystem ? (
-                <p className="text-xs text-muted-foreground">{t('roles.readOnly')}</p>
-              ) : canManage ? (
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(role)}>
-                    {t('common.edit')}
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setDeleting(role)}>
-                    {t('common.delete')}
-                  </Button>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      {editing ? <RoleDialog role={editing} onClose={() => setEditing(null)} /> : null}
-      <Dialog
-        open={deleting !== null}
-        onOpenChange={(open) => (open ? undefined : setDeleting(null))}
-      >
-        <DialogContent closeLabel={t('common.close')}>
-          <DialogHeader>
-            <DialogTitle>{t('common.delete')}</DialogTitle>
-            <DialogDescription>
-              {t('roles.deleteConfirm', { name: deleting?.name ?? '' })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter closeLabel={t('common.cancel')}>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleting) {
-                  mutations.deleteRole.mutate(deleting.id, {
-                    onSettled: () => setDeleting(null),
-                  });
-                }
-              }}
-            >
-              {t('common.delete')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProblemAlert problem={problemFromError(roles.error)} />
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('roles.columns.name')}</TableHead>
+              <TableHead>{t('roles.columns.kind')}</TableHead>
+              <TableHead className="text-right">{t('roles.columns.permissions')}</TableHead>
+              <TableHead className="text-right">{t('roles.columns.users')}</TableHead>
+              <TableHead>
+                <span className="sr-only">{t('common.actions')}</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {roles.isPending ? <SkeletonRows columns={5} /> : null}
+            {rows.map((role) => (
+              <TableRow key={role.id}>
+                <TableCell className="font-medium">
+                  <RoleName role={role} />
+                </TableCell>
+                <TableCell>
+                  <Badge variant={role.isSystem ? 'secondary' : 'outline'}>
+                    {role.isSystem ? t('roles.systemBadge') : t('roles.customBadge')}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono">{role.permissions.length}</TableCell>
+                <TableCell className="text-right font-mono">{role.userCount}</TableCell>
+                <RowActions>
+                  {role.isSystem || !canManage ? (
+                    <>
+                      <RowAction
+                        label={`${t('roles.view')}: ${nameOf(role)}`}
+                        icon={Eye}
+                        onClick={() => setOpen(role)}
+                      />
+                      <RowActionSpacer />
+                    </>
+                  ) : (
+                    <>
+                      <RowAction
+                        label={`${t('common.edit')}: ${nameOf(role)}`}
+                        icon={Pencil}
+                        onClick={() => setOpen(role)}
+                      />
+                      <RowAction
+                        label={`${t('common.delete')}: ${nameOf(role)}`}
+                        icon={Trash2}
+                        destructive
+                        onClick={() => deletion.ask(role)}
+                      />
+                    </>
+                  )}
+                </RowActions>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!roles.isPending && rows.length === 0 ? (
+          <EmptyState icon={ShieldCheck} title={t('roles.empty')} />
+        ) : null}
+      </ListCard>
+      {creating ? <RoleDialog role="new" onClose={() => setCreating(false)} /> : null}
+      {open ? (
+        open.isSystem || !canManage ? (
+          <RolePermissionsDialog role={open} onClose={() => setOpen(null)} />
+        ) : (
+          <RoleDialog role={open} onClose={() => setOpen(null)} />
+        )
+      ) : null}
+      <ConfirmDialog
+        open={deletion.target !== null}
+        title={t('common.delete')}
+        description={t('roles.deleteConfirm', {
+          name: deletion.target ? nameOf(deletion.target) : '',
+        })}
+        confirmLabel={t('common.delete')}
+        pending={deletion.pending}
+        problem={deletion.problem}
+        onClose={deletion.close}
+        onConfirm={deletion.confirm}
+      />
     </div>
+  );
+}
+
+/** What a system role (or a role read by someone who cannot change it) may do. */
+function RolePermissionsDialog({ role, onClose }: { role: Role; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open onOpenChange={(value) => (value ? undefined : onClose())}>
+      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            <RoleName role={role} />
+          </DialogTitle>
+          <DialogDescription>
+            {role.isSystem ? t('roles.readOnly') : t('roles.userCount', { count: role.userCount })}
+          </DialogDescription>
+        </DialogHeader>
+        {role.permissions.length ? (
+          <ul className="flex max-h-96 list-inside list-disc flex-col gap-1 overflow-y-auto text-sm">
+            {role.permissions.map((code) => (
+              <li key={code}>
+                <PermissionLabel code={code} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('roles.noPermissions')}</p>
+        )}
+        <DialogFooter closeLabel={t('common.close')} />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -156,44 +226,40 @@ function RoleDialog({ role, onClose }: { role: Role | 'new'; onClose: () => void
   const assignable = (catalog.data ?? []).filter((permission) => permission.assignable);
 
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+    <Dialog open onOpenChange={(value) => (value ? undefined : onClose())}>
       <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isNew ? t('roles.create') : t('roles.edit')}</DialogTitle>
-          <DialogDescription>{t('roles.form.adminOnly')}</DialogDescription>
-        </DialogHeader>
-        <ProblemAlert
-          problem={problemFromError(mutations.createRole.error ?? mutations.updateRole.error)}
-        />
-        <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="role-name">{t('roles.form.name')}</Label>
+        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
+          <DialogHeader>
+            <DialogTitle>{isNew ? t('roles.create') : t('roles.edit')}</DialogTitle>
+            <DialogDescription>{t('roles.form.adminOnly')}</DialogDescription>
+          </DialogHeader>
+          <ProblemAlert
+            problem={problemFromError(mutations.createRole.error ?? mutations.updateRole.error)}
+          />
+          <FormField label={t('roles.form.name')} htmlFor="role-name" error={errors.name?.message}>
             <Input id="role-name" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
+          </FormField>
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">{t('roles.form.permissions')}</legend>
-            <Controller
-              control={form.control}
-              name="permissions"
-              render={({ field }) => (
-                <CheckboxGroup
-                  name="permission"
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={assignable.map((permission) => ({
-                    value: permission.code,
-                    label: <PermissionLabel code={permission.code} />,
-                  }))}
-                />
-              )}
-            />
+            <div className="max-h-80 overflow-y-auto pr-1">
+              <Controller
+                control={form.control}
+                name="permissions"
+                render={({ field }) => (
+                  <CheckboxGroup
+                    name="permission"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={assignable.map((permission) => ({
+                      value: permission.code,
+                      label: <PermissionLabel code={permission.code} />,
+                    }))}
+                  />
+                )}
+              />
+            </div>
           </fieldset>
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          <DialogFormFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>

@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, settle } from '@/lib/problem';
+import { useCreateParam } from '@/lib/use-create-param';
 import { type PasswordCode, useIdentityMutations, useRoles, useUsers } from './api';
 import { UserForm, type UserFormValues } from './user-form';
 
@@ -59,7 +60,7 @@ export function UsersPage() {
   const users = useUsers(deferredSearch);
   const roles = useRoles();
   const mutations = useIdentityMutations();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useCreateParam();
   const [issued, setIssued] = useState<{ id: number; name: string; code: PasswordCode } | null>(
     null,
   );
@@ -184,7 +185,12 @@ export function UsersPage() {
           <ProblemAlert
             problem={problemFromError(mutations.createUser.error ?? mutations.issueCode.error)}
           />
-          <UserForm defaultValues={EMPTY_USER} submitLabel={t('common.save')} onSubmit={create} />
+          <UserForm
+            defaultValues={EMPTY_USER}
+            submitLabel={t('common.save')}
+            onSubmit={create}
+            onCancel={() => setCreating(false)}
+          />
         </DialogContent>
       </Dialog>
       <CodeDialog

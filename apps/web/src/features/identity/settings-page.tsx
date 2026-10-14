@@ -1,21 +1,33 @@
 import {
   parseSettingValue,
-  type SettingDefinition,
   SETTINGS,
+  type SettingDefinition,
   type SettingKey,
 } from '@tugeel/shared/settings';
 import { businessDate } from '@tugeel/shared/time';
+import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
-import { NativeSelect } from '@/components/native-select';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DialogFormFooter, FormField } from '@/components/form';
+import { RowAction, RowActions, RowActionSpacer } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -25,7 +37,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError, settle } from '@/lib/problem';
+import { toast } from '@/lib/toast';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type SettingView, useIdentityMutations, useSettings } from './api';
+
+type SettingEntry = SettingView['entries'][number];
 
 /** Effective-dated settings: VAT and city-tax rates, payer flags, session length (SPEC §5.1). */
 export function SettingsPage() {
@@ -62,42 +78,25 @@ function SettingValue({
   return <>{String(value)}</>;
 }
 
-/** The typed value the API expects for a key, from the text the admin entered. */
-function candidateValue(kind: 'percent' | 'boolean' | 'integer', raw: string) {
-  const text = raw.trim();
-  if (kind === 'boolean') return text === 'true';
-  if (kind === 'integer') return /^\d{1,4}$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
-  return text;
-}
-
+/**
+ * One setting: its value today, its history and planned changes (a planned one can be deleted,
+ * asked first), and «Шинэ утга» for a value from a date (ADR-0043: a dialog, yes/no as a switch).
+ */
 function SettingCard({ view }: { view: SettingView }) {
   const { t } = useTranslation();
   const settingKey = view.key;
-  const definition: SettingDefinition = SETTINGS[settingKey];
-  const kind = definition.kind;
   const canManage = useHasPermission('identity.settings.manage');
   const mutations = useIdentityMutations();
+  const [adding, setAdding] = useState(false);
+  const deletion = useDeleteConfirm<SettingEntry>((id) => mutations.deleteSetting.mutateAsync(id));
   const today = businessDate();
-  const initialRaw = kind === 'boolean' ? 'true' : '';
-  const [raw, setRaw] = useState(initialRaw);
-  const [effectiveFrom, setEffectiveFrom] = useState(today);
-  const [invalid, setInvalid] = useState(false);
   const inForceId = view.entries.find((entry) => entry.effectiveFrom <= today)?.id;
-
-  const add = async () => {
-    const parsed = parseSettingValue(settingKey, candidateValue(kind, raw));
-    setInvalid(!parsed.ok);
-    if (!parsed.ok || !effectiveFrom) return;
-    const created = await settle(
-      mutations.createSetting.mutateAsync({ key: settingKey, value: parsed.value, effectiveFrom }),
-    );
-    if (created) setRaw(initialRaw);
-  };
+  const title = t(`settings.keys.${settingKey}`);
 
   return (
-    <Card>
+    <Card role="region" aria-label={title}>
       <CardHeader>
-        <CardTitle>{t(`settings.keys.${settingKey}`)}</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
           {t('settings.current')}
           {': '}
@@ -105,15 +104,28 @@ function SettingCard({ view }: { view: SettingView }) {
             <SettingValue settingKey={settingKey} value={view.current} />
           </span>
         </CardDescription>
+        {canManage ? (
+          <CardAction>
+            <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
+              <Plus />
+              {t('settings.add')}
+            </Button>
+          </CardAction>
+        ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent>
         {view.entries.length ? (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('settings.effectiveFrom')}</TableHead>
                 <TableHead>{t('settings.value')}</TableHead>
-                <TableHead />
+                <TableHead>{t('users.columns.status')}</TableHead>
+                {canManage ? (
+                  <TableHead>
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -127,90 +139,152 @@ function SettingCard({ view }: { view: SettingView }) {
                       <SettingValue settingKey={settingKey} value={entry.value} />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={upcoming ? 'default' : inForce ? 'success' : 'secondary'}>
-                          {upcoming
-                            ? t('settings.upcoming')
-                            : inForce
-                              ? t('settings.inForce')
-                              : t('settings.past')}
-                        </Badge>
-                        {upcoming && canManage ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={mutations.deleteSetting.isPending}
-                            onClick={() => mutations.deleteSetting.mutate(entry.id)}
-                          >
-                            {t('common.delete')}
-                          </Button>
-                        ) : null}
-                      </div>
+                      <Badge variant={upcoming ? 'default' : inForce ? 'success' : 'secondary'}>
+                        {upcoming
+                          ? t('settings.upcoming')
+                          : inForce
+                            ? t('settings.inForce')
+                            : t('settings.past')}
+                      </Badge>
                     </TableCell>
+                    {canManage ? (
+                      <RowActions>
+                        {upcoming ? (
+                          <RowAction
+                            label={`${t('common.delete')}: ${entry.effectiveFrom}`}
+                            icon={Trash2}
+                            destructive
+                            onClick={() => deletion.ask(entry)}
+                          />
+                        ) : (
+                          <RowActionSpacer />
+                        )}
+                      </RowActions>
+                    ) : null}
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
-        ) : null}
-        {canManage ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">{t('settings.add')}</p>
-            <ProblemAlert
-              problem={problemFromError(
-                mutations.createSetting.error ?? mutations.deleteSetting.error,
-              )}
-            />
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`${settingKey}-value`}>{t('settings.value')}</Label>
-                {kind === 'boolean' ? (
-                  <NativeSelect
-                    id={`${settingKey}-value`}
-                    value={raw}
-                    onChange={(event) => setRaw(event.target.value)}
-                  >
-                    <option value="true">{t('settings.true')}</option>
-                    <option value="false">{t('settings.false')}</option>
-                  </NativeSelect>
-                ) : (
-                  <Input
-                    id={`${settingKey}-value`}
-                    className="w-32"
-                    inputMode={kind === 'integer' ? 'numeric' : 'decimal'}
-                    value={raw}
-                    aria-invalid={invalid}
-                    onChange={(event) => setRaw(event.target.value)}
-                  />
-                )}
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`${settingKey}-date`}>{t('settings.effectiveFrom')}</Label>
-                <Input
-                  id={`${settingKey}-date`}
-                  type="date"
-                  min={view.entries.length ? today : undefined}
-                  value={effectiveFrom}
-                  onChange={(event) => setEffectiveFrom(event.target.value)}
-                />
-              </div>
-              <Button onClick={() => void add()} disabled={mutations.createSetting.isPending}>
-                {t('common.save')}
-              </Button>
-            </div>
-            {invalid ? (
-              <p role="alert" className="text-sm text-destructive">
-                {kind === 'integer'
-                  ? t('validation.integerRange', {
-                      min: definition.min ?? 0,
-                      max: definition.max ?? 9999,
-                    })
-                  : t('validation.percent')}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('settings.noEntries')}</p>
+        )}
       </CardContent>
+      {adding ? (
+        <SettingDialog
+          settingKey={settingKey}
+          first={view.entries.length === 0}
+          onClose={() => setAdding(false)}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={deletion.target !== null}
+        title={t('settings.deleteTitle', { date: deletion.target?.effectiveFrom ?? '' })}
+        description={title}
+        confirmLabel={t('common.delete')}
+        pending={deletion.pending}
+        problem={deletion.problem}
+        onClose={deletion.close}
+        onConfirm={deletion.confirm}
+      />
     </Card>
+  );
+}
+
+/** The typed value the API expects for a key, from the text the admin entered. */
+function candidateValue(kind: SettingDefinition['kind'], raw: string, flag: boolean) {
+  const text = raw.trim();
+  if (kind === 'boolean') return flag;
+  if (kind === 'integer') return /^\d{1,4}$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
+  return text;
+}
+
+function SettingDialog(props: { settingKey: SettingKey; first: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const mutations = useIdentityMutations();
+  const definition: SettingDefinition = SETTINGS[props.settingKey];
+  const kind = definition.kind;
+  const today = businessDate();
+  const [raw, setRaw] = useState('');
+  const [flag, setFlag] = useState(true);
+  const [effectiveFrom, setEffectiveFrom] = useState(today);
+  const [invalid, setInvalid] = useState(false);
+
+  const save = async () => {
+    const parsed = parseSettingValue(props.settingKey, candidateValue(kind, raw, flag));
+    setInvalid(!parsed.ok);
+    if (!parsed.ok || !effectiveFrom) return;
+    const created = await settle(
+      mutations.createSetting.mutateAsync({
+        key: props.settingKey,
+        value: parsed.value,
+        effectiveFrom,
+      }),
+    );
+    if (created) {
+      toast.success(t('common.saved'));
+      props.onClose();
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')}>
+        <form
+          className="space-y-4"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{t(`settings.keys.${props.settingKey}`)}</DialogTitle>
+          </DialogHeader>
+          <ProblemAlert problem={problemFromError(mutations.createSetting.error)} />
+          {kind === 'boolean' ? (
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="setting-value">{t('settings.value')}</Label>
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm">{flag ? t('settings.true') : t('settings.false')}</span>
+                <Switch id="setting-value" checked={flag} onCheckedChange={setFlag} />
+              </div>
+            </div>
+          ) : (
+            <FormField label={t('settings.value')} htmlFor="setting-value">
+              <Input
+                id="setting-value"
+                className="font-mono sm:w-32"
+                inputMode={kind === 'integer' ? 'numeric' : 'decimal'}
+                value={raw}
+                aria-invalid={invalid}
+                onChange={(event) => setRaw(event.target.value)}
+              />
+              {invalid ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {kind === 'integer'
+                    ? t('validation.integerRange', {
+                        min: definition.min ?? 0,
+                        max: definition.max ?? 9999,
+                      })
+                    : t('validation.percent')}
+                </p>
+              ) : null}
+            </FormField>
+          )}
+          <FormField label={t('settings.effectiveFrom')} htmlFor="setting-date">
+            <Input
+              id="setting-date"
+              type="date"
+              className="sm:w-44"
+              min={props.first ? undefined : today}
+              value={effectiveFrom}
+              onChange={(event) => setEffectiveFrom(event.target.value)}
+            />
+          </FormField>
+          <DialogFormFooter pending={mutations.createSetting.isPending} onCancel={props.onClose} />
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

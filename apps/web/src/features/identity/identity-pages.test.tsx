@@ -211,7 +211,12 @@ describe('users', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: mn.users.detail.unlock }));
     await waitFor(() => expect(calledWith(fetchMock, 'POST', '/api/v1/users/7/unlock')).toBe(true));
-    await user.click(await screen.findByRole('button', { name: mn.users.detail.revoke }));
+    await user.click(
+      await screen.findByRole('button', { name: `${mn.users.detail.revoke}: 192.0.2.10` }),
+    );
+    // Signing a device out is asked first.
+    const confirm = within(await screen.findByRole('dialog'));
+    await user.click(confirm.getByRole('button', { name: mn.users.detail.revoke }));
     await waitFor(() =>
       expect(calledWith(fetchMock, 'DELETE', `/api/v1/users/7/sessions/${session.id}`)).toBe(true),
     );
@@ -233,8 +238,9 @@ describe('roles', () => {
       }),
     );
     const user = userEvent.setup();
-    expect(await screen.findAllByText(mn.roles.readOnly)).toHaveLength(2);
-    await user.click(screen.getByRole('button', { name: mn.common.edit }));
+    // System roles are only read; the custom one is edited from its row.
+    expect(await screen.findAllByText(mn.roles.systemBadge)).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: `${mn.common.edit}: Ахлах нярав` }));
     const dialog = within(await screen.findByRole('dialog'));
     await user.click(
       await dialog.findByRole('checkbox', { name: mn.permissions.identity.settings.read }),
@@ -290,14 +296,17 @@ describe('settings', () => {
     expect(card.getByText(mn.settings.inForce)).toBeInTheDocument();
     expect(card.getByText(mn.settings.upcoming)).toBeInTheDocument();
 
-    await user.type(card.getByLabelText(mn.settings.value), '110');
-    await user.click(card.getByRole('button', { name: mn.common.save }));
-    expect(await card.findByText(mn.validation.percent)).toBeInTheDocument();
+    // A new value is typed in a dialog opened from the card.
+    await user.click(card.getByRole('button', { name: mn.settings.add }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(mn.settings.value), '110');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.validation.percent)).toBeInTheDocument();
     expect(posted).toBeUndefined();
 
-    await user.clear(card.getByLabelText(mn.settings.value));
-    await user.type(card.getByLabelText(mn.settings.value), '10');
-    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await user.clear(dialog.getByLabelText(mn.settings.value));
+    await user.type(dialog.getByLabelText(mn.settings.value), '10');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() =>
       expect(posted).toEqual({
         key: 'tax.vat_rate_pct',
@@ -315,10 +324,12 @@ describe('settings', () => {
     renderApp('/settings', fetchMock);
     const user = userEvent.setup();
     const card = cardOf(await screen.findByText(mn.settings.keys.credit.payment_term_days));
-    await user.type(card.getByLabelText(mn.settings.value), '400');
-    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await user.click(card.getByRole('button', { name: mn.settings.add }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(mn.settings.value), '400');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
     expect(
-      await card.findByText(
+      await dialog.findByText(
         mn.validation.integerRange.replace('{{min}}', '0').replace('{{max}}', '365'),
       ),
     ).toBeInTheDocument();
@@ -333,8 +344,11 @@ describe('settings', () => {
     renderApp('/settings', fetchMock);
     const user = userEvent.setup();
     const card = cardOf(await screen.findByText(mn.settings.keys.tax.vat_rate_pct));
-    // getByRole throws unless exactly one value (the upcoming one) offers a delete button.
-    await user.click(card.getByRole('button', { name: mn.common.delete }));
+    // Only the upcoming value offers a delete button, and it asks first.
+    await user.click(card.getByRole('button', { name: `${mn.common.delete}: 2099-01-01` }));
+    expect(card.queryByRole('button', { name: `${mn.common.delete}: 2020-01-01` })).toBeNull();
+    const confirm = within(await screen.findByRole('dialog'));
+    await user.click(confirm.getByRole('button', { name: mn.common.delete }));
     await waitFor(() => expect(calledWith(fetchMock, 'DELETE', '/api/v1/settings/2')).toBe(true));
   });
 });

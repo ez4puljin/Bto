@@ -5,11 +5,10 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { CheckboxGroup } from '@/components/checkbox-group';
-import { FieldError } from '@/components/field-error';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import { RoleName } from '@/components/role-name';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useBranches, useRoles, useWarehouses } from './api';
 
 const userFormSchema = z.object({
@@ -26,8 +25,9 @@ const userFormSchema = z.object({
 export type UserFormValues = z.infer<typeof userFormSchema>;
 
 /**
- * Username, name, phone, roles and write scopes. `lockUsername` for existing users,
- * `lockAccess` when an admin edits themselves (the API refuses own role/scope changes).
+ * Username, name, phone, roles and write scopes, settings-style (ADR-0043). `lockUsername` for
+ * existing users, `lockAccess` when an admin edits themselves (the API refuses own role and scope
+ * changes).
  */
 export function UserForm(props: {
   defaultValues: UserFormValues;
@@ -35,6 +35,7 @@ export function UserForm(props: {
   lockAccess?: boolean;
   submitLabel: string;
   onSubmit: (values: UserFormValues) => Promise<void>;
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const roles = useRoles();
@@ -48,93 +49,104 @@ export function UserForm(props: {
   const submit = form.handleSubmit(props.onSubmit);
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="user-username">{t('users.form.username')}</Label>
+    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
+      <FormSection title={t('users.form.sectionAccount')}>
+        <FormRow
+          label={t('users.form.username')}
+          htmlFor="user-username"
+          error={errors.username?.message}
+        >
           <Input
             id="user-username"
             autoCapitalize="none"
+            className="font-mono sm:w-56"
             disabled={props.lockUsername}
             {...form.register('username')}
           />
-          <FieldError message={errors.username?.message} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="user-fullName">{t('users.form.fullName')}</Label>
+        </FormRow>
+        <FormRow
+          label={t('users.form.fullName')}
+          htmlFor="user-fullName"
+          error={errors.fullName?.message}
+        >
           <Input id="user-fullName" {...form.register('fullName')} />
-          <FieldError message={errors.fullName?.message} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="user-phone">{t('users.form.phone')}</Label>
-          <Input id="user-phone" inputMode="tel" {...form.register('phone')} />
-          <FieldError message={errors.phone?.message} />
-        </div>
-      </div>
-      <fieldset className="flex flex-col gap-2" disabled={props.lockAccess}>
-        <legend className="mb-2 text-sm font-medium">{t('users.form.roles')}</legend>
-        <Controller
-          control={form.control}
-          name="roleIds"
-          render={({ field }) => (
-            <CheckboxGroup
-              name="role"
-              value={field.value}
-              onChange={field.onChange}
-              disabled={props.lockAccess}
-              options={(roles.data ?? []).map((role) => ({
-                value: role.id,
-                label: <RoleName role={role} />,
-              }))}
+        </FormRow>
+        <FormRow label={t('users.form.phone')} htmlFor="user-phone" error={errors.phone?.message}>
+          <Input id="user-phone" inputMode="tel" className="sm:w-56" {...form.register('phone')} />
+        </FormRow>
+      </FormSection>
+      <fieldset disabled={props.lockAccess} className="flex min-w-0 flex-col gap-5">
+        <FormSection title={t('users.form.roles')}>
+          <div className="px-3.5 py-3">
+            <Controller
+              control={form.control}
+              name="roleIds"
+              render={({ field }) => (
+                <CheckboxGroup
+                  name="role"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={props.lockAccess}
+                  options={(roles.data ?? []).map((role) => ({
+                    value: role.id,
+                    label: <RoleName role={role} />,
+                  }))}
+                />
+              )}
             />
-          )}
-        />
+          </div>
+        </FormSection>
+        <FormSection title={t('users.form.scopes')} description={t('users.form.scopesHint')}>
+          <FormRow label={t('users.form.scopeBranches')}>
+            <Controller
+              control={form.control}
+              name="branchIds"
+              render={({ field }) => (
+                <CheckboxGroup
+                  name="scope-branch"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={props.lockAccess}
+                  options={(branches.data ?? []).map((branch) => ({
+                    value: branch.id,
+                    label: `${branch.code} · ${branch.name}`,
+                  }))}
+                />
+              )}
+            />
+          </FormRow>
+          <FormRow label={t('users.form.scopeWarehouses')}>
+            <Controller
+              control={form.control}
+              name="warehouseIds"
+              render={({ field }) => (
+                <CheckboxGroup
+                  name="scope-warehouse"
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={props.lockAccess}
+                  options={(warehouses.data ?? [])
+                    .filter((warehouse) => warehouse.kind !== 'TRANSIT')
+                    .map((warehouse) => ({
+                      value: warehouse.id,
+                      label: `${warehouse.code} · ${warehouse.name}`,
+                    }))}
+                />
+              )}
+            />
+          </FormRow>
+        </FormSection>
       </fieldset>
-      <fieldset className="flex flex-col gap-2" disabled={props.lockAccess}>
-        <legend className="mb-1 text-sm font-medium">{t('users.form.scopes')}</legend>
-        <p className="text-sm text-muted-foreground">{t('users.form.scopesHint')}</p>
-        <p className="text-sm">{t('users.form.scopeBranches')}</p>
-        <Controller
-          control={form.control}
-          name="branchIds"
-          render={({ field }) => (
-            <CheckboxGroup
-              name="scope-branch"
-              value={field.value}
-              onChange={field.onChange}
-              disabled={props.lockAccess}
-              options={(branches.data ?? []).map((branch) => ({
-                value: branch.id,
-                label: `${branch.code} · ${branch.name}`,
-              }))}
-            />
-          )}
-        />
-        <p className="text-sm">{t('users.form.scopeWarehouses')}</p>
-        <Controller
-          control={form.control}
-          name="warehouseIds"
-          render={({ field }) => (
-            <CheckboxGroup
-              name="scope-warehouse"
-              value={field.value}
-              onChange={field.onChange}
-              disabled={props.lockAccess}
-              options={(warehouses.data ?? [])
-                .filter((warehouse) => warehouse.kind !== 'TRANSIT')
-                .map((warehouse) => ({
-                  value: warehouse.id,
-                  label: `${warehouse.code} · ${warehouse.name}`,
-                }))}
-            />
-          )}
-        />
-      </fieldset>
-      <div>
+      <FormFooter>
+        {props.onCancel ? (
+          <Button type="button" variant="ghost" onClick={props.onCancel}>
+            {t('common.cancel')}
+          </Button>
+        ) : null}
         <Button type="submit" disabled={isSubmitting}>
           {props.submitLabel}
         </Button>
-      </div>
+      </FormFooter>
     </form>
   );
 }
