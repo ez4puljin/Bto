@@ -32,6 +32,7 @@ export type BarcodeResolution = Schemas['BarcodeResolution'];
 export type VatType = ProductDetail['vatType'];
 export type ProductStatus = ProductDetail['status'];
 export type SegmentDefinition = Schemas['SegmentDefinition'];
+export type ProductExportRequest = Schemas['ProductExportRequest'];
 
 export const KEYS = {
   uoms: ['catalog', 'uoms'] as const,
@@ -133,6 +134,15 @@ export function useProductQuery(filter: ProductQueryFilter, options: ListReadOpt
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** The product list as Excel (ADR-0049 #6): the ticked products or what the filters keep. */
+export function useExportProducts() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: async (body: ProductExportRequest): Promise<Blob> =>
+      unwrap(await api.POST('/api/v1/exports/products', { body, parseAs: 'blob' })),
   });
 }
 

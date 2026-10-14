@@ -444,6 +444,94 @@ describe('products list', () => {
     await waitFor(() => expect(router.state.location.search).toBe('?price=%7E1000'));
   });
 
+  it('ticks rows and writes the ticked ones, or every filtered one, to Excel', async () => {
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(['weight']));
+    const fanta = listItem(2, '10002', 'Фанта');
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW, fanta]),
+      'POST /api/v1/exports/products': () =>
+        new Response(new Blob(['xlsx']), {
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        }),
+    });
+    URL.createObjectURL = vi.fn(() => 'blob:export');
+    URL.revokeObjectURL = vi.fn();
+    const saved: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(this.download);
+    });
+    const { router } = renderApp('/catalog/products?status=PENDING', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Фанта' });
+    const exports = () => calls(fetchMock, 'POST', '/api/v1/exports/products');
+    const visible = PRODUCT_LIST_COLUMNS.filter((key) => key !== 'image' && key !== 'weight');
+
+    // Nothing ticked: every product the filters keep, with the visible columns.
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.export.button }));
+    await waitFor(() => expect(exports()).toHaveLength(1));
+    expect(await sent(exports()[0] as Request)).toEqual({
+      status: 'ACTIVE',
+      saleReady: false,
+      columns: visible,
+    });
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]).toMatch(/\.xlsx$/);
+
+    // A tick beside the box does not open the product; the bar counts and exports the ticked rows.
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10002'),
+      }),
+    );
+    expect(router.state.location.pathname).toBe('/catalog/products');
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '1'));
+    expect(screen.getAllByRole('button', { name: mn.catalog.products.export.button })).toHaveLength(
+      1,
+    );
+    await user.click(within(bar).getByRole('button', { name: mn.catalog.products.export.button }));
+    await waitFor(() => expect(exports()).toHaveLength(2));
+    expect(await sent(exports()[1] as Request)).toEqual({ productIds: [2], columns: visible });
+
+    // «Бүгдийг сонгох» ticks every loaded row, again clears them.
+    const all = screen.getByRole('checkbox', { name: mn.common.selectAll });
+    expect(all).toHaveAttribute('data-state', 'indeterminate');
+    await user.click(all);
+    expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '2'));
+    await user.click(all);
+    expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
+
+    // A new filter starts without ticks.
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10001'),
+      }),
+    );
+    expect(screen.getByRole('region', { name: mn.common.selection })).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: mn.catalog.product.status }), '');
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull(),
+    );
+  });
+
+  it('offers neither ticks nor Excel without the export right', async () => {
+    renderApp(
+      '/catalog/products',
+      signedIn(WORKER_ME, {
+        ...LIST_ROUTES,
+        'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+      }),
+    );
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.catalog.products.export.button })).toBeNull();
+  });
+
   it('shows every piece of product information in its own column', async () => {
     renderApp(
       '/catalog/products',

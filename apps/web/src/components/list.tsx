@@ -168,10 +168,17 @@ const INTERACTIVE =
  * copy codes). The record's name or number stays a link: the keyboard and screen-reader path. The
  * chevron at the end shows the row leads somewhere.
  */
-export function LinkRow(props: { to: string; children: ReactNode; className?: string }) {
+export function LinkRow(props: {
+  to: string;
+  children: ReactNode;
+  className?: string;
+  /** A ticked row of a list with a checkbox column: tinted. */
+  selected?: boolean;
+}) {
   const navigate = useNavigate();
   return (
     <TableRow
+      data-state={props.selected ? 'selected' : undefined}
       className={cn('cursor-pointer has-[a:focus-visible]:bg-accent', props.className)}
       onClick={(event) => {
         if (

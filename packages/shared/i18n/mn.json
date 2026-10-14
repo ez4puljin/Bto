@@ -255,7 +255,12 @@
     "viewRecord": "Харах: {{name}}",
     "clearFilters": "Шүүлтүүр арилгах",
     "created": "Үүсгэлээ",
-    "editing": "Засаж байна"
+    "editing": "Засаж байна",
+    "selectAll": "Бүгдийг сонгох",
+    "selectRow": "{{name}} сонгох",
+    "selected": "{{count}} сонгосон",
+    "clearSelection": "Сонголтыг цуцлах",
+    "selection": "Сонгосон мөрүүд"
   },
   "validation": {
     "required": "Заавал бөглөнө",
@@ -707,6 +712,10 @@
           "home": "Харьяа агуулахгүй",
           "price": "Үнийн тохиргоогүй"
         }
+      },
+      "export": {
+        "button": "Excel татах",
+        "pending": "Бэлтгэж байна…"
       }
     },
     "product": {

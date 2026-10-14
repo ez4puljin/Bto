@@ -28,7 +28,8 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { HowComputed } from './answer-step';
-import { type AiReport, type AiResult, saveBlob, useAiMutations, useReports } from './api';
+import { saveBlob } from '@/lib/download';
+import { type AiReport, type AiResult, useAiMutations, useReports } from './api';
 import { ReportNameDialog } from './report-name-dialog';
 import { ResultTable } from './result-table';
 

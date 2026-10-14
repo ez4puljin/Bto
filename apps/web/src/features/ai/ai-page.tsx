@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { formatUbDateTime } from '@/lib/dayjs';
+import { saveBlob } from '@/lib/download';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
@@ -20,7 +21,6 @@ import { randomUuid } from '@/lib/uuid';
 import {
   type AiQuestion,
   type AiResult,
-  saveBlob,
   useAiMutations,
   useAiStatus,
   useConversation,
