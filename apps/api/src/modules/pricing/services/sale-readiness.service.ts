@@ -6,7 +6,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { ProductLifecycleService, UnitConversionService } from '../../catalog';
+import { CatalogService, ProductLifecycleService, UnitConversionService } from '../../catalog';
 import type { Actor } from '../../identity';
 import { UnitPricesService } from './unit-prices.service';
 
@@ -32,6 +32,7 @@ export class SaleReadinessService {
     private readonly lifecycle: ProductLifecycleService,
     private readonly units: UnitConversionService,
     private readonly prices: UnitPricesService,
+    private readonly catalog: CatalogService,
   ) {}
 
   complete(actor: Actor, productIds: readonly number[]): Promise<SaleReadyResult> {
@@ -105,5 +106,10 @@ export class SaleReadinessService {
       const done = new Set(completed);
       return { completed, alreadyComplete: ids.filter((id) => !done.has(id)) };
     });
+  }
+
+  /** Products the price clerk still has to complete, up to `cap` (the home tile, ADR-0047 #7). */
+  waitingCount(cap: number): Promise<number> {
+    return this.catalog.countWaitingForPrices(cap);
   }
 }

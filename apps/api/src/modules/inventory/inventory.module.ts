@@ -4,6 +4,7 @@ import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
 import { IdentityModule, WAREHOUSE_CREATED_HOOK } from '../identity';
 import { PartnersModule } from '../partners';
+import { InventoryAttentionController } from './controllers/attention.controller';
 import { BinsController, ProductLocationsController } from './controllers/bins.controller';
 import {
   AdjustmentLinesController,
@@ -18,6 +19,7 @@ import { TransferLinesController, TransfersController } from './controllers/tran
 import { ReconcileJob } from './jobs/reconcile.job';
 import { SnapshotMonthlyJob } from './jobs/snapshot-monthly.job';
 import { AdjustmentsService } from './services/adjustments.service';
+import { InventoryAttentionService } from './services/attention.service';
 import { BinMovesService } from './services/bin-moves.service';
 import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
@@ -31,6 +33,7 @@ import { TransfersService } from './services/transfers.service';
 
 const CORE_SERVICES = [
   AdjustmentsService,
+  InventoryAttentionService,
   BinMovesService,
   BinsService,
   ProductLocationsService,
@@ -84,6 +87,7 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
     StocktakesController,
     TransfersController,
     TransferLinesController,
+    InventoryAttentionController,
   ],
   providers: [InventoryBootstrap],
 })

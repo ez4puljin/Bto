@@ -8381,6 +8381,42 @@
         ]
       }
     },
+    "/api/v1/inventory/attention": {
+      "get": {
+        "operationId": "InventoryAttention_counts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/imports/templates/{kind}": {
       "get": {
         "operationId": "Imports_template",
@@ -9305,6 +9341,43 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/attention": {
+      "get": {
+        "operationId": "Pricing_attention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricingAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The home page's tile for the price clerk (ADR-0047 #7).",
         "tags": [
           "pricing"
         ]
@@ -16842,6 +16915,66 @@
           }
         }
       },
+      "InventoryAttentionLowStock": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Low-stock lines over the caller’s warehouses, capped"
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The warehouse with the most low-stock lines (the tile opens its list)"
+          }
+        },
+        "required": [
+          "count",
+          "warehouseId"
+        ]
+      },
+      "InventoryAttention": {
+        "type": "object",
+        "properties": {
+          "transfersToShip": {
+            "type": "number",
+            "description": "Requests the caller’s warehouses are to ship"
+          },
+          "transfersToReceive": {
+            "type": "number",
+            "description": "Shipments on their way to the caller’s warehouses"
+          },
+          "adjustmentsToApprove": {
+            "type": "number",
+            "description": "Adjustments waiting for approval (approvers)"
+          },
+          "stocktakesToReview": {
+            "type": "number",
+            "description": "Stocktakes waiting for review (approvers)"
+          },
+          "receiptsToCost": {
+            "type": "number",
+            "description": "Posted receipts waiting for their costs (cost holders)"
+          },
+          "lowStock": {
+            "$ref": "#/components/schemas/InventoryAttentionLowStock"
+          },
+          "cap": {
+            "type": "number",
+            "example": 100,
+            "description": "Counts stop here; show «99+» at the cap"
+          }
+        },
+        "required": [
+          "transfersToShip",
+          "transfersToReceive",
+          "adjustmentsToApprove",
+          "stocktakesToReview",
+          "receiptsToCost",
+          "lowStock",
+          "cap"
+        ]
+      },
       "ImportFileIssue": {
         "type": "object",
         "properties": {
@@ -17699,6 +17832,23 @@
           "effect",
           "validFrom",
           "steps"
+        ]
+      },
+      "PricingAttention": {
+        "type": "object",
+        "properties": {
+          "productsWaitingForPrices": {
+            "type": "number"
+          },
+          "cap": {
+            "type": "number",
+            "example": 100,
+            "description": "Counts stop here; show «99+» at the cap"
+          }
+        },
+        "required": [
+          "productsWaitingForPrices",
+          "cap"
         ]
       },
       "SaleReadyRequest": {

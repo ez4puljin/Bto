@@ -159,6 +159,14 @@ export class SaleReadyRequestDto {
   productIds: number[];
 }
 
+/** The price clerk's tile (ADR-0047 #7): products waiting for their prices, up to `cap`. */
+@ApiSchema({ name: 'PricingAttention' })
+export class PricingAttentionDto {
+  @ApiProperty() productsWaitingForPrices: number;
+  @ApiProperty({ example: 100, description: 'Counts stop here; show «99+» at the cap' })
+  cap: number;
+}
+
 @ApiSchema({ name: 'SaleReadyResult' })
 export class SaleReadyResultDto {
   @ApiProperty({ type: [Number], description: 'Completed by this call' }) completed: number[];

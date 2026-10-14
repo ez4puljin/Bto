@@ -44,6 +44,7 @@ Other modules never read or write pricing tables.
 | `GET /unit-prices/current?productIds=…` | authenticated | base unit prices in force, both lists (ADR-0037 batch read, up to 200 ids) |
 | `POST /unit-prices` | `pricing.prices.manage`, Idempotency-Key | `{ productId, validFrom, entries: [{ list, productUnitId, price \| null }] }` → the product's prices; 200 |
 | `POST /pricing/sale-ready` | `pricing.prices.manage`, Idempotency-Key | `{ productIds }` (1–200) → `{ completed, alreadyComplete }`, 200; `PRODUCT_INACTIVE` (409), `PRICE_MISSING` (409) with `params.count` and `errors[]` (`productIds.N`, the SKU) |
+| `GET /pricing/attention` | `pricing.prices.manage` | the price clerk's home tile (ADR-0047 #7): `{ productsWaitingForPrices, cap }`, active products without `sale_ready_at`, counted up to 100 through `CatalogService.countWaitingForPrices` |
 | `GET /discount-programs?list&scope&status&productId` | authenticated | newest first, keyset; `status` SCHEDULED / ACTIVE / ENDED relative to today |
 | `GET /discount-programs/:id` | authenticated | with product, units (name, factor) and steps |
 | `POST /discount-programs` | `pricing.manage`, Idempotency-Key | 201; thresholds in canonical units (PRODUCT QTY: base units) |

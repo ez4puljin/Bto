@@ -217,6 +217,11 @@ export class StockQueryService {
     return { data, nextCursor: after ? encodeCursor(after) : null };
   }
 
+  /** How many lines the low-stock list of a warehouse has, up to `cap` (the home tile). */
+  async lowStockCount(warehouseId: number, cap: number): Promise<number> {
+    return (await this.lowStock({ warehouseId, limit: cap })).data.length;
+  }
+
   /** Rows of the low-stock list after a keyset position, raw. */
   private async lowStockRows(
     warehouseId: number,

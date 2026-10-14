@@ -1979,6 +1979,22 @@ export interface paths {
         patch: operations["TransferLines_update"];
         trace?: never;
     };
+    "/api/v1/inventory/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InventoryAttention_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/imports/templates/{kind}": {
         parameters: {
             query?: never;
@@ -2156,6 +2172,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["DiscountPrograms_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The home page's tile for the price clerk (ADR-0047 #7). */
+        get: operations["Pricing_attention"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4351,6 +4384,30 @@ export interface components {
             /** @example 6 */
             qty?: string;
         };
+        InventoryAttentionLowStock: {
+            /** @description Low-stock lines over the caller’s warehouses, capped */
+            count: number;
+            /** @description The warehouse with the most low-stock lines (the tile opens its list) */
+            warehouseId: number | null;
+        };
+        InventoryAttention: {
+            /** @description Requests the caller’s warehouses are to ship */
+            transfersToShip: number;
+            /** @description Shipments on their way to the caller’s warehouses */
+            transfersToReceive: number;
+            /** @description Adjustments waiting for approval (approvers) */
+            adjustmentsToApprove: number;
+            /** @description Stocktakes waiting for review (approvers) */
+            stocktakesToReview: number;
+            /** @description Posted receipts waiting for their costs (cost holders) */
+            receiptsToCost: number;
+            lowStock: components["schemas"]["InventoryAttentionLowStock"];
+            /**
+             * @description Counts stop here; show «99+» at the cap
+             * @example 100
+             */
+            cap: number;
+        };
         ImportFileIssue: {
             /** @example MISSING_COLUMNS */
             code: string;
@@ -4600,6 +4657,14 @@ export interface components {
             /** @description Up to, not including */
             validTo?: string | null;
             steps: components["schemas"]["DiscountStep"][];
+        };
+        PricingAttention: {
+            productsWaitingForPrices: number;
+            /**
+             * @description Counts stop here; show «99+» at the cap
+             * @example 100
+             */
+            cap: number;
         };
         SaleReadyRequest: {
             productIds: number[];
@@ -9950,6 +10015,34 @@ export interface operations {
             };
         };
     };
+    InventoryAttention_counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Imports_template: {
         parameters: {
             query?: never;
@@ -10456,6 +10549,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscountProgram"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Pricing_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricingAttention"];
                 };
             };
             /** @description RFC 9457 problem details */

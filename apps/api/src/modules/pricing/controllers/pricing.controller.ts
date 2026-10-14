@@ -13,6 +13,7 @@ import {
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate, isIsoDate } from '@tugeel/shared/time';
+import { ATTENTION_CAP } from '../../../common/attention';
 import { invalid } from '../../../common/errors/app-error';
 import {
   type AuthContext,
@@ -28,6 +29,7 @@ import {
   DiscountProgramInputDto,
   DiscountProgramPageDto,
   DiscountProgramQueryDto,
+  PricingAttentionDto,
   ProductPricesDto,
   ProductPricesQueryDto,
   QuoteDto,
@@ -171,6 +173,17 @@ export class PricingController {
     private readonly quotes: PriceQuoteService,
     private readonly saleReadiness: SaleReadinessService,
   ) {}
+
+  /** The home page's tile for the price clerk (ADR-0047 #7). */
+  @Get('attention')
+  @RequirePermission(PRICES)
+  @ApiOkResponse({ type: PricingAttentionDto })
+  async attention(): Promise<PricingAttentionDto> {
+    return {
+      productsWaitingForPrices: await this.saleReadiness.waitingCount(ATTENTION_CAP),
+      cap: ATTENTION_CAP,
+    };
+  }
 
   /** Completes registered products whose base unit has both prices today (ADR-0044 #3). */
   @Post('sale-ready')

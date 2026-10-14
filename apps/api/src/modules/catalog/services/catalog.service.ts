@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { products } from '../schema';
@@ -33,5 +33,15 @@ export class CatalogService {
 
   search(query: ProductQuery) {
     return this.products.list(query);
+  }
+
+  /** Active products waiting for their prices (ADR-0044), counted up to `cap` (ADR-0047 #7). */
+  async countWaitingForPrices(cap: number): Promise<number> {
+    const rows = await this.db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.status, 'ACTIVE'), isNull(products.saleReadyAt)))
+      .limit(cap);
+    return rows.length;
   }
 }
