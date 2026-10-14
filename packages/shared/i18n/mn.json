@@ -19,7 +19,8 @@
       "partners": "Харилцагч",
       "inventory": "Агуулах",
       "pricing": "Үнэ",
-      "ai": "AI"
+      "ai": "AI",
+      "segments": "Сегмент"
     },
     "products": "Бараа",
     "categories": "Ангилал",
@@ -43,7 +44,8 @@
     "pendingProducts": "Үнэ хүлээгдэж буй",
     "aiAssistant": "AI туслах",
     "aiReports": "Тайлангууд",
-    "priceProfiles": "Үнийн тохиргоо"
+    "priceProfiles": "Үнийн тохиргоо",
+    "segments": "Сегментүүд"
   },
   "systemStatus": {
     "title": "Системийн төлөв",
@@ -2493,6 +2495,54 @@
       "MONEY_ORDER": "Доод үнэ дээд үнээс их байна",
       "TEXT_INVALID": "1–100 тэмдэгт оруулна уу"
     },
-    "create": "Сегмент үүсгэх"
+    "create": "Сегмент үүсгэх",
+    "title": "Сегментүүд",
+    "edit": "Сегмент засах",
+    "columns": {
+      "name": "Нэр",
+      "description": "Тайлбар",
+      "count": "Тоо"
+    },
+    "empty": "Сегмент алга байна.",
+    "countOf": {
+      "PRODUCT": "{{count}} бараа",
+      "CUSTOMER": "{{count}} харилцагч",
+      "SUPPLIER": "{{count}} нийлүүлэгч"
+    },
+    "countUnavailable": "Тоолох боломжгүй",
+    "viewList": "Жагсаалтаар харах",
+    "archive": "Архивлах",
+    "archiveTitle": "«{{name}}» сегментийг архивлах уу?",
+    "archiveHint": "Архивласан сегмент жагсаалт, шүүлтүүрт харагдахгүй болно.",
+    "archived": "Сегмент архивлагдлаа",
+    "saved": "Сегмент хадгалагдлаа",
+    "general": "Ерөнхий",
+    "name": "Нэр",
+    "description": "Тайлбар",
+    "entity": "Төрөл",
+    "conditions": "Нөхцөл",
+    "conditionsHint": "Бүлэг доторх нөхцөлүүд, бүлгүүдийн хоорондох холбоог сонгоно.",
+    "group": "Бүлэг {{n}}",
+    "groupsMatch": "Бүлгүүдийн хооронд",
+    "conditionsMatch": "Бүлэг {{n}}-ийн нөхцөлүүд",
+    "addCondition": "Нөхцөл нэмэх",
+    "addGroup": "Бүлэг нэмэх",
+    "removeCondition": "Нөхцөл хасах",
+    "removeGroup": "Бүлэг хасах",
+    "field": "Талбар",
+    "operator": "Нөхцөл",
+    "choose": "Сонгох",
+    "chosen": "{{count}} сонгосон",
+    "days": "Өдрийн тоо",
+    "text": "Агуулах үг",
+    "liveCount": "Таарах: {{count}}",
+    "counting": "Тоолж байна…",
+    "fromFilters": "Сегмент болгох",
+    "allSegments": "Бүх сегмент",
+    "format": {
+      "withOp": "{{field}} {{op}}: {{value}}",
+      "plain": "{{field}}: {{value}}",
+      "quoted": "«{{text}}»"
+    }
   }
 }

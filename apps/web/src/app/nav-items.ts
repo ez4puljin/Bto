@@ -26,6 +26,7 @@ import {
   ScanBarcode,
   ScrollText,
   Settings,
+  Shapes,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -147,6 +148,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
       { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
     ],
+  },
+  {
+    label: 'nav.groups.segments',
+    items: [{ to: '/segments', label: 'nav.segments', icon: Shapes }],
   },
   {
     label: 'nav.groups.ai',

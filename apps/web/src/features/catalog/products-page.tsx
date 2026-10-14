@@ -1,6 +1,6 @@
 import { EXPORTABLE_PRODUCT_COLUMNS, PRODUCT_LIST_COLUMNS } from '@tugeel/shared/catalog';
 import { businessDate } from '@tugeel/shared/time';
-import { FileSpreadsheet, Package, Plus } from 'lucide-react';
+import { FileSpreadsheet, Package, Plus, Shapes } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
@@ -29,6 +29,7 @@ import { categoryPaths, categoryTree } from './category-tree';
 import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMNS } from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
 import {
+  activeFilterFields,
   filterParam,
   PRODUCT_FILTER_FIELDS,
   type ProductFilters,
@@ -70,6 +71,7 @@ export function ProductsPage() {
   const { t } = useTranslation();
   const canRegister = useHasPermission('catalog.products.register');
   const canExport = useHasPermission('catalog.products.export');
+  const canManageSegments = useHasPermission('segments.manage');
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
@@ -260,6 +262,18 @@ export function ProductsPage() {
           ))}
         </NativeSelect>
         <ProductFilterMenu filters={filters} onChange={applyFilters} />
+        {canManageSegments &&
+        (q ||
+          categoryId ||
+          stage ||
+          activeFilterFields(filters).some((field) => field !== 'segment')) ? (
+          <Button asChild variant="ghost" size="sm" className="text-link">
+            <Link to={`/segments/new?entity=PRODUCT&from=${encodeURIComponent(params.toString())}`}>
+              <Shapes />
+              {t('segments.fromFilters')}
+            </Link>
+          </Button>
+        ) : null}
       </FilterBar>
       <ProblemAlert problem={exporting.problem ?? problemFromError(products.error)} />
       <ListCard>

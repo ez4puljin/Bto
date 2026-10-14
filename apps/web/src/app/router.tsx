@@ -35,6 +35,7 @@ import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/di
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
+import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
@@ -170,6 +171,24 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
+          { path: 'segments', element: <SegmentsPage />, handle: { wide: true } },
+          {
+            path: 'segments/new',
+            element: (
+              <RequirePermission permission="segments.manage">
+                <SegmentEditorPage />
+              </RequirePermission>
+            ),
+          },
+          { path: 'segments/:id', element: <SegmentPage /> },
+          {
+            path: 'segments/:id/edit',
+            element: (
+              <RequirePermission permission="segments.manage">
+                <SegmentEditorPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: 'ai',
             element: (

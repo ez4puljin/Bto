@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
+import { segmentParam } from '@/features/segments/segment-definition';
+import { SegmentFilter } from '@/features/segments/segment-filter';
 import { type CustomerKind, type PartnerStatus, useCustomers } from './api';
 import {
   CUSTOMER_COLUMN_KEYS,
@@ -64,10 +66,12 @@ export function CustomersPage() {
   const kind = isKind(kindParam) ? kindParam : undefined;
   const status = isStatus(statusParam) ? statusParam : undefined;
   const flag = (name: Flag) => (params.get(name) === '1' ? true : undefined);
+  const segmentId = segmentParam(params);
   const customers = useCustomers({
     q,
     kind,
     status,
+    segmentId,
     tinPending: flag('tinPending'),
     gpsMissing: flag('gpsMissing'),
     creditHold: flag('creditHold'),
@@ -153,6 +157,11 @@ export function CustomersPage() {
             </option>
           ))}
         </NativeSelect>
+        <SegmentFilter
+          entity="CUSTOMER"
+          value={segmentId}
+          onChange={(id) => setParam('segment', id ? String(id) : '')}
+        />
         {FLAGS.map((name) => (
           <FilterToggle
             key={name}

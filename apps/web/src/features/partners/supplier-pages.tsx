@@ -41,6 +41,8 @@ import {
   useSupplierProducts,
   useSuppliers,
 } from './api';
+import { segmentParam } from '@/features/segments/segment-definition';
+import { SegmentFilter } from '@/features/segments/segment-filter';
 import { ContactsCard } from './contacts-card';
 import {
   emptySupplier,
@@ -72,7 +74,8 @@ export function SuppliersPage() {
   const q = useDeferredValue(search.trim());
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
-  const suppliers = useSuppliers({ q, status });
+  const segmentId = segmentParam(params);
+  const suppliers = useSuppliers({ q, status, segmentId });
   const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
   const columnState = useHiddenColumns(COLUMNS_LIST, SUPPLIER_COLUMN_KEYS, LOCKED_SUPPLIER_COLUMNS);
   const { hidden } = columnState;
@@ -141,6 +144,11 @@ export function SuppliersPage() {
             </option>
           ))}
         </NativeSelect>
+        <SegmentFilter
+          entity="SUPPLIER"
+          value={segmentId}
+          onChange={(id) => setParam('segment', id ? String(id) : '')}
+        />
       </FilterBar>
       <ProblemAlert problem={problemFromError(suppliers.error)} />
       <ListCard>

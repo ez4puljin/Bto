@@ -56,6 +56,8 @@ export interface CustomerFilter {
   creditHold?: boolean;
   tinPending?: boolean;
   gpsMissing?: boolean;
+  /** A saved customer segment (ADR-0049). */
+  segmentId?: number;
 }
 
 export function useCustomers(filter: CustomerFilter, options: ListReadOptions = {}) {
@@ -76,6 +78,7 @@ export function useCustomers(filter: CustomerFilter, options: ListReadOptions = 
               creditHold: filter.creditHold,
               tinPending: filter.tinPending,
               gpsMissing: filter.gpsMissing,
+              segmentId: filter.segmentId,
               cursor: pageParam,
               limit,
             },
@@ -108,7 +111,7 @@ export function useNextCustomerCode() {
 }
 
 export function useSuppliers(
-  filter: { q?: string; status?: PartnerStatus },
+  filter: { q?: string; status?: PartnerStatus; segmentId?: number },
   options: ListReadOptions = {},
 ) {
   const api = useApiClient();
@@ -124,6 +127,7 @@ export function useSuppliers(
             query: {
               q: filter.q || undefined,
               status: filter.status,
+              segmentId: filter.segmentId,
               cursor: pageParam,
               limit,
             },
