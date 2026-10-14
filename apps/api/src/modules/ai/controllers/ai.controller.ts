@@ -20,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import { AppError } from '../../../common/errors/app-error';
+import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
@@ -41,15 +42,6 @@ import { type AiReportView, ReportsService } from '../services/reports.service';
 import { AiQueryError, AiReaderService, type AiResult } from '../sql/ai-reader.service';
 
 const ASK = 'ai.ask';
-
-/** An Excel download; the ASCII name for old clients, the Mongolian one in filename*. */
-function xlsxFile(buffer: Buffer, asciiName: string, name: string): StreamableFile {
-  return new StreamableFile(buffer, {
-    type: XLSX_CONTENT_TYPE,
-    disposition: `attachment; filename="${asciiName}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}.xlsx`,
-    length: buffer.length,
-  });
-}
 
 /** Runs stored SQL again (guard + read-only reader); a failure is 422 AI_QUERY_FAILED. */
 async function rerun(reader: AiReaderService, sql: string): Promise<AiResult> {

@@ -12,6 +12,7 @@ import {
 import { ApiCreatedResponse, ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import { IMPORT_KINDS } from '@tugeel/shared/imports';
+import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
   CreateImportDto,
@@ -64,12 +65,7 @@ export class ImportsController {
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
   async template(@Param() params: ImportKindParamDto): Promise<StreamableFile> {
-    const buffer = await this.imports.template(params.kind);
-    return new StreamableFile(buffer, {
-      type: XLSX_CONTENT_TYPE,
-      disposition: `attachment; filename="${templateFileName(params.kind)}"`,
-      length: buffer.length,
-    });
+    return xlsxFile(await this.imports.template(params.kind), templateFileName(params.kind));
   }
 
   @Get()

@@ -57,10 +57,24 @@ export class ProductQueryService implements OnModuleInit {
     return { ...page, total };
   }
 
-  /** The filtered ids in the list's order, at most `cap` (an export, ADR-0049 #6). */
-  async orderedIds(query: ProductListQuery, cap: number, executor: Db | Tx = this.db) {
+  /**
+   * The ids the filters keep in the list's order, at most `cap` of them, and how many they keep in
+   * all: the rows of a filtered export (ADR-0049 #6).
+   */
+  async orderedIds(
+    query: ProductListQuery,
+    cap: number,
+    executor: Db | Tx = this.db,
+  ): Promise<{ ids: number[]; total: number }> {
     const within = await this.within(query);
-    return this.products.orderedIds(query, within, cap, executor);
+    const ids = await this.products.orderedIds(query, within, cap + 1, executor);
+    if (ids.length <= cap) return { ids, total: ids.length };
+    return { ids: ids.slice(0, cap), total: await this.products.countItems(query, within) };
+  }
+
+  /** Ticked products in the list's order; unknown ids drop out (an export of the selection). */
+  orderedOf(ids: readonly number[], executor: Db | Tx = this.db): Promise<number[]> {
+    return this.products.orderedIds({}, ids, ids.length, executor);
   }
 
   /** List rows of these products in the order given. */

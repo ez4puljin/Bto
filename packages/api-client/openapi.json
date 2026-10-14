@@ -10832,6 +10832,54 @@
           "segments"
         ]
       }
+    },
+    "/api/v1/exports/products": {
+      "post": {
+        "operationId": "Exports_products",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The ticked products, or every product the list's filters keep, with the visible columns:\n422 EXPORT_TOO_LARGE above 20,000 rows, 429 while two exports are running.",
+        "tags": [
+          "segments"
+        ]
+      }
     }
   },
   "info": {
@@ -20030,6 +20078,82 @@
         "required": [
           "name",
           "definition"
+        ]
+      },
+      "ProductExportRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "minItems": 1,
+            "description": "The ticked products (1–20000), without filters",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "q": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Words of the name in either script, a SKU or a barcode"
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Includes its subcategories"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "saleReady": {
+            "type": "boolean",
+            "description": "true: complete products; false: those waiting for prices (ADR-0044)"
+          },
+          "where": {
+            "description": "Conditions not saved as a segment",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
+          },
+          "segmentId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A saved product segment; with where, both apply"
+          },
+          "columns": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "sku",
+                "name",
+                "category",
+                "baseUnit",
+                "units",
+                "warehousePrice",
+                "priceProfile",
+                "baseBarcodes",
+                "unitBarcodes",
+                "weight",
+                "homeWarehouse",
+                "fixedBins",
+                "supplier",
+                "status"
+              ]
+            },
+            "description": "The list's visible columns; the file keeps the list's order"
+          }
+        },
+        "required": [
+          "columns"
         ]
       },
       "ErrorCode": {

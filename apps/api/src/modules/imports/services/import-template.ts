@@ -32,7 +32,7 @@ export async function buildTemplate(kind: ImportKind): Promise<Buffer> {
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-/** The file name of a template download, e.g. «tugeel-products.xlsx». */
+/** The file name of a template download without the extension, e.g. «tugeel-products». */
 export function templateFileName(kind: ImportKind): string {
-  return `tugeel-${kind.toLowerCase().replace(/_/g, '-')}.xlsx`;
+  return `tugeel-${kind.toLowerCase().replace(/_/g, '-')}`;
 }

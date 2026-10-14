@@ -1,6 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { EXPORTABLE_PRODUCT_COLUMNS } from '@tugeel/shared/catalog';
 import type { SegmentCondition, SegmentDefinition } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
+import ExcelJS from 'exceljs';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp, sqlStateOf } from '../harness/apps';
@@ -24,7 +26,8 @@ const all = (...conditions: SegmentCondition[]): SegmentDefinition => ({
  * The segments guards and their scale (ADR-0049): a segment is archived, never deleted (the app
  * role can neither DELETE nor TRUNCATE the table); a live name is unique per entity; and with the
  * owner's whole catalogue (20,000 products) a list page under three conditions answers within
- * 500 ms and the segments list counts ten segments within 2 s. Timings are logged.
+ * 500 ms, the segments list counts ten segments within 2 s, and the whole catalogue goes to Excel
+ * (two files at a time, never more than 20,000 rows). Timings are logged.
  */
 describe('integrity: segments', () => {
   let app: NestExpressApplication;
@@ -188,4 +191,45 @@ describe('integrity: segments', () => {
     expect(pageMs).toBeLessThan(500);
     expect(countsMs).toBeLessThan(2000);
   }, 120_000);
+
+  it('exports the whole catalogue, two files at a time, and no more than 20,000 rows', async () => {
+    const exportAll = () =>
+      http()
+        .post('/api/v1/exports/products')
+        .set(bearer(token))
+        .send({ columns: EXPORTABLE_PRODUCT_COLUMNS })
+        .buffer(true)
+        .parse((res, done) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => done(null, Buffer.concat(chunks)));
+        });
+    const started = performance.now();
+    const file = await exportAll().expect(200);
+    const exportMs = performance.now() - started;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.body as ArrayBuffer);
+    expect(workbook.worksheets[0]?.rowCount).toBe(COUNT + 1);
+    // A third export while two run is refused at once, never queued.
+    const statuses = (await Promise.all([exportAll(), exportAll(), exportAll()])).map(
+      (res) => res.status,
+    );
+    expect(statuses.sort()).toEqual([200, 200, 429]);
+    // One product more than an export holds: refused with the count, before any row is read.
+    await owner.query(
+      `WITH made AS (
+         INSERT INTO products (sku, name, search_text, search_phonetic, search_version, category_id)
+         SELECT '999999', 'Илүү бараа', 'илүү бараа', 'илү бара', 1, category_id FROM products LIMIT 1
+         RETURNING id)
+       INSERT INTO product_units (product_id, uom_id, factor_to_base, is_base, is_default_sales, is_default_purchase)
+       SELECT made.id, u.uom_id, 1, true, true, true FROM made, (SELECT uom_id FROM product_units LIMIT 1) u`,
+    );
+    const tooMany = await exportAll().expect(422);
+    expect(JSON.parse((tooMany.body as Buffer).toString('utf8'))).toMatchObject({
+      code: 'EXPORT_TOO_LARGE',
+      params: { count: COUNT + 1, limit: COUNT },
+    });
+    console.log(`segments at scale: export of ${COUNT} rows ${Math.round(exportMs)} ms`);
+    expect(exportMs).toBeLessThan(60_000);
+  }, 180_000);
 });

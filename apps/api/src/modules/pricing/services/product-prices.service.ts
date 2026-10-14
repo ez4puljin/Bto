@@ -201,10 +201,19 @@ export class ProductPricesService {
     };
   }
 
-  /** Today's terms of each product (products without any are left out), for list columns. */
-  async currentOf(productIds: readonly number[]): Promise<CurrentTerms[]> {
-    const inForce = await this.inForce(productIds, businessDate());
-    const names = await this.profiles.namesOf([...inForce.values()].map((t) => t.profileId));
+  /**
+   * Today's terms of each product (products without any are left out), for list columns and the
+   * product export.
+   */
+  async currentOf(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<CurrentTerms[]> {
+    const inForce = await this.inForce(productIds, businessDate(), executor);
+    const names = await this.profiles.namesOf(
+      [...inForce.values()].map((t) => t.profileId),
+      executor,
+    );
     return [...inForce.entries()]
       .sort(([a], [b]) => a - b)
       .map(([productId, terms]) => ({
