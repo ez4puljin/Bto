@@ -26,6 +26,7 @@ import {
   useProductQuery,
 } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
+import { BulkActions } from './bulk-actions';
 import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMNS } from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
 import {
@@ -63,7 +64,8 @@ const NO_IDS: ReadonlySet<number> = new Set();
  * subcategories), status and «Шүүлтүүр» (suppliers, homes, prices, stock, dates, missing data, a
  * segment; ADR-0049), with the count the filters keep. Filters live in the URL so "back" keeps
  * them (SPEC §5.2). Rows can be ticked; «Excel татах» writes the ticked rows, or every row the
- * filters keep, with the visible columns (ADR-0049 #6). Changing a filter clears the ticks.
+ * filters keep, with the visible columns (ADR-0049 #6); «Засах» and «Идэвхгүй болгох» change the
+ * ticked products together (ADR-0051). Changing a filter clears the ticks.
  * Every piece of product information has a column; each user picks which ones show on their
  * own browser (ADR-0037, ADR-0050).
  */
@@ -72,6 +74,14 @@ export function ProductsPage() {
   const canRegister = useHasPermission('catalog.products.register');
   const canExport = useHasPermission('catalog.products.export');
   const canManageSegments = useHasPermission('segments.manage');
+  // Rows can be ticked by whoever may export them or change them together (ADR-0051 #3).
+  const canSelect = [
+    canExport,
+    useHasPermission('catalog.products.manage'),
+    useHasPermission('partners.suppliers.manage'),
+    useHasPermission('pricing.prices.manage'),
+    useHasPermission('inventory.setup.manage'),
+  ].some(Boolean);
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
@@ -130,6 +140,7 @@ export function ProductsPage() {
     [t, paths, warehouseName],
   );
   const pages = products.data?.pages ?? NO_PAGES;
+  const tickedRows = pages.flatMap((page) => page.data.filter((row) => selected.has(row.id)));
 
   /** The ticked products, or every product the filters keep, with the visible columns. */
   const exportExcel = async () => {
@@ -281,13 +292,14 @@ export function ProductsPage() {
           pages={pages}
           columns={columns}
           context={context}
-          {...(canExport ? { selection } : {})}
+          {...(canSelect ? { selection } : {})}
         />
         {empty ? <EmptyState icon={Package} title={t('catalog.products.empty')} /> : null}
         <LoadMore query={products} />
       </ListCard>
       <SelectionBar count={selected.size} onClear={clearTicks}>
         {canExport ? exportButton : null}
+        <BulkActions rows={tickedRows} onDone={clearTicks} />
       </SelectionBar>
     </div>
   );

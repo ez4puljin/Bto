@@ -532,6 +532,143 @@ describe('products list', () => {
     expect(screen.queryByRole('button', { name: mn.catalog.products.export.button })).toBeNull();
   });
 
+  it('moves ticked products to another category and clears the ticks', async () => {
+    const fanta = listItem(2, '10002', 'Фанта');
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW, fanta]),
+      'POST /api/v1/products/bulk/category': () => json({ changed: [1], unchanged: [2] }),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Фанта' });
+    await user.click(screen.getByRole('checkbox', { name: mn.common.selectAll }));
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    await user.click(within(bar).getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.bulk.actions.category }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(mn.catalog.products.bulk.count.replace('{{count}}', '2'));
+    await user.selectOptions(
+      within(dialog).getByLabelText(mn.catalog.products.bulk.category),
+      '11',
+    );
+    await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      `${mn.catalog.products.bulk.done.replace('{{count}}', '1')}. ${mn.catalog.products.bulk.same.replace('{{count}}', '1')}`,
+    );
+    const [request] = calls(fetchMock, 'POST', '/api/v1/products/bulk/category');
+    expect(request?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(request ? await sent(request) : {}).toEqual({ productIds: [1, 2], categoryId: 11 });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull(),
+    );
+  });
+
+  it('names the products holding stock elsewhere before moving their home', async () => {
+    const fanta = listItem(2, '10002', 'Фанта');
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/warehouses': () =>
+        list([WH, { ...WH, id: 5, code: 'WH2', name: 'Шинэ агуулах' }]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW, fanta]),
+      'POST /api/v1/product-locations/bulk/home': () =>
+        json({ changed: [1, 2], unchanged: [], withStock: [{ productId: 1, warehouseId: 4 }] }),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Фанта' });
+    await user.click(screen.getByRole('checkbox', { name: mn.common.selectAll }));
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.bulk.actions.home }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.selectOptions(
+      within(dialog).getByLabelText(mn.catalog.products.bulk.warehouse),
+      '5',
+    );
+    await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
+    const warning = await within(dialog).findByRole('alert');
+    expect(warning).toHaveTextContent(mn.catalog.products.bulk.withStock.replace('{{count}}', '1'));
+    expect(warning).toHaveTextContent('10001 Кока кола');
+    const requests = () => calls(fetchMock, 'POST', '/api/v1/product-locations/bulk/home');
+    expect(requests()).toHaveLength(1);
+    expect(await sent(requests()[0] as Request)).toEqual({
+      productIds: [1, 2],
+      warehouseId: 5,
+      dryRun: true,
+    });
+    await user.click(within(dialog).getByRole('button', { name: mn.catalog.products.bulk.move }));
+    await waitFor(() => expect(requests()).toHaveLength(2));
+    expect(await sent(requests()[1] as Request)).toEqual({ productIds: [1, 2], warehouseId: 5 });
+    expect(requests()[0]?.headers.get('Idempotency-Key')).not.toBe(
+      requests()[1]?.headers.get('Idempotency-Key'),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      mn.catalog.products.bulk.done.replace('{{count}}', '2'),
+    );
+  });
+
+  it('deactivates ticked products after a question, and offers each change by its right', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+      'POST /api/v1/products/bulk/status': () => json({ changed: [1], unchanged: [] }),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    await user.click(
+      screen.getByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', '10001') }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: mn.catalog.products.bulk.actions.deactivate }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      mn.catalog.products.bulk.deactivateTitle.replace('{{count}}', '1'),
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.bulk.actions.deactivate }),
+    );
+    const [request] = await waitFor(() => {
+      const found = calls(fetchMock, 'POST', '/api/v1/products/bulk/status');
+      expect(found).toHaveLength(1);
+      return found;
+    });
+    expect(request ? await sent(request) : {}).toEqual({ productIds: [1], status: 'INACTIVE' });
+
+    // A price clerk ticks rows to change their price profile, and nothing else.
+    cleanup();
+    renderApp(
+      '/catalog/products',
+      signedIn(
+        { ...WORKER_ME, permissions: ['pricing.prices.manage'] },
+        {
+          ...LIST_ROUTES,
+          'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+        },
+      ),
+    );
+    await screen.findByRole('link', { name: 'Кока кола' });
+    await user.click(
+      screen.getByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', '10001') }),
+    );
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(
+      within(bar).queryByRole('button', { name: mn.catalog.products.export.button }),
+    ).toBeNull();
+    expect(
+      within(bar).queryByRole('button', { name: mn.catalog.products.bulk.actions.deactivate }),
+    ).toBeNull();
+    await user.click(within(bar).getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      mn.catalog.products.bulk.actions.profile,
+    ]);
+  });
+
   it('shows every piece of product information in its own column', async () => {
     renderApp(
       '/catalog/products',
