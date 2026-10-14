@@ -5,6 +5,8 @@ import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
 import { ADJUSTMENT_REASON_CODES } from './inventory';
+import { PRICE_BASES } from './pricing/cart';
+import { PRICE_ROUNDINGS } from './pricing/profile';
 import { SETTING_KEYS } from './settings';
 
 function lookup(path: string): unknown {
@@ -46,6 +48,13 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   });
 
   it.each(ADJUSTMENT_REASON_CODES.map((code) => `inventory.reasons.${code}`))('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...PRICE_ROUNDINGS.map((rounding) => `pricing.roundings.${rounding}`),
+    ...PRICE_BASES.map((basis) => `pricing.bases.${basis}`),
+  ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });
 
