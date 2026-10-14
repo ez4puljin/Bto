@@ -37,7 +37,7 @@ export function CustomerCreatePage() {
   const loadProblem = problemFromError(nextCode.error);
 
   return (
-    <div>
+    <div className="max-w-3xl">
       <PageHeader title={t('partners.customer.newTitle')} />
       <ProblemAlert problem={loadProblem} />
       {nextCode.isPending ? (

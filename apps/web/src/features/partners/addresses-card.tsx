@@ -1,27 +1,30 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { Archive, Pencil, Plus, Star } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FieldError } from '@/components/field-error';
+import { DialogFormFooter, FormField } from '@/components/form';
+import { RowAction, RowActionSpacer } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useAction } from '@/lib/use-action';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type CustomerAddress, type CustomerDetail, usePartnersMutations } from './api';
 import { GpsField, MapLink } from './gps-field';
 import { type AddressFormValues, addressBody, addressSchema, gpsText } from './partner-schema';
 
 /**
  * Delivery addresses: the default one first, each with its GPS point and a map link (SPEC §5.3).
- * Addresses are archived, never deleted: orders keep a copy of the address they went to.
+ * Addresses are archived, never deleted: orders keep a copy of the address they went to. Each row
+ * ends with its icon actions (ADR-0043); the form opens in a dialog.
  */
 export function AddressesCard({
   customer,
@@ -33,9 +36,12 @@ export function AddressesCard({
   const { t } = useTranslation();
   const mutations = usePartnersMutations();
   const action = useAction();
-  const archiveAction = useAction();
   const [editing, setEditing] = useState<CustomerAddress | 'new' | null>(null);
-  const [archiving, setArchiving] = useState<CustomerAddress | null>(null);
+  const archiving = useDeleteConfirm<CustomerAddress>((id) =>
+    mutations.archiveAddress.mutateAsync(id),
+  );
+  const nameOf = (address: CustomerAddress) =>
+    address.label ?? address.address ?? t('partners.addresses.title');
 
   return (
     <Card>
@@ -43,7 +49,7 @@ export function AddressesCard({
         <CardTitle>{t('partners.addresses.title')}</CardTitle>
         {canManage ? (
           <CardAction>
-            <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
+            <Button size="sm" variant="secondary" onClick={() => setEditing('new')}>
               <Plus />
               {t('partners.addresses.add')}
             </Button>
@@ -55,67 +61,69 @@ export function AddressesCard({
         {customer.addresses.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('partners.addresses.empty')}</p>
         ) : null}
-        {customer.addresses.map((address) => (
-          <section
-            key={address.id}
-            aria-label={address.label ?? address.address ?? t('partners.addresses.title')}
-            className="flex flex-col gap-1 rounded-lg border p-3"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              {address.label ? <span className="font-medium">{address.label}</span> : null}
-              {address.isDefault ? (
-                <Badge variant="secondary">{t('partners.addresses.default')}</Badge>
-              ) : null}
-            </div>
-            {address.address ? <p className="text-sm">{address.address}</p> : null}
-            {address.lat && address.lng ? (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-mono text-muted-foreground">
-                  {gpsText(address.lat, address.lng)}
-                </span>
-                {address.gpsSource ? (
-                  <Badge variant="outline">
-                    {t(`partners.addresses.gpsSource.${address.gpsSource}`)}
-                  </Badge>
+        <ul className="flex flex-col divide-y divide-border/80">
+          {customer.addresses.map((address) => (
+            <li key={address.id}>
+              <section aria-label={nameOf(address)} className="flex items-start gap-3 py-2.5">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {address.label ? <span className="font-medium">{address.label}</span> : null}
+                    {address.isDefault ? (
+                      <Badge variant="secondary">{t('partners.addresses.default')}</Badge>
+                    ) : null}
+                  </div>
+                  {address.address ? <p className="text-sm">{address.address}</p> : null}
+                  {address.lat && address.lng ? (
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-mono text-muted-foreground">
+                        {gpsText(address.lat, address.lng)}
+                      </span>
+                      {address.gpsSource ? (
+                        <Badge variant="outline">
+                          {t(`partners.addresses.gpsSource.${address.gpsSource}`)}
+                        </Badge>
+                      ) : null}
+                      <MapLink lat={address.lat} lng={address.lng} />
+                    </div>
+                  ) : (
+                    <div>
+                      <Badge variant="outline">{t('partners.addresses.noGps')}</Badge>
+                    </div>
+                  )}
+                  {address.note ? (
+                    <p className="text-[13px] text-muted-foreground">{address.note}</p>
+                  ) : null}
+                </div>
+                {canManage ? (
+                  <span className="-my-1 flex shrink-0 gap-0.5">
+                    <RowAction
+                      label={`${t('common.edit')}: ${nameOf(address)}`}
+                      icon={Pencil}
+                      onClick={() => setEditing(address)}
+                    />
+                    {address.isDefault ? (
+                      <RowActionSpacer />
+                    ) : (
+                      <RowAction
+                        label={`${t('partners.addresses.makeDefault')}: ${nameOf(address)}`}
+                        icon={Star}
+                        onClick={() =>
+                          void action.run(() => mutations.defaultAddress.mutateAsync(address.id))
+                        }
+                      />
+                    )}
+                    <RowAction
+                      label={`${t('partners.addresses.archive')}: ${nameOf(address)}`}
+                      icon={Archive}
+                      destructive
+                      onClick={() => archiving.ask(address)}
+                    />
+                  </span>
                 ) : null}
-                <MapLink lat={address.lat} lng={address.lng} />
-              </div>
-            ) : (
-              <div>
-                <Badge variant="outline">{t('partners.addresses.noGps')}</Badge>
-              </div>
-            )}
-            {address.note ? <p className="text-sm text-muted-foreground">{address.note}</p> : null}
-            {canManage ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Button size="sm" variant="outline" onClick={() => setEditing(address)}>
-                  {t('common.edit')}
-                </Button>
-                {address.isDefault ? null : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      void action.run(() => mutations.defaultAddress.mutateAsync(address.id))
-                    }
-                  >
-                    {t('partners.addresses.makeDefault')}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    archiveAction.clear();
-                    setArchiving(address);
-                  }}
-                >
-                  {t('partners.addresses.archive')}
-                </Button>
-              </div>
-            ) : null}
-          </section>
-        ))}
+              </section>
+            </li>
+          ))}
+        </ul>
       </CardContent>
       {editing ? (
         <AddressDialog
@@ -125,19 +133,14 @@ export function AddressesCard({
         />
       ) : null}
       <ConfirmDialog
-        open={archiving !== null}
+        open={archiving.target !== null}
         title={t('partners.addresses.archive')}
         description={t('partners.addresses.archiveConfirm')}
         confirmLabel={t('partners.addresses.archive')}
-        pending={mutations.archiveAddress.isPending}
-        problem={archiveAction.problem}
-        onClose={() => setArchiving(null)}
-        onConfirm={() => {
-          if (!archiving) return;
-          void archiveAction
-            .run(() => mutations.archiveAddress.mutateAsync(archiving.id))
-            .then((ok) => (ok ? setArchiving(null) : undefined));
-        }}
+        pending={archiving.pending}
+        problem={archiving.problem}
+        onClose={archiving.close}
+        onConfirm={archiving.confirm}
       />
     </Card>
   );
@@ -178,57 +181,62 @@ function AddressDialog(props: {
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {address ? t('partners.addresses.edit') : t('partners.addresses.add')}
-          </DialogTitle>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="address-label">{t('partners.addresses.label')}</Label>
+        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
+          <DialogHeader>
+            <DialogTitle>
+              {address ? t('partners.addresses.edit') : t('partners.addresses.add')}
+            </DialogTitle>
+          </DialogHeader>
+          <ProblemAlert problem={action.problem} />
+          <FormField
+            label={t('partners.addresses.label')}
+            htmlFor="address-label"
+            error={errors.label?.message}
+          >
             <Input id="address-label" autoComplete="off" {...form.register('label')} />
-            <FieldError message={errors.label?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="address-text">{t('partners.addresses.address')}</Label>
+          </FormField>
+          <FormField
+            label={t('partners.addresses.address')}
+            htmlFor="address-text"
+            error={errors.address?.message}
+          >
             <Textarea id="address-text" rows={2} {...form.register('address')} />
-            <FieldError message={errors.address?.message} />
-          </div>
-          <GpsField
-            id="address-gps"
-            value={form.watch('gps')}
-            registration={form.register('gps')}
+          </FormField>
+          <FormField
+            label={t('partners.addresses.gps')}
+            htmlFor="address-gps"
             error={errors.gps?.message}
-          />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="address-note">{t('partners.addresses.note')}</Label>
+          >
+            <GpsField
+              id="address-gps"
+              value={form.watch('gps')}
+              registration={form.register('gps')}
+            />
+          </FormField>
+          <FormField
+            label={t('partners.addresses.note')}
+            htmlFor="address-note"
+            error={errors.note?.message}
+          >
             <Input id="address-note" autoComplete="off" {...form.register('note')} />
-            <FieldError message={errors.note?.message} />
-          </div>
+          </FormField>
           {address ? null : (
             <Controller
               control={form.control}
               name="isDefault"
               render={({ field }) => (
-                <div className="flex items-center gap-2">
-                  <Checkbox
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="address-default">{t('partners.addresses.makeDefault')}</Label>
+                  <Switch
                     id="address-default"
                     checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                    onCheckedChange={field.onChange}
                   />
-                  <Label htmlFor="address-default" className="font-normal">
-                    {t('partners.addresses.makeDefault')}
-                  </Label>
                 </div>
               )}
             />
           )}
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+          <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>
       </DialogContent>
     </Dialog>

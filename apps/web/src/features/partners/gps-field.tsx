@@ -2,9 +2,7 @@ import { mapsUrl, parseCoordinates } from '@tugeel/shared/geo';
 import { MapPin } from 'lucide-react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { FieldError } from '@/components/field-error';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 /** "Open on the map" for a stored or typed point; opens Google Maps in a new tab. */
 export function MapLink({ lat, lng }: { lat: string; lng: string }) {
@@ -14,7 +12,7 @@ export function MapLink({ lat, lng }: { lat: string; lng: string }) {
       href={mapsUrl({ lat, lng })}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+      className="inline-flex items-center gap-1 text-sm text-link underline-offset-4 hover:underline"
     >
       <MapPin className="size-3.5" />
       {t('partners.addresses.openMap')}
@@ -24,19 +22,18 @@ export function MapLink({ lat, lng }: { lat: string; lng: string }) {
 
 /**
  * The GPS box: the office pastes a Google Maps link or "47.918412, 106.917712" (SPEC §5.3). The
- * point it reads is shown with a map link at once, so a wrong pin is caught before saving.
+ * point it reads is shown with a map link at once, so a wrong pin is caught before saving. Only the
+ * control: the caller labels it and shows its error (`FormRow` / `FormField`, ADR-0043).
  */
 export function GpsField(props: {
   id: string;
   value: string;
   registration: UseFormRegisterReturn;
-  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   const parsed = parseCoordinates(props.value);
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={props.id}>{t('partners.addresses.gps')}</Label>
+    <>
       <Input
         id={props.id}
         autoComplete="off"
@@ -53,7 +50,6 @@ export function GpsField(props: {
       ) : (
         <p className="text-xs text-muted-foreground">{t('partners.addresses.gpsHint')}</p>
       )}
-      <FieldError message={props.error} />
-    </div>
+    </>
   );
 }

@@ -1,22 +1,26 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FieldError } from '@/components/field-error';
+import { DialogFormFooter, FormField } from '@/components/form';
+import { RowAction } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAction } from '@/lib/use-action';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import type { Contact, ContactRequest } from './api';
 import { type ContactFormValues, contactBody, contactSchema } from './partner-schema';
 import { localPhone, phoneInput } from './phone';
 
-/** The people to call at a customer or a supplier: name or phone, position, a note. */
+/**
+ * The people to call at a customer or a supplier: name or phone, position, a note. Each row ends
+ * with its icon actions (ADR-0043); the form opens in a dialog.
+ */
 export function ContactsCard(props: {
   contacts: readonly Contact[];
   canManage: boolean;
@@ -25,10 +29,9 @@ export function ContactsCard(props: {
   onDelete: (id: number) => Promise<unknown>;
 }) {
   const { t } = useTranslation();
-  const deleteAction = useAction();
   const [editing, setEditing] = useState<Contact | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<Contact | null>(null);
-  const [pending, setPending] = useState(false);
+  const deletion = useDeleteConfirm<Contact>(props.onDelete);
+  const nameOf = (contact: Contact) => contact.name ?? localPhone(contact.phone ?? '');
 
   return (
     <Card>
@@ -36,7 +39,7 @@ export function ContactsCard(props: {
         <CardTitle>{t('partners.contacts.title')}</CardTitle>
         {props.canManage ? (
           <CardAction>
-            <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
+            <Button size="sm" variant="secondary" onClick={() => setEditing('new')}>
               <Plus />
               {t('partners.contacts.add')}
             </Button>
@@ -47,36 +50,38 @@ export function ContactsCard(props: {
         {props.contacts.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('partners.contacts.empty')}</p>
         ) : (
-          <ul className="flex flex-col divide-y">
+          <ul className="flex flex-col divide-y divide-border/80">
             {props.contacts.map((contact) => (
-              <li key={contact.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                <span className="font-medium">{contact.name ?? t('common.none')}</span>
-                {contact.position ? (
-                  <span className="text-sm text-muted-foreground">{contact.position}</span>
-                ) : null}
-                {contact.phone ? (
-                  <a className="font-mono text-sm" href={`tel:${contact.phone}`}>
-                    {localPhone(contact.phone)}
-                  </a>
-                ) : null}
-                {contact.note ? (
-                  <span className="basis-full text-sm text-muted-foreground">{contact.note}</span>
-                ) : null}
+              <li key={contact.id} className="flex items-start gap-3 py-2.5">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span className="font-medium">{contact.name ?? t('common.none')}</span>
+                  {contact.position ? (
+                    <span className="text-[13px] text-muted-foreground">{contact.position}</span>
+                  ) : null}
+                  {contact.phone ? (
+                    <a className="font-mono text-sm text-link" href={`tel:${contact.phone}`}>
+                      {localPhone(contact.phone)}
+                    </a>
+                  ) : null}
+                  {contact.note ? (
+                    <span className="basis-full text-[13px] text-muted-foreground">
+                      {contact.note}
+                    </span>
+                  ) : null}
+                </div>
                 {props.canManage ? (
-                  <span className="ml-auto flex gap-1">
-                    <Button size="xs" variant="ghost" onClick={() => setEditing(contact)}>
-                      {t('common.edit')}
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => {
-                        deleteAction.clear();
-                        setDeleting(contact);
-                      }}
-                    >
-                      {t('common.delete')}
-                    </Button>
+                  <span className="-my-1 flex shrink-0 gap-0.5">
+                    <RowAction
+                      label={`${t('common.edit')}: ${nameOf(contact)}`}
+                      icon={Pencil}
+                      onClick={() => setEditing(contact)}
+                    />
+                    <RowAction
+                      label={`${t('common.delete')}: ${nameOf(contact)}`}
+                      icon={Trash2}
+                      destructive
+                      onClick={() => deletion.ask(contact)}
+                    />
                   </span>
                 ) : null}
               </li>
@@ -94,23 +99,13 @@ export function ContactsCard(props: {
         />
       ) : null}
       <ConfirmDialog
-        open={deleting !== null}
+        open={deletion.target !== null}
         title={t('common.delete')}
         description={t('partners.contacts.deleteConfirm')}
         confirmLabel={t('common.delete')}
-        pending={pending}
-        problem={deleteAction.problem}
-        onClose={() => setDeleting(null)}
-        onConfirm={() => {
-          if (!deleting) return;
-          setPending(true);
-          void deleteAction
-            .run(() => props.onDelete(deleting.id))
-            .then((ok) => {
-              setPending(false);
-              if (ok) setDeleting(null);
-            });
-        }}
+        problem={deletion.problem}
+        onClose={deletion.close}
+        onConfirm={deletion.confirm}
       />
     </Card>
   );
@@ -141,46 +136,48 @@ function ContactDialog(props: {
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent closeLabel={t('common.close')}>
-        <DialogHeader>
-          <DialogTitle>
-            {props.contact ? t('partners.contacts.edit') : t('partners.contacts.add')}
-          </DialogTitle>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <form className="flex flex-col gap-3" noValidate onSubmit={(event) => void submit(event)}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="contact-name">{t('partners.contacts.name')}</Label>
-              <Input id="contact-name" autoComplete="off" {...form.register('name')} />
-              <FieldError message={errors.name?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="contact-position">{t('partners.contacts.position')}</Label>
-              <Input id="contact-position" autoComplete="off" {...form.register('position')} />
-              <FieldError message={errors.position?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="contact-phone">{t('partners.contacts.phone')}</Label>
-              <Input
-                id="contact-phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                {...form.register('phone')}
-              />
-              <FieldError message={errors.phone?.message} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="contact-note">{t('partners.contacts.note')}</Label>
-              <Input id="contact-note" autoComplete="off" {...form.register('note')} />
-              <FieldError message={errors.note?.message} />
-            </div>
-          </div>
-          <div>
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </div>
+        <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
+          <DialogHeader>
+            <DialogTitle>
+              {props.contact ? t('partners.contacts.edit') : t('partners.contacts.add')}
+            </DialogTitle>
+          </DialogHeader>
+          <ProblemAlert problem={action.problem} />
+          <FormField
+            label={t('partners.contacts.name')}
+            htmlFor="contact-name"
+            error={errors.name?.message}
+          >
+            <Input id="contact-name" autoComplete="off" {...form.register('name')} />
+          </FormField>
+          <FormField
+            label={t('partners.contacts.position')}
+            htmlFor="contact-position"
+            error={errors.position?.message}
+          >
+            <Input id="contact-position" autoComplete="off" {...form.register('position')} />
+          </FormField>
+          <FormField
+            label={t('partners.contacts.phone')}
+            htmlFor="contact-phone"
+            error={errors.phone?.message}
+          >
+            <Input
+              id="contact-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              {...form.register('phone')}
+            />
+          </FormField>
+          <FormField
+            label={t('partners.contacts.note')}
+            htmlFor="contact-note"
+            error={errors.note?.message}
+          >
+            <Input id="contact-note" autoComplete="off" {...form.register('note')} />
+          </FormField>
+          <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>
       </DialogContent>
     </Dialog>

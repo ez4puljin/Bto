@@ -1,41 +1,41 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProblemDetails } from '@tugeel/api-client';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FieldList } from '@/components/detail';
-import { FieldError } from '@/components/field-error';
-import { NativeSelect } from '@/components/native-select';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import type { SupplierDetail } from './api';
-import {
-  fieldOfDuplicate,
-  PARTNER_STATUSES,
-  type SupplierFormValues,
-  supplierSchema,
-} from './partner-schema';
+import { fieldOfDuplicate, type SupplierFormValues, supplierSchema } from './partner-schema';
 import { localPhone } from './phone';
 
 type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note'>;
-const FIELDS: readonly {
+interface FieldSpec {
   name: TextField;
   inputMode?: 'numeric' | 'tel' | 'email';
   mono?: boolean;
-}[] = [
-  { name: 'code', inputMode: 'numeric', mono: true },
+  /** A width for a short value (ADR-0043); names and addresses take the row. */
+  width?: string;
+}
+const GENERAL: readonly FieldSpec[] = [
+  { name: 'code', inputMode: 'numeric', mono: true, width: 'sm:w-44' },
   { name: 'name' },
-  { name: 'regNo', mono: true },
-  { name: 'tin', inputMode: 'numeric', mono: true },
-  { name: 'phone', inputMode: 'tel' },
+  { name: 'phone', inputMode: 'tel', width: 'sm:w-56' },
   { name: 'email', inputMode: 'email' },
   { name: 'address' },
+];
+const MONEY: readonly FieldSpec[] = [
+  { name: 'regNo', mono: true, width: 'sm:w-56' },
+  { name: 'tin', inputMode: 'numeric', mono: true, width: 'sm:w-56' },
   { name: 'bankName' },
-  { name: 'bankAccount', mono: true },
-  { name: 'paymentTermDays', inputMode: 'numeric' },
+  { name: 'bankAccount', mono: true, width: 'sm:w-64' },
+  { name: 'paymentTermDays', inputMode: 'numeric', width: 'sm:w-28' },
 ];
 const LABELS = {
   code: 'partners.supplier.code',
@@ -51,8 +51,8 @@ const LABELS = {
 } as const satisfies Record<TextField, string>;
 
 /**
- * The supplier form (SPEC §5.3): names are unique so the product sheet's supplier column can be
- * matched by name; a taken code or name is shown on its field.
+ * The supplier form (SPEC §5.3), settings-style (ADR-0043): names are unique so the product sheet's
+ * supplier column can be matched by name; a taken code or name is shown on its field.
  */
 export function SupplierForm(props: {
   mode: 'create' | 'edit';
@@ -91,61 +91,79 @@ export function SupplierForm(props: {
     setProblem(result);
   });
 
+  const row = (field: FieldSpec) => (
+    <FormRow
+      key={field.name}
+      label={t(LABELS[field.name])}
+      htmlFor={`supplier-${field.name}`}
+      hint={
+        field.name === 'code' && props.mode === 'create'
+          ? t('partners.supplier.codeHint')
+          : undefined
+      }
+      error={errors[field.name]?.message}
+    >
+      <Input
+        id={`supplier-${field.name}`}
+        inputMode={field.inputMode}
+        autoComplete="off"
+        className={cn(field.mono && 'font-mono', field.width)}
+        {...form.register(field.name)}
+      />
+    </FormRow>
+  );
+
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
       <ProblemAlert problem={problem} />
-      <fieldset disabled={props.readOnly} className="grid gap-4 sm:grid-cols-2">
-        {FIELDS.map((field) => (
-          <div key={field.name} className="flex flex-col gap-2">
-            <Label htmlFor={`supplier-${field.name}`}>{t(LABELS[field.name])}</Label>
-            <Input
-              id={`supplier-${field.name}`}
-              inputMode={field.inputMode}
-              autoComplete="off"
-              className={field.mono ? 'font-mono' : undefined}
-              {...form.register(field.name)}
-            />
-            {field.name === 'code' && props.mode === 'create' ? (
-              <p className="text-xs text-muted-foreground">{t('partners.supplier.codeHint')}</p>
-            ) : null}
-            <FieldError message={errors[field.name]?.message} />
-          </div>
-        ))}
-        {props.mode === 'edit' ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="supplier-status">{t('partners.supplier.status')}</Label>
-            <NativeSelect id="supplier-status" {...form.register('status')}>
-              {PARTNER_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {t(`partners.status.${value}`)}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-        ) : null}
-        <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label htmlFor="supplier-note">{t('partners.supplier.note')}</Label>
-          <Textarea id="supplier-note" rows={2} {...form.register('note')} />
-          <FieldError message={errors.note?.message} />
-        </div>
+      <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
+        <FormSection title={t('partners.supplier.sectionGeneral')}>
+          {GENERAL.map(row)}
+          {props.mode === 'edit' ? (
+            <FormRow label={t('partners.supplier.status')} htmlFor="supplier-status" align="center">
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <div className="flex items-center gap-2.5">
+                    <Switch
+                      id="supplier-status"
+                      checked={field.value === 'ACTIVE'}
+                      onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
+                    />
+                    <span className="text-sm">{t(`partners.status.${field.value}`)}</span>
+                  </div>
+                )}
+              />
+            </FormRow>
+          ) : null}
+          <FormRow
+            label={t('partners.supplier.note')}
+            htmlFor="supplier-note"
+            error={errors.note?.message}
+          >
+            <Textarea id="supplier-note" rows={2} {...form.register('note')} />
+          </FormRow>
+        </FormSection>
+        <FormSection title={t('partners.supplier.sectionMoney')}>{MONEY.map(row)}</FormSection>
       </fieldset>
       {props.readOnly ? null : (
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={isSubmitting}>
-            {props.submitLabel}
-          </Button>
+        <FormFooter>
           {props.onCancel ? (
             <Button type="button" variant="ghost" onClick={props.onCancel}>
               {t('common.cancel')}
             </Button>
           ) : null}
-        </div>
+          <Button type="submit" disabled={isSubmitting}>
+            {props.submitLabel}
+          </Button>
+        </FormFooter>
       )}
     </form>
   );
 }
 
-/** The reading side of a supplier's card: the form's fields, label over value (ADR-0042). */
+/** The reading side of a supplier's card: the form's sections, label beside value (ADR-0043). */
 export function SupplierFacts({ detail }: { detail: SupplierDetail }) {
   const { t } = useTranslation();
   const value = (name: TextField) => {
@@ -160,19 +178,25 @@ export function SupplierFacts({ detail }: { detail: SupplierDetail }) {
         return detail[name];
     }
   };
+  const items = (fields: readonly FieldSpec[]) =>
+    fields.map((field) => {
+      const shown = value(field.name);
+      return {
+        label: t(LABELS[field.name]),
+        value: field.mono && shown ? <span className="font-mono">{shown}</span> : shown,
+      };
+    });
   return (
-    <FieldList
-      items={[
-        ...FIELDS.map((field) => {
-          const shown = value(field.name);
-          return {
-            label: t(LABELS[field.name]),
-            value: field.mono && shown ? <span className="font-mono">{shown}</span> : shown,
-          };
-        }),
-        { label: t('partners.supplier.status'), value: t(`partners.status.${detail.status}`) },
-        { label: t('partners.supplier.note'), value: detail.note, wide: true },
-      ]}
-    />
+    <div className="flex flex-col gap-5">
+      <FieldList
+        title={t('partners.supplier.sectionGeneral')}
+        items={[
+          ...items(GENERAL),
+          { label: t('partners.supplier.status'), value: t(`partners.status.${detail.status}`) },
+          { label: t('partners.supplier.note'), value: detail.note },
+        ]}
+      />
+      <FieldList title={t('partners.supplier.sectionMoney')} items={items(MONEY)} />
+    </div>
   );
 }

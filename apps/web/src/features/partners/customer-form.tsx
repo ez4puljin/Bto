@@ -5,32 +5,26 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FieldList } from '@/components/detail';
-import { FieldError } from '@/components/field-error';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { CustomerDetail } from './api';
 import { GpsField } from './gps-field';
-import {
-  type CustomerFormValues,
-  customerSchema,
-  fieldOfDuplicate,
-  PARTNER_STATUSES,
-} from './partner-schema';
+import { type CustomerFormValues, customerSchema, fieldOfDuplicate } from './partner-schema';
 import { localPhone } from './phone';
 
 type PayerFlag = 'vatPayer' | 'cityPayer';
 const PAYER_FLAGS: readonly PayerFlag[] = ['vatPayer', 'cityPayer'];
 
 /**
- * The customer form (SPEC §5.3). Citizens get the e-Barimt consumer number field; the TIN length
- * follows the kind. A registration number that does not look like the kind's only gets a hint:
- * old and foreign numbers exist. Creating also takes the first delivery address with its GPS point.
+ * The customer form (SPEC §5.3), settings-style (ADR-0043). Citizens get the e-Barimt consumer
+ * number field; the TIN length follows the kind. A registration number that does not look like the
+ * kind's only gets a hint: old and foreign numbers exist. Creating also takes the first delivery
+ * address with its GPS point.
  */
 export function CustomerForm(props: {
   mode: 'create' | 'edit';
@@ -73,226 +67,260 @@ export function CustomerForm(props: {
   });
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
       <ProblemAlert problem={problem} />
-      <fieldset disabled={props.readOnly} className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-code">{t('partners.customer.code')}</Label>
+      <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
+        <FormSection title={t('partners.customer.sectionGeneral')}>
+          <FormRow
+            label={t('partners.customer.code')}
+            htmlFor="customer-code"
+            hint={mode === 'create' ? t('partners.customer.codeHint') : undefined}
+            error={errors.code?.message}
+          >
             <Input
               id="customer-code"
               inputMode="numeric"
               autoComplete="off"
-              className="font-mono"
+              className="font-mono sm:w-44"
               {...form.register('code')}
             />
-            {mode === 'create' ? (
-              <p className="text-xs text-muted-foreground">{t('partners.customer.codeHint')}</p>
-            ) : null}
-            <FieldError message={errors.code?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-kind">{t('partners.customer.kind')}</Label>
-            <NativeSelect id="customer-kind" {...form.register('kind')}>
+          </FormRow>
+          <FormRow
+            label={t('partners.customer.name')}
+            htmlFor="customer-name"
+            error={errors.name?.message}
+          >
+            <Input id="customer-name" autoComplete="off" {...form.register('name')} />
+          </FormRow>
+          <FormRow label={t('partners.customer.kind')} htmlFor="customer-kind">
+            <NativeSelect id="customer-kind" className="sm:w-56" {...form.register('kind')}>
               {CUSTOMER_KINDS.map((value) => (
                 <option key={value} value={value}>
                   {t(`partners.kinds.${value}`)}
                 </option>
               ))}
             </NativeSelect>
-          </div>
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label htmlFor="customer-name">{t('partners.customer.name')}</Label>
-            <Input id="customer-name" autoComplete="off" {...form.register('name')} />
-            <FieldError message={errors.name?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-reg-no">{t('partners.customer.regNo')}</Label>
-            <Input
-              id="customer-reg-no"
-              autoComplete="off"
-              className="font-mono"
-              {...form.register('regNo')}
-            />
-            {regNoLooksOff ? (
-              <p className="text-xs text-muted-foreground">
-                {kind === 'COMPANY'
-                  ? t('partners.customer.regNoHintCompany')
-                  : t('partners.customer.regNoHintIndividual')}
-              </p>
-            ) : null}
-            <FieldError message={errors.regNo?.message} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-tin">{t('partners.customer.tin')}</Label>
-            <Input
-              id="customer-tin"
-              inputMode="numeric"
-              autoComplete="off"
-              className="font-mono"
-              {...form.register('tin')}
-            />
-            {customer?.tinSource ? (
-              <p className="text-xs text-muted-foreground">
-                {t(`partners.customer.tinSource.${customer.tinSource}`)}
-              </p>
-            ) : kind === 'COMPANY' ? (
-              <p className="text-xs text-muted-foreground">{t('partners.customer.tinHint')}</p>
-            ) : null}
-            <FieldError message={errors.tin?.message} />
-          </div>
-          {kind === 'INDIVIDUAL' ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="customer-consumer-no">{t('partners.customer.consumerNo')}</Label>
-              <Input
-                id="customer-consumer-no"
-                inputMode="numeric"
-                autoComplete="off"
-                className="font-mono"
-                {...form.register('consumerNo')}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('partners.customer.consumerNoHint')}
-              </p>
-              <FieldError message={errors.consumerNo?.message} />
-            </div>
-          ) : null}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-phone">{t('partners.customer.phone')}</Label>
+          </FormRow>
+          <FormRow
+            label={t('partners.customer.phone')}
+            htmlFor="customer-phone"
+            error={errors.phone?.message}
+          >
             <Input
               id="customer-phone"
               type="tel"
               inputMode="tel"
               autoComplete="off"
+              className="sm:w-56"
               {...form.register('phone')}
             />
-            <FieldError message={errors.phone?.message} />
-          </div>
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <div className="flex flex-wrap gap-4">
-              {PAYER_FLAGS.map((flag) => (
-                <Controller
-                  key={flag}
-                  control={form.control}
-                  name={flag}
-                  render={({ field }) => (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`customer-${flag}`}
-                        checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(checked === true)}
-                      />
-                      <Label htmlFor={`customer-${flag}`} className="font-normal">
-                        {t(`partners.customer.${flag}`)}
-                      </Label>
-                    </div>
-                  )}
-                />
-              ))}
-            </div>
-            {mode === 'edit' && customer?.taxStatusSource === null ? (
-              <p className="text-xs text-muted-foreground">
-                {t('partners.customer.payerUnchecked')}
-              </p>
-            ) : null}
-          </div>
+          </FormRow>
           {mode === 'edit' ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="customer-status">{t('partners.customer.status')}</Label>
-              <NativeSelect id="customer-status" {...form.register('status')}>
-                {PARTNER_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {t(`partners.status.${value}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <FormRow label={t('partners.customer.status')} htmlFor="customer-status" align="center">
+              <Controller
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <div className="flex items-center gap-2.5">
+                    <Switch
+                      id="customer-status"
+                      checked={field.value === 'ACTIVE'}
+                      onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
+                    />
+                    <span className="text-sm">{t(`partners.status.${field.value}`)}</span>
+                  </div>
+                )}
+              />
+            </FormRow>
           ) : null}
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label htmlFor="customer-note">{t('partners.customer.note')}</Label>
+          <FormRow
+            label={t('partners.customer.note')}
+            htmlFor="customer-note"
+            error={errors.note?.message}
+          >
             <Textarea id="customer-note" rows={2} {...form.register('note')} />
-            <FieldError message={errors.note?.message} />
-          </div>
-        </div>
+          </FormRow>
+        </FormSection>
+
+        <FormSection
+          title={t('partners.customer.sectionTax')}
+          description={
+            mode === 'edit' && customer?.taxStatusSource === null
+              ? t('partners.customer.payerUnchecked')
+              : undefined
+          }
+        >
+          <FormRow
+            label={t('partners.customer.regNo')}
+            htmlFor="customer-reg-no"
+            hint={
+              regNoLooksOff
+                ? kind === 'COMPANY'
+                  ? t('partners.customer.regNoHintCompany')
+                  : t('partners.customer.regNoHintIndividual')
+                : undefined
+            }
+            error={errors.regNo?.message}
+          >
+            <Input
+              id="customer-reg-no"
+              autoComplete="off"
+              className="font-mono sm:w-56"
+              {...form.register('regNo')}
+            />
+          </FormRow>
+          <FormRow
+            label={t('partners.customer.tin')}
+            htmlFor="customer-tin"
+            hint={
+              customer?.tinSource
+                ? t(`partners.customer.tinSource.${customer.tinSource}`)
+                : kind === 'COMPANY'
+                  ? t('partners.customer.tinHint')
+                  : undefined
+            }
+            error={errors.tin?.message}
+          >
+            <Input
+              id="customer-tin"
+              inputMode="numeric"
+              autoComplete="off"
+              className="font-mono sm:w-56"
+              {...form.register('tin')}
+            />
+          </FormRow>
+          {kind === 'INDIVIDUAL' ? (
+            <FormRow
+              label={t('partners.customer.consumerNo')}
+              htmlFor="customer-consumer-no"
+              hint={t('partners.customer.consumerNoHint')}
+              error={errors.consumerNo?.message}
+            >
+              <Input
+                id="customer-consumer-no"
+                inputMode="numeric"
+                autoComplete="off"
+                className="font-mono sm:w-56"
+                {...form.register('consumerNo')}
+              />
+            </FormRow>
+          ) : null}
+          {PAYER_FLAGS.map((flag) => (
+            <FormRow
+              key={flag}
+              label={t(`partners.customer.${flag}`)}
+              htmlFor={`customer-${flag}`}
+              align="center"
+            >
+              <Controller
+                control={form.control}
+                name={flag}
+                render={({ field }) => (
+                  <Switch
+                    id={`customer-${flag}`}
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+            </FormRow>
+          ))}
+        </FormSection>
 
         {mode === 'create' ? (
-          <>
-            <Separator />
-            <h2 className="font-medium">{t('partners.customer.firstAddress')}</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="customer-address">{t('partners.addresses.address')}</Label>
-                <Textarea id="customer-address" rows={2} {...form.register('address')} />
-                <FieldError message={errors.address?.message} />
-              </div>
+          <FormSection title={t('partners.customer.firstAddress')}>
+            <FormRow
+              label={t('partners.addresses.address')}
+              htmlFor="customer-address"
+              error={errors.address?.message}
+            >
+              <Textarea id="customer-address" rows={2} {...form.register('address')} />
+            </FormRow>
+            <FormRow
+              label={t('partners.addresses.gps')}
+              htmlFor="customer-gps"
+              error={errors.gps?.message}
+            >
               <GpsField
                 id="customer-gps"
                 value={form.watch('gps')}
                 registration={form.register('gps')}
-                error={errors.gps?.message}
               />
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="customer-address-note">{t('partners.addresses.note')}</Label>
-                <Input
-                  id="customer-address-note"
-                  autoComplete="off"
-                  {...form.register('addressNote')}
-                />
-                <FieldError message={errors.addressNote?.message} />
-              </div>
-            </div>
-          </>
+            </FormRow>
+            <FormRow
+              label={t('partners.addresses.note')}
+              htmlFor="customer-address-note"
+              error={errors.addressNote?.message}
+            >
+              <Input
+                id="customer-address-note"
+                autoComplete="off"
+                {...form.register('addressNote')}
+              />
+            </FormRow>
+          </FormSection>
         ) : null}
       </fieldset>
       {props.readOnly ? null : (
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={isSubmitting}>
-            {props.submitLabel}
-          </Button>
+        <FormFooter>
           {props.onCancel ? (
             <Button type="button" variant="ghost" onClick={props.onCancel}>
               {t('common.cancel')}
             </Button>
           ) : null}
-        </div>
+          <Button type="submit" disabled={isSubmitting}>
+            {props.submitLabel}
+          </Button>
+        </FormFooter>
       )}
     </form>
   );
 }
 
-/** The reading side of a customer's card: the form's fields, label over value (ADR-0042). */
+/** The reading side of a customer's card: the form's sections, label beside value (ADR-0043). */
 export function CustomerFacts({ customer }: { customer: CustomerDetail }) {
   const { t } = useTranslation();
   const mono = (value: string | null) =>
     value ? <span className="font-mono">{value}</span> : null;
   return (
-    <FieldList
-      items={[
-        { label: t('partners.customer.code'), value: mono(customer.code) },
-        { label: t('partners.customer.name'), value: customer.name },
-        { label: t('partners.customer.kind'), value: t(`partners.kinds.${customer.kind}`) },
-        { label: t('partners.customer.regNo'), value: mono(customer.regNo) },
-        {
-          label: t('partners.customer.tin'),
-          value: mono(customer.tin),
-          hint: customer.tinSource ? t(`partners.customer.tinSource.${customer.tinSource}`) : null,
-        },
-        ...(customer.kind === 'INDIVIDUAL'
-          ? [{ label: t('partners.customer.consumerNo'), value: mono(customer.consumerNo) }]
-          : []),
-        {
-          label: t('partners.customer.phone'),
-          value: customer.phone ? localPhone(customer.phone) : null,
-        },
-        ...PAYER_FLAGS.map((flag) => ({
-          label: t(`partners.customer.${flag}`),
-          value: customer[flag] ? t('common.yes') : t('common.no'),
-          hint:
-            customer.taxStatusSource === null ? t('partners.customer.payerUnchecked') : undefined,
-        })),
-        { label: t('partners.customer.status'), value: t(`partners.status.${customer.status}`) },
-        { label: t('partners.customer.note'), value: customer.note, wide: true },
-      ]}
-    />
+    <div className="flex flex-col gap-5">
+      <FieldList
+        title={t('partners.customer.sectionGeneral')}
+        items={[
+          { label: t('partners.customer.code'), value: mono(customer.code) },
+          { label: t('partners.customer.name'), value: customer.name },
+          { label: t('partners.customer.kind'), value: t(`partners.kinds.${customer.kind}`) },
+          {
+            label: t('partners.customer.phone'),
+            value: customer.phone ? localPhone(customer.phone) : null,
+          },
+          { label: t('partners.customer.status'), value: t(`partners.status.${customer.status}`) },
+          { label: t('partners.customer.note'), value: customer.note },
+        ]}
+      />
+      <FieldList
+        title={t('partners.customer.sectionTax')}
+        description={
+          customer.taxStatusSource === null ? t('partners.customer.payerUnchecked') : undefined
+        }
+        items={[
+          { label: t('partners.customer.regNo'), value: mono(customer.regNo) },
+          {
+            label: t('partners.customer.tin'),
+            value: mono(customer.tin),
+            hint: customer.tinSource
+              ? t(`partners.customer.tinSource.${customer.tinSource}`)
+              : null,
+          },
+          ...(customer.kind === 'INDIVIDUAL'
+            ? [{ label: t('partners.customer.consumerNo'), value: mono(customer.consumerNo) }]
+            : []),
+          ...PAYER_FLAGS.map((flag) => ({
+            label: t(`partners.customer.${flag}`),
+            value: customer[flag] ? t('common.yes') : t('common.no'),
+          })),
+        ]}
+      />
+    </div>
   );
 }

@@ -1,8 +1,10 @@
-import { Plus } from 'lucide-react';
+import { Plus, Star, Unlink } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { RowAction, RowActionSpacer } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { usePartnersMutations, useProductSuppliers, useSuppliers } from './api';
 
 /**
@@ -24,6 +27,9 @@ export function ProductSuppliersCard({ productId }: { productId: number }) {
   const mutations = usePartnersMutations();
   const action = useAction();
   const [adding, setAdding] = useState(false);
+  const removing = useDeleteConfirm<{ id: number; supplier: { name: string } }>((id) =>
+    mutations.unlinkSupplier.mutateAsync(id),
+  );
   const rows = links.data ?? [];
 
   return (
@@ -32,7 +38,7 @@ export function ProductSuppliersCard({ productId }: { productId: number }) {
         <CardTitle>{t('partners.productSuppliers.title')}</CardTitle>
         {canManage ? (
           <CardAction>
-            <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
               <Plus />
               {t('partners.productSuppliers.add')}
             </Button>
@@ -61,33 +67,42 @@ export function ProductSuppliersCard({ productId }: { productId: number }) {
                 <Badge variant="outline">{t(`partners.status.${link.supplier.status}`)}</Badge>
               )}
               {canManage ? (
-                <span className="ml-auto flex gap-1">
-                  {link.isMain ? null : (
-                    <Button
-                      size="xs"
-                      variant="ghost"
+                <span className="-my-1 ml-auto flex gap-0.5">
+                  {link.isMain ? (
+                    <RowActionSpacer />
+                  ) : (
+                    <RowAction
+                      label={`${t('partners.productSuppliers.makeMain')}: ${link.supplier.name}`}
+                      icon={Star}
                       onClick={() =>
                         void action.run(() => mutations.mainSupplier.mutateAsync(link.id))
                       }
-                    >
-                      {t('partners.productSuppliers.makeMain')}
-                    </Button>
+                    />
                   )}
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      void action.run(() => mutations.unlinkSupplier.mutateAsync(link.id))
-                    }
-                  >
-                    {t('partners.productSuppliers.remove')}
-                  </Button>
+                  <RowAction
+                    label={`${t('partners.productSuppliers.remove')}: ${link.supplier.name}`}
+                    icon={Unlink}
+                    destructive
+                    onClick={() => removing.ask(link)}
+                  />
                 </span>
               ) : null}
             </li>
           ))}
         </ul>
       </CardContent>
+      <ConfirmDialog
+        open={removing.target !== null}
+        title={t('partners.productSuppliers.removeTitle', {
+          name: removing.target?.supplier.name ?? '',
+        })}
+        description={t('partners.productSuppliers.removeDescription')}
+        confirmLabel={t('partners.productSuppliers.remove')}
+        pending={removing.pending}
+        problem={removing.problem}
+        onClose={removing.close}
+        onConfirm={removing.confirm}
+      />
       {adding ? (
         <LinkSupplierDialog
           productId={productId}

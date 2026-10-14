@@ -504,7 +504,7 @@ describe('customer page', () => {
     expect(screen.queryByLabelText(mn.partners.credit.holdReason)).toBeNull();
     await user.type(limit, '5,000,000');
     await user.type(screen.getByLabelText(mn.partners.credit.term), '45');
-    await user.click(screen.getByRole('checkbox', { name: mn.partners.credit.hold }));
+    await user.click(screen.getByRole('switch', { name: mn.partners.credit.hold }));
     await user.type(screen.getByLabelText(mn.partners.credit.holdReason), 'Хугацаа хэтэрсэн');
     const card = within(limit.closest<HTMLElement>('form') ?? document.body);
     await user.click(card.getByRole('button', { name: mn.common.save }));
@@ -543,7 +543,7 @@ describe('customer page', () => {
     await user.type(dialog.getByLabelText(mn.partners.addresses.label), 'Салбар');
     await user.click(dialog.getByLabelText(mn.partners.addresses.gps));
     await user.paste('47.9, 106.95');
-    await user.click(dialog.getByRole('checkbox', { name: mn.partners.addresses.makeDefault }));
+    await user.click(dialog.getByRole('switch', { name: mn.partners.addresses.makeDefault }));
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(added).toEqual({
@@ -556,7 +556,9 @@ describe('customer page', () => {
     });
 
     const store = within(screen.getByRole('region', { name: 'Агуулахын хаяг' }));
-    await user.click(store.getByRole('button', { name: mn.partners.addresses.archive }));
+    await user.click(
+      store.getByRole('button', { name: `${mn.partners.addresses.archive}: Агуулахын хаяг` }),
+    );
     const confirm = within(await screen.findByRole('dialog'));
     expect(confirm.getByText(mn.partners.addresses.archiveConfirm)).toBeInTheDocument();
     await user.click(confirm.getByRole('button', { name: mn.partners.addresses.archive }));
@@ -789,7 +791,9 @@ describe('product suppliers card', () => {
     );
     expect(screen.getByText(mn.partners.productSuppliers.main)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: mn.partners.productSuppliers.makeMain }));
+    await user.click(
+      screen.getByRole('button', { name: `${mn.partners.productSuppliers.makeMain}: Номин Трейд` }),
+    );
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/product-suppliers/42/main')).toHaveLength(1),
     );
@@ -815,7 +819,7 @@ describe('product suppliers card', () => {
     expect(await screen.findByRole('link', { name: 'Номин Трейд' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: mn.partners.productSuppliers.add })).toBeNull();
     expect(
-      screen.queryByRole('button', { name: mn.partners.productSuppliers.makeMain }),
+      screen.queryByRole('button', { name: new RegExp(mn.partners.productSuppliers.makeMain) }),
     ).toBeNull();
   });
 });

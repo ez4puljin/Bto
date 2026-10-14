@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useAction } from '@/lib/use-action';
 
 /**
- * Deletes one row after a confirmation (a `ConfirmDialog` opened while `target` is set); the API
- * refuses rows still in use, and the refusal shows in the dialog (`problem`).
+ * Deletes (or archives) one row after a confirmation: `ask(row)`, then a `ConfirmDialog` open while
+ * `target` is set, busy while `pending`; the API's refusal shows in the dialog (`problem`).
  */
 export function useDeleteConfirm<T extends { id: number }>(
   remove: (id: number) => Promise<unknown>,
 ) {
   const action = useAction();
   const [target, setTarget] = useState<T | null>(null);
+  const [pending, setPending] = useState(false);
   return {
     target,
+    pending,
     problem: action.problem,
     ask: (row: T) => {
       action.clear();
@@ -19,8 +21,14 @@ export function useDeleteConfirm<T extends { id: number }>(
     },
     close: () => setTarget(null),
     confirm: () => {
-      if (!target) return;
-      void action.run(() => remove(target.id)).then((ok) => (ok ? setTarget(null) : undefined));
+      if (!target || pending) return;
+      setPending(true);
+      void action
+        .run(() => remove(target.id))
+        .then((ok) => {
+          setPending(false);
+          if (ok) setTarget(null);
+        });
     },
   };
 }

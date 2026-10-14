@@ -4,14 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { DetailCard, FieldList } from '@/components/detail';
-import { FieldError } from '@/components/field-error';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -185,72 +184,73 @@ function CreditForm(props: { customer: CustomerDetail; onClose: () => void }) {
   });
 
   return (
-    <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
       <ProblemAlert problem={action.problem} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="credit-limit">{t('partners.credit.limit')}</Label>
+      <FormSection>
+        <FormRow
+          label={t('partners.credit.limit')}
+          htmlFor="credit-limit"
+          hint={t('partners.credit.limitHint')}
+          error={errors.creditLimit?.message}
+        >
           <Input
             id="credit-limit"
             inputMode="decimal"
             autoComplete="off"
+            className="font-mono sm:w-44"
             placeholder={t('partners.credit.limitUndecided')}
             {...form.register('creditLimit')}
           />
-          <p className="text-xs text-muted-foreground">{t('partners.credit.limitHint')}</p>
-          <FieldError message={errors.creditLimit?.message} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="credit-term">{t('partners.credit.term')}</Label>
+        </FormRow>
+        <FormRow
+          label={t('partners.credit.term')}
+          htmlFor="credit-term"
+          hint={
+            customer.paymentTerm.source === 'CUSTOMER'
+              ? t('partners.credit.termHint')
+              : `${t('partners.credit.termHint')}. ${termText(customer.paymentTerm)}`
+          }
+          error={errors.paymentTermDays?.message}
+        >
           <Input
             id="credit-term"
             inputMode="numeric"
             autoComplete="off"
+            className="font-mono sm:w-28"
             {...form.register('paymentTermDays')}
           />
-          <p className="text-xs text-muted-foreground">
-            {customer.paymentTerm.source === 'CUSTOMER'
-              ? t('partners.credit.termHint')
-              : `${t('partners.credit.termHint')}. ${termText(customer.paymentTerm)}`}
-          </p>
-          <FieldError message={errors.paymentTermDays?.message} />
-        </div>
-        <Controller
-          control={form.control}
-          name="creditHold"
-          render={({ field }) => (
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <Checkbox
-                id="credit-hold"
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-              />
-              <Label htmlFor="credit-hold" className="font-normal">
-                {t('partners.credit.hold')}
-              </Label>
-            </div>
-          )}
-        />
+        </FormRow>
+        <FormRow label={t('partners.credit.hold')} htmlFor="credit-hold" align="center">
+          <Controller
+            control={form.control}
+            name="creditHold"
+            render={({ field }) => (
+              <Switch id="credit-hold" checked={field.value} onCheckedChange={field.onChange} />
+            )}
+          />
+        </FormRow>
         {held ? (
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label htmlFor="credit-hold-reason">{t('partners.credit.holdReason')}</Label>
+          <FormRow
+            label={t('partners.credit.holdReason')}
+            htmlFor="credit-hold-reason"
+            error={errors.creditHoldReason?.message}
+          >
             <Input
               id="credit-hold-reason"
               autoComplete="off"
               {...form.register('creditHoldReason')}
             />
-            <FieldError message={errors.creditHoldReason?.message} />
-          </div>
+          </FormRow>
         ) : null}
-      </div>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {t('common.save')}
-        </Button>
+      </FormSection>
+      <FormFooter>
         <Button type="button" variant="ghost" onClick={props.onClose}>
           {t('common.cancel')}
         </Button>
-      </div>
+        <Button type="submit" disabled={isSubmitting}>
+          {t('common.save')}
+        </Button>
+      </FormFooter>
     </form>
   );
 }
