@@ -16,8 +16,11 @@ export const GLOSSARY = {
   onHand: 'stock.on_hand (quantity in a warehouse); what can be sold now is stock.available',
   stockValue: 'stock.stock_value (stock valued at average cost)',
   cost: 'stock.avg_cost (average unit cost); purchase cost per receipt line: receipt_lines.amount and unit_cost',
-  wholesalePrice: "prices_today with list = 'WHOLESALE' (the price every customer pays)",
-  retailPrice: "prices_today with list = 'RETAIL' (the supermarket's price)",
+  wholesalePrice:
+    'product_prices_today: warehouse_price per base unit for whole packs (whole_unit_price per pack), loose_price for loose pieces (every customer)',
+  retailPrice:
+    'product_prices_today.retail_price, and retail_bulk_price from retail_bulk_min_qty base units (the supermarket)',
+  priceProfile: 'price_profiles (markups and rounding by date); product_prices_today.profile_name',
   receipt: "receipt_lines, or stock_documents with doc_type = 'GR' (goods received from suppliers)",
   transfer: "stock_documents with doc_type = 'TR'; stock_movements TRANSFER_OUT / TRANSFER_IN",
   adjustment:
@@ -58,11 +61,13 @@ export const EXAMPLES = {
  WHERE receipt_status = 'POSTED' AND receipt_date >= date_trunc('month', current_date)
  GROUP BY supplier_name
  ORDER BY 3 DESC NULLS LAST`,
-  wholesalePrices: `SELECT p.sku ${as(C.code)}, p.name ${as(C.product)}, t.unit_name ${as(C.unit)}, t.price ${as(C.wholesalePrice)}
-  FROM prices_today t
+  wholesalePrices: `SELECT t.sku ${as(C.code)}, t.product_name ${as(C.product)}, t.warehouse_price ${as(C.warehousePrice)},
+       t.whole_unit_name ${as(C.unit)}, t.whole_unit_price ${as(C.wholesalePrice)}, t.loose_price ${as(C.loosePrice)},
+       t.profile_name ${as(C.priceProfile)}
+  FROM product_prices_today t
   JOIN products p ON p.id = t.product_id
- WHERE t.list = 'WHOLESALE' AND p.status = 'ACTIVE'
- ORDER BY p.name, t.factor_to_base
+ WHERE p.status = 'ACTIVE'
+ ORDER BY t.product_name
  LIMIT 500`,
   creditCustomers: `SELECT name ${as(C.customer)}, phone ${as(C.phone)}, credit_limit ${as(C.creditLimit)},
        credit_hold ${as(C.creditHold)}

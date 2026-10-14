@@ -8,9 +8,10 @@ import {
   type DiscountScope,
   MAX_DISCOUNT_STEPS,
   MAX_QUOTE_LINES,
+  PRICE_BASES,
   PRICE_LISTS,
+  type PriceBasis,
   type PriceList,
-  type PriceSource,
 } from '@tugeel/shared/pricing';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -25,125 +26,18 @@ import {
   Matches,
   MaxLength,
   Min,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
+import { PageQueryDto } from '../../../common/pagination/page';
 import { PROGRAM_STATUSES, type ProgramStatus } from '../services/discount-programs.service';
 import { MAX_SALE_READY } from '../services/sale-readiness.service';
-import { MAX_PRICE_ENTRIES } from '../services/unit-prices.service';
 
-const WHOLE_MNT = /^[1-9]\d{0,11}$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 const DECIMAL_2 = /^\d{1,12}(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const PRICE_SOURCES = ['UNIT', 'DERIVED'] as const;
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
-
-// ---------------------------------------------------------------------------------------------
-// Unit prices
-
-@ApiSchema({ name: 'PricePeriod' })
-export class PricePeriodDto {
-  @ApiProperty() id: number;
-  @ApiProperty({ example: '22800', description: 'Whole MNT, VAT included' }) price: string;
-  @ApiProperty({ example: '2026-10-13' }) validFrom: string;
-  @ApiProperty({ type: String, nullable: true, description: 'Up to, not including' })
-  validTo: string | null;
-}
-
-@ApiSchema({ name: 'CurrentUnitPrice' })
-export class CurrentUnitPriceDto {
-  @ApiProperty({ example: '22800' }) price: string;
-  @ApiProperty({
-    enum: PRICE_SOURCES,
-    description: "UNIT: the unit's own price; DERIVED: the base unit's price × factor",
-  })
-  source: PriceSource;
-  @ApiProperty({ type: PricePeriodDto, nullable: true }) period: PricePeriodDto | null;
-}
-
-@ApiSchema({ name: 'UnitPriceView' })
-export class UnitPriceViewDto {
-  @ApiProperty() productUnitId: number;
-  @ApiProperty() uomName: string;
-  @ApiProperty({ example: '24' }) factorToBase: string;
-  @ApiProperty() isBase: boolean;
-  @ApiProperty({ type: CurrentUnitPriceDto, nullable: true }) current: CurrentUnitPriceDto | null;
-  @ApiProperty({ type: [PricePeriodDto], description: 'Starting after today, earliest first' })
-  scheduled: PricePeriodDto[];
-  @ApiProperty({ type: [PricePeriodDto], description: 'Ended, latest first' })
-  history: PricePeriodDto[];
-}
-
-@ApiSchema({ name: 'ProductPrices' })
-export class ProductPricesDto {
-  @ApiProperty() productId: number;
-  @ApiProperty({ description: 'The Ulaanbaatar business date the view is for' }) today: string;
-  @ApiProperty({ type: [UnitPriceViewDto], description: 'Every channel but the supermarket' })
-  wholesale: UnitPriceViewDto[];
-  @ApiProperty({ type: [UnitPriceViewDto], description: 'The supermarket' })
-  retail: UnitPriceViewDto[];
-}
-
-export class ProductPricesQueryDto {
-  @ApiProperty() @Type(() => Number) @IsInt() @Min(1) productId: number;
-}
-
-export class CurrentPricesQueryDto {
-  @ApiProperty({
-    type: [Number],
-    maxItems: MAX_PAGE_LIMIT,
-    description: 'Repeated: productIds=1&productIds=2',
-  })
-  @Transform(queryIds)
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(MAX_PAGE_LIMIT)
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  productIds: number[];
-}
-
-@ApiSchema({ name: 'CurrentPrice' })
-export class CurrentPriceDto {
-  @ApiProperty() productId: number;
-  @ApiProperty({ enum: PRICE_LISTS }) list: PriceList;
-  @ApiProperty({ description: 'The base unit' }) productUnitId: number;
-  @ApiProperty({ example: '1000' }) price: string;
-}
-
-@ApiSchema({ name: 'PriceEntryRequest' })
-export class PriceEntryDto {
-  @ApiProperty({ enum: PRICE_LISTS }) @IsIn(PRICE_LISTS) list: PriceList;
-  @ApiProperty() @IsInt() @Min(1) productUnitId: number;
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    example: '22800',
-    description: "Whole MNT; null takes the unit back to its base unit's price × factor",
-  })
-  @ValidateIf((_, value) => value !== null)
-  @Matches(WHOLE_MNT)
-  price: string | null;
-}
-
-@ApiSchema({ name: 'SetPricesRequest' })
-export class SetPricesDto {
-  @ApiProperty() @IsInt() @Min(1) productId: number;
-  @ApiProperty({ example: '2026-10-13', description: 'Today or later (Ulaanbaatar)' })
-  @Matches(ISO_DATE)
-  validFrom: string;
-  @ApiProperty({ type: [PriceEntryDto], maxItems: MAX_PRICE_ENTRIES })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(MAX_PRICE_ENTRIES)
-  @ValidateNested({ each: true })
-  @Type(() => PriceEntryDto)
-  entries: PriceEntryDto[];
-}
 
 // ---------------------------------------------------------------------------------------------
 // Completing registered products (ADR-0044 #3)
@@ -333,9 +227,26 @@ export class AppliedDiscountDto {
   @ApiProperty({
     type: String,
     nullable: true,
-    description: 'Tugriks a category or order program took off the line',
+    description: 'Tugriks a category or order program took off the part',
   })
   amount: string | null;
+}
+
+/** A part of a quoted line (ADR-0048 #4): whole packs, loose pieces or a supermarket price. */
+@ApiSchema({ name: 'QuotePart' })
+export class QuotePartDto {
+  @ApiProperty({ description: 'The unit the part is counted in' }) productUnitId: number;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ example: '20' }) factorSnapshot: string;
+  @ApiProperty() qty: string;
+  @ApiProperty() qtyBase: string;
+  @ApiProperty({ enum: PRICE_BASES }) basis: PriceBasis;
+  @ApiProperty({ description: "The basis' price of one unit" }) listPrice: string;
+  @ApiProperty({ description: 'After the product’s own discounts' }) unitPrice: string;
+  @ApiProperty() subtotal: string;
+  @ApiProperty() discountAmount: string;
+  @ApiProperty() total: string;
+  @ApiProperty({ type: [AppliedDiscountDto] }) applied: AppliedDiscountDto[];
 }
 
 @ApiSchema({ name: 'QuoteLine' })
@@ -347,15 +258,12 @@ export class QuoteLineDto {
   @ApiProperty() priced: boolean;
   @ApiProperty({ type: String, enum: ['PRICE_MISSING'], nullable: true })
   problem: 'PRICE_MISSING' | null;
-  @ApiProperty({ type: String, nullable: true }) listPrice: string | null;
-  @ApiProperty({ type: String, enum: PRICE_SOURCES, nullable: true })
-  priceSource: PriceSource | null;
-  @ApiProperty({ type: String, nullable: true, description: 'After the product’s own discounts' })
-  unitPrice: string | null;
-  @ApiProperty({ type: String, nullable: true }) subtotal: string | null;
+  @ApiProperty({ type: [QuotePartDto], description: 'Empty when the line is not priced' })
+  parts: QuotePartDto[];
+  @ApiProperty({ type: String, nullable: true, description: 'Sums of the parts' })
+  subtotal: string | null;
   @ApiProperty({ type: String, nullable: true }) discountAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
-  @ApiProperty({ type: [AppliedDiscountDto] }) applied: AppliedDiscountDto[];
 }
 
 @ApiSchema({ name: 'Quote' })

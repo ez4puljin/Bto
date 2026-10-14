@@ -5,12 +5,16 @@ import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, customRoleUser, login, seedUser } from '../harness/identity';
+import { PROFILE_BODY, pricingApi } from '../harness/pricing';
 
 interface PageJson {
   data: { id: number; saleReadyAt: string | null }[];
 }
 
-/** Registered products wait for their prices until the price clerk completes them (ADR-0044). */
+/**
+ * Registered products wait for their prices until the price clerk completes them (ADR-0044), with
+ * price terms and a profile in force today and a whole unit that resolves (ADR-0048 #5).
+ */
 describe('sale readiness', () => {
   let app: NestExpressApplication;
   let sql: Client;
@@ -19,27 +23,25 @@ describe('sale readiness', () => {
   let worker: string;
   let drinks: number;
   let pcs: number;
+  let boxUom: number;
+  let profile: number;
   const today = businessDate();
   const http = () => request(app.getHttpServer());
 
   const product = (name: string) =>
     catalogApi(app, admin).product({ name, categoryId: drinks, baseUomId: pcs });
-  const price = (item: ProductJson, list: 'WHOLESALE' | 'RETAIL', value: string) => ({
-    list,
-    productUnitId: unitOf(item, 'PCS').id,
-    price: value,
-  });
-  const setPrices = (
+  const setTerms = (
     token: string,
     item: ProductJson,
-    entries: ReturnType<typeof price>[],
+    warehousePrice: string,
+    wholeUomId: number | null = null,
     validFrom = today,
   ) =>
     http()
-      .post('/api/v1/unit-prices')
+      .post('/api/v1/product-prices')
       .set(bearer(token))
       .set(idempotency())
-      .send({ productId: item.id, validFrom, entries });
+      .send({ productId: item.id, validFrom, warehousePrice, profileId: profile, wholeUomId });
   const complete = (token: string, productIds: number[], key = idempotency()) =>
     http().post('/api/v1/pricing/sale-ready').set(bearer(token)).set(key).send({ productIds });
   const listed = async (saleReady: boolean) =>
@@ -62,6 +64,8 @@ describe('sale readiness', () => {
     const catalog = catalogApi(app, admin);
     drinks = await catalog.category('Ундаа');
     pcs = await catalog.uomId('PCS');
+    boxUom = await catalog.uomId('BOX');
+    profile = await pricingApi(app, admin).profile('Ундаа');
   });
   afterAll(async () => {
     await sql.end();
@@ -75,27 +79,25 @@ describe('sale readiness', () => {
     expect(await listed(true)).not.toContain(water.id);
   });
 
-  it('completes with a wholesale and a supermarket price in force today, all or none', async () => {
+  it('completes with price terms and a profile in force today, all or none', async () => {
     const juice = await product('Жүүс');
     const tea = await product('Цай');
     const refusal = async (ids: number[]) =>
       (await complete(clerk, ids).expect(422)).body as {
         code: string;
         params: { count: number };
-        errors: { path: string; message: string }[];
+        errors: { path: string; constraint: string; message: string }[];
       };
 
     expect(await refusal([juice.id])).toMatchObject({
       code: 'PRICE_MISSING',
       params: { count: 1 },
-      errors: [{ path: 'productIds.0', message: juice.sku }],
+      errors: [{ path: 'productIds.0', constraint: 'priced', message: juice.sku }],
     });
-    await setPrices(clerk, juice, [price(juice, 'WHOLESALE', '1000')]).expect(200);
+    // Terms from tomorrow are not in force today.
+    await setTerms(clerk, juice, '1000', null, addDays(today, 1)).expect(200);
     expect((await refusal([juice.id])).code).toBe('PRICE_MISSING');
-    // A supermarket price from tomorrow is not in force today.
-    await setPrices(clerk, juice, [price(juice, 'RETAIL', '1200')], addDays(today, 1)).expect(200);
-    expect((await refusal([juice.id])).code).toBe('PRICE_MISSING');
-    await setPrices(clerk, juice, [price(juice, 'RETAIL', '1200')]).expect(200);
+    await setTerms(clerk, juice, '1000').expect(200);
     // Tea has no prices: the whole batch is refused and juice keeps waiting.
     expect((await refusal([juice.id, tea.id])).errors).toEqual([
       expect.objectContaining({ path: 'productIds.1', message: tea.sku }),
@@ -120,12 +122,33 @@ describe('sale readiness', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.after).toMatchObject({
-      prices: { WHOLESALE: '1000', RETAIL: '1200' },
+      warehousePrice: '1000',
+      profileId: profile,
+      wholeUomId: null,
       date: today,
     });
   });
 
-  it('refuses inactive products and leaves discount programs to the admin', async () => {
+  it('refuses a product whose whole pack is gone', async () => {
+    const cola = await catalogApi(app, admin).product({
+      name: 'Кола',
+      categoryId: drinks,
+      baseUomId: pcs,
+      units: [{ uomId: boxUom, factorToBase: '24' }],
+    });
+    await setTerms(clerk, cola, '1000', boxUom).expect(200);
+    await http()
+      .post(`/api/v1/product-units/${unitOf(cola, 'BOX').id}/retire`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .expect(200);
+    const refused = await complete(clerk, [cola.id]).expect(422);
+    expect(refused.body.errors).toEqual([
+      expect.objectContaining({ constraint: 'wholeUnit', message: cola.sku }),
+    ]);
+  });
+
+  it('refuses inactive products and leaves discount programs and profiles to the admin', async () => {
     const old = await product('Хуучин бараа');
     await http()
       .patch(`/api/v1/products/${old.id}`)
@@ -138,7 +161,13 @@ describe('sale readiness', () => {
     });
     await complete(clerk, [999_999]).expect(404);
     await complete(worker, [old.id]).expect(403);
-    await setPrices(worker, old, [price(old, 'WHOLESALE', '500')]).expect(403);
+    await setTerms(worker, old, '500').expect(403);
+    await http()
+      .post('/api/v1/price-profiles')
+      .set(bearer(clerk))
+      .set(idempotency())
+      .send({ name: 'Үнэ оруулагчийнх', validFrom: today, ...PROFILE_BODY })
+      .expect(403);
     await http()
       .post('/api/v1/discount-programs')
       .set(bearer(clerk))

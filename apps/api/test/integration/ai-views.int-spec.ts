@@ -8,6 +8,7 @@ import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/ca
 import { bearer, login, seedUser } from '../harness/identity';
 import { expectReconciled, inventoryApi, type WarehouseJson } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
+import { pricingApi } from '../harness/pricing';
 
 const PG_TYPES: Record<AiColumnType, string> = {
   bigint: 'bigint',
@@ -29,13 +30,9 @@ const FORBIDDEN_TABLES = [
   'import_rows',
 ];
 
-interface UnitPriceJson {
-  productUnitId: number;
-  current: { price: string; source: 'UNIT' | 'DERIVED' } | null;
-}
-interface PricesJson {
-  wholesale: UnitPriceJson[];
-  retail: UnitPriceJson[];
+interface PriceViewJson {
+  current: { warehousePrice: string } | null;
+  table: { productUnitId: number; wholesale: string; retail: string; retailBulk: string | null }[];
 }
 interface BalanceJson {
   warehouseId: number;
@@ -57,7 +54,7 @@ interface LowJson {
 }
 
 /**
- * The views of schema ai (migration 0017_ai): exactly the AI_DATASETS catalog, readable only by
+ * The views of schema ai (migrations 0017_ai, 0019_price_profiles): exactly the AI_DATASETS catalog, readable only by
  * ai_reader, free of credentials, and in agreement with the services whose rules they repeat.
  */
 describe('AI views (ADR-0045)', () => {
@@ -70,6 +67,8 @@ describe('AI views (ADR-0045)', () => {
   let cola: ProductJson;
   let juice: ProductJson;
   let programs: { active: number; scheduled: number; ended: number };
+  /** Products priced under each rounding with half-tugrik markups (ADR-0048 #3). */
+  const priced: ProductJson[] = [];
   const today = businessDate();
   const http = () => request(app.getHttpServer());
 
@@ -162,20 +161,30 @@ describe('AI views (ADR-0045)', () => {
       .send({ warehouseId: wholesale.id, productId: cola.id, minQty: '50', maxQty: '100' })
       .expect(200);
 
-    await http()
-      .post('/api/v1/unit-prices')
-      .set(bearer(admin))
-      .set(idempotency())
-      .send({
-        productId: cola.id,
-        validFrom: today,
-        entries: [
-          { list: 'WHOLESALE', productUnitId: unitOf(cola, 'PCS').id, price: '1000' },
-          { list: 'WHOLESALE', productUnitId: unitOf(cola, 'BOX').id, price: '22800' },
-          { list: 'RETAIL', productUnitId: unitOf(cola, 'PCS').id, price: '1200' },
-        ],
-      })
-      .expect(200);
+    const pricing = pricingApi(app, admin);
+    await pricing.terms(cola.id, '1000', await pricing.profile('Ундаа'), box);
+    // 5 %, 12.5 % and 7.5 % of 1,010 and 1,234 end in half tugriks: every rounding is exercised.
+    let sku = 20;
+    for (const rounding of ['WHOLE', 'UP_10', 'UP_50', 'UP_100']) {
+      const profile = await pricing.profile(`Тоймлолт ${rounding}`, {
+        looseMarkupPct: '5',
+        retailMarkupPct: '12.5',
+        retailBulkMarkupPct: '7.5',
+        rounding,
+      });
+      for (const price of ['1010', '1234']) {
+        sku += 1;
+        const item = await catalog.product({
+          sku: String(sku),
+          name: `Тоймлолт ${sku}`,
+          categoryId: drinks,
+          baseUomId: pcs,
+          units: [{ uomId: box, factorToBase: '24' }],
+        });
+        await pricing.terms(item.id, price, profile, box);
+        priced.push(item);
+      }
+    }
 
     const program = async (name: string, validFrom: string) =>
       (
@@ -267,7 +276,7 @@ describe('AI views (ADR-0045)', () => {
     );
     const used = tables.rows.map((row) => row.table);
     expect(used.filter((table) => FORBIDDEN_TABLES.includes(table))).toEqual([]);
-    expect(used).toEqual(expect.arrayContaining(['products', 'stock_ledger', 'unit_prices']));
+    expect(used).toEqual(expect.arrayContaining(['products', 'stock_ledger', 'product_prices']));
     const userColumns = await migrator.query<{ column: string }>(
       `SELECT DISTINCT column_name AS column FROM information_schema.view_column_usage
         WHERE view_schema = 'ai' AND table_schema = 'public' AND table_name = 'users' ORDER BY 1`,
@@ -289,28 +298,49 @@ describe('AI views (ADR-0045)', () => {
     ]);
   });
 
-  it("shows today's prices as the price service does", async () => {
-    const prices = (
-      await http().get('/api/v1/unit-prices').query({ productId: cola.id }).set(bearer(admin))
-    ).body as PricesJson;
-    const fromService = [
-      ...prices.wholesale.map((unit) => ['WHOLESALE', unit] as const),
-      ...prices.retail.map((unit) => ['RETAIL', unit] as const),
-    ]
-      .filter(([, unit]) => unit.current)
-      .map(
-        ([list, unit]) =>
-          `${list} ${unit.productUnitId} ${unit.current?.price} ${unit.current?.source}`,
-      )
-      .sort();
-    const fromView = (await rowsOf('prices_today', 'product_id = $1', [cola.id]))
-      .map(
-        (row) =>
-          `${String(row.list)} ${String(row.product_unit_id)} ${String(row.price).replace(/\.00$/, '')} ${String(row.price_source)}`,
-      )
-      .sort();
-    expect(fromView).toEqual(fromService);
-    expect(fromView).toContain(`RETAIL ${unitOf(cola, 'BOX').id} 28800 DERIVED`);
+  it("shows today's prices as the price service computes them, under every rounding", async () => {
+    // NUMERIC columns arrive as strings: «1150.00» reads as the api's «1150».
+    const amount = (value: unknown) =>
+      typeof value === 'string' ? value.replace(/\.00$/, '') : value;
+    for (const item of [cola, ...priced]) {
+      const view = (
+        await http().get('/api/v1/product-prices').query({ productId: item.id }).set(bearer(admin))
+      ).body as PriceViewJson;
+      const piece = view.table.find((row) => row.productUnitId === unitOf(item, 'PCS').id);
+      const whole = view.table.find((row) => row.productUnitId === unitOf(item, 'BOX').id);
+      const [row] = await rowsOf('product_prices_today', 'product_id = $1', [item.id]);
+      expect({
+        warehouse: amount(row?.warehouse_price),
+        whole: amount(row?.whole_unit_price),
+        loose: amount(row?.loose_price),
+        retail: amount(row?.retail_price),
+        bulk: amount(row?.retail_bulk_price),
+      }).toEqual({
+        warehouse: view.current?.warehousePrice,
+        whole: whole?.wholesale,
+        loose: piece?.wholesale,
+        retail: piece?.retail,
+        bulk: piece?.retailBulk,
+      });
+    }
+    // 1,010 + 5 % = 1,060.5: half up to 1,061, or up to 1,070 / 1,100 / 1,100.
+    const loose = await reader.query<{ rounding: string; loose: string }>(
+      `SELECT rounding, loose_price::text AS loose FROM product_prices_today
+        WHERE warehouse_price = 1010 ORDER BY loose_price, rounding`,
+    );
+    expect(loose.rows.map((row) => `${row.rounding} ${row.loose}`)).toEqual([
+      'WHOLE 1061.00',
+      'UP_10 1070.00',
+      'UP_100 1100.00',
+      'UP_50 1100.00',
+    ]);
+    const profiles = await rowsOf('price_profiles', "name = 'Ундаа'");
+    expect(profiles).toEqual([
+      expect.objectContaining({ status: 'ACTIVE', archived: false, products_today: 1 }),
+    ]);
+    expect(await rowsOf('product_price_history', 'product_id = $1', [cola.id])).toEqual([
+      expect.objectContaining({ profile_name: 'Ундаа', whole_unit_name: 'хайрцаг' }),
+    ]);
   });
 
   it('values stock as the stock service does', async () => {

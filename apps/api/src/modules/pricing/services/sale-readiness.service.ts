@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Decimal } from '@tugeel/shared/money';
-import { PRICE_LISTS, type PriceList } from '@tugeel/shared/pricing';
+import { wholeUnitProblem } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
@@ -8,7 +7,8 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { CatalogService, ProductLifecycleService, UnitConversionService } from '../../catalog';
 import type { Actor } from '../../identity';
-import { UnitPricesService } from './unit-prices.service';
+import { PriceProfilesService } from './price-profiles.service';
+import { packUnitsOf, ProductPricesService } from './product-prices.service';
 
 export const MAX_SALE_READY = 200;
 
@@ -20,10 +20,11 @@ export interface SaleReadyResult {
 }
 
 /**
- * The price clerk completes registered products (ADR-0044 #3): each must be active and its base
- * unit must have a wholesale and a supermarket price in force today (Ulaanbaatar). All or none: a
- * product that fails stops the call, listed in `errors`. A base unit's price can never be removed
- * or superseded, so nothing changes between the check and the update.
+ * The price clerk completes registered products (ADR-0044 #3, ADR-0048 #5): each must be active,
+ * with price terms and a profile version in force today (Ulaanbaatar) and a whole unit that
+ * resolves. All or none: a product that fails stops the call, listed in `errors` (constraint
+ * `priced` or `wholeUnit`). Terms are never removed, only replaced from a day on, so nothing changes
+ * between the check and the update.
  */
 @Injectable()
 export class SaleReadinessService {
@@ -31,7 +32,8 @@ export class SaleReadinessService {
     @Inject(DB) private readonly db: Db,
     private readonly lifecycle: ProductLifecycleService,
     private readonly units: UnitConversionService,
-    private readonly prices: UnitPricesService,
+    private readonly prices: ProductPricesService,
+    private readonly profiles: PriceProfilesService,
     private readonly catalog: CatalogService,
   ) {}
 
@@ -59,50 +61,49 @@ export class SaleReadinessService {
         );
       }
       const waiting = rows.filter((row) => row.saleReadyAt === null);
-      const bases = await this.units.baseUnits(
-        waiting.map((row) => row.id),
+      const waitingIds = waiting.map((row) => row.id);
+      const today = businessDate();
+      const terms = await this.prices.inForce(waitingIds, today, tx);
+      const versions = await this.profiles.versionsInForce(
+        [...terms.values()].map((own) => own.profileId),
+        today,
         tx,
       );
-      const baseIds = [...bases.values()].map((unit) => unit.unitId);
-      const today = businessDate();
-      const inForce = new Map<PriceList, Map<number, Decimal>>();
-      for (const list of PRICE_LISTS) {
-        inForce.set(list, await this.prices.inForce(list, baseIds, today, tx));
-      }
-      const unpriced = waiting.filter((row) => {
-        const base = bases.get(row.id);
-        return !base || PRICE_LISTS.some((list) => !inForce.get(list)?.has(base.unitId));
+      const units = await this.units.currentUnits(waitingIds, tx);
+      const refused = waiting.flatMap((row) => {
+        const own = terms.get(row.id);
+        if (!own || !versions.has(own.profileId)) return [{ row, constraint: 'priced' }];
+        return wholeUnitProblem(packUnitsOf(units.get(row.id) ?? []), own.wholeUomId)
+          ? [{ row, constraint: 'wholeUnit' }]
+          : [];
       });
-      if (unpriced.length > 0) {
+      if (refused.length > 0) {
         throw new AppError(
           'PRICE_MISSING',
-          'the base unit needs a wholesale and a supermarket price in force today',
-          { count: unpriced.length },
-          unpriced.map((row) => ({
+          'a product needs its warehouse price and price profile in force today',
+          { count: refused.length },
+          refused.map(({ row, constraint }) => ({
             path: `productIds.${ids.indexOf(row.id)}`,
-            constraint: 'priced',
+            constraint,
             message: row.sku,
           })),
         );
       }
       const checked = new Map(
         waiting.map((row) => {
-          const base = bases.get(row.id);
-          const prices = Object.fromEntries(
-            PRICE_LISTS.map((list) => [
-              list,
-              base ? (inForce.get(list)?.get(base.unitId)?.toFixed(0) ?? null) : null,
-            ]),
-          );
-          return [row.id, { prices, date: today }] as const;
+          const own = terms.get(row.id);
+          return [
+            row.id,
+            {
+              warehousePrice: own?.warehousePrice.toFixed(0) ?? null,
+              profileId: own?.profileId ?? null,
+              wholeUomId: own?.wholeUomId ?? null,
+              date: today,
+            },
+          ] as const;
         }),
       );
-      const completed = await this.lifecycle.markSaleReadyInTx(
-        tx,
-        actor,
-        waiting.map((row) => row.id),
-        checked,
-      );
+      const completed = await this.lifecycle.markSaleReadyInTx(tx, actor, waitingIds, checked);
       const done = new Set(completed);
       return { completed, alreadyComplete: ids.filter((id) => !done.has(id)) };
     });

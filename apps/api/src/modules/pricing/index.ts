@@ -9,22 +9,29 @@ export {
   type ProgramStatus,
 } from './services/discount-programs.service';
 export {
+  type NewPriceProfile,
+  type PriceProfile,
+  type PriceProfileVersion,
+  PriceProfilesService,
+} from './services/price-profiles.service';
+export {
   PriceQuoteService,
   type Quote,
   type QuotedLine,
+  type QuotedPart,
   type QuoteRequest,
 } from './services/price-quote.service';
+export {
+  type CurrentTerms,
+  type PriceProblem,
+  type PriceTerms,
+  ProductPricesService,
+  type ProductPriceView,
+  type SetTermsInput,
+  type TermsInForce,
+} from './services/product-prices.service';
 export {
   MAX_SALE_READY,
   type SaleReadyResult,
   SaleReadinessService,
 } from './services/sale-readiness.service';
-export {
-  type CurrentPrice,
-  type PriceEntry,
-  type PricePeriod,
-  type ProductPrices,
-  type SetPricesInput,
-  type UnitPriceView,
-  UnitPricesService,
-} from './services/unit-prices.service';

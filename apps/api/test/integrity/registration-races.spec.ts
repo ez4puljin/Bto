@@ -1,6 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { SKU_NUMBER_LOCK } from '../../src/modules/catalog/services/sku-ranges.service';
@@ -10,11 +9,12 @@ import { ProductRegistrationService, type RegistrationInput } from '../../src/mo
 import { LOCKS as PARTNER_LOCKS } from '../../src/modules/partners/services/support';
 import { SaleReadinessService } from '../../src/modules/pricing';
 import { connectAs, createHttpApp, waitFor } from '../harness/apps';
-import { catalogApi, codeOf, idempotency, type ProductJson, unitOf } from '../harness/catalog';
+import { catalogApi, codeOf, idempotency, type ProductJson } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
 import { importsApi } from '../harness/imports';
 import { inventoryApi, staffContext, type WarehouseJson } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
+import { pricingApi } from '../harness/pricing';
 
 type ImageFiles = RegistrationInput['images'][number];
 
@@ -204,7 +204,8 @@ describe('integrity: product registration concurrency', () => {
 
   it('completes overlapping selections once each, waiting instead of deadlocking', async () => {
     const catalog = catalogApi(app, admin);
-    const today = businessDate();
+    const pricing = pricingApi(app, admin);
+    const profile = await pricing.profile('Ус');
     const items: ProductJson[] = [];
     for (const sku of ['8001', '8002', '8003']) {
       const item = await catalog.product({
@@ -213,20 +214,7 @@ describe('integrity: product registration concurrency', () => {
         categoryId: water,
         baseUomId: pcs,
       });
-      await http()
-        .post('/api/v1/unit-prices')
-        .set(bearer(admin))
-        .set(idempotency())
-        .send({
-          productId: item.id,
-          validFrom: today,
-          entries: (['WHOLESALE', 'RETAIL'] as const).map((list) => ({
-            list,
-            productUnitId: unitOf(item, 'PCS').id,
-            price: '1500',
-          })),
-        })
-        .expect(200);
+      await pricing.terms(item.id, '1500', profile, null);
       items.push(item);
     }
     const [first, second, third] = items.map((item) => item.id);

@@ -5,11 +5,12 @@ import { invalid } from '../../../common/errors/app-error';
 
 /**
  * pg_advisory_xact_lock keys of the pricing module (catalog 72_026_1xx, partners 72_027_xxx,
- * inventory 72_028_xxx, imports 72_029_xxx).
+ * inventory 72_028_xxx, imports 72_029_xxx). 72_030_001 locked a unit's prices (ADR-0041) and is
+ * never reused.
  */
 export const LOCKS = {
-  /** Two-key form (this, product unit id): one change of a unit's prices at a time. */
-  unitPrice: 72_030_001,
+  /** Two-key form (this, product id): one change of a product's price terms at a time. */
+  productPrices: 72_030_002,
 } as const;
 
 export async function advisoryLock(tx: Tx, key: number, id: number): Promise<void> {
@@ -29,7 +30,7 @@ export function applied(row: { validFrom: string; validTo: string | null }): boo
   return row.validTo === null || row.validTo > row.validFrom;
 }
 
-/** Prices and programs change from today on: history is never rewritten (ADR-0041). */
+/** Prices, profiles and programs change from today on: history is never rewritten (ADR-0041). */
 export function assertNotPast(path: string, date: string, today = businessDate()): void {
   if (!isIsoDate(date)) throw invalid(path, 'isDate', `${path} must be a date`);
   if (date < today) throw invalid(path, 'notPast', `${path} must be today or later`);

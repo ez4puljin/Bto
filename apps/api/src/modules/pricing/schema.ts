@@ -3,6 +3,7 @@ import {
   DISCOUNT_MEASURES,
   DISCOUNT_SCOPES,
   PRICE_LISTS,
+  PRICE_ROUNDINGS,
 } from '@tugeel/shared/pricing';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -15,15 +16,16 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { money, qty } from '../../common/db/types';
+import { money, percent, qty } from '../../common/db/types';
 import { categories, products, productUnits, uoms } from '../catalog/schema';
 import { users } from '../identity/schema';
 
-// Tables owned by the pricing module (docs/modules/pricing.md, ADR-0041). Migration 0013_pricing
-// adds by hand the EXCLUDE constraints that keep dated rows from overlapping, the trigger that
-// keeps a price's history from being rewritten, and the REVOKE that keeps prices from being
-// deleted.
+// Tables owned by the pricing module (docs/modules/pricing.md, ADR-0041, ADR-0048). Migrations
+// 0013_pricing and 0019_price_profiles add by hand the EXCLUDE constraints that keep dated rows
+// from overlapping, the trigger that keeps their history from being rewritten, and the REVOKEs
+// that keep prices and profiles from being deleted.
 
 const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
 const ref = (name: string) => bigint(name, { mode: 'number' });
@@ -37,21 +39,92 @@ const inList = (column: AnyPgColumn, values: readonly string[]): SQL =>
   )})`;
 
 /**
- * The price of a product unit in a list from `valid_from` up to (not including) `valid_to`, whole
- * MNT and VAT included (ADR-0010, ADR-0041 #1). A change closes the row in force and inserts the
- * next one; a row's `valid_to` only ever moves earlier, and a row closed on its first day
- * (`valid_to = valid_from`) never applied. A unit without a price in force takes its base unit's
- * price × its factor.
+ * A price profile (ADR-0048 #1): the named rules that derive a product's other prices from its
+ * warehouse price. Its values live in dated versions; a live name never repeats (archived ones may).
  */
-export const unitPrices = pgTable(
-  'unit_prices',
+export const priceProfiles = pgTable(
+  'price_profiles',
   {
     id: id(),
-    list: text('list', { enum: PRICE_LISTS }).notNull(),
-    productUnitId: ref('product_unit_id')
+    name: text('name').notNull(),
+    /** `nameKey(name)` from @tugeel/shared/text. */
+    nameKey: text('name_key').notNull(),
+    /** An archived profile cannot be chosen; prices already using it keep working. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('price_profiles_live_name')
+      .on(t.nameKey)
+      .where(sql`${t.archivedAt} IS NULL`),
+    check('price_profiles_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+);
+
+/**
+ * A profile's values from `valid_from` up to (not including) `valid_to` (ADR-0048 #1): the loose
+ * and supermarket markups, the optional supermarket bulk threshold and markup, and the rounding of
+ * the derived prices. Changed like prices: the row in force is closed, a new one inserted.
+ */
+export const priceProfileVersions = pgTable(
+  'price_profile_versions',
+  {
+    id: id(),
+    profileId: ref('profile_id')
       .notNull()
-      .references(() => productUnits.id),
-    price: money('price').notNull(),
+      .references(() => priceProfiles.id),
+    looseMarkupPct: percent('loose_markup_pct').notNull(),
+    retailMarkupPct: percent('retail_markup_pct').notNull(),
+    /** Base units of a product in a supermarket cart from which the bulk markup applies. */
+    retailBulkMinQty: qty('retail_bulk_min_qty'),
+    retailBulkMarkupPct: percent('retail_bulk_markup_pct'),
+    rounding: text('rounding', { enum: PRICE_ROUNDINGS }).notNull(),
+    validFrom: date('valid_from', { mode: 'string' }).notNull(),
+    validTo: date('valid_to', { mode: 'string' }),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('price_profile_versions_profile_idx').on(t.profileId, t.validFrom),
+    check('price_profile_versions_rounding', inList(t.rounding, PRICE_ROUNDINGS)),
+    // The same rules as priceProfileIssue() in @tugeel/shared/pricing.
+    check(
+      'price_profile_versions_markups',
+      sql`${t.looseMarkupPct} >= 0 AND ${t.retailMarkupPct} >= 0`,
+    ),
+    check(
+      'price_profile_versions_bulk',
+      sql`(${t.retailBulkMinQty} IS NULL) = (${t.retailBulkMarkupPct} IS NULL)
+        AND (${t.retailBulkMinQty} IS NULL OR (${t.retailBulkMinQty} > 0
+          AND ${t.retailBulkMarkupPct} >= 0 AND ${t.retailBulkMarkupPct} < ${t.retailMarkupPct}))`,
+    ),
+    check(
+      'price_profile_versions_validity',
+      sql`${t.validTo} IS NULL OR ${t.validTo} >= ${t.validFrom}`,
+    ),
+  ],
+);
+
+/**
+ * A product's price terms from `valid_from` up to (not including) `valid_to` (ADR-0048 #2): the
+ * warehouse price of one base unit (whole MNT, VAT included), the profile that derives the other
+ * prices, and the unit of measure counted as a whole pack (null for a product without packs),
+ * resolved to the product's current unit of it.
+ */
+export const productPrices = pgTable(
+  'product_prices',
+  {
+    id: id(),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    warehousePrice: money('warehouse_price').notNull(),
+    profileId: ref('profile_id')
+      .notNull()
+      .references(() => priceProfiles.id),
+    wholeUomId: ref('whole_uom_id').references(() => uoms.id),
     /** Ulaanbaatar business dates. */
     validFrom: date('valid_from', { mode: 'string' }).notNull(),
     validTo: date('valid_to', { mode: 'string' }),
@@ -59,10 +132,13 @@ export const unitPrices = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index('unit_prices_unit_idx').on(t.productUnitId, t.list, t.validFrom),
-    check('unit_prices_list', inList(t.list, PRICE_LISTS)),
-    check('unit_prices_price', sql`${t.price} > 0 AND ${t.price} = trunc(${t.price})`),
-    check('unit_prices_validity', sql`${t.validTo} IS NULL OR ${t.validTo} >= ${t.validFrom}`),
+    index('product_prices_product_idx').on(t.productId, t.validFrom),
+    index('product_prices_profile_idx').on(t.profileId),
+    check(
+      'product_prices_price',
+      sql`${t.warehousePrice} > 0 AND ${t.warehousePrice} = trunc(${t.warehousePrice})`,
+    ),
+    check('product_prices_validity', sql`${t.validTo} IS NULL OR ${t.validTo} >= ${t.validFrom}`),
   ],
 );
 

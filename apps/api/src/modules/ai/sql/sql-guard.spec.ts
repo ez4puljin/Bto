@@ -44,8 +44,8 @@ describe('guardSql (ADR-0045 #3)', () => {
     ],
     [
       'a LATERAL subquery, VALUES and row comparison',
-      `SELECT v.list, t.price FROM (VALUES ('WHOLESALE'), ('RETAIL')) AS v (list),
-              LATERAL (SELECT price FROM prices_today p WHERE p.list = v.list LIMIT 1) t
+      `SELECT v.list, t.name FROM (VALUES ('WHOLESALE'), ('RETAIL')) AS v (list),
+              LATERAL (SELECT name FROM discount_programs p WHERE p.list = v.list LIMIT 1) t
         WHERE (1, 2) < (2, 3)`,
     ],
     ['a CTE named like a view', 'WITH stock AS (SELECT 1 AS x) SELECT x FROM stock'],

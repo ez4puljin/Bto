@@ -32,9 +32,8 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type PriceList, useCurrentPricesOf, usePricingMutations } from './api';
+import { useCurrentPricesOf, usePricingMutations } from './api';
 import { PriceEntryDialog } from './price-entry-dialog';
-import { LISTS } from './price-views';
 
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
@@ -42,9 +41,9 @@ const positiveId = (value: string | null) => {
 };
 
 /**
- * Products waiting for their prices (ADR-0044 #3), the price clerk's list: each with its wholesale
- * and supermarket base price in force today, «Үнэ оруулах» per row, and the ticked rows completed at
- * once. A completed product leaves the list and appears in every order.
+ * Products waiting for their prices (ADR-0044 #3), the price clerk's list: each with its warehouse
+ * price and price profile in force today (ADR-0048), «Үнэ оруулах» per row, and the ticked rows
+ * completed at once. A completed product leaves the list and appears in every order.
  */
 export function PendingProductsPage() {
   const { t } = useTranslation();
@@ -72,8 +71,8 @@ export function PendingProductsPage() {
 
   const chosen = rows.filter((row) => selected.has(row.id));
   const allChosen = rows.length > 0 && chosen.length === rows.length;
-  const priceOf = (productId: number, list: PriceList) =>
-    prices.data?.find((price) => price.productId === productId && price.list === list)?.price;
+  const termsOf = (productId: number) =>
+    prices.data?.find((terms) => terms.productId === productId);
   const missing =
     completion.problem?.code === 'PRICE_MISSING'
       ? (completion.problem.errors ?? []).map((error) => error.message)
@@ -176,13 +175,10 @@ export function PendingProductsPage() {
               <TableHead className="hidden md:table-cell">
                 {t('catalog.products.columns.category')}
               </TableHead>
-              {LISTS.map((list) => (
-                <TableHead key={list} className="text-right">
-                  {list === 'WHOLESALE'
-                    ? t('catalog.products.columns.wholesalePrice')
-                    : t('catalog.products.columns.retailPrice')}
-                </TableHead>
-              ))}
+              <TableHead className="text-right">
+                {t('catalog.products.columns.warehousePrice')}
+              </TableHead>
+              <TableHead>{t('catalog.products.columns.priceProfile')}</TableHead>
               <TableHead className="w-px" />
             </TableRow>
           </TableHeader>
@@ -206,20 +202,18 @@ export function PendingProductsPage() {
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   {paths.get(row.categoryId)}
                 </TableCell>
-                {LISTS.map((list) => {
-                  const price = priceOf(row.id, list);
-                  return (
-                    <TableCell key={list} className="text-right font-mono">
-                      {price ? (
-                        t('pricing.money', { amount: formatMnt(price) })
-                      ) : (
-                        <span className="font-sans text-xs text-warning">
-                          {t('pricing.card.none')}
-                        </span>
-                      )}
-                    </TableCell>
-                  );
-                })}
+                <TableCell className="text-right font-mono">
+                  {termsOf(row.id) ? (
+                    t('pricing.money', {
+                      amount: formatMnt(termsOf(row.id)?.warehousePrice ?? '0'),
+                    })
+                  ) : (
+                    <span className="font-sans text-xs text-warning">{t('pricing.card.none')}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {termsOf(row.id)?.profileName ?? t('common.none')}
+                </TableCell>
                 <RowActions>
                   <RowAction
                     label={t('pricing.pending.enterPrices', { sku: row.sku })}

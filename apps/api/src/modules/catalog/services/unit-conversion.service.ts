@@ -21,6 +21,8 @@ export interface UnitInfo {
   unitId: number;
   productId: number;
   uomId: number;
+  /** The system unit of measure's code (PCS, BLOCK, BOX, KG); null for a custom one. */
+  uomCode: string | null;
   uomName: string;
   factorToBase: Decimal;
   isBase: boolean;
@@ -83,6 +85,7 @@ export class UnitConversionService {
         unitId: productUnits.id,
         productId: productUnits.productId,
         uomId: productUnits.uomId,
+        uomCode: uoms.code,
         uomName: uoms.name,
         factorToBase: productUnits.factorToBase,
         isBase: productUnits.isBase,

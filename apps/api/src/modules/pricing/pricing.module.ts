@@ -3,26 +3,29 @@ import { CatalogModule, UNIT_SUPERSEDED_HOOK } from '../catalog';
 import { IdentityModule } from '../identity';
 import {
   DiscountProgramsController,
+  PriceProfilesController,
   PricingController,
-  UnitPricesController,
+  ProductPricesController,
 } from './controllers/pricing.controller';
 import { DiscountProgramsService } from './services/discount-programs.service';
+import { PriceProfilesService } from './services/price-profiles.service';
 import { PriceQuoteService } from './services/price-quote.service';
 import { PricingUnitsHook } from './services/pricing-units.hook';
+import { ProductPricesService } from './services/product-prices.service';
 import { SaleReadinessService } from './services/sale-readiness.service';
-import { UnitPricesService } from './services/unit-prices.service';
 
 const CORE_SERVICES = [
   DiscountProgramsService,
+  PriceProfilesService,
   PriceQuoteService,
+  ProductPricesService,
   SaleReadinessService,
-  UnitPricesService,
 ];
 
 /**
  * Pricing services every process may use (the api now; orders and the price import next).
- * Binding catalog's UNIT_SUPERSEDED_HOOK here closes a superseded unit's prices and programs in
- * the supersede transaction (catalog resolves the hook with ModuleRef, strict: false).
+ * Binding catalog's UNIT_SUPERSEDED_HOOK here stops a superseded unit's discount programs in the
+ * supersede transaction (catalog resolves the hook with ModuleRef, strict: false).
  */
 @Module({
   imports: [IdentityModule, CatalogModule],
@@ -38,6 +41,11 @@ export class PricingModule {}
 /** The HTTP side of pricing (api only). */
 @Module({
   imports: [PricingModule],
-  controllers: [UnitPricesController, DiscountProgramsController, PricingController],
+  controllers: [
+    ProductPricesController,
+    PriceProfilesController,
+    DiscountProgramsController,
+    PricingController,
+  ],
 })
 export class PricingHttpModule {}

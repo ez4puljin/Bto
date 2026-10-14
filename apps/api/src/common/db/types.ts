@@ -47,6 +47,8 @@ export const factor = decimalColumn(18, 6);
 export const weight = decimalColumn(12, 4);
 /** Latitudes and longitudes in degrees, NUMERIC(9,6) (about 10 cm; @tugeel/shared/geo). */
 export const coordinate = decimalColumn(9, 6);
+/** Percentages up to 999.99, NUMERIC(5,2) (a price profile's markups, ADR-0048). */
+export const percent = decimalColumn(5, 2);
 
 /**
  * JSONB that round-trips every JSON value. Drizzle's own jsonb() runs JSON.parse a second time on

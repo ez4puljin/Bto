@@ -5,8 +5,7 @@ import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
 import { ADJUSTMENT_REASON_CODES } from './inventory';
-import { PRICE_BASES } from './pricing/cart';
-import { PRICE_ROUNDINGS } from './pricing/profile';
+import { PRICE_BASES, PRICE_ROUNDINGS } from './pricing';
 import { SETTING_KEYS } from './settings';
 
 function lookup(path: string): unknown {

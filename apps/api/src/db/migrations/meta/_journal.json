@@ -134,6 +134,13 @@
       "when": 1791947922126,
       "tag": "0018_transfer_reopen",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791961756206,
+      "tag": "0019_price_profiles",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 /**
- * The views of schema `ai` (migration 0017_ai) the assistant may query, in the order of their columns
+ * The views of schema `ai` (migrations 0017_ai, 0019_price_profiles) the assistant may query, in the order of their columns
  * (ADR-0045 #2). The prompt describes them to the model, the SQL guard accepts only these relations,
  * and the view tests check that the database matches, column by column. Descriptions are English for
  * the model; Mongolian names for screens live in mn.json `ai.datasets`.
@@ -311,33 +311,70 @@ export const AI_DATASETS: readonly AiDataset[] = [
     ],
   },
   {
-    name: 'prices_today',
+    name: 'price_profiles',
     description:
-      "Today's selling price of every current unit in both lists: WHOLESALE (every customer) and RETAIL (the supermarket). Whole MNT including VAT. A unit without a price today has no row.",
+      "Price profiles: named rules that derive a product's prices from its warehouse price, one row per version (values valid from valid_from up to, not including, valid_to; NULL = open).",
     columns: [
-      col('list', 'text', "'WHOLESALE' or 'RETAIL'"),
-      ...PRODUCT,
-      col('product_unit_id', 'bigint'),
-      col('unit_name', 'text'),
-      col('factor_to_base', 'numeric'),
-      col('is_base', 'boolean'),
-      col('price', 'numeric', 'price of one unit'),
-      col('price_source', 'text', "'UNIT' (its own price) or 'DERIVED' (base price × factor)"),
-      col('valid_from', 'date', 'start of its own price'),
-      col('valid_to', 'date', 'end of its own price (exclusive); NULL = open'),
+      col('profile_id', 'bigint'),
+      col('name', 'text'),
+      col('archived', 'boolean', 'archived profiles cannot be chosen any more'),
+      col('version_id', 'bigint'),
+      col(
+        'loose_markup_pct',
+        'numeric',
+        '% added for pieces that do not fill a whole pack (wholesale)',
+      ),
+      col('retail_markup_pct', 'numeric', '% added at the supermarket'),
+      col(
+        'retail_bulk_min_qty',
+        'numeric',
+        'supermarket bulk price from this many base units of a product; NULL = none',
+      ),
+      col('retail_bulk_markup_pct', 'numeric', '% added for the supermarket bulk price'),
+      col(
+        'rounding',
+        'text',
+        "'WHOLE' (whole tugriks), 'UP_10', 'UP_50' or 'UP_100' (up to a multiple)",
+      ),
+      col('valid_from', 'date'),
+      col('valid_to', 'date', 'end (exclusive); NULL = open'),
+      col('status', 'text', "'SCHEDULED', 'ACTIVE' or 'ENDED' as of today"),
+      col('products_today', 'integer', 'products priced with this profile today'),
     ],
   },
   {
-    name: 'price_history',
+    name: 'product_prices_today',
     description:
-      'Every price period of every unit: valid from valid_from up to (not including) valid_to; NULL valid_to = open.',
+      "Today's selling prices of every product that has them, whole MNT including VAT. Wholesale (every customer): whole packs pay warehouse_price per base unit (whole_unit_price per pack), the pieces that do not fill a pack pay loose_price. Supermarket: retail_price per base unit, or retail_bulk_price once a cart holds retail_bulk_min_qty base units of the product. A product without prices today has no row.",
+    columns: [
+      ...PRODUCT,
+      BASE_UNIT,
+      col('warehouse_price', 'numeric', 'the one entered price, per base unit'),
+      col('profile_id', 'bigint'),
+      col('profile_name', 'text', 'its price profile'),
+      col('whole_unit_name', 'text', 'the pack counted as whole (box, block…); NULL = no packs'),
+      col('whole_unit_factor', 'numeric', 'base units in the whole pack'),
+      col('whole_unit_price', 'numeric', 'price of one whole pack'),
+      col('loose_price', 'numeric', 'wholesale price of one loose base unit'),
+      col('retail_price', 'numeric', 'supermarket price of one base unit'),
+      col('retail_bulk_price', 'numeric', 'supermarket bulk price of one base unit; NULL = none'),
+      col('retail_bulk_min_qty', 'numeric', 'base units from which the bulk price applies'),
+      col('rounding', 'text'),
+      col('valid_from', 'date', 'start of the warehouse price in force'),
+      col('valid_to', 'date', 'its end (exclusive); NULL = open'),
+    ],
+  },
+  {
+    name: 'product_price_history',
+    description:
+      'Every warehouse-price period of every product with its profile: valid from valid_from up to (not including) valid_to; NULL valid_to = open.',
     columns: [
       col('id', 'bigint'),
-      col('list', 'text', "'WHOLESALE' or 'RETAIL'"),
       ...PRODUCT,
-      col('product_unit_id', 'bigint'),
-      col('unit_name', 'text'),
-      col('price', 'numeric'),
+      col('warehouse_price', 'numeric', 'per base unit'),
+      col('profile_id', 'bigint'),
+      col('profile_name', 'text'),
+      col('whole_unit_name', 'text'),
       col('valid_from', 'date'),
       col('valid_to', 'date'),
       col('created_at', 'timestamptz'),
@@ -351,7 +388,11 @@ export const AI_DATASETS: readonly AiDataset[] = [
     columns: [
       col('id', 'bigint'),
       col('name', 'text'),
-      col('list', 'text', "'WHOLESALE' or 'RETAIL'"),
+      col(
+        'list',
+        'text',
+        "the channel: 'WHOLESALE' (every customer) or 'RETAIL' (the supermarket)",
+      ),
       col('scope', 'text', "'PRODUCT', 'CATEGORY' or 'ORDER'"),
       col('measure', 'text', "'QTY' (a quantity) or 'AMOUNT' (MNT) — what the steps count"),
       col('effect', 'text', "'PRICE' (new unit price), 'PERCENT' (% off) or 'AMOUNT' (MNT off)"),

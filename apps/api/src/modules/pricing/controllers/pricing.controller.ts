@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -23,77 +24,179 @@ import {
   RequirePermission,
 } from '../../identity';
 import {
-  CurrentPriceDto,
-  CurrentPricesQueryDto,
+  CreatePriceProfileDto,
+  PriceProfileDto,
+  PriceProfilePageDto,
+  PriceProfileQueryDto,
+  PriceProfileVersionInputDto,
+  RenamePriceProfileDto,
+} from '../dto/price-profiles.dto';
+import {
   DiscountProgramDto,
   DiscountProgramInputDto,
   DiscountProgramPageDto,
   DiscountProgramQueryDto,
   PricingAttentionDto,
-  ProductPricesDto,
-  ProductPricesQueryDto,
   QuoteDto,
   QuoteRequestDto,
   SaleReadyRequestDto,
   SaleReadyResultDto,
-  SetPricesDto,
 } from '../dto/pricing.dto';
+import {
+  CurrentPricesQueryDto,
+  CurrentTermsDto,
+  ProductPricesQueryDto,
+  ProductPriceViewDto,
+  SetPriceTermsDto,
+} from '../dto/product-prices.dto';
 import { DiscountProgramsService } from '../services/discount-programs.service';
+import { PriceProfilesService } from '../services/price-profiles.service';
 import { PriceQuoteService } from '../services/price-quote.service';
+import { ProductPricesService } from '../services/product-prices.service';
 import { SaleReadinessService } from '../services/sale-readiness.service';
-import { UnitPricesService } from '../services/unit-prices.service';
-import { toProductPricesDto, toProgramDto, toProgramInput, toQuoteDto } from './mappers';
+import {
+  toPriceProfileDto,
+  toProductPriceViewDto,
+  toProgramDto,
+  toProgramInput,
+  toQuoteDto,
+  toValuesInput,
+} from './mappers';
 
 const MANAGE = 'pricing.manage';
-/** The price clerk (ADR-0044): unit prices and completing registered products. */
+/** The price clerk (ADR-0044, ADR-0048): price terms and completing registered products. */
 const PRICES = 'pricing.prices.manage';
 
-/** Unit prices (ADR-0041 #1): every signed-in user reads them; pricing.prices.manage sets them. */
+/**
+ * A product's price terms (ADR-0048 #2): every signed-in user reads them; the price clerk
+ * (pricing.prices.manage) sets the warehouse price, the profile and the whole unit.
+ */
 @ApiTags('pricing')
-@Controller('unit-prices')
-export class UnitPricesController {
-  constructor(private readonly prices: UnitPricesService) {}
+@Controller('product-prices')
+export class ProductPricesController {
+  constructor(private readonly prices: ProductPricesService) {}
 
   @Get()
   @Authenticated()
-  @ApiOkResponse({ type: ProductPricesDto })
-  async view(@Query() query: ProductPricesQueryDto): Promise<ProductPricesDto> {
-    return toProductPricesDto(await this.prices.view(query.productId));
+  @ApiOkResponse({ type: ProductPriceViewDto })
+  async view(@Query() query: ProductPricesQueryDto): Promise<ProductPriceViewDto> {
+    return toProductPriceViewDto(await this.prices.view(query.productId));
   }
 
-  /** Base unit prices of many products, for list columns (ADR-0037). */
+  /** Today's terms of many products, for list columns (ADR-0037). */
   @Get('current')
   @Authenticated()
-  @ApiOkResponse({ type: [CurrentPriceDto] })
-  async current(@Query() query: CurrentPricesQueryDto): Promise<CurrentPriceDto[]> {
+  @ApiOkResponse({ type: [CurrentTermsDto] })
+  async current(@Query() query: CurrentPricesQueryDto): Promise<CurrentTermsDto[]> {
     return (await this.prices.currentOf(query.productIds)).map((row) => ({
       productId: row.productId,
-      list: row.list,
-      productUnitId: row.productUnitId,
-      price: row.price.toFixed(0),
+      warehousePrice: row.warehousePrice.toFixed(0),
+      profileId: row.profileId,
+      profileName: row.profileName,
+      wholeUomId: row.wholeUomId,
     }));
   }
 
-  /** Idempotent: a retried change must not close the price it just inserted. */
+  /** Idempotent: a retried change must not close the terms it just inserted. */
   @Post()
   @RequirePermission(PRICES)
   @Idempotent()
   @HttpCode(200)
-  @ApiOkResponse({ type: ProductPricesDto })
+  @ApiOkResponse({ type: ProductPriceViewDto })
   async set(
     @CurrentUser() ctx: AuthContext,
-    @Body() body: SetPricesDto,
-  ): Promise<ProductPricesDto> {
-    const prices = await this.prices.set(ctx, {
+    @Body() body: SetPriceTermsDto,
+  ): Promise<ProductPriceViewDto> {
+    const view = await this.prices.set(ctx, {
       productId: body.productId,
       validFrom: body.validFrom,
-      entries: body.entries.map((entry) => ({
-        list: entry.list,
-        productUnitId: entry.productUnitId,
-        price: entry.price === null ? null : new Decimal(entry.price),
-      })),
+      warehousePrice: new Decimal(body.warehousePrice),
+      profileId: body.profileId,
+      wholeUomId: body.wholeUomId ?? null,
     });
-    return toProductPricesDto(prices);
+    return toProductPriceViewDto(view);
+  }
+}
+
+/**
+ * Price profiles (ADR-0048 #1): every signed-in user reads them (the price dialog chooses one);
+ * pricing.manage creates, changes, renames and archives them.
+ */
+@ApiTags('pricing')
+@Controller('price-profiles')
+export class PriceProfilesController {
+  constructor(private readonly profiles: PriceProfilesService) {}
+
+  @Get()
+  @Authenticated()
+  @ApiOkResponse({ type: PriceProfilePageDto })
+  async list(@Query() query: PriceProfileQueryDto): Promise<PriceProfilePageDto> {
+    const page = await this.profiles.list(query);
+    return { data: page.data.map(toPriceProfileDto), nextCursor: page.nextCursor };
+  }
+
+  @Get(':id')
+  @Authenticated()
+  @ApiOkResponse({ type: PriceProfileDto })
+  async get(@Param('id', ParseIntPipe) id: number): Promise<PriceProfileDto> {
+    return toPriceProfileDto(await this.profiles.get(id));
+  }
+
+  @Post()
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @ApiCreatedResponse({ type: PriceProfileDto })
+  async create(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: CreatePriceProfileDto,
+  ): Promise<PriceProfileDto> {
+    const profile = await this.profiles.create(ctx, {
+      name: body.name,
+      validFrom: body.validFrom,
+      values: toValuesInput(body),
+    });
+    return toPriceProfileDto(profile);
+  }
+
+  /** New values from a day on (today or later); idempotent like every dated change. */
+  @Post(':id/versions')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: PriceProfileDto })
+  async setVersion(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: PriceProfileVersionInputDto,
+  ): Promise<PriceProfileDto> {
+    const profile = await this.profiles.setVersion(ctx, id, {
+      validFrom: body.validFrom,
+      values: toValuesInput(body),
+    });
+    return toPriceProfileDto(profile);
+  }
+
+  @Patch(':id')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: PriceProfileDto })
+  async rename(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: RenamePriceProfileDto,
+  ): Promise<PriceProfileDto> {
+    return toPriceProfileDto(await this.profiles.rename(ctx, id, body.name));
+  }
+
+  /** Refused while products use the profile today or later (PRICE_PROFILE_IN_USE). */
+  @Post(':id/archive')
+  @RequirePermission(MANAGE)
+  @HttpCode(200)
+  @ApiOkResponse({ type: PriceProfileDto })
+  async archive(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<PriceProfileDto> {
+    return toPriceProfileDto(await this.profiles.archive(ctx, id));
   }
 }
 
@@ -165,7 +268,7 @@ export class DiscountProgramsController {
   }
 }
 
-/** Quotes (ADR-0041 #3): prices a cart as an order would be priced, for every signed-in user. */
+/** Quotes (ADR-0041 #3, ADR-0048 #4): prices a cart as an order would be, for every user. */
 @ApiTags('pricing')
 @Controller('pricing')
 export class PricingController {
@@ -185,7 +288,7 @@ export class PricingController {
     };
   }
 
-  /** Completes registered products whose base unit has both prices today (ADR-0044 #3). */
+  /** Completes registered products priced today (ADR-0044 #3, ADR-0048 #5). */
   @Post('sale-ready')
   @RequirePermission(PRICES)
   @Idempotent()

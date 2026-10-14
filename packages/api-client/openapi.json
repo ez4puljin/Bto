@@ -8850,9 +8850,9 @@
         ]
       }
     },
-    "/api/v1/unit-prices": {
+    "/api/v1/product-prices": {
       "get": {
-        "operationId": "UnitPrices_view",
+        "operationId": "ProductPrices_view",
         "parameters": [
           {
             "name": "productId",
@@ -8870,7 +8870,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProductPrices"
+                  "$ref": "#/components/schemas/ProductPriceView"
                 }
               }
             }
@@ -8896,7 +8896,7 @@
         ]
       },
       "post": {
-        "operationId": "UnitPrices_set",
+        "operationId": "ProductPrices_set",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -8913,7 +8913,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetPricesRequest"
+                "$ref": "#/components/schemas/SetPriceTermsRequest"
               }
             }
           }
@@ -8924,7 +8924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProductPrices"
+                  "$ref": "#/components/schemas/ProductPriceView"
                 }
               }
             }
@@ -8945,15 +8945,15 @@
             "bearer": []
           }
         ],
-        "summary": "Idempotent: a retried change must not close the price it just inserted.",
+        "summary": "Idempotent: a retried change must not close the terms it just inserted.",
         "tags": [
           "pricing"
         ]
       }
     },
-    "/api/v1/unit-prices/current": {
+    "/api/v1/product-prices/current": {
       "get": {
-        "operationId": "UnitPrices_current",
+        "operationId": "ProductPrices_current",
         "parameters": [
           {
             "name": "productIds",
@@ -8979,7 +8979,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CurrentPrice"
+                    "$ref": "#/components/schemas/CurrentTerms"
                   }
                 }
               }
@@ -9001,7 +9001,336 @@
             "bearer": []
           }
         ],
-        "summary": "Base unit prices of many products, for list columns (ADR-0037).",
+        "summary": "Today's terms of many products, for list columns (ADR-0037).",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/price-profiles": {
+      "get": {
+        "operationId": "PriceProfiles_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "true: archived profiles; default live ones",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfilePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "post": {
+        "operationId": "PriceProfiles_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/price-profiles/{id}": {
+      "get": {
+        "operationId": "PriceProfiles_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "PriceProfiles_rename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenamePriceProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/price-profiles/{id}/versions": {
+      "post": {
+        "operationId": "PriceProfiles_setVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceProfileVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "New values from a day on (today or later); idempotent like every dated change.",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/price-profiles/{id}/archive": {
+      "post": {
+        "operationId": "PriceProfiles_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refused while products use the profile today or later (PRICE_PROFILE_IN_USE).",
         "tags": [
           "pricing"
         ]
@@ -9434,7 +9763,7 @@
             "bearer": []
           }
         ],
-        "summary": "Completes registered products whose base unit has both prices today (ADR-0044 #3).",
+        "summary": "Completes registered products priced today (ADR-0044 #3, ADR-0048 #5).",
         "tags": [
           "pricing"
         ]
@@ -17321,20 +17650,65 @@
           "fileName"
         ]
       },
-      "PricePeriod": {
+      "PricedUnit": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomId": {
+            "type": "number"
+          },
+          "uomCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "BOX"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string",
+            "example": "20"
+          },
+          "isBase": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "uomId",
+          "uomCode",
+          "uomName",
+          "factorToBase",
+          "isBase"
+        ]
+      },
+      "PriceTerms": {
         "type": "object",
         "properties": {
           "id": {
             "type": "number"
           },
-          "price": {
+          "warehousePrice": {
             "type": "string",
-            "example": "22800",
-            "description": "Whole MNT, VAT included"
+            "example": "1000",
+            "description": "Per base unit, whole MNT, VAT included"
+          },
+          "profileId": {
+            "type": "number"
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "wholeUomId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The unit of measure counted as a whole pack; null without packs"
           },
           "validFrom": {
             "type": "string",
-            "example": "2026-10-13"
+            "example": "2026-10-14"
           },
           "validTo": {
             "type": "string",
@@ -17344,93 +17718,121 @@
         },
         "required": [
           "id",
-          "price",
+          "warehousePrice",
+          "profileId",
+          "profileName",
+          "wholeUomId",
           "validFrom",
           "validTo"
         ]
       },
-      "CurrentUnitPrice": {
+      "PriceProfileValues": {
         "type": "object",
         "properties": {
-          "price": {
+          "looseMarkupPct": {
             "type": "string",
-            "example": "22800"
+            "example": "15.00"
           },
-          "source": {
-            "enum": [
-              "UNIT",
-              "DERIVED"
-            ],
+          "retailMarkupPct": {
             "type": "string",
-            "description": "UNIT: the unit's own price; DERIVED: the base unit's price × factor"
+            "example": "30.00"
           },
-          "period": {
+          "retailBulkMinQty": {
+            "type": "string",
             "nullable": true,
+            "example": "24"
+          },
+          "retailBulkMarkupPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "20.00"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "looseMarkupPct",
+          "retailMarkupPct",
+          "retailBulkMinQty",
+          "retailBulkMarkupPct",
+          "rounding"
+        ]
+      },
+      "ProductPriceProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "values": {
+            "nullable": true,
+            "description": "In force today",
             "type": "object",
             "allOf": [
               {
-                "$ref": "#/components/schemas/PricePeriod"
+                "$ref": "#/components/schemas/PriceProfileValues"
               }
             ]
           }
         },
         "required": [
-          "price",
-          "source",
-          "period"
+          "id",
+          "name",
+          "archived",
+          "values"
         ]
       },
-      "UnitPriceView": {
+      "UnitPriceRow": {
         "type": "object",
         "properties": {
           "productUnitId": {
             "type": "number"
           },
-          "uomName": {
+          "wholesale": {
+            "type": "string",
+            "example": "20000",
+            "description": "One unit, wholesale, split as a quote splits it"
+          },
+          "wholesaleBasis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "MIXED"
+            ],
             "type": "string"
           },
-          "factorToBase": {
+          "retail": {
             "type": "string",
-            "example": "24"
+            "example": "26000"
           },
-          "isBase": {
-            "type": "boolean"
-          },
-          "current": {
+          "retailBulk": {
+            "type": "string",
             "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CurrentUnitPrice"
-              }
-            ]
-          },
-          "scheduled": {
-            "description": "Starting after today, earliest first",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PricePeriod"
-            }
-          },
-          "history": {
-            "description": "Ended, latest first",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PricePeriod"
-            }
+            "example": "24000"
           }
         },
         "required": [
           "productUnitId",
-          "uomName",
-          "factorToBase",
-          "isBase",
-          "current",
-          "scheduled",
-          "history"
+          "wholesale",
+          "wholesaleBasis",
+          "retail",
+          "retailBulk"
         ]
       },
-      "ProductPrices": {
+      "ProductPriceView": {
         "type": "object",
         "properties": {
           "productId": {
@@ -17440,85 +17842,112 @@
             "type": "string",
             "description": "The Ulaanbaatar business date the view is for"
           },
-          "wholesale": {
-            "description": "Every channel but the supermarket",
+          "units": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/UnitPriceView"
+              "$ref": "#/components/schemas/PricedUnit"
             }
           },
-          "retail": {
-            "description": "The supermarket",
+          "current": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PriceTerms"
+              }
+            ]
+          },
+          "profile": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductPriceProfile"
+              }
+            ]
+          },
+          "wholeUnitId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The current unit counted as whole"
+          },
+          "problems": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/UnitPriceView"
+              "type": "string",
+              "enum": [
+                "NO_TERMS",
+                "NO_PROFILE_VERSION",
+                "NOT_CHOSEN",
+                "GONE"
+              ]
+            }
+          },
+          "table": {
+            "description": "Empty when the product cannot be priced",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitPriceRow"
+            }
+          },
+          "scheduled": {
+            "description": "Starting after today, earliest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceTerms"
+            }
+          },
+          "history": {
+            "description": "Ended, latest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceTerms"
             }
           }
         },
         "required": [
           "productId",
           "today",
-          "wholesale",
-          "retail"
+          "units",
+          "current",
+          "profile",
+          "wholeUnitId",
+          "problems",
+          "table",
+          "scheduled",
+          "history"
         ]
       },
-      "CurrentPrice": {
+      "CurrentTerms": {
         "type": "object",
         "properties": {
           "productId": {
             "type": "number"
           },
-          "list": {
-            "enum": [
-              "WHOLESALE",
-              "RETAIL"
-            ],
-            "type": "string"
-          },
-          "productUnitId": {
-            "type": "number",
-            "description": "The base unit"
-          },
-          "price": {
+          "warehousePrice": {
             "type": "string",
             "example": "1000"
+          },
+          "profileId": {
+            "type": "number"
+          },
+          "profileName": {
+            "type": "string"
+          },
+          "wholeUomId": {
+            "type": "number",
+            "nullable": true
           }
         },
         "required": [
           "productId",
-          "list",
-          "productUnitId",
-          "price"
+          "warehousePrice",
+          "profileId",
+          "profileName",
+          "wholeUomId"
         ]
       },
-      "PriceEntryRequest": {
-        "type": "object",
-        "properties": {
-          "list": {
-            "enum": [
-              "WHOLESALE",
-              "RETAIL"
-            ],
-            "type": "string"
-          },
-          "productUnitId": {
-            "type": "number",
-            "minimum": 1
-          },
-          "price": {
-            "type": "string",
-            "nullable": true,
-            "example": "22800",
-            "description": "Whole MNT; null takes the unit back to its base unit's price × factor"
-          }
-        },
-        "required": [
-          "list",
-          "productUnitId",
-          "price"
-        ]
-      },
-      "SetPricesRequest": {
+      "SetPriceTermsRequest": {
         "type": "object",
         "properties": {
           "productId": {
@@ -17527,22 +17956,275 @@
           },
           "validFrom": {
             "type": "string",
-            "example": "2026-10-13",
+            "example": "2026-10-14",
             "description": "Today or later (Ulaanbaatar)"
           },
-          "entries": {
-            "minItems": 1,
-            "maxItems": 20,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PriceEntryRequest"
-            }
+          "warehousePrice": {
+            "type": "string",
+            "example": "1000",
+            "description": "Per base unit, whole MNT, VAT included"
+          },
+          "profileId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "wholeUomId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The unit of measure counted as whole; required when the product has packs"
           }
         },
         "required": [
           "productId",
           "validFrom",
-          "entries"
+          "warehousePrice",
+          "profileId"
+        ]
+      },
+      "PriceProfileVersion": {
+        "type": "object",
+        "properties": {
+          "looseMarkupPct": {
+            "type": "string",
+            "example": "15.00"
+          },
+          "retailMarkupPct": {
+            "type": "string",
+            "example": "30.00"
+          },
+          "retailBulkMinQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24"
+          },
+          "retailBulkMarkupPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "20.00"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-14"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          }
+        },
+        "required": [
+          "looseMarkupPct",
+          "retailMarkupPct",
+          "retailBulkMinQty",
+          "retailBulkMarkupPct",
+          "rounding",
+          "id",
+          "validFrom",
+          "validTo"
+        ]
+      },
+      "PriceProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "current": {
+            "nullable": true,
+            "description": "In force today; null when the first values start later",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PriceProfileVersion"
+              }
+            ]
+          },
+          "scheduled": {
+            "description": "Starting after today, earliest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceProfileVersion"
+            }
+          },
+          "history": {
+            "description": "Ended, latest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceProfileVersion"
+            }
+          },
+          "productsToday": {
+            "type": "number",
+            "description": "Products whose price terms in force today use the profile"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "archivedAt",
+          "current",
+          "scheduled",
+          "history",
+          "productsToday",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PriceProfilePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceProfile"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PriceProfileRequest": {
+        "type": "object",
+        "properties": {
+          "looseMarkupPct": {
+            "type": "string",
+            "example": "15",
+            "description": "Loose pieces: % added to the warehouse price"
+          },
+          "retailMarkupPct": {
+            "type": "string",
+            "example": "30",
+            "description": "Supermarket: % added to the warehouse price"
+          },
+          "retailBulkMinQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24",
+            "description": "Supermarket bulk price from this many base units of a product in the cart"
+          },
+          "retailBulkMarkupPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "20",
+            "description": "Supermarket bulk: % added to the warehouse price; below the supermarket %"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-14",
+            "description": "The first values start this day"
+          }
+        },
+        "required": [
+          "looseMarkupPct",
+          "retailMarkupPct",
+          "rounding",
+          "name",
+          "validFrom"
+        ]
+      },
+      "PriceProfileVersionRequest": {
+        "type": "object",
+        "properties": {
+          "looseMarkupPct": {
+            "type": "string",
+            "example": "15",
+            "description": "Loose pieces: % added to the warehouse price"
+          },
+          "retailMarkupPct": {
+            "type": "string",
+            "example": "30",
+            "description": "Supermarket: % added to the warehouse price"
+          },
+          "retailBulkMinQty": {
+            "type": "string",
+            "nullable": true,
+            "example": "24",
+            "description": "Supermarket bulk price from this many base units of a product in the cart"
+          },
+          "retailBulkMarkupPct": {
+            "type": "string",
+            "nullable": true,
+            "example": "20",
+            "description": "Supermarket bulk: % added to the warehouse price; below the supermarket %"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100"
+            ],
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-15",
+            "description": "Today or later (Ulaanbaatar)"
+          }
+        },
+        "required": [
+          "looseMarkupPct",
+          "retailMarkupPct",
+          "rounding",
+          "validFrom"
+        ]
+      },
+      "RenamePriceProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "ProgramProduct": {
@@ -17972,7 +18654,7 @@
           "amount": {
             "type": "string",
             "nullable": true,
-            "description": "Tugriks a category or order program took off the line"
+            "description": "Tugriks a category or order program took off the part"
           }
         },
         "required": [
@@ -17983,6 +18665,74 @@
           "threshold",
           "value",
           "amount"
+        ]
+      },
+      "QuotePart": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "description": "The unit the part is counted in"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "20"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "basis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "RETAIL",
+              "RETAIL_BULK"
+            ],
+            "type": "string"
+          },
+          "listPrice": {
+            "type": "string",
+            "description": "The basis' price of one unit"
+          },
+          "unitPrice": {
+            "type": "string",
+            "description": "After the product’s own discounts"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "discountAmount": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedDiscount"
+            }
+          }
+        },
+        "required": [
+          "productUnitId",
+          "uomName",
+          "factorSnapshot",
+          "qty",
+          "qtyBase",
+          "basis",
+          "listPrice",
+          "unitPrice",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "applied"
         ]
       },
       "QuoteLine": {
@@ -18010,26 +18760,17 @@
             ],
             "type": "string"
           },
-          "listPrice": {
-            "type": "string",
-            "nullable": true
-          },
-          "priceSource": {
-            "nullable": true,
-            "enum": [
-              "UNIT",
-              "DERIVED"
-            ],
-            "type": "string"
-          },
-          "unitPrice": {
-            "type": "string",
-            "nullable": true,
-            "description": "After the product’s own discounts"
+          "parts": {
+            "description": "Empty when the line is not priced",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuotePart"
+            }
           },
           "subtotal": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Sums of the parts"
           },
           "discountAmount": {
             "type": "string",
@@ -18038,12 +18779,6 @@
           "total": {
             "type": "string",
             "nullable": true
-          },
-          "applied": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AppliedDiscount"
-            }
           }
         },
         "required": [
@@ -18053,13 +18788,10 @@
           "qtyBase",
           "priced",
           "problem",
-          "listPrice",
-          "priceSource",
-          "unitPrice",
+          "parts",
           "subtotal",
           "discountAmount",
-          "total",
-          "applied"
+          "total"
         ]
       },
       "Quote": {
@@ -18546,6 +19278,8 @@
           "IMPORT_REVERT_BLOCKED",
           "DISCOUNT_PROGRAM_STARTED",
           "DISCOUNT_PROGRAM_OVERLAP",
+          "PRICE_PROFILE_ARCHIVED",
+          "PRICE_PROFILE_IN_USE",
           "AI_NOT_CONFIGURED",
           "AI_PROVIDER_FAILED",
           "AI_QUERY_FAILED",

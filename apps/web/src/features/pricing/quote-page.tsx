@@ -6,6 +6,7 @@ import { ListCard, RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,7 @@ import { ProductSearch } from '@/features/inventory/shared';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type PriceList, type Quote, type QuoteLine, useQuote } from './api';
+import { type PriceList, type Quote, type QuotePart, useQuote } from './api';
 import { useProgramText } from './program-text';
 
 interface CartLine {
@@ -36,8 +37,9 @@ interface CartLine {
 }
 
 /**
- * «Үнэ» → «Үнэ тооцоолох» (ADR-0041 #3): a test cart priced as an order would be, with every
- * discount that applies and why. Nothing is stored; orders use the same quote at SUBMIT.
+ * «Үнэ» → «Үнэ тооцоолох» (ADR-0041 #3, ADR-0048 #4): a test cart priced as an order would be —
+ * whole packs and loose pieces apart, or the supermarket's prices — with every discount that
+ * applies and why. Nothing is stored; orders use the same quote at SUBMIT.
  */
 export function PriceQuotePage() {
   const { t } = useTranslation();
@@ -221,10 +223,9 @@ function UnitSelect(props: { line: CartLine; onChange: (unitId: number) => void 
 function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
   const { t } = useTranslation();
   const text = useProgramText();
-  const money = (value: string | null) =>
-    value === null ? '' : t('pricing.money', { amount: formatMnt(value) });
-  const applied = (line: QuoteLine) =>
-    line.applied.map((entry) => {
+  const money = (value: string) => t('pricing.money', { amount: formatMnt(value) });
+  const applied = (part: QuotePart) =>
+    part.applied.map((entry) => {
       const value = text.value(entry.effect, entry.value);
       return entry.amount === null
         ? t('pricing.quote.applied', { name: entry.name, value })
@@ -242,6 +243,7 @@ function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
           <TableRow>
             <TableHead>{t('pricing.quote.columns.product')}</TableHead>
             <TableHead className="text-right">{t('pricing.quote.columns.qty')}</TableHead>
+            <TableHead>{t('pricing.quote.columns.basis')}</TableHead>
             <TableHead className="text-right">{t('pricing.quote.columns.listPrice')}</TableHead>
             <TableHead className="text-right">{t('pricing.quote.columns.unitPrice')}</TableHead>
             <TableHead className="text-right">{t('pricing.quote.columns.subtotal')}</TableHead>
@@ -250,43 +252,57 @@ function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {result.lines.map((line, index) => (
-            <TableRow key={lines[index]?.key ?? index}>
-              <TableCell className="align-top whitespace-normal">
-                <div className="font-medium">{lines[index]?.name}</div>
-                {line.priced ? (
+          {result.lines.flatMap((line, index) => {
+            const name = lines[index]?.name;
+            const key = lines[index]?.key ?? String(index);
+            if (!line.priced) {
+              return [
+                <TableRow key={key}>
+                  <TableCell className="align-top whitespace-normal">
+                    <div className="font-medium">{name}</div>
+                    <span className="text-xs text-destructive">{t('pricing.quote.missing')}</span>
+                  </TableCell>
+                  <TableCell className="text-right align-top font-mono">
+                    {plainDecimal(line.qty)}
+                  </TableCell>
+                  <TableCell colSpan={6} />
+                </TableRow>,
+              ];
+            }
+            return line.parts.map((part, at) => (
+              <TableRow key={`${key}:${at}`}>
+                <TableCell className="align-top whitespace-normal">
+                  {at === 0 ? <div className="font-medium">{name}</div> : null}
                   <ul className="text-xs text-muted-foreground">
-                    {applied(line).map((entry) => (
+                    {applied(part).map((entry) => (
                       <li key={entry}>{entry}</li>
                     ))}
                   </ul>
-                ) : (
-                  <span className="text-xs text-destructive">{t('pricing.quote.missing')}</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono">
-                {plainDecimal(line.qty)}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono">
-                {money(line.listPrice)}
-                {line.priceSource === 'DERIVED' ? (
-                  <div className="text-xs text-muted-foreground">{t('pricing.quote.derived')}</div>
-                ) : null}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono">
-                {money(line.unitPrice)}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono">
-                {money(line.subtotal)}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono">
-                {money(line.discountAmount)}
-              </TableCell>
-              <TableCell className="text-right align-top font-mono font-medium">
-                {money(line.total)}
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+                <TableCell className="text-right align-top font-mono">
+                  {t('pricing.quote.partQty', { qty: plainDecimal(part.qty), unit: part.uomName })}
+                </TableCell>
+                <TableCell className="align-top">
+                  <Badge variant="outline">{t(`pricing.bases.${part.basis}`)}</Badge>
+                </TableCell>
+                <TableCell className="text-right align-top font-mono">
+                  {money(part.listPrice)}
+                </TableCell>
+                <TableCell className="text-right align-top font-mono">
+                  {money(part.unitPrice)}
+                </TableCell>
+                <TableCell className="text-right align-top font-mono">
+                  {money(part.subtotal)}
+                </TableCell>
+                <TableCell className="text-right align-top font-mono">
+                  {money(part.discountAmount)}
+                </TableCell>
+                <TableCell className="text-right align-top font-mono font-medium">
+                  {money(part.total)}
+                </TableCell>
+              </TableRow>
+            ));
+          })}
         </TableBody>
       </Table>
       <p className="border-t border-border/80 px-4 py-3 text-right font-medium">

@@ -2094,34 +2094,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/unit-prices": {
+    "/api/v1/product-prices": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["UnitPrices_view"];
+        get: operations["ProductPrices_view"];
         put?: never;
-        /** Idempotent: a retried change must not close the price it just inserted. */
-        post: operations["UnitPrices_set"];
+        /** Idempotent: a retried change must not close the terms it just inserted. */
+        post: operations["ProductPrices_set"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/unit-prices/current": {
+    "/api/v1/product-prices/current": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Base unit prices of many products, for list columns (ADR-0037). */
-        get: operations["UnitPrices_current"];
+        /** Today's terms of many products, for list columns (ADR-0037). */
+        get: operations["ProductPrices_current"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PriceProfiles_list"];
+        put?: never;
+        post: operations["PriceProfiles_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-profiles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PriceProfiles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PriceProfiles_rename"];
+        trace?: never;
+    };
+    "/api/v1/price-profiles/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New values from a day on (today or later); idempotent like every dated change. */
+        post: operations["PriceProfiles_setVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-profiles/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refused while products use the profile today or later (PRICE_PROFILE_IN_USE). */
+        post: operations["PriceProfiles_archive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2204,7 +2270,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Completes registered products whose base unit has both prices today (ADR-0044 #3). */
+        /** Completes registered products priced today (ADR-0044 #3, ADR-0048 #5). */
         post: operations["Pricing_saleReady"];
         delete?: never;
         options?: never;
@@ -4515,76 +4581,204 @@ export interface components {
             /** @example Бараа.xlsx */
             fileName: string;
         };
-        PricePeriod: {
+        PricedUnit: {
+            productUnitId: number;
+            uomId: number;
+            /** @example BOX */
+            uomCode: string | null;
+            uomName: string;
+            /** @example 20 */
+            factorToBase: string;
+            isBase: boolean;
+        };
+        PriceTerms: {
             id: number;
             /**
-             * @description Whole MNT, VAT included
-             * @example 22800
+             * @description Per base unit, whole MNT, VAT included
+             * @example 1000
              */
-            price: string;
-            /** @example 2026-10-13 */
+            warehousePrice: string;
+            profileId: number;
+            profileName: string;
+            /** @description The unit of measure counted as a whole pack; null without packs */
+            wholeUomId: number | null;
+            /** @example 2026-10-14 */
             validFrom: string;
             /** @description Up to, not including */
             validTo: string | null;
         };
-        CurrentUnitPrice: {
-            /** @example 22800 */
-            price: string;
-            /**
-             * @description UNIT: the unit's own price; DERIVED: the base unit's price × factor
-             * @enum {string}
-             */
-            source: "UNIT" | "DERIVED";
-            period: components["schemas"]["PricePeriod"] | null;
-        };
-        UnitPriceView: {
-            productUnitId: number;
-            uomName: string;
+        PriceProfileValues: {
+            /** @example 15.00 */
+            looseMarkupPct: string;
+            /** @example 30.00 */
+            retailMarkupPct: string;
             /** @example 24 */
-            factorToBase: string;
-            isBase: boolean;
-            current: components["schemas"]["CurrentUnitPrice"] | null;
-            /** @description Starting after today, earliest first */
-            scheduled: components["schemas"]["PricePeriod"][];
-            /** @description Ended, latest first */
-            history: components["schemas"]["PricePeriod"][];
+            retailBulkMinQty: string | null;
+            /** @example 20.00 */
+            retailBulkMarkupPct: string | null;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
         };
-        ProductPrices: {
+        ProductPriceProfile: {
+            id: number;
+            name: string;
+            archived: boolean;
+            /** @description In force today */
+            values: components["schemas"]["PriceProfileValues"] | null;
+        };
+        UnitPriceRow: {
+            productUnitId: number;
+            /**
+             * @description One unit, wholesale, split as a quote splits it
+             * @example 20000
+             */
+            wholesale: string;
+            /** @enum {string} */
+            wholesaleBasis: "WAREHOUSE" | "LOOSE" | "MIXED";
+            /** @example 26000 */
+            retail: string;
+            /** @example 24000 */
+            retailBulk: string | null;
+        };
+        ProductPriceView: {
             productId: number;
             /** @description The Ulaanbaatar business date the view is for */
             today: string;
-            /** @description Every channel but the supermarket */
-            wholesale: components["schemas"]["UnitPriceView"][];
-            /** @description The supermarket */
-            retail: components["schemas"]["UnitPriceView"][];
+            units: components["schemas"]["PricedUnit"][];
+            current: components["schemas"]["PriceTerms"] | null;
+            profile: components["schemas"]["ProductPriceProfile"] | null;
+            /** @description The current unit counted as whole */
+            wholeUnitId: number | null;
+            problems: ("NO_TERMS" | "NO_PROFILE_VERSION" | "NOT_CHOSEN" | "GONE")[];
+            /** @description Empty when the product cannot be priced */
+            table: components["schemas"]["UnitPriceRow"][];
+            /** @description Starting after today, earliest first */
+            scheduled: components["schemas"]["PriceTerms"][];
+            /** @description Ended, latest first */
+            history: components["schemas"]["PriceTerms"][];
         };
-        CurrentPrice: {
+        CurrentTerms: {
             productId: number;
-            /** @enum {string} */
-            list: "WHOLESALE" | "RETAIL";
-            /** @description The base unit */
-            productUnitId: number;
             /** @example 1000 */
-            price: string;
+            warehousePrice: string;
+            profileId: number;
+            profileName: string;
+            wholeUomId: number | null;
         };
-        PriceEntryRequest: {
-            /** @enum {string} */
-            list: "WHOLESALE" | "RETAIL";
-            productUnitId: number;
-            /**
-             * @description Whole MNT; null takes the unit back to its base unit's price × factor
-             * @example 22800
-             */
-            price: string | null;
-        };
-        SetPricesRequest: {
+        SetPriceTermsRequest: {
             productId: number;
             /**
              * @description Today or later (Ulaanbaatar)
-             * @example 2026-10-13
+             * @example 2026-10-14
              */
             validFrom: string;
-            entries: components["schemas"]["PriceEntryRequest"][];
+            /**
+             * @description Per base unit, whole MNT, VAT included
+             * @example 1000
+             */
+            warehousePrice: string;
+            profileId: number;
+            /** @description The unit of measure counted as whole; required when the product has packs */
+            wholeUomId?: number | null;
+        };
+        PriceProfileVersion: {
+            /** @example 15.00 */
+            looseMarkupPct: string;
+            /** @example 30.00 */
+            retailMarkupPct: string;
+            /** @example 24 */
+            retailBulkMinQty: string | null;
+            /** @example 20.00 */
+            retailBulkMarkupPct: string | null;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            id: number;
+            /** @example 2026-10-14 */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+        };
+        PriceProfile: {
+            id: number;
+            name: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            /** @description In force today; null when the first values start later */
+            current: components["schemas"]["PriceProfileVersion"] | null;
+            /** @description Starting after today, earliest first */
+            scheduled: components["schemas"]["PriceProfileVersion"][];
+            /** @description Ended, latest first */
+            history: components["schemas"]["PriceProfileVersion"][];
+            /** @description Products whose price terms in force today use the profile */
+            productsToday: number;
+            createdAt: string;
+            updatedAt: string;
+        };
+        PriceProfilePage: {
+            data: components["schemas"]["PriceProfile"][];
+            nextCursor: string | null;
+        };
+        PriceProfileRequest: {
+            /**
+             * @description Loose pieces: % added to the warehouse price
+             * @example 15
+             */
+            looseMarkupPct: string;
+            /**
+             * @description Supermarket: % added to the warehouse price
+             * @example 30
+             */
+            retailMarkupPct: string;
+            /**
+             * @description Supermarket bulk price from this many base units of a product in the cart
+             * @example 24
+             */
+            retailBulkMinQty?: string | null;
+            /**
+             * @description Supermarket bulk: % added to the warehouse price; below the supermarket %
+             * @example 20
+             */
+            retailBulkMarkupPct?: string | null;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            name: string;
+            /**
+             * @description The first values start this day
+             * @example 2026-10-14
+             */
+            validFrom: string;
+        };
+        PriceProfileVersionRequest: {
+            /**
+             * @description Loose pieces: % added to the warehouse price
+             * @example 15
+             */
+            looseMarkupPct: string;
+            /**
+             * @description Supermarket: % added to the warehouse price
+             * @example 30
+             */
+            retailMarkupPct: string;
+            /**
+             * @description Supermarket bulk price from this many base units of a product in the cart
+             * @example 24
+             */
+            retailBulkMinQty?: string | null;
+            /**
+             * @description Supermarket bulk: % added to the warehouse price; below the supermarket %
+             * @example 20
+             */
+            retailBulkMarkupPct?: string | null;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100";
+            /**
+             * @description Today or later (Ulaanbaatar)
+             * @example 2026-10-15
+             */
+            validFrom: string;
+        };
+        RenamePriceProfileRequest: {
+            name: string;
         };
         ProgramProduct: {
             id: number;
@@ -4703,8 +4897,27 @@ export interface components {
             /** @description The step reached */
             threshold: string;
             value: string;
-            /** @description Tugriks a category or order program took off the line */
+            /** @description Tugriks a category or order program took off the part */
             amount: string | null;
+        };
+        QuotePart: {
+            /** @description The unit the part is counted in */
+            productUnitId: number;
+            uomName: string;
+            /** @example 20 */
+            factorSnapshot: string;
+            qty: string;
+            qtyBase: string;
+            /** @enum {string} */
+            basis: "WAREHOUSE" | "LOOSE" | "RETAIL" | "RETAIL_BULK";
+            /** @description The basis' price of one unit */
+            listPrice: string;
+            /** @description After the product’s own discounts */
+            unitPrice: string;
+            subtotal: string;
+            discountAmount: string;
+            total: string;
+            applied: components["schemas"]["AppliedDiscount"][];
         };
         QuoteLine: {
             productId: number;
@@ -4714,15 +4927,12 @@ export interface components {
             priced: boolean;
             /** @enum {string|null} */
             problem: "PRICE_MISSING" | null;
-            listPrice: string | null;
-            /** @enum {string|null} */
-            priceSource: "UNIT" | "DERIVED" | null;
-            /** @description After the product’s own discounts */
-            unitPrice: string | null;
+            /** @description Empty when the line is not priced */
+            parts: components["schemas"]["QuotePart"][];
+            /** @description Sums of the parts */
             subtotal: string | null;
             discountAmount: string | null;
             total: string | null;
-            applied: components["schemas"]["AppliedDiscount"][];
         };
         Quote: {
             /** @enum {string} */
@@ -4837,7 +5047,7 @@ export interface components {
             name: string;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -10273,7 +10483,7 @@ export interface operations {
             };
         };
     };
-    UnitPrices_view: {
+    ProductPrices_view: {
         parameters: {
             query: {
                 productId: number;
@@ -10289,7 +10499,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductPrices"];
+                    "application/json": components["schemas"]["ProductPriceView"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -10303,7 +10513,7 @@ export interface operations {
             };
         };
     };
-    UnitPrices_set: {
+    ProductPrices_set: {
         parameters: {
             query?: never;
             header: {
@@ -10315,7 +10525,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SetPricesRequest"];
+                "application/json": components["schemas"]["SetPriceTermsRequest"];
             };
         };
         responses: {
@@ -10324,7 +10534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductPrices"];
+                    "application/json": components["schemas"]["ProductPriceView"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -10338,7 +10548,7 @@ export interface operations {
             };
         };
     };
-    UnitPrices_current: {
+    ProductPrices_current: {
         parameters: {
             query: {
                 /** @description Repeated: productIds=1&productIds=2 */
@@ -10355,7 +10565,207 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CurrentPrice"][];
+                    "application/json": components["schemas"]["CurrentTerms"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description true: archived profiles; default live ones */
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfilePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceProfileRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_rename: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenamePriceProfileRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_setVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceProfileVersionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PriceProfiles_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceProfile"];
                 };
             };
             /** @description RFC 9457 problem details */

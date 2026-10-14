@@ -58,5 +58,11 @@ export {
   warehouseStock,
 } from '../modules/inventory/schema';
 export { importDocuments, importJobs, importRows } from '../modules/imports/schema';
-export { discountPrograms, discountSteps, unitPrices } from '../modules/pricing/schema';
+export {
+  discountPrograms,
+  discountSteps,
+  priceProfiles,
+  priceProfileVersions,
+  productPrices,
+} from '../modules/pricing/schema';
 export { aiConversations, aiQuestions, aiReports } from '../modules/ai/schema';

@@ -71,6 +71,9 @@ export const ERROR_HTTP_STATUS = {
   IMPORT_REVERT_BLOCKED: 409,
   DISCOUNT_PROGRAM_STARTED: 409,
   DISCOUNT_PROGRAM_OVERLAP: 409,
+  // pricing: an archived profile chosen; archiving a profile products still use (ADR-0048)
+  PRICE_PROFILE_ARCHIVED: 409,
+  PRICE_PROFILE_IN_USE: 409,
   // ai: no provider or read-only database; the provider failed; a stored query failed (ADR-0045)
   AI_NOT_CONFIGURED: 503,
   AI_PROVIDER_FAILED: 502,

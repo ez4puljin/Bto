@@ -215,7 +215,7 @@ const LIST_ROUTES = {
   'GET /api/v1/warehouses': () => list([WH]),
   'GET /api/v1/product-suppliers': () => list([]),
   'GET /api/v1/product-locations': () => list([]),
-  'GET /api/v1/unit-prices/current': () => json([]),
+  'GET /api/v1/product-prices/current': () => json([]),
 };
 const HIDDEN_COLUMNS_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
 const idsOf = (request: Request) => new URL(request.url).searchParams.getAll('productIds');
@@ -296,25 +296,27 @@ describe('products list', () => {
               maxQty: null,
             },
           ]),
-        'GET /api/v1/unit-prices/current': () =>
+        'GET /api/v1/product-prices/current': () =>
           json([
-            { productId: 1, list: 'RETAIL', productUnitId: 10, price: '1200' },
-            { productId: 1, list: 'WHOLESALE', productUnitId: 10, price: '990' },
+            {
+              productId: 1,
+              warehousePrice: '990',
+              profileId: 4,
+              profileName: 'Ундааны үнэ',
+              wholeUomId: 3,
+            },
           ]),
       }),
     );
     const table = await screen.findByRole('table');
     expect(await within(table).findByText('МСМ ХХК +1')).toBeInTheDocument();
     expect(await within(table).findByText('990₮')).toBeInTheDocument();
-    expect(within(table).getByText('1,200₮')).toBeInTheDocument();
     for (const text of [
+      'Ундааны үнэ',
       '1 хайрцаг = 24 ш',
       COLA_CODE,
       'BOX-1 (хайрцаг)',
-      mn.catalog.product.vatTypes.VAT_ABLE,
-      mn.catalog.product.cityTaxValues.no,
       '0.55',
-      '2211100',
       'Бөөний агуулах',
       'Бөөний агуулах: A-01-01',
     ]) {
@@ -323,6 +325,10 @@ describe('products list', () => {
     for (const key of PRODUCT_COLUMN_KEYS) {
       expect(columnHeader(key)).toBeInTheDocument();
     }
+    // The tax data lives on the product's e-Barimt card, not in the list (ADR-0048).
+    expect(within(table).queryByText(mn.catalog.product.vatTypes.VAT_ABLE)).toBeNull();
+    expect(within(table).queryByText('2211100')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: mn.catalog.product.vatType })).toBeNull();
   });
 
   it('hides a column, remembers it, and shows every column again', async () => {
@@ -355,7 +361,7 @@ describe('products list', () => {
   it('reads no suppliers, locations or prices while their columns are hidden', async () => {
     localStorage.setItem(
       HIDDEN_COLUMNS_KEY,
-      JSON.stringify(['supplier', 'homeWarehouse', 'fixedBins', 'wholesalePrice', 'retailPrice']),
+      JSON.stringify(['supplier', 'homeWarehouse', 'fixedBins', 'warehousePrice', 'priceProfile']),
     );
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
@@ -367,7 +373,7 @@ describe('products list', () => {
     expect(columnHeader('category')).toBeInTheDocument();
     expect(calls(fetchMock, 'GET', '/api/v1/product-suppliers')).toHaveLength(0);
     expect(calls(fetchMock, 'GET', '/api/v1/product-locations')).toHaveLength(0);
-    expect(calls(fetchMock, 'GET', '/api/v1/unit-prices/current')).toHaveLength(0);
+    expect(calls(fetchMock, 'GET', '/api/v1/product-prices/current')).toHaveLength(0);
   });
 
   it('ignores a broken or foreign stored choice and still hides when storage refuses', async () => {

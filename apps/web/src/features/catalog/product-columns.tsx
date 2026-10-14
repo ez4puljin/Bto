@@ -4,12 +4,16 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ProductLocation } from '@/features/inventory/api';
 import type { ProductSupplierLink } from '@/features/partners/api';
-import type { CurrentPrice } from '@/features/pricing/api';
+import type { CurrentTerms } from '@/features/pricing/api';
 import { formatMnt } from '@/lib/money';
 import type { ProductListItem } from './api';
 import { ProductStageBadge } from './product-stage-badge';
 
-/** Every column of the product list, in the order of the owner's product sheet (ADR-0037). */
+/**
+ * Every column of the product list, in the order of the owner's product sheet (ADR-0037); the
+ * price columns are the warehouse price and the price profile, and the tax data lives on the
+ * product's e-Barimt card, not here (ADR-0048).
+ */
 export const PRODUCT_COLUMN_KEYS = [
   'image',
   'sku',
@@ -17,18 +21,14 @@ export const PRODUCT_COLUMN_KEYS = [
   'category',
   'baseUnit',
   'units',
-  'wholesalePrice',
-  'retailPrice',
+  'warehousePrice',
+  'priceProfile',
   'baseBarcodes',
   'unitBarcodes',
-  'vatType',
-  'cityTax',
   'weight',
   'homeWarehouse',
   'fixedBins',
   'supplier',
-  'classificationCode',
-  'taxProductCode',
   'status',
 ] as const;
 export type ProductColumnKey = (typeof PRODUCT_COLUMN_KEYS)[number];
@@ -43,7 +43,7 @@ export interface ProductCellContext {
   warehouseName: (id: number) => string;
   suppliers: ReadonlyMap<number, readonly ProductSupplierLink[]> | undefined;
   locations: ReadonlyMap<number, readonly ProductLocation[]> | undefined;
-  prices: ReadonlyMap<number, readonly CurrentPrice[]> | undefined;
+  prices: ReadonlyMap<number, readonly CurrentTerms[]> | undefined;
 }
 
 export interface ProductColumn {
@@ -75,12 +75,8 @@ const text = (value: string | null | undefined, ctx: ProductCellContext) =>
 
 const otherUnits = (row: ProductListItem) => row.units.filter((unit) => !unit.isBase);
 
-/** The base unit's price today in a list (ADR-0041), or «—». */
-const priceCell = (row: ProductListItem, ctx: ProductCellContext, list: CurrentPrice['list']) => {
-  if (!ctx.prices) return null;
-  const price = ctx.prices.get(row.id)?.find((entry) => entry.list === list);
-  return price ? ctx.t('pricing.money', { amount: formatMnt(price.price) }) : none(ctx);
-};
+/** Today's price terms of a product (ADR-0048), or undefined while they load. */
+const termsOf = (row: ProductListItem, ctx: ProductCellContext) => ctx.prices?.get(row.id)?.[0];
 
 export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
@@ -129,16 +125,21 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
       ),
   },
   {
-    key: 'wholesalePrice',
+    key: 'warehousePrice',
     source: 'prices',
     className: 'text-right font-mono',
-    cell: (row, ctx) => priceCell(row, ctx, 'WHOLESALE'),
+    cell: (row, ctx) => {
+      if (!ctx.prices) return null;
+      const terms = termsOf(row, ctx);
+      return terms
+        ? ctx.t('pricing.money', { amount: formatMnt(terms.warehousePrice) })
+        : none(ctx);
+    },
   },
   {
-    key: 'retailPrice',
+    key: 'priceProfile',
     source: 'prices',
-    className: 'text-right font-mono',
-    cell: (row, ctx) => priceCell(row, ctx, 'RETAIL'),
+    cell: (row, ctx) => (ctx.prices ? text(termsOf(row, ctx)?.profileName, ctx) : null),
   },
   {
     key: 'baseBarcodes',
@@ -155,18 +156,6 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         ),
         ctx,
         true,
-      ),
-  },
-  { key: 'vatType', cell: (row, ctx) => ctx.t(`catalog.product.vatTypes.${row.vatType}`) },
-  {
-    key: 'cityTax',
-    cell: (row, ctx) =>
-      ctx.t(
-        row.cityTax === null
-          ? 'catalog.product.cityTaxValues.unknown'
-          : row.cityTax
-            ? 'catalog.product.cityTaxValues.yes'
-            : 'catalog.product.cityTaxValues.no',
       ),
   },
   { key: 'weight', className: 'font-mono', cell: (row, ctx) => text(row.weightKg, ctx) },
@@ -211,16 +200,6 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         ? main.supplier.name
         : `${main.supplier.name} ${ctx.t('catalog.products.moreSuppliers', { count: others.length })}`;
     },
-  },
-  {
-    key: 'classificationCode',
-    className: 'font-mono',
-    cell: (row, ctx) => text(row.classificationCode, ctx),
-  },
-  {
-    key: 'taxProductCode',
-    className: 'font-mono',
-    cell: (row, ctx) => text(row.taxProductCode, ctx),
   },
   {
     key: 'status',
