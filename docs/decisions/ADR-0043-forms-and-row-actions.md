@@ -6,6 +6,7 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0042 (#6: lists edited in dialogs keep their row actions, now as icon buttons; #7: a read-first card reads in the form's rows) |
+| Amended by | ADR-0047 (#3: a confirmation of the default kind gives its main button the focus, so Enter confirms) |
 
 ## Context
 

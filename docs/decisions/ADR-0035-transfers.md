@@ -7,6 +7,7 @@
 | Deciders | Owner, Claude (Claude Code session) |
 | Revised | 2026-10-11, same session, before the code: #4 takes TRANSIT out at the cost each line entered it instead of TRANSIT's pooled average, which made "zero per line in value" untrue for transfers in flight together |
 | Amends | ADR-0007 (transfer receive: shortfall booked as an adjustment at the destination), ADR-0034 #3 (transfer legs), `docs/SPEC.md` §6.5 #1–2, `docs/architecture.md` §5.3 |
+| Amended by | ADR-0046 (#1, #3: the destination may take a sent request back to DRAFT; it keeps its number when sent again) |
 
 ## Context
 
