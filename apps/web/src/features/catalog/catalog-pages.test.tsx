@@ -506,17 +506,161 @@ describe('products list', () => {
     await user.click(all);
     expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
 
-    // A new filter starts without ticks.
+    // A new filter keeps the ticks (ADR-0052): the ticks of several searches go together.
     await user.click(
       screen.getByRole('checkbox', {
         name: mn.common.selectRow.replace('{{name}}', '10001'),
       }),
     );
-    expect(screen.getByRole('region', { name: mn.common.selection })).toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox', { name: mn.catalog.product.status }), '');
-    await waitFor(() =>
-      expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull(),
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(screen.getByRole('region', { name: mn.common.selection })).toHaveTextContent(
+      mn.common.selected.replace('{{count}}', '1'),
     );
+  });
+
+  it('keeps the ticks of several searches through a reload, for each user apart', async () => {
+    const fanta = listItem(2, '10002', 'Фанта');
+    const routes = {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': async (request: Request) =>
+        queryPage((await sent(request)).q === 'фанта' ? [fanta] : [COLA_ROW]),
+    };
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    const tick = async (sku: string) =>
+      user.click(
+        await screen.findByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', sku) }),
+      );
+    const bar = () => screen.getByRole('region', { name: mn.common.selection });
+    await tick('10001');
+    await user.type(screen.getByRole('searchbox', { name: mn.common.search }), 'фанта');
+    await tick('10002');
+    expect(bar()).toHaveTextContent(mn.common.selected.replace('{{count}}', '2'));
+
+    // A reload (or «back» from a product opened by mistake) keeps them.
+    cleanup();
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(bar()).toHaveTextContent(mn.common.selected.replace('{{count}}', '2'));
+    expect(
+      screen.getByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', '10001') }),
+    ).toBeChecked();
+
+    // Another user signed in to the tab starts with none.
+    cleanup();
+    renderApp('/catalog/products', signedIn({ ...ADMIN_ME, id: 9 }, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
+  });
+
+  it('ticks every product the filters keep beyond the loaded rows, never past 20,000', async () => {
+    const fanta = listItem(2, '10002', 'Фанта');
+    let total = 3;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW, fanta], 'page-2', total),
+      'POST /api/v1/products/query/ids': () => json({ ids: [1, 2, 3] }),
+    });
+    renderApp('/catalog/products?q=кола', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Фанта' });
+    const header = () => screen.getByRole('checkbox', { name: mn.common.selectAll });
+    await user.click(header());
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '2'));
+    await user.click(
+      within(bar).getByRole('button', {
+        name: mn.catalog.products.selection.allMatching.replace('{{total}}', '3'),
+      }),
+    );
+    await waitFor(() =>
+      expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '3')),
+    );
+    expect(bar).toHaveTextContent(
+      mn.catalog.products.selection.allMatchingDone.replace('{{total}}', '3'),
+    );
+    // The list's filters without a page.
+    const [request] = calls(fetchMock, 'POST', '/api/v1/products/query/ids');
+    expect(request ? await sent(request) : {}).toEqual({ q: 'кола' });
+    // Unticking the header unticks every match, the one not loaded too.
+    await user.click(header());
+    expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
+
+    // Past the limit there is nothing to click, only the reason.
+    total = 20_001;
+    cleanup();
+    renderApp('/catalog/products', fetchMock);
+    await screen.findByRole('link', { name: 'Фанта' });
+    await user.click(header());
+    expect(screen.getByRole('region', { name: mn.common.selection })).toHaveTextContent(
+      mn.catalog.products.selection.tooMany
+        .replace('{{total}}', '20,001')
+        .replace('{{limit}}', '20,000'),
+    );
+    expect(screen.queryByRole('button', { name: /^Таарсан бүгдийг сонгох/ })).toBeNull();
+    expect(calls(fetchMock, 'POST', '/api/v1/products/query/ids')).toHaveLength(1);
+  });
+
+  it('only explains the limit when more than 500 ticked products are to change', async () => {
+    const ticked = Array.from({ length: 501 }, (_, index) => index + 1);
+    sessionStorage.setItem(
+      `tugeel.catalog.products.selection.v1:${ADMIN_ME.id}`,
+      JSON.stringify(ticked),
+    );
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '501'));
+    await user.click(within(bar).getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.bulk.actions.category }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      mn.catalog.products.bulk.tooMany.replace('{{limit}}', '500').replace('{{total}}', '501'),
+    );
+    expect(within(dialog).queryByRole('button', { name: mn.common.save })).toBeNull();
+    await user.click(within(dialog).getAllByRole('button', { name: mn.common.close })[0]!);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls(fetchMock, 'POST', '/api/v1/products/bulk/category')).toHaveLength(0);
+  });
+
+  it('starts without ticks from broken storage and keeps ticking when storage refuses', async () => {
+    const key = `tugeel.catalog.products.selection.v1:${ADMIN_ME.id}`;
+    sessionStorage.setItem(key, 'not json');
+    const routes = {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+    };
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
+    // Ids that are not products' ids are dropped.
+    sessionStorage.setItem(key, JSON.stringify([1, -2, 'x', 1.5]));
+    cleanup();
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(screen.getByRole('region', { name: mn.common.selection })).toHaveTextContent(
+      mn.common.selected.replace('{{count}}', '1'),
+    );
+    // Storage that refuses writes: the ticks last while the page is open.
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    await user.click(screen.getByRole('button', { name: mn.common.clearSelection }));
+    expect(screen.queryByRole('region', { name: mn.common.selection })).toBeNull();
+    await user.click(
+      screen.getByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', '10001') }),
+    );
+    expect(screen.getByRole('region', { name: mn.common.selection })).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it('offers neither ticks nor Excel without the export right', async () => {
@@ -611,6 +755,44 @@ describe('products list', () => {
     );
   });
 
+  it('names a product with stock elsewhere that the list has not loaded', async () => {
+    sessionStorage.setItem(
+      `tugeel.catalog.products.selection.v1:${ADMIN_ME.id}`,
+      JSON.stringify([1, 99]),
+    );
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/warehouses': () =>
+        list([WH, { ...WH, id: 5, code: 'WH2', name: 'Шинэ агуулах' }]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+      'GET /api/v1/products/99': () =>
+        json({ ...COLA, id: 99, sku: '10099', name: 'Өмнөх хайлтын бараа' }),
+      'POST /api/v1/product-locations/bulk/home': () =>
+        json({ changed: [1, 99], unchanged: [], withStock: [{ productId: 99, warehouseId: 4 }] }),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.bulk.actions.home }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(mn.catalog.products.bulk.count.replace('{{count}}', '2'));
+    await user.selectOptions(
+      within(dialog).getByLabelText(mn.catalog.products.bulk.warehouse),
+      '5',
+    );
+    await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
+    expect(await within(dialog).findByText('10099 Өмнөх хайлтын бараа')).toBeInTheDocument();
+    const [request] = calls(fetchMock, 'POST', '/api/v1/product-locations/bulk/home');
+    expect(request ? await sent(request) : {}).toEqual({
+      productIds: [1, 99],
+      warehouseId: 5,
+      dryRun: true,
+    });
+  });
+
   it('deactivates ticked products after a question, and offers each change by its right', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
@@ -623,9 +805,18 @@ describe('products list', () => {
     await user.click(
       screen.getByRole('checkbox', { name: mn.common.selectRow.replace('{{name}}', '10001') }),
     );
-    await user.click(
-      screen.getByRole('button', { name: mn.catalog.products.bulk.actions.deactivate }),
-    );
+    // The status of ticks from other searches is unknown: both changes sit in «Засах».
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.bulk.edit }));
+    const actions = mn.catalog.products.bulk.actions;
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      actions.category,
+      actions.mainSupplier,
+      actions.profile,
+      actions.home,
+      actions.deactivate,
+      actions.activate,
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: actions.deactivate }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(
       mn.catalog.products.bulk.deactivateTitle.replace('{{count}}', '1'),

@@ -1,3 +1,4 @@
+import { MAX_BULK_PRODUCTS } from '@tugeel/shared/catalog';
 import { businessDate } from '@tugeel/shared/time';
 import { ChevronDown, Pencil } from 'lucide-react';
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
@@ -20,16 +21,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useWarehouses } from '@/features/identity/api';
 import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { usePriceProfileChoices } from '@/features/pricing/api';
+import { formatCount } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type ProductListItem, useCategories } from './api';
+import { type ProductListItem, useCategories, useProductNames } from './api';
 import { useBulkEdits } from './bulk-api';
 import { categoryTree } from './category-tree';
 
@@ -58,12 +61,20 @@ function useReport() {
 }
 
 /**
- * The selection bar's changes of the ticked products (ADR-0051 #3): «Засах» (category, main
- * supplier, price profile, home warehouse) and «Идэвхгүй болгох / Идэвхжүүлэх», each shown to those
- * holding its right. Every change opens a dialog naming the count; afterwards a toast says what
- * changed and the ticks clear.
+ * The selection bar's changes of the ticked products (ADR-0051 #3, ADR-0052): «Засах» (category,
+ * main supplier, price profile, home warehouse, then «Идэвхгүй болгох» and «Идэвхжүүлэх»), each
+ * shown to those holding its right. They act on every ticked product, loaded or not; the ticks of
+ * other searches have unknown statuses, so both status changes are offered and the server says
+ * which already were so. Every change opens a dialog naming the count (above 500 it only says
+ * so); afterwards a toast says what changed and the ticks clear.
  */
-export function BulkActions(props: { rows: readonly ProductListItem[]; onDone: () => void }) {
+export function BulkActions(props: {
+  /** Every ticked product. */
+  ids: readonly number[];
+  /** The ticked rows the list has loaded: their names. */
+  rows: readonly ProductListItem[];
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const canProducts = useHasPermission('catalog.products.manage');
   const canSuppliers = useHasPermission('partners.suppliers.manage');
@@ -77,10 +88,7 @@ export function BulkActions(props: { rows: readonly ProductListItem[]; onDone: (
     ...(canPrices ? (['profile'] as const) : []),
     ...(canHomes ? (['home'] as const) : []),
   ];
-  const status: StatusAction =
-    props.rows.length > 0 && props.rows.every((row) => row.status === 'INACTIVE')
-      ? 'activate'
-      : 'deactivate';
+  const statuses: StatusAction[] = canProducts ? ['deactivate', 'activate'] : [];
   const close = () => {
     setOpen(null);
     // The menu item is gone by the time a dialog closes: the focus goes back to «Засах».
@@ -90,10 +98,11 @@ export function BulkActions(props: { rows: readonly ProductListItem[]; onDone: (
     setOpen(null);
     props.onDone();
   };
-  const ids = props.rows.map((row) => row.id);
+  const { ids } = props;
+  const tooMany = ids.length > MAX_BULK_PRODUCTS;
   return (
     <>
-      {edits.length > 0 ? (
+      {edits.length > 0 || statuses.length > 0 ? (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button ref={trigger} variant="outline" size="sm">
@@ -108,22 +117,63 @@ export function BulkActions(props: { rows: readonly ProductListItem[]; onDone: (
                 {t(`catalog.products.bulk.actions.${action}`)}
               </DropdownMenuItem>
             ))}
+            {edits.length > 0 && statuses.length > 0 ? <DropdownMenuSeparator /> : null}
+            {statuses.map((action) => (
+              <DropdownMenuItem key={action} onSelect={() => setOpen(action)}>
+                {t(`catalog.products.bulk.actions.${action}`)}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      {canProducts ? (
-        <Button variant="outline" size="sm" onClick={() => setOpen(status)}>
-          {t(`catalog.products.bulk.actions.${status}`)}
-        </Button>
+      {open !== null && tooMany ? (
+        <LimitDialog action={open} count={ids.length} onClose={close} />
       ) : null}
-      {open === 'category' ? <CategoryDialog ids={ids} onClose={close} onDone={done} /> : null}
-      {open === 'mainSupplier' ? <SupplierDialog ids={ids} onClose={close} onDone={done} /> : null}
-      {open === 'profile' ? <ProfileDialog ids={ids} onClose={close} onDone={done} /> : null}
-      {open === 'home' ? <HomeDialog rows={props.rows} onClose={close} onDone={done} /> : null}
-      {open === 'activate' || open === 'deactivate' ? (
-        <StatusDialog action={open} ids={ids} onClose={() => setOpen(null)} onDone={done} />
+      {open === 'category' && !tooMany ? (
+        <CategoryDialog ids={ids} onClose={close} onDone={done} />
+      ) : null}
+      {open === 'mainSupplier' && !tooMany ? (
+        <SupplierDialog ids={ids} onClose={close} onDone={done} />
+      ) : null}
+      {open === 'profile' && !tooMany ? (
+        <ProfileDialog ids={ids} onClose={close} onDone={done} />
+      ) : null}
+      {open === 'home' && !tooMany ? (
+        <HomeDialog ids={ids} rows={props.rows} onClose={close} onDone={done} />
+      ) : null}
+      {(open === 'activate' || open === 'deactivate') && !tooMany ? (
+        <StatusDialog action={open} ids={ids} onClose={close} onDone={done} />
       ) : null}
     </>
+  );
+}
+
+/** More products are ticked than one change takes (ADR-0052): the dialog only says so. */
+function LimitDialog(props: {
+  action: EditAction | StatusAction;
+  count: number;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t(`catalog.products.bulk.actions.${props.action}`)}</DialogTitle>
+          <DialogDescription>
+            {t('catalog.products.bulk.tooMany', {
+              total: formatCount(props.count),
+              limit: formatCount(MAX_BULK_PRODUCTS),
+            })}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" onClick={props.onClose}>
+            {t('common.close')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -337,8 +387,12 @@ function ProfileDialog({ ids, onClose, onDone }: DialogProps) {
   );
 }
 
-/** First a dry run: products holding stock elsewhere are named and confirmed before the move. */
+/**
+ * First a dry run: products holding stock elsewhere are named and confirmed before the move. The
+ * names come from the loaded rows, else are read one by one (ticks of other searches, ADR-0052).
+ */
 function HomeDialog(props: {
+  ids: readonly number[];
   rows: readonly ProductListItem[];
   onClose: () => void;
   onDone: () => void;
@@ -353,8 +407,11 @@ function HomeDialog(props: {
   const wholesale = (warehouses.data ?? []).filter((row) => row.kind === 'WHOLESALE');
   const [warehouseId, setWarehouseId] = useState<number | undefined>();
   const [stocked, setStocked] = useState<readonly number[] | null>(null);
-  const ids = props.rows.map((row) => row.id);
-  const named = new Map(props.rows.map((row) => [row.id, `${row.sku} ${row.name}`]));
+  const { ids } = props;
+  const loaded = new Map(props.rows.map((row) => [row.id, `${row.sku} ${row.name}`]));
+  const shown = (stocked ?? []).slice(0, NAMED);
+  const read = useProductNames(shown.filter((id) => !loaded.has(id)));
+  const nameOf = (id: number) => loaded.get(id) ?? read.get(id) ?? `#${id}`;
 
   const apply = async (target: number) => {
     let result: { changed: number[]; unchanged: number[] } | undefined;
@@ -362,7 +419,7 @@ function HomeDialog(props: {
       await action.run(async () => {
         result = await edits.home.mutateAsync({
           key: applyKey,
-          productIds: ids,
+          productIds: [...ids],
           warehouseId: target,
         });
       })
@@ -385,7 +442,7 @@ function HomeDialog(props: {
     const checked = await action.run(async () => {
       dry = await edits.home.mutateAsync({
         key: dryKey,
-        productIds: ids,
+        productIds: [...ids],
         warehouseId,
         dryRun: true,
       });
@@ -403,7 +460,6 @@ function HomeDialog(props: {
       setStocked(found);
     }
   };
-  const shown = (stocked ?? []).slice(0, NAMED);
   return (
     <BulkDialog
       action="home"
@@ -437,7 +493,7 @@ function HomeDialog(props: {
           <p>{t('catalog.products.bulk.withStock', { count: stocked.length })}</p>
           <ul className="list-inside list-disc text-muted-foreground">
             {shown.map((id) => (
-              <li key={id}>{named.get(id) ?? `#${id}`}</li>
+              <li key={id}>{nameOf(id)}</li>
             ))}
             {stocked.length > NAMED ? (
               <li>{t('catalog.products.bulk.more', { count: stocked.length - NAMED })}</li>

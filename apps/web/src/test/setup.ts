@@ -32,4 +32,6 @@ afterEach(() => {
   clearToasts();
   // Lists remember hidden columns in localStorage (ADR-0037); each test starts with none.
   localStorage.clear();
+  // The product list keeps its ticks in sessionStorage (ADR-0052); each test starts with none.
+  sessionStorage.clear();
 });

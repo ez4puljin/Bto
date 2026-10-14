@@ -1,4 +1,8 @@
-import { EXPORTABLE_PRODUCT_COLUMNS, PRODUCT_LIST_COLUMNS } from '@tugeel/shared/catalog';
+import {
+  EXPORTABLE_PRODUCT_COLUMNS,
+  MAX_SELECTED_PRODUCTS,
+  PRODUCT_LIST_COLUMNS,
+} from '@tugeel/shared/catalog';
 import { businessDate } from '@tugeel/shared/time';
 import { FileSpreadsheet, Package, Plus, Shapes } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -15,14 +19,16 @@ import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { saveBlob } from '@/lib/download';
 import { formatCount } from '@/lib/money';
-import { problemFromError } from '@/lib/problem';
+import { ApiProblem, problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import {
-  type ProductExportRequest,
+  productQueryBody,
+  type ProductQueryFilter,
   type ProductStatus,
   useCategories,
   useExportProducts,
+  useProductIds,
   useProductQuery,
 } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
@@ -39,6 +45,7 @@ import {
 } from './product-filters';
 import { type ProductStage } from './product-stage';
 import { type ProductSelection, ProductTable, type ProductTableContext } from './product-table';
+import { useProductSelection } from './use-product-selection';
 
 const positiveId = (value: string | null) => {
   const id = Number.parseInt(value ?? '', 10);
@@ -57,15 +64,16 @@ const STAGE_FILTER: Record<ProductStage, { status: ProductStatus; saleReady?: bo
 /** The list's name in the column-choice key (ADR-0050). */
 const COLUMNS_LIST = 'catalog.products';
 const NO_PAGES: readonly { data: never[] }[] = [];
-const NO_IDS: ReadonlySet<number> = new Set();
 
 /**
  * Products: search by name in either script, SKU or barcode, filter by category (with its
  * subcategories), status and «Шүүлтүүр» (suppliers, homes, prices, stock, dates, missing data, a
  * segment; ADR-0049), with the count the filters keep. Filters live in the URL so "back" keeps
- * them (SPEC §5.2). Rows can be ticked; «Excel татах» writes the ticked rows, or every row the
- * filters keep, with the visible columns (ADR-0049 #6); «Засах» and «Идэвхгүй болгох» change the
- * ticked products together (ADR-0051). Changing a filter clears the ticks.
+ * them (SPEC §5.2). Rows can be ticked; the ticks stay while the search and the filters change,
+ * so the ticks of several searches go together, and «Таарсан бүгдийг сонгох» ticks every product
+ * the filters keep beyond the loaded rows (ADR-0052). «Excel татах» writes the ticked rows, or
+ * every row the filters keep, with the visible columns (ADR-0049 #6); «Засах» changes the ticked
+ * products together (ADR-0051).
  * Every piece of product information has a column; each user picks which ones show on their
  * own browser (ADR-0037, ADR-0050).
  */
@@ -90,37 +98,34 @@ export function ProductsPage() {
   const stage = isStage(stageParam) ? stageParam : undefined;
   const filters = useMemo(() => readFilters(params), [params]);
   const where = useMemo(() => whereOf(filters), [filters]);
-  const products = useProductQuery({
+  const filter: ProductQueryFilter = {
     q,
-    categoryId,
+    ...(categoryId ? { categoryId } : {}),
     ...(stage ? STAGE_FILTER[stage] : {}),
     ...(where ? { where } : {}),
     ...(filters.segment ? { segmentId: filters.segment } : {}),
-  });
+  };
+  const products = useProductQuery(filter);
   const total = products.data?.pages[0]?.total;
   const exportProducts = useExportProducts();
   const exporting = useAction();
-  // Ticks belong to one set of filters: a change of filter starts with none.
-  const filterKey = JSON.stringify([q, categoryId, stage, filters]);
-  const [ticks, setTicks] = useState<{ key: string; ids: ReadonlySet<number> }>(() => ({
-    key: filterKey,
-    ids: NO_IDS,
-  }));
-  const selected = ticks.key === filterKey ? ticks.ids : NO_IDS;
+  const ticks = useProductSelection();
+  const { selected } = ticks;
+  // «Таарсан бүгдийг сонгох»: the ids the current filters keep, once asked for (ADR-0052).
+  const filterKey = JSON.stringify(productQueryBody(filter));
+  const [matching, setMatching] = useState<{ key: string; ids: readonly number[] } | null>(null);
+  const matchingIds = matching?.key === filterKey ? matching.ids : null;
+  const productIds = useProductIds();
+  const selecting = useAction();
   const selection = useMemo<ProductSelection>(
     () => ({
       selected,
-      toggle: (id, on) => {
-        const ids = new Set(selected);
-        if (on) ids.add(id);
-        else ids.delete(id);
-        setTicks({ key: filterKey, ids });
-      },
-      setAll: (ids, on) => setTicks({ key: filterKey, ids: on ? new Set(ids) : NO_IDS }),
+      toggle: (id, on) => ticks.set([id], on),
+      // Unticking the header after «Таарсан бүгдийг сонгох» unticks every match, loaded or not.
+      setAll: (ids, on) => ticks.set(on || !matchingIds ? ids : [...ids, ...matchingIds], on),
     }),
-    [selected, filterKey],
+    [selected, ticks, matchingIds],
   );
-  const clearTicks = () => setTicks({ key: filterKey, ids: NO_IDS });
   const categories = useCategories();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
@@ -140,22 +145,64 @@ export function ProductsPage() {
     [t, paths, warehouseName],
   );
   const pages = products.data?.pages ?? NO_PAGES;
-  const tickedRows = pages.flatMap((page) => page.data.filter((row) => selected.has(row.id)));
+  const loaded = pages.flatMap((page) => page.data);
+  const tickedRows = loaded.filter((row) => selected.has(row.id));
+
+  /** Every product the filters keep joins the ticks, never past the limit (ADR-0052). */
+  const selectMatching = async () => {
+    await selecting.run(async () => {
+      const ids = await productIds.mutateAsync(filter);
+      const count = selected.size + ids.filter((id) => !selected.has(id)).length;
+      if (count > MAX_SELECTED_PRODUCTS) {
+        throw new ApiProblem({
+          type: 'about:blank',
+          title: 'Selection too large',
+          status: 422,
+          code: 'SELECTION_TOO_LARGE',
+          params: { count, limit: MAX_SELECTED_PRODUCTS },
+        });
+      }
+      setMatching({ key: filterKey, ids });
+      ticks.set(ids, true);
+    });
+  };
+  const everyLoadedTicked = loaded.length > 0 && tickedRows.length === loaded.length;
+  const moreThanLoaded = typeof total === 'number' && total > loaded.length;
+  const matchingNote =
+    everyLoadedTicked && moreThanLoaded ? (
+      matchingIds?.every((id) => selected.has(id)) ? (
+        <span className="px-1 text-sm text-muted-foreground">
+          {t('catalog.products.selection.allMatchingDone', { total: formatCount(total) })}
+        </span>
+      ) : total > MAX_SELECTED_PRODUCTS ? (
+        <span className="px-1 text-sm text-muted-foreground">
+          {t('catalog.products.selection.tooMany', {
+            total: formatCount(total),
+            limit: formatCount(MAX_SELECTED_PRODUCTS),
+          })}
+        </span>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-link"
+          disabled={productIds.isPending}
+          onClick={() => void selectMatching()}
+        >
+          {productIds.isPending
+            ? t('catalog.products.selection.selecting')
+            : t('catalog.products.selection.allMatching', { total: formatCount(total) })}
+        </Button>
+      )
+    ) : null;
 
   /** The ticked products, or every product the filters keep, with the visible columns. */
   const exportExcel = async () => {
     const columns = EXPORTABLE_PRODUCT_COLUMNS.filter((key) => !hidden.has(key));
-    const body: ProductExportRequest =
+    const body =
       selected.size > 0
         ? { productIds: [...selected], columns }
-        : {
-            ...(q ? { q } : {}),
-            ...(categoryId ? { categoryId } : {}),
-            ...(stage ? STAGE_FILTER[stage] : {}),
-            ...(where ? { where } : {}),
-            ...(filters.segment ? { segmentId: filters.segment } : {}),
-            columns,
-          };
+        : { ...productQueryBody(filter), columns };
     await exporting.run(async () => {
       const file = await exportProducts.mutateAsync(body);
       saveBlob(file, `${t('catalog.products.title')} ${businessDate()}.xlsx`);
@@ -286,7 +333,9 @@ export function ProductsPage() {
           </Button>
         ) : null}
       </FilterBar>
-      <ProblemAlert problem={exporting.problem ?? problemFromError(products.error)} />
+      <ProblemAlert
+        problem={exporting.problem ?? selecting.problem ?? problemFromError(products.error)}
+      />
       <ListCard>
         <ProductTable
           pages={pages}
@@ -297,9 +346,10 @@ export function ProductsPage() {
         {empty ? <EmptyState icon={Package} title={t('catalog.products.empty')} /> : null}
         <LoadMore query={products} />
       </ListCard>
-      <SelectionBar count={selected.size} onClear={clearTicks}>
+      <SelectionBar count={selected.size} onClear={ticks.clear}>
+        {matchingNote}
         {canExport ? exportButton : null}
-        <BulkActions rows={tickedRows} onDone={clearTicks} />
+        <BulkActions ids={[...selected]} rows={tickedRows} onDone={ticks.clear} />
       </SelectionBar>
     </div>
   );

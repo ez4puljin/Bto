@@ -2,6 +2,7 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -106,6 +107,21 @@ export interface ProductQueryFilter extends ProductFilter {
 }
 
 /**
+ * The list's filters as `/products/query`, its ids and the export take them; filters not set are
+ * left out.
+ */
+export function productQueryBody(filter: ProductQueryFilter): Schemas['ProductIdsRequest'] {
+  return {
+    ...(filter.q ? { q: filter.q } : {}),
+    ...(filter.categoryId === undefined ? {} : { categoryId: filter.categoryId }),
+    ...(filter.status === undefined ? {} : { status: filter.status }),
+    ...(filter.saleReady === undefined ? {} : { saleReady: filter.saleReady }),
+    ...(filter.where === undefined ? {} : { where: filter.where }),
+    ...(filter.segmentId === undefined ? {} : { segmentId: filter.segmentId }),
+  };
+}
+
+/**
  * The product list screen (`POST /products/query`): the rows in the list's order and, on the first
  * page, how many products the filters keep.
  */
@@ -119,21 +135,24 @@ export function useProductQuery(filter: ProductQueryFilter, options: ListReadOpt
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.POST('/api/v1/products/query', {
-          body: {
-            q: filter.q || undefined,
-            categoryId: filter.categoryId,
-            status: filter.status,
-            saleReady: filter.saleReady,
-            where: filter.where,
-            segmentId: filter.segmentId,
-            cursor: pageParam,
-            limit,
-          },
+          body: { ...productQueryBody(filter), cursor: pageParam, limit },
           signal,
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Every product the list's filters keep, in the list's order (ADR-0052): «Таарсан бүгдийг
+ * сонгох». A mutation because each click asks again; 422 SELECTION_TOO_LARGE above 20,000.
+ */
+export function useProductIds() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: async (filter: ProductQueryFilter) =>
+      unwrap(await api.POST('/api/v1/products/query/ids', { body: productQueryBody(filter) })).ids,
   });
 }
 
@@ -153,6 +172,26 @@ export function useProduct(id: number) {
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/products/{id}', { params: { path: { id } }, signal })),
   });
+}
+
+/**
+ * «SKU name» of a few products read one by one (the home move names the products with stock
+ * elsewhere that the list has not loaded, ADR-0052); shares `useProduct`'s cache.
+ */
+export function useProductNames(ids: readonly number[]): ReadonlyMap<number, string> {
+  const api = useApiClient();
+  const results = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: [...KEYS.products, id],
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        unwrap(await api.GET('/api/v1/products/{id}', { params: { path: { id } }, signal })),
+    })),
+  });
+  return new Map(
+    results.flatMap((result) =>
+      result.data ? [[result.data.id, `${result.data.sku} ${result.data.name}`] as const] : [],
+    ),
+  );
 }
 
 /** The code to suggest for a new product of the category, from its range (ADR-0044 #1). */
