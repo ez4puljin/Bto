@@ -43,7 +43,10 @@ const NAMED = 5;
 function useReport() {
   const { t } = useTranslation();
   return (result: { changed: number[]; unchanged: number[]; skipped?: unknown[] }) => {
-    const parts = [t('catalog.products.bulk.done', { count: result.changed.length })];
+    const parts: string[] = [];
+    if (result.changed.length > 0 || (result.unchanged.length === 0 && !result.skipped?.length)) {
+      parts.push(t('catalog.products.bulk.done', { count: result.changed.length }));
+    }
     if (result.unchanged.length > 0) {
       parts.push(t('catalog.products.bulk.same', { count: result.unchanged.length }));
     }
@@ -374,20 +377,31 @@ function HomeDialog(props: {
       await apply(warehouseId);
       return;
     }
-    let found: number[] = [];
+    let dry: { changed: number[]; unchanged: number[]; withStock: { productId: number }[] } = {
+      changed: [],
+      unchanged: [],
+      withStock: [],
+    };
     const checked = await action.run(async () => {
-      const dry = await edits.home.mutateAsync({
+      dry = await edits.home.mutateAsync({
         key: dryKey,
         productIds: ids,
         warehouseId,
         dryRun: true,
       });
-      found = [...new Set(dry.withStock.map((row) => row.productId))];
     });
     if (!checked) return;
-    // Nothing holds stock elsewhere: no question to ask.
-    if (found.length === 0) await apply(warehouseId);
-    else setStocked(found);
+    const found = [...new Set(dry.withStock.map((row) => row.productId))];
+    if (dry.changed.length === 0) {
+      // Every product already lives there: nothing to write.
+      report(dry);
+      props.onDone();
+    } else if (found.length === 0) {
+      // Nothing holds stock elsewhere: no question to ask.
+      await apply(warehouseId);
+    } else {
+      setStocked(found);
+    }
   };
   const shown = (stocked ?? []).slice(0, NAMED);
   return (

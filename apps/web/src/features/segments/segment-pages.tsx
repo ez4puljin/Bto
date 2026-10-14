@@ -157,19 +157,7 @@ export function SegmentsPage() {
             ))}
           </TableBody>
         </Table>
-        {empty ? (
-          <EmptyState
-            icon={Shapes}
-            title={t('segments.empty')}
-            action={
-              canManage ? (
-                <Button asChild variant="outline">
-                  <Link to={createLink}>{t('segments.create')}</Link>
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : null}
+        {empty ? <EmptyState icon={Shapes} title={t('segments.empty')} /> : null}
         <LoadMore query={segments} />
       </ListCard>
     </div>

@@ -12,7 +12,7 @@ import {
 } from '@tugeel/shared/segments';
 import type { TFunction } from 'i18next';
 import { Plus, X } from 'lucide-react';
-import { useDeferredValue, useId, useMemo, useState } from 'react';
+import { Fragment, useDeferredValue, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckboxGroup } from '@/components/checkbox-group';
 import { SearchField } from '@/components/list';
@@ -105,26 +105,34 @@ export function DefinitionText(props: { entity: SegmentEntity; definition: Segme
   const { t } = useTranslation();
   const { entity, definition } = props;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {definition.groups.map((group, index) => (
-        <div key={index} className="flex flex-col gap-1.5">
-          {definition.groups.length > 1 ? (
-            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              {t('segments.group', { n: index + 1 })}
-              {index > 0 ? ` · ${t(`segments.matches.${definition.match}`)}` : ''}
+        <Fragment key={index}>
+          {index > 0 ? (
+            <p className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {t(`segments.join.${definition.match}`)}
             </p>
           ) : null}
-          <ul className="flex flex-col gap-1 text-sm">
-            {group.conditions.map((condition, at) => (
-              <li key={at} className="flex gap-2">
-                <span aria-hidden className="text-muted-foreground">
-                  {at === 0 ? '•' : group.match === 'ALL' ? '∧' : '∨'}
-                </span>
-                <ConditionText entity={entity} condition={condition} />
-              </li>
-            ))}
-          </ul>
-        </div>
+          <div className="flex flex-col gap-1.5 rounded-lg border border-border/80 p-3">
+            {definition.groups.length > 1 ? (
+              <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {t('segments.group', { n: index + 1 })}
+              </p>
+            ) : null}
+            <ul className="flex flex-col gap-1 text-sm">
+              {group.conditions.map((condition, at) => (
+                <li key={at}>
+                  {at > 0 ? (
+                    <span className="mr-1.5 text-muted-foreground">
+                      {t(`segments.join.${group.match}`)}
+                    </span>
+                  ) : null}
+                  <ConditionText entity={entity} condition={condition} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Fragment>
       ))}
     </div>
   );
