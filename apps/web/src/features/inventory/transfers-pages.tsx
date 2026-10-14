@@ -1,10 +1,12 @@
 import { Decimal } from '@tugeel/shared/money';
-import { ArrowLeftRight, Plus, Printer } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeftRight, Plus, Printer, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FormField } from '@/components/form';
+import { LeaveGuard } from '@/components/leave-guard';
 import {
   ChevronHead,
   EmptyState,
@@ -12,12 +14,16 @@ import {
   LinkRow,
   ListCard,
   LoadMore,
+  RowAction,
+  RowActions,
   SkeletonRows,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
+import { StickyActions } from '@/components/sticky-actions';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +36,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -39,15 +44,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import {
   type Bin,
+  type TransferCount,
   type TransferDetail,
   type TransferLine,
   type TransferOrigin,
@@ -58,7 +67,6 @@ import {
   useTransfers,
 } from './api';
 import {
-  type CountEntry,
   countBase,
   countEntry,
   inUnit,
@@ -67,7 +75,14 @@ import {
   useWarehouseName,
   useWarehouseOptions,
 } from './helpers';
+import { useDefaultWarehouse } from './last-warehouse';
 import { DocStatusBadge, ProductSearch, QtyInput, WarehouseSelect } from './shared';
+import {
+  type LineCount,
+  sweepStepCounts,
+  useStepCounts,
+  useStepCountsCleanup,
+} from './step-counts';
 
 const TRANSFER_KINDS = ['WHOLESALE', 'STORE'] as const;
 const STATUSES: readonly TransferStatus[] = [
@@ -82,6 +97,10 @@ const ORIGINS: readonly TransferOrigin[] = ['REQUEST', 'PUSH'];
 const isStatus = (value: string | null): value is TransferStatus =>
   STATUSES.some((status) => status === value);
 
+/** A sent request the destination took back to edit: a draft that keeps its number (ADR-0046). */
+const reopened = (transfer: { status: TransferStatus; number: string | null }) =>
+  transfer.status === 'DRAFT' && transfer.number !== null;
+
 /** A lookup that answers 404 for an unknown code: null instead of an error. */
 async function orNull<T>(promise: Promise<T>): Promise<T | null> {
   try {
@@ -94,7 +113,8 @@ async function orNull<T>(promise: Promise<T>): Promise<T | null> {
 
 /**
  * Transfers (ADR-0035): what a warehouse receives and sends. Everyone reads them; the holders of
- * inventory.transfers.manage request, ship and receive for the warehouses they write for.
+ * inventory.transfers.manage request, ship and receive for the warehouses they write for. The
+ * direction works on its own too: then it means the warehouses the user writes for.
  */
 export function TransfersPage() {
   const { t } = useTranslation();
@@ -110,12 +130,16 @@ export function TransfersPage() {
       ? mine.options[0]?.id
       : undefined
     : warehouseParam;
-  const direction = params.get('direction') === 'OUTGOING' ? 'OUTGOING' : 'INCOMING';
+  const directionParam = params.get('direction');
+  const direction =
+    directionParam === 'INCOMING' || directionParam === 'OUTGOING' ? directionParam : undefined;
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
   const transfers = useTransfers({ warehouseId, direction, status });
   const rows = transfers.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
+
+  useEffect(() => sweepStepCounts(), []);
 
   const setParam = (key: string, value: string) =>
     setParams(
@@ -156,12 +180,11 @@ export function TransfersPage() {
         />
         <NativeSelect
           variant="filter"
-          active={false}
           aria-label={t('inventory.transfers.direction')}
-          disabled={warehouseId === undefined}
-          value={direction}
+          value={direction ?? ''}
           onChange={(event) => setParam('direction', event.target.value)}
         >
+          <option value="">{t('inventory.transfers.anyDirection')}</option>
           <option value="INCOMING">{t('inventory.transfers.incoming')}</option>
           <option value="OUTGOING">{t('inventory.transfers.outgoing')}</option>
         </NativeSelect>
@@ -207,7 +230,12 @@ export function TransfersPage() {
                 <TableCell>{t(`inventory.transfer.origins.${row.origin}`)}</TableCell>
                 <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
                 <TableCell>
-                  <DocStatusBadge status={row.status} />
+                  <div className="flex gap-1">
+                    <DocStatusBadge status={row.status} />
+                    {reopened(row) ? (
+                      <Badge variant="outline">{t('inventory.transfer.reopenedBadge')}</Badge>
+                    ) : null}
+                  </div>
                 </TableCell>
               </LinkRow>
             ))}
@@ -222,19 +250,26 @@ export function TransfersPage() {
   );
 }
 
-/** A request is made by the receiving warehouse, a push by the sending one (supermarket returns). */
+/**
+ * A request is made by the receiving warehouse, a push by the sending one (supermarket returns).
+ * The user's own side is chosen already: the only warehouse, or the last one used (ADR-0047 #6).
+ */
 function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const all = useWarehouseOptions(TRANSFER_KINDS);
   const mine = useWarehouseOptions(TRANSFER_KINDS, true);
+  const asking = useDefaultWarehouse(mine.options, 'transferRequest');
+  const pushing = useDefaultWarehouse(mine.options, 'transferPush');
   const mutations = useTransferMutations();
   const action = useAction();
   const [key] = useState(randomUuid);
   const [origin, setOrigin] = useState<TransferOrigin>('REQUEST');
-  const [source, setSource] = useState<number | undefined>();
-  const [dest, setDest] = useState<number | undefined>();
+  const [pickedSource, setPickedSource] = useState<number | undefined>();
+  const [pickedDest, setPickedDest] = useState<number | undefined>();
   const [note, setNote] = useState('');
+  const source = pickedSource ?? (origin === 'PUSH' ? pushing.defaultId : undefined);
+  const dest = pickedDest ?? (origin === 'REQUEST' ? asking.defaultId : undefined);
   const ready = source !== undefined && dest !== undefined && source !== dest;
 
   const create = () =>
@@ -247,27 +282,35 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
         destWarehouseId: dest,
         ...(note.trim() ? { note: note.trim() } : {}),
       });
+      if (origin === 'REQUEST') asking.remember(dest);
+      else pushing.remember(source);
       await navigate(`/inventory/transfers/${transfer.id}`, { replace: true });
     });
 
   return (
     <DialogContent closeLabel={t('common.close')}>
-      <DialogHeader>
-        <DialogTitle>{t('inventory.transfer.newTitle')}</DialogTitle>
-        <DialogDescription>{t(`inventory.transfer.originHints.${origin}`)}</DialogDescription>
-      </DialogHeader>
-      <div className="flex flex-col gap-3">
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (ready && !mutations.create.isPending) create();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{t('inventory.transfer.newTitle')}</DialogTitle>
+          <DialogDescription>{t(`inventory.transfer.originHints.${origin}`)}</DialogDescription>
+        </DialogHeader>
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3">
+        <FormField label={t('inventory.transfer.origin')} htmlFor="transfer-origin">
           <NativeSelect
-            aria-label={t('inventory.transfer.origin')}
+            id="transfer-origin"
             value={origin}
             onChange={(event) => {
               const picked = ORIGINS.find((value) => value === event.target.value);
               if (!picked) return;
               setOrigin(picked);
-              setSource(undefined);
-              setDest(undefined);
+              setPickedSource(undefined);
+              setPickedDest(undefined);
             }}
           >
             {ORIGINS.map((value) => (
@@ -276,50 +319,60 @@ function TransferCreateDialog({ onCancel }: { onCancel: () => void }) {
               </option>
             ))}
           </NativeSelect>
+        </FormField>
+        <FormField label={t('inventory.transfers.from')} htmlFor="transfer-from">
           <WarehouseSelect
-            label={t('inventory.transfers.from')}
+            id="transfer-from"
             options={origin === 'REQUEST' ? all.options : mine.options}
             value={source}
             emptyLabel={t('inventory.transfers.pickFrom')}
-            onChange={setSource}
+            onChange={setPickedSource}
           />
+        </FormField>
+        <FormField label={t('inventory.transfers.to')} htmlFor="transfer-to">
           <WarehouseSelect
-            label={t('inventory.transfers.to')}
+            id="transfer-to"
             options={origin === 'REQUEST' ? mine.options : all.options}
             value={dest}
             emptyLabel={t('inventory.transfers.pickTo')}
-            onChange={setDest}
+            onChange={setPickedDest}
           />
+        </FormField>
+        <FormField label={t('inventory.note')} htmlFor="transfer-note">
           <Input
-            aria-label={t('inventory.note')}
-            placeholder={t('inventory.note')}
+            id="transfer-note"
             maxLength={500}
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button disabled={!ready || mutations.create.isPending} onClick={create}>
-          {t('inventory.transfer.createDraft')}
-        </Button>
-      </DialogFooter>
+        </FormField>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={!ready || mutations.create.isPending}>
+            {t('inventory.transfer.createDraft')}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }
 
-/** One transfer: the editor of the step the user's warehouse takes, and a printable list. */
+/**
+ * One transfer: the editor of the step the user's warehouse takes, and a printable list. A push
+ * being prepared for shipping keeps `?ship=1` in the URL, so a reload stays on the ship editor.
+ */
 export function TransferPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
+  const [params, setParams] = useSearchParams();
   const canManage = useHasPermission('inventory.transfers.manage');
   const canWrite = useCanWrite();
   const transfer = useTransfer(id);
   const warehouseName = useWarehouseName();
-  const [shipping, setShipping] = useState(false);
+  useStepCountsCleanup(id, transfer.data?.status);
+  const shipping = params.get('ship') === '1';
 
   const loadProblem = problemFromError(transfer.error);
   if (loadProblem) return <ProblemAlert problem={loadProblem} />;
@@ -330,15 +383,20 @@ export function TransferPage() {
   const atSource = canManage && canWrite(detail.sourceWarehouseId);
   const atDest = canManage && canWrite(detail.destWarehouseId);
   const owner = detail.origin === 'REQUEST' ? atDest : atSource;
+  const pushShipping = detail.status === 'DRAFT' && detail.origin === 'PUSH' && shipping;
   const editor =
-    detail.status === 'DRAFT' && owner && !(detail.origin === 'PUSH' && shipping) ? (
+    detail.status === 'DRAFT' && owner && !pushShipping ? (
       <TransferDraftEditor
         key={`draft-${detail.id}`}
         detail={detail}
-        onShip={() => setShipping(true)}
+        onShip={() => setParams({ ship: '1' })}
       />
-    ) : (detail.status === 'REQUESTED' || (detail.status === 'DRAFT' && shipping)) && atSource ? (
-      <TransferShipEditor key={`ship-${detail.id}`} detail={detail} />
+    ) : (detail.status === 'REQUESTED' || pushShipping) && atSource ? (
+      <TransferShipEditor
+        key={`ship-${detail.id}`}
+        detail={detail}
+        canDecline={detail.status === 'REQUESTED' && !atDest}
+      />
     ) : detail.status === 'SHIPPED' && atDest ? (
       <TransferReceiveEditor key={`receive-${detail.id}`} detail={detail} />
     ) : null;
@@ -350,6 +408,9 @@ export function TransferPage() {
         meta={
           <>
             <DocStatusBadge status={detail.status} />
+            {reopened(detail) ? (
+              <Badge variant="outline">{t('inventory.transfer.reopenedBadge')}</Badge>
+            ) : null}
             <Badge variant="outline">{t(`inventory.transfer.origins.${detail.origin}`)}</Badge>
             <span className="text-foreground">
               {t('inventory.transfer.route', {
@@ -357,6 +418,13 @@ export function TransferPage() {
                 to: warehouseName(detail.destWarehouseId),
               })}
             </span>
+            {detail.requestedAt ? (
+              <span className="font-mono">
+                {t('inventory.transfer.requestedOn', {
+                  time: formatUbDateTime(Date.parse(detail.requestedAt)),
+                })}
+              </span>
+            ) : null}
             {detail.shipDate ? (
               <span className="font-mono">
                 {t('inventory.transfer.shippedOn', { date: detail.shipDate })}
@@ -382,10 +450,17 @@ export function TransferPage() {
           {t('inventory.transfer.cancelReason', { reason: detail.cancelReason })}
         </p>
       ) : null}
-      {detail.status === 'REQUESTED' && (atSource || atDest) ? (
-        <RequestActions detail={detail} atDest={atDest} />
+      {reopened(detail) && (owner || atSource) ? (
+        <Alert className="print:hidden">
+          <AlertDescription>
+            {owner
+              ? t('inventory.transfer.reopenedOwnerNote')
+              : t('inventory.transfer.reopenedSourceNote')}
+          </AlertDescription>
+        </Alert>
       ) : null}
-      {editor ? <div className="print:hidden">{editor}</div> : null}
+      {detail.status === 'REQUESTED' && atDest ? <RequestOwnerActions detail={detail} /> : null}
+      {editor ? <div className="space-y-4 print:hidden">{editor}</div> : null}
       <div className={editor ? 'hidden print:block' : undefined}>
         <TransferLinesView detail={detail} />
       </div>
@@ -393,56 +468,53 @@ export function TransferPage() {
   );
 }
 
-/** A sent request: its destination withdraws it, its source declines it with a reason. */
-function RequestActions({ detail, atDest }: { detail: TransferDetail; atDest: boolean }) {
+/**
+ * A sent request, for the side that asked: take it back to edit it (ADR-0046, nothing to confirm:
+ * it is sent again under its number) or withdraw it for good (asked first).
+ */
+function RequestOwnerActions({ detail }: { detail: TransferDetail }) {
   const { t } = useTranslation();
   const mutations = useTransferMutations();
   const action = useAction();
-  const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState('');
-  const run = () =>
+  const [confirm, setConfirm] = useState(false);
+  const reopen = () =>
     void action.run(async () => {
-      await mutations.cancel.mutateAsync({
-        id: detail.id,
-        ...(reason.trim() ? { reason: reason.trim() } : {}),
-      });
-      setOpen(false);
+      await mutations.reopen.mutateAsync(detail.id);
+      toast.success(t('inventory.transfer.reopened'));
+    });
+  const withdraw = () =>
+    void action.run(async () => {
+      await mutations.cancel.mutateAsync({ id: detail.id });
+      setConfirm(false);
+      toast.success(t('inventory.transfer.withdrawn'));
     });
 
   return (
-    <div className="flex flex-wrap items-end gap-2 print:hidden">
-      {atDest ? null : (
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="transfer-decline">{t('inventory.transfer.declineReason')}</Label>
-          <Input
-            id="transfer-decline"
-            className="w-72"
-            maxLength={300}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-        </div>
-      )}
-      <Button
-        variant="outline"
-        disabled={!atDest && !reason.trim()}
-        onClick={() => {
-          action.clear();
-          setOpen(true);
-        }}
-      >
-        {atDest ? t('inventory.transfer.withdraw') : t('inventory.transfer.decline')}
-      </Button>
+    <div className="flex flex-col gap-2 print:hidden">
+      <ProblemAlert problem={confirm ? null : action.problem} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" disabled={mutations.reopen.isPending} onClick={reopen}>
+          {t('inventory.transfer.reopen')}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            action.clear();
+            setConfirm(true);
+          }}
+        >
+          {t('inventory.transfer.withdraw')}
+        </Button>
+      </div>
       <ConfirmDialog
-        open={open}
-        title={
-          atDest ? t('inventory.transfer.withdrawTitle') : t('inventory.transfer.declineTitle')
-        }
-        confirmLabel={atDest ? t('inventory.transfer.withdraw') : t('inventory.transfer.decline')}
+        open={confirm}
+        title={t('inventory.transfer.withdrawTitle')}
+        description={t('inventory.transfer.withdrawDescription')}
+        confirmLabel={t('inventory.transfer.withdraw')}
         pending={mutations.cancel.isPending}
         problem={action.problem}
-        onConfirm={run}
-        onClose={() => setOpen(false)}
+        onConfirm={withdraw}
+        onClose={() => setConfirm(false)}
       />
     </div>
   );
@@ -456,7 +528,7 @@ function TransferDraftEditor({ detail, onShip }: { detail: TransferDetail; onShi
   const lookupBarcode = useBarcodeLookup();
   const action = useAction();
   const [message, setMessage] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<'request' | 'cancel' | null>(null);
+  const [confirm, setConfirm] = useState(false);
 
   const addUnit = async (productId: number, productUnitId: number) => {
     const line = detail.lines.find((row) => row.productId === productId);
@@ -480,138 +552,122 @@ function TransferDraftEditor({ detail, onShip }: { detail: TransferDetail; onShi
       else setMessage(t('inventory.transfer.unknownProduct', { code }));
     });
 
+  // Sending a request asks nothing: it can be taken back (ADR-0047 #7).
   const request = () =>
     void action.run(async () => {
-      await mutations.request.mutateAsync(detail.id);
-      setConfirm(null);
+      const sent = await mutations.request.mutateAsync(detail.id);
+      toast.success(t('inventory.transfer.requestSent', { number: sent.number ?? '' }));
     });
   const cancel = () =>
     void action.run(async () => {
       await mutations.cancel.mutateAsync({ id: detail.id });
-      setConfirm(null);
+      setConfirm(false);
       await navigate('/inventory/transfers');
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.lines')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ScanBox
-          label={t('inventory.transfer.scanProduct')}
-          placeholder={t('inventory.transfer.scanProductPlaceholder')}
-          onScan={onScan}
-        />
-        {message ? <p className="text-sm text-destructive">{message}</p> : null}
-        <ProblemAlert problem={confirm ? null : action.problem} />
-        <ProductSearch
-          onPick={(product) => void action.run(() => addUnit(product.id, product.baseUnit.id))}
-        />
-        {detail.lines.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('inventory.product')}</TableHead>
-                <TableHead>{t('inventory.unit')}</TableHead>
-                <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-                <TableHead>
-                  <span className="sr-only">{t('common.actions')}</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.lines.map((line) => (
-                <TableRow key={line.id}>
-                  <TableCell className="whitespace-normal">
-                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                    {line.productName}
-                  </TableCell>
-                  <TableCell>{line.unitName}</TableCell>
-                  <TableCell className="text-right">
-                    <QtyInput
-                      key={line.requestedQty}
-                      label={`${t('inventory.qty')}: ${line.productName}`}
-                      value={line.requestedQty}
-                      onScan={onScan}
-                      onSave={(qty) =>
-                        void action.run(() =>
-                          mutations.updateLine.mutateAsync({ id: line.id, body: { qty } }),
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      aria-label={`${t('inventory.remove')}: ${line.productName}`}
-                      onClick={() =>
-                        void action.run(() => mutations.removeLine.mutateAsync(line.id))
-                      }
-                    >
-                      {t('inventory.remove')}
-                    </Button>
-                  </TableCell>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.lines')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ScanBox
+            label={t('inventory.transfer.scanProduct')}
+            placeholder={t('inventory.transfer.scanProductPlaceholder')}
+            onScan={onScan}
+          />
+          {message ? <p className="text-sm text-destructive">{message}</p> : null}
+          <ProblemAlert problem={confirm ? null : action.problem} />
+          <ProductSearch
+            onPick={(product) => void action.run(() => addUnit(product.id, product.baseUnit.id))}
+          />
+          {detail.lines.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('inventory.product')}</TableHead>
+                  <TableHead>{t('inventory.unit')}</TableHead>
+                  <TableHead className="text-right">{t('inventory.qty')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          {detail.origin === 'REQUEST' ? (
-            <Button
-              disabled={detail.lines.length === 0 || mutations.request.isPending}
-              onClick={() => {
-                action.clear();
-                setConfirm('request');
-              }}
-            >
-              {t('inventory.transfer.sendRequest')}
-            </Button>
-          ) : (
-            <Button disabled={detail.lines.length === 0} onClick={onShip}>
-              {t('inventory.transfer.prepareShipment')}
-            </Button>
-          )}
+              </TableHeader>
+              <TableBody>
+                {detail.lines.map((line) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                    </TableCell>
+                    <TableCell>{line.unitName}</TableCell>
+                    <TableCell className="text-right">
+                      <QtyInput
+                        key={line.requestedQty}
+                        label={`${t('inventory.qty')}: ${line.productName}`}
+                        value={line.requestedQty}
+                        onScan={onScan}
+                        onSave={(qty) =>
+                          void action.run(() =>
+                            mutations.updateLine.mutateAsync({ id: line.id, body: { qty } }),
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <RowActions>
+                      <RowAction
+                        label={`${t('inventory.remove')}: ${line.productName}`}
+                        icon={Trash2}
+                        destructive
+                        onClick={() =>
+                          void action.run(() => mutations.removeLine.mutateAsync(line.id))
+                        }
+                      />
+                    </RowActions>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : null}
+        </CardContent>
+      </Card>
+      <StickyActions summary={t('inventory.linesCount', { count: detail.lines.length })}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            action.clear();
+            setConfirm(true);
+          }}
+        >
+          {t('inventory.transfer.cancelDraft')}
+        </Button>
+        {detail.origin === 'REQUEST' ? (
           <Button
-            variant="outline"
-            onClick={() => {
-              action.clear();
-              setConfirm('cancel');
-            }}
+            disabled={detail.lines.length === 0 || mutations.request.isPending}
+            onClick={request}
           >
-            {t('inventory.transfer.cancelDraft')}
+            {reopened(detail)
+              ? t('inventory.transfer.resendRequest')
+              : t('inventory.transfer.sendRequest')}
           </Button>
-        </div>
-      </CardContent>
+        ) : (
+          <Button disabled={detail.lines.length === 0} onClick={onShip}>
+            {t('inventory.transfer.prepareShipment')}
+          </Button>
+        )}
+      </StickyActions>
       <ConfirmDialog
-        open={confirm === 'request'}
-        variant="default"
-        title={t('inventory.transfer.requestTitle')}
-        description={t('inventory.transfer.requestDescription')}
-        confirmLabel={t('inventory.transfer.sendRequest')}
-        pending={mutations.request.isPending}
-        problem={action.problem}
-        onConfirm={request}
-        onClose={() => setConfirm(null)}
-      />
-      <ConfirmDialog
-        open={confirm === 'cancel'}
+        open={confirm}
         title={t('inventory.transfer.cancelTitle')}
         confirmLabel={t('inventory.transfer.cancelDraft')}
         pending={mutations.cancel.isPending}
         problem={action.problem}
         onConfirm={cancel}
-        onClose={() => setConfirm(null)}
+        onClose={() => setConfirm(false)}
       />
-    </Card>
+    </>
   );
-}
-
-interface LineCount extends CountEntry {
-  binId: number | null;
-  binCode: string | null;
 }
 
 /**
@@ -707,7 +763,7 @@ function UnitChoice(props: {
 }
 
 /** What a count sends: the line's unit or the base unit, the quantity and the bin. */
-function countsOf(detail: TransferDetail, counts: Record<number, LineCount>) {
+function countsOf(detail: TransferDetail, counts: Record<number, LineCount>): TransferCount[] {
   return detail.lines.map((line) => {
     const count = counts[line.id];
     return {
@@ -719,14 +775,70 @@ function countsOf(detail: TransferDetail, counts: Record<number, LineCount>) {
   });
 }
 
-/** The source ships: quantities default to what was asked, shelves to the fixed shelf. */
-function TransferShipEditor({ detail }: { detail: TransferDetail }) {
+/**
+ * One Idempotency-Key per set of counts: a retry of the same counts replays the stored answer, a
+ * changed count is a new step.
+ */
+function useCountsKey() {
+  const last = useRef<{ counts: string; key: string } | null>(null);
+  return (lines: TransferCount[]) => {
+    const counts = JSON.stringify(lines);
+    if (last.current?.counts !== counts) last.current = { counts, key: randomUuid() };
+    return last.current.key;
+  };
+}
+
+/** Counts restored from this device, with the way back to the defaults. */
+function RestoredNote(props: { restored: number; dropped: number; onReset: () => void }) {
+  const { t } = useTranslation();
+  const [hidden, setHidden] = useState(false);
+  if (hidden || (props.restored === 0 && props.dropped === 0)) return null;
+  return (
+    <Alert>
+      <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {props.restored > 0 ? (
+          <span>{t('inventory.transfer.restored', { count: props.restored })}</span>
+        ) : null}
+        {props.dropped > 0 ? (
+          <span>{t('inventory.transfer.restoreDropped', { count: props.dropped })}</span>
+        ) : null}
+        {props.restored > 0 ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            className="text-link"
+            onClick={() => {
+              props.onReset();
+              setHidden(true);
+            }}
+          >
+            {t('inventory.transfer.resetCounts')}
+          </Button>
+        ) : null}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * The source ships: quantities default to what was asked, shelves to the fixed shelf. The counts
+ * stay on this device until shipped (ADR-0047 #6); a shipment as asked goes at once, one that
+ * differs lists the differences first (#7). The source may decline a request, with a reason.
+ */
+function TransferShipEditor({
+  detail,
+  canDecline,
+}: {
+  detail: TransferDetail;
+  canDecline: boolean;
+}) {
   const { t } = useTranslation();
   const mutations = useTransferMutations();
   const action = useAction();
-  const [key, setKey] = useState(randomUuid);
-  const [confirm, setConfirm] = useState(false);
-  const [counts, setCounts] = useState<Record<number, LineCount>>(() =>
+  const keyFor = useCountsKey();
+  const [confirm, setConfirm] = useState<'ship' | 'decline' | null>(null);
+  const [reason, setReason] = useState('');
+  const step = useStepCounts(detail, 'ship', () =>
     Object.fromEntries(
       detail.lines.map((line) => [
         line.id,
@@ -734,6 +846,7 @@ function TransferShipEditor({ detail }: { detail: TransferDetail }) {
       ]),
     ),
   );
+  const { counts, setCounts } = step;
   const update = (lineId: number, patch: Partial<LineCount>) =>
     setCounts((previous) => {
       const current = previous[lineId];
@@ -751,123 +864,216 @@ function TransferShipEditor({ detail }: { detail: TransferDetail }) {
     (line) => (base(line)?.gt(0) ?? false) && !counts[line.id]?.binId,
   );
   const nothing = detail.lines.every((line) => !(base(line)?.gt(0) ?? false));
+  const differences = detail.lines.flatMap((line) => {
+    const shipped = base(line);
+    if (shipped === null) return [];
+    const difference = shipped.minus(new Decimal(line.requestedQty).times(line.requestFactor));
+    return difference.isZero() ? [] : [{ line, difference, none: shipped.isZero() }];
+  });
 
   const ship = () =>
     void action.run(async () => {
-      await mutations.ship.mutateAsync({ id: detail.id, key, lines: countsOf(detail, counts) });
-      setConfirm(false);
+      const lines = countsOf(detail, counts);
+      const shipped = await mutations.ship.mutateAsync({
+        id: detail.id,
+        key: keyFor(lines),
+        lines,
+      });
+      step.clear();
+      setConfirm(null);
+      toast.success(t('inventory.transfer.shippedToast', { number: shipped.number ?? '' }));
+    });
+  const decline = () =>
+    void action.run(async () => {
+      await mutations.cancel.mutateAsync({ id: detail.id, reason: reason.trim() });
+      step.clear();
+      setConfirm(null);
+      toast.success(t('inventory.transfer.declined'));
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.transfer.shipTitle')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ScanBox
-          letters
-          label={t('inventory.scanLabel')}
-          placeholder={t('inventory.scanPlaceholder')}
-          onScan={scanner.onScan}
-        />
-        <span className="text-sm font-medium">
-          {scanner.activeBin
-            ? t('inventory.activeBin', { code: scanner.activeBin.code })
-            : t('inventory.transfer.shelfHint')}
-        </span>
-        {scanner.message ? (
-          <p className="text-sm text-muted-foreground">{scanner.message}</p>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.transfer.shipTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <RestoredNote restored={step.restored} dropped={step.dropped} onReset={step.reset} />
+          <ScanBox
+            letters
+            label={t('inventory.scanLabel')}
+            placeholder={t('inventory.scanPlaceholder')}
+            onScan={scanner.onScan}
+          />
+          <span className="text-sm font-medium">
+            {scanner.activeBin
+              ? t('inventory.activeBin', { code: scanner.activeBin.code })
+              : t('inventory.transfer.shelfHint')}
+          </span>
+          {scanner.message ? (
+            <p className="text-sm text-muted-foreground">{scanner.message}</p>
+          ) : null}
+          <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.product')}</TableHead>
+                <TableHead className="text-right">{t(requestedLabel(detail.origin))}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.toShip')}</TableHead>
+                <TableHead>{t('inventory.unit')}</TableHead>
+                <TableHead>{t('inventory.transfer.fromBin')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.lines.map((line) => {
+                const count = counts[line.id];
+                const qtyBase = base(line);
+                return (
+                  <TableRow key={line.id}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {t('inventory.qtyWithUnit', { qty: line.requestedQty, unit: line.unitName })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <CountInput
+                        label={`${t('inventory.transfer.toShip')}: ${line.productName}`}
+                        value={count?.qty ?? ''}
+                        invalid={qtyBase === null}
+                        onChange={(qty) => update(line.id, { qty })}
+                        onScan={scanner.onScan}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <UnitChoice
+                        line={line}
+                        base={count?.base ?? false}
+                        onChange={(value) => update(line.id, { base: value })}
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {count?.binCode ??
+                        (qtyBase?.gt(0) ? (
+                          <span className="font-sans text-destructive">
+                            {t('inventory.transfer.scanShelf')}
+                          </span>
+                        ) : (
+                          t('common.none')
+                        ))}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <StickyActions
+        summary={
+          differences.length > 0
+            ? t('inventory.transfer.differencesCount', { count: differences.length })
+            : t('inventory.linesCount', { count: detail.lines.length })
+        }
+      >
+        {canDecline ? (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              action.clear();
+              setReason('');
+              setConfirm('decline');
+            }}
+          >
+            {t('inventory.transfer.decline')}
+          </Button>
         ) : null}
-        <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('inventory.product')}</TableHead>
-              <TableHead className="text-right">{t(requestedLabel(detail.origin))}</TableHead>
-              <TableHead className="text-right">{t('inventory.transfer.toShip')}</TableHead>
-              <TableHead>{t('inventory.unit')}</TableHead>
-              <TableHead>{t('inventory.transfer.fromBin')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.lines.map((line) => {
-              const count = counts[line.id];
-              const qtyBase = base(line);
-              return (
-                <TableRow key={line.id}>
-                  <TableCell className="whitespace-normal">
-                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                    {line.productName}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {t('inventory.qtyWithUnit', { qty: line.requestedQty, unit: line.unitName })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <CountInput
-                      label={`${t('inventory.transfer.toShip')}: ${line.productName}`}
-                      value={count?.qty ?? ''}
-                      invalid={qtyBase === null}
-                      onChange={(qty) => update(line.id, { qty })}
-                      onScan={scanner.onScan}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <UnitChoice
-                      line={line}
-                      base={count?.base ?? false}
-                      onChange={(value) => update(line.id, { base: value })}
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {count?.binCode ??
-                      (qtyBase?.gt(0) ? (
-                        <span className="font-sans text-destructive">
-                          {t('inventory.transfer.scanShelf')}
-                        </span>
-                      ) : (
-                        t('common.none')
-                      ))}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
         <Button
-          className="self-start"
           disabled={invalid || missingBin || nothing || mutations.ship.isPending}
           onClick={() => {
-            setKey(randomUuid());
             action.clear();
-            setConfirm(true);
+            if (differences.length > 0) setConfirm('ship');
+            else ship();
           }}
         >
           {t('inventory.transfer.ship')}
         </Button>
-      </CardContent>
+      </StickyActions>
       <ConfirmDialog
-        open={confirm}
+        open={confirm === 'ship'}
         variant="default"
-        title={t('inventory.transfer.shipConfirm')}
+        title={t('inventory.transfer.shipDifferences')}
         description={t('inventory.transfer.shipDescription')}
         confirmLabel={t('inventory.transfer.ship')}
         pending={mutations.ship.isPending}
         problem={action.problem}
         onConfirm={ship}
-        onClose={() => setConfirm(false)}
+        onClose={() => setConfirm(null)}
+      >
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+          {differences.map(({ line, difference, none }) => (
+            <li key={line.id}>
+              {none
+                ? t('inventory.transfer.shipNone', { name: line.productName })
+                : t(
+                    difference.isNegative()
+                      ? 'inventory.transfer.shipShort'
+                      : 'inventory.transfer.shipExtra',
+                    {
+                      name: line.productName,
+                      qty: t('inventory.qtyWithUnit', {
+                        qty: difference.abs().toFixed(),
+                        unit: line.baseUnitName,
+                      }),
+                    },
+                  )}
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={confirm === 'decline'}
+        title={t('inventory.transfer.declineTitle')}
+        description={t('inventory.transfer.declineDescription')}
+        confirmLabel={t('inventory.transfer.decline')}
+        disabled={!reason.trim()}
+        pending={mutations.cancel.isPending}
+        problem={action.problem}
+        onConfirm={decline}
+        onClose={() => setConfirm(null)}
+      >
+        <FormField label={t('inventory.transfer.declineReason')} htmlFor="transfer-decline-reason">
+          <Textarea
+            id="transfer-decline-reason"
+            rows={2}
+            maxLength={300}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </FormField>
+      </ConfirmDialog>
+      <LeaveGuard
+        when={step.dirty}
+        title={t('inventory.transfer.leaveTitle')}
+        description={t('inventory.transfer.leaveDescription')}
+        leaveLabel={t('inventory.transfer.leave')}
       />
-    </Card>
+    </>
   );
 }
 
-/** The destination counts what arrived, in the unit shipped; the differences are shown first. */
+/**
+ * The destination counts what arrived, in the unit shipped; the differences are shown first. The
+ * counts stay on this device until received; a receipt without differences goes at once.
+ */
 function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
   const { t } = useTranslation();
   const mutations = useTransferMutations();
   const action = useAction();
-  const [key, setKey] = useState(randomUuid);
+  const keyFor = useCountsKey();
   const [confirm, setConfirm] = useState(false);
-  const [counts, setCounts] = useState<Record<number, LineCount>>(() =>
+  const step = useStepCounts(detail, 'receive', () =>
     Object.fromEntries(
       detail.lines.map((line) => [
         line.id,
@@ -879,6 +1085,7 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
       ]),
     ),
   );
+  const { counts, setCounts } = step;
   const update = (lineId: number, patch: Partial<LineCount>) =>
     setCounts((previous) => {
       const current = previous[lineId];
@@ -901,106 +1108,121 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
 
   const receive = () =>
     void action.run(async () => {
-      await mutations.receive.mutateAsync({
+      const lines = countsOf(detail, counts);
+      const received = await mutations.receive.mutateAsync({
         id: detail.id,
-        key,
-        lines: countsOf(detail, counts),
+        key: keyFor(lines),
+        lines,
       });
+      step.clear();
       setConfirm(false);
+      toast.success(t('inventory.transfer.receivedToast', { number: received.number ?? '' }));
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.transfer.receiveTitle')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ScanBox
-          letters
-          label={t('inventory.scanLabel')}
-          placeholder={t('inventory.scanPlaceholder')}
-          onScan={scanner.onScan}
-        />
-        <span className="text-sm font-medium">
-          {scanner.activeBin
-            ? t('inventory.activeBin', { code: scanner.activeBin.code })
-            : t('inventory.transfer.destinationHint')}
-        </span>
-        {scanner.message ? (
-          <p className="text-sm text-muted-foreground">{scanner.message}</p>
-        ) : null}
-        <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('inventory.product')}</TableHead>
-              <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
-              <TableHead className="text-right">{t('inventory.transfer.arrived')}</TableHead>
-              <TableHead>{t('inventory.unit')}</TableHead>
-              <TableHead className="text-right">{t('inventory.transfer.difference')}</TableHead>
-              <TableHead>{t('inventory.transfer.toBin')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.lines.map((line) => {
-              const count = counts[line.id];
-              const difference = differenceOf(line);
-              return (
-                <TableRow key={line.id}>
-                  <TableCell className="whitespace-normal">
-                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                    {line.productName}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    <ShippedQty line={line} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <CountInput
-                      label={`${t('inventory.transfer.arrived')}: ${line.productName}`}
-                      value={count?.qty ?? ''}
-                      invalid={difference === null}
-                      onChange={(qty) => update(line.id, { qty })}
-                      onScan={scanner.onScan}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <UnitChoice
-                      line={line}
-                      base={count?.base ?? false}
-                      onChange={(value) => update(line.id, { base: value })}
-                    />
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      'text-right font-mono',
-                      difference && !difference.isZero() && 'text-destructive',
-                    )}
-                  >
-                    {difference && !difference.isZero()
-                      ? t('inventory.qtyWithUnit', {
-                          qty: signed(difference),
-                          unit: line.baseUnitName,
-                        })
-                      : t('common.none')}
-                  </TableCell>
-                  <TableCell className="font-mono">{count?.binCode ?? t('common.none')}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.transfer.receiveTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <RestoredNote restored={step.restored} dropped={step.dropped} onReset={step.reset} />
+          <ScanBox
+            letters
+            label={t('inventory.scanLabel')}
+            placeholder={t('inventory.scanPlaceholder')}
+            onScan={scanner.onScan}
+          />
+          <span className="text-sm font-medium">
+            {scanner.activeBin
+              ? t('inventory.activeBin', { code: scanner.activeBin.code })
+              : t('inventory.transfer.destinationHint')}
+          </span>
+          {scanner.message ? (
+            <p className="text-sm text-muted-foreground">{scanner.message}</p>
+          ) : null}
+          <ProblemAlert problem={confirm ? null : (action.problem ?? scanner.problem)} />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.product')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.shipped')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.arrived')}</TableHead>
+                <TableHead>{t('inventory.unit')}</TableHead>
+                <TableHead className="text-right">{t('inventory.transfer.difference')}</TableHead>
+                <TableHead>{t('inventory.transfer.toBin')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.lines.map((line) => {
+                const count = counts[line.id];
+                const difference = differenceOf(line);
+                return (
+                  <TableRow key={line.id}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      <ShippedQty line={line} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <CountInput
+                        label={`${t('inventory.transfer.arrived')}: ${line.productName}`}
+                        value={count?.qty ?? ''}
+                        invalid={difference === null}
+                        onChange={(qty) => update(line.id, { qty })}
+                        onScan={scanner.onScan}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <UnitChoice
+                        line={line}
+                        base={count?.base ?? false}
+                        onChange={(value) => update(line.id, { base: value })}
+                      />
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'text-right font-mono',
+                        difference && !difference.isZero() && 'text-destructive',
+                      )}
+                    >
+                      {difference && !difference.isZero()
+                        ? t('inventory.qtyWithUnit', {
+                            qty: signed(difference),
+                            unit: line.baseUnitName,
+                          })
+                        : t('common.none')}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {count?.binCode ?? t('common.none')}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <StickyActions
+        summary={
+          differences.length > 0
+            ? t('inventory.transfer.differencesCount', { count: differences.length })
+            : t('inventory.linesCount', { count: detail.lines.length })
+        }
+      >
         <Button
-          className="self-start"
           disabled={invalid || mutations.receive.isPending}
           onClick={() => {
-            setKey(randomUuid());
             action.clear();
-            setConfirm(true);
+            if (differences.length > 0) setConfirm(true);
+            else receive();
           }}
         >
           {t('inventory.transfer.receive')}
         </Button>
-      </CardContent>
+      </StickyActions>
       <ConfirmDialog
         open={confirm}
         variant="default"
@@ -1011,28 +1233,30 @@ function TransferReceiveEditor({ detail }: { detail: TransferDetail }) {
         onConfirm={receive}
         onClose={() => setConfirm(false)}
       >
-        {differences.length === 0 ? (
-          <p className="text-sm">{t('inventory.transfer.noDifference')}</p>
-        ) : (
-          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
-            {differences.map(({ line, difference }) => (
-              <li key={line.id}>
-                {t(
-                  difference.isNegative() ? 'inventory.transfer.short' : 'inventory.transfer.extra',
-                  {
-                    name: line.productName,
-                    qty: t('inventory.qtyWithUnit', {
-                      qty: difference.abs().toFixed(),
-                      unit: line.baseUnitName,
-                    }),
-                  },
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
+          {differences.map(({ line, difference }) => (
+            <li key={line.id}>
+              {t(
+                difference.isNegative() ? 'inventory.transfer.short' : 'inventory.transfer.extra',
+                {
+                  name: line.productName,
+                  qty: t('inventory.qtyWithUnit', {
+                    qty: difference.abs().toFixed(),
+                    unit: line.baseUnitName,
+                  }),
+                },
+              )}
+            </li>
+          ))}
+        </ul>
       </ConfirmDialog>
-    </Card>
+      <LeaveGuard
+        when={step.dirty}
+        title={t('inventory.transfer.leaveTitle')}
+        description={t('inventory.transfer.leaveDescription')}
+        leaveLabel={t('inventory.transfer.leave')}
+      />
+    </>
   );
 }
 

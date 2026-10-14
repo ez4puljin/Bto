@@ -599,7 +599,7 @@ export function useTransfers(filter: TransferFilter) {
           params: {
             query: {
               warehouseId: filter.warehouseId,
-              direction: filter.warehouseId === undefined ? undefined : filter.direction,
+              direction: filter.direction,
               status: filter.status,
               cursor: pageParam,
               limit: 50,
@@ -613,16 +613,21 @@ export function useTransfers(filter: TransferFilter) {
   });
 }
 
+/** One transfer; read again when the window regains focus, as the other side may have moved it on. */
 export function useTransfer(id: number) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.transfers, id],
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/transfers/{id}', { params: { path: { id } }, signal })),
+    refetchOnWindowFocus: true,
   });
 }
 
-/** Transfer mutations; each refreshes the transfers and, when stock moved, the stock pages. */
+/**
+ * Transfer mutations; each refreshes the transfers and, when stock moved, the stock pages. The
+ * steps refresh after a refusal too: the other side may have shipped, taken back or cancelled.
+ */
 export function useTransferMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -665,7 +670,13 @@ export function useTransferMutations() {
     request: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.POST('/api/v1/transfers/{id}/request', { params: { path: { id } } })),
-      onSuccess: () => changed(),
+      onSettled: () => changed(),
+    }),
+    /** ADR-0046: the destination takes a sent request back to edit it. */
+    reopen: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/transfers/{id}/reopen', { params: { path: { id } } })),
+      onSettled: () => changed(),
     }),
     ship: useMutation({
       mutationFn: async ({ id, key, lines }: { id: number; key: string; lines: TransferCount[] }) =>
@@ -675,7 +686,7 @@ export function useTransferMutations() {
             body: { lines },
           }),
         ),
-      onSuccess: () => changed(true),
+      onSettled: () => changed(true),
     }),
     receive: useMutation({
       mutationFn: async ({ id, key, lines }: { id: number; key: string; lines: TransferCount[] }) =>
@@ -685,7 +696,7 @@ export function useTransferMutations() {
             body: { lines },
           }),
         ),
-      onSuccess: () => changed(true),
+      onSettled: () => changed(true),
     }),
     cancel: useMutation({
       mutationFn: async ({ id, reason }: { id: number; reason?: string }) =>
@@ -695,7 +706,7 @@ export function useTransferMutations() {
             body: reason ? { reason } : {},
           }),
         ),
-      onSuccess: () => changed(),
+      onSettled: () => changed(),
     }),
   };
 }

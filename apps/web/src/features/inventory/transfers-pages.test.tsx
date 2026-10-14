@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
@@ -225,9 +225,9 @@ describe('transfer request', () => {
     );
     await user.selectOptions(from, String(WH1.id));
     const to = createDialog.getByRole('combobox', { name: mn.inventory.transfers.to });
-    // The clerk asks only for the store.
+    // The clerk asks only for the store, which is chosen already.
     expect(within(to).queryByRole('option', { name: WH1.name })).toBeNull();
-    await user.selectOptions(to, String(STORE.id));
+    expect(to).toHaveValue(String(STORE.id));
     await user.click(createDialog.getByRole('button', { name: mn.inventory.transfer.createDraft }));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/transfers')).toHaveLength(1));
     const created = calls(fetchMock, 'POST', '/api/v1/transfers')[0];
@@ -257,13 +257,62 @@ describe('transfer request', () => {
       qty: '2',
     });
 
+    // Sending asks nothing: the request can be taken back (ADR-0047 #7).
     await user.click(screen.getByRole('button', { name: mn.inventory.transfer.sendRequest }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(
-      within(dialog).getByRole('button', { name: mn.inventory.transfer.sendRequest }),
-    );
     expect(await screen.findByRole('heading', { name: 'TR-2026-000001' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/request')).toHaveLength(1);
+    expect(await screen.findByRole('status')).toHaveTextContent('TR-2026-000001');
+  }, 15_000);
+
+  it('takes a sent request back to edit it and sends it again under its number', async () => {
+    let transfer: Schemas['TransferDetail'] = {
+      ...DRAFT,
+      status: 'REQUESTED',
+      number: 'TR-2026-000001',
+      requestedAt: STAMP,
+      lines: [COLA_LINE],
+    };
+    const fetchMock = signedIn(CLERK_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(transfer),
+      'POST /api/v1/transfers/7/reopen': () => {
+        transfer = { ...transfer, status: 'DRAFT', requestedAt: null };
+        return json(transfer);
+      },
+      'POST /api/v1/transfers/7/request': () => {
+        transfer = { ...transfer, status: 'REQUESTED', requestedAt: STAMP };
+        return json(transfer);
+      },
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.reopen }));
+    // No question: the request becomes a draft that keeps its number.
+    expect(await screen.findByText(mn.inventory.transfer.reopenedOwnerNote)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'TR-2026-000001' })).toBeInTheDocument();
+    expect(screen.getAllByText(mn.inventory.transfer.reopenedBadge).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: mn.inventory.transfer.resendRequest }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/request')).toHaveLength(1),
+    );
+    expect(
+      await screen.findByRole('button', { name: mn.inventory.transfer.reopen }),
+    ).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/reopen')).toHaveLength(1);
+  });
+
+  it('tells the sender to wait while a request is being edited', async () => {
+    renderApp(
+      '/inventory/transfers/7',
+      signedIn(WAREHOUSE_ME, {
+        'GET /api/v1/warehouses': warehouses,
+        'GET /api/v1/transfers/7': () =>
+          json({ ...DRAFT, number: 'TR-2026-000001', lines: [COLA_LINE] }),
+      }),
+    );
+    expect(await screen.findByText(mn.inventory.transfer.reopenedSourceNote)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: mn.inventory.transfer.ship })).toBeNull();
   });
 });
 
@@ -306,8 +355,9 @@ describe('shipping', () => {
     await user.type(colaQty, '0.5');
     await waitFor(() => expect(ship).toBeEnabled());
     await user.click(ship);
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: mn.inventory.transfer.ship }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Кока кола: 12 ш дутуу илгээнэ')).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: mn.inventory.transfer.ship }));
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/ship')).toHaveLength(1),
     );
@@ -319,7 +369,112 @@ describe('shipping', () => {
       ],
     });
     expect(post!.headers.get('Idempotency-Key')).toMatch(UUID);
-  });
+  }, 15_000);
+
+  it('ships as asked without a question and declines in one dialog', async () => {
+    const requested: Schemas['TransferDetail'] = {
+      ...DRAFT,
+      status: 'REQUESTED',
+      number: 'TR-2026-000001',
+      requestedAt: STAMP,
+      lines: [COLA_LINE],
+    };
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(requested),
+      'POST /api/v1/transfers/7/cancel': () =>
+        json({ ...requested, status: 'CANCELLED', cancelReason: 'Үлдэгдэлгүй' }),
+      'POST /api/v1/transfers/7/ship': () => json({ ...requested, status: 'SHIPPED' }),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.decline }));
+    const dialog = within(await screen.findByRole('dialog'));
+    const confirm = dialog.getByRole('button', { name: mn.inventory.transfer.decline });
+    expect(confirm).toBeDisabled();
+    await user.type(dialog.getByLabelText(mn.inventory.transfer.declineReason), 'Үлдэгдэлгүй');
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/cancel')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/transfers/7/cancel')[0])).toEqual({
+      reason: 'Үлдэгдэлгүй',
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.inventory.transfer.declined);
+
+    // A shipment exactly as asked goes on the click.
+    cleanup();
+    renderApp('/inventory/transfers/7', fetchMock);
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.ship }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/ship')).toHaveLength(1),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  }, 15_000);
+
+  it('keeps typed counts on this device until they are sent', async () => {
+    const requested: Schemas['TransferDetail'] = {
+      ...DRAFT,
+      status: 'REQUESTED',
+      number: 'TR-2026-000001',
+      requestedAt: STAMP,
+      lines: [COLA_LINE],
+    };
+    const key = `tugeel.inventory.stepCounts.v1:${WAREHOUSE_ME.id}:7:ship`;
+    const routes = {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(requested),
+      'POST /api/v1/transfers/7/ship': () => json({ ...requested, status: 'SHIPPED' }),
+    };
+    // Another user's and an old entry are never used; the old one is swept.
+    localStorage.setItem(
+      `tugeel.inventory.stepCounts.v1:99:7:ship`,
+      JSON.stringify({ savedAt: Date.now(), lines: {} }),
+    );
+    localStorage.setItem(
+      `tugeel.inventory.stepCounts.v1:${WAREHOUSE_ME.id}:8:ship`,
+      JSON.stringify({ savedAt: Date.now() - 8 * 24 * 60 * 60 * 1000, lines: {} }),
+    );
+    const fetchMock = signedIn(WAREHOUSE_ME, routes);
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    const qty = await screen.findByRole('textbox', {
+      name: `${mn.inventory.transfer.toShip}: ${COLA.name}`,
+    });
+    await user.clear(qty);
+    await user.type(qty, '0.5');
+    await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
+    expect(
+      localStorage.getItem(`tugeel.inventory.stepCounts.v1:${WAREHOUSE_ME.id}:8:ship`),
+    ).toBeNull();
+
+    // A reload brings the count back.
+    cleanup();
+    renderApp('/inventory/transfers/7', signedIn(WAREHOUSE_ME, routes));
+    expect(
+      await screen.findByRole('textbox', { name: `${mn.inventory.transfer.toShip}: ${COLA.name}` }),
+    ).toHaveValue('0.5');
+    expect(
+      screen.getByText(mn.inventory.transfer.restored.replace('{{count}}', '1')),
+    ).toBeInTheDocument();
+
+    // Leaving asks first; «Болих» stays on the page.
+    const nav = await findSidebar();
+    await user.click(within(nav).getByRole('link', { name: mn.nav.transfers }));
+    const leave = within(await screen.findByRole('dialog'));
+    expect(leave.getByText(mn.inventory.transfer.leaveTitle)).toBeInTheDocument();
+    await user.click(leave.getByRole('button', { name: mn.common.cancel }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    // Shipped: the kept counts go.
+    await user.click(screen.getByRole('button', { name: mn.inventory.transfer.ship }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: mn.inventory.transfer.ship,
+      }),
+    );
+    await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
+  }, 20_000);
 });
 
 describe('receiving', () => {
@@ -366,5 +521,28 @@ describe('receiving', () => {
       lines: [{ lineId: 1, productUnitId: 77, qty: '1.5', binId: 50 }],
     });
     expect(post!.headers.get('Idempotency-Key')).toMatch(UUID);
+  });
+
+  it('receives a transfer without differences at once', async () => {
+    const shipped: Schemas['TransferDetail'] = {
+      ...DRAFT,
+      status: 'SHIPPED',
+      number: 'TR-2026-000001',
+      shipDate: '2026-10-11',
+      lines: [{ ...COLA_LINE, shippedQtyBase: '24', toBinId: 50, toBinCode: 'SALESFLOOR' }],
+    };
+    const fetchMock = signedIn(CLERK_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/transfers/7': () => json(shipped),
+      'POST /api/v1/transfers/7/receive': () => json({ ...shipped, status: 'RECEIVED' }),
+    });
+    renderApp('/inventory/transfers/7', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.inventory.transfer.receive }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/transfers/7/receive')).toHaveLength(1),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await screen.findByRole('status')).toHaveTextContent('TR-2026-000001');
   });
 });
