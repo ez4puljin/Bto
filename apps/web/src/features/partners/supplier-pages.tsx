@@ -57,7 +57,8 @@ import {
 } from './supplier-columns';
 import { SupplierFacts, SupplierForm } from './supplier-form';
 
-const COLUMNS_STORAGE_KEY = 'tugeel.partners.suppliers.hiddenColumns.v1';
+/** The list's name in the column-choice key (ADR-0050). */
+const COLUMNS_LIST = 'partners.suppliers';
 
 const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
@@ -73,11 +74,7 @@ export function SuppliersPage() {
   const status = isStatus(statusParam) ? statusParam : undefined;
   const suppliers = useSuppliers({ q, status });
   const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
-  const columnState = useHiddenColumns(
-    COLUMNS_STORAGE_KEY,
-    SUPPLIER_COLUMN_KEYS,
-    LOCKED_SUPPLIER_COLUMNS,
-  );
+  const columnState = useHiddenColumns(COLUMNS_LIST, SUPPLIER_COLUMN_KEYS, LOCKED_SUPPLIER_COLUMNS);
   const { hidden } = columnState;
   const columns = useMemo(
     () => SUPPLIER_COLUMNS.filter((column) => !hidden.has(column.key)),

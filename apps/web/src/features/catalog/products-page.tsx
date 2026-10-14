@@ -33,13 +33,15 @@ const STAGE_FILTER: Record<ProductStage, { status: ProductStatus; saleReady?: bo
   INACTIVE: { status: 'INACTIVE' },
 };
 
-const COLUMNS_STORAGE_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
+/** The list's name in the column-choice key (ADR-0050). */
+const COLUMNS_LIST = 'catalog.products';
 const NO_PAGES: readonly { data: never[] }[] = [];
 
 /**
  * Products: search by name in either script, SKU or barcode, filter by category (with its
  * subcategories) and status. Filters live in the URL so "back" keeps them (SPEC §5.2).
- * Every piece of product information has a column; the user picks which ones show (ADR-0037).
+ * Every piece of product information has a column; each user picks which ones show on their
+ * own browser (ADR-0037, ADR-0050).
  */
 export function ProductsPage() {
   const { t } = useTranslation();
@@ -55,11 +57,7 @@ export function ProductsPage() {
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
   const warehouseName = useWarehouseName();
-  const columnState = useHiddenColumns(
-    COLUMNS_STORAGE_KEY,
-    PRODUCT_LIST_COLUMNS,
-    LOCKED_PRODUCT_COLUMNS,
-  );
+  const columnState = useHiddenColumns(COLUMNS_LIST, PRODUCT_LIST_COLUMNS, LOCKED_PRODUCT_COLUMNS);
   const { hidden } = columnState;
   const columns = useMemo(
     () => PRODUCT_COLUMNS.filter((column) => !hidden.has(column.key)),

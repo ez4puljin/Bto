@@ -1,21 +1,26 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useAuthState } from '@/app/auth-context';
 
 /**
- * The columns a user hid on a list, remembered in this browser (ADR-0037). Only hidden keys are
- * stored, so columns added later show up by default. Storage can be missing or refuse writes
- * (private windows, blocked site data): the choice then lasts until the page is closed.
+ * The columns the signed-in user hid on a list, remembered in this browser (ADR-0050) under
+ * `tugeel.<list>.hiddenColumns.v1:<userId>`. A user without a key yet starts from the list's old
+ * shared key (ADR-0037), which is never written again. Only hidden keys are stored, so columns
+ * added later show up by default; showing every column stores an empty list, so the old shared
+ * choice cannot come back. Storage can be missing or refuse writes (private windows, blocked site
+ * data): the choice then lasts until the page is closed.
  */
-export function useHiddenColumns(
-  storageKey: string,
-  keys: readonly string[],
-  locked: readonly string[],
-) {
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() =>
-    readHidden(storageKey, keys, locked),
-  );
+export function useHiddenColumns(list: string, keys: readonly string[], locked: readonly string[]) {
+  const auth = useAuthState();
+  const userId = auth.status === 'authenticated' ? auth.me.id : 0;
+  const shared = `tugeel.${list}.hiddenColumns.v1`;
+  const own = `${shared}:${userId}`;
+  const stored = useMemo(() => readHidden(own, shared, keys, locked), [own, shared, keys, locked]);
+  // The choice made on this page; signing in as someone else reads that user's own.
+  const [chosen, setChosen] = useState<{ key: string; hidden: ReadonlySet<string> } | null>(null);
+  const hidden = chosen?.key === own ? chosen.hidden : stored;
   const save = (next: ReadonlySet<string>) => {
-    setHidden(next);
-    writeHidden(storageKey, next);
+    setChosen({ key: own, hidden: next });
+    writeHidden(own, next);
   };
   const toggle = (key: string) => {
     if (locked.includes(key) || !keys.includes(key)) return;
@@ -29,12 +34,13 @@ export function useHiddenColumns(
 }
 
 function readHidden(
-  storageKey: string,
+  own: string,
+  shared: string,
   keys: readonly string[],
   locked: readonly string[],
 ): ReadonlySet<string> {
   try {
-    const text = window.localStorage.getItem(storageKey);
+    const text = window.localStorage.getItem(own) ?? window.localStorage.getItem(shared);
     if (text === null) return new Set();
     const value: unknown = JSON.parse(text);
     if (!Array.isArray(value)) return new Set();
@@ -50,10 +56,9 @@ function readHidden(
   }
 }
 
-function writeHidden(storageKey: string, hidden: ReadonlySet<string>): void {
+function writeHidden(own: string, hidden: ReadonlySet<string>): void {
   try {
-    if (hidden.size === 0) window.localStorage.removeItem(storageKey);
-    else window.localStorage.setItem(storageKey, JSON.stringify([...hidden]));
+    window.localStorage.setItem(own, JSON.stringify([...hidden]));
   } catch {
     // Storage blocked or full: the choice lasts until the page is closed.
   }

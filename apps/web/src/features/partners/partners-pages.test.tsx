@@ -310,7 +310,9 @@ describe('customers list', () => {
     expect(
       screen.queryByRole('columnheader', { name: mn.partners.customers.columns.note }),
     ).toBeNull();
-    expect(localStorage.getItem('tugeel.partners.customers.hiddenColumns.v1')).toBe('["note"]');
+    expect(localStorage.getItem(`tugeel.partners.customers.hiddenColumns.v1:${OFFICE_ME.id}`)).toBe(
+      '["note"]',
+    );
 
     cleanup();
     renderApp('/partners/customers', signedIn(OFFICE_ME, routes));

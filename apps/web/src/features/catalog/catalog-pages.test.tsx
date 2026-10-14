@@ -217,7 +217,9 @@ const LIST_ROUTES = {
   'GET /api/v1/product-locations': () => list([]),
   'GET /api/v1/product-prices/current': () => json([]),
 };
-const HIDDEN_COLUMNS_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
+/** The column choice every user of a browser shared before ADR-0050, and the admin's own. */
+const SHARED_COLUMNS_KEY = 'tugeel.catalog.products.hiddenColumns.v1';
+const HIDDEN_COLUMNS_KEY = `${SHARED_COLUMNS_KEY}:${ADMIN_ME.id}`;
 const idsOf = (request: Request) => new URL(request.url).searchParams.getAll('productIds');
 const columnHeader = (key: keyof typeof mn.catalog.products.columns) =>
   screen.queryByRole('columnheader', { name: mn.catalog.products.columns[key] });
@@ -355,7 +357,34 @@ describe('products list', () => {
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
     await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
     expect(columnHeader('category')).toBeInTheDocument();
-    expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBeNull();
+    // An empty list, not a missing key: the old shared choice must not come back.
+    expect(localStorage.getItem(HIDDEN_COLUMNS_KEY)).toBe('[]');
+  });
+
+  it("keeps each user's columns, starting from the browser's old shared choice", async () => {
+    localStorage.setItem(SHARED_COLUMNS_KEY, JSON.stringify(['category']));
+    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('category')).toBeNull();
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(
+      await screen.findByRole('menuitemcheckbox', { name: mn.catalog.products.columns.weight }),
+    );
+    await user.keyboard('{Escape}');
+    expect(JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]')).toEqual([
+      'category',
+      'weight',
+    ]);
+    expect(localStorage.getItem(SHARED_COLUMNS_KEY)).toBe('["category"]');
+
+    // Another user of the same browser starts from the old shared choice, not the admin's.
+    cleanup();
+    renderApp('/catalog/products', signedIn(WORKER_ME, routes));
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(columnHeader('category')).toBeNull();
+    expect(columnHeader('weight')).toBeInTheDocument();
   });
 
   it('reads no suppliers, locations or prices while their columns are hidden', async () => {

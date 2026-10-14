@@ -39,7 +39,8 @@ import {
 import { PARTNER_STATUSES } from './partner-schema';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
-const COLUMNS_STORAGE_KEY = 'tugeel.partners.customers.hiddenColumns.v1';
+/** The list's name in the column-choice key (ADR-0050). */
+const COLUMNS_LIST = 'partners.customers';
 type Flag = (typeof FLAGS)[number];
 
 const isKind = (value: string | null): value is CustomerKind =>
@@ -72,11 +73,7 @@ export function CustomersPage() {
     creditHold: flag('creditHold'),
   });
   const rows = customers.data?.pages.flatMap((page) => page.data) ?? [];
-  const columnState = useHiddenColumns(
-    COLUMNS_STORAGE_KEY,
-    CUSTOMER_COLUMN_KEYS,
-    LOCKED_CUSTOMER_COLUMNS,
-  );
+  const columnState = useHiddenColumns(COLUMNS_LIST, CUSTOMER_COLUMN_KEYS, LOCKED_CUSTOMER_COLUMNS);
   const { hidden } = columnState;
   const columns = useMemo(
     () => CUSTOMER_COLUMNS.filter((column) => !hidden.has(column.key)),
