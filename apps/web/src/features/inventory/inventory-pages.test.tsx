@@ -394,6 +394,29 @@ describe('adjustment drafts', () => {
 });
 
 describe('shelf setup', () => {
+  it('adds one shelf after another in the dialog', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/bins': () => list([SHELF]),
+      'POST /api/v1/bins': () => json({ ...SHELF, id: 40, code: 'A-01-04' }, 201),
+    });
+    renderApp('/inventory/bins?warehouseId=1&new=1', fetchMock);
+    const user = userEvent.setup();
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByLabelText(mn.inventory.bins.code), 'A-01-04{Enter}');
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/bins')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/bins')[0])).toEqual({
+      warehouseId: 1,
+      code: 'A-01-04',
+      type: 'STORAGE',
+    });
+    // The dialog stays for the next shelf, its code box empty again.
+    expect(
+      await dialog.findByText(mn.inventory.bins.createdOne.replace('{{code}}', 'A-01-04')),
+    ).toBeInTheDocument();
+    expect(dialog.getByLabelText(mn.inventory.bins.code)).toHaveValue('');
+  });
+
   it('previews a range of labels before creating it', async () => {
     const codes = Array.from({ length: 30 }, (_, index) => {
       const rack = String(Math.floor(index / 3) + 1).padStart(2, '0');
@@ -409,7 +432,10 @@ describe('shelf setup', () => {
     });
     renderApp('/inventory/bins?warehouseId=1', fetchMock);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: mn.inventory.bins.preview }));
+    await user.click(await screen.findByRole('button', { name: mn.inventory.bins.createTitle }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.click(dialog.getByRole('tab', { name: mn.inventory.bins.rangeTitle }));
+    await user.click(dialog.getByRole('button', { name: mn.inventory.bins.preview }));
     expect(await screen.findByText(/30 тавиур: A-01-01 … A-10-03/)).toBeInTheDocument();
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/bins/bulk')[0])).toEqual({
       warehouseId: 1,
@@ -422,8 +448,9 @@ describe('shelf setup', () => {
       levelTo: 3,
       dryRun: true,
     });
-    await user.click(screen.getByRole('button', { name: mn.inventory.bins.createRange }));
+    await user.click(dialog.getByRole('button', { name: mn.inventory.bins.createRange }));
     expect(await screen.findByText('29 тавиур нэмэгдлээ')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(calls(fetchMock, 'POST', '/api/v1/bins/bulk')).toHaveLength(2);
   });
 });

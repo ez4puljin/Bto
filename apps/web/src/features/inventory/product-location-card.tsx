@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { NativeSelect } from '@/components/native-select';
+import { DialogFormFooter, FormField } from '@/components/form';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -175,53 +176,65 @@ function LocationDialog(props: {
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('inventory.location.edit')}</DialogTitle>
-        </DialogHeader>
-        <ProblemAlert problem={action.problem} />
-        <WarehouseSelect
-          options={warehouses.options}
-          value={warehouseId}
-          emptyLabel={t('inventory.pickWarehouse')}
-          onChange={pick}
-        />
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="location-bin">{t('inventory.location.binCode')}</Label>
-          <Input
-            id="location-bin"
-            className="font-mono"
-            placeholder={t('inventory.bins.codePlaceholder')}
-            value={binCode}
-            onChange={(event) => setBinCode(event.target.value)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="location-min">{t('inventory.location.min')}</Label>
-            <Input
-              id="location-min"
-              inputMode="decimal"
-              value={minQty}
-              onChange={(event) => setMinQty(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="location-max">{t('inventory.location.max')}</Label>
-            <Input
-              id="location-max"
-              inputMode="decimal"
-              value={maxQty}
-              onChange={(event) => setMaxQty(event.target.value)}
-            />
-          </div>
-        </div>
-        <Button
-          className="self-start"
-          disabled={warehouseId === undefined || !levelsValid || mutations.setLocation.isPending}
-          onClick={save}
+        <form
+          className="space-y-4"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (warehouseId !== undefined && levelsValid && !mutations.setLocation.isPending) {
+              save();
+            }
+          }}
         >
-          {t('common.save')}
-        </Button>
+          <DialogHeader>
+            <DialogTitle>{t('inventory.location.edit')}</DialogTitle>
+          </DialogHeader>
+          <ProblemAlert problem={action.problem} />
+          <FormField label={t('inventory.warehouse')} htmlFor="location-warehouse">
+            <WarehouseSelect
+              id="location-warehouse"
+              options={warehouses.options}
+              value={warehouseId}
+              emptyLabel={t('inventory.pickWarehouse')}
+              onChange={pick}
+            />
+          </FormField>
+          <FormField label={t('inventory.location.binCode')} htmlFor="location-bin">
+            <Input
+              id="location-bin"
+              className="font-mono sm:w-44"
+              autoComplete="off"
+              placeholder={t('inventory.bins.codePlaceholder')}
+              value={binCode}
+              onChange={(event) => setBinCode(event.target.value)}
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t('inventory.location.min')} htmlFor="location-min">
+              <Input
+                id="location-min"
+                inputMode="decimal"
+                className="font-mono"
+                value={minQty}
+                onChange={(event) => setMinQty(event.target.value)}
+              />
+            </FormField>
+            <FormField label={t('inventory.location.max')} htmlFor="location-max">
+              <Input
+                id="location-max"
+                inputMode="decimal"
+                className="font-mono"
+                value={maxQty}
+                onChange={(event) => setMaxQty(event.target.value)}
+              />
+            </FormField>
+          </div>
+          <DialogFormFooter
+            pending={mutations.setLocation.isPending}
+            disabled={warehouseId === undefined || !levelsValid}
+            onCancel={props.onClose}
+          />
+        </form>
       </DialogContent>
     </Dialog>
   );
