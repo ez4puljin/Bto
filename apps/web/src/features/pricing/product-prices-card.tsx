@@ -48,7 +48,7 @@ export function ProductPricesCard({ productId, pending }: { productId: number; p
         <CardTitle>{t('pricing.card.title')}</CardTitle>
         {canManage && data ? (
           <CardAction>
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
               {t('pricing.card.set')}
             </Button>
           </CardAction>

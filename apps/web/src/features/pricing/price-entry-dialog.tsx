@@ -1,6 +1,7 @@
 import { CircleCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FormField } from '@/components/form';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -184,17 +184,16 @@ function PriceEntryForm(props: { prices: ProductPrices; pending: boolean; onClos
           {t('pricing.dialog.fromToday', { date: prices.today })}
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="price-valid-from">{t('pricing.dialog.validFrom')}</Label>
+        <FormField label={t('pricing.dialog.validFrom')} htmlFor="price-valid-from">
           <Input
             id="price-valid-from"
             type="date"
             min={prices.today}
             value={validFrom}
             onChange={(event) => setValidFrom(event.target.value)}
-            className="max-w-48"
+            className="sm:w-44"
           />
-        </div>
+        </FormField>
       )}
       <Table>
         <TableHeader>

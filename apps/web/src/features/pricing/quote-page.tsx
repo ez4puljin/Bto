@@ -2,7 +2,7 @@ import { businessDate } from '@tugeel/shared/time';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ListCard } from '@/components/list';
+import { ListCard, RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -164,22 +164,20 @@ export function PriceQuotePage() {
                         }
                       />
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`${t('pricing.quote.remove')}: ${line.name}`}
+                    <RowActions>
+                      <RowAction
+                        label={`${t('pricing.quote.remove')}: ${line.name}`}
+                        icon={Trash2}
+                        destructive
                         onClick={() => change(lines.filter((row) => row.key !== line.key))}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </TableCell>
+                      />
+                    </RowActions>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-          <div>
+          <div className="flex justify-end">
             <Button disabled={lines.length === 0 || quote.isPending} onClick={calculate}>
               {t('pricing.quote.calculate')}
             </Button>

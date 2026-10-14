@@ -4,11 +4,12 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
+import { FormFooter, FormRow, FormSection } from '@/components/form';
+import { RowAction } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { type Crumb, PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCategories, useProduct, useUoms } from '@/features/catalog/api';
@@ -182,219 +183,224 @@ function ProgramForm(props: {
           {t(`pricing.programs.issues.${shown.issue}`, { step: shown.step ?? 0 })}
         </p>
       ) : null}
-      <Card className="max-w-3xl">
-        <CardContent>
-          <form
-            className="grid gap-4 sm:grid-cols-2"
-            noValidate
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            <div className="flex flex-col gap-2 sm:col-span-2">
-              <Label htmlFor="program-name">{t('pricing.programs.fields.name')}</Label>
-              <Input
-                id="program-name"
-                maxLength={120}
-                value={draft.name}
-                onChange={(event) => update({ name: event.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-list">{t('pricing.programs.fields.list')}</Label>
-              <NativeSelect
-                id="program-list"
-                value={draft.list}
-                onChange={(event) =>
-                  update({ list: event.target.value === 'RETAIL' ? 'RETAIL' : 'WHOLESALE' })
-                }
-              >
-                <option value="WHOLESALE">{t('pricing.lists.WHOLESALE')}</option>
-                <option value="RETAIL">{t('pricing.lists.RETAIL')}</option>
-              </NativeSelect>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-scope">{t('pricing.programs.fields.scope')}</Label>
-              <NativeSelect
-                id="program-scope"
-                value={draft.scope}
-                onChange={(event) =>
-                  setScope(SCOPES.find((scope) => scope === event.target.value) ?? 'PRODUCT')
-                }
-              >
-                {SCOPES.map((scope) => (
-                  <option key={scope} value={scope}>
-                    {t(`pricing.programs.scopes.${scope}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+      <form
+        className="flex max-w-3xl flex-col gap-5"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <FormSection title={t('pricing.programs.sectionGeneral')}>
+          <FormRow label={t('pricing.programs.fields.name')} htmlFor="program-name">
+            <Input
+              id="program-name"
+              maxLength={120}
+              value={draft.name}
+              onChange={(event) => update({ name: event.target.value })}
+            />
+          </FormRow>
+          <FormRow label={t('pricing.programs.fields.list')} htmlFor="program-list">
+            <NativeSelect
+              id="program-list"
+              className="sm:w-56"
+              value={draft.list}
+              onChange={(event) =>
+                update({ list: event.target.value === 'RETAIL' ? 'RETAIL' : 'WHOLESALE' })
+              }
+            >
+              <option value="WHOLESALE">{t('pricing.lists.WHOLESALE')}</option>
+              <option value="RETAIL">{t('pricing.lists.RETAIL')}</option>
+            </NativeSelect>
+          </FormRow>
+          <FormRow label={t('pricing.programs.fields.validFrom')} htmlFor="program-valid-from">
+            <Input
+              id="program-valid-from"
+              type="date"
+              className="sm:w-44"
+              min={today}
+              value={draft.validFrom}
+              onChange={(event) => update({ validFrom: event.target.value })}
+            />
+          </FormRow>
+          <FormRow label={t('pricing.programs.fields.validTo')} htmlFor="program-last-day">
+            <Input
+              id="program-last-day"
+              type="date"
+              className="sm:w-44"
+              min={draft.validFrom}
+              value={draft.lastDay}
+              onChange={(event) => update({ lastDay: event.target.value })}
+            />
+          </FormRow>
+        </FormSection>
 
-            {draft.scope === 'PRODUCT' ? (
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label>{t('pricing.programs.fields.product')}</Label>
-                {product ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-mono text-muted-foreground">{product.sku}</span>
-                    <span className="font-medium">{product.name}</span>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={() => {
-                        setProduct(null);
-                        update({ productId: null, productUnitId: null, thresholdUnitId: null });
-                      }}
-                    >
-                      {t('pricing.programs.changeProduct')}
-                    </Button>
-                  </div>
-                ) : (
-                  <ProductSearch
-                    pickLabel={t('pricing.programs.pickProduct')}
-                    onPick={(picked) => {
-                      setProduct({ id: picked.id, sku: picked.sku, name: picked.name });
-                      update({
-                        productId: picked.id,
-                        productUnitId: null,
-                        thresholdUnitId: picked.baseUnit.id,
-                        thresholdFactor: '1',
-                        thresholdUnitName: picked.baseUnit.uomName,
-                      });
+        <FormSection title={t('pricing.programs.sectionWhat')}>
+          <FormRow label={t('pricing.programs.fields.scope')} htmlFor="program-scope">
+            <NativeSelect
+              id="program-scope"
+              className="sm:w-56"
+              value={draft.scope}
+              onChange={(event) =>
+                setScope(SCOPES.find((scope) => scope === event.target.value) ?? 'PRODUCT')
+              }
+            >
+              {SCOPES.map((scope) => (
+                <option key={scope} value={scope}>
+                  {t(`pricing.programs.scopes.${scope}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormRow>
+          {draft.scope === 'PRODUCT' ? (
+            <FormRow label={t('pricing.programs.fields.product')}>
+              {product ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm sm:pt-2">
+                  <span className="font-mono text-muted-foreground">{product.sku}</span>
+                  <span className="font-medium">{product.name}</span>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => {
+                      setProduct(null);
+                      update({ productId: null, productUnitId: null, thresholdUnitId: null });
                     }}
-                  />
-                )}
-              </div>
-            ) : null}
-            {draft.scope === 'PRODUCT' && draft.productId !== null ? (
-              <ProductUnitFields draft={draft} productId={draft.productId} update={update} />
-            ) : null}
-
-            {draft.scope === 'CATEGORY' ? (
-              <>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="program-category">{t('pricing.programs.fields.category')}</Label>
+                  >
+                    {t('pricing.programs.changeProduct')}
+                  </Button>
+                </div>
+              ) : (
+                <ProductSearch
+                  pickLabel={t('pricing.programs.pickProduct')}
+                  onPick={(picked) => {
+                    setProduct({ id: picked.id, sku: picked.sku, name: picked.name });
+                    update({
+                      productId: picked.id,
+                      productUnitId: null,
+                      thresholdUnitId: picked.baseUnit.id,
+                      thresholdFactor: '1',
+                      thresholdUnitName: picked.baseUnit.uomName,
+                    });
+                  }}
+                />
+              )}
+            </FormRow>
+          ) : null}
+          {draft.scope === 'PRODUCT' && draft.productId !== null ? (
+            <ProductUnitFields draft={draft} productId={draft.productId} update={update} />
+          ) : null}
+          {draft.scope === 'CATEGORY' ? (
+            <>
+              <FormRow label={t('pricing.programs.fields.category')} htmlFor="program-category">
+                <NativeSelect
+                  id="program-category"
+                  value={draft.categoryId ?? ''}
+                  onChange={(event) =>
+                    update({
+                      categoryId: event.target.value
+                        ? Number.parseInt(event.target.value, 10)
+                        : null,
+                    })
+                  }
+                >
+                  <option value="" />
+                  {tree.map((node) => (
+                    <option key={node.category.id} value={node.category.id}>
+                      {node.path}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </FormRow>
+              <FormRow label={t('pricing.programs.fields.measure')} htmlFor="program-measure">
+                <NativeSelect
+                  id="program-measure"
+                  className="sm:w-56"
+                  value={draft.measure}
+                  onChange={(event) =>
+                    update({
+                      measure: MEASURES.find((measure) => measure === event.target.value) ?? 'QTY',
+                    })
+                  }
+                >
+                  {MEASURES.map((measure) => (
+                    <option key={measure} value={measure}>
+                      {t(`pricing.programs.measures.${measure}`)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </FormRow>
+              {draft.measure === 'QTY' ? (
+                <FormRow label={t('pricing.programs.fields.countUom')} htmlFor="program-count-uom">
                   <NativeSelect
-                    id="program-category"
-                    value={draft.categoryId ?? ''}
+                    id="program-count-uom"
+                    className="sm:w-56"
+                    value={draft.countUomId ?? ''}
                     onChange={(event) =>
                       update({
-                        categoryId: event.target.value
+                        countUomId: event.target.value
                           ? Number.parseInt(event.target.value, 10)
                           : null,
                       })
                     }
                   >
                     <option value="" />
-                    {tree.map((node) => (
-                      <option key={node.category.id} value={node.category.id}>
-                        {node.path}
+                    {(uoms.data ?? []).map((uom) => (
+                      <option key={uom.id} value={uom.id}>
+                        {uom.name}
                       </option>
                     ))}
                   </NativeSelect>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="program-measure">{t('pricing.programs.fields.measure')}</Label>
-                  <NativeSelect
-                    id="program-measure"
-                    value={draft.measure}
-                    onChange={(event) =>
-                      update({
-                        measure:
-                          MEASURES.find((measure) => measure === event.target.value) ?? 'QTY',
-                      })
-                    }
-                  >
-                    {MEASURES.map((measure) => (
-                      <option key={measure} value={measure}>
-                        {t(`pricing.programs.measures.${measure}`)}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-                {draft.measure === 'QTY' ? (
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="program-count-uom">
-                      {t('pricing.programs.fields.countUom')}
-                    </Label>
-                    <NativeSelect
-                      id="program-count-uom"
-                      value={draft.countUomId ?? ''}
-                      onChange={(event) =>
-                        update({
-                          countUomId: event.target.value
-                            ? Number.parseInt(event.target.value, 10)
-                            : null,
-                        })
-                      }
-                    >
-                      <option value="" />
-                      {(uoms.data ?? []).map((uom) => (
-                        <option key={uom.id} value={uom.id}>
-                          {uom.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
+                </FormRow>
+              ) : null}
+            </>
+          ) : null}
+          <FormRow label={t('pricing.programs.fields.effect')} htmlFor="program-effect">
+            <NativeSelect
+              id="program-effect"
+              className="sm:w-56"
+              value={draft.effect}
+              onChange={(event) =>
+                update({
+                  effect:
+                    effectsFor(draft.scope).find((effect) => effect === event.target.value) ??
+                    'PERCENT',
+                })
+              }
+            >
+              {effectsFor(draft.scope).map((effect: DiscountEffect) => (
+                <option key={effect} value={effect}>
+                  {t(`pricing.programs.effects.${effect}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormRow>
+        </FormSection>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-effect">{t('pricing.programs.fields.effect')}</Label>
-              <NativeSelect
-                id="program-effect"
-                value={draft.effect}
-                onChange={(event) =>
-                  update({
-                    effect:
-                      effectsFor(draft.scope).find((effect) => effect === event.target.value) ??
-                      'PERCENT',
-                  })
-                }
-              >
-                {effectsFor(draft.scope).map((effect: DiscountEffect) => (
-                  <option key={effect} value={effect}>
-                    {t(`pricing.programs.effects.${effect}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-valid-from">{t('pricing.programs.fields.validFrom')}</Label>
-              <Input
-                id="program-valid-from"
-                type="date"
-                min={today}
-                value={draft.validFrom}
-                onChange={(event) => update({ validFrom: event.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="program-last-day">{t('pricing.programs.fields.validTo')}</Label>
-              <Input
-                id="program-last-day"
-                type="date"
-                min={draft.validFrom}
-                value={draft.lastDay}
-                onChange={(event) => update({ lastDay: event.target.value })}
-              />
-            </div>
+        <StepsEditor draft={draft} update={update} unitName={thresholdUnitName} />
 
-            <StepsEditor draft={draft} update={update} unitName={thresholdUnitName} />
-
-            <div className="sm:col-span-2">
-              <Button
-                type="submit"
-                disabled={mutations.createProgram.isPending || mutations.updateProgram.isPending}
-              >
-                {t('common.save')}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        <FormFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              void navigate(
+                props.programId === null
+                  ? '/pricing/discounts'
+                  : `/pricing/discounts/${props.programId}`,
+              )
+            }
+          >
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            disabled={mutations.createProgram.isPending || mutations.updateProgram.isPending}
+          >
+            {t('common.save')}
+          </Button>
+        </FormFooter>
+      </form>
     </div>
   );
 }
@@ -420,10 +426,10 @@ function ProductUnitFields(props: {
   return (
     <>
       <ProblemAlert problem={problemFromError(product.error)} />
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="program-unit">{t('pricing.programs.fields.productUnit')}</Label>
+      <FormRow label={t('pricing.programs.fields.productUnit')} htmlFor="program-unit">
         <NativeSelect
           id="program-unit"
+          className="sm:w-72"
           value={props.draft.productUnitId ?? ''}
           onChange={(event) =>
             props.update({
@@ -438,11 +444,15 @@ function ProductUnitFields(props: {
             </option>
           ))}
         </NativeSelect>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="program-threshold-unit">{t('pricing.programs.fields.thresholdUnit')}</Label>
+      </FormRow>
+      <FormRow
+        label={t('pricing.programs.fields.thresholdUnit')}
+        htmlFor="program-threshold-unit"
+        hint={t('pricing.programs.thresholdUnitHint')}
+      >
         <NativeSelect
           id="program-threshold-unit"
+          className="sm:w-72"
           value={props.draft.thresholdUnitId ?? base?.id ?? ''}
           onChange={(event) => {
             const unit = units.find((row) => String(row.id) === event.target.value);
@@ -461,7 +471,7 @@ function ProductUnitFields(props: {
             </option>
           ))}
         </NativeSelect>
-      </div>
+      </FormRow>
     </>
   );
 }
@@ -490,60 +500,59 @@ function StepsEditor(props: {
     });
 
   return (
-    <fieldset className="flex flex-col gap-2 sm:col-span-2">
-      <legend className="mb-2 text-sm font-medium">{t('pricing.programs.fields.steps')}</legend>
+    <FormSection
+      title={t('pricing.programs.fields.steps')}
+      action={
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="text-link"
+          onClick={() => props.update({ steps: [...draft.steps, { threshold: '', value: '' }] })}
+        >
+          <Plus />
+          {t('pricing.programs.addStep')}
+        </Button>
+      }
+    >
       {draft.steps.map((step, index) => (
-        <div key={index} className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`step-threshold-${index}`} className="text-xs">
+        <div key={index} className="flex flex-wrap items-end gap-3 px-3.5 py-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`step-threshold-${index}`} className="text-[13px] text-foreground/80">
               {thresholdHead}
             </Label>
             <Input
               id={`step-threshold-${index}`}
               inputMode="decimal"
               autoComplete="off"
-              className="w-40"
+              className="w-40 font-mono"
               value={step.threshold}
               onChange={(event) => setStep(index, { threshold: event.target.value.trim() })}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`step-value-${index}`} className="text-xs">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`step-value-${index}`} className="text-[13px] text-foreground/80">
               {valueHead}
             </Label>
             <Input
               id={`step-value-${index}`}
               inputMode="decimal"
               autoComplete="off"
-              className="w-40"
+              className="w-40 font-mono"
               value={step.value}
               onChange={(event) => setStep(index, { value: event.target.value.trim() })}
             />
           </div>
           {draft.steps.length > 1 ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label={t('pricing.programs.removeStep')}
+            <RowAction
+              label={t('pricing.programs.removeStep')}
+              icon={Trash2}
+              destructive
               onClick={() => props.update({ steps: draft.steps.filter((_, at) => at !== index) })}
-            >
-              <Trash2 />
-            </Button>
+            />
           ) : null}
         </div>
       ))}
-      <div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => props.update({ steps: [...draft.steps, { threshold: '', value: '' }] })}
-        >
-          <Plus />
-          {t('pricing.programs.addStep')}
-        </Button>
-      </div>
-    </fieldset>
+    </FormSection>
   );
 }

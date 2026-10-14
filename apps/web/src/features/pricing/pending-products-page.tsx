@@ -10,6 +10,7 @@ import {
   RowAction,
   RowActions,
   SearchField,
+  SkeletonRows,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -186,6 +187,7 @@ export function PendingProductsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {products.isPending ? <SkeletonRows columns={7} /> : null}
             {rows.map((row) => (
               <TableRow key={row.id} data-state={selected.has(row.id) ? 'selected' : undefined}>
                 <TableCell>
