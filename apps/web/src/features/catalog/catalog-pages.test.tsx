@@ -18,6 +18,14 @@ import {
 type Schemas = components['schemas'];
 const STAMP = '2026-10-01T02:00:00.000Z';
 const list = <T,>(data: T[], nextCursor: string | null = null) => json({ data, nextCursor });
+/** A page of `POST /products/query`: the total comes with the first page only. */
+const queryPage = <T,>(
+  data: T[],
+  nextCursor: string | null = null,
+  total: number | null = data.length,
+) => json({ data, nextCursor, total });
+/** The JSON body a request sent, read from a copy so its handler may read it too. */
+const sent = async (request: Request) => (await request.clone().json()) as Record<string, unknown>;
 /** A valid EAN-13 from its first twelve digits. */
 const ean = (body: string) => `${body}${gtinCheckDigit(body)}`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -228,11 +236,11 @@ describe('products list', () => {
   it('searches, keeps the search in the URL and loads the next page', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
-      'GET /api/v1/products': (request) => {
-        const query = new URL(request.url).searchParams;
-        if (query.get('cursor') === 'page-2') return list([listItem(2, '10002', 'Фанта')]);
-        if (query.get('q') === 'coca') return list([listItem(1, '10001', 'Кока кола')]);
-        return list([listItem(1, '10001', 'Кока кола')], 'page-2');
+      'POST /api/v1/products/query': async (request) => {
+        const body = await sent(request);
+        if (body.cursor === 'page-2') return queryPage([listItem(2, '10002', 'Фанта')], null, null);
+        if (body.q === 'coca') return queryPage([listItem(1, '10001', 'Кока кола')]);
+        return queryPage([listItem(1, '10001', 'Кока кола')], 'page-2', 2);
       },
     });
     const { router } = renderApp('/catalog/products', fetchMock);
@@ -256,25 +264,184 @@ describe('products list', () => {
     await user.type(screen.getByRole('searchbox', { name: mn.common.search }), 'coca');
     await waitFor(() => expect(router.state.location.search).toBe('?q=coca'));
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Фанта' })).toBeNull());
-    expect(
-      calls(fetchMock, 'GET', '/api/v1/products').some(
-        (request) => new URL(request.url).searchParams.get('q') === 'coca',
-      ),
-    ).toBe(true);
+    const bodies = await Promise.all(calls(fetchMock, 'POST', '/api/v1/products/query').map(sent));
+    expect(bodies.some((body) => body.q === 'coca')).toBe(true);
   });
 
   it('filters the products waiting for their prices and marks them', async () => {
     const waiting = listItem(3, '10003', 'Шинэ ус', { saleReadyAt: null });
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
-      'GET /api/v1/products': () => list([waiting]),
+      'POST /api/v1/products/query': () => queryPage([waiting]),
     });
     renderApp('/catalog/products?status=PENDING', fetchMock);
     const table = await screen.findByRole('table');
     expect(await within(table).findByText(mn.catalog.products.status.PENDING)).toBeInTheDocument();
-    const [request] = calls(fetchMock, 'GET', '/api/v1/products');
-    const query = new URL(request?.url ?? 'http://x').searchParams;
-    expect([query.get('status'), query.get('saleReady')]).toEqual(['ACTIVE', 'false']);
+    const [request] = calls(fetchMock, 'POST', '/api/v1/products/query');
+    const body = request ? await sent(request) : {};
+    expect([body.status, body.saleReady]).toEqual(['ACTIVE', false]);
+  });
+
+  it('filters with «Шүүлтүүр», counts the products and keeps the filters in the URL', async () => {
+    const supplierRow = (id: number, name: string): Schemas['SupplierListItem'] => ({
+      id,
+      code: String(id),
+      name,
+      tin: null,
+      phone: null,
+      status: 'ACTIVE',
+      regNo: null,
+      email: null,
+      address: null,
+      bankName: null,
+      bankAccount: null,
+      paymentTermDays: null,
+      note: null,
+      contact: null,
+      productCount: 1,
+    });
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/suppliers': (request) =>
+        new URL(request.url).searchParams.getAll('ids').length > 0
+          ? list([supplierRow(7, 'МСМ ХХК')])
+          : list([supplierRow(7, 'МСМ ХХК'), supplierRow(8, 'АПУ ХК')]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW], null, 1751),
+    });
+    const { router } = renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    expect(
+      screen.getByText(mn.catalog.products.count.replace('{{total}}', '1,751')),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.filters.menu }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.filters.fields.supplier }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('tab', { name: mn.catalog.products.filters.supplierModes.MAIN_IN }),
+    );
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'МСМ ХХК' }));
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.filters.apply }),
+    );
+    await waitFor(() => expect(router.state.location.search).toBe('?supplier=main%3A7'));
+    const chipName = `${mn.catalog.products.filters.supplierModes.MAIN_IN}: МСМ ХХК`;
+    expect(await screen.findByRole('button', { name: chipName })).toBeInTheDocument();
+    await waitFor(async () => {
+      const bodies = await Promise.all(
+        calls(fetchMock, 'POST', '/api/v1/products/query').map(sent),
+      );
+      expect(bodies.at(-1)).toMatchObject({
+        where: {
+          match: 'ALL',
+          groups: [{ match: 'ALL', conditions: [{ field: 'supplier', op: 'MAIN_IN', ids: [7] }] }],
+        },
+      });
+    });
+
+    // The chip opens its dialog again; its button removes the filter.
+    await user.click(screen.getByRole('button', { name: chipName }));
+    expect(
+      within(await screen.findByRole('dialog')).getByRole('checkbox', { name: 'МСМ ХХК' }),
+    ).toBeChecked();
+    await user.click(screen.getByRole('button', { name: mn.common.cancel }));
+    await user.click(
+      screen.getByRole('button', {
+        name: mn.catalog.products.filters.clear.replace(
+          '{{name}}',
+          mn.catalog.products.filters.supplierModes.MAIN_IN,
+        ),
+      }),
+    );
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+  });
+
+  it('reads the filters of a shared link, names them and clears them all', async () => {
+    const segment: Schemas['Segment'] = {
+      id: 5,
+      entity: 'PRODUCT',
+      name: 'Ундааны бараа',
+      description: null,
+      definition: { match: 'ALL', groups: [] },
+      createdAt: STAMP,
+      updatedAt: STAMP,
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/segments': () => list([segment]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+    });
+    const { router } = renderApp(
+      '/catalog/products?segment=5&stock=out&price=1000~&created=30d&missing=photo,price',
+      fetchMock,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    const filters = mn.catalog.products.filters;
+    for (const name of [
+      `${filters.fields.segment}: Ундааны бараа`,
+      `${filters.fields.stock}: ${filters.stockKinds.out}`,
+      `${filters.fields.price}: ≥ 1,000₮`,
+      `${filters.fields.created}: ${filters.lastDays.replace('{{count}}', '30')}`,
+      `${filters.fields.missing}: ${mn.segments.missing.PHOTO}, ${filters.missingNone.price}`,
+    ]) {
+      expect(await screen.findByRole('button', { name })).toBeInTheDocument();
+    }
+    const [request] = calls(fetchMock, 'POST', '/api/v1/products/query');
+    expect(request ? await sent(request) : {}).toMatchObject({
+      segmentId: 5,
+      where: {
+        match: 'ALL',
+        groups: [
+          {
+            match: 'ALL',
+            conditions: [
+              { field: 'warehousePrice', op: 'BETWEEN', min: '1000' },
+              { field: 'stock', op: 'OUT_OF_STOCK' },
+              { field: 'createdAt', op: 'LAST_DAYS', days: 30 },
+            ],
+          },
+          {
+            match: 'ANY',
+            conditions: [
+              { field: 'missing', op: 'IS', values: ['PHOTO'] },
+              { field: 'priceProfile', op: 'NONE' },
+            ],
+          },
+        ],
+      },
+    });
+    await user.click(screen.getByRole('button', { name: filters.clearAll }));
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+  });
+
+  it('checks a price range before filtering by it', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+    });
+    const { router } = renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Кока кола' });
+    await user.click(screen.getByRole('button', { name: mn.catalog.products.filters.menu }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: mn.catalog.products.filters.fields.price }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(mn.catalog.products.filters.minPrice), '5000');
+    await user.type(within(dialog).getByLabelText(mn.catalog.products.filters.maxPrice), '1,000');
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.filters.apply }),
+    );
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(mn.segments.issues.MONEY_ORDER);
+    await user.clear(within(dialog).getByLabelText(mn.catalog.products.filters.minPrice));
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.filters.apply }),
+    );
+    await waitFor(() => expect(router.state.location.search).toBe('?price=%7E1000'));
   });
 
   it('shows every piece of product information in its own column', async () => {
@@ -282,7 +449,7 @@ describe('products list', () => {
       '/catalog/products',
       signedIn(ADMIN_ME, {
         ...LIST_ROUTES,
-        'GET /api/v1/products': () => list([COLA_ROW]),
+        'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
         'GET /api/v1/product-suppliers': () =>
           list([supplierLink(1, 1, 'МСМ ХХК', true), supplierLink(2, 1, 'АПУ ХК', false)]),
         'GET /api/v1/product-locations': () =>
@@ -334,7 +501,7 @@ describe('products list', () => {
   });
 
   it('hides a column, remembers it, and shows every column again', async () => {
-    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
     await screen.findByRole('link', { name: 'Кока кола' });
@@ -363,7 +530,7 @@ describe('products list', () => {
 
   it("keeps each user's columns, starting from the browser's old shared choice", async () => {
     localStorage.setItem(SHARED_COLUMNS_KEY, JSON.stringify(['category']));
-    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
     await screen.findByRole('link', { name: 'Кока кола' });
@@ -394,7 +561,7 @@ describe('products list', () => {
     );
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
-      'GET /api/v1/products': () => list([COLA_ROW]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
     });
     renderApp('/catalog/products', fetchMock);
     await screen.findByRole('link', { name: 'Кока кола' });
@@ -406,7 +573,7 @@ describe('products list', () => {
   });
 
   it('ignores a broken or foreign stored choice and still hides when storage refuses', async () => {
-    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     localStorage.setItem(HIDDEN_COLUMNS_KEY, '{not json');
     renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     await screen.findByRole('link', { name: 'Кока кола' });
@@ -434,7 +601,7 @@ describe('products list', () => {
   });
 
   it('opens a product from its name or anywhere on its row', async () => {
-    const routes = { ...LIST_ROUTES, 'GET /api/v1/products': () => list([COLA_ROW]) };
+    const routes = { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) };
     const first = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const user = userEvent.setup();
     await user.click(await screen.findByRole('link', { name: 'Кока кола' }));

@@ -11,6 +11,11 @@ export function formatMnt(value: string): string {
   return `${sign}${grouped}${cents === '00' ? '' : `.${cents}`}`;
 }
 
+/** A count for reading, thousands grouped with commas (1751 → "1,751"). */
+export function formatCount(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 /** A NUMERIC string without trailing zeros, for a form field ("47.918400" → "47.9184"). */
 export function plainDecimal(value: string): string {
   return new Decimal(value).toString();

@@ -136,6 +136,22 @@ export function useSuppliers(
   });
 }
 
+/** Given suppliers by id (a filter chip's names, ADR-0049), in one read; nothing when none. */
+export function useSuppliersByIds(ids: readonly number[]) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.suppliers, 'ids', ids],
+    enabled: ids.length > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/suppliers', {
+          params: { query: { ids: [...ids], limit: 200 } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 export function useSupplier(id: number) {
   const api = useApiClient();
   return useQuery({

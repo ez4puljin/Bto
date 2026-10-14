@@ -11,11 +11,20 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
+import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
-import { type ProductStatus, useCategories, useProducts } from './api';
+import { type ProductStatus, useCategories, useProductQuery } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
 import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMNS } from './product-columns';
+import { ProductFilterMenu } from './product-filter-menu';
+import {
+  filterParam,
+  PRODUCT_FILTER_FIELDS,
+  type ProductFilters,
+  readFilters,
+  whereOf,
+} from './product-filters';
 import { type ProductStage } from './product-stage';
 import { ProductTable, type ProductTableContext } from './product-table';
 
@@ -39,7 +48,9 @@ const NO_PAGES: readonly { data: never[] }[] = [];
 
 /**
  * Products: search by name in either script, SKU or barcode, filter by category (with its
- * subcategories) and status. Filters live in the URL so "back" keeps them (SPEC §5.2).
+ * subcategories), status and «Шүүлтүүр» (suppliers, homes, prices, stock, dates, missing data, a
+ * segment; ADR-0049), with the count the filters keep. Filters live in the URL so "back" keeps
+ * them (SPEC §5.2).
  * Every piece of product information has a column; each user picks which ones show on their
  * own browser (ADR-0037, ADR-0050).
  */
@@ -52,7 +63,16 @@ export function ProductsPage() {
   const categoryId = positiveId(params.get('category'));
   const stageParam = params.get('status');
   const stage = isStage(stageParam) ? stageParam : undefined;
-  const products = useProducts({ q, categoryId, ...(stage ? STAGE_FILTER[stage] : {}) });
+  const filters = useMemo(() => readFilters(params), [params]);
+  const where = useMemo(() => whereOf(filters), [filters]);
+  const products = useProductQuery({
+    q,
+    categoryId,
+    ...(stage ? STAGE_FILTER[stage] : {}),
+    ...(where ? { where } : {}),
+    ...(filters.segment ? { segmentId: filters.segment } : {}),
+  });
+  const total = products.data?.pages[0]?.total;
   const categories = useCategories();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
@@ -84,11 +104,31 @@ export function ProductsPage() {
       },
       { replace: true },
     );
+  const applyFilters = (next: ProductFilters) =>
+    setParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        for (const field of PRODUCT_FILTER_FIELDS) {
+          const value = filterParam(field, next);
+          if (value === null) params.delete(field);
+          else params.set(field, value);
+        }
+        return params;
+      },
+      { replace: true },
+    );
 
   return (
     <div>
       <PageHeader
         title={t('catalog.products.title')}
+        meta={
+          typeof total === 'number' ? (
+            <span className="tabular-nums">
+              {t('catalog.products.count', { total: formatCount(total) })}
+            </span>
+          ) : null
+        }
         actions={
           canRegister ? (
             <Button asChild>
@@ -147,6 +187,7 @@ export function ProductsPage() {
             </option>
           ))}
         </NativeSelect>
+        <ProductFilterMenu filters={filters} onChange={applyFilters} />
       </FilterBar>
       <ProblemAlert problem={problemFromError(products.error)} />
       <ListCard>

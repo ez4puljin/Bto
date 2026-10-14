@@ -652,7 +652,62 @@
       },
       "unitBarcode": "{{code}} ({{unit}})",
       "fixedBin": "{{warehouse}}: {{bin}}",
-      "moreSuppliers": "+{{count}}"
+      "moreSuppliers": "+{{count}}",
+      "count": "{{total}} бараа",
+      "filters": {
+        "menu": "Шүүлтүүр",
+        "fields": {
+          "segment": "Сегмент",
+          "supplier": "Нийлүүлэгч",
+          "home": "Харьяа агуулах",
+          "profile": "Үнийн тохиргоо",
+          "price": "Агуулахын үнэ",
+          "stock": "Үлдэгдэл",
+          "created": "Бүртгэсэн огноо",
+          "updated": "Шинэчилсэн огноо",
+          "missing": "Дутуу мэдээлэл"
+        },
+        "apply": "Шүүх",
+        "remove": "Шүүлтүүрийг арилгах",
+        "clear": "«{{name}}» шүүлтүүрийг арилгах",
+        "clearAll": "Бүгдийг арилгах",
+        "hint": "Юу ч сонгохгүй бол энэ шүүлтүүр арилна.",
+        "supplierModes": {
+          "IN": "Нийлүүлдэг",
+          "MAIN_IN": "Үндсэн нийлүүлэгч"
+        },
+        "searchSupplier": "Нийлүүлэгч хайх",
+        "noMatches": "Олдсонгүй",
+        "stockKinds": {
+          "in": "Үлдэгдэлтэй",
+          "out": "Дууссан",
+          "low": "Доод хэмжээнд хүрсэн"
+        },
+        "warehouse": "Агуулах",
+        "allSellingWarehouses": "Бүх борлуулах агуулах",
+        "datePresets": {
+          "1": "Өнөөдөр",
+          "7": "7 хоног",
+          "30": "30 хоног",
+          "range": "Хугацаа"
+        },
+        "lastDays": "Сүүлийн {{count}} хоног",
+        "today": "Өнөөдөр",
+        "from": "Эхлэх өдөр",
+        "to": "Дуусах өдөр",
+        "minPrice": "Доод үнэ",
+        "maxPrice": "Дээд үнэ",
+        "between": "{{from}} – {{to}}",
+        "atLeast": "≥ {{value}}",
+        "atMost": "≤ {{value}}",
+        "noSegments": "Барааны сегмент алга байна.",
+        "chooseSegment": "Сегмент сонгоно уу",
+        "missingNone": {
+          "supplier": "Нийлүүлэгчгүй",
+          "home": "Харьяа агуулахгүй",
+          "price": "Үнийн тохиргоогүй"
+        }
+      }
     },
     "product": {
       "newTitle": "Шинэ бараа",
@@ -2428,6 +2483,7 @@
       "MONEY_INVALID": "Бүхэл төгрөг оруулна уу",
       "MONEY_ORDER": "Доод үнэ дээд үнээс их байна",
       "TEXT_INVALID": "1–100 тэмдэгт оруулна уу"
-    }
+    },
+    "create": "Сегмент үүсгэх"
   }
 }

@@ -31,6 +31,7 @@ export type AssignRequest = Schemas['ReadinessAssignRequest'];
 export type BarcodeResolution = Schemas['BarcodeResolution'];
 export type VatType = ProductDetail['vatType'];
 export type ProductStatus = ProductDetail['status'];
+export type SegmentDefinition = Schemas['SegmentDefinition'];
 
 export const KEYS = {
   uoms: ['catalog', 'uoms'] as const,
@@ -88,6 +89,44 @@ export function useProducts(filter: ProductFilter, options: ListReadOptions = {}
               cursor: pageParam,
               limit,
             },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The product list's filters with conditions on other modules' data (ADR-0049). */
+export interface ProductQueryFilter extends ProductFilter {
+  where?: SegmentDefinition;
+  segmentId?: number;
+}
+
+/**
+ * The product list screen (`POST /products/query`): the rows in the list's order and, on the first
+ * page, how many products the filters keep.
+ */
+export function useProductQuery(filter: ProductQueryFilter, options: ListReadOptions = {}) {
+  const api = useApiClient();
+  const limit = options.limit ?? 50;
+  return useInfiniteQuery({
+    queryKey: [...KEYS.products, 'query', filter, limit],
+    enabled: options.enabled ?? true,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.POST('/api/v1/products/query', {
+          body: {
+            q: filter.q || undefined,
+            categoryId: filter.categoryId,
+            status: filter.status,
+            saleReady: filter.saleReady,
+            where: filter.where,
+            segmentId: filter.segmentId,
+            cursor: pageParam,
+            limit,
           },
           signal,
         }),

@@ -1,6 +1,6 @@
 import type { components } from '@tugeel/api-client';
 import { describe, expect, it } from 'vitest';
-import { formatMnt, plainDecimal } from '@/lib/money';
+import { formatCount, formatMnt, plainDecimal } from '@/lib/money';
 import {
   creditBody,
   customerCreateBody,
@@ -48,6 +48,12 @@ describe('money and numbers for reading', () => {
     expect(formatMnt('-1234567.89')).toBe('-1,234,567.89');
     expect(formatMnt('999')).toBe('999');
     expect(formatMnt('9007199254740993.01')).toBe('9,007,199,254,740,993.01');
+  });
+
+  it('groups counts by thousands', () => {
+    expect(formatCount(1751)).toBe('1,751');
+    expect(formatCount(20000)).toBe('20,000');
+    expect(formatCount(0)).toBe('0');
   });
 
   it('drops trailing zeros of stored decimals', () => {
