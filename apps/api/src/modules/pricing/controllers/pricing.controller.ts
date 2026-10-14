@@ -46,6 +46,8 @@ import {
   CurrentPricesQueryDto,
   CurrentTermsDto,
   ProductPricesQueryDto,
+  BulkProfileDto,
+  BulkProfileResultDto,
   ProductPriceViewDto,
   SetPriceTermsDto,
 } from '../dto/product-prices.dto';
@@ -95,6 +97,19 @@ export class ProductPricesController {
       profileName: row.profileName,
       wholeUomId: row.wholeUomId,
     }));
+  }
+
+  /** Changes the price profile of ticked products from a day on (ADR-0051 #1). */
+  @Post('bulk/profile')
+  @RequirePermission(PRICES)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: BulkProfileResultDto })
+  bulkProfile(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: BulkProfileDto,
+  ): Promise<BulkProfileResultDto> {
+    return this.prices.setProfileMany(ctx, body);
   }
 
   /** Idempotent: a retried change must not close the terms it just inserted. */

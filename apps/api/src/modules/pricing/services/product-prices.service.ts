@@ -19,7 +19,7 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { invalid, notFound } from '../../../common/errors/app-error';
 import { CatalogService, type UnitInfo, UnitConversionService } from '../../catalog';
-import { type Actor, actorUserId, AuditService } from '../../identity';
+import { type Actor, actorUserId, type AuditEntry, AuditService } from '../../identity';
 import { productPrices } from '../schema';
 import { assertLive, PriceProfilesService } from './price-profiles.service';
 import { advisoryLock, applied, assertNotPast, inForceOn, LOCKS } from './support';
@@ -90,6 +90,14 @@ export interface CurrentTerms {
   profileId: number;
   profileName: string;
   wholeUomId: number | null;
+}
+
+/** What a bulk profile change did (ADR-0051 #1). */
+export interface ProfileChangeResult {
+  changed: number[];
+  unchanged: number[];
+  /** Products without terms on the day or after it. */
+  skipped: { productId: number; reason: 'NO_TERMS' }[];
 }
 
 /** The terms in force on a date, for quotes and completion. */
@@ -354,6 +362,87 @@ export class ProductPricesService {
       });
     });
     return this.view(input.productId);
+  }
+
+  /**
+   * Changes the price profile of ticked products from a day on (ADR-0051 #1): the terms in force
+   * that day and every planned row after it are written again with the new profile, the same
+   * warehouse price and the same whole unit, under the dated-row rules (a row is closed on the day
+   * its copy starts, so history is never rewritten). The products' advisory locks are taken in id
+   * order, then the profile's (the order of `set`). Rows that already name the profile change
+   * nothing; a product without terms is skipped as NO_TERMS.
+   */
+  async setProfileMany(
+    actor: Actor,
+    input: { productIds: readonly number[]; profileId: number; validFrom: string },
+  ): Promise<ProfileChangeResult> {
+    assertNotPast('validFrom', input.validFrom);
+    const ids = [...new Set(input.productIds)].sort((a, b) => a - b);
+    const found = new Set((await this.catalog.getMany(ids)).map((product) => product.id));
+    const missing = ids.find((id) => !found.has(id));
+    if (missing !== undefined) throw notFound('product', missing);
+    return inTransaction(this.db, async (tx) => {
+      for (const id of ids) await advisoryLock(tx, LOCKS.productPrices, id);
+      const profile = await this.profiles.lockForPricesInTx(tx, input.profileId);
+      assertLive(profile);
+      if (profile.firstFrom === null || profile.firstFrom > input.validFrom) {
+        throw invalid('profileId', 'inForce', 'the price profile has no values on that day');
+      }
+      const byProduct = new Map<number, TermsRow[]>();
+      for (const row of await tx
+        .select()
+        .from(productPrices)
+        .where(idIn(productPrices.productId, ids))) {
+        const list = byProduct.get(row.productId) ?? [];
+        list.push(row);
+        byProduct.set(row.productId, list);
+      }
+      const result: ProfileChangeResult = { changed: [], unchanged: [], skipped: [] };
+      const audits: AuditEntry[] = [];
+      for (const id of ids) {
+        const targets = (byProduct.get(id) ?? [])
+          .filter(applied)
+          .filter((row) => inForceOn(row, input.validFrom) || row.validFrom > input.validFrom)
+          .sort((a, b) => a.validFrom.localeCompare(b.validFrom));
+        if (targets.length === 0) {
+          result.skipped.push({ productId: id, reason: 'NO_TERMS' });
+          continue;
+        }
+        const changing = targets.filter((row) => row.profileId !== input.profileId);
+        if (changing.length === 0) {
+          result.unchanged.push(id);
+          continue;
+        }
+        for (const row of changing) {
+          const from = row.validFrom > input.validFrom ? row.validFrom : input.validFrom;
+          await tx.update(productPrices).set({ validTo: from }).where(eq(productPrices.id, row.id));
+          await tx.insert(productPrices).values({
+            productId: id,
+            warehousePrice: row.warehousePrice,
+            profileId: input.profileId,
+            wholeUomId: row.wholeUomId,
+            validFrom: from,
+            validTo: row.validTo,
+            createdBy: actorUserId(actor),
+          });
+          audits.push({
+            action: 'UPDATE',
+            entity: 'product_prices',
+            entityId: id,
+            before: termsAudit(row),
+            after: {
+              validFrom: from,
+              warehousePrice: row.warehousePrice.toFixed(0),
+              profileId: input.profileId,
+              wholeUomId: row.wholeUomId,
+            },
+          });
+        }
+        result.changed.push(id);
+      }
+      if (audits.length > 0) await this.audit.recordMany(tx, actor, audits);
+      return result;
+    });
   }
 }
 

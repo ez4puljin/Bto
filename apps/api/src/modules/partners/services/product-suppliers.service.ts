@@ -5,7 +5,7 @@ import { DB } from '../../../common/db/db.tokens';
 import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { notFound } from '../../../common/errors/app-error';
+import { AppError, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { CatalogService, type ProductSummary } from '../../catalog';
 import { type Actor, AuditService } from '../../identity';
@@ -308,6 +308,98 @@ export class ProductSuppliersService {
       .where(and(...filters))
       .orderBy(asc(productSuppliers.productId));
     return rows.map((row) => row.productId);
+  }
+
+  /**
+   * Makes a supplier the main one of ticked products (ADR-0051 #1). The supplier must be active; a
+   * product already linked to it has that link made main, any other gets a new main link, and the
+   * previous main link stays as an additional supplier. Locked as `linkManyInTx` locks; products
+   * whose main supplier it already is are reported, not touched.
+   */
+  setMainMany(
+    actor: Actor,
+    productIds: readonly number[],
+    supplierId: number,
+  ): Promise<{ changed: number[]; unchanged: number[] }> {
+    const ids = [...new Set(productIds)].sort((a, b) => a - b);
+    return inTransaction(this.db, async (tx) => {
+      const found = new Set((await this.catalog.getMany(ids, tx)).map((product) => product.id));
+      const missing = ids.find((id) => !found.has(id));
+      if (missing !== undefined) throw notFound('product', missing);
+      const [supplier] = await tx
+        .select({ status: suppliers.status })
+        .from(suppliers)
+        .where(eq(suppliers.id, supplierId));
+      if (!supplier) throw notFound('supplier', supplierId);
+      if (supplier.status !== 'ACTIVE') {
+        throw new AppError('SUPPLIER_INACTIVE', `supplier ${supplierId} is inactive`, {
+          id: supplierId,
+        });
+      }
+      await tx.execute(sql`LOCK TABLE product_suppliers IN SHARE ROW EXCLUSIVE MODE`);
+      const mains = await tx
+        .select({ productId: productSuppliers.productId })
+        .from(productSuppliers)
+        .where(
+          and(
+            idIn(productSuppliers.productId, ids),
+            eq(productSuppliers.supplierId, supplierId),
+            eq(productSuppliers.isMain, true),
+          ),
+        );
+      const already = new Set(mains.map((row) => row.productId));
+      const changing = ids.filter((id) => !already.has(id));
+      if (changing.length > 0) {
+        // Demote first: one main link per product (partial unique index).
+        const demoted = await tx
+          .update(productSuppliers)
+          .set({ isMain: false })
+          .where(and(idIn(productSuppliers.productId, changing), eq(productSuppliers.isMain, true)))
+          .returning();
+        const promoted = await tx
+          .update(productSuppliers)
+          .set({ isMain: true })
+          .where(
+            and(
+              idIn(productSuppliers.productId, changing),
+              eq(productSuppliers.supplierId, supplierId),
+            ),
+          )
+          .returning();
+        const linked = new Set(promoted.map((row) => row.productId));
+        const missingLinks = changing.filter((id) => !linked.has(id));
+        const created =
+          missingLinks.length === 0
+            ? []
+            : await tx
+                .insert(productSuppliers)
+                .values(missingLinks.map((productId) => ({ productId, supplierId, isMain: true })))
+                .returning();
+        await this.audit.recordMany(tx, actor, [
+          ...demoted.map((row) => ({
+            action: 'UPDATE' as const,
+            entity: 'product_suppliers',
+            entityId: row.id,
+            before: { ...row, isMain: true },
+            after: row,
+          })),
+          ...promoted.map((row) => ({
+            action: 'UPDATE' as const,
+            entity: 'product_suppliers',
+            entityId: row.id,
+            before: { ...row, isMain: false },
+            after: row,
+          })),
+          ...created.map((row) => ({
+            action: 'CREATE' as const,
+            entity: 'product_suppliers',
+            entityId: row.id,
+            after: row,
+          })),
+        ]);
+      }
+      return { changed: changing, unchanged: ids.filter((id) => already.has(id)) };
+    });
   }
 
   /** Makes a link the main supplier of its product. */

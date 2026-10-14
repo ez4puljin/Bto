@@ -17,6 +17,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { BulkProductsDto } from '../../../common/bulk/bulk.dto';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { SegmentDefinitionDto } from '../../../common/segments/segment-definition.dto';
 import { PRODUCT_STATUSES, VAT_TYPES } from '../schema';
@@ -482,4 +483,21 @@ export class AttachImageDto {
   @IsInt()
   @Min(1)
   thumbFileId: number;
+}
+
+/** «Идэвхгүй болгох / Идэвхжүүлэх» for ticked products (ADR-0051). */
+@ApiSchema({ name: 'BulkStatusRequest' })
+export class BulkStatusDto extends BulkProductsDto {
+  @ApiProperty({ enum: PRODUCT_STATUSES })
+  @IsIn(PRODUCT_STATUSES)
+  status: ProductStatus;
+}
+
+/** Moves ticked products to a category; their codes stay (ADR-0051, ADR-0044 #1). */
+@ApiSchema({ name: 'BulkCategoryRequest' })
+export class BulkCategoryDto extends BulkProductsDto {
+  @ApiProperty()
+  @IsInt()
+  @Min(1)
+  categoryId: number;
 }

@@ -504,6 +504,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/bulk/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets the status of ticked products (ADR-0051 #1). */
+        post: operations["Products_bulkStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/bulk/category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves ticked products to a category (ADR-0051 #1). */
+        post: operations["Products_bulkCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/next-sku": {
         parameters: {
             query?: never;
@@ -1062,6 +1096,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/product-suppliers/bulk/main": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes a supplier the main one of ticked products. Declared before `:id/main`. */
+        post: operations["ProductSuppliers_bulkMain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/product-suppliers/{id}/main": {
         parameters: {
             query?: never;
@@ -1203,6 +1254,23 @@ export interface paths {
         get: operations["ProductLocations_list"];
         put: operations["ProductLocations_set"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/product-locations/bulk/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Makes a wholesale warehouse the home of ticked products, or says what it would do (ADR-0051). */
+        post: operations["ProductLocations_bulkHome"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2142,6 +2210,23 @@ export interface paths {
         get: operations["ProductPrices_current"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/product-prices/bulk/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Changes the price profile of ticked products from a day on (ADR-0051 #1). */
+        post: operations["ProductPrices_bulkProfile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3107,6 +3192,21 @@ export interface components {
             /** @description How many products the filters keep; on the first page only */
             total: number | null;
         };
+        BulkStatusRequest: {
+            /** @description 1–500 products, no repeats */
+            productIds: number[];
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+        };
+        BulkResult: {
+            changed: number[];
+            unchanged: number[];
+        };
+        BulkCategoryRequest: {
+            /** @description 1–500 products, no repeats */
+            productIds: number[];
+            categoryId: number;
+        };
         NextSku: {
             /** @example 10024 */
             sku: string;
@@ -3667,6 +3767,11 @@ export interface components {
             productId: number;
             supplierId: number;
         };
+        BulkMainSupplierRequest: {
+            /** @description 1–500 products, no repeats */
+            productIds: number[];
+            supplierId: number;
+        };
         Bin: {
             id: number;
             warehouseId: number;
@@ -3751,6 +3856,24 @@ export interface components {
             minQty?: string | null;
             /** @description Base units */
             maxQty?: string | null;
+        };
+        BulkHomeRequest: {
+            /** @description 1–500 products, no repeats */
+            productIds: number[];
+            warehouseId: number;
+            /** @description Answer what would change, writing nothing */
+            dryRun?: boolean;
+        };
+        BulkStockElsewhere: {
+            productId: number;
+            /** @description A wholesale warehouse holding the product */
+            warehouseId: number;
+        };
+        BulkHomeResult: {
+            changed: number[];
+            unchanged: number[];
+            /** @description Moving products that hold stock in another wholesale warehouse */
+            withStock: components["schemas"]["BulkStockElsewhere"][];
         };
         ProductHomeRequest: {
             productId: number;
@@ -4861,6 +4984,29 @@ export interface components {
             profileId: number;
             profileName: string;
             wholeUomId: number | null;
+        };
+        BulkProfileRequest: {
+            /** @description 1–500 products, no repeats */
+            productIds: number[];
+            profileId: number;
+            /**
+             * @description Today or later (Ulaanbaatar)
+             * @example 2026-10-15
+             */
+            validFrom: string;
+        };
+        BulkSkipped: {
+            productId: number;
+            /**
+             * @description The product has no price terms to change
+             * @enum {string}
+             */
+            reason: "NO_TERMS";
+        };
+        BulkProfileResult: {
+            changed: number[];
+            unchanged: number[];
+            skipped: components["schemas"]["BulkSkipped"][];
         };
         SetPriceTermsRequest: {
             productId: number;
@@ -6703,6 +6849,76 @@ export interface operations {
             };
         };
     };
+    Products_bulkStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStatusRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Products_bulkCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkCategoryRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Products_nextSku: {
         parameters: {
             query?: {
@@ -8161,6 +8377,41 @@ export interface operations {
             };
         };
     };
+    ProductSuppliers_bulkMain: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkMainSupplierRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ProductSuppliers_setMain: {
         parameters: {
             query?: never;
@@ -8560,6 +8811,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductLocation"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ProductLocations_bulkHome: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkHomeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkHomeResult"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -10863,6 +11149,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentTerms"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ProductPrices_bulkProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkProfileRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkProfileResult"];
                 };
             };
             /** @description RFC 9457 problem details */

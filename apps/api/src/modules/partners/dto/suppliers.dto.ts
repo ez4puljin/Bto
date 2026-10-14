@@ -14,6 +14,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { BulkProductsDto } from '../../../common/bulk/bulk.dto';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { PARTNER_STATUSES } from '../schema';
 import { CODE, ContactDto, ListContactDto, trimmed } from './common.dto';
@@ -267,4 +268,13 @@ export class SupplierProductDto {
 export class SupplierProductPageDto {
   @ApiProperty({ type: [SupplierProductDto] }) data: SupplierProductDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+/** Makes a supplier the main one of ticked products (ADR-0051). */
+@ApiSchema({ name: 'BulkMainSupplierRequest' })
+export class BulkMainSupplierDto extends BulkProductsDto {
+  @ApiProperty()
+  @IsInt()
+  @Min(1)
+  supplierId: number;
 }

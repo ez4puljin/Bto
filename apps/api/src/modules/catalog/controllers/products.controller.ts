@@ -18,9 +18,12 @@ import {
   Idempotent,
   RequirePermission,
 } from '../../identity';
+import { BulkResultDto } from '../../../common/bulk/bulk.dto';
 import {
   AddBarcodeDto,
   BarcodeDto,
+  BulkCategoryDto,
+  BulkStatusDto,
   CreateProductDto,
   NewUnitDto,
   NextSkuDto,
@@ -37,6 +40,7 @@ import {
   UpdateUnitDto,
 } from '../dto/products.dto';
 import { BarcodeService } from '../services/barcode.service';
+import { ProductBulkService } from '../services/product-bulk.service';
 import { ProductEbarimtService } from '../services/product-ebarimt.service';
 import { ProductQueryService } from '../services/product-query.service';
 import { SkuRangesService } from '../services/sku-ranges.service';
@@ -66,6 +70,7 @@ export class ProductsController {
     private readonly ebarimt: ProductEbarimtService,
     private readonly ranges: SkuRangesService,
     private readonly productQuery: ProductQueryService,
+    private readonly bulk: ProductBulkService,
   ) {}
 
   @Get()
@@ -91,6 +96,29 @@ export class ProductsController {
       nextCursor: page.nextCursor,
       total: page.total,
     };
+  }
+
+  /** Sets the status of ticked products (ADR-0051 #1). */
+  @Post('bulk/status')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: BulkResultDto })
+  bulkStatus(@CurrentUser() ctx: AuthContext, @Body() body: BulkStatusDto): Promise<BulkResultDto> {
+    return this.bulk.setStatus(ctx, body.productIds, body.status);
+  }
+
+  /** Moves ticked products to a category (ADR-0051 #1). */
+  @Post('bulk/category')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: BulkResultDto })
+  bulkCategory(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: BulkCategoryDto,
+  ): Promise<BulkResultDto> {
+    return this.bulk.setCategory(ctx, body.productIds, body.categoryId);
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { BulkResultDto } from '../../../common/bulk/bulk.dto';
 import { invalid } from '../../../common/errors/app-error';
 import { PageQueryDto } from '../../../common/pagination/page';
 import {
@@ -22,6 +23,7 @@ import {
 } from '../../identity';
 import { ContactDto, ContactRequestDto, NextCodeDto } from '../dto/common.dto';
 import {
+  BulkMainSupplierDto,
   CreateSupplierDto,
   LinkRequestDto,
   ProductSupplierLinkDto,
@@ -205,6 +207,19 @@ export class ProductSuppliersController {
     @Body() body: LinkRequestDto,
   ): Promise<ProductSupplierLinkDto> {
     return this.links.link(ctx, body.productId, body.supplierId);
+  }
+
+  /** Makes a supplier the main one of ticked products. Declared before `:id/main`. */
+  @Post('bulk/main')
+  @RequirePermission(MANAGE)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: BulkResultDto })
+  bulkMain(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: BulkMainSupplierDto,
+  ): Promise<BulkResultDto> {
+    return this.links.setMainMany(ctx, body.productIds, body.supplierId);
   }
 
   @Post(':id/main')

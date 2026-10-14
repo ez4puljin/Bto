@@ -9,6 +9,7 @@ import {
   Matches,
   Min,
 } from 'class-validator';
+import { BulkProductsDto, BulkResultDto } from '../../../common/bulk/bulk.dto';
 import { MAX_PAGE_LIMIT, queryIds } from '../../../common/pagination/page';
 import type { PriceProblem } from '../services/product-prices.service';
 import { PriceProfileValuesDto } from './price-profiles.dto';
@@ -131,4 +132,25 @@ export class SetPriceTermsDto {
   @IsInt()
   @Min(1)
   wholeUomId?: number | null;
+}
+
+/** Changes the price profile of ticked products from a day on (ADR-0051). */
+@ApiSchema({ name: 'BulkProfileRequest' })
+export class BulkProfileDto extends BulkProductsDto {
+  @ApiProperty() @IsInt() @Min(1) profileId: number;
+  @ApiProperty({ example: '2026-10-15', description: 'Today or later (Ulaanbaatar)' })
+  @Matches(ISO_DATE)
+  validFrom: string;
+}
+
+@ApiSchema({ name: 'BulkSkipped' })
+export class BulkSkippedDto {
+  @ApiProperty() productId: number;
+  @ApiProperty({ enum: ['NO_TERMS'], description: 'The product has no price terms to change' })
+  reason: 'NO_TERMS';
+}
+
+@ApiSchema({ name: 'BulkProfileResult' })
+export class BulkProfileResultDto extends BulkResultDto {
+  @ApiProperty({ type: [BulkSkippedDto] }) skipped: BulkSkippedDto[];
 }

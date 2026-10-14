@@ -2011,6 +2011,120 @@
         ]
       }
     },
+    "/api/v1/products/bulk/status": {
+      "post": {
+        "operationId": "Products_bulkStatus",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sets the status of ticked products (ADR-0051 #1).",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/v1/products/bulk/category": {
+      "post": {
+        "operationId": "Products_bulkCategory",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCategoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Moves ticked products to a category (ADR-0051 #1).",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/products/next-sku": {
       "get": {
         "operationId": "Products_nextSku",
@@ -4403,6 +4517,63 @@
         ]
       }
     },
+    "/api/v1/product-suppliers/bulk/main": {
+      "post": {
+        "operationId": "ProductSuppliers_bulkMain",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkMainSupplierRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Makes a supplier the main one of ticked products. Declared before `:id/main`.",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
     "/api/v1/product-suppliers/{id}/main": {
       "post": {
         "operationId": "ProductSuppliers_setMain",
@@ -5094,6 +5265,63 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/product-locations/bulk/home": {
+      "post": {
+        "operationId": "ProductLocations_bulkHome",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkHomeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkHomeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Makes a wholesale warehouse the home of ticked products, or says what it would do (ADR-0051).",
         "tags": [
           "inventory"
         ]
@@ -9087,6 +9315,63 @@
         ]
       }
     },
+    "/api/v1/product-prices/bulk/profile": {
+      "post": {
+        "operationId": "ProductPrices_bulkProfile",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkProfileResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changes the price profile of ticked products from a day on (ADR-0051 #1).",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
     "/api/v1/price-profiles": {
       "get": {
         "operationId": "PriceProfiles_list",
@@ -12797,6 +13082,76 @@
           "total"
         ]
       },
+      "BulkStatusRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "1–500 products, no repeats",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "productIds",
+          "status"
+        ]
+      },
+      "BulkResult": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "changed",
+          "unchanged"
+        ]
+      },
+      "BulkCategoryRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "1–500 products, no repeats",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "productIds",
+          "categoryId"
+        ]
+      },
       "NextSku": {
         "type": "object",
         "properties": {
@@ -14795,6 +15150,29 @@
           "supplierId"
         ]
       },
+      "BulkMainSupplierRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "1–500 products, no repeats",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "supplierId": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "productIds",
+          "supplierId"
+        ]
+      },
       "Bin": {
         "type": "object",
         "properties": {
@@ -15120,6 +15498,78 @@
         "required": [
           "warehouseId",
           "productId"
+        ]
+      },
+      "BulkHomeRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "1–500 products, no repeats",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Answer what would change, writing nothing"
+          }
+        },
+        "required": [
+          "productIds",
+          "warehouseId"
+        ]
+      },
+      "BulkStockElsewhere": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number",
+            "description": "A wholesale warehouse holding the product"
+          }
+        },
+        "required": [
+          "productId",
+          "warehouseId"
+        ]
+      },
+      "BulkHomeResult": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "withStock": {
+            "description": "Moving products that hold stock in another wholesale warehouse",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkStockElsewhere"
+            }
+          }
+        },
+        "required": [
+          "changed",
+          "unchanged",
+          "withStock"
         ]
       },
       "ProductHomeRequest": {
@@ -18652,6 +19102,82 @@
           "profileId",
           "profileName",
           "wholeUomId"
+        ]
+      },
+      "BulkProfileRequest": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "1–500 products, no repeats",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "profileId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-15",
+            "description": "Today or later (Ulaanbaatar)"
+          }
+        },
+        "required": [
+          "productIds",
+          "profileId",
+          "validFrom"
+        ]
+      },
+      "BulkSkipped": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "reason": {
+            "enum": [
+              "NO_TERMS"
+            ],
+            "type": "string",
+            "description": "The product has no price terms to change"
+          }
+        },
+        "required": [
+          "productId",
+          "reason"
+        ]
+      },
+      "BulkProfileResult": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkSkipped"
+            }
+          }
+        },
+        "required": [
+          "changed",
+          "unchanged",
+          "skipped"
         ]
       },
       "SetPriceTermsRequest": {

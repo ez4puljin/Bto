@@ -14,7 +14,13 @@ import {
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { invalid } from '../../../common/errors/app-error';
-import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
+import {
+  type AuthContext,
+  Authenticated,
+  CurrentUser,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import {
   BinDto,
   BinListQueryDto,
@@ -22,6 +28,8 @@ import {
   BinPageDto,
   BinRangeRequestDto,
   BinRangeResultDto,
+  BulkHomeDto,
+  BulkHomeResultDto,
   CreateBinDto,
   ProductLocationDto,
   ProductLocationListDto,
@@ -186,6 +194,20 @@ export class ProductLocationsController {
         ...(maxQty === undefined ? {} : { maxQty }),
       }),
     );
+  }
+
+  /** Makes a wholesale warehouse the home of ticked products, or says what it would do (ADR-0051). */
+  @Post('bulk/home')
+  @RequirePermission(SETUP)
+  @Idempotent()
+  @HttpCode(200)
+  @ApiOkResponse({ type: BulkHomeResultDto })
+  bulkHome(@CurrentUser() ctx: AuthContext, @Body() body: BulkHomeDto): Promise<BulkHomeResultDto> {
+    return this.locations.setHomeMany(ctx, {
+      productIds: body.productIds,
+      warehouseId: body.warehouseId,
+      dryRun: body.dryRun ?? false,
+    });
   }
 
   @Put('home')

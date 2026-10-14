@@ -17,7 +17,7 @@ import {
   OrgService,
   ScopeService,
 } from '../../identity';
-import { bins, productLocations } from '../schema';
+import { bins, productLocations, warehouseStock } from '../schema';
 import { advisoryLock, LOCKS } from './support';
 
 type LocationRow = typeof productLocations.$inferSelect;
@@ -73,6 +73,14 @@ export interface LevelRestore {
 }
 
 const levelKey = (warehouseId: number, productId: number) => `${warehouseId}:${productId}`;
+
+/** A bulk home move (ADR-0051 #1): what moves, what already lives there, what holds stock elsewhere. */
+export interface HomeMoveResult {
+  changed: number[];
+  unchanged: number[];
+  /** Moving products holding stock in another wholesale warehouse, with that warehouse. */
+  withStock: { productId: number; warehouseId: number }[];
+}
 
 export interface ProductLocation extends LocationRow {
   /** Code of the fixed bin, for display and scanning. */
@@ -483,6 +491,114 @@ export class ProductLocationsService {
       )
       .orderBy(asc(productLocations.productId));
     return rows.map((row) => row.productId);
+  }
+
+  /**
+   * Makes a wholesale warehouse the home of ticked products (ADR-0051 #1). `dryRun` answers which
+   * would move and which hold stock in another wholesale warehouse, without writing; the screen
+   * asks only when that list is not empty. Applied, the old home's fixed shelf and minimum and
+   * maximum go where it holds none of the product (its row, then empty, is removed); where stock
+   * remains they stay, so the stock can be found and shipped out. Locked as `setManyInTx` locks.
+   */
+  async setHomeMany(
+    ctx: AuthContext,
+    input: { productIds: readonly number[]; warehouseId: number; dryRun: boolean },
+  ): Promise<HomeMoveResult> {
+    this.scope.assertCanWriteWarehouse(ctx, input.warehouseId);
+    const ids = [...new Set(input.productIds)].sort((a, b) => a - b);
+    return inTransaction(this.db, async (tx) => {
+      await this.assertHomes(tx, [{ warehouseId: input.warehouseId }]);
+      const found = new Set((await this.catalog.getMany(ids, tx)).map((product) => product.id));
+      const missing = ids.find((id) => !found.has(id));
+      if (missing !== undefined) throw notFound('product', missing);
+      if (!input.dryRun) {
+        await tx.execute(sql`LOCK TABLE product_locations IN SHARE ROW EXCLUSIVE MODE`);
+      }
+      const homes = new Map(
+        (await this.ofProducts(ids, tx))
+          .filter((row) => row.isHome)
+          .map((row) => [row.productId, row] as const),
+      );
+      const changed = ids.filter((id) => homes.get(id)?.warehouseId !== input.warehouseId);
+      const unchanged = ids.filter((id) => homes.get(id)?.warehouseId === input.warehouseId);
+      const others = (await this.org.listWarehouses({ kind: 'WHOLESALE' }))
+        .map((warehouse) => warehouse.id)
+        .filter((id) => id !== input.warehouseId);
+      const withStock =
+        changed.length === 0 || others.length === 0
+          ? []
+          : await tx
+              .select({
+                productId: warehouseStock.productId,
+                warehouseId: warehouseStock.warehouseId,
+              })
+              .from(warehouseStock)
+              .where(
+                and(
+                  idIn(warehouseStock.productId, changed),
+                  idIn(warehouseStock.warehouseId, others),
+                  gt(warehouseStock.onHand, sql`0`),
+                ),
+              )
+              .orderBy(asc(warehouseStock.productId), asc(warehouseStock.warehouseId));
+      if (input.dryRun || changed.length === 0) return { changed, unchanged, withStock };
+
+      // Clear the old homes first: one home per product (partial unique index).
+      await tx
+        .update(productLocations)
+        .set({ isHome: false, updatedAt: sql`now()` })
+        .where(and(idIn(productLocations.productId, changed), eq(productLocations.isHome, true)));
+      await tx
+        .insert(productLocations)
+        .values(
+          changed.map((productId) => ({ warehouseId: input.warehouseId, productId, isHome: true })),
+        )
+        .onConflictDoUpdate({
+          target: [productLocations.warehouseId, productLocations.productId],
+          set: { isHome: true, updatedAt: sql`now()` },
+        });
+      const stocked = new Set(withStock.map((row) => levelKey(row.warehouseId, row.productId)));
+      const emptied = changed.flatMap((productId) => {
+        const old = homes.get(productId);
+        return old && !stocked.has(levelKey(old.warehouseId, productId)) ? [old] : [];
+      });
+      if (emptied.length > 0) {
+        await tx.delete(productLocations).where(
+          idIn(
+            productLocations.id,
+            emptied.map((row) => row.id),
+          ),
+        );
+      }
+      const cleared = new Set(emptied.map((row) => row.productId));
+      await this.audit.recordMany(
+        tx,
+        ctx,
+        changed.map((productId) => {
+          const old = homes.get(productId);
+          return {
+            action: 'UPDATE',
+            entity: 'product_locations',
+            entityId: productId,
+            before: {
+              home: old?.warehouseId ?? null,
+              ...(old && cleared.has(productId)
+                ? {
+                    cleared: {
+                      warehouseId: old.warehouseId,
+                      defaultBinId: old.defaultBinId,
+                      minQty: old.minQty?.toFixed() ?? null,
+                      maxQty: old.maxQty?.toFixed() ?? null,
+                    },
+                  }
+                : {}),
+            },
+            after: { home: input.warehouseId },
+          };
+        }),
+      );
+      return { changed, unchanged, withStock };
+    });
   }
 
   /** Makes a WHOLESALE warehouse the product's home (null: no home); one home per product. */

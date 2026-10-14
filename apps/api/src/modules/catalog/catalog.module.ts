@@ -14,6 +14,7 @@ import { CatalogRegistrationService } from './services/catalog-registration.serv
 import { CatalogService } from './services/catalog.service';
 import { CategoriesService } from './services/categories.service';
 import { EbarimtReadinessService } from './services/ebarimt-readiness.service';
+import { ProductBulkService } from './services/product-bulk.service';
 import { ProductEbarimtService } from './services/product-ebarimt.service';
 import { ProductImagesService } from './services/product-images.service';
 import { ProductFiltersService } from './services/product-filters.service';
@@ -33,6 +34,7 @@ const CORE_SERVICES = [
   CatalogService,
   CategoriesService,
   EbarimtReadinessService,
+  ProductBulkService,
   ProductEbarimtService,
   ProductImagesService,
   ProductFiltersService,

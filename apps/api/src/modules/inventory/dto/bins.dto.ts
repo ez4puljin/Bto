@@ -21,6 +21,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { BulkProductsDto, BulkResultDto } from '../../../common/bulk/bulk.dto';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { BIN_STATUSES } from '../schema';
 
@@ -241,4 +242,29 @@ export class SetProductHomeDto {
   @IsInt()
   @Min(1)
   warehouseId: number | null;
+}
+
+/** Makes a wholesale warehouse the home of ticked products (ADR-0051). */
+@ApiSchema({ name: 'BulkHomeRequest' })
+export class BulkHomeDto extends BulkProductsDto {
+  @ApiProperty() @IsInt() @Min(1) warehouseId: number;
+  @ApiPropertyOptional({ description: 'Answer what would change, writing nothing' })
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
+}
+
+@ApiSchema({ name: 'BulkStockElsewhere' })
+export class BulkStockElsewhereDto {
+  @ApiProperty() productId: number;
+  @ApiProperty({ description: 'A wholesale warehouse holding the product' }) warehouseId: number;
+}
+
+@ApiSchema({ name: 'BulkHomeResult' })
+export class BulkHomeResultDto extends BulkResultDto {
+  @ApiProperty({
+    type: [BulkStockElsewhereDto],
+    description: 'Moving products that hold stock in another wholesale warehouse',
+  })
+  withStock: BulkStockElsewhereDto[];
 }
