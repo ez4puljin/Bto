@@ -148,18 +148,20 @@ describe('segments (ADR-0049)', () => {
       kind: 'LIST',
       definition: null,
     };
-    const fetchMock = signedIn(ADMIN_ME, {
+    const routes = {
       ...LOOKUPS,
       'GET /api/v1/segments': () => list([DRINKS, picked]),
       'GET /api/v1/segments/6': () => json(picked),
-      'GET /api/v1/segments/counts': (request) =>
+      'GET /api/v1/segments/counts': (request: Request) =>
         json(
           new URL(request.url).searchParams
             .getAll('segmentIds')
             .map((id) => ({ segmentId: Number(id), count: 137 })),
         ),
-      'PUT /api/v1/segments/6': async (request) => json({ ...picked, ...(await sent(request)) }),
-    });
+      'PUT /api/v1/segments/6': async (request: Request) =>
+        json({ ...picked, ...(await sent(request)) }),
+    };
+    const fetchMock = signedIn(ADMIN_ME, routes);
     renderApp('/segments', fetchMock);
     const user = userEvent.setup();
     const row = (await screen.findByRole('link', { name: picked.name })).closest('tr');
@@ -173,6 +175,8 @@ describe('segments (ADR-0049)', () => {
     renderApp('/segments/6', fetchMock);
     expect(await screen.findByRole('heading', { level: 1, name: picked.name })).toBeInTheDocument();
     expect(screen.getByText(mn.segments.list.hint)).toBeInTheDocument();
+    // An admin is told how to change its products.
+    expect(screen.getByText(mn.segments.list.howTo)).toBeInTheDocument();
     expect(screen.queryByText(mn.segments.conditions)).toBeNull();
     await waitFor(() =>
       expect(
@@ -193,6 +197,12 @@ describe('segments (ADR-0049)', () => {
     await waitFor(() => expect(edit.router.state.location.pathname).toBe('/segments/6'));
     const [request] = calls(fetchMock, 'PUT', '/api/v1/segments/6');
     expect(request ? await sent(request) : {}).toEqual({ name: 'Түмний эх', description: null });
+
+    // A reader is not told how to change products they may not change.
+    cleanup();
+    renderApp('/segments/6', signedIn(WORKER_ME, routes));
+    expect(await screen.findByText(mn.segments.list.hint)).toBeInTheDocument();
+    expect(screen.queryByText(mn.segments.list.howTo)).toBeNull();
   });
 
   it('creates a segment with groups of conditions and a live count', async () => {

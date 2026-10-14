@@ -263,7 +263,11 @@ export function SegmentPage() {
           {data.definition ? (
             <DefinitionText entity={data.entity} definition={data.definition} />
           ) : (
-            <p className="text-sm text-muted-foreground">{t('segments.list.hint')}</p>
+            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+              <p>{t('segments.list.hint')}</p>
+              {/* Only those who may change its products are told how. */}
+              {canManage ? <p>{t('segments.list.howTo')}</p> : null}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -431,7 +435,10 @@ function SegmentForm(props: {
         </FormRow>
       </FormSection>
       {isList ? (
-        <p className="text-sm text-muted-foreground">{t('segments.list.hint')}</p>
+        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+          <p>{t('segments.list.hint')}</p>
+          <p>{t('segments.list.howTo')}</p>
+        </div>
       ) : (
         <>
           <FormSection title={t('segments.conditions')} description={t('segments.conditionsHint')}>
