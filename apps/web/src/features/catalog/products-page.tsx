@@ -17,6 +17,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { SelectionBar } from '@/components/selection-bar';
 import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
+import { SegmentActions } from '@/features/segments/segment-actions';
 import { saveBlob } from '@/lib/download';
 import { formatCount } from '@/lib/money';
 import { ApiProblem, problemFromError } from '@/lib/problem';
@@ -82,9 +83,11 @@ export function ProductsPage() {
   const canRegister = useHasPermission('catalog.products.register');
   const canExport = useHasPermission('catalog.products.export');
   const canManageSegments = useHasPermission('segments.manage');
-  // Rows can be ticked by whoever may export them or change them together (ADR-0051 #3).
+  // Rows can be ticked by whoever may export them, change them together (ADR-0051 #3) or make
+  // a hand-picked segment of them (ADR-0052).
   const canSelect = [
     canExport,
+    canManageSegments,
     useHasPermission('catalog.products.manage'),
     useHasPermission('partners.suppliers.manage'),
     useHasPermission('pricing.prices.manage'),
@@ -350,6 +353,13 @@ export function ProductsPage() {
         {matchingNote}
         {canExport ? exportButton : null}
         <BulkActions ids={[...selected]} rows={tickedRows} onDone={ticks.clear} />
+        {canManageSegments ? (
+          <SegmentActions
+            ids={[...selected]}
+            {...(filters.segment ? { segmentId: filters.segment } : {})}
+            onDone={ticks.clear}
+          />
+        ) : null}
       </SelectionBar>
     </div>
   );

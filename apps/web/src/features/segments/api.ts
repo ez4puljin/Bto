@@ -8,6 +8,7 @@ import {
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import type { SegmentEntity } from '@tugeel/shared/segments';
 import { useApiClient } from '@/app/api-client-context';
+import { KEYS as CATALOG_KEYS } from '@/features/catalog/api';
 import { unwrap } from '@/lib/problem';
 
 type Schemas = components['schemas'];
@@ -16,6 +17,7 @@ export type SegmentDefinition = Schemas['SegmentDefinition'];
 export type SegmentCondition = Schemas['SegmentCondition'];
 export type SegmentCreate = Schemas['SegmentCreateRequest'];
 export type SegmentUpdate = Schemas['SegmentUpdateRequest'];
+export type SegmentListCreate = Schemas['SegmentListRequest'];
 
 export const KEYS = {
   segments: ['segments'] as const,
@@ -123,6 +125,54 @@ export function useSegmentMutations() {
     archive: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.DELETE('/api/v1/segments/{id}', { params: { path: { id } } })),
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+/**
+ * Hand-picked product segments (ADR-0052): one made of the ticked products, products added or
+ * taken out. Each refreshes the segments and the product lists (a list filtered by the segment
+ * changes with it).
+ */
+export function useSegmentLists() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: KEYS.segments }),
+      queryClient.invalidateQueries({ queryKey: CATALOG_KEYS.products }),
+    ]);
+  type Members = Keyed<{ id: number; productIds: number[] }>;
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<SegmentListCreate>) =>
+        unwrap(
+          await api.POST('/api/v1/segments/lists', {
+            body,
+            params: { header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: invalidate,
+    }),
+    add: useMutation({
+      mutationFn: async ({ key, id, productIds }: Members) =>
+        unwrap(
+          await api.POST('/api/v1/segments/{id}/products', {
+            body: { productIds },
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: async ({ key, id, productIds }: Members) =>
+        unwrap(
+          await api.POST('/api/v1/segments/{id}/products/remove', {
+            body: { productIds },
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
       onSuccess: invalidate,
     }),
   };

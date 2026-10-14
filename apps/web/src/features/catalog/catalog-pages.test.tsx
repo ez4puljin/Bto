@@ -231,6 +231,17 @@ const HIDDEN_COLUMNS_KEY = `${SHARED_COLUMNS_KEY}:${ADMIN_ME.id}`;
 const idsOf = (request: Request) => new URL(request.url).searchParams.getAll('productIds');
 const columnHeader = (key: keyof typeof mn.catalog.products.columns) =>
   screen.queryByRole('columnheader', { name: mn.catalog.products.columns[key] });
+/** A hand-picked product segment (ADR-0052). */
+const LIST_SEGMENT: Schemas['Segment'] = {
+  id: 20,
+  entity: 'PRODUCT',
+  kind: 'LIST',
+  name: 'Түмний бараа',
+  description: null,
+  definition: null,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+};
 
 describe('products list', () => {
   it('searches, keeps the search in the URL and loads the next page', async () => {
@@ -675,6 +686,160 @@ describe('products list', () => {
     await screen.findByRole('link', { name: 'Кока кола' });
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: mn.catalog.products.export.button })).toBeNull();
+  });
+
+  it('makes a segment of the ticks of two searches (ADR-0052)', async () => {
+    const fanta = listItem(2, '10002', 'Фанта');
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/segments': () => list([]),
+      'POST /api/v1/products/query': async (request) =>
+        queryPage((await sent(request)).q === 'фанта' ? [fanta] : [COLA_ROW]),
+      'POST /api/v1/segments/lists': async (request) =>
+        json({ ...LIST_SEGMENT, id: 21, ...(await sent(request)) }, 201),
+      'GET /api/v1/segments/21': () => json({ ...LIST_SEGMENT, id: 21 }),
+      'GET /api/v1/segments/counts': () => json([{ segmentId: 21, count: 2 }]),
+    });
+    const { router } = renderApp('/catalog/products?q=кока', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('checkbox', { name: mn.common.selectAll }));
+    const search = screen.getByRole('searchbox', { name: mn.common.search });
+    await user.clear(search);
+    await user.type(search, 'фанта');
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10002'),
+      }),
+    );
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(bar).toHaveTextContent(mn.common.selected.replace('{{count}}', '2'));
+    await user.click(within(bar).getByRole('button', { name: mn.segments.list.menu }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.segments.list.create }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(mn.segments.list.count.replace('{{total}}', '2'));
+    await user.type(within(dialog).getByLabelText(mn.segments.name), 'Түмний ба Хараа');
+    await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/segments/21'));
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.segments.list.created);
+    const [request] = calls(fetchMock, 'POST', '/api/v1/segments/lists');
+    expect(request?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(request ? await sent(request) : {}).toEqual({
+      name: 'Түмний ба Хараа',
+      description: null,
+      productIds: [1, 2],
+    });
+    // The ticks went into the segment.
+    expect(
+      sessionStorage.getItem(`tugeel.catalog.products.selection.v1:${ADMIN_ME.id}`),
+    ).toBeNull();
+  });
+
+  it('adds ticked products to a hand-picked segment and takes them out of the one shown', async () => {
+    const rules: Schemas['Segment'] = {
+      ...LIST_SEGMENT,
+      id: 30,
+      kind: 'RULES',
+      name: 'Ундаа',
+      definition: { match: 'ALL', groups: [] },
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...LIST_ROUTES,
+      'GET /api/v1/segments': () => list([rules, LIST_SEGMENT]),
+      'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+      'POST /api/v1/segments/20/products': () => json({ changed: 0, unchanged: 1, count: 5 }),
+      'POST /api/v1/segments/20/products/remove': () =>
+        json({ changed: 1, unchanged: 0, count: 4 }),
+    });
+    renderApp('/catalog/products', fetchMock);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10001'),
+      }),
+    );
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    await user.click(within(bar).getByRole('button', { name: mn.segments.list.menu }));
+    // Not filtered by a hand-picked segment: nothing to take out of.
+    expect(screen.queryByRole('menuitem', { name: mn.segments.list.remove })).toBeNull();
+    await user.click(await screen.findByRole('menuitem', { name: mn.segments.list.add }));
+    const dialog = await screen.findByRole('dialog');
+    const choice = within(dialog).getByLabelText(mn.segments.list.segment);
+    // Only hand-picked segments are offered.
+    expect(
+      within(choice)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([mn.segments.list.chooseSegment, LIST_SEGMENT.name]);
+    await user.selectOptions(choice, '20');
+    await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      `${mn.segments.list.added.replace('{{changed}}', '0')}. ${mn.segments.list.alreadyIn.replace('{{unchanged}}', '1')}`,
+    );
+    const [added] = calls(fetchMock, 'POST', '/api/v1/segments/20/products');
+    expect(added ? await sent(added) : {}).toEqual({ productIds: [1] });
+
+    // Filtered by the segment, the menu takes ticked products out of it, after a question.
+    cleanup();
+    renderApp('/catalog/products?segment=20', fetchMock);
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10001'),
+      }),
+    );
+    // The sidebar's «Сегмент» group is a button too: the menu is the selection bar's.
+    const shownBar = screen.getByRole('region', { name: mn.common.selection });
+    await user.click(within(shownBar).getByRole('button', { name: mn.segments.list.menu }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.segments.list.remove }));
+    const confirm = await screen.findByRole('dialog');
+    expect(confirm).toHaveTextContent(mn.segments.list.removeTitle.replace('{{total}}', '1'));
+    await user.click(within(confirm).getByRole('button', { name: mn.segments.list.remove }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      mn.segments.list.removed.replace('{{changed}}', '1'),
+    );
+    expect(calls(fetchMock, 'POST', '/api/v1/segments/20/products/remove')).toHaveLength(1);
+  });
+
+  it('lets an admin of segments tick rows, and hides the segment menu from others', async () => {
+    renderApp(
+      '/catalog/products',
+      signedIn(
+        { ...WORKER_ME, permissions: ['segments.manage'] },
+        {
+          ...LIST_ROUTES,
+          'GET /api/v1/segments': () => list([]),
+          'POST /api/v1/products/query': () => queryPage([COLA_ROW]),
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10001'),
+      }),
+    );
+    const bar = screen.getByRole('region', { name: mn.common.selection });
+    expect(within(bar).getByRole('button', { name: mn.segments.list.menu })).toBeInTheDocument();
+    expect(within(bar).queryByRole('button', { name: mn.catalog.products.bulk.edit })).toBeNull();
+
+    // Someone else (ticks are kept per user) who may only export: no segment menu.
+    cleanup();
+    renderApp(
+      '/catalog/products',
+      signedIn(
+        { ...WORKER_ME, id: 3, permissions: ['catalog.products.export'] },
+        { ...LIST_ROUTES, 'POST /api/v1/products/query': () => queryPage([COLA_ROW]) },
+      ),
+    );
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: mn.common.selectRow.replace('{{name}}', '10001'),
+      }),
+    );
+    expect(
+      within(screen.getByRole('region', { name: mn.common.selection })).queryByRole('button', {
+        name: mn.segments.list.menu,
+      }),
+    ).toBeNull();
   });
 
   it('moves ticked products to another category and clears the ticks', async () => {
