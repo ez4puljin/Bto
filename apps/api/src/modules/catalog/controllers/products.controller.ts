@@ -29,6 +29,8 @@ import {
   NextSkuDto,
   NextSkuQueryDto,
   ProductDetailDto,
+  ProductIdsDto,
+  ProductIdsRequestDto,
   ProductListQueryDto,
   ProductPageDto,
   ProductQueryPageDto,
@@ -96,6 +98,18 @@ export class ProductsController {
       nextCursor: page.nextCursor,
       total: page.total,
     };
+  }
+
+  /**
+   * Every product the list's filters keep, in the list's order, at most 20,000 (ADR-0052):
+   * «Таарсан бүх N-ийг сонгох». 422 SELECTION_TOO_LARGE above that, with the count.
+   */
+  @Post('query/ids')
+  @Authenticated()
+  @HttpCode(200)
+  @ApiOkResponse({ type: ProductIdsDto })
+  async queryIds(@Body() body: ProductIdsRequestDto): Promise<ProductIdsDto> {
+    return { ids: await this.productQuery.selectableIds(body) };
   }
 
   /** Sets the status of ticked products (ADR-0051 #1). */

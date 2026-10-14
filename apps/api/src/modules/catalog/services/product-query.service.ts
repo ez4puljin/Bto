@@ -1,5 +1,6 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { MAX_SELECTED_PRODUCTS } from '@tugeel/shared/catalog';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
@@ -70,6 +71,22 @@ export class ProductQueryService implements OnModuleInit {
     const ids = await this.products.orderedIds(query, within, cap + 1, executor);
     if (ids.length <= cap) return { ids, total: ids.length };
     return { ids: ids.slice(0, cap), total: await this.products.countItems(query, within) };
+  }
+
+  /**
+   * Every product the filters keep, in the list's order: «Таарсан бүх N-ийг сонгох» (ADR-0052).
+   * More than the list may hold ticked is refused with the count.
+   */
+  async selectableIds(query: ProductListQuery): Promise<number[]> {
+    const { ids, total } = await this.orderedIds(query, MAX_SELECTED_PRODUCTS);
+    if (total > MAX_SELECTED_PRODUCTS) {
+      throw new AppError(
+        'SELECTION_TOO_LARGE',
+        `${total} products match, at most ${MAX_SELECTED_PRODUCTS}`,
+        { count: total, limit: MAX_SELECTED_PRODUCTS },
+      );
+    }
+    return ids;
   }
 
   /** Ticked products in the list's order; unknown ids drop out (an export of the selection). */

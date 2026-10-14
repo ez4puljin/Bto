@@ -2011,6 +2011,53 @@
         ]
       }
     },
+    "/api/v1/products/query/ids": {
+      "post": {
+        "operationId": "Products_queryIds",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductIdsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductIds"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every product the list's filters keep, in the list's order, at most 20,000 (ADR-0052):\n«Таарсан бүх N-ийг сонгох». 422 SELECTION_TOO_LARGE above that, with the count.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/products/bulk/status": {
       "post": {
         "operationId": "Products_bulkStatus",
@@ -13082,6 +13129,60 @@
           "total"
         ]
       },
+      "ProductIdsRequest": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Words of the name in either script, a SKU or a barcode"
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Includes its subcategories"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "saleReady": {
+            "type": "boolean",
+            "description": "true: complete products; false: those waiting for prices (ADR-0044)"
+          },
+          "where": {
+            "description": "Conditions not saved as a segment",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
+          },
+          "segmentId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A saved product segment; with where, both apply"
+          }
+        }
+      },
+      "ProductIds": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "In the list's order; at most 20,000",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
       "BulkStatusRequest": {
         "type": "object",
         "properties": {
@@ -20726,6 +20827,7 @@
           "BARCODE_TAKEN",
           "BARCODE_AMBIGUOUS",
           "TAX_ATTRIBUTES_MISSING",
+          "SELECTION_TOO_LARGE",
           "CUSTOMER_INACTIVE",
           "SUPPLIER_INACTIVE",
           "PRODUCT_INACTIVE",

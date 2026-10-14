@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/swagger';
 import { SKU_PATTERN, WEIGHT_PATTERN } from '@tugeel/shared/catalog';
 import { BARCODE_TYPES } from '@tugeel/shared/gtin';
 import { FACTOR_PATTERN } from '@tugeel/shared/units';
@@ -409,6 +409,19 @@ export class ProductQueryPageDto extends ProductPageDto {
     description: 'How many products the filters keep; on the first page only',
   })
   total: number | null;
+}
+
+/** The list's filters without a page: every product they keep is wanted (ADR-0052). */
+@ApiSchema({ name: 'ProductIdsRequest' })
+export class ProductIdsRequestDto extends OmitType(ProductQueryRequestDto, [
+  'cursor',
+  'limit',
+] as const) {}
+
+@ApiSchema({ name: 'ProductIds' })
+export class ProductIdsDto {
+  @ApiProperty({ type: [Number], description: "In the list's order; at most 20,000" })
+  ids: number[];
 }
 
 @ApiSchema({ name: 'ProductDetail' })

@@ -249,6 +249,11 @@ export type ExportableProductColumn = (typeof EXPORTABLE_PRODUCT_COLUMNS)[number
 export const MAX_BULK_PRODUCTS = 500;
 /** Rows one product export may hold (ADR-0049 #6). */
 export const MAX_EXPORT_ROWS = 20_000;
+/**
+ * Products the list may hold ticked and a hand-picked segment may hold (ADR-0052); never above the
+ * export's limit, so the ticks can always go to Excel.
+ */
+export const MAX_SELECTED_PRODUCTS = 20_000;
 
 /** A category as the tree helpers need it. */
 export interface CategoryLike {

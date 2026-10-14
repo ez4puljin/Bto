@@ -40,8 +40,9 @@ function ean13(): string {
  * Segments and the filtered product list (ADR-0049): every product condition is answered by the
  * module that owns its data (catalog, partners, inventory, pricing), AND / OR groups combine them,
  * negative conditions subtract from every product, and saved segments narrow the product,
- * customer and supplier lists. Product queries keep to the file's category tree, so the list's own
- * filters apply too; partner segments match names carrying the file's tag (the search condition).
+ * customer and supplier lists; the list also gives every id its filters keep (ADR-0052). Product
+ * queries keep to the file's category tree, so the list's own filters apply too; partner segments
+ * match names carrying the file's tag (the search condition).
  */
 describe('segments and filtered lists', () => {
   const tag = `S${randomInt(10_000, 99_999)}`;
@@ -288,6 +289,29 @@ describe('segments and filtered lists', () => {
     expect(second).toMatchObject({ total: null, data: [{ id: tea.id }], nextCursor: null });
     const searched = await query({ where: anyOf, categoryId: root, q: 'цай' });
     expect(searched).toMatchObject({ total: 1, data: [{ id: tea.id }] });
+  });
+
+  it('gives every product the list keeps, in its order, for «Таарсан бүх N» (ADR-0052)', async () => {
+    const ids = async (body: Record<string, unknown>, status = 200) =>
+      (
+        await http()
+          .post('/api/v1/products/query/ids')
+          .set(bearer(worker))
+          .send(body)
+          .expect(status)
+      ).body as { ids: number[] };
+    // The list's filters and its order (by name): the same products as every page put together.
+    const listed = await query({ categoryId: root, limit: 200 });
+    expect((await ids({ categoryId: root })).ids).toEqual(listed.data.map((row) => row.id));
+    expect((await ids({ categoryId: root, q: 'кока' })).ids).toEqual([cola.id]);
+    expect((await ids({ categoryId: root, status: 'INACTIVE' })).ids).toEqual([old.id]);
+    const homed = all({ field: 'homeWarehouse', op: 'IN', ids: [wh1.id] });
+    expect((await ids({ categoryId: root, where: homed })).ids).toEqual(
+      (await query({ categoryId: root, where: homed })).data.map((row) => row.id),
+    );
+    // A page's cursor or size has no place here.
+    await ids({ categoryId: root, limit: 10 }, 422);
+    await ids({ categoryId: root, cursor: 'x' }, 422);
   });
 
   it('refuses conditions that fail the shared rules, at their path', async () => {

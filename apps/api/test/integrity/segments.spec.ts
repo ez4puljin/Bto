@@ -26,8 +26,9 @@ const all = (...conditions: SegmentCondition[]): SegmentDefinition => ({
  * The segments guards and their scale (ADR-0049): a segment is archived, never deleted (the app
  * role can neither DELETE nor TRUNCATE the table); a live name is unique per entity; and with the
  * owner's whole catalogue (20,000 products) a list page under three conditions answers within
- * 500 ms, the segments list counts ten segments within 2 s, and the whole catalogue goes to Excel
- * (two files at a time, never more than 20,000 rows). Timings are logged.
+ * 500 ms, the segments list counts ten segments within 2 s, the whole catalogue goes to Excel
+ * (two files at a time, never more than 20,000 rows), and «Таарсан бүх N» gets 20,000 ids within
+ * a second but never more (ADR-0052). Timings are logged.
  */
 describe('integrity: segments', () => {
   let app: NestExpressApplication;
@@ -232,4 +233,33 @@ describe('integrity: segments', () => {
     console.log(`segments at scale: export of ${COUNT} rows ${Math.round(exportMs)} ms`);
     expect(exportMs).toBeLessThan(60_000);
   }, 180_000);
+
+  it('gives every product a filter keeps, up to 20,000, and refuses more (ADR-0052)', async () => {
+    const ids = (body: Record<string, unknown>) =>
+      http().post('/api/v1/products/query/ids').set(bearer(token)).send(body);
+    // The 20,001st product (added above) has no supplier: «any supplier» keeps the 20,000.
+    const linked = { where: all({ field: 'supplier', op: 'ANY' }) };
+    await ids(linked).expect(200); // warms the route
+    const started = performance.now();
+    const res = await ids(linked).expect(200);
+    const idsMs = performance.now() - started;
+    const kept = (res.body as { ids: number[] }).ids;
+    expect(kept).toHaveLength(COUNT);
+    // In the list's order: the first page of the list is the first 50 ids.
+    const page = await http()
+      .post('/api/v1/products/query')
+      .set(bearer(token))
+      .send({ ...linked, limit: 50 })
+      .expect(200);
+    expect(kept.slice(0, 50)).toEqual(
+      (page.body as { data: { id: number }[] }).data.map((row) => row.id),
+    );
+    const tooMany = await ids({}).expect(422);
+    expect(tooMany.body).toMatchObject({
+      code: 'SELECTION_TOO_LARGE',
+      params: { count: COUNT + 1, limit: COUNT },
+    });
+    console.log(`segments at scale: ${COUNT} ids for «Таарсан бүх N» ${Math.round(idsMs)} ms`);
+    expect(idsMs).toBeLessThan(1000);
+  }, 60_000);
 });

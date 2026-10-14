@@ -9,6 +9,9 @@ import {
   holesOf,
   innermostOwner,
   lowestFree,
+  MAX_BULK_PRODUCTS,
+  MAX_EXPORT_ROWS,
+  MAX_SELECTED_PRODUCTS,
   nextAfter,
   type RangedCategory,
   rangeConflict,
@@ -124,6 +127,11 @@ describe('product stage, list columns and category paths (ADR-0044, ADR-0049)', 
     expect(EXPORTABLE_PRODUCT_COLUMNS).toEqual(
       PRODUCT_LIST_COLUMNS.filter((column) => column !== 'image'),
     );
+  });
+
+  it('lets every possible tick go to Excel (ADR-0052)', () => {
+    expect(MAX_SELECTED_PRODUCTS).toBeLessThanOrEqual(MAX_EXPORT_ROWS);
+    expect(MAX_SELECTED_PRODUCTS).toBeGreaterThan(MAX_BULK_PRODUCTS);
   });
 
   it('walks categories depth-first with their full paths', () => {
