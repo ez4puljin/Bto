@@ -7,6 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey, type paths } from '@tugeel/api-client';
+import { useCallback } from 'react';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
 
@@ -294,6 +295,33 @@ export function useReceipt(id: number) {
   });
 }
 
+/**
+ * The latest copy of a receipt in the cache, read when a queued scan runs (ADR-0047 #2): line
+ * changes write the returned draft there before the next scan looks for its line.
+ */
+export function useReceiptSnapshot(id: number): () => ReceiptDetail | undefined {
+  const queryClient = useQueryClient();
+  return useCallback(
+    () => queryClient.getQueryData<ReceiptDetail>([...KEYS.receipts, id]),
+    [queryClient, id],
+  );
+}
+
+/** Posted receipts waiting for their costs, newest first: the accountant's queue (ADR-0047 #1). */
+export function usePendingReceipts() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.receipts, 'pending'],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/receipts', {
+          params: { query: { costingPending: true, limit: 200 } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 /** The costs of a receipt: only for holders of inventory.costs.manage. */
 export function useReceiptCosting(id: number) {
   const api = useApiClient();
@@ -362,6 +390,13 @@ export function useInventoryMutations() {
     Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
   const binsChanged = () => invalidate(KEYS.bins, KEYS.locations);
   const receiptsChanged = () => invalidate(KEYS.receipts, KEYS.stock);
+  /** A draft's new copy goes into the cache at once; lists and stock refresh behind it. */
+  const receiptLinesChanged = async (receipt: ReceiptDetail) => {
+    const key = [...KEYS.receipts, receipt.id];
+    await queryClient.cancelQueries({ queryKey: key, exact: true });
+    queryClient.setQueryData(key, receipt);
+    void invalidate([...KEYS.receipts, 'list'], [...KEYS.receipts, 'pending'], KEYS.stock);
+  };
   const adjustmentsChanged = () => invalidate(KEYS.adjustments, KEYS.stock);
 
   return {
@@ -404,17 +439,17 @@ export function useInventoryMutations() {
         unwrap(
           await api.POST('/api/v1/receipts', { params: { header: idempotencyKey(key) }, body }),
         ),
-      onSuccess: receiptsChanged,
+      onSuccess: receiptLinesChanged,
     }),
     updateReceipt: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: ReceiptUpdate }) =>
         unwrap(await api.PATCH('/api/v1/receipts/{id}', { params: { path: { id } }, body })),
-      onSuccess: receiptsChanged,
+      onSuccess: receiptLinesChanged,
     }),
     addReceiptLine: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: ReceiptLineRequest }) =>
         unwrap(await api.POST('/api/v1/receipts/{id}/lines', { params: { path: { id } }, body })),
-      onSuccess: receiptsChanged,
+      onSuccess: receiptLinesChanged,
     }),
     updateReceiptLine: useMutation({
       mutationFn: async ({
@@ -425,12 +460,12 @@ export function useInventoryMutations() {
         body: { enteredQty?: string; binId?: number };
       }) =>
         unwrap(await api.PATCH('/api/v1/receipt-lines/{id}', { params: { path: { id } }, body })),
-      onSuccess: receiptsChanged,
+      onSuccess: receiptLinesChanged,
     }),
     removeReceiptLine: useMutation({
       mutationFn: async (id: number) =>
         unwrap(await api.DELETE('/api/v1/receipt-lines/{id}', { params: { path: { id } } })),
-      onSuccess: receiptsChanged,
+      onSuccess: receiptLinesChanged,
     }),
     postReceipt: useMutation({
       mutationFn: async ({ id, key }: { id: number; key: string }) =>

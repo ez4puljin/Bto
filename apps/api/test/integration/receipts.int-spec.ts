@@ -324,4 +324,70 @@ describe('goods receipts', () => {
       .expect(201);
     expect((await postReceipt(worker, draft.id).expect(409)).body.code).toBe('UNIT_SUPERSEDED');
   });
+
+  it('corrects the delivery note of a draft, never of a posted receipt (ADR-0047 #1)', async () => {
+    interface HeaderJson extends ReceiptJson {
+      warehouseId: number;
+      supplierId: number;
+      supplierDocNo: string | null;
+      supplierDocDate: string | null;
+      note: string | null;
+    }
+    const draft = (
+      await create(worker, {
+        warehouseId: wh1.id,
+        supplierId,
+        supplierDocNo: 'П-1',
+        note: 'Анхны',
+      }).expect(201)
+    ).body as HeaderJson;
+    const patch = (token: string, body: Record<string, unknown>) =>
+      http().patch(`/api/v1/receipts/${draft.id}`).set(bearer(token)).send(body);
+
+    const nomin = (await partnersApi(app, admin).supplier({ name: 'Номин' })).id;
+    const corrected = (
+      await patch(worker, {
+        supplierId: nomin,
+        supplierDocNo: 'П-2',
+        supplierDocDate: '2026-10-12',
+        note: null,
+      }).expect(200)
+    ).body as HeaderJson;
+    expect(corrected).toMatchObject({
+      warehouseId: wh1.id,
+      supplierId: nomin,
+      supplierDocNo: 'П-2',
+      supplierDocDate: '2026-10-12',
+      note: null,
+    });
+    // An empty text clears; fields left out stay.
+    expect(
+      (await patch(worker, { supplierDocNo: '', supplierDocDate: null }).expect(200)).body,
+    ).toMatchObject({ supplierId: nomin, supplierDocNo: null, supplierDocDate: null });
+
+    const closed = (await partnersApi(app, admin).supplier({ name: 'Хаагдсан' })).id;
+    await http()
+      .patch(`/api/v1/suppliers/${closed}`)
+      .set(bearer(admin))
+      .send({ status: 'INACTIVE' })
+      .expect(200);
+    expect((await patch(worker, { supplierId: closed }).expect(409)).body.code).toBe(
+      'SUPPLIER_INACTIVE',
+    );
+    const elsewhere = (
+      await login(app, await seedUser(app, { roles: ['WAREHOUSE'], warehouseIds: [wh2.id] }))
+    ).accessToken;
+    await patch(elsewhere, { note: 'Өөр агуулах' }).expect(403);
+    await patch(accountant, { note: 'Нягтлан' }).expect(403);
+
+    await http()
+      .post(`/api/v1/receipts/${draft.id}/lines`)
+      .set(bearer(worker))
+      .send({ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' })
+      .expect(201);
+    await postReceipt(worker, draft.id).expect(200);
+    expect((await patch(worker, { note: 'Хожуу' }).expect(409)).body.code).toBe(
+      'DOC_ALREADY_POSTED',
+    );
+  });
 });

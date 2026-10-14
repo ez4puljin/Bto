@@ -226,7 +226,7 @@ export interface QuickAction {
 /** The home page's shortcuts to the day's work, each behind the right to do it (ADR-0042). */
 export const QUICK_ACTIONS: readonly QuickAction[] = [
   {
-    to: '/inventory/receipts/new',
+    to: '/inventory/receipts?new=1',
     label: 'home.actions.newReceipt',
     icon: PackagePlus,
     permission: 'inventory.receipts.manage',

@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { AppShell } from '@/app/app-shell';
 import { NotFoundPage } from '@/app/not-found-page';
 import { RequireAuth, RequirePermission } from '@/app/require-auth';
@@ -21,9 +21,8 @@ import { UsersPage } from '@/features/identity/users-page';
 import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustments-pages';
 import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
-import { ReceiptCostingPage } from '@/features/inventory/costing-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
-import { ReceiptCreatePage, ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
+import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
 import { StocktakePage, StocktakesPage } from '@/features/inventory/stocktakes-pages';
@@ -139,22 +138,15 @@ export const routes: RouteObject[] = [
           { path: 'inventory/movements', element: <MovementsPage />, handle: { wide: true } },
           { path: 'inventory/low-stock', element: <LowStockPage /> },
           { path: 'inventory/receipts', element: <ReceiptsPage /> },
+          // Old links: a receipt is created in the list's dialog and costed on its own page.
           {
             path: 'inventory/receipts/new',
-            element: (
-              <RequirePermission permission="inventory.receipts.manage">
-                <ReceiptCreatePage />
-              </RequirePermission>
-            ),
+            element: <Navigate to="/inventory/receipts?new=1" replace />,
           },
           { path: 'inventory/receipts/:id', element: <ReceiptPage /> },
           {
             path: 'inventory/receipts/:id/costing',
-            element: (
-              <RequirePermission permission="inventory.costs.manage">
-                <ReceiptCostingPage />
-              </RequirePermission>
-            ),
+            element: <Navigate to=".." relative="path" replace />,
           },
           { path: 'pricing/discounts', element: <DiscountProgramsPage />, handle: { wide: true } },
           {

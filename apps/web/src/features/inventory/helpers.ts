@@ -1,5 +1,5 @@
 import type { components } from '@tugeel/api-client';
-import { ADJUSTMENT_REASONS, type AdjustmentReason } from '@tugeel/shared/inventory';
+import { ADJUSTMENT_REASONS, type AdjustmentReason, lineAmountOf } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { fromBase } from '@tugeel/shared/units';
 import { useCallback, useMemo } from 'react';
@@ -112,24 +112,19 @@ export function rangeNumbers(form: RangeForm) {
 /** MNT with at most two decimals, as the API takes it (NUMERIC(14,2)). */
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
-export type CostingMode = 'amount' | 'unitPrice';
-export interface CostingValue {
+/** A receipt line's costing as typed: the field typed last (price per entered unit or line amount), or bonus. */
+export interface CostEntry {
+  source: 'unitPrice' | 'amount';
   value: string;
   free: boolean;
 }
 
 /** The amount a receipt line will be costed at, or null while its field is empty or invalid. */
-export function lineAmount(
-  mode: CostingMode,
-  entry: CostingValue,
-  enteredQty: string,
-): Decimal | null {
+export function entryAmount(entry: CostEntry, enteredQty: string): Decimal | null {
   if (entry.free) return new Decimal(0);
   const value = entry.value.trim();
   if (!MONEY.test(value)) return null;
-  return mode === 'amount'
-    ? new Decimal(value)
-    : new Decimal(value).times(enteredQty).toDecimalPlaces(2);
+  return entry.source === 'amount' ? new Decimal(value) : lineAmountOf(value, enteredQty);
 }
 
 /** A transfer count as typed: in the line's unit, or in base units. */
