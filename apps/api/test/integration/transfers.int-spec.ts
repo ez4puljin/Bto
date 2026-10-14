@@ -632,4 +632,110 @@ describe('transfers', () => {
       ),
     ).toBe(true);
   });
+
+  it('lets the requester take a sent request back to edit it, under the same number (ADR-0046)', async () => {
+    const seq = (number: string | null) => Number.parseInt((number ?? '').slice(-6), 10);
+    const sent = await requested(clerk, {
+      sourceWarehouseId: wh1.id,
+      destWarehouseId: store.id,
+      lines: [{ productUnitId: pcs(water), qty: '2' }],
+    });
+    expect(sent.number).toMatch(new RegExp(`^TR-${year}-`));
+
+    // The direction alone means the warehouses one writes for.
+    const incoming = await http()
+      .get('/api/v1/transfers')
+      .query({ direction: 'INCOMING', status: 'REQUESTED' })
+      .set(bearer(clerk))
+      .expect(200);
+    const asked = (incoming.body as { data: { id: number; destWarehouseId: number }[] }).data;
+    expect(asked.map((row) => row.id)).toContain(sent.id);
+    expect(asked.every((row) => row.destWarehouseId === store.id)).toBe(true);
+    const toShip = await http()
+      .get('/api/v1/transfers')
+      .query({ direction: 'OUTGOING', status: 'REQUESTED' })
+      .set(bearer(wh1Worker))
+      .expect(200);
+    expect((toShip.body as { data: { id: number }[] }).data.map((row) => row.id)).toContain(
+      sent.id,
+    );
+
+    // Only the side that asked takes it back; pressed twice, nothing changes.
+    await step(wh1Worker, sent.id, 'reopen').expect(403);
+    const reopened = (await step(clerk, sent.id, 'reopen').expect(200)).body as TransferJson & {
+      requestedAt: string | null;
+    };
+    expect(reopened).toMatchObject({ status: 'DRAFT', number: sent.number, requestedAt: null });
+    expect((await step(clerk, sent.id, 'reopen').expect(200)).body).toMatchObject({
+      status: 'DRAFT',
+      number: sent.number,
+    });
+
+    // Meanwhile the sender can neither ship nor decline it.
+    expect((await step(wh1Worker, sent.id, 'ship').expect(409)).body).toMatchObject({
+      code: 'DOC_STATE_INVALID',
+    });
+    await step(wh1Worker, sent.id, 'cancel', { reason: 'Үлдэгдэлгүй' }).expect(403);
+
+    // Edited and sent again under its number; the next request takes the next number.
+    await http()
+      .post(`/api/v1/transfers/${sent.id}/lines`)
+      .set(bearer(clerk))
+      .send({ productUnitId: pcs(cola), qty: '6' })
+      .expect(201);
+    const again = (await step(clerk, sent.id, 'request').expect(200)).body as TransferJson;
+    expect(again).toMatchObject({ status: 'REQUESTED', number: sent.number });
+    expect(again.lines).toHaveLength(2);
+    const next = await requested(clerk, {
+      sourceWarehouseId: wh1.id,
+      destWarehouseId: store.id,
+      lines: [{ productUnitId: pcs(water), qty: '1' }],
+    });
+    expect(seq(next.number)).toBe(seq(sent.number) + 1);
+    await step(clerk, next.id, 'cancel').expect(200);
+
+    // A shipment, a draft never sent and a push are never taken back.
+    await step(wh1Worker, sent.id, 'ship').expect(200);
+    expect((await step(clerk, sent.id, 'reopen').expect(409)).body).toMatchObject({
+      code: 'DOC_STATE_INVALID',
+    });
+    await step(clerk, sent.id, 'receive').expect(200);
+    const unsent = (
+      await create(clerk, {
+        origin: 'REQUEST',
+        sourceWarehouseId: wh1.id,
+        destWarehouseId: store.id,
+        lines: [{ productUnitId: pcs(water), qty: '1' }],
+      }).expect(201)
+    ).body as TransferJson;
+    await step(clerk, unsent.id, 'reopen').expect(409);
+    const push = (
+      await create(clerk, {
+        origin: 'PUSH',
+        sourceWarehouseId: store.id,
+        destWarehouseId: wh1.id,
+        lines: [{ productUnitId: pcs(water), qty: '1' }],
+      }).expect(201)
+    ).body as TransferJson;
+    await step(clerk, push.id, 'reopen').expect(409);
+    // The database keeps numbers off every other draft.
+    await expect(
+      sql.query(`UPDATE transfers SET number = 'TR-TEST-1' WHERE id = $1`, [push.id]),
+    ).rejects.toMatchObject({ code: '23514' });
+    await step(clerk, unsent.id, 'cancel').expect(200);
+    await step(clerk, push.id, 'cancel').expect(200);
+
+    const { rows } = await sql.query<{ action: string }>(
+      `SELECT action FROM audit_log WHERE entity = 'transfers' AND entity_id = $1 ORDER BY id`,
+      [String(sent.id)],
+    );
+    expect(rows.map((row) => row.action)).toEqual([
+      'CREATE',
+      'REQUEST',
+      'RETURN',
+      'REQUEST',
+      'SHIP',
+      'RECEIVE',
+    ]);
+  });
 });

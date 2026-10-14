@@ -125,7 +125,10 @@ export interface TransferSummary {
 }
 
 export interface TransferQuery {
-  /** With `warehouseId`: INCOMING = it receives, OUTGOING = it sends; without, either side. */
+  /**
+   * INCOMING = received by, OUTGOING = sent by `warehouseId`, or without it by the warehouses the
+   * caller writes for (every warehouse for an unscoped caller). Without a direction: either side.
+   */
   direction?: 'INCOMING' | 'OUTGOING';
   warehouseId?: number;
   status?: TransferStatus;
@@ -289,7 +292,8 @@ export class TransfersService {
         header.destWarehouseId,
         lines.map((line) => line.productId),
       );
-      const number = await this.allocateNumber(tx);
+      // A request taken back for editing is sent again under its number (ADR-0046).
+      const number = header.number ?? (await this.allocateNumber(tx));
       await tx
         .update(transfers)
         .set({
@@ -306,6 +310,36 @@ export class TransfersService {
         entityId: id,
         before: header,
         after: { number },
+      });
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * REQUESTED → DRAFT by the destination, which edits the request and sends it again under the same
+   * number (ADR-0046). The header lock is the one shipping takes first, so of a shipment and a
+   * take-back exactly one wins; pressed twice, the draft is answered as it is.
+   */
+  reopen(ctx: AuthContext, id: number): Promise<TransferDetail> {
+    return inTransaction(this.db, async (tx) => {
+      const header = await this.lockHeader(tx, id);
+      this.scope.assertCanWriteWarehouse(ctx, ownerSide(header));
+      if (header.status === 'DRAFT' && header.number !== null) return this.get(id, tx);
+      if (header.origin !== 'REQUEST' || header.status !== 'REQUESTED') {
+        throw new AppError('DOC_STATE_INVALID', `transfer ${id} is ${header.status}`, {
+          status: header.status,
+        });
+      }
+      await tx
+        .update(transfers)
+        .set({ status: 'DRAFT', requestedAt: null, requestedBy: null, updatedAt: sql`now()` })
+        .where(eq(transfers.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'RETURN',
+        entity: 'transfers',
+        entityId: id,
+        before: header,
+        after: { status: 'DRAFT', number: header.number },
       });
       return this.get(id, tx);
     });
@@ -569,10 +603,18 @@ export class TransfersService {
   }
 
   async list(
+    ctx: AuthContext,
     query: TransferQuery,
   ): Promise<{ data: TransferSummary[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
+    if (query.warehouseId === undefined && query.direction && ctx.writableWarehouseIds !== null) {
+      // A direction alone: the warehouses the caller writes for (ADR-0047 #7).
+      const mine = [...ctx.writableWarehouseIds];
+      const side =
+        query.direction === 'INCOMING' ? transfers.destWarehouseId : transfers.sourceWarehouseId;
+      filters.push(mine.length > 0 ? inArray(side, mine) : sql`false`);
+    }
     if (query.warehouseId !== undefined) {
       const side =
         query.direction === 'INCOMING'

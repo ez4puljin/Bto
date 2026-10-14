@@ -102,7 +102,8 @@ export class TransferPageDto {
 export class TransferListQueryDto extends PageQueryDto {
   @ApiPropertyOptional({
     enum: DIRECTIONS,
-    description: 'With warehouseId: INCOMING = it receives, OUTGOING = it sends',
+    description:
+      'INCOMING = received by, OUTGOING = sent by warehouseId; without it, by the warehouses the caller writes for',
   })
   @IsOptional()
   @IsIn(DIRECTIONS)

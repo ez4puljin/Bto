@@ -1895,6 +1895,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** REQUESTED → DRAFT by the destination, to edit the request; it keeps its number (ADR-0046). */
+        post: operations["Transfers_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers/{id}/ship": {
         parameters: {
             query?: never;
@@ -9538,7 +9555,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                /** @description With warehouseId: INCOMING = it receives, OUTGOING = it sends */
+                /** @description INCOMING = received by, OUTGOING = sent by warehouseId; without it, by the warehouses the caller writes for */
                 direction?: "INCOMING" | "OUTGOING";
                 warehouseId?: number;
                 status?: "DRAFT" | "REQUESTED" | "SHIPPED" | "RECEIVED" | "CANCELLED";
@@ -9702,6 +9719,36 @@ export interface operations {
         };
     };
     Transfers_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Transfers_reopen: {
         parameters: {
             query?: never;
             header?: never;

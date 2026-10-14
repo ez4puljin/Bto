@@ -228,6 +228,34 @@ describe('integrity: transfers', () => {
     expect(outcomes).toHaveLength(6);
   });
 
+  it('lets exactly one of shipping and taking a request back win (ADR-0046)', async () => {
+    for (let round = 0; round < 6; round += 1) {
+      const sent = await request(clerk, wh1, store, [{ product: sugar, qty: '1' }]);
+      const [shipped, reopened] = await Promise.allSettled([
+        transfers.ship(worker, sent.id),
+        transfers.reopen(clerk, sent.id),
+      ]);
+      const final = await transfers.get(sent.id);
+      const { rows } = await sql.query(
+        `SELECT 1 FROM stock_ledger WHERE doc_type = 'TR' AND doc_id = $1`,
+        [sent.id],
+      );
+      if (shipped.status === 'fulfilled') {
+        expect(reopened.status).toBe('rejected');
+        expect(reasonCode((reopened as PromiseRejectedResult).reason)).toBe('DOC_STATE_INVALID');
+        expect(final.status).toBe('SHIPPED');
+        expect(rows).toHaveLength(2);
+        await transfers.receive(clerk, sent.id);
+      } else {
+        expect(reopened.status).toBe('fulfilled');
+        expect(reasonCode(shipped.reason)).toBe('DOC_STATE_INVALID');
+        expect(final).toMatchObject({ status: 'DRAFT', number: sent.number });
+        expect(rows).toHaveLength(0);
+        await transfers.cancel(clerk, sent.id);
+      }
+    }
+  });
+
   it('receives a transfer once when two receivers confirm together', async () => {
     for (let round = 0; round < 4; round += 1) {
       const sent = await request(clerk, wh1, store, [{ product: sugar, qty: '2' }]);

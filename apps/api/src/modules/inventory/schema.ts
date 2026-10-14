@@ -516,10 +516,11 @@ export const transfers = pgTable(
     check('transfers_origin', inList(t.origin, TRANSFER_ORIGINS)),
     check('transfers_status', inList(t.status, TRANSFER_STATUSES)),
     check('transfers_warehouses', sql`${t.sourceWarehouseId} <> ${t.destWarehouseId}`),
-    // Drafts have no number; a sent request and everything after it has one (SPEC §6.13).
+    // Drafts have no number, except a request taken back for editing (ADR-0046); a sent request
+    // and everything after it has one (SPEC §6.13).
     check(
       'transfers_number',
-      sql`(${t.status} <> 'DRAFT' OR ${t.number} IS NULL)
+      sql`(${t.status} <> 'DRAFT' OR ${t.number} IS NULL OR ${t.origin} = 'REQUEST')
         AND (${t.status} NOT IN ('REQUESTED', 'SHIPPED', 'RECEIVED') OR ${t.number} IS NOT NULL)`,
     ),
     check(

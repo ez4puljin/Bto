@@ -7732,7 +7732,7 @@
             "name": "direction",
             "required": false,
             "in": "query",
-            "description": "With warehouseId: INCOMING = it receives, OUTGOING = it sends",
+            "description": "INCOMING = received by, OUTGOING = sent by warehouseId; without it, by the warehouses the caller writes for",
             "schema": {
               "type": "string",
               "enum": [
@@ -8046,6 +8046,52 @@
           }
         ],
         "summary": "DRAFT → REQUESTED by the destination; the request gets its number.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/transfers/{id}/reopen": {
+      "post": {
+        "operationId": "Transfers_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "REQUESTED → DRAFT by the destination, to edit the request; it keeps its number (ADR-0046).",
         "tags": [
           "inventory"
         ]

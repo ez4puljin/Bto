@@ -186,7 +186,7 @@ export const AI_DATASETS: readonly AiDataset[] = [
     columns: [
       col('doc_type', 'text'),
       col('id', 'bigint'),
-      col('number', 'text', 'NULL for drafts'),
+      col('number', 'text', 'NULL for drafts, except a TR request taken back for editing'),
       col(
         'status',
         'text',

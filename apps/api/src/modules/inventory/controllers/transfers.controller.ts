@@ -60,8 +60,11 @@ export class TransfersController {
   @Get()
   @Authenticated()
   @ApiOkResponse({ type: TransferPageDto })
-  async list(@Query() query: TransferListQueryDto): Promise<TransferPageDto> {
-    const page = await this.transfers.list(query);
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: TransferListQueryDto,
+  ): Promise<TransferPageDto> {
+    const page = await this.transfers.list(ctx, query);
     return { data: page.data.map(toTransferSummaryDto), nextCursor: page.nextCursor };
   }
 
@@ -123,6 +126,18 @@ export class TransfersController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<TransferDetailDto> {
     return toTransferDetailDto(await this.transfers.request(ctx, id));
+  }
+
+  /** REQUESTED → DRAFT by the destination, to edit the request; it keeps its number (ADR-0046). */
+  @Post(':id/reopen')
+  @HttpCode(200)
+  @RequirePermission(TRANSFERS)
+  @ApiOkResponse({ type: TransferDetailDto })
+  async reopen(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<TransferDetailDto> {
+    return toTransferDetailDto(await this.transfers.reopen(ctx, id));
   }
 
   /** The source ships into TRANSIT; idempotent so a retried click never ships twice. */
