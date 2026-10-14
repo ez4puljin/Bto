@@ -54,7 +54,7 @@ export function BarcodeLookupPage() {
   const [latest, ...older] = scans;
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="space-y-4 max-w-3xl">
       <PageHeader title={t('scan.title')} />
       <Card>
         <CardContent className="flex flex-col gap-4">

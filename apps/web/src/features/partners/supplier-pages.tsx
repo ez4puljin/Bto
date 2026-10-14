@@ -248,7 +248,7 @@ export function SupplierPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={detail.name}
         meta={

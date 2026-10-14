@@ -344,7 +344,7 @@ export function TransferPage() {
     ) : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={detail.number ?? t('inventory.draftNo', { id: detail.id })}
         meta={

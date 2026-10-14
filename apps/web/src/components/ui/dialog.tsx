@@ -5,6 +5,7 @@ import { cn } from "cn"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { useScanEnterGuard } from "@/lib/scan/use-wedge-scanner"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -52,12 +53,15 @@ function DialogContent({
   children,
   showCloseButton = true,
   closeLabel,
+  onKeyDownCapture,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   /** Screen-reader label of the close button, from i18n (no literal JSX text: ESLint G5). */
   closeLabel?: string
 }) {
+  // A barcode scan's Enter never presses the focused button (ADR-0047 #4).
+  const scanGuard = useScanEnterGuard()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -67,6 +71,10 @@ function DialogContent({
           "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-150 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.97] data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.97]",
           className
         )}
+        onKeyDownCapture={(event) => {
+          scanGuard(event)
+          onKeyDownCapture?.(event)
+        }}
         {...props}
       >
         {children}

@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FieldError } from '@/components/field-error';
+import { Button } from '@/components/ui/button';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 /*
- * The form kit (ADR-0042, docs/ui.md §4): settings-style forms like Apple's — sections of rows,
+ * The form kit (ADR-0043, docs/ui.md §4): settings-style forms like Apple's — sections of rows,
  * the label on the left and the field on the right on wide screens (stacked on phones), and the
  * actions at the foot, «Болих» then the main button on the right. The read view (`FieldList`)
  * uses the same rows, so reading and editing line up.
@@ -106,5 +109,25 @@ export function FormFooter({ children }: { children: ReactNode }) {
     <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/80 pt-4">
       {children}
     </div>
+  );
+}
+
+/** «Болих», then the submit button («Хадгалах» unless named), at the foot of a dialog's form. */
+export function DialogFormFooter(props: {
+  pending: boolean;
+  onCancel: () => void;
+  submitLabel?: string;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <DialogFooter>
+      <Button type="button" variant="ghost" onClick={props.onCancel}>
+        {t('common.cancel')}
+      </Button>
+      <Button type="submit" disabled={props.pending || props.disabled}>
+        {props.submitLabel ?? t('common.save')}
+      </Button>
+    </DialogFooter>
   );
 }

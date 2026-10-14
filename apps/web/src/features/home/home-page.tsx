@@ -36,7 +36,7 @@ export function HomePage() {
   }, [permissions]);
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="space-y-7">
       <PageHeader title={t('home.greeting', { name })} meta={formatUbToday()} />
       {actions.length > 0 ? (
         <section aria-labelledby="home-actions">

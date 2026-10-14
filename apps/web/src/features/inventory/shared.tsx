@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input';
 import { type ProductSummary, useProducts } from '@/features/catalog/api';
 import type { Warehouse } from '@/features/identity/api';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
-import { isQty } from './helpers';
+import { cn } from '@/lib/utils';
+import { isQty, parseScanQty } from './helpers';
+import type { ScanQty } from './scan-qty';
 
 type DocStatus =
   | 'DRAFT'
@@ -22,6 +24,8 @@ type DocStatus =
   | 'CANCELLED';
 
 export function WarehouseSelect(props: {
+  /** Set when a visible label names the select (`FormField htmlFor`). */
+  id?: string;
   options: readonly Warehouse[];
   value: number | undefined;
   onChange: (id: number | undefined) => void;
@@ -35,7 +39,8 @@ export function WarehouseSelect(props: {
   const { t } = useTranslation();
   return (
     <NativeSelect
-      aria-label={props.label ?? t('inventory.warehouse')}
+      id={props.id}
+      aria-label={props.id ? undefined : (props.label ?? t('inventory.warehouse'))}
       className={props.className}
       variant={props.variant}
       value={props.value ?? ''}
@@ -72,9 +77,12 @@ export function DocStatusBadge({ status }: { status: DocStatus }) {
 
 /** Search active products by name, SKU or barcode and pick one (documents without a scanner). */
 export function ProductSearch({
+  id,
   onPick,
   pickLabel,
 }: {
+  /** Set when a visible label names the search box. */
+  id?: string;
   onPick: (product: ProductSummary) => void;
   /** The button of each found product; default «Нэмэх». */
   pickLabel?: string;
@@ -88,8 +96,9 @@ export function ProductSearch({
   return (
     <div className="flex flex-col gap-2">
       <Input
+        id={id}
         type="search"
-        aria-label={t('inventory.productSearch')}
+        aria-label={id ? undefined : t('inventory.productSearch')}
         placeholder={t('inventory.productSearchPlaceholder')}
         className="max-w-sm"
         value={search}
@@ -156,6 +165,25 @@ export function QtyInput(props: {
         event.preventDefault();
         save();
       }}
+    />
+  );
+}
+
+/** The «Тоо» field beside a scan box; a scan that lands here goes to `onScan` instead. */
+export function ScanQtyField(props: { id: string; qty: ScanQty; onScan: (code: string) => void }) {
+  const guard = useScanGuard(props.onScan, { letters: true });
+  const invalid = parseScanQty(props.qty.value) === null;
+  return (
+    <Input
+      id={props.id}
+      inputMode="decimal"
+      autoComplete="off"
+      aria-invalid={invalid}
+      className={cn('w-20 text-right font-mono', invalid && 'border-destructive')}
+      value={props.qty.value}
+      onFocus={(event) => event.currentTarget.select()}
+      onChange={(event) => props.qty.set(event.target.value)}
+      onKeyDown={(event) => guard(event, props.qty.value, props.qty.set)}
     />
   );
 }

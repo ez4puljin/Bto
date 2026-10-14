@@ -78,7 +78,7 @@ export function AccountPage() {
   const { errors, isSubmitting } = form.formState;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader title={t('auth.account.title')} />
       <Card>
         <CardHeader>

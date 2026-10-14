@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FormField } from '@/components/form';
+import { DialogFormFooter, FormField } from '@/components/form';
 import {
   EmptyState,
   ListCard,
@@ -30,13 +30,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -50,6 +44,7 @@ import {
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type Category, type Uom, useCatalogMutations, useCategories, useUoms } from './api';
 import { categoryTree, subtreeIds } from './category-tree';
 import { CLASSIFICATION_CODE } from './product-schema';
@@ -61,42 +56,6 @@ const optionalCode = z
     (value) => value === '' || CLASSIFICATION_CODE.test(value),
     'validation.classificationCode',
   );
-
-/** Deletes one master row after a confirmation; the API refuses rows still in use. */
-function useDeleteConfirm<T extends { id: number; name: string }>(
-  remove: (id: number) => Promise<unknown>,
-) {
-  const action = useAction();
-  const [target, setTarget] = useState<T | null>(null);
-  return {
-    target,
-    problem: action.problem,
-    ask: (row: T) => {
-      action.clear();
-      setTarget(row);
-    },
-    close: () => setTarget(null),
-    confirm: () => {
-      if (!target) return;
-      void action.run(() => remove(target.id)).then((ok) => (ok ? setTarget(null) : undefined));
-    },
-  };
-}
-
-/** «Болих» then «Хадгалах» at the foot of a master dialog. */
-function SaveFooter({ pending, onCancel }: { pending: boolean; onCancel: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <DialogFooter>
-      <Button type="button" variant="ghost" onClick={onCancel}>
-        {t('common.cancel')}
-      </Button>
-      <Button type="submit" disabled={pending}>
-        {t('common.save')}
-      </Button>
-    </DialogFooter>
-  );
-}
 
 /** A muted «—» for an empty cell. */
 function None() {
@@ -391,7 +350,7 @@ function CategoryDialog(props: {
               />
             </div>
           </FormField>
-          <SaveFooter pending={isSubmitting} onCancel={props.onClose} />
+          <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>
       </DialogContent>
     </Dialog>
@@ -571,7 +530,7 @@ function UomDialog({ uom, onClose }: { uom: Uom | 'new'; onClose: () => void }) 
           >
             <Input id="uom-measure" autoComplete="off" {...form.register('measureUnit')} />
           </FormField>
-          <SaveFooter pending={isSubmitting} onCancel={onClose} />
+          <DialogFormFooter pending={isSubmitting} onCancel={onClose} />
         </form>
       </DialogContent>
     </Dialog>

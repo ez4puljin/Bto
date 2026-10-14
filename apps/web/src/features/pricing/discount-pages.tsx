@@ -173,7 +173,7 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={program.name}
         meta={

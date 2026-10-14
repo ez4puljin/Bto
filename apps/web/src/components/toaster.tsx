@@ -14,7 +14,7 @@ export function Toaster() {
   return (
     <section
       aria-label={t('toast.region')}
-      className="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4 md:top-auto md:bottom-6 print:hidden"
+      className="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4 md:top-auto md:bottom-[calc(1.5rem+var(--sticky-actions-space,0rem))] print:hidden"
       onMouseEnter={pauseToasts}
       onMouseLeave={resumeToasts}
     >

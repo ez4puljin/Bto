@@ -605,13 +605,65 @@ describe('adjustment approval', () => {
       '1550',
     );
     await user.click(screen.getByRole('button', { name: mn.inventory.adjustment.approve }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: mn.inventory.adjustment.approve }));
+    const dialog = within(await screen.findByRole('dialog'));
+    // The approval's main button holds the focus: Enter approves (ADR-0047 #3).
+    await waitFor(() =>
+      expect(dialog.getByRole('button', { name: mn.inventory.adjustment.approve })).toHaveFocus(),
+    );
+    await user.keyboard('{Enter}');
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/adjustments/9/post')).toHaveLength(1),
     );
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/adjustments/9/post')[0])).toEqual({
       costs: [{ lineId: 40, unitCost: '1550' }],
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      mn.inventory.adjustment.posted.replace('{{number}}', 'ADJ-2026-000001'),
+    );
+  });
+});
+
+describe('adjustment drafts', () => {
+  it('creates a draft in its dialog with the only warehouse chosen and remembers it', async () => {
+    const draft: Schemas['AdjustmentDetail'] = {
+      id: 12,
+      number: null,
+      warehouseId: 1,
+      reason: 'EXPIRED',
+      status: 'DRAFT',
+      note: 'Тавиур 3',
+      submittedAt: null,
+      effectiveDate: null,
+      postedAt: null,
+      createdAt: STAMP,
+      updatedAt: STAMP,
+      lines: [],
+    };
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/adjustments': () => list([]),
+      'POST /api/v1/adjustments': () => json(draft, 201),
+      'GET /api/v1/adjustments/12': () => json(draft),
+    });
+    const { router } = renderApp('/inventory/adjustments?new=1', fetchMock);
+    const user = userEvent.setup();
+    const dialog = within(await screen.findByRole('dialog'));
+    await waitFor(() => expect(dialog.getByLabelText(mn.inventory.warehouse)).toHaveValue('1'));
+    await user.selectOptions(
+      dialog.getByLabelText(mn.inventory.adjustments.reason),
+      mn.inventory.reasons.EXPIRED,
+    );
+    await user.click(dialog.getByLabelText(mn.inventory.note));
+    await user.paste('Тавиур 3');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/inventory/adjustments/12'));
+    const posts = calls(fetchMock, 'POST', '/api/v1/adjustments');
+    expect(posts).toHaveLength(1);
+    expect(await bodyOf(posts[0])).toEqual({ warehouseId: 1, reason: 'EXPIRED', note: 'Тавиур 3' });
+    expect(posts[0]!.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(JSON.parse(localStorage.getItem('tugeel.inventory.lastWarehouse.v1') ?? '{}')).toEqual({
+      '2': { adjustment: 1 },
     });
   });
 });

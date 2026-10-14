@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FormField } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -19,6 +20,7 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
+import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +43,7 @@ import {
 } from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { randomUuid } from '@/lib/uuid';
@@ -55,6 +58,7 @@ import {
   useInventoryMutations,
 } from './api';
 import { isInbound, looksLikeLabel, useWarehouseName, useWarehouseOptions } from './helpers';
+import { useDefaultWarehouse } from './last-warehouse';
 import { DocStatusBadge, ProductSearch, QtyInput, WarehouseSelect } from './shared';
 
 const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
@@ -180,10 +184,12 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
   const navigate = useNavigate();
   const canApprove = useHasPermission('inventory.adjustments.approve');
   const warehouses = useWarehouseOptions(SHELF_KINDS, true);
+  const { defaultId, remember } = useDefaultWarehouse(warehouses.options, 'adjustment');
   const mutations = useInventoryMutations();
   const action = useAction();
   const [key] = useState(randomUuid);
-  const [warehouseId, setWarehouseId] = useState<number | undefined>();
+  const [picked, setPicked] = useState<number | undefined>();
+  const warehouseId = picked ?? defaultId;
   const [reason, setReason] = useState<RequestableReason>('DAMAGED');
   const [note, setNote] = useState('');
   const reasons: readonly RequestableReason[] = canApprove
@@ -199,34 +205,44 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
         reason,
         ...(note.trim() ? { note: note.trim() } : {}),
       });
+      remember(warehouseId);
       await navigate(`/inventory/adjustments/${adjustment.id}`, { replace: true });
     });
 
   return (
     <DialogContent closeLabel={t('common.close')}>
-      <DialogHeader>
-        <DialogTitle>{t('inventory.adjustment.newTitle')}</DialogTitle>
-        <DialogDescription>
-          {isInbound(reason)
-            ? t('inventory.adjustment.increases')
-            : t('inventory.adjustment.decreases')}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="flex flex-col gap-3">
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          create();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{t('inventory.adjustment.newTitle')}</DialogTitle>
+          <DialogDescription>
+            {isInbound(reason)
+              ? t('inventory.adjustment.increases')
+              : t('inventory.adjustment.decreases')}
+          </DialogDescription>
+        </DialogHeader>
         <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3">
+        <FormField label={t('inventory.warehouse')} htmlFor="adjustment-warehouse">
           <WarehouseSelect
+            id="adjustment-warehouse"
             options={warehouses.options}
             value={warehouseId}
             emptyLabel={t('inventory.pickWarehouse')}
-            onChange={setWarehouseId}
+            onChange={setPicked}
           />
+        </FormField>
+        <FormField label={t('inventory.adjustments.reason')} htmlFor="adjustment-reason">
           <NativeSelect
-            aria-label={t('inventory.adjustments.reason')}
+            id="adjustment-reason"
             value={reason}
             onChange={(event) => {
-              const picked = reasons.find((value) => value === event.target.value);
-              if (picked) setReason(picked);
+              const chosen = reasons.find((value) => value === event.target.value);
+              if (chosen) setReason(chosen);
             }}
           >
             {reasons.map((value) => (
@@ -235,26 +251,27 @@ function AdjustmentCreateDialog({ onCancel }: { onCancel: () => void }) {
               </option>
             ))}
           </NativeSelect>
+        </FormField>
+        <FormField label={t('inventory.note')} htmlFor="adjustment-note">
           <Input
-            aria-label={t('inventory.note')}
-            placeholder={t('inventory.note')}
+            id="adjustment-note"
             maxLength={500}
             value={note}
             onChange={(event) => setNote(event.target.value)}
           />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button
-          disabled={warehouseId === undefined || mutations.createAdjustment.isPending}
-          onClick={create}
-        >
-          {t('inventory.adjustment.createDraft')}
-        </Button>
-      </DialogFooter>
+        </FormField>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            disabled={warehouseId === undefined || mutations.createAdjustment.isPending}
+          >
+            {t('inventory.adjustment.createDraft')}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }
@@ -275,7 +292,7 @@ export function AdjustmentPage() {
   const detail = adjustment.data;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={detail.number ?? t('inventory.draftNo', { id: detail.id })}
         meta={
@@ -368,9 +385,10 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
     });
 
   const submit = () =>
-    void action.run(() =>
-      mutations.adjustmentAction.mutateAsync({ id: detail.id, action: 'submit' }),
-    );
+    void action.run(async () => {
+      await mutations.adjustmentAction.mutateAsync({ id: detail.id, action: 'submit' });
+      toast.success(t('inventory.adjustment.submitted'));
+    });
   const cancel = () =>
     void action.run(async () => {
       await mutations.adjustmentAction.mutateAsync({ id: detail.id, action: 'cancel' });
@@ -379,96 +397,102 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
     });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('inventory.lines')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ScanBox
-          letters
-          label={t('inventory.scanLabel')}
-          placeholder={t('inventory.scanPlaceholder')}
-          onScan={onScan}
-        />
-        <span className="text-sm font-medium">
-          {activeBin ? t('inventory.activeBin', { code: activeBin.code }) : t('inventory.needBin')}
-        </span>
-        {message ? <p className="text-sm text-destructive">{message}</p> : null}
-        <ProblemAlert problem={confirm ? null : action.problem} />
-        <ProductSearch onPick={(product) => void action.run(() => addUnit(product.baseUnit.id))} />
-        {detail.lines.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('inventory.product')}</TableHead>
-                <TableHead>{t('inventory.unit')}</TableHead>
-                <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-                <TableHead>{t('inventory.bin')}</TableHead>
-                <TableHead>
-                  <span className="sr-only">{t('common.actions')}</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.lines.map((line) => (
-                <TableRow key={line.id}>
-                  <TableCell className="whitespace-normal">
-                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                    {line.productName}
-                  </TableCell>
-                  <TableCell>{line.unitName}</TableCell>
-                  <TableCell className="text-right">
-                    <QtyInput
-                      key={line.enteredQty}
-                      label={`${t('inventory.qty')}: ${line.productName}`}
-                      value={line.enteredQty}
-                      onScan={onScan}
-                      onSave={(enteredQty) =>
-                        void action.run(() =>
-                          mutations.updateAdjustmentLine.mutateAsync({
-                            id: line.id,
-                            body: { enteredQty },
-                          }),
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono">{line.binCode}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      aria-label={`${t('inventory.remove')}: ${line.productName}`}
-                      onClick={() =>
-                        void action.run(() => mutations.removeAdjustmentLine.mutateAsync(line.id))
-                      }
-                    >
-                      {t('inventory.remove')}
-                    </Button>
-                  </TableCell>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('inventory.lines')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ScanBox
+            letters
+            label={t('inventory.scanLabel')}
+            placeholder={t('inventory.scanPlaceholder')}
+            onScan={onScan}
+          />
+          <span className="text-sm font-medium">
+            {activeBin
+              ? t('inventory.activeBin', { code: activeBin.code })
+              : t('inventory.needBin')}
+          </span>
+          {message ? <p className="text-sm text-destructive">{message}</p> : null}
+          <ProblemAlert problem={confirm ? null : action.problem} />
+          <ProductSearch
+            onPick={(product) => void action.run(() => addUnit(product.baseUnit.id))}
+          />
+          {detail.lines.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('inventory.product')}</TableHead>
+                  <TableHead>{t('inventory.unit')}</TableHead>
+                  <TableHead className="text-right">{t('inventory.qty')}</TableHead>
+                  <TableHead>{t('inventory.bin')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={detail.lines.length === 0 || mutations.adjustmentAction.isPending}
-            onClick={submit}
-          >
-            {t('inventory.adjustment.submit')}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              action.clear();
-              setConfirm(true);
-            }}
-          >
-            {t('inventory.adjustment.cancel')}
-          </Button>
-        </div>
-      </CardContent>
+              </TableHeader>
+              <TableBody>
+                {detail.lines.map((line) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                    </TableCell>
+                    <TableCell>{line.unitName}</TableCell>
+                    <TableCell className="text-right">
+                      <QtyInput
+                        key={line.enteredQty}
+                        label={`${t('inventory.qty')}: ${line.productName}`}
+                        value={line.enteredQty}
+                        onScan={onScan}
+                        onSave={(enteredQty) =>
+                          void action.run(() =>
+                            mutations.updateAdjustmentLine.mutateAsync({
+                              id: line.id,
+                              body: { enteredQty },
+                            }),
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono">{line.binCode}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        aria-label={`${t('inventory.remove')}: ${line.productName}`}
+                        onClick={() =>
+                          void action.run(() => mutations.removeAdjustmentLine.mutateAsync(line.id))
+                        }
+                      >
+                        {t('inventory.remove')}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : null}
+        </CardContent>
+      </Card>
+      <StickyActions summary={t('inventory.linesCount', { count: detail.lines.length })}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            action.clear();
+            setConfirm(true);
+          }}
+        >
+          {t('inventory.adjustment.cancel')}
+        </Button>
+        <Button
+          disabled={detail.lines.length === 0 || mutations.adjustmentAction.isPending}
+          onClick={submit}
+        >
+          {t('inventory.adjustment.submit')}
+        </Button>
+      </StickyActions>
       <ConfirmDialog
         open={confirm}
         title={t('inventory.adjustment.cancelTitle')}
@@ -478,7 +502,7 @@ function AdjustmentEditor({ detail }: { detail: AdjustmentDetail }) {
         onConfirm={cancel}
         onClose={() => setConfirm(false)}
       />
-    </Card>
+    </>
   );
 }
 
@@ -504,7 +528,7 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
 
   const approve = () =>
     void action.run(async () => {
-      await mutations.approveAdjustment.mutateAsync({
+      const posted = await mutations.approveAdjustment.mutateAsync({
         id: detail.id,
         key,
         costs: Object.entries(costs)
@@ -515,6 +539,12 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
           })),
       });
       setConfirm(null);
+      toast.success(t('inventory.adjustment.posted', { number: posted.number ?? '' }));
+    });
+  const sendBack = () =>
+    void action.run(async () => {
+      await mutations.adjustmentAction.mutateAsync({ id: detail.id, action: 'return' });
+      toast.success(t('inventory.adjustment.returned'));
     });
   const cancel = () =>
     void action.run(async () => {
@@ -523,90 +553,88 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
     });
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4">
-        <ProblemAlert problem={confirm ? null : action.problem} />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('inventory.product')}</TableHead>
-              <TableHead>{t('inventory.unit')}</TableHead>
-              <TableHead className="text-right">{t('inventory.qty')}</TableHead>
-              <TableHead className="text-right">{t('inventory.qtyBase')}</TableHead>
-              <TableHead>{t('inventory.bin')}</TableHead>
-              {withCosts ? <TableHead>{t('inventory.adjustment.unitCost')}</TableHead> : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.lines.map((line) => (
-              <TableRow key={line.id}>
-                <TableCell className="whitespace-normal">
-                  <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                  {line.productName}
-                </TableCell>
-                <TableCell>{line.unitName}</TableCell>
-                <TableCell className="text-right font-mono">{line.enteredQty}</TableCell>
-                <TableCell className="text-right font-mono">{line.qtyBase}</TableCell>
-                <TableCell className="font-mono">{line.binCode}</TableCell>
-                {withCosts ? (
-                  <TableCell>
-                    <Input
-                      aria-label={`${t('inventory.adjustment.unitCost')}: ${line.productName}`}
-                      placeholder={t('inventory.adjustment.unitCostHint')}
-                      inputMode="decimal"
-                      className="w-40 font-mono"
-                      value={costs[line.id] ?? ''}
-                      onChange={(event) =>
-                        setCosts((previous) => ({ ...previous, [line.id]: event.target.value }))
-                      }
-                    />
-                  </TableCell>
-                ) : null}
+    <>
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <ProblemAlert problem={confirm ? null : action.problem} />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.product')}</TableHead>
+                <TableHead>{t('inventory.unit')}</TableHead>
+                <TableHead className="text-right">{t('inventory.qty')}</TableHead>
+                <TableHead className="text-right">{t('inventory.qtyBase')}</TableHead>
+                <TableHead>{t('inventory.bin')}</TableHead>
+                {withCosts ? <TableHead>{t('inventory.adjustment.unitCost')}</TableHead> : null}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {submitted ? (
-          <div className="flex flex-wrap gap-2">
-            {canApprove ? (
-              <>
-                <Button
-                  disabled={!costsValid}
-                  onClick={() => {
-                    setKey(randomUuid());
-                    action.clear();
-                    setConfirm('approve');
-                  }}
-                >
-                  {t('inventory.adjustment.approve')}
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={mutations.adjustmentAction.isPending}
-                  onClick={() =>
-                    void action.run(() =>
-                      mutations.adjustmentAction.mutateAsync({ id: detail.id, action: 'return' }),
-                    )
-                  }
-                >
-                  {t('inventory.adjustment.return')}
-                </Button>
-              </>
-            ) : null}
-            {canManage ? (
+            </TableHeader>
+            <TableBody>
+              {detail.lines.map((line) => (
+                <TableRow key={line.id}>
+                  <TableCell className="whitespace-normal">
+                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                    {line.productName}
+                  </TableCell>
+                  <TableCell>{line.unitName}</TableCell>
+                  <TableCell className="text-right font-mono">{line.enteredQty}</TableCell>
+                  <TableCell className="text-right font-mono">{line.qtyBase}</TableCell>
+                  <TableCell className="font-mono">{line.binCode}</TableCell>
+                  {withCosts ? (
+                    <TableCell>
+                      <Input
+                        aria-label={`${t('inventory.adjustment.unitCost')}: ${line.productName}`}
+                        placeholder={t('inventory.adjustment.unitCostHint')}
+                        inputMode="decimal"
+                        className="w-40 font-mono"
+                        value={costs[line.id] ?? ''}
+                        onChange={(event) =>
+                          setCosts((previous) => ({ ...previous, [line.id]: event.target.value }))
+                        }
+                      />
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      {submitted && (canApprove || canManage) ? (
+        <StickyActions summary={t('inventory.linesCount', { count: detail.lines.length })}>
+          {canManage ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                action.clear();
+                setConfirm('cancel');
+              }}
+            >
+              {t('inventory.adjustment.cancel')}
+            </Button>
+          ) : null}
+          {canApprove ? (
+            <>
               <Button
-                variant="ghost"
+                variant="outline"
+                disabled={mutations.adjustmentAction.isPending}
+                onClick={sendBack}
+              >
+                {t('inventory.adjustment.return')}
+              </Button>
+              <Button
+                disabled={!costsValid}
                 onClick={() => {
+                  setKey(randomUuid());
                   action.clear();
-                  setConfirm('cancel');
+                  setConfirm('approve');
                 }}
               >
-                {t('inventory.adjustment.cancel')}
+                {t('inventory.adjustment.approve')}
               </Button>
-            ) : null}
-          </div>
-        ) : null}
-      </CardContent>
+            </>
+          ) : null}
+        </StickyActions>
+      ) : null}
       <ConfirmDialog
         open={confirm === 'approve'}
         variant="default"
@@ -627,6 +655,6 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
         onConfirm={cancel}
         onClose={() => setConfirm(null)}
       />
-    </Card>
+    </>
   );
 }

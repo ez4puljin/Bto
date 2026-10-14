@@ -72,7 +72,7 @@ export function ReadinessPage() {
   const rows = products.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader title={t('catalog.readiness.title')} meta={t('catalog.readiness.hint')} />
       <ProblemAlert problem={problemFromError(report.error ?? products.error)} />
       {report.data ? (

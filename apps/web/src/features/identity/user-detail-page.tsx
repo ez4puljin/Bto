@@ -72,7 +72,7 @@ export function UserDetailPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={detail.fullName}
         meta={

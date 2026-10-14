@@ -6,11 +6,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterToggle } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
+import { StickyActions } from '@/components/sticky-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBarcodeLookup } from '@/features/catalog/api';
@@ -27,24 +28,12 @@ import {
   useStocktakeBinLines,
   useStocktakeMutations,
 } from './api';
-import { looksLikeLabel } from './helpers';
-import { ProductSearch } from './shared';
+import { looksLikeLabel, parseCount, parseScanQty } from './helpers';
+import { useScanQty } from './scan-qty';
+import { ProductSearch, ScanQtyField } from './shared';
 
-/** A count: at most three decimals, "," taken as the decimal mark of a phone keyboard. */
-const COUNT = /^\d{1,11}(\.\d{1,3})?$/;
 /** Shelves shown at once; the rest are reached by scanning their label. */
 const SHELVES_SHOWN = 300;
-
-function parseCount(text: string): string | null {
-  const value = text.trim().replace(',', '.');
-  return COUNT.test(value) ? value : null;
-}
-
-/** The quantity a scan adds: a count above zero. */
-function parseScanQty(text: string): string | null {
-  const value = parseCount(text);
-  return value !== null && new Decimal(value).gt(0) ? value : null;
-}
 
 const signed = (value: string) => (value.startsWith('-') ? value : `+${value}`);
 
@@ -189,7 +178,7 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
   const binParam = Number.parseInt(params.get('bin') ?? '', 10);
   const activeBin = detail.bins.find((bin) => bin.id === binParam);
   const lines = useStocktakeBinLines(detail.id, activeBin?.id);
-  const [multiplier, setMultiplier] = useState('1');
+  const multiplier = useScanQty();
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [confirm, setConfirm] = useState<'finish' | 'review' | 'cancel' | null>(null);
   const byCode = useMemo(() => new Map(detail.bins.map((bin) => [bin.code, bin])), [detail.bins]);
@@ -231,7 +220,7 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
     setFeedback({ tone: 'ok', text: t('inventory.stocktake.binActive', { code: bin.code }) });
   };
 
-  const count = (scan: Omit<PendingScan, 'key' | 'binId' | 'qty'>, qtyText = multiplier) => {
+  const count = (scan: Omit<PendingScan, 'key' | 'binId' | 'qty'>, qtyText = multiplier.read()) => {
     if (!activeBin) {
       setFeedback({ tone: 'error', text: t('inventory.needBin') });
       return;
@@ -242,7 +231,7 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
       return;
     }
     queue.push({ ...scan, key: randomUuid(), binId: activeBin.id, qty });
-    setMultiplier('1');
+    multiplier.reset();
   };
 
   const onScan = (code: string) => {
@@ -312,19 +301,13 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
         <CardContent className="flex flex-col gap-3">
           <ScanBox
             letters
-            disabled={confirm !== null}
             label={t('inventory.stocktake.scanLabel')}
             placeholder={t('inventory.stocktake.scanPlaceholder')}
             onScan={onScan}
           />
           <div className="flex items-center gap-2">
             <Label htmlFor="stocktake-qty">{t('inventory.stocktake.multiplier')}</Label>
-            <QtyField
-              id="stocktake-qty"
-              value={multiplier}
-              onChange={setMultiplier}
-              onScan={onScan}
-            />
+            <ScanQtyField id="stocktake-qty" qty={multiplier} onScan={onScan} />
             <span className="text-xs text-muted-foreground">
               {t('inventory.stocktake.multiplierHint')}
             </span>
@@ -408,22 +391,21 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
 
       <ShelfGrid bins={detail.bins} activeId={activeBin?.id} onPick={activate} />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <StickyActions
+        summary={
+          unfinished > 0 ? t('inventory.stocktake.unfinishedLeft', { count: unfinished }) : null
+        }
+      >
+        <Button variant="ghost" onClick={() => ask('cancel')}>
+          {t('inventory.stocktake.cancel')}
+        </Button>
         <Button
           disabled={unfinished > 0 || queue.pending > 0 || queue.unsent > 0}
           onClick={() => ask('review')}
         >
           {t('inventory.stocktake.finishCount')}
         </Button>
-        {unfinished > 0 ? (
-          <span className="text-sm text-muted-foreground">
-            {t('inventory.stocktake.unfinishedLeft', { count: unfinished })}
-          </span>
-        ) : null}
-        <Button variant="ghost" onClick={() => ask('cancel')}>
-          {t('inventory.stocktake.cancel')}
-        </Button>
-      </div>
+      </StickyActions>
 
       <ConfirmDialog
         open={confirm === 'finish'}
@@ -458,29 +440,6 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
         onClose={() => setConfirm(null)}
       />
     </div>
-  );
-}
-
-/** The quantity the next scan adds; a scan landing here goes to the scanner instead. */
-function QtyField(props: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  onScan: (code: string) => void;
-}) {
-  const guard = useScanGuard(props.onScan, { letters: true });
-  const invalid = parseScanQty(props.value) === null;
-  return (
-    <Input
-      id={props.id}
-      inputMode="decimal"
-      autoComplete="off"
-      aria-invalid={invalid}
-      className={cn('w-20 text-right font-mono', invalid && 'border-destructive')}
-      value={props.value}
-      onChange={(event) => props.onChange(event.target.value)}
-      onKeyDown={(event) => guard(event, props.value, props.onChange)}
-    />
   );
 }
 
@@ -598,15 +557,12 @@ function ShelfGrid(props: {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="stocktake-open-shelves"
+        <div>
+          <FilterToggle
+            label={t('inventory.stocktake.onlyUnfinished')}
             checked={onlyOpen}
-            onCheckedChange={(value) => setOnlyOpen(value === true)}
+            onCheckedChange={setOnlyOpen}
           />
-          <Label htmlFor="stocktake-open-shelves" className="font-normal">
-            {t('inventory.stocktake.onlyUnfinished')}
-          </Label>
         </div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {shown.slice(0, SHELVES_SHOWN).map((bin) => (

@@ -40,7 +40,7 @@ export function ReceiptCostingPage() {
   if (!costing.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={t('inventory.costing.title', { number: costing.data.number ?? '' })}
         crumbs={[

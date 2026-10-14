@@ -1,6 +1,6 @@
 import { cleanBarcode } from '@tugeel/shared/gtin';
 import { Camera } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CameraScanner } from '@/components/camera-scanner';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,15 @@ import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 /**
  * The visible scan box (ADR-0021 #1): a keyboard-wedge scanner works with or without focus here,
  * a code can be typed, and where the page may open a camera a button reads one with it. With
- * `letters` it also reads shelf labels ("A-01-03") whatever the keyboard layout. While `disabled`
- * (a dialog is open) it reads nothing.
+ * `letters` it also reads shelf labels ("A-01-03") whatever the keyboard layout. It reads nothing
+ * while `disabled` or while a dialog that does not hold it is open (ADR-0047 #4). `autoFocus` puts
+ * the cursor in the box (a document just created from a dialog).
  */
 export function ScanBox(props: {
   onScan: (code: string) => void;
   letters?: boolean;
   disabled?: boolean;
+  autoFocus?: boolean;
   label?: string;
   placeholder?: string;
 }) {
@@ -28,20 +30,22 @@ export function ScanBox(props: {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [canUseCamera] = useState(cameraAvailable);
   const [insecure] = useState(() => !window.isSecureContext);
+  const root = useRef<HTMLDivElement>(null);
   const submit = (text: string) => {
     const code = cleanBarcode(text);
     setDraft('');
     if (code) onScan(code);
   };
-  useWedgeScanner(submit, !cameraOpen && !disabled, { letters });
+  useWedgeScanner(submit, !cameraOpen && !disabled, { letters, root });
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={root} className="flex flex-col gap-2">
       <div className="flex gap-2">
         <Input
           aria-label={props.label ?? t('scan.label')}
           className="max-w-sm font-mono"
           disabled={disabled}
+          autoFocus={props.autoFocus}
           autoComplete="off"
           spellCheck={false}
           placeholder={props.placeholder ?? t('scan.placeholder')}

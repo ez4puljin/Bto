@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { CheckboxGroup } from '@/components/checkbox-group';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FormField } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -20,6 +21,7 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
+import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +45,7 @@ import {
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
@@ -61,6 +64,7 @@ import {
   useStocktakes,
 } from './api';
 import { useCanWrite, useWarehouseName, useWarehouseOptions } from './helpers';
+import { useDefaultWarehouse } from './last-warehouse';
 import { DocStatusBadge, WarehouseSelect } from './shared';
 import { StocktakeCounter } from './stocktake-count';
 
@@ -206,6 +210,7 @@ function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const mine = useWarehouseOptions(SHELF_KINDS, true);
+  const { defaultId, remember } = useDefaultWarehouse(mine.options, 'stocktake');
   const mutations = useStocktakeMutations();
   const lookup = useBinLookup();
   const action = useAction();
@@ -216,8 +221,8 @@ function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
   const [scanned, setScanned] = useState<Bin[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  // A warehouse worker usually writes for one warehouse: it is chosen already.
-  const warehouseId = picked ?? (mine.options.length === 1 ? mine.options[0]?.id : undefined);
+  // The only warehouse, or the last one chosen, is picked already.
+  const warehouseId = picked ?? defaultId;
   const typed = useDeferredValue(prefix.trim());
   const preview = useStocktakeBinPreview(
     scope === 'scan'
@@ -258,6 +263,7 @@ function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
               : { binIds: scanned.map((bin) => bin.id) }),
           ...(note.trim() ? { note: note.trim() } : {}),
         });
+        remember(warehouseId);
         await navigate(`/inventory/stocktakes/${created.id}`, { replace: true });
       })
       .then((done) => {
@@ -268,104 +274,118 @@ function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
   return (
     // Wider than the default: the label scan box and its camera button share a row.
     <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
-      <DialogHeader>
-        <DialogTitle>{t('inventory.stocktake.newTitle')}</DialogTitle>
-        <DialogDescription>{t(`inventory.stocktake.scopeHints.${scope}`)}</DialogDescription>
-      </DialogHeader>
-      <div className="flex flex-col gap-3">
-        <ProblemAlert problem={action.problem} />
-        <div className="grid gap-3">
-          <WarehouseSelect
-            options={mine.options}
-            value={warehouseId}
-            emptyLabel={t('inventory.stocktake.pickWarehouse')}
-            onChange={(id) => {
-              setPicked(id);
-              setScanned([]);
-            }}
-          />
-          <NativeSelect
-            aria-label={t('inventory.stocktake.scope')}
-            value={scope}
-            onChange={(event) => {
-              const next = SCOPES.find((value) => value === event.target.value);
-              if (next) setScope(next);
-            }}
-          >
-            {SCOPES.map((value) => (
-              <option key={value} value={value}>
-                {t(`inventory.stocktake.scopes.${value}`)}
-              </option>
-            ))}
-          </NativeSelect>
-          {scope === 'prefix' ? (
-            <Input
-              aria-label={t('inventory.stocktake.prefix')}
-              placeholder={t('inventory.stocktake.prefixPlaceholder')}
-              className="font-mono"
-              autoComplete="off"
-              maxLength={32}
-              value={prefix}
-              onChange={(event) => setPrefix(event.target.value)}
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (ready && !mutations.create.isPending) create();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{t('inventory.stocktake.newTitle')}</DialogTitle>
+          <DialogDescription>{t(`inventory.stocktake.scopeHints.${scope}`)}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <ProblemAlert problem={action.problem} />
+          <FormField label={t('inventory.warehouse')} htmlFor="stocktake-warehouse">
+            <WarehouseSelect
+              id="stocktake-warehouse"
+              options={mine.options}
+              value={warehouseId}
+              emptyLabel={t('inventory.stocktake.pickWarehouse')}
+              onChange={(id) => {
+                setPicked(id);
+                setScanned([]);
+              }}
             />
-          ) : null}
-          <Input
-            aria-label={t('inventory.note')}
-            placeholder={t('inventory.note')}
-            maxLength={500}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </div>
-        {scope === 'scan' ? (
-          warehouseId === undefined ? null : (
-            <div className="flex flex-col gap-2">
-              <ScanBox
-                letters
-                label={t('inventory.stocktake.scanBins')}
-                placeholder={t('inventory.stocktake.scanBinsPlaceholder')}
-                onScan={addBin}
+          </FormField>
+          <FormField label={t('inventory.stocktake.scope')} htmlFor="stocktake-scope">
+            <NativeSelect
+              id="stocktake-scope"
+              value={scope}
+              onChange={(event) => {
+                const next = SCOPES.find((value) => value === event.target.value);
+                if (next) setScope(next);
+              }}
+            >
+              {SCOPES.map((value) => (
+                <option key={value} value={value}>
+                  {t(`inventory.stocktake.scopes.${value}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          {scope === 'prefix' ? (
+            <FormField label={t('inventory.stocktake.prefix')} htmlFor="stocktake-prefix">
+              <Input
+                id="stocktake-prefix"
+                placeholder={t('inventory.stocktake.prefixPlaceholder')}
+                className="font-mono"
+                autoComplete="off"
+                maxLength={32}
+                value={prefix}
+                onChange={(event) => setPrefix(event.target.value)}
               />
-              {missing ? (
-                <p className="text-sm text-destructive">
-                  {t('inventory.stocktake.binNotFound', { code: missing })}
-                </p>
-              ) : null}
-              {scanned.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {scanned.map((bin) => (
-                    <Badge key={bin.id} variant="outline" className="gap-1 font-mono">
-                      {bin.code}
-                      <button
-                        type="button"
-                        aria-label={t('inventory.stocktake.removeBin', { code: bin.code })}
-                        onClick={() =>
-                          setScanned((list) => list.filter((row) => row.id !== bin.id))
-                        }
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          )
-        ) : (
-          <BinPreviewLine
-            problem={problemFromError(preview.error)}
-            preview={warehouseId === undefined ? undefined : preview.data}
-          />
-        )}
-      </div>
-      <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button disabled={!ready || mutations.create.isPending} onClick={create}>
-          {t('inventory.stocktake.createDraft')}
-        </Button>
-      </DialogFooter>
+            </FormField>
+          ) : null}
+          <FormField label={t('inventory.note')} htmlFor="stocktake-note">
+            <Input
+              id="stocktake-note"
+              maxLength={500}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </FormField>
+          {scope === 'scan' ? (
+            warehouseId === undefined ? null : (
+              <div className="flex flex-col gap-2">
+                <ScanBox
+                  letters
+                  label={t('inventory.stocktake.scanBins')}
+                  placeholder={t('inventory.stocktake.scanBinsPlaceholder')}
+                  onScan={addBin}
+                />
+                {missing ? (
+                  <p className="text-sm text-destructive">
+                    {t('inventory.stocktake.binNotFound', { code: missing })}
+                  </p>
+                ) : null}
+                {scanned.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {scanned.map((bin) => (
+                      <Badge key={bin.id} variant="outline" className="gap-1 font-mono">
+                        {bin.code}
+                        <button
+                          type="button"
+                          aria-label={t('inventory.stocktake.removeBin', { code: bin.code })}
+                          onClick={() =>
+                            setScanned((list) => list.filter((row) => row.id !== bin.id))
+                          }
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          ) : (
+            <BinPreviewLine
+              problem={problemFromError(preview.error)}
+              preview={warehouseId === undefined ? undefined : preview.data}
+            />
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={!ready || mutations.create.isPending}>
+            {t('inventory.stocktake.createDraft')}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }
@@ -462,7 +482,7 @@ export function StocktakePage() {
   })();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
         meta={
@@ -620,7 +640,7 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
   };
   const approve = () =>
     void action.run(async () => {
-      await mutations.approve.mutateAsync({
+      const approved = await mutations.approve.mutateAsync({
         id: detail.id,
         key,
         costs: Object.entries(costs)
@@ -631,11 +651,13 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
           })),
       });
       setConfirm(null);
+      toast.success(t('inventory.stocktake.approved', { number: approved.number ?? '' }));
     });
   const sendBack = () =>
     void action.run(async () => {
       await mutations.recount.mutateAsync({ id: detail.id, binIds: recount });
       setConfirm(null);
+      toast.success(t('inventory.stocktake.sentBack', { count: recount.length }));
     });
   const cancel = () =>
     void action.run(async () => {
@@ -645,165 +667,160 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
     });
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          <span className="font-medium">
-            {t('inventory.stocktake.summary', { count: detail.differenceCount ?? 0 })}
-          </span>
-          {detail.shortageValue !== undefined ? (
-            <span>
-              {t('inventory.stocktake.shortageValue', { value: formatMnt(detail.shortageValue) })}
+    <>
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="font-medium">
+              {t('inventory.stocktake.summary', { count: detail.differenceCount ?? 0 })}
             </span>
-          ) : null}
-          {detail.surplusValue !== undefined ? (
-            <span>
-              {t('inventory.stocktake.surplusValue', { value: formatMnt(detail.surplusValue) })}
-            </span>
-          ) : null}
-          {detail.shortageValue !== undefined ? (
-            <span className="text-muted-foreground">{t('inventory.stocktake.valuesNote')}</span>
-          ) : null}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant={all ? 'outline' : 'default'}
-            aria-pressed={!all}
-            onClick={() => setAll(false)}
-          >
-            {t('inventory.stocktake.onlyDifferences')}
-          </Button>
-          <Button
-            size="sm"
-            variant={all ? 'default' : 'outline'}
-            aria-pressed={all}
-            onClick={() => setAll(true)}
-          >
-            {t('inventory.stocktake.allLines')}
-          </Button>
-        </div>
-        <ProblemAlert
-          problem={confirm ? null : (action.problem ?? problemFromError(lines.error))}
-        />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('inventory.stocktake.columns.bin')}</TableHead>
-              <TableHead>{t('inventory.stocktake.columns.product')}</TableHead>
-              <TableHead className="text-right">
-                {t('inventory.stocktake.columns.expected')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('inventory.stocktake.columns.counted')}
-              </TableHead>
-              <TableHead className="text-right">
-                {t('inventory.stocktake.columns.difference')}
-              </TableHead>
-              {withAverages ? (
-                <>
-                  <TableHead className="text-right">
-                    {t('inventory.stocktake.columns.avgCost')}
-                  </TableHead>
-                  <TableHead>{t('inventory.stocktake.columns.unitCost')}</TableHead>
-                </>
-              ) : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((line) => {
-              const difference = line.difference ?? null;
-              const changed = difference !== null && !new Decimal(difference).isZero();
-              const surplus = difference !== null && new Decimal(difference).gt(0);
-              return (
-                <TableRow key={line.id}>
-                  <TableCell className="font-mono">{line.binCode}</TableCell>
-                  <TableCell className="min-w-48 whitespace-normal">
-                    <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
-                    {line.productName}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {line.expectedQty ?? t('common.none')}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {countedText(line, t('common.none'), (qty) =>
-                      t('inventory.stocktake.notFound', { qty }),
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      'text-right font-mono',
-                      changed && !surplus && 'text-destructive',
-                    )}
-                  >
-                    {difference === null || !changed
-                      ? t('common.none')
-                      : t('inventory.qtyWithUnit', {
-                          qty: signed(difference),
-                          unit: line.baseUnitName,
-                        })}
-                  </TableCell>
-                  {withAverages ? (
-                    <>
-                      <TableCell className="text-right font-mono">
-                        {line.avgCost ? formatMnt(line.avgCost) : t('common.none')}
-                      </TableCell>
-                      <TableCell>
-                        {surplus ? (
-                          <Input
-                            aria-label={t('inventory.stocktake.unitCostFor', {
-                              code: line.binCode,
-                              name: line.productName,
-                            })}
-                            placeholder={t('inventory.stocktake.unitCostHint')}
-                            inputMode="decimal"
-                            className="w-40 font-mono"
-                            value={costs[line.id] ?? ''}
-                            onChange={(event) =>
-                              setCosts((previous) => ({
-                                ...previous,
-                                [line.id]: event.target.value,
-                              }))
-                            }
-                          />
-                        ) : null}
-                      </TableCell>
-                    </>
-                  ) : null}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        {!lines.isPending && rows.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">
-            {all ? t('inventory.stocktake.noLinesAll') : t('inventory.stocktake.noDifferences')}
-          </p>
-        ) : null}
-        {lines.hasNextPage ? (
-          <Button
-            className="self-start"
-            variant="outline"
-            disabled={lines.isFetchingNextPage}
-            onClick={() => void lines.fetchNextPage()}
-          >
-            {t('common.loadMore')}
-          </Button>
-        ) : null}
-        {open ? (
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={!costsValid} onClick={() => ask('approve')}>
-              {t('inventory.stocktake.approve')}
+            {detail.shortageValue !== undefined ? (
+              <span>
+                {t('inventory.stocktake.shortageValue', { value: formatMnt(detail.shortageValue) })}
+              </span>
+            ) : null}
+            {detail.surplusValue !== undefined ? (
+              <span>
+                {t('inventory.stocktake.surplusValue', { value: formatMnt(detail.surplusValue) })}
+              </span>
+            ) : null}
+            {detail.shortageValue !== undefined ? (
+              <span className="text-muted-foreground">{t('inventory.stocktake.valuesNote')}</span>
+            ) : null}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={all ? 'outline' : 'default'}
+              aria-pressed={!all}
+              onClick={() => setAll(false)}
+            >
+              {t('inventory.stocktake.onlyDifferences')}
             </Button>
-            <Button variant="outline" onClick={() => ask('recount')}>
-              {t('inventory.stocktake.recount')}
-            </Button>
-            <Button variant="ghost" onClick={() => ask('cancel')}>
-              {t('inventory.stocktake.cancel')}
+            <Button
+              size="sm"
+              variant={all ? 'default' : 'outline'}
+              aria-pressed={all}
+              onClick={() => setAll(true)}
+            >
+              {t('inventory.stocktake.allLines')}
             </Button>
           </div>
-        ) : null}
-      </CardContent>
+          <ProblemAlert
+            problem={confirm ? null : (action.problem ?? problemFromError(lines.error))}
+          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('inventory.stocktake.columns.bin')}</TableHead>
+                <TableHead>{t('inventory.stocktake.columns.product')}</TableHead>
+                <TableHead className="text-right">
+                  {t('inventory.stocktake.columns.expected')}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t('inventory.stocktake.columns.counted')}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t('inventory.stocktake.columns.difference')}
+                </TableHead>
+                {withAverages ? (
+                  <>
+                    <TableHead className="text-right">
+                      {t('inventory.stocktake.columns.avgCost')}
+                    </TableHead>
+                    <TableHead>{t('inventory.stocktake.columns.unitCost')}</TableHead>
+                  </>
+                ) : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((line) => {
+                const difference = line.difference ?? null;
+                const changed = difference !== null && !new Decimal(difference).isZero();
+                const surplus = difference !== null && new Decimal(difference).gt(0);
+                return (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-mono">{line.binCode}</TableCell>
+                    <TableCell className="min-w-48 whitespace-normal">
+                      <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
+                      {line.productName}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {line.expectedQty ?? t('common.none')}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {countedText(line, t('common.none'), (qty) =>
+                        t('inventory.stocktake.notFound', { qty }),
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'text-right font-mono',
+                        changed && !surplus && 'text-destructive',
+                      )}
+                    >
+                      {difference === null || !changed
+                        ? t('common.none')
+                        : t('inventory.qtyWithUnit', {
+                            qty: signed(difference),
+                            unit: line.baseUnitName,
+                          })}
+                    </TableCell>
+                    {withAverages ? (
+                      <>
+                        <TableCell className="text-right font-mono">
+                          {line.avgCost ? formatMnt(line.avgCost) : t('common.none')}
+                        </TableCell>
+                        <TableCell>
+                          {surplus ? (
+                            <Input
+                              aria-label={t('inventory.stocktake.unitCostFor', {
+                                code: line.binCode,
+                                name: line.productName,
+                              })}
+                              placeholder={t('inventory.stocktake.unitCostHint')}
+                              inputMode="decimal"
+                              className="w-40 font-mono"
+                              value={costs[line.id] ?? ''}
+                              onChange={(event) =>
+                                setCosts((previous) => ({
+                                  ...previous,
+                                  [line.id]: event.target.value,
+                                }))
+                              }
+                            />
+                          ) : null}
+                        </TableCell>
+                      </>
+                    ) : null}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {!lines.isPending && rows.length === 0 ? (
+            <p className="py-2 text-sm text-muted-foreground">
+              {all ? t('inventory.stocktake.noLinesAll') : t('inventory.stocktake.noDifferences')}
+            </p>
+          ) : null}
+          <LoadMore query={lines} />
+        </CardContent>
+      </Card>
+      {open ? (
+        <StickyActions
+          summary={t('inventory.stocktake.summary', { count: detail.differenceCount ?? 0 })}
+        >
+          <Button variant="ghost" onClick={() => ask('cancel')}>
+            {t('inventory.stocktake.cancel')}
+          </Button>
+          <Button variant="outline" onClick={() => ask('recount')}>
+            {t('inventory.stocktake.recount')}
+          </Button>
+          <Button disabled={!costsValid} onClick={() => ask('approve')}>
+            {t('inventory.stocktake.approve')}
+          </Button>
+        </StickyActions>
+      ) : null}
       <ConfirmDialog
         open={confirm === 'approve'}
         variant="default"
@@ -852,6 +869,6 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
         onConfirm={cancel}
         onClose={() => setConfirm(null)}
       />
-    </Card>
+    </>
   );
 }

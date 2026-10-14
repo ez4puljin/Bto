@@ -60,6 +60,18 @@ export function isQty(value: string): boolean {
   return QTY.test(value) && new Decimal(value).gt(0);
 }
 
+/** A typed count: at most three decimals, "," taken as the decimal mark of a phone keyboard. */
+export function parseCount(text: string): string | null {
+  const value = text.trim().replace(',', '.');
+  return QTY.test(value) ? value : null;
+}
+
+/** The quantity a scan adds («Тоо»): a count above zero. */
+export function parseScanQty(text: string): string | null {
+  const value = parseCount(text);
+  return value !== null && new Decimal(value).gt(0) ? value : null;
+}
+
 /** The reason adds stock (found goods, opening stock) rather than writing it off. */
 export function isInbound(reason: AdjustmentReason): boolean {
   return ADJUSTMENT_REASONS[reason] === 1;

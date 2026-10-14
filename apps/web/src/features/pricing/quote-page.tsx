@@ -64,7 +64,7 @@ export function PriceQuotePage() {
     });
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="space-y-4">
       <PageHeader
         title={t('pricing.quote.title')}
         meta={<p className="max-w-3xl">{t('pricing.quote.hint')}</p>}
