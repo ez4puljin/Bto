@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  conditionDays,
   conditionKey,
   MAX_CONDITION_IDS,
   MAX_GROUP_CONDITIONS,
   MAX_SEGMENT_GROUPS,
   needsUniverse,
+  positiveCondition,
   SEGMENT_ENTITIES,
   SEGMENT_FIELDS,
   type SegmentCondition,
@@ -213,5 +215,32 @@ describe('evaluation helpers', () => {
     expect(conditionKey({ field: 'category', op: 'IN', ids: [1] })).not.toBe(
       conditionKey({ field: 'category', op: 'NOT_IN', ids: [1] }),
     );
+  });
+});
+
+describe('owner helpers', () => {
+  it('turns a negative condition into its positive form and a complement', () => {
+    expect(positiveCondition({ field: 'supplier', op: 'NOT_IN', ids: [5] })).toEqual({
+      condition: { field: 'supplier', op: 'IN', ids: [5] },
+      negated: true,
+    });
+    expect(positiveCondition({ field: 'stock', op: 'OUT_OF_STOCK', warehouseId: 4 })).toEqual({
+      condition: { field: 'stock', op: 'IN_STOCK', warehouseId: 4 },
+      negated: true,
+    });
+    expect(positiveCondition({ field: 'priceProfile', op: 'NONE' }).condition.op).toBe('ANY');
+    expect(positiveCondition({ field: 'category', op: 'IN', ids: [1] }).negated).toBe(false);
+  });
+
+  it('gives a date condition its Ulaanbaatar days, today included in the last days', () => {
+    expect(conditionDays({ field: 'createdAt', op: 'LAST_DAYS', days: 7 }, '2026-10-14')).toEqual({
+      from: '2026-10-08',
+    });
+    expect(conditionDays({ field: 'createdAt', op: 'LAST_DAYS', days: 1 }, '2026-10-14')).toEqual({
+      from: '2026-10-14',
+    });
+    expect(
+      conditionDays({ field: 'updatedAt', op: 'BETWEEN', to: '2026-10-01' }, '2026-10-14'),
+    ).toEqual({ to: '2026-10-01' });
   });
 });

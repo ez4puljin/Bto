@@ -1,3 +1,4 @@
+import type { SegmentCondition } from '@tugeel/shared/segments';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
 import {
@@ -11,8 +12,9 @@ import {
   wholeUnitProblem,
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { type SQL, and, asc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { invalid, notFound } from '../../../common/errors/app-error';
@@ -210,6 +212,45 @@ export class ProductPricesService {
         ...terms,
         profileName: names.get(terms.profileId) ?? '',
       }));
+  }
+
+  /**
+   * The products one segment condition on prices keeps, ascending (ADR-0049 #3), by the terms in
+   * force on a day: using these profiles (`IN`) or any (`ANY`), or a warehouse price within
+   * whole-MNT bounds, both included (`BETWEEN`).
+   */
+  async productIdsWhere(
+    condition: SegmentCondition,
+    date: string,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    const filters: SQL[] = [
+      lte(productPrices.validFrom, date),
+      or(isNull(productPrices.validTo), gt(productPrices.validTo, sql`${date}::date`)) ?? sql`true`,
+    ];
+    if (condition.field === 'priceProfile') {
+      if (condition.op === 'IN') {
+        if (!condition.ids?.length) return [];
+        filters.push(idIn(productPrices.profileId, condition.ids));
+      } else if (condition.op !== 'ANY') {
+        return [];
+      }
+    } else if (condition.field === 'warehousePrice') {
+      if (condition.min !== undefined) {
+        filters.push(sql`${productPrices.warehousePrice} >= ${condition.min}::numeric`);
+      }
+      if (condition.max !== undefined) {
+        filters.push(sql`${productPrices.warehousePrice} <= ${condition.max}::numeric`);
+      }
+    } else {
+      return [];
+    }
+    const rows = await executor
+      .selectDistinct({ productId: productPrices.productId })
+      .from(productPrices)
+      .where(and(...filters))
+      .orderBy(asc(productPrices.productId));
+    return rows.map((row) => row.productId);
   }
 
   /** The terms in force on a date, by product. */

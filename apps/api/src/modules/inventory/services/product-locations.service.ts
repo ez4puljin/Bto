@@ -1,8 +1,10 @@
+import type { SegmentCondition } from '@tugeel/shared/segments';
 import { Inject, Injectable } from '@nestjs/common';
 import { USER_BIN_TYPES } from '@tugeel/shared/inventory';
 import type { Decimal } from '@tugeel/shared/money';
 import { and, asc, eq, gt, inArray, ne, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -456,6 +458,31 @@ export class ProductLocationsService {
       after,
     });
     return after;
+  }
+
+  /**
+   * The products one segment condition on home warehouses keeps, ascending (ADR-0049 #3): homed
+   * in these warehouses (`IN`) or in any (`ANY`).
+   */
+  async productIdsWhere(
+    condition: SegmentCondition,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    if (condition.field !== 'homeWarehouse') return [];
+    if (condition.op !== 'ANY' && !condition.ids?.length) return [];
+    const rows = await executor
+      .select({ productId: productLocations.productId })
+      .from(productLocations)
+      .where(
+        and(
+          eq(productLocations.isHome, true),
+          ...(condition.op === 'ANY' || !condition.ids
+            ? []
+            : [idIn(productLocations.warehouseId, condition.ids)]),
+        ),
+      )
+      .orderBy(asc(productLocations.productId));
+    return rows.map((row) => row.productId);
   }
 
   /** Makes a WHOLESALE warehouse the product's home (null: no home); one home per product. */

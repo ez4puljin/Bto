@@ -26,6 +26,7 @@ import {
   CustomerPageDto,
   UpdateCustomerDto,
 } from '../dto/customers.dto';
+import { PartnerSegmentsService } from '../services/partner-segments.service';
 import { CustomerContactsService } from '../services/contacts.service';
 import { CustomerAddressesService } from '../services/customer-addresses.service';
 import { CustomersService } from '../services/customers.service';
@@ -48,6 +49,7 @@ export class CustomersController {
     private readonly customers: CustomersService,
     private readonly addresses: CustomerAddressesService,
     private readonly contacts: CustomerContactsService,
+    private readonly segments: PartnerSegmentsService,
   ) {}
 
   @Get()
@@ -57,7 +59,8 @@ export class CustomersController {
     @CurrentUser() ctx: AuthContext,
     @Query() query: CustomerListQueryDto,
   ): Promise<CustomerPageDto> {
-    const page = await this.customers.listItems(ctx, query);
+    const within = await this.segments.within(ctx, 'CUSTOMER', query.segmentId);
+    const page = await this.customers.listItems(ctx, query, within);
     return { data: page.data.map(toCustomerListItemDto), nextCursor: page.nextCursor };
   }
 

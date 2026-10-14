@@ -9,10 +9,10 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import { type Actor, AuditService } from '../../identity';
 import { UNIT_SUPERSEDED_HOOK, type UnitSupersededHook } from '../hooks';
-import { products, productBarcodes, productUnits, uoms } from '../schema';
+import { productBarcodes, productUnits, uoms } from '../schema';
 import { BarcodeService } from './barcode.service';
 import type { NewUnitInput, ProductUnit } from './products.service';
-import { invalid, notFound } from './support';
+import { touchProduct, invalid, notFound } from './support';
 
 export interface UnitPatch {
   isDefaultSales?: boolean;
@@ -225,14 +225,12 @@ export class UnitsService implements OnModuleInit {
     return current;
   }
 
-  /** Row lock on the product (serialises unit changes); returns whether its base unit is fractional. */
+  /**
+   * Row lock on the product (serialises unit changes), which also marks it changed; returns
+   * whether its base unit is fractional.
+   */
   private async lockProduct(tx: Tx, productId: number): Promise<boolean> {
-    const [product] = await tx
-      .select({ id: products.id })
-      .from(products)
-      .where(eq(products.id, productId))
-      .for('update');
-    if (!product) throw notFound('product', productId);
+    if (!(await touchProduct(tx, productId))) throw notFound('product', productId);
     return this.baseFractional(tx, productId);
   }
 

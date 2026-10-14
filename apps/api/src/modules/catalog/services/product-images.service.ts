@@ -4,9 +4,9 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { type Actor, AuditService, StorageService } from '../../identity';
-import { productImages, products } from '../schema';
+import { productImages } from '../schema';
 import type { ImageView } from './products.service';
-import { invalid, notFound } from './support';
+import { touchProduct, invalid, notFound } from './support';
 
 /** At most this many photos per product. */
 export const MAX_PRODUCT_IMAGES = 10;
@@ -62,12 +62,8 @@ export class ProductImagesService {
     files: readonly ImageFiles[],
   ): Promise<ProductImage[]> {
     if (files.length === 0) return [];
-    const [product] = await tx
-      .select({ id: products.id })
-      .from(products)
-      .where(eq(products.id, productId))
-      .for('update');
-    if (!product) throw notFound('product', productId);
+    // Locks the product and marks it changed (ADR-0049 #2).
+    if (!(await touchProduct(tx, productId))) throw notFound('product', productId);
     const [stats] = await tx
       .select({ total: count(productImages.id), last: max(productImages.sortOrder) })
       .from(productImages)
@@ -165,11 +161,8 @@ export class ProductImagesService {
   private async get(tx: Tx, imageId: number): Promise<ProductImage> {
     const [row] = await tx.select().from(productImages).where(eq(productImages.id, imageId));
     if (!row) throw notFound('product image', imageId);
-    await tx
-      .select({ id: products.id })
-      .from(products)
-      .where(eq(products.id, row.productId))
-      .for('update');
+    // Locks the product and marks it changed (ADR-0049 #2).
+    await touchProduct(tx, row.productId);
     return row;
   }
 

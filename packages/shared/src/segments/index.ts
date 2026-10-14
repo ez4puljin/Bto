@@ -1,7 +1,7 @@
 import { PRODUCT_STAGES } from '../catalog';
 import { Decimal } from '../money';
 import { CUSTOMER_KINDS } from '../taxpayer';
-import { isIsoDate } from '../time';
+import { addDays, isIsoDate } from '../time';
 
 /**
  * Segments (ADR-0049): saved conditions over one entity, combined in AND / OR groups and answered
@@ -387,4 +387,40 @@ export function conditionKey(condition: SegmentCondition): string {
     condition.warehouseId ?? null,
     condition.text?.trim() ?? null,
   ]);
+}
+
+const POSITIVE: Partial<Record<SegmentOperator, SegmentOperator>> = {
+  NOT_IN: 'IN',
+  NONE: 'ANY',
+  OUT_OF_STOCK: 'IN_STOCK',
+};
+
+/**
+ * The positive form of a condition and whether the evaluator takes its complement (ADR-0049 #3):
+ * owners answer only positive conditions; «аль нь ч биш», «байхгүй» and «дууссан» are the universe
+ * minus the matching set.
+ */
+export function positiveCondition(condition: SegmentCondition): {
+  condition: SegmentCondition;
+  negated: boolean;
+} {
+  const op = POSITIVE[condition.op];
+  return op ? { condition: { ...condition, op }, negated: true } : { condition, negated: false };
+}
+
+/**
+ * The Ulaanbaatar days of a date condition, both ends included: BETWEEN as given, LAST_DAYS n as
+ * today and the n − 1 days before it.
+ */
+export function conditionDays(
+  condition: SegmentCondition,
+  today: string,
+): { from?: string; to?: string } {
+  if (condition.op === 'LAST_DAYS' && condition.days !== undefined) {
+    return { from: addDays(today, -(condition.days - 1)) };
+  }
+  return {
+    ...(condition.from ? { from: condition.from } : {}),
+    ...(condition.to ? { to: condition.to } : {}),
+  };
 }

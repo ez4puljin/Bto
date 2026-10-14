@@ -18,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
+import { SegmentDefinitionDto } from '../../../common/segments/segment-definition.dto';
 import { PRODUCT_STATUSES, VAT_TYPES } from '../schema';
 
 const trimmed = ({ value }: { value: unknown }) =>
@@ -375,6 +376,38 @@ export class ProductListItemDto extends ProductSummaryDto {
 export class ProductPageDto {
   @ApiProperty({ type: [ProductListItemDto] }) data: ProductListItemDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+/**
+ * The product list's read (ADR-0049 #4): today's filters plus a condition tree and/or a saved
+ * segment, which other modules' data answer. A POST because the conditions are a tree.
+ */
+@ApiSchema({ name: 'ProductQueryRequest' })
+export class ProductQueryRequestDto extends ProductListQueryDto {
+  @ApiPropertyOptional({
+    type: SegmentDefinitionDto,
+    description: 'Conditions not saved as a segment',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SegmentDefinitionDto)
+  where?: SegmentDefinitionDto;
+
+  @ApiPropertyOptional({ description: 'A saved product segment; with where, both apply' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  segmentId?: number;
+}
+
+@ApiSchema({ name: 'ProductQueryPage' })
+export class ProductQueryPageDto extends ProductPageDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'How many products the filters keep; on the first page only',
+  })
+  total: number | null;
 }
 
 @ApiSchema({ name: 'ProductDetail' })

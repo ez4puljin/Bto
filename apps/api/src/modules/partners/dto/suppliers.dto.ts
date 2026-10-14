@@ -177,6 +177,25 @@ export class SupplierListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(PARTNER_STATUSES)
   status?: PartnerStatus;
+
+  @ApiPropertyOptional({ description: 'A saved supplier segment (ADR-0049)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  segmentId?: number;
+
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'Only these suppliers (1–200 ids, ADR-0037 batch read): names of a filter',
+  })
+  @IsOptional()
+  @Transform(queryIds)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_PAGE_LIMIT)
+  @IsInt({ each: true })
+  ids?: number[];
 }
 
 @ApiSchema({ name: 'LinkedSupplier' })

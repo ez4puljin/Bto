@@ -1,9 +1,12 @@
+import { conditionDays, type SegmentCondition } from '@tugeel/shared/segments';
+import { businessDate } from '@tugeel/shared/time';
 import { Inject, Injectable } from '@nestjs/common';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import { cleanTaxNumber, normalizeRegNo, TIN_PATTERN } from '@tugeel/shared/taxpayer';
 import { nameKey, normalizeName, searchKeys } from '@tugeel/shared/text';
 import { and, asc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn, onBusinessDays } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -220,8 +223,10 @@ export class SuppliersService {
    */
   async listItems(
     query: SupplierQuery,
+    within: readonly number[] | null = null,
   ): Promise<{ data: SupplierListItem[]; nextCursor: string | null }> {
-    const page = await this.pageRows(query);
+    if (within?.length === 0) return { data: [], nextCursor: null };
+    const page = await this.pageRows(query, within);
     const ids = page.data.map((row) => row.id);
     if (ids.length === 0) return { data: [], nextCursor: page.nextCursor };
     const contacts = await this.db
@@ -260,10 +265,34 @@ export class SuppliersService {
     };
   }
 
+  /** Every supplier: the universe of a negative condition (ADR-0049 #3). */
+  allIds(executor: Db | Tx = this.db): Promise<number[]> {
+    return this.idsOf(sql`true`, executor);
+  }
+
+  /**
+   * The suppliers one segment condition keeps, ascending (ADR-0049 #3): search, status, linked
+   * to products, the day it was registered.
+   */
+  idsWhere(condition: SegmentCondition, executor: Db | Tx = this.db): Promise<number[]> {
+    const where = supplierCondition(condition);
+    return where ? this.idsOf(where, executor) : Promise.resolve([]);
+  }
+
+  private async idsOf(where: SQL, executor: Db | Tx): Promise<number[]> {
+    const rows = await executor
+      .select({ id: suppliers.id })
+      .from(suppliers)
+      .where(where)
+      .orderBy(asc(suppliers.id));
+    return rows.map((row) => row.id);
+  }
+
   /** One keyset page of suppliers (search rank, name, id) with every column the lists show. */
-  private async pageRows(query: SupplierQuery) {
+  private async pageRows(query: SupplierQuery, within: readonly number[] | null = null) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [];
+    if (within) filters.push(idIn(suppliers.id, within));
     if (query.status) filters.push(eq(suppliers.status, query.status));
     const searched = partnerSearch(suppliers, query.q);
     if (searched) filters.push(searched.match);
@@ -382,4 +411,25 @@ function validated(input: SupplierInput) {
     paymentTermDays: input.paymentTermDays ?? null,
     note: optionalText(input.note) ?? null,
   };
+}
+
+/** One positive segment condition on suppliers as SQL; null keeps none (ADR-0049 #3). */
+function supplierCondition(condition: SegmentCondition): SQL | null {
+  switch (condition.field) {
+    case 'search':
+      return condition.text ? (partnerSearch(suppliers, condition.text)?.match ?? null) : null;
+    case 'status':
+      return condition.values?.length
+        ? sql`${suppliers.status} IN (${sql.join(
+            condition.values.map((value) => sql`${value}`),
+            sql`, `,
+          )})`
+        : null;
+    case 'products':
+      return sql`EXISTS (SELECT 1 FROM product_suppliers ps WHERE ps.supplier_id = suppliers.id)`;
+    case 'createdAt':
+      return onBusinessDays(suppliers.createdAt, conditionDays(condition, businessDate()));
+    default:
+      return null;
+  }
 }

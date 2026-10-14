@@ -1,8 +1,11 @@
+import type { SegmentCondition } from '@tugeel/shared/segments';
 import { Inject, Injectable } from '@nestjs/common';
 import { COST_SCALE, valueOf } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { and, desc, eq, gt, inArray, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn } from '../../../common/db/days';
+import { OrgService } from '../../identity';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { notFound } from '../../../common/errors/app-error';
 import {
@@ -116,6 +119,9 @@ export interface ReconciliationSummary {
  * reconciliation. Products come from the catalog's search, so a stock search finds what the
  * catalog finds (names, SKUs, barcodes).
  */
+/** Warehouses whose stock a segment's «any warehouse» counts: not transit, not vehicles. */
+const SELLING_KINDS: readonly string[] = ['WHOLESALE', 'STORE'];
+
 @Injectable()
 export class StockQueryService {
   constructor(
@@ -124,6 +130,7 @@ export class StockQueryService {
     private readonly catalog: CatalogService,
     private readonly posting: StockPostingService,
     private readonly units: UnitConversionService,
+    private readonly org: OrgService,
   ) {}
 
   async overview(query: StockQuery): Promise<{ data: ProductStock[]; nextCursor: string | null }> {
@@ -370,6 +377,44 @@ export class StockQueryService {
       for (const row of rows) held.add(row.productId);
     }
     return held;
+  }
+
+  /**
+   * The products one segment condition on stock keeps, ascending (ADR-0049 #3): holding stock on
+   * hand (`IN_STOCK`) or at or below their minimum (`AT_OR_BELOW_MIN`, ADR-0039's LOW rule), in
+   * one warehouse or in any wholesale or store one (never transit or vehicles).
+   */
+  async productIdsWhere(
+    condition: SegmentCondition,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    if (condition.field !== 'stock') return [];
+    const warehouses =
+      condition.warehouseId !== undefined
+        ? [condition.warehouseId]
+        : (await this.org.listWarehouses())
+            .filter((warehouse) => SELLING_KINDS.includes(warehouse.kind))
+            .map((warehouse) => warehouse.id);
+    if (warehouses.length === 0) return [];
+    if (condition.op === 'IN_STOCK') {
+      const rows = await executor
+        .selectDistinct({ productId: warehouseStock.productId })
+        .from(warehouseStock)
+        .where(and(idIn(warehouseStock.warehouseId, warehouses), gt(warehouseStock.onHand, ZERO)))
+        .orderBy(warehouseStock.productId);
+      return rows.map((row) => row.productId);
+    }
+    if (condition.op !== 'AT_OR_BELOW_MIN') return [];
+    const result = await executor.execute<{ product_id: string }>(sql`
+      SELECT DISTINCT l.product_id
+        FROM product_locations l
+        LEFT JOIN (SELECT ws.warehouse_id, ws.product_id, sum(ws.on_hand) AS on_hand
+                     FROM warehouse_stock ws GROUP BY ws.warehouse_id, ws.product_id) s
+          ON s.warehouse_id = l.warehouse_id AND s.product_id = l.product_id
+       WHERE l.min_qty IS NOT NULL AND COALESCE(s.on_hand, 0) <= l.min_qty
+         AND ${idIn(sql`l.warehouse_id`, warehouses)}
+       ORDER BY l.product_id`);
+    return result.rows.map((row) => Number.parseInt(row.product_id, 10));
   }
 
   // -------------------------------------------------------------------------------------------

@@ -16,7 +16,9 @@ import { CategoriesService } from './services/categories.service';
 import { EbarimtReadinessService } from './services/ebarimt-readiness.service';
 import { ProductEbarimtService } from './services/product-ebarimt.service';
 import { ProductImagesService } from './services/product-images.service';
+import { ProductFiltersService } from './services/product-filters.service';
 import { ProductLifecycleService } from './services/product-lifecycle.service';
+import { ProductQueryService } from './services/product-query.service';
 import { ProductsService } from './services/products.service';
 import { SkuRangesService } from './services/sku-ranges.service';
 import { TaxService } from './services/tax.service';
@@ -33,7 +35,9 @@ const CORE_SERVICES = [
   EbarimtReadinessService,
   ProductEbarimtService,
   ProductImagesService,
+  ProductFiltersService,
   ProductLifecycleService,
+  ProductQueryService,
   ProductsService,
   SkuRangesService,
   TaxService,

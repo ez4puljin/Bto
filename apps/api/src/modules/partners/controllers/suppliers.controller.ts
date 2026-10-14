@@ -33,6 +33,7 @@ import {
   SupplierProductPageDto,
   UpdateSupplierDto,
 } from '../dto/suppliers.dto';
+import { PartnerSegmentsService } from '../services/partner-segments.service';
 import { SupplierContactsService } from '../services/contacts.service';
 import { ProductSuppliersService } from '../services/product-suppliers.service';
 import { type SupplierDetail, SuppliersService } from '../services/suppliers.service';
@@ -57,13 +58,22 @@ export class SuppliersController {
     private readonly suppliers: SuppliersService,
     private readonly contacts: SupplierContactsService,
     private readonly links: ProductSuppliersService,
+    private readonly segments: PartnerSegmentsService,
   ) {}
 
   @Get()
   @Authenticated()
   @ApiOkResponse({ type: SupplierPageDto })
-  async list(@Query() query: SupplierListQueryDto): Promise<SupplierPageDto> {
-    return this.suppliers.listItems(query);
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SupplierListQueryDto,
+  ): Promise<SupplierPageDto> {
+    const segment = await this.segments.within(ctx, 'SUPPLIER', query.segmentId);
+    const within =
+      query.ids && segment
+        ? query.ids.filter((id) => segment.includes(id))
+        : (query.ids ?? segment);
+    return this.suppliers.listItems(query, within);
   }
 
   /** Declared before `:id`, so "next-code" never reaches ParseIntPipe. */

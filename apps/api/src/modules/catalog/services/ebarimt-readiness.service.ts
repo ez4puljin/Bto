@@ -44,7 +44,8 @@ const MISSING_MEASURE_UNIT = sql`EXISTS (
    WHERE pu.product_id = products.id AND pu.superseded_at IS NULL
      AND coalesce(pu.measure_unit, u.measure_unit) IS NULL)`;
 
-const GAP_CONDITIONS: Record<ReadinessGap, SQL> = {
+/** What a product lacks for e-Barimt, by gap (also the «e-Barimt мэдээлэл дутуу» filter, ADR-0049). */
+export const GAP_CONDITIONS: Record<ReadinessGap, SQL> = {
   classificationCode: sql`${products.classificationCode} IS NULL`,
   taxProductCode: sql`${products.vatType} IN ('VAT_FREE', 'VAT_ZERO') AND ${products.taxProductCode} IS NULL`,
   measureUnit: MISSING_MEASURE_UNIT,

@@ -355,4 +355,11 @@ export class CustomerListQueryDto extends PageQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   gpsMissing?: boolean;
+
+  @ApiPropertyOptional({ description: 'A saved customer segment (ADR-0049)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  segmentId?: number;
 }

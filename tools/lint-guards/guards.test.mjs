@@ -108,6 +108,27 @@ const CASES = [
     true,
   ],
   [
+    'nobody imports segments (ADR-0049)',
+    G1,
+    `${M}/catalog/services/catalog.service.ts`,
+    `import { segments } from '../../segments';\nexport const x = segments;`,
+    true,
+  ],
+  [
+    'pricing reaches segments only through a hook it declares (ADR-0049 #4)',
+    G1,
+    `${M}/pricing/services/discount-programs.service.ts`,
+    `import { segments } from '../../segments';\nexport const x = segments;`,
+    true,
+  ],
+  [
+    'segments -> pricing index (the owners answer its conditions)',
+    G1,
+    `${M}/segments/services/segment-evaluator.ts`,
+    `import { pricing } from '../../pricing';\nexport const x = pricing;`,
+    false,
+  ],
+  [
     'ai -> identity index',
     G1,
     ASK_FLOW,

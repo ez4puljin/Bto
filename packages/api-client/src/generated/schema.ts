@@ -484,6 +484,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The product list screen (ADR-0049 #4): the list's filters plus conditions on other modules'
+         *     data or a saved segment, with the total on the first page. Declared before `:id`.
+         */
+        post: operations["Products_query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/next-sku": {
         parameters: {
             query?: never;
@@ -2454,6 +2474,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Segments_list"];
+        put?: never;
+        post: operations["Segments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many records each segment keeps. Declared before `:id`, so "counts" never reaches it. */
+        get: operations["Segments_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Segments_get"];
+        put: operations["Segments_update"];
+        post?: never;
+        /** Archives the segment: segments are never deleted (ADR-0049 #1). */
+        delete: operations["Segments_archive"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The editor's live count of conditions not saved yet. */
+        post: operations["Segments_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2909,6 +2996,96 @@ export interface components {
         ProductPage: {
             data: components["schemas"]["ProductListItem"][];
             nextCursor: string | null;
+        };
+        SegmentCondition: {
+            /**
+             * @description A field of the entity (SEGMENT_FIELDS)
+             * @example category
+             */
+            field: string;
+            /** @enum {string} */
+            op: "IN" | "NOT_IN" | "MAIN_IN" | "ANY" | "NONE" | "IS" | "YES" | "NO" | "BETWEEN" | "LAST_DAYS" | "CONTAINS" | "IN_STOCK" | "OUT_OF_STOCK" | "AT_OR_BELOW_MIN";
+            /**
+             * @example [
+             *       12
+             *     ]
+             */
+            ids?: number[];
+            /**
+             * @example [
+             *       "ACTIVE"
+             *     ]
+             */
+            values?: string[];
+            /**
+             * @description Ulaanbaatar day, included
+             * @example 2026-10-01
+             */
+            from?: string;
+            /**
+             * @description Ulaanbaatar day, included
+             * @example 2026-10-14
+             */
+            to?: string;
+            /**
+             * @description LAST_DAYS: today and the days before it
+             * @example 30
+             */
+            days?: number;
+            /**
+             * @description Whole MNT
+             * @example 1000
+             */
+            min?: string;
+            /**
+             * @description Whole MNT
+             * @example 5000
+             */
+            max?: string;
+            /**
+             * @description Stock conditions: one warehouse, or any
+             * @example 4
+             */
+            warehouseId?: number;
+            /** @example кока */
+            text?: string;
+        };
+        SegmentGroup: {
+            /** @enum {string} */
+            match: "ALL" | "ANY";
+            conditions: components["schemas"]["SegmentCondition"][];
+        };
+        SegmentDefinition: {
+            /**
+             * @description ALL: every group holds; ANY: one does
+             * @enum {string}
+             */
+            match: "ALL" | "ANY";
+            groups: components["schemas"]["SegmentGroup"][];
+        };
+        ProductQueryRequest: {
+            /** @description nextCursor of the previous page */
+            cursor?: string;
+            /** @default 50 */
+            limit: number;
+            /** @description Words of the name in either script, a SKU or a barcode */
+            q?: string;
+            /** @description Includes its subcategories */
+            categoryId?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+            /** @description true: complete products; false: those waiting for prices (ADR-0044) */
+            saleReady?: boolean;
+            /** @description Conditions not saved as a segment */
+            where?: components["schemas"]["SegmentDefinition"];
+            /** @description A saved product segment; with where, both apply */
+            segmentId?: number;
+        };
+        ProductQueryPage: {
+            data: components["schemas"]["ProductListItem"][];
+            nextCursor: string | null;
+            /** @description How many products the filters keep; on the first page only */
+            total: number | null;
         };
         NextSku: {
             /** @example 10024 */
@@ -5046,6 +5223,50 @@ export interface components {
         AiReportRenameRequest: {
             name: string;
         };
+        Segment: {
+            id: number;
+            /** @enum {string} */
+            entity: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+            name: string;
+            description: string | null;
+            definition: components["schemas"]["SegmentDefinition"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SegmentPage: {
+            data: components["schemas"]["Segment"][];
+            nextCursor: string | null;
+        };
+        SegmentCount: {
+            segmentId: number;
+            /** @description Null for a segment the caller may not count, archived or no longer valid */
+            count: number | null;
+        };
+        SegmentPreviewRequest: {
+            /** @enum {string} */
+            entity: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+            definition: components["schemas"]["SegmentDefinition"];
+        };
+        SegmentPreview: {
+            /** @example 1751 */
+            count: number;
+        };
+        SegmentCreateRequest: {
+            /** @example Бөөний бараа — Жиж ороогүй */
+            name: string;
+            description?: string | null;
+            definition: components["schemas"]["SegmentDefinition"];
+            /** @enum {string} */
+            entity: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+        };
+        SegmentUpdateRequest: {
+            /** @example Бөөний бараа — Жиж ороогүй */
+            name: string;
+            description?: string | null;
+            definition: components["schemas"]["SegmentDefinition"];
+        };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
@@ -6412,6 +6633,38 @@ export interface operations {
             };
         };
     };
+    Products_query: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductQueryRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductQueryPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Products_nextSku: {
         parameters: {
             query?: {
@@ -7039,6 +7292,8 @@ export interface operations {
                 tinPending?: boolean;
                 /** @description The default address has no GPS point */
                 gpsMissing?: boolean;
+                /** @description A saved customer segment (ADR-0049) */
+                segmentId?: number;
             };
             header?: never;
             path?: never;
@@ -7517,6 +7772,10 @@ export interface operations {
                 /** @description Name in either script, code, phone, TIN or registration number */
                 q?: string;
                 status?: "ACTIVE" | "INACTIVE";
+                /** @description A saved supplier segment (ADR-0049) */
+                segmentId?: number;
+                /** @description Only these suppliers (1–200 ids, ADR-0037 batch read): names of a filter */
+                ids?: number[];
             };
             header?: never;
             path?: never;
@@ -11428,6 +11687,229 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                entity?: "PRODUCT" | "CUSTOMER" | "SUPPLIER";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_counts: {
+        parameters: {
+            query: {
+                /** @description 1–50 segment ids */
+                segmentIds: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentCount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentPreviewRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentPreview"];
                 };
             };
             /** @description RFC 9457 problem details */

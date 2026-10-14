@@ -7,7 +7,7 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import { type Actor, AuditService } from '../../identity';
 import { internalBarcodeSeq, productBarcodes, products, productUnits } from '../schema';
-import { notFound } from './support';
+import { touchProduct, notFound } from './support';
 
 export type Barcode = typeof productBarcodes.$inferSelect;
 
@@ -211,7 +211,14 @@ export class BarcodeService {
     return rows;
   }
 
+  /** A barcode locked for a change; its product is locked first and marked changed. */
   private async get(tx: Tx, barcodeId: number): Promise<Barcode> {
+    const [owner] = await tx
+      .select({ productId: productUnits.productId })
+      .from(productBarcodes)
+      .innerJoin(productUnits, eq(productUnits.id, productBarcodes.productUnitId))
+      .where(eq(productBarcodes.id, barcodeId));
+    if (owner) await touchProduct(tx, owner.productId);
     const [row] = await tx
       .select()
       .from(productBarcodes)
@@ -221,12 +228,14 @@ export class BarcodeService {
     return row;
   }
 
+  /** The unit is current; its product is locked first and marked changed (ADR-0049 #2). */
   private async currentUnit(tx: Tx, unitId: number): Promise<void> {
     const [unit] = await tx
-      .select({ supersededAt: productUnits.supersededAt })
+      .select({ productId: productUnits.productId, supersededAt: productUnits.supersededAt })
       .from(productUnits)
       .where(eq(productUnits.id, unitId));
     if (!unit) throw notFound('product unit', unitId);
+    await touchProduct(tx, unit.productId);
     if (unit.supersededAt) {
       throw new AppError('UNIT_SUPERSEDED', `unit ${unitId} is no longer current`, { id: unitId });
     }

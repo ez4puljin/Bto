@@ -141,6 +141,13 @@
       "when": 1791961756206,
       "tag": "0019_price_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791971813450,
+      "tag": "0020_segments",
+      "breakpoints": true
     }
   ]
 }

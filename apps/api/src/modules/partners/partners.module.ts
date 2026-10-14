@@ -11,6 +11,7 @@ import {
   SupplierContactsController,
   SuppliersController,
 } from './controllers/suppliers.controller';
+import { PartnerSegmentsService } from './services/partner-segments.service';
 import { CustomerContactsService, SupplierContactsService } from './services/contacts.service';
 import { CustomerAddressesService } from './services/customer-addresses.service';
 import { CustomersService } from './services/customers.service';
@@ -21,6 +22,7 @@ const CORE_SERVICES = [
   CustomerAddressesService,
   CustomerContactsService,
   CustomersService,
+  PartnerSegmentsService,
   ProductSuppliersService,
   SupplierContactsService,
   SuppliersService,

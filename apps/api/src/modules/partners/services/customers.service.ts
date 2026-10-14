@@ -9,9 +9,11 @@ import {
   normalizeRegNo,
 } from '@tugeel/shared/taxpayer';
 import { normalizeName, searchKeys } from '@tugeel/shared/text';
+import { conditionDays, type SegmentCondition } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn, onBusinessDays } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -361,8 +363,10 @@ export class CustomersService {
   async listItems(
     ctx: AuthContext,
     query: CustomerQuery,
+    within: readonly number[] | null = null,
   ): Promise<{ data: CustomerListItem[]; nextCursor: string | null }> {
-    const page = await this.pageRows(ctx, query);
+    if (within?.length === 0) return { data: [], nextCursor: null };
+    const page = await this.pageRows(ctx, query, within);
     const ids = page.data.map((row) => row.id);
     if (ids.length === 0) return { data: [], nextCursor: page.nextCursor };
     const points = await this.db
@@ -417,10 +421,43 @@ export class CustomersService {
     };
   }
 
+  /** Every customer the caller may read: the universe of a negative condition (ADR-0049 #3). */
+  allIds(ctx: AuthContext, executor: Db | Tx = this.db): Promise<number[]> {
+    return this.idsOf(ctx, sql`true`, executor);
+  }
+
+  /**
+   * The customers one segment condition keeps among those the caller may read, ascending
+   * (ADR-0049 #3): search, kind, status, credit hold, a company without a TIN, a default address
+   * without a GPS point, the day it was registered.
+   */
+  idsWhere(
+    ctx: AuthContext,
+    condition: SegmentCondition,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    const where = customerCondition(condition);
+    return where ? this.idsOf(ctx, where, executor) : Promise.resolve([]);
+  }
+
+  private async idsOf(ctx: AuthContext, where: SQL, executor: Db | Tx): Promise<number[]> {
+    const rows = await executor
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(this.visibleTo(ctx), where))
+      .orderBy(asc(customers.id));
+    return rows.map((row) => row.id);
+  }
+
   /** One keyset page of customers (search rank, name, id) with every column the lists show. */
-  private async pageRows(ctx: AuthContext, query: CustomerQuery) {
+  private async pageRows(
+    ctx: AuthContext,
+    query: CustomerQuery,
+    within: readonly number[] | null = null,
+  ) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const filters: SQL[] = [this.visibleTo(ctx)];
+    if (within) filters.push(idIn(customers.id, within));
     if (query.kind) filters.push(eq(customers.kind, query.kind));
     if (query.status) filters.push(eq(customers.status, query.status));
     if (query.creditHold !== undefined) filters.push(eq(customers.creditHold, query.creditHold));
@@ -634,4 +671,43 @@ function toSummary(row: Omit<CustomerSummary, 'tinPending'>): CustomerSummary {
     address: row.address,
     hasGps: row.hasGps,
   };
+}
+
+/** A company without a TIN (the list's «ТТД дутуу»). */
+const TIN_PENDING = sql`${customers.kind} = 'COMPANY' AND ${customers.tin} IS NULL`;
+/** The default address has a GPS point. */
+const HAS_GPS = sql`EXISTS (SELECT 1 FROM customer_addresses a
+  WHERE a.customer_id = customers.id AND a.is_default AND a.lat IS NOT NULL)`;
+
+/** One positive segment condition on customers as SQL; null keeps none (ADR-0049 #3). */
+function customerCondition(condition: SegmentCondition): SQL | null {
+  const yes = condition.op === 'YES';
+  switch (condition.field) {
+    case 'search':
+      return condition.text ? (partnerSearch(customers, condition.text)?.match ?? null) : null;
+    case 'kind':
+      return condition.values?.length
+        ? sql`${customers.kind} IN (${sql.join(
+            condition.values.map((value) => sql`${value}`),
+            sql`, `,
+          )})`
+        : null;
+    case 'status':
+      return condition.values?.length
+        ? sql`${customers.status} IN (${sql.join(
+            condition.values.map((value) => sql`${value}`),
+            sql`, `,
+          )})`
+        : null;
+    case 'creditHold':
+      return eq(customers.creditHold, yes);
+    case 'tinPending':
+      return yes ? TIN_PENDING : sql`NOT (${TIN_PENDING})`;
+    case 'gpsMissing':
+      return yes ? sql`NOT ${HAS_GPS}` : HAS_GPS;
+    case 'createdAt':
+      return onBusinessDays(customers.createdAt, conditionDays(condition, businessDate()));
+    default:
+      return null;
+  }
 }

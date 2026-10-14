@@ -1964,6 +1964,53 @@
         ]
       }
     },
+    "/api/v1/products/query": {
+      "post": {
+        "operationId": "Products_query",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductQueryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The product list screen (ADR-0049 #4): the list's filters plus conditions on other modules'\ndata or a saved segment, with the total on the first page. Declared before `:id`.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/products/next-sku": {
       "get": {
         "operationId": "Products_nextSku",
@@ -3028,6 +3075,16 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "segmentId",
+            "required": false,
+            "in": "query",
+            "description": "A saved customer segment (ADR-0049)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -3782,6 +3839,29 @@
                 "ACTIVE",
                 "INACTIVE"
               ]
+            }
+          },
+          {
+            "name": "segmentId",
+            "required": false,
+            "in": "query",
+            "description": "A saved supplier segment (ADR-0049)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "ids",
+            "required": false,
+            "in": "query",
+            "description": "Only these suppliers (1–200 ids, ADR-0037 batch read): names of a filter",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
             }
           }
         ],
@@ -10392,6 +10472,366 @@
           "ai"
         ]
       }
+    },
+    "/api/v1/segments": {
+      "get": {
+        "operationId": "Segments_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "entity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCT",
+                "CUSTOMER",
+                "SUPPLIER"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "segments"
+        ]
+      },
+      "post": {
+        "operationId": "Segments_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/counts": {
+      "get": {
+        "operationId": "Segments_counts",
+        "parameters": [
+          {
+            "name": "segmentIds",
+            "required": true,
+            "in": "query",
+            "description": "1–50 segment ids",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SegmentCount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "How many records each segment keeps. Declared before `:id`, so \"counts\" never reaches it.",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/{id}": {
+      "get": {
+        "operationId": "Segments_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "segments"
+        ]
+      },
+      "put": {
+        "operationId": "Segments_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "segments"
+        ]
+      },
+      "delete": {
+        "operationId": "Segments_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives the segment: segments are never deleted (ADR-0049 #1).",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/preview": {
+      "post": {
+        "operationId": "Segments_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The editor's live count of conditions not saved yet.",
+        "tags": [
+          "segments"
+        ]
+      }
     }
   },
   "info": {
@@ -12090,6 +12530,223 @@
         "required": [
           "data",
           "nextCursor"
+        ]
+      },
+      "SegmentCondition": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "category",
+            "description": "A field of the entity (SEGMENT_FIELDS)"
+          },
+          "op": {
+            "enum": [
+              "IN",
+              "NOT_IN",
+              "MAIN_IN",
+              "ANY",
+              "NONE",
+              "IS",
+              "YES",
+              "NO",
+              "BETWEEN",
+              "LAST_DAYS",
+              "CONTAINS",
+              "IN_STOCK",
+              "OUT_OF_STOCK",
+              "AT_OR_BELOW_MIN"
+            ],
+            "type": "string"
+          },
+          "ids": {
+            "example": [
+              12
+            ],
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "values": {
+            "maxItems": 20,
+            "example": [
+              "ACTIVE"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "from": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "2026-10-01",
+            "description": "Ulaanbaatar day, included"
+          },
+          "to": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "2026-10-14",
+            "description": "Ulaanbaatar day, included"
+          },
+          "days": {
+            "type": "number",
+            "minimum": 1,
+            "example": 30,
+            "description": "LAST_DAYS: today and the days before it"
+          },
+          "min": {
+            "type": "string",
+            "maxLength": 13,
+            "example": "1000",
+            "description": "Whole MNT"
+          },
+          "max": {
+            "type": "string",
+            "maxLength": 13,
+            "example": "5000",
+            "description": "Whole MNT"
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "example": 4,
+            "description": "Stock conditions: one warehouse, or any"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "кока"
+          }
+        },
+        "required": [
+          "field",
+          "op"
+        ]
+      },
+      "SegmentGroup": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "enum": [
+              "ALL",
+              "ANY"
+            ],
+            "type": "string"
+          },
+          "conditions": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentCondition"
+            }
+          }
+        },
+        "required": [
+          "match",
+          "conditions"
+        ]
+      },
+      "SegmentDefinition": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "enum": [
+              "ALL",
+              "ANY"
+            ],
+            "type": "string",
+            "description": "ALL: every group holds; ANY: one does"
+          },
+          "groups": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentGroup"
+            }
+          }
+        },
+        "required": [
+          "match",
+          "groups"
+        ]
+      },
+      "ProductQueryRequest": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "nextCursor of the previous page"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          },
+          "q": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Words of the name in either script, a SKU or a barcode"
+          },
+          "categoryId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Includes its subcategories"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "saleReady": {
+            "type": "boolean",
+            "description": "true: complete products; false: those waiting for prices (ADR-0044)"
+          },
+          "where": {
+            "description": "Conditions not saved as a segment",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentDefinition"
+              }
+            ]
+          },
+          "segmentId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A saved product segment; with where, both apply"
+          }
+        }
+      },
+      "ProductQueryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductListItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "How many products the filters keep; on the first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
         ]
       },
       "NextSku": {
@@ -19209,6 +19866,170 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "Segment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "entity": {
+            "enum": [
+              "PRODUCT",
+              "CUSTOMER",
+              "SUPPLIER"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "definition": {
+            "$ref": "#/components/schemas/SegmentDefinition"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "entity",
+          "name",
+          "description",
+          "definition",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SegmentPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SegmentCount": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "type": "number"
+          },
+          "count": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null for a segment the caller may not count, archived or no longer valid"
+          }
+        },
+        "required": [
+          "segmentId",
+          "count"
+        ]
+      },
+      "SegmentPreviewRequest": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "enum": [
+              "PRODUCT",
+              "CUSTOMER",
+              "SUPPLIER"
+            ],
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/SegmentDefinition"
+          }
+        },
+        "required": [
+          "entity",
+          "definition"
+        ]
+      },
+      "SegmentPreview": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "example": 1751
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "SegmentCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "Бөөний бараа — Жиж ороогүй"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "definition": {
+            "$ref": "#/components/schemas/SegmentDefinition"
+          },
+          "entity": {
+            "enum": [
+              "PRODUCT",
+              "CUSTOMER",
+              "SUPPLIER"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition",
+          "entity"
+        ]
+      },
+      "SegmentUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "Бөөний бараа — Жиж ороогүй"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "definition": {
+            "$ref": "#/components/schemas/SegmentDefinition"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
         ]
       },
       "ErrorCode": {

@@ -50,6 +50,8 @@ const MODULE_DEPS = {
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
   ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai
+  // ADR-0049: evaluates segments through the owners' index.ts; nobody imports segments (hooks reach it)
+  segments: ['identity', 'catalog', 'partners', 'inventory', 'pricing'],
 };
 const MOD = { type: 'api-module' };
 const INT = { type: 'api-integration' };
@@ -97,6 +99,12 @@ const POLICIES = [
     from: { element: MOD },
     disallow: { to: { element: { ...MOD, captured: { module: 'ai' } } } },
     message: 'Nothing imports the ai module (§3.1 rule 4, ADR-0045).',
+  },
+  {
+    from: { element: MOD },
+    disallow: { to: { element: { ...MOD, captured: { module: 'segments' } } } },
+    message:
+      'Nothing imports the segments module: declare a resolver hook and let segments bind it (ADR-0049 #4).',
   },
   // G1b §3.1 rule 6: integration clients only from jobs and flow services (ADR-0002 #8).
   {

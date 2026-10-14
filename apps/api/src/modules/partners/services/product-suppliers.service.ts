@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
+import type { SegmentCondition } from '@tugeel/shared/segments';
 import { DB } from '../../../common/db/db.tokens';
+import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { notFound } from '../../../common/errors/app-error';
@@ -281,6 +283,31 @@ export class ProductSuppliersService {
         }
       }
     }
+  }
+
+  /**
+   * The products one segment condition on suppliers keeps, ascending (ADR-0049 #3): linked to
+   * these suppliers (`IN`), with one of them as the main one (`MAIN_IN`), or to any (`ANY`).
+   */
+  async productIdsWhere(
+    condition: SegmentCondition,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    if (condition.field !== 'supplier') return [];
+    const filters =
+      condition.op === 'ANY'
+        ? []
+        : condition.ids?.length
+          ? [idIn(productSuppliers.supplierId, condition.ids)]
+          : null;
+    if (!filters) return [];
+    if (condition.op === 'MAIN_IN') filters.push(eq(productSuppliers.isMain, true));
+    const rows = await executor
+      .selectDistinct({ productId: productSuppliers.productId })
+      .from(productSuppliers)
+      .where(and(...filters))
+      .orderBy(asc(productSuppliers.productId));
+    return rows.map((row) => row.productId);
   }
 
   /** Makes a link the main supplier of its product. */

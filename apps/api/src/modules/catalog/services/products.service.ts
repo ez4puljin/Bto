@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
+import { idIn } from '../../../common/db/days';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
@@ -342,18 +343,75 @@ export class ProductsService {
 
   /**
    * The product list screen's rows (ADR-0037): the summary plus weight, e-Barimt codes and the
-   * current units with their barcodes, read with one statement each for the whole page.
+   * current units with their barcodes, read with one statement each for the whole page. `within`
+   * narrows the list to a set of products (a segment filter, ADR-0049 #4); null: no narrowing.
    */
   async listItems(
     query: ProductQuery,
+    within: readonly number[] | null = null,
   ): Promise<{ data: ProductListItem[]; nextCursor: string | null }> {
-    const page = await this.pageRows(query);
-    const summaries = await this.summaries(page.data);
-    const ids = page.data.map((row) => row.id);
+    if (within?.length === 0) return { data: [], nextCursor: null };
+    const page = await this.pageRows(query, within);
+    return { data: await this.enrich(page.data), nextCursor: page.nextCursor };
+  }
+
+  /** How many products the list's filters keep (the list's total, ADR-0049 #4). */
+  async countItems(query: ProductQuery, within: readonly number[] | null = null): Promise<number> {
+    if (within?.length === 0) return 0;
+    const { filters } = this.filtersOf(query, within);
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(and(...filters));
+    return row?.count ?? 0;
+  }
+
+  /**
+   * The ids the list's filters keep, in the list's order (rank, name, id), at most `cap` of them:
+   * the order of a filtered export (ADR-0049 #6).
+   */
+  async orderedIds(
+    query: ProductQuery,
+    within: readonly number[] | null,
+    cap: number,
+    executor: Db | Tx = this.db,
+  ): Promise<number[]> {
+    if (within?.length === 0) return [];
+    const { filters, searched } = this.filtersOf(query, within);
+    const rows = await executor
+      .select({ id: products.id })
+      .from(products)
+      .where(and(...filters))
+      .orderBy(...(searched ? [searched] : []), asc(products.name), asc(products.id))
+      .limit(cap);
+    return rows.map((row) => row.id);
+  }
+
+  /** List rows of these products, in the order given (an export reads 1,000 at a time). */
+  async listItemsOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<ProductListItem[]> {
+    if (ids.length === 0) return [];
+    const rows = await executor.select().from(products).where(idIn(products.id, ids));
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return this.enrich(
+      ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [row] : [];
+      }),
+      executor,
+    );
+  }
+
+  /** Rows with their summary, units and barcodes: one statement each for all of them. */
+  private async enrich(rows: Product[], executor: Db | Tx = this.db): Promise<ProductListItem[]> {
+    const summaries = await this.summaries(rows, executor);
+    const ids = rows.map((row) => row.id);
     const units =
       ids.length === 0
         ? []
-        : await this.db
+        : await executor
             .select({
               id: productUnits.id,
               productId: productUnits.productId,
@@ -374,7 +432,7 @@ export class ProductsService {
     const codes =
       units.length === 0
         ? []
-        : await this.db
+        : await executor
             .select({ unitId: productBarcodes.productUnitId, code: productBarcodes.code })
             .from(productBarcodes)
             .where(
@@ -397,47 +455,29 @@ export class ProductsService {
       unitsOf.set(productId, list);
     }
     const summaryOf = new Map(summaries.map((summary) => [summary.id, summary]));
-    return {
-      data: page.data.flatMap((row) => {
-        const summary = summaryOf.get(row.id);
-        return summary
-          ? [
-              {
-                ...summary,
-                weightKg: row.weightKg,
-                classificationCode: row.classificationCode,
-                taxProductCode: row.taxProductCode,
-                units: unitsOf.get(row.id) ?? [],
-              },
-            ]
-          : [];
-      }),
-      nextCursor: page.nextCursor,
-    };
+    return rows.flatMap((row) => {
+      const summary = summaryOf.get(row.id);
+      return summary
+        ? [
+            {
+              ...summary,
+              weightKg: row.weightKg,
+              classificationCode: row.classificationCode,
+              taxProductCode: row.taxProductCode,
+              units: unitsOf.get(row.id) ?? [],
+            },
+          ]
+        : [];
+    });
   }
 
   /** One keyset page of product rows: search rank, then name, then id. */
   private async pageRows(
     query: ProductQuery,
+    within: readonly number[] | null = null,
   ): Promise<{ data: Product[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
-    const filters: SQL[] = [];
-    if (query.status) filters.push(eq(products.status, query.status));
-    if (query.saleReady !== undefined) {
-      filters.push(
-        query.saleReady ? isNotNull(products.saleReadyAt) : isNull(products.saleReadyAt),
-      );
-    }
-    if (query.categoryId !== undefined) {
-      filters.push(sql`${products.categoryId} IN (
-        WITH RECURSIVE down(id) AS (
-          SELECT id FROM ${categories} WHERE id = ${query.categoryId}
-          UNION ALL
-          SELECT c.id FROM ${categories} c JOIN down ON c.parent_id = down.id
-        )
-        SELECT id FROM down)`);
-    }
-    const searched = this.searchRank(query.q, filters);
+    const { filters, searched } = this.filtersOf(query, within);
     // Without a search every row ranks 0; a bare 0 in ORDER BY would mean "column 0".
     const rank = searched ?? sql`0`;
     const after = decodeCursor(query.cursor);
@@ -454,6 +494,36 @@ export class ProductsService {
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ id: row.product.id, rank: row.rank }));
     return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The list's conditions — status, stage, category subtree, a set of products (one array
+   * parameter, not one per id), the search — and the search's rank expression.
+   */
+  private filtersOf(
+    query: ProductQuery,
+    within: readonly number[] | null,
+  ): { filters: SQL[]; searched: SQL | null } {
+    const filters: SQL[] = [];
+    if (query.status) filters.push(eq(products.status, query.status));
+    if (query.saleReady !== undefined) {
+      filters.push(
+        query.saleReady ? isNotNull(products.saleReadyAt) : isNull(products.saleReadyAt),
+      );
+    }
+    if (query.categoryId !== undefined) {
+      filters.push(sql`${products.categoryId} IN (
+        WITH RECURSIVE down(id) AS (
+          SELECT id FROM ${categories} WHERE id = ${query.categoryId}
+          UNION ALL
+          SELECT c.id FROM ${categories} c JOIN down ON c.parent_id = down.id
+        )
+        SELECT id FROM down)`);
+    }
+    if (within) filters.push(idIn(products.id, within));
+    const search = productSearch(query.q);
+    if (search) filters.push(search.match);
+    return { filters, searched: search?.rank ?? null };
   }
 
   /**
@@ -514,10 +584,12 @@ export class ProductsService {
       primaries.map((image) => image.fileId),
       executor,
     );
+    const baseOf = new Map(bases.map((unit) => [unit.productId, unit]));
+    const thumbOf = new Map(primaries.map((image) => [image.productId, image]));
     return rows.map((row) => {
-      const base = bases.find((unit) => unit.productId === row.id);
+      const base = baseOf.get(row.id);
       if (!base) throw new Error(`product ${row.id} has no base unit`);
-      const thumb = primaries.find((image) => image.productId === row.id);
+      const thumb = thumbOf.get(row.id);
       return {
         id: row.id,
         sku: row.sku,
@@ -531,39 +603,6 @@ export class ProductsService {
         thumbUrl: thumb ? (urls.get(thumb.fileId) ?? null) : null,
       };
     });
-  }
-
-  /** The rank expression of a search (null without one) and, as a side effect, its match condition in `filters`. */
-  private searchRank(q: string | undefined, filters: SQL[]): SQL | null {
-    const text = q?.trim() ?? '';
-    const terms = queryTerms(text);
-    if (terms.length === 0) return null;
-    const strict = terms.map((term) =>
-      like(products.searchText, `%${escapeLike(termPattern(term.strict))}%`),
-    );
-    const either = terms.map((term, index) => {
-      const phonetic = term.phonetic
-        ? like(products.searchPhonetic, `%${escapeLike(termPattern(term.phonetic))}%`)
-        : undefined;
-      return or(strict[index], phonetic) ?? sql`false`;
-    });
-    let exact: SQL = sql`false`;
-    let match = and(...either) ?? sql`false`;
-    if (/^\d+$/.test(text)) {
-      const keys = lookupCandidates(text);
-      const barcode = keys.length
-        ? sql`EXISTS (SELECT 1 FROM ${productBarcodes} b JOIN ${productUnits} u ON u.id = b.product_unit_id
-             WHERE u.product_id = products.id AND u.superseded_at IS NULL
-               AND b.lookup_key IN (${sql.join(
-                 keys.map((key) => sql`${key}`),
-                 sql`, `,
-               )}))`
-        : sql`false`;
-      exact = or(eq(products.sku, text), barcode) ?? sql`false`;
-      match = or(match, like(products.sku, `${text}%`), barcode) ?? match;
-    }
-    filters.push(match);
-    return sql`CASE WHEN ${exact} THEN 0 WHEN ${and(...strict) ?? sql`false`} THEN 1 ELSE 2 END`;
   }
 
   private async assertReferences(tx: Tx, input: { categoryId?: number }): Promise<void> {
@@ -626,5 +665,44 @@ function auditView(product: ProductDetail) {
       barcodes: barcodes.map((b) => b.code),
     })),
     images: undefined,
+  };
+}
+
+/**
+ * A list search (ADR-0028): every word of the name in either script, or the start of a SKU, or an
+ * exact SKU or barcode. `match` keeps the products; `rank` orders them (exact hits, then strict
+ * matches, then phonetic ones). Null without a search. The segment conditions use the same match.
+ */
+export function productSearch(q: string | undefined): { match: SQL; rank: SQL } | null {
+  const text = q?.trim() ?? '';
+  const terms = queryTerms(text);
+  if (terms.length === 0) return null;
+  const strict = terms.map((term) =>
+    like(products.searchText, `%${escapeLike(termPattern(term.strict))}%`),
+  );
+  const either = terms.map((term, index) => {
+    const phonetic = term.phonetic
+      ? like(products.searchPhonetic, `%${escapeLike(termPattern(term.phonetic))}%`)
+      : undefined;
+    return or(strict[index], phonetic) ?? sql`false`;
+  });
+  let exact: SQL = sql`false`;
+  let match = and(...either) ?? sql`false`;
+  if (/^\d+$/.test(text)) {
+    const keys = lookupCandidates(text);
+    const barcode = keys.length
+      ? sql`EXISTS (SELECT 1 FROM ${productBarcodes} b JOIN ${productUnits} u ON u.id = b.product_unit_id
+           WHERE u.product_id = products.id AND u.superseded_at IS NULL
+             AND b.lookup_key IN (${sql.join(
+               keys.map((key) => sql`${key}`),
+               sql`, `,
+             )}))`
+      : sql`false`;
+    exact = or(eq(products.sku, text), barcode) ?? sql`false`;
+    match = or(match, like(products.sku, `${text}%`), barcode) ?? match;
+  }
+  return {
+    match,
+    rank: sql`CASE WHEN ${exact} THEN 0 WHEN ${and(...strict) ?? sql`false`} THEN 1 ELSE 2 END`,
   };
 }

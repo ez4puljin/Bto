@@ -28,6 +28,8 @@ import {
   ProductDetailDto,
   ProductListQueryDto,
   ProductPageDto,
+  ProductQueryPageDto,
+  ProductQueryRequestDto,
   ProductUnitDto,
   SupersedeUnitDto,
   UpdateProductDto,
@@ -36,6 +38,7 @@ import {
 } from '../dto/products.dto';
 import { BarcodeService } from '../services/barcode.service';
 import { ProductEbarimtService } from '../services/product-ebarimt.service';
+import { ProductQueryService } from '../services/product-query.service';
 import { SkuRangesService } from '../services/sku-ranges.service';
 import {
   type NewUnitInput,
@@ -62,6 +65,7 @@ export class ProductsController {
     private readonly products: ProductsService,
     private readonly ebarimt: ProductEbarimtService,
     private readonly ranges: SkuRangesService,
+    private readonly productQuery: ProductQueryService,
   ) {}
 
   @Get()
@@ -70,6 +74,23 @@ export class ProductsController {
   async list(@Query() query: ProductListQueryDto): Promise<ProductPageDto> {
     const page = await this.products.listItems(query);
     return { data: page.data.map(toProductListItemDto), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * The product list screen (ADR-0049 #4): the list's filters plus conditions on other modules'
+   * data or a saved segment, with the total on the first page. Declared before `:id`.
+   */
+  @Post('query')
+  @Authenticated()
+  @HttpCode(200)
+  @ApiOkResponse({ type: ProductQueryPageDto })
+  async query(@Body() body: ProductQueryRequestDto): Promise<ProductQueryPageDto> {
+    const page = await this.productQuery.query(body);
+    return {
+      data: page.data.map(toProductListItemDto),
+      nextCursor: page.nextCursor,
+      total: page.total,
+    };
   }
 
   /**
