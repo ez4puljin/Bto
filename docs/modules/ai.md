@@ -47,8 +47,8 @@ Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the sche
 | `ai.product_prices_today` | product with prices today: the warehouse price per base unit, the whole pack and its price, the loose, supermarket and supermarket bulk prices, computed as the price service does (0019) |
 | `ai.product_price_history` | a product's warehouse-price period with its profile (0019) |
 | `ai.discount_programs` | discount program, with its status today and its steps as text |
-| `ai.sales_orders` | customer order: number, status, customer, pickup or delivery, date, payment method, frozen totals, line count (0023, ADR-0055) |
-| `ai.sales_order_lines` | order line: product, unit and quantity, base quantity, home warehouse, reserved and backordered quantities, totals (0023) |
+| `ai.sales_orders` | customer order: number, status, customer, pickup or delivery, date, payment method, frozen totals, line count (0023, ADR-0055); its board, pipeline and stage by name, picked, delivered and archived times (0024, 0025, ADR-0056, ADR-0057). No row rights: `ai.ask` holders see every order, also on own-orders-only pipelines |
+| `ai.sales_order_lines` | order line: product, unit and quantity, base quantity, home warehouse, reserved and backordered quantities, picked and delivered quantities, totals (0023, 0024) |
 
 The views never read `auth_sessions`, `password_resets`, `idempotency_keys`, `files`, `audit_log` or `import_rows`, and from `users` only `id` and `full_name`. `AI_DATASETS` (`semantic/datasets.ts`) describes every view and column in English. The prompt, the guard and the tests all use it. Mongolian names, the glossary and example questions live in `mn.json` (`ai.datasets`, `ai.glossary`, `ai.examples`).
 

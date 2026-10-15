@@ -6,6 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0055 (#1: a reserved order may be edited; the submit is one stage action among others), ADR-0034 (#5: `post()` takes external documents and consumes reservations), architecture §5.3 (`reservationConsume` as built), §5.6 (stages instead of picking waves and packing; the interim confirm-delivery screen becomes the SALE stage), §4 (no `pickings` / `packages` tables) |
+| Amended by | ADR-0057 (#1: boards group pipelines, which hold the stages, a visibility, an own-orders-only switch and ALL_ORDERS roles; a stage's VIEW hides its orders on every read; #2: placement in a pipeline and a stage chosen through «+»; #8: the warehouse sales page with board and list views, the settings page) |
 
 ## Context
 
