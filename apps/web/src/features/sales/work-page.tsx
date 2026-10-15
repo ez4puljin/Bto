@@ -21,7 +21,9 @@ import { BoardView } from './board-view';
 import { type ListFilters, ListView } from './list-view';
 import { OrderFilterMenu } from './order-filter-menu';
 import { orderFilterQuery, readOrderFilters, writeOrderFilters } from './order-filters';
-import { OrderSheet } from './order-sheet';
+import { OrderCreateDialog } from './order-create-dialog';
+import { OrderPanel } from './order-panel';
+import { type PanelTab, parsePanelTab } from './order-panel-tabs';
 import { useBoardTree, usePipeline, useStageCards } from './pipelines-api';
 import { SheetFor } from './settings-page';
 import { WORK_VIEWS, type WorkView, useWorkPrefs } from './work-prefs';
@@ -31,7 +33,8 @@ import { WorkPanel } from './work-panel';
  * «Борлуулалт» → «Агуулахын борлуулалт» (ADR-0057 #7, after erxes Deals): the boards and their
  * pipelines on the left, the chosen pipeline as a board of stages or as a list, the search, the
  * filters and the count above. The URL keeps the pipeline (`?pipeline=`), the view (`?view=`) and
- * the filters; the last pipeline, view and panel are remembered per user in this browser.
+ * the filters; the last pipeline, view and panel are remembered per user in this browser. An open
+ * order (`?order=&tab=`) and the create dialog (`?new=1&stage=`) live in the URL too (ADR-0059).
  */
 export function SalesWorkPage() {
   const { t } = useTranslation();
@@ -68,21 +71,27 @@ export function SalesWorkPage() {
     scope: 'PIPELINE',
     archived: 'exclude',
   });
-  const [openId, setOpenId] = useState<number | null>(
-    Number.parseInt(params.get('order') ?? '', 10) || null,
-  );
+  const openId = Number.parseInt(params.get('order') ?? '', 10) || null;
+  const tab = parsePanelTab(params.get('tab'));
+  const creating = canCreate && params.get('new') === '1';
+  const newStage = Number.parseInt(params.get('stage') ?? '', 10) || null;
   const [configuring, setConfiguring] = useState(false);
 
-  const setParam = (key: string, value: string | null) =>
+  const setMany = (patch: Record<string, string | null>) =>
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        if (value === null) next.delete(key);
-        else next.set(key, value);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value === null) next.delete(key);
+          else next.set(key, value);
+        }
         return next;
       },
       { replace: true },
     );
+  const setParam = (key: string, value: string | null) => setMany({ [key]: value });
+  const openOrder = (id: number, section: PanelTab | null = null) =>
+    setMany({ order: String(id), tab: section, new: null, stage: null });
   const choose = (id: number) => {
     setParam('pipeline', String(id));
     update({ pipelineId: id });
@@ -140,11 +149,9 @@ export function SalesWorkPage() {
               </Button>
             ) : null}
             {canCreate && current ? (
-              <Button asChild>
-                <Link to={`/sales/orders/new?pipeline=${current.id}`}>
-                  <Plus />
-                  {t('sales.orders.new')}
-                </Link>
+              <Button onClick={() => setMany({ new: '1', stage: null })}>
+                <Plus />
+                {t('sales.orders.new')}
               </Button>
             ) : null}
           </>
@@ -240,7 +247,8 @@ export function SalesWorkPage() {
                 pipeline={pipeline.data}
                 filters={query}
                 canCreate={canCreate}
-                onOpen={setOpenId}
+                onOpen={(id) => openOrder(id)}
+                onNew={(stageId) => setMany({ new: '1', stage: String(stageId) })}
               />
             ) : null}
             {view === 'LIST' ? (
@@ -249,14 +257,26 @@ export function SalesWorkPage() {
                 filters={query}
                 own={listFilters}
                 onOwnChange={setListFilters}
-                onOpen={setOpenId}
+                onOpen={(id) => openOrder(id)}
                 onCount={setListCount}
               />
             ) : null}
           </div>
         </div>
       ) : null}
-      <OrderSheet orderId={openId} onClose={() => setOpenId(null)} />
+      <OrderPanel
+        orderId={openId}
+        tab={tab}
+        onTab={(next) => setParam('tab', next === 'overview' ? null : next)}
+        onClose={() => setMany({ order: null, tab: null })}
+      />
+      <OrderCreateDialog
+        open={creating}
+        pipelineId={current?.id ?? null}
+        stageId={newStage}
+        onClose={() => setMany({ new: null, stage: null })}
+        onCreated={(id) => openOrder(id, 'products')}
+      />
       {configuring && current ? (
         <SheetFor
           pipelineId={current.id}

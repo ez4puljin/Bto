@@ -4,7 +4,7 @@ import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it, vi } from 'vitest';
-import { bodyOf, calls, UUID, warehouses } from '@/test/inventory-fixtures';
+import { bodyOf, calls, list, UUID, warehouses } from '@/test/inventory-fixtures';
 import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
@@ -222,10 +222,10 @@ describe('warehouse sales page', () => {
     // «+» on the stage without an action only.
     const first = screen.getByRole('region', { name: 'ХТ Захиалга' });
     expect(
-      within(first).getByRole('link', { name: `${mn.sales.work.addHere}: ХТ Захиалга` }),
-    ).toHaveAttribute('href', '/sales/orders/new?pipeline=10&stage=1');
+      within(first).getByRole('button', { name: `${mn.sales.work.addHere}: ХТ Захиалга` }),
+    ).toBeInTheDocument();
     expect(
-      within(confirmed).queryByRole('link', { name: `${mn.sales.work.addHere}: Нярав Хяналт` }),
+      within(confirmed).queryByRole('button', { name: `${mn.sales.work.addHere}: Нярав Хяналт` }),
     ).toBeNull();
     // Every card: how it is paid and who entered it (ADR-0058).
     expect(within(first).getByText(mn.sales.paymentMethods.CREDIT)).toBeInTheDocument();
@@ -352,7 +352,7 @@ describe('warehouse sales page', () => {
     open.mockRestore();
   });
 
-  it('opens an order beside the board and archives it once finished', async () => {
+  it('opens an order in its panel, prints on this computer’s paper and archives it', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const fetchMock = signedIn(
       OFFICE_ME,
@@ -364,21 +364,97 @@ describe('warehouse sales page', () => {
     const user = userEvent.setup();
     const cancelled = await screen.findByRole('region', { name: 'Цуцалсан' });
     await user.click(await within(cancelled).findByRole('button', { name: '20261015_0007' }));
-    const sheet = await screen.findByRole('dialog', { name: '20261015_0007' });
-    expect(within(sheet).getByText('Мөрөн, 3-р баг')).toBeInTheDocument();
-    // The label and the header's payment row say the same.
-    expect(within(sheet).getAllByText(mn.sales.paymentMethods.CASH)).toHaveLength(2);
-    await user.click(within(sheet).getByRole('button', { name: mn.sales.printKinds.PICK_LIST }));
+    const panel = await screen.findByRole('dialog', { name: '20261015_0007' });
+    // The sections (ADR-0059); «Бэлтгэх» only for pickers of a confirmed order.
+    const sections = within(panel).getByRole('tablist', { name: mn.sales.panel.sections });
+    expect(
+      within(sections)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual([
+      mn.sales.panel.tabs.overview,
+      mn.sales.panel.tabs.properties,
+      mn.sales.panel.tabs.products,
+      mn.sales.panel.tabs.activity,
+    ]);
+    await user.click(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.properties }));
+    expect(within(panel).getByText('Мөрөн, 3-р баг')).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: mn.sales.printKinds.PICK_LIST }));
     expect(open).toHaveBeenCalledWith(
       '/sales/orders/7/print/PICK_LIST?format=a4',
       '_blank',
       'noopener',
     );
-    await user.click(within(sheet).getByRole('button', { name: mn.sales.work.archive }));
+    await user.click(within(panel).getByRole('button', { name: mn.sales.panel.more }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.sales.work.archive }));
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/sales-orders/7/archive')).toHaveLength(1),
     );
     open.mockRestore();
+  });
+
+  it('creates an order in a stage from its «+» and opens it on its products', async () => {
+    const created: Schemas['SalesOrderDetail'] = {
+      ...ORDER,
+      id: 8,
+      number: '20261015_0008',
+      status: 'DRAFT',
+      stageId: 1,
+      stageName: 'ХТ Захиалга',
+      cancelledAt: null,
+      cancelReason: null,
+      lines: [],
+    };
+    const fetchMock = signedIn(
+      OFFICE_ME,
+      routes({
+        'GET /api/v1/customers': () =>
+          list([
+            {
+              id: 9,
+              code: '1001',
+              kind: 'COMPANY',
+              name: 'Номин дэлгүүр',
+              regNo: null,
+              tin: null,
+              phone: null,
+              status: 'ACTIVE',
+              creditHold: false,
+            },
+          ]),
+        'POST /api/v1/sales-orders': () => json(created, 201),
+        'GET /api/v1/sales-orders/8': () => json(created),
+      }),
+    );
+    renderApp('/sales/boards', fetchMock);
+    const user = userEvent.setup();
+    const first = await screen.findByRole('region', { name: 'ХТ Захиалга' });
+    await user.click(
+      within(first).getByRole('button', { name: `${mn.sales.work.addHere}: ХТ Захиалга` }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: mn.sales.create.title });
+    expect(
+      await within(dialog).findByText(mn.sales.order.stageFixed.replace('{{name}}', 'ХТ Захиалга')),
+    ).toBeInTheDocument();
+    await user.type(
+      within(dialog).getByPlaceholderText(mn.partners.customerPicker.search),
+      'номин',
+    );
+    await user.click(await within(dialog).findByRole('button', { name: /Номин дэлгүүр/ }));
+    await user.click(within(dialog).getByRole('button', { name: mn.sales.create.create }));
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/sales-orders')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/sales-orders')[0])).toMatchObject({
+      customerId: 9,
+      pipelineId: 10,
+      stageId: 1,
+      paymentMethod: 'CASH',
+      lines: [],
+    });
+    const panel = await screen.findByRole('dialog', { name: '20261015_0008' });
+    expect(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.products })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   it('filters the cards and shows the list view, remembered for the user', async () => {

@@ -208,6 +208,8 @@ export class SalesOrderEventDto {
   @ApiProperty({ enum: ORDER_STATUSES }) toStatus: OrderStatus;
   @ApiProperty({ type: String, nullable: true }) reason: string | null;
   @ApiProperty({ type: Number, nullable: true }) actorId: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Who did it (ADR-0059)' })
+  actorName: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
 }
 
@@ -215,7 +217,11 @@ export class SalesOrderEventDto {
 export class SalesOrderMoveDto {
   @ApiProperty({ type: Number, nullable: true }) fromStageId: number | null;
   @ApiProperty() toStageId: number;
+  @ApiProperty({ type: String, nullable: true, description: 'Archived stages keep their name' })
+  fromStageName: string | null;
+  @ApiProperty({ type: String, nullable: true }) toStageName: string | null;
   @ApiProperty({ type: Number, nullable: true }) actorId: number | null;
+  @ApiProperty({ type: String, nullable: true }) actorName: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
 }
 

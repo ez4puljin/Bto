@@ -57,8 +57,19 @@ export interface OrderJson {
   createdByName: string | null;
   canEdit: boolean;
   lines: OrderLineJson[];
-  events: { fromStatus: string | null; toStatus: string; reason: string | null }[];
-  moves: { fromStageId: number | null; toStageId: number }[];
+  events: {
+    fromStatus: string | null;
+    toStatus: string;
+    reason: string | null;
+    actorName?: string | null;
+  }[];
+  moves: {
+    fromStageId: number | null;
+    toStageId: number;
+    fromStageName?: string | null;
+    toStageName?: string | null;
+    actorName?: string | null;
+  }[];
 }
 
 /** A pickup order for tomorrow paid in cash, unless the fields say otherwise. */

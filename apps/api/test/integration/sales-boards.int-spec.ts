@@ -418,6 +418,20 @@ describe('sales boards', () => {
       ['12', '0'],
       ['5', '3'],
     ]);
+    // The activity names who moved it and between which stages (ADR-0059).
+    expect(reserved.order.moves.at(-1)).toMatchObject({
+      fromStageName: 'ХТ Захиалга',
+      toStageName: 'Нярав Хяналт',
+      actorName: expect.any(String),
+    });
+    expect(reserved.order.moves[0]).toMatchObject({
+      fromStageName: null,
+      toStageName: 'ХТ Захиалга',
+    });
+    expect(reserved.order.events.at(-1)).toMatchObject({
+      toStatus: 'CONFIRMED',
+      actorName: expect.any(String),
+    });
     expect((await stockOf(cola.id))[0]).toMatchObject({
       bin: 'A-01-01',
       on_hand: '20.000',

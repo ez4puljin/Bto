@@ -1,0 +1,462 @@
+import { Decimal } from '@tugeel/shared/money';
+import { isEditable } from '@tugeel/shared/sales';
+import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
+import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FilterBar, ListCard, RowAction, RowActions, SearchField } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
+import { ProblemAlert } from '@/components/problem-alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { isQty, useWarehouseName } from '@/features/inventory/helpers';
+import { ProductSearch } from '@/features/inventory/shared';
+import { useLinesQuote } from '@/features/pricing/api';
+import { UnitSelect } from '@/features/pricing/quote-table';
+import { formatMnt, plainDecimal } from '@/lib/money';
+import { toast } from '@/lib/toast';
+import { useAction } from '@/lib/use-action';
+import { useDebounced } from '@/lib/use-debounced';
+import { randomUuid } from '@/lib/uuid';
+import {
+  type SalesOrder,
+  type SalesOrderLine,
+  useProductOrderInfo,
+  useSalesOrderMutations,
+} from './api';
+import { orderRequestOf } from './order-request';
+
+/** A line as the table edits it; saved lines keep their id as the key. */
+interface EditLine {
+  key: string;
+  productId: number;
+  sku: string;
+  name: string;
+  unitId: number;
+  unitName: string;
+  qty: string;
+}
+
+const PICKED_FILTERS = ['ALL', 'PICKED', 'NOT_PICKED'] as const;
+type PickedFilter = (typeof PICKED_FILTERS)[number];
+
+/** What a price column shows: the parts (a pack and loose pieces may differ) and the total. */
+interface Price {
+  priced: boolean;
+  parts: { qty: string; uomName: string; unitPrice: string }[];
+  total: string | null;
+}
+
+const linesOf = (order: SalesOrder): EditLine[] =>
+  order.lines.map((line) => ({
+    key: String(line.id),
+    productId: line.productId,
+    sku: line.productSku,
+    name: line.productName,
+    unitId: line.productUnitId,
+    unitName: line.unitName,
+    qty: plainDecimal(line.qty),
+  }));
+
+const isPicked = (line: SalesOrderLine | undefined) =>
+  line !== undefined && line.qtyPicked !== null && new Decimal(line.qtyPicked).gt(0);
+
+/**
+ * «Бараа» (ADR-0059, erxes's Products): the order's lines with a search by name or code, a filter by
+ * warehouse and by picked or not. While the order may change, units and quantities are edited in
+ * place, products are added and removed, and «Хадгалах» saves them with the header as stored.
+ * Prices come from the rules: the frozen ones of a confirmed order, else a quote of the lines.
+ */
+export function OrderProducts({
+  order,
+  onDirty,
+}: {
+  order: SalesOrder;
+  onDirty: (dirty: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouseName = useWarehouseName();
+  const mutations = useSalesOrderMutations();
+  const action = useAction();
+  const editable = order.canEdit && isEditable(order.status);
+  const saved = useMemo(() => linesOf(order), [order]);
+  const savedById = useMemo(
+    () => new Map(order.lines.map((line) => [String(line.id), line])),
+    [order.lines],
+  );
+  // null: the stored lines; a list: edits not saved yet.
+  const [edits, setEdits] = useState<EditLine[] | null>(null);
+  const lines = edits ?? saved;
+  const dirty = edits !== null;
+  useEffect(() => onDirty(dirty), [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
+  const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+  const [warehouse, setWarehouse] = useState<number | null>(null);
+  const [picked, setPicked] = useState<PickedFilter>('ALL');
+
+  const info = useProductOrderInfo(lines.map((line) => line.productId));
+  const infoOf = (productId: number) => info.data?.find((row) => row.productId === productId);
+
+  // Prices: frozen on a confirmed order nobody is editing; else a quote of the valid lines.
+  const frozen = !dirty && order.total !== null;
+  const wanted = JSON.stringify(
+    lines
+      .filter((line) => isQty(line.qty))
+      .map((line) => ({ key: line.key, productUnitId: line.unitId, qty: line.qty })),
+  );
+  const asked = useDebounced(wanted, 300);
+  const askedLines = useMemo(
+    () => JSON.parse(asked) as { key: string; productUnitId: number; qty: string }[],
+    [asked],
+  );
+  const request = useMemo(
+    () => askedLines.map(({ productUnitId, qty }) => ({ productUnitId, qty })),
+    [askedLines],
+  );
+  const quote = useLinesQuote(request, !frozen);
+  const priceOf = (line: EditLine): Price | null => {
+    if (frozen) {
+      const stored = savedById.get(line.key);
+      if (!stored) return null;
+      return {
+        priced: stored.total !== null,
+        parts: stored.parts.map((part) => ({
+          qty: part.qty,
+          uomName: part.uomName,
+          unitPrice: part.unitPrice,
+        })),
+        total: stored.total,
+      };
+    }
+    const index = askedLines.findIndex((entry) => entry.key === line.key);
+    const quoted = index < 0 ? undefined : quote.data?.lines[index];
+    if (!quoted) return null;
+    return {
+      priced: quoted.priced,
+      parts: quoted.parts.map((part) => ({
+        qty: part.qty,
+        uomName: part.uomName,
+        unitPrice: part.unitPrice,
+      })),
+      total: quoted.total,
+    };
+  };
+  const total = frozen ? order.total : (quote.data?.total ?? null);
+
+  const rows = lines.map((line) => {
+    const stored = savedById.get(line.key);
+    const row = infoOf(line.productId);
+    return {
+      line,
+      stored,
+      warehouseId: stored?.warehouseId ?? row?.homeWarehouseId ?? null,
+      problem:
+        row && !row.sellable
+          ? t('sales.order.notSellable')
+          : row && row.homeWarehouseId === null
+            ? t('sales.order.noHome')
+            : null,
+      keys: searchKeys(line.name, [line.sku]),
+    };
+  });
+  const terms = queryTerms(q);
+  const shown = rows.filter(
+    (row) =>
+      (terms.length === 0 || matchesQuery(row.keys, terms)) &&
+      (warehouse === null || row.warehouseId === warehouse) &&
+      (picked === 'ALL' || (picked === 'PICKED') === isPicked(row.stored)),
+  );
+  const warehouses = [
+    ...new Set(rows.flatMap((row) => (row.warehouseId === null ? [] : [row.warehouseId]))),
+  ];
+  const confirmed = order.status !== 'DRAFT';
+  const anyPicked = order.lines.some((line) => line.qtyPicked !== null);
+  const invalid = lines.some((line) => !isQty(line.qty));
+  const blocked = rows.some((row) => row.problem !== null);
+
+  const change = (next: EditLine[]) => setEdits(next);
+  const update = (key: string, patch: Partial<EditLine>) =>
+    change(lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  const save = () =>
+    void action.run(async () => {
+      await mutations.update.mutateAsync({
+        id: order.id,
+        body: orderRequestOf(order, {
+          lines: lines.map((line) => ({ productUnitId: line.unitId, qty: line.qty })),
+        }),
+      });
+      setEdits(null);
+      setAdding(false);
+      toast.success(t('sales.panel.products.saved'));
+    });
+
+  const backordered = order.lines.filter((line) => new Decimal(line.qtyBackordered).gt(0));
+
+  return (
+    <div className="flex flex-col gap-3">
+      {backordered.length > 0 && order.status !== 'CANCELLED' ? (
+        <p className="text-sm text-warning">
+          {t('sales.order.backorderedLines', { count: backordered.length })}
+        </p>
+      ) : null}
+      <FilterBar>
+        <SearchField
+          aria-label={t('sales.panel.products.search')}
+          placeholder={t('sales.panel.products.search')}
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+        />
+        <NativeSelect
+          variant="filter"
+          active={warehouse !== null}
+          aria-label={t('sales.order.warehouse')}
+          value={warehouse ?? ''}
+          onChange={(event) =>
+            setWarehouse(event.target.value ? Number.parseInt(event.target.value, 10) : null)
+          }
+        >
+          <option value="">{t('sales.panel.products.allWarehouses')}</option>
+          {warehouses.map((id) => (
+            <option key={id} value={id}>
+              {warehouseName(id)}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          variant="filter"
+          active={picked !== 'ALL'}
+          aria-label={t('sales.panel.products.pickedFilter')}
+          value={picked}
+          onChange={(event) =>
+            setPicked(PICKED_FILTERS.find((value) => value === event.target.value) ?? 'ALL')
+          }
+        >
+          {PICKED_FILTERS.map((value) => (
+            <option key={value} value={value}>
+              {t(`sales.panel.products.picked.${value}`)}
+            </option>
+          ))}
+        </NativeSelect>
+      </FilterBar>
+      {editable && (adding || lines.length === 0) ? (
+        <ProductSearch
+          onPick={(product) => {
+            // The search stays open for the next product.
+            setAdding(true);
+            change([
+              ...lines,
+              {
+                key: randomUuid(),
+                productId: product.id,
+                sku: product.sku,
+                name: product.name,
+                unitId: product.baseUnit.id,
+                unitName: product.baseUnit.uomName,
+                qty: '1',
+              },
+            ]);
+          }}
+        />
+      ) : null}
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('sales.order.product')}</TableHead>
+              <TableHead>{t('sales.order.warehouse')}</TableHead>
+              <TableHead>{t('sales.order.unit')}</TableHead>
+              <TableHead className="text-right">{t('sales.order.qty')}</TableHead>
+              <TableHead className="text-right">{t('sales.panel.products.unitPrice')}</TableHead>
+              <TableHead className="text-right">{t('sales.panel.products.amount')}</TableHead>
+              {confirmed ? (
+                <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
+              ) : null}
+              {backordered.length > 0 ? (
+                <TableHead className="text-right">{t('sales.order.backordered')}</TableHead>
+              ) : null}
+              {anyPicked ? (
+                <TableHead className="text-right">{t('sales.order.picked')}</TableHead>
+              ) : null}
+              {editable ? (
+                <TableHead>
+                  <span className="sr-only">{t('sales.order.remove')}</span>
+                </TableHead>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shown.map(({ line, stored, warehouseId, problem }) => {
+              const price = priceOf(line);
+              const badQty = !isQty(line.qty);
+              return (
+                <TableRow key={line.key}>
+                  <TableCell className="whitespace-normal">
+                    <span className="mr-2 rounded-md bg-fill px-1.5 py-0.5 font-mono text-xs">
+                      {line.sku}
+                    </span>
+                    {line.name}
+                    {problem ? <div className="text-xs text-destructive">{problem}</div> : null}
+                  </TableCell>
+                  <TableCell>{warehouseId === null ? '' : warehouseName(warehouseId)}</TableCell>
+                  <TableCell>
+                    {editable ? (
+                      <UnitSelect
+                        productId={line.productId}
+                        unitId={line.unitId}
+                        name={line.name}
+                        onChange={(unitId) => update(line.key, { unitId })}
+                      />
+                    ) : (
+                      line.unitName
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {editable ? (
+                      <Input
+                        aria-label={`${t('sales.order.qty')}: ${line.name}`}
+                        aria-invalid={badQty || undefined}
+                        inputMode="decimal"
+                        className="ml-auto w-24 text-right font-mono"
+                        value={line.qty}
+                        onChange={(event) => update(line.key, { qty: event.target.value.trim() })}
+                      />
+                    ) : (
+                      <span className="font-mono">{plainDecimal(line.qty)}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono whitespace-nowrap">
+                    {price && !price.priced ? (
+                      <span className="text-destructive">{t('sales.panel.products.noPrice')}</span>
+                    ) : price && price.parts.length === 1 && price.parts[0] ? (
+                      t('pricing.money', { amount: formatMnt(price.parts[0].unitPrice) })
+                    ) : (
+                      (price?.parts ?? []).map((part, index) => (
+                        <div key={index}>
+                          {t('sales.print.partLine', {
+                            qty: plainDecimal(part.qty),
+                            unit: part.uomName,
+                            price: formatMnt(part.unitPrice),
+                          })}
+                        </div>
+                      ))
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {price?.total ? t('pricing.money', { amount: formatMnt(price.total) }) : ''}
+                  </TableCell>
+                  {confirmed ? (
+                    <TableCell className="text-right font-mono">
+                      {stored
+                        ? t('sales.order.qtyIn', {
+                            qty: plainDecimal(stored.qtyApproved),
+                            unit: stored.baseUnitName,
+                          })
+                        : ''}
+                    </TableCell>
+                  ) : null}
+                  {backordered.length > 0 ? (
+                    <TableCell className="text-right font-mono">
+                      {stored && new Decimal(stored.qtyBackordered).gt(0)
+                        ? t('sales.order.qtyIn', {
+                            qty: plainDecimal(stored.qtyBackordered),
+                            unit: stored.baseUnitName,
+                          })
+                        : ''}
+                    </TableCell>
+                  ) : null}
+                  {anyPicked ? (
+                    <TableCell className="text-right font-mono">
+                      {stored === undefined || stored.qtyPicked === null
+                        ? ''
+                        : t('sales.order.pickedIn', {
+                            qty: plainDecimal(stored.qtyPicked),
+                            unit: stored.baseUnitName,
+                            bin: stored.pickBinCode ?? '',
+                          })}
+                    </TableCell>
+                  ) : null}
+                  {editable ? (
+                    <RowActions>
+                      <RowAction
+                        label={`${t('sales.order.remove')}: ${line.name}`}
+                        icon={Trash2}
+                        destructive
+                        onClick={() => change(lines.filter((entry) => entry.key !== line.key))}
+                      />
+                    </RowActions>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        {lines.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            {editable ? t('sales.panel.products.emptyEditable') : t('sales.panel.products.empty')}
+          </p>
+        ) : shown.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            {t('sales.panel.products.noMatch')}
+          </p>
+        ) : null}
+      </ListCard>
+      <ProblemAlert problem={action.problem} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm">
+          <p className="font-medium">
+            {t('sales.panel.products.summary', {
+              count: lines.length,
+              total: total === null ? '0' : formatMnt(total),
+            })}
+          </p>
+          {!frozen && lines.length > 0 ? (
+            <p className="text-[13px] text-muted-foreground">
+              {t('sales.panel.products.estimated')}
+            </p>
+          ) : null}
+          {dirty && order.status === 'CONFIRMED' ? (
+            <p className="text-[13px] text-warning">{t('sales.panel.products.repriceHint')}</p>
+          ) : null}
+        </div>
+        {editable ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {lines.length > 0 ? (
+              <Button variant="outline" onClick={() => setAdding((open) => !open)}>
+                <Plus />
+                {adding ? t('sales.panel.products.hideAdd') : t('sales.panel.products.add')}
+              </Button>
+            ) : null}
+            {dirty ? (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setEdits(null);
+                    action.clear();
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button disabled={invalid || blocked || mutations.update.isPending} onClick={save}>
+                  {t('common.save')}
+                </Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {invalid ? (
+        <p className="text-[13px] text-destructive">{t('sales.panel.products.badQty')}</p>
+      ) : null}
+    </div>
+  );
+}

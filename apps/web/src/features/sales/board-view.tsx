@@ -9,9 +9,7 @@ import {
 import { ArrowRightLeft, Ellipsis, Plus, Printer } from 'lucide-react';
 import { type DragEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { FormField } from '@/components/form';
 import { SegmentedControl } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -35,20 +33,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
-import { randomUuid } from '@/lib/uuid';
-import { OrderStatusBadge, PaymentLabel } from './orders-pages';
+import { MoveDialogs } from './move-dialogs';
+import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import {
   batchPrintPath,
   type FilterQuery,
   openPrint,
   type OrderCard,
-  orderPrintPath,
   type SalesPipeline,
   type SalesStage,
   type StageCards,
@@ -57,6 +53,7 @@ import {
 } from './pipelines-api';
 import { usePrintFormat } from './print-format';
 import { PrintFormatToggle } from './print-format-toggle';
+import { useMover } from './use-mover';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
 
@@ -70,11 +67,14 @@ export function BoardView({
   filters,
   canCreate,
   onOpen,
+  onNew,
 }: {
   pipeline: SalesPipeline;
   filters: FilterQuery;
   canCreate: boolean;
   onOpen: (orderId: number) => void;
+  /** «+» on a stage: a new order landing there (ADR-0059: the create dialog). */
+  onNew: (stageId: number) => void;
 }) {
   const { t } = useTranslation();
   const cards = useStageCards(pipeline.id, filters);
@@ -145,14 +145,12 @@ export function BoardView({
                 <div className="flex shrink-0 items-center">
                   {canCreate && stage.action === 'NONE' && stage.canMove ? (
                     <Button
-                      asChild
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`${t('sales.work.addHere')}: ${stage.name}`}
+                      onClick={() => onNew(stage.id)}
                     >
-                      <Link to={`/sales/orders/new?pipeline=${pipeline.id}&stage=${stage.id}`}>
-                        <Plus />
-                      </Link>
+                      <Plus />
                     </Button>
                   ) : null}
                   <StageMenu
@@ -373,109 +371,6 @@ function Card({
         </span>
       </div>
     </article>
-  );
-}
-
-/** Moving a card: the request, a reason for a CANCEL stage, the documents to print afterwards. */
-function useMover() {
-  const mutations = useSalesMutations();
-  const action = useAction();
-  const [pending, setPending] = useState<{ orderId: number; stage: SalesStage } | null>(null);
-  const [reason, setReason] = useState('');
-  const [print, setPrint] = useState<{ orderId: number; kinds: PrintKind[] } | null>(null);
-  const [key, setKey] = useState(randomUuid);
-
-  const run = (orderId: number, stage: SalesStage, why?: string) =>
-    void action.run(async () => {
-      const result = await mutations.move.mutateAsync({
-        orderId,
-        key,
-        stageId: stage.id,
-        reason: why,
-      });
-      setKey(randomUuid());
-      setPending(null);
-      setReason('');
-      if (result.print.length > 0) setPrint({ orderId, kinds: result.print });
-    });
-  return {
-    pending,
-    reason,
-    setReason,
-    print,
-    problem: action.problem,
-    busy: mutations.move.isPending,
-    start(orderId: number, stage: SalesStage) {
-      action.clear();
-      if (stage.action === 'CANCEL') setPending({ orderId, stage });
-      else run(orderId, stage);
-    },
-    confirm() {
-      if (pending) run(pending.orderId, pending.stage, reason.trim());
-    },
-    cancel() {
-      setPending(null);
-      setReason('');
-      action.clear();
-    },
-    closePrint: () => setPrint(null),
-  };
-}
-
-function MoveDialogs({ mover }: { mover: ReturnType<typeof useMover> }) {
-  const { t } = useTranslation();
-  const [format, setFormat] = usePrintFormat();
-  return (
-    <>
-      <ProblemAlert problem={mover.pending || mover.print ? null : mover.problem} />
-      <ConfirmDialog
-        open={mover.pending !== null}
-        title={t('sales.order.cancelTitle')}
-        description={t('sales.order.cancelDescription')}
-        confirmLabel={t('sales.order.cancel')}
-        disabled={!mover.reason.trim()}
-        pending={mover.busy}
-        problem={mover.problem}
-        onConfirm={() => mover.confirm()}
-        onClose={() => mover.cancel()}
-      >
-        <FormField label={t('sales.order.cancelReason')} htmlFor="board-cancel-reason">
-          <Textarea
-            id="board-cancel-reason"
-            rows={2}
-            value={mover.reason}
-            onChange={(event) => mover.setReason(event.target.value)}
-          />
-        </FormField>
-      </ConfirmDialog>
-      <Dialog
-        open={mover.print !== null}
-        onOpenChange={(open) => (open ? undefined : mover.closePrint())}
-      >
-        <DialogContent closeLabel={t('common.close')}>
-          <DialogHeader>
-            <DialogTitle>{t('sales.boards.printTitle')}</DialogTitle>
-            <DialogDescription>{t('sales.boards.printDescription')}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <PrintFormatToggle value={format} onChange={setFormat} />
-            {(mover.print?.kinds ?? []).map((kind) => (
-              <Button
-                key={kind}
-                variant="outline"
-                onClick={() =>
-                  mover.print && openPrint(orderPrintPath(mover.print.orderId, kind, format))
-                }
-              >
-                <Printer />
-                {t(`sales.printKinds.${kind}`)}
-              </Button>
-            ))}
-          </div>
-          <DialogFooter closeLabel={t('common.close')} />
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 

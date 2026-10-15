@@ -6087,13 +6087,19 @@ export interface components {
             toStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
             reason: string | null;
             actorId: number | null;
+            /** @description Who did it (ADR-0059) */
+            actorName: string | null;
             /** Format: date-time */
             createdAt: string;
         };
         SalesOrderMove: {
             fromStageId: number | null;
             toStageId: number;
+            /** @description Archived stages keep their name */
+            fromStageName: string | null;
+            toStageName: string | null;
             actorId: number | null;
+            actorName: string | null;
             /** Format: date-time */
             createdAt: string;
         };

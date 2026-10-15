@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
+import { businessDate } from '@tugeel/shared/time';
 import { useApiClient } from '@/app/api-client-context';
 import { KEYS as CATALOG_KEYS } from '@/features/catalog/api';
 import { ATTENTION_KEY } from '@/features/home/api';
@@ -238,6 +239,29 @@ export function usePricingMutations() {
       onSuccess: () => invalidate(KEYS.programs),
     }),
   };
+}
+
+/**
+ * A quote of lines being edited (ADR-0059: an order's products before they are saved), read again
+ * whenever the lines change; the previous answer stays on screen meanwhile.
+ */
+export function useLinesQuote(
+  lines: readonly { productUnitId: number; qty: string }[],
+  enabled = true,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['pricing', 'quote', lines],
+    enabled: enabled && lines.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.POST('/api/v1/pricing/quote', {
+          body: { list: 'WHOLESALE', date: businessDate(), lines: [...lines] },
+          signal,
+        }),
+      ),
+  });
 }
 
 /** A quote of a test cart (the calculator); nothing is stored. */

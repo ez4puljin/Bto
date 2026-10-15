@@ -73,6 +73,79 @@ const PRODUCT_ROW = {
   taxProductCode: null,
   units: [],
 };
+const PRODUCT = {
+  ...PRODUCT_ROW,
+  tracksLots: false,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  images: [],
+  units: [
+    {
+      id: 70,
+      uomId: 1,
+      uomName: 'ш',
+      uomCode: 'PCS',
+      fractional: false,
+      factorToBase: '1',
+      isBase: true,
+      isDefaultSales: false,
+      isDefaultPurchase: false,
+      measureUnit: null,
+      effectiveMeasureUnit: null,
+      supersededBy: null,
+      supersededAt: null,
+      barcodes: [],
+    },
+  ],
+};
+const PART: Schemas['SalesOrderPart'] = {
+  productUnitId: 70,
+  uomName: 'ш',
+  basis: 'LOOSE',
+  qty: '30',
+  factorSnapshot: '1',
+  qtyBase: '30',
+  listPrice: '1000',
+  unitPrice: '1000',
+  subtotal: '30000',
+  discountAmount: '0',
+  total: '30000',
+  applied: [],
+};
+const LINE: Schemas['SalesOrderLine'] = {
+  id: 11,
+  lineNo: 1,
+  productId: 7,
+  productSku: '10023',
+  productName: 'Кока кола',
+  productUnitId: 70,
+  unitName: 'ш',
+  qty: '30',
+  factorSnapshot: '1',
+  qtyBase: '30',
+  baseUnitName: 'ш',
+  warehouseId: 1,
+  qtyApproved: '20',
+  qtyBackordered: '10',
+  qtyPicked: null,
+  pickBinId: null,
+  pickBinCode: null,
+  qtyDelivered: null,
+  subtotal: '30000',
+  discountAmount: '0',
+  total: '30000',
+  parts: [PART],
+};
+
+const CREATED: Schemas['SalesOrderEvent'] = {
+  fromStatus: null,
+  toStatus: 'DRAFT',
+  reason: null,
+  actorId: 3,
+  actorName: 'Оффис Сараа',
+  createdAt: STAMP,
+};
+const EDIT_HEADER = mn.common.editRecord.replace('{{name}}', mn.sales.order.header);
 
 const ORDER: Schemas['SalesOrderDetail'] = {
   id: 5,
@@ -83,7 +156,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   customerCode: '1001',
   customerName: 'Номин дэлгүүр',
   fulfilment: 'DELIVERY',
-  deliveryDate: '2026-10-16',
+  deliveryDate: '2099-10-16',
   addressId: 50,
   addressText: 'Мөрөн, 3-р баг',
   addressLat: null,
@@ -115,51 +188,46 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   createdAt: STAMP,
   updatedAt: STAMP,
   moves: [],
+  lines: [LINE],
+  events: [
+    CREATED,
+    {
+      fromStatus: 'SUBMITTED',
+      toStatus: 'CONFIRMED',
+      reason: null,
+      actorId: 3,
+      actorName: 'Оффис Сараа',
+      createdAt: STAMP,
+    },
+  ],
+};
+
+const QUOTE: Schemas['Quote'] = {
+  list: 'WHOLESALE',
+  date: '2026-10-15',
   lines: [
     {
-      id: 11,
-      lineNo: 1,
       productId: 7,
-      productSku: '10023',
-      productName: 'Кока кола',
       productUnitId: 70,
-      unitName: 'ш',
       qty: '30',
-      factorSnapshot: '1',
       qtyBase: '30',
-      baseUnitName: 'ш',
-      warehouseId: 1,
-      qtyApproved: '20',
-      qtyBackordered: '10',
-      qtyPicked: null,
-      pickBinId: null,
-      pickBinCode: null,
-      qtyDelivered: null,
+      priced: true,
+      problem: null,
+      parts: [{ ...PART, applied: [] }],
       subtotal: '30000',
       discountAmount: '0',
       total: '30000',
-      parts: [
-        {
-          productUnitId: 70,
-          uomName: 'ш',
-          basis: 'LOOSE',
-          qty: '30',
-          factorSnapshot: '1',
-          qtyBase: '30',
-          listPrice: '1000',
-          unitPrice: '1000',
-          subtotal: '30000',
-          discountAmount: '0',
-          total: '30000',
-          applied: [],
-        },
-      ],
     },
   ],
-  events: [
-    { fromStatus: null, toStatus: 'DRAFT', reason: null, actorId: 3, createdAt: STAMP },
-    { fromStatus: 'SUBMITTED', toStatus: 'CONFIRMED', reason: null, actorId: 3, createdAt: STAMP },
-  ],
+  subtotal: '30000',
+  discountTotal: '0',
+  total: '30000',
+};
+
+const base = {
+  'GET /api/v1/warehouses': warehouses,
+  'GET /api/v1/sales-boards': () => json([]),
+  'GET /api/v1/branches': () => json({ data: [] }),
 };
 
 describe('orders menu', () => {
@@ -178,111 +246,152 @@ describe('orders menu', () => {
   });
 });
 
-describe('new order', () => {
-  it('enters a delivery for a customer, then submits it once with its keys', async () => {
+describe('new order (ADR-0059)', () => {
+  it('creates a draft from its customer, adds the products in the panel and submits it once', async () => {
+    const draft: Schemas['SalesOrderDetail'] = {
+      ...ORDER,
+      number: '20261015_0005',
+      status: 'DRAFT',
+      fulfilment: 'PICKUP',
+      addressId: null,
+      addressText: null,
+      contactName: null,
+      contactPhone: null,
+      subtotal: null,
+      discountTotal: null,
+      total: null,
+      priceDate: null,
+      submittedAt: null,
+      confirmedAt: null,
+      lines: [],
+      events: [CREATED],
+    };
+    let current = draft;
     const fetchMock = signedIn(OFFICE_ME, {
-      'GET /api/v1/warehouses': warehouses,
+      ...base,
       'GET /api/v1/customers': () => list([CUSTOMER_ROW]),
       'GET /api/v1/customers/9': () => json(CUSTOMER),
       'GET /api/v1/products': () => list([PRODUCT_ROW]),
-      'GET /api/v1/products/7': () =>
-        json({
-          ...PRODUCT_ROW,
-          tracksLots: false,
-          createdAt: STAMP,
-          updatedAt: STAMP,
-          images: [],
-          units: [
-            {
-              id: 70,
-              uomId: 1,
-              uomName: 'ш',
-              uomCode: 'PCS',
-              fractional: false,
-              factorToBase: '1',
-              isBase: true,
-              isDefaultSales: false,
-              isDefaultPurchase: false,
-              measureUnit: null,
-              effectiveMeasureUnit: null,
-              supersededBy: null,
-              supersededAt: null,
-              barcodes: [],
-            },
-          ],
-        }),
+      'GET /api/v1/products/7': () => json(PRODUCT),
       'GET /api/v1/sales-orders/product-info': () =>
         json([{ productId: 7, homeWarehouseId: 1, sellable: true, available: '20' }]),
-      'POST /api/v1/sales-orders': () => json({ ...ORDER, status: 'DRAFT', number: null }, 201),
-      'POST /api/v1/sales-orders/5/submit': () => json(ORDER),
-      'GET /api/v1/sales-orders/5': () => json(ORDER),
+      'POST /api/v1/pricing/quote': () => json(QUOTE),
+      'POST /api/v1/sales-orders': () => json(current, 201),
+      'GET /api/v1/sales-orders/5': () => json(current),
+      'PUT /api/v1/sales-orders/5': () => {
+        current = {
+          ...draft,
+          lines: [{ ...LINE, qtyApproved: '0', qtyBackordered: '0', total: null, parts: [] }],
+        };
+        return json(current);
+      },
+      'POST /api/v1/sales-orders/5/submit': () => {
+        current = { ...ORDER, number: '20261015_0005' };
+        return json(current);
+      },
     });
+    // The old page's address opens the work page's create dialog.
     renderApp('/sales/orders/new', fetchMock);
     const user = userEvent.setup();
-    await user.type(await screen.findByPlaceholderText(mn.partners.customerPicker.search), 'номин');
-    await user.click(await screen.findByRole('button', { name: /Номин дэлгүүр/ }));
-    await user.selectOptions(screen.getByLabelText(mn.sales.order.fulfilment), 'DELIVERY');
-    await waitFor(() =>
-      expect(screen.getByLabelText<HTMLSelectElement>(mn.sales.order.address).value).toBe('50'),
-    );
-    await user.selectOptions(screen.getByLabelText(mn.sales.order.paymentMethod), 'CREDIT');
-    await user.type(screen.getByLabelText(mn.sales.order.contactName), 'Бат');
+    const create = await screen.findByRole('dialog', { name: mn.sales.create.title });
     await user.type(
-      await screen.findByRole('searchbox', { name: mn.inventory.productSearch }),
-      'кока',
+      await within(create).findByPlaceholderText(mn.partners.customerPicker.search),
+      'номин',
     );
-    await user.click(await screen.findByRole('button', { name: `${mn.inventory.add}: Кока кола` }));
-    const qty = await screen.findByLabelText(`${mn.sales.order.qty}: Кока кола`);
-    await user.clear(qty);
-    await user.type(qty, '30');
-    expect(await screen.findByText('20')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: mn.sales.order.submit }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: mn.sales.order.submit }));
-    await waitFor(() =>
-      expect(calls(fetchMock, 'POST', '/api/v1/sales-orders/5/submit')).toHaveLength(1),
-    );
+    await user.click(await within(create).findByRole('button', { name: /Номин дэлгүүр/ }));
+    await user.selectOptions(within(create).getByLabelText(mn.sales.order.paymentMethod), 'CREDIT');
+    await user.click(within(create).getByRole('button', { name: mn.sales.create.create }));
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/sales-orders')).toHaveLength(1));
     const [created] = calls(fetchMock, 'POST', '/api/v1/sales-orders');
     expect(created?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await bodyOf(created)).toEqual({
       customerId: 9,
       pipelineId: null,
       stageId: null,
-      fulfilment: 'DELIVERY',
+      fulfilment: 'PICKUP',
       deliveryDate: defaultDeliveryDate(),
-      addressId: 50,
-      contactName: 'Бат',
-      contactPhone: '+97688112233',
+      addressId: null,
+      contactName: null,
+      contactPhone: null,
+      paymentMethod: 'CREDIT',
+      note: null,
+      lines: [],
+    });
+
+    // The panel opens on its products, the search ready for the first one.
+    const panel = await screen.findByRole('dialog', { name: '20261015_0005' });
+    expect(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.products })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await user.type(
+      await within(panel).findByRole('searchbox', { name: mn.inventory.productSearch }),
+      'кока',
+    );
+    await user.click(
+      await within(panel).findByRole('button', { name: `${mn.inventory.add}: Кока кола` }),
+    );
+    const qty = await within(panel).findByLabelText(`${mn.sales.order.qty}: Кока кола`);
+    await user.clear(qty);
+    await user.type(qty, '30');
+    // The rules' price, marked as an estimate until the order is confirmed.
+    expect(await within(panel).findByText('30,000₮')).toBeInTheDocument();
+    expect(within(panel).getByText(mn.sales.panel.products.estimated)).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')[0])).toEqual({
+      customerId: 9,
+      pipelineId: null,
+      stageId: null,
+      fulfilment: 'PICKUP',
+      deliveryDate: ORDER.deliveryDate,
+      addressId: null,
+      contactName: null,
+      contactPhone: null,
       paymentMethod: 'CREDIT',
       note: null,
       lines: [{ productUnitId: 70, qty: '30' }],
     });
+
+    // A draft outside every pipeline is submitted from «⋯».
+    await user.click(within(panel).getByRole('button', { name: mn.sales.panel.more }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.sales.order.submit }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/sales-orders/5/submit')).toHaveLength(1),
+    );
     expect(
       calls(fetchMock, 'POST', '/api/v1/sales-orders/5/submit')[0]?.headers.get('Idempotency-Key'),
     ).toMatch(UUID);
-    expect(await screen.findByText('SO-2026-000001 захиалга батлагдлаа')).toBeInTheDocument();
+    expect(
+      await screen.findByText(mn.sales.order.confirmed.replace('{{number}}', '20261015_0005')),
+    ).toBeInTheDocument();
   });
 });
 
-describe('confirmed order', () => {
+describe('confirmed order in the panel (ADR-0059)', () => {
   it('shows what was reserved and backordered and cancels with a reason', async () => {
     const fetchMock = signedIn(OFFICE_ME, {
-      'GET /api/v1/warehouses': warehouses,
+      ...base,
       'GET /api/v1/sales-orders/5': () => json(ORDER),
       'POST /api/v1/sales-orders/5/cancel': () =>
         json({ ...ORDER, status: 'CANCELLED', cancelReason: 'Харилцагч цуцалсан' }),
     });
+    // The old page's address opens the order's panel.
     renderApp('/sales/orders/5', fetchMock);
     const user = userEvent.setup();
-    expect(await screen.findByRole('heading', { name: 'SO-2026-000001' })).toBeInTheDocument();
+    const panel = await screen.findByRole('dialog', { name: 'SO-2026-000001' });
+    await user.click(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.products }));
     expect(
-      screen.getByText('1 мөрөнд үлдэгдэл хүрэлцээгүй тул хойшилсон тоо бий'),
+      within(panel).getByText(mn.sales.order.backorderedLines.replace('{{count}}', '1')),
     ).toBeInTheDocument();
-    expect(screen.getByText('20 ш')).toBeInTheDocument();
-    expect(screen.getByText('10 ш')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: mn.sales.order.cancel }));
-    const dialog = await screen.findByRole('dialog');
+    expect(within(panel).getByText('20 ш')).toBeInTheDocument();
+    expect(within(panel).getByText('10 ш')).toBeInTheDocument();
+    // Frozen prices: no estimate.
+    expect(within(panel).queryByText(mn.sales.panel.products.estimated)).toBeNull();
+
+    await user.click(within(panel).getByRole('button', { name: mn.sales.panel.more }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.sales.order.cancel }));
+    const dialog = await screen.findByRole('dialog', { name: mn.sales.order.cancelTitle });
     const confirm = within(dialog).getByRole('button', { name: mn.sales.order.cancel });
     expect(confirm).toBeDisabled();
     await user.type(
@@ -298,7 +407,40 @@ describe('confirmed order', () => {
     });
   });
 
-  it('lets a user who only reads open an order without the cancel button', async () => {
+  it('edits the header in «Мэдээлэл» and saves it with the stored lines', async () => {
+    const fetchMock = signedIn(OFFICE_ME, {
+      ...base,
+      'GET /api/v1/customers/9': () => json(CUSTOMER),
+      'GET /api/v1/sales-orders/5': () => json(ORDER),
+      'PUT /api/v1/sales-orders/5': () => json({ ...ORDER, paymentMethod: 'CASH', note: 'Өглөө' }),
+    });
+    renderApp('/sales/boards?order=5&tab=properties', fetchMock);
+    const user = userEvent.setup();
+    const panel = await screen.findByRole('dialog', { name: 'SO-2026-000001' });
+    await user.click(await within(panel).findByRole('button', { name: EDIT_HEADER }));
+    await user.selectOptions(within(panel).getByLabelText(mn.sales.order.paymentMethod), 'CASH');
+    await user.type(within(panel).getByLabelText(mn.sales.order.note), 'Өглөө');
+    // A confirmed order is priced and reserved again when saved.
+    expect(within(panel).getByText(mn.sales.panel.properties.repriceHint)).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/sales-orders/5')[0])).toEqual({
+      customerId: 9,
+      pipelineId: null,
+      stageId: null,
+      fulfilment: 'DELIVERY',
+      deliveryDate: ORDER.deliveryDate,
+      addressId: 50,
+      contactName: 'Бат',
+      contactPhone: '+97688112233',
+      paymentMethod: 'CASH',
+      note: 'Өглөө',
+      lines: [{ productUnitId: 70, qty: '30' }],
+    });
+    expect(await screen.findByText(mn.sales.panel.properties.saved)).toBeInTheDocument();
+  });
+
+  it('lets a user who only reads open an order without editing or cancelling', async () => {
     const reader: Me = {
       ...OFFICE_ME,
       permissions: ['sales.orders.read'],
@@ -307,11 +449,17 @@ describe('confirmed order', () => {
     renderApp(
       '/sales/orders/5',
       signedIn(reader, {
-        'GET /api/v1/warehouses': warehouses,
-        'GET /api/v1/sales-orders/5': () => json(ORDER),
+        ...base,
+        'GET /api/v1/sales-orders/5': () => json({ ...ORDER, canEdit: false }),
       }),
     );
-    expect(await screen.findByRole('heading', { name: 'SO-2026-000001' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: mn.sales.order.cancel })).toBeNull();
+    const panel = await screen.findByRole('dialog', { name: 'SO-2026-000001' });
+    expect(within(panel).queryByRole('button', { name: mn.sales.panel.more })).toBeNull();
+    const user = userEvent.setup();
+    await user.click(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.products }));
+    expect(within(panel).queryByLabelText(`${mn.sales.order.qty}: Кока кола`)).toBeNull();
+    expect(within(panel).queryByRole('button', { name: mn.sales.panel.products.add })).toBeNull();
+    await user.click(within(panel).getByRole('tab', { name: mn.sales.panel.tabs.properties }));
+    expect(within(panel).queryByRole('button', { name: EDIT_HEADER })).toBeNull();
   });
 });

@@ -39,6 +39,7 @@ import {
   salesOrderLines,
   salesOrders,
   salesStageMoves,
+  salesStages,
 } from '../schema';
 import { type Access, SalesAccessService } from './sales-access.service';
 
@@ -91,13 +92,19 @@ export interface OrderEvent {
   toStatus: OrderStatus;
   reason: string | null;
   actorId: number | null;
+  /** Who did it, for the order's activity (ADR-0059). */
+  actorName: string | null;
   createdAt: Date;
 }
 
 export interface StageMove {
   fromStageId: number | null;
   toStageId: number;
+  /** The stages' names, archived ones too, for the order's activity (ADR-0059). */
+  fromStageName: string | null;
+  toStageName: string | null;
   actorId: number | null;
+  actorName: string | null;
   createdAt: Date;
 }
 
@@ -550,9 +557,29 @@ export class SalesOrderQueryService {
               .where(idIn(salesBoards.id, boardIds))
           ).map((board) => [board.id, board.name]),
     );
-    const names = await this.names.namesOf(
-      orders.flatMap((order) => (order.createdBy === null ? [] : [order.createdBy])),
+    const stageIds = [
+      ...new Set(
+        moves.flatMap((move) =>
+          move.fromStageId === null ? [move.toStageId] : [move.fromStageId, move.toStageId],
+        ),
+      ),
+    ];
+    const stageNames = new Map(
+      stageIds.length === 0
+        ? []
+        : (
+            await executor
+              .select({ id: salesStages.id, name: salesStages.name })
+              .from(salesStages)
+              .where(idIn(salesStages.id, stageIds))
+          ).map((stage) => [stage.id, stage.name]),
     );
+    const names = await this.names.namesOf([
+      ...orders.flatMap((order) => (order.createdBy === null ? [] : [order.createdBy])),
+      ...events.flatMap((event) => (event.actorId === null ? [] : [event.actorId])),
+      ...moves.flatMap((move) => (move.actorId === null ? [] : [move.actorId])),
+    ]);
+    const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
     return orders.map((order) => {
       const {
         createdBy,
@@ -574,7 +601,7 @@ export class SalesOrderQueryService {
         pipelineName: pipeline?.name ?? null,
         stageName:
           order.stageId === null ? null : (access.stage(order.stageId)?.stage.name ?? null),
-        createdByName: createdBy === null ? null : (names.get(createdBy) ?? null),
+        createdByName: nameOf(createdBy),
         canEdit: access.canEdit(order),
         lines: lines
           .filter((line) => line.orderId === order.id)
@@ -584,7 +611,11 @@ export class SalesOrderQueryService {
           .map((move) => ({
             fromStageId: move.fromStageId,
             toStageId: move.toStageId,
+            fromStageName:
+              move.fromStageId === null ? null : (stageNames.get(move.fromStageId) ?? null),
+            toStageName: stageNames.get(move.toStageId) ?? null,
             actorId: move.actorId,
+            actorName: nameOf(move.actorId),
             createdAt: move.createdAt,
           })),
         events: events
@@ -594,6 +625,7 @@ export class SalesOrderQueryService {
             toStatus: event.toStatus,
             reason: event.reason,
             actorId: event.actorId,
+            actorName: nameOf(event.actorId),
             createdAt: event.createdAt,
           })),
       };

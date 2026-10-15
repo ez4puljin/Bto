@@ -20,7 +20,7 @@ import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import type { OrderStatus } from './api';
-import { OrderStatusBadge, PaymentLabel } from './orders-pages';
+import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import {
   type FilterQuery,
   type ListQuery,

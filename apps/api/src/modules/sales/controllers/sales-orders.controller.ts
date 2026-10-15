@@ -144,7 +144,10 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     moves: order.moves.map((move) => ({
       fromStageId: move.fromStageId,
       toStageId: move.toStageId,
+      fromStageName: move.fromStageName,
+      toStageName: move.toStageName,
       actorId: move.actorId,
+      actorName: move.actorName,
       createdAt: move.createdAt.toISOString(),
     })),
     events: order.events.map((event) => ({
@@ -152,6 +155,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
       toStatus: event.toStatus,
       reason: event.reason,
       actorId: event.actorId,
+      actorName: event.actorName,
       createdAt: event.createdAt.toISOString(),
     })),
   };

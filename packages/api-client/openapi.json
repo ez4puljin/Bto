@@ -23258,6 +23258,11 @@
             "type": "number",
             "nullable": true
           },
+          "actorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Who did it (ADR-0059)"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -23268,6 +23273,7 @@
           "toStatus",
           "reason",
           "actorId",
+          "actorName",
           "createdAt"
         ]
       },
@@ -23281,8 +23287,21 @@
           "toStageId": {
             "type": "number"
           },
+          "fromStageName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Archived stages keep their name"
+          },
+          "toStageName": {
+            "type": "string",
+            "nullable": true
+          },
           "actorId": {
             "type": "number",
+            "nullable": true
+          },
+          "actorName": {
+            "type": "string",
             "nullable": true
           },
           "createdAt": {
@@ -23293,7 +23312,10 @@
         "required": [
           "fromStageId",
           "toStageId",
+          "fromStageName",
+          "toStageName",
           "actorId",
+          "actorName",
           "createdAt"
         ]
       },

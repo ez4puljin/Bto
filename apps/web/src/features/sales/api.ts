@@ -81,12 +81,8 @@ export function useProductOrderInfo(productIds: readonly number[]) {
 export function useSalesOrderMutations() {
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const changed = () =>
-    Promise.all(
-      [KEYS.orders, KEYS.productInfo].map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey }),
-      ),
-    );
+  // Every sales read: the order, the board's cards and totals, the lists (ADR-0059: edited in the panel).
+  const changed = () => queryClient.invalidateQueries({ queryKey: ['sales'] });
   return {
     create: useMutation({
       mutationFn: async ({ key, body }: { key: string; body: SalesOrderRequest }) =>
