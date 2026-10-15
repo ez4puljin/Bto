@@ -16,6 +16,9 @@ export interface OrderLineJson {
   warehouseId: number;
   qtyApproved: string;
   qtyBackordered: string;
+  qtyPicked: string | null;
+  pickBinCode: string | null;
+  qtyDelivered: string | null;
   total: string | null;
   parts: {
     uomName: string;
@@ -44,8 +47,13 @@ export interface OrderJson {
   discountTotal: string | null;
   total: string | null;
   cancelReason: string | null;
+  boardId: number | null;
+  boardName: string | null;
+  stageId: number | null;
+  stageName: string | null;
   lines: OrderLineJson[];
   events: { fromStatus: string | null; toStatus: string; reason: string | null }[];
+  moves: { fromStageId: number | null; toStageId: number }[];
 }
 
 /** A pickup order for tomorrow paid in cash, unless the fields say otherwise. */

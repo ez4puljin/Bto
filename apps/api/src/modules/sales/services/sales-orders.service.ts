@@ -6,11 +6,13 @@ import type { PriceBasis } from '@tugeel/shared/pricing';
 import {
   type Fulfilment,
   isCancellable,
+  isEditable,
   ORDER_LIMITS,
   type OrderChannel,
   orderHeaderIssues,
   type OrderStatus,
   type PaymentMethod,
+  type PrintKind,
 } from '@tugeel/shared/sales';
 import { businessDate, businessYear } from '@tugeel/shared/time';
 import { and, asc, desc, eq, ilike, lt, type SQL, sql } from 'drizzle-orm';
@@ -21,12 +23,33 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
-import { type Actor, actorUserId, AuditService, NumberingService } from '../../identity';
-import { ProductLocationsService, ReservationService } from '../../inventory';
+import {
+  type Actor,
+  actorUserId,
+  AuditService,
+  type AuthContext,
+  NumberingService,
+  ScopeService,
+} from '../../identity';
+import {
+  BinsService,
+  type Movement,
+  ProductLocationsService,
+  ReservationService,
+  StockPostingService,
+  StockQueryService,
+} from '../../inventory';
 import { CustomerAddressesService, CustomersService } from '../../partners';
 import { PriceQuoteService } from '../../pricing';
-import { orderStatusEvents, salesOrderLineParts, salesOrderLines, salesOrders } from '../schema';
+import {
+  orderStatusEvents,
+  salesOrderLineParts,
+  salesOrderLines,
+  salesOrders,
+  salesStageMoves,
+} from '../schema';
 import { CreditChecker } from './credit-checker';
+import { SalesBoardsService } from './sales-boards.service';
 
 type OrderRow = typeof salesOrders.$inferSelect;
 type LineRow = typeof salesOrderLines.$inferSelect;
@@ -39,6 +62,8 @@ export interface OrderLineInput {
 
 export interface OrderInput {
   customerId: number;
+  /** The board a new order goes on (ADR-0056 #2); null = the channel's default. */
+  boardId?: number | null;
   fulfilment: Fulfilment;
   deliveryDate: string;
   addressId: number | null;
@@ -79,6 +104,11 @@ export interface OrderLine {
   warehouseId: number;
   qtyApproved: Decimal;
   qtyBackordered: Decimal;
+  /** The picked counts (ADR-0056 #5); null until picked. */
+  qtyPicked: Decimal | null;
+  pickBinId: number | null;
+  pickBinCode: string | null;
+  qtyDelivered: Decimal | null;
   subtotal: Decimal | null;
   discountAmount: Decimal | null;
   total: Decimal | null;
@@ -93,11 +123,45 @@ export interface OrderEvent {
   createdAt: Date;
 }
 
-export interface OrderDetail extends Omit<OrderRow, 'createdBy' | 'submittedBy' | 'cancelledBy'> {
+export interface StageMove {
+  fromStageId: number | null;
+  toStageId: number;
+  actorId: number | null;
+  createdAt: Date;
+}
+
+export interface OrderDetail extends Omit<
+  OrderRow,
+  'createdBy' | 'submittedBy' | 'cancelledBy' | 'pickedBy' | 'deliveredBy'
+> {
   customerCode: string;
   customerName: string;
+  boardName: string | null;
+  stageName: string | null;
   lines: OrderLine[];
   events: OrderEvent[];
+  moves: StageMove[];
+}
+
+/** One line of the pick form (ADR-0056 #5): the quantity to pick and where from. */
+export interface PickLineInput {
+  lineId: number;
+  qty: Decimal;
+  binId: number;
+}
+
+/** What the pick form proposes for a line: the fixed shelf, else the shelves holding stock. */
+export interface PickLineInfo {
+  lineId: number;
+  warehouseId: number;
+  proposedBinId: number | null;
+  bins: { id: number; code: string; onHand: Decimal }[];
+}
+
+export interface MoveResult {
+  order: OrderDetail;
+  /** The documents the stage prints on arrival. */
+  print: PrintKind[];
 }
 
 export interface OrderSummary {
@@ -160,49 +224,346 @@ export class SalesOrdersService {
     private readonly reservations: ReservationService,
     private readonly quotes: PriceQuoteService,
     private readonly credit: CreditChecker,
+    private readonly boards: SalesBoardsService,
+    private readonly posting: StockPostingService,
+    private readonly bins: BinsService,
+    private readonly stock: StockQueryService,
+    private readonly scope: ScopeService,
   ) {}
 
-  async create(actor: Actor, input: OrderInput): Promise<OrderDetail> {
+  /** A draft, placed on its board's stage when one is configured (ADR-0056 #2). */
+  async create(ctx: AuthContext, input: OrderInput): Promise<OrderDetail> {
     const id = await inTransaction(this.db, async (tx) => {
       const header = await this.checkedHeader(tx, input);
+      const placement = await this.boards.placementFor(ctx, 'ADMIN', input.boardId ?? null, tx);
       const [row] = await tx
         .insert(salesOrders)
-        .values({ ...header, channel: 'ADMIN', createdBy: actorUserId(actor) })
+        .values({
+          ...header,
+          channel: 'ADMIN',
+          createdBy: actorUserId(ctx),
+          ...(placement
+            ? { boardId: placement.boardId, stageId: placement.stageId, stageEnteredAt: sql`now()` }
+            : {}),
+        })
         .returning({ id: salesOrders.id });
       if (!row) throw new Error('sales order insert returned no row');
       await this.writeLines(tx, row.id, input.lines);
-      await this.event(tx, actor, row.id, null, 'DRAFT', null);
-      await this.audit.record(tx, actor, {
+      await this.event(tx, ctx, row.id, null, 'DRAFT', null);
+      if (placement) {
+        await tx.insert(salesStageMoves).values({
+          orderId: row.id,
+          fromStageId: null,
+          toStageId: placement.stageId,
+          actorId: actorUserId(ctx),
+        });
+      }
+      await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'sales_orders',
         entityId: row.id,
-        after: { ...header, lines: input.lines.length },
+        after: { ...header, lines: input.lines.length, stageId: placement?.stageId ?? null },
       });
       return row.id;
     });
     return this.get(id);
   }
 
-  /** Replaces a draft's header and lines. */
-  async update(actor: Actor, id: number, input: OrderInput): Promise<OrderDetail> {
+  /**
+   * Replaces the header and lines of a draft, or of a confirmed order before picking (ADR-0056 #4):
+   * the latter is priced again today and its reservations replaced in one lock pass; the number,
+   * board and stage stay. On a board, the stage's EDIT right is needed.
+   */
+  async update(ctx: AuthContext, id: number, input: OrderInput): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
       const order = await this.lock(tx, id);
-      if (order.status !== 'DRAFT') throw stateError(order, 'DRAFT');
+      if (!isEditable(order.status)) throw stateError(order, 'EDITABLE');
       if (input.customerId !== order.customerId) {
         throw invalid('customerId', 'fixed', 'the customer of an order does not change');
+      }
+      if (order.stageId !== null) {
+        const { rights } = await this.boards.stageRights(ctx, order.stageId, tx);
+        if (!rights.edit) {
+          throw new AppError('FORBIDDEN', 'the stage does not let this role edit orders', {
+            stageId: order.stageId,
+          });
+        }
+      } else if (!ctx.permissions.has('sales.orders.manage')) {
+        throw new AppError('FORBIDDEN', 'editing an order needs sales.orders.manage', {
+          permission: 'sales.orders.manage',
+        });
       }
       const header = await this.checkedHeader(tx, input);
       await tx
         .update(salesOrders)
         .set({ ...header, updatedAt: sql`now()` })
         .where(eq(salesOrders.id, id));
+      await tx.delete(salesOrderLineParts).where(
+        idIn(
+          salesOrderLineParts.lineId,
+          (
+            await tx
+              .select({ id: salesOrderLines.id })
+              .from(salesOrderLines)
+              .where(eq(salesOrderLines.orderId, id))
+          ).map((line) => line.id),
+        ),
+      );
       await tx.delete(salesOrderLines).where(eq(salesOrderLines.orderId, id));
       await this.writeLines(tx, id, input.lines);
-      await this.audit.record(tx, actor, {
+      let repriced: { total: string; backordered: number } | null = null;
+      if (order.status === 'CONFIRMED') {
+        const { quote, reserved } = await this.priceAndReserve(tx, ctx, order, true);
+        await tx
+          .update(salesOrders)
+          .set({
+            priceDate: businessDate(),
+            subtotal: quote.subtotal,
+            discountTotal: quote.discountTotal,
+            total: quote.total,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(salesOrders.id, id));
+        repriced = {
+          total: quote.total.toFixed(0),
+          backordered: reserved.filter((entry) => entry.backordered.gt(0)).length,
+        };
+      }
+      await this.audit.record(tx, ctx, {
         action: 'UPDATE',
         entity: 'sales_orders',
         entityId: id,
-        after: { ...header, lines: input.lines.length },
+        after: { ...header, lines: input.lines.length, ...(repriced ?? {}) },
+      });
+    });
+    return this.get(id);
+  }
+
+  /**
+   * Moves a card to a stage of its board (ADR-0056 #3) and runs the stage's action in the same
+   * transaction: CONFIRM submits a draft, PICK starts picking, SALE issues a picked order's stock,
+   * CANCEL cancels with the reason. Returns the documents the stage prints.
+   */
+  async move(
+    ctx: AuthContext,
+    id: number,
+    input: { stageId: number; reason?: string | null },
+  ): Promise<MoveResult> {
+    const print = await inTransaction(this.db, async (tx) => {
+      const order = await this.lock(tx, id);
+      if (order.boardId === null || order.stageId === null) {
+        throw new AppError('ORDER_STATE_INVALID', 'the order is on no board', {
+          status: order.status,
+          expected: 'ON_BOARD',
+        });
+      }
+      const { stage, rights } = await this.boards.stageRights(ctx, input.stageId, tx);
+      if (stage.boardId !== order.boardId) {
+        throw invalid('stageId', 'ofBoard', "a stage of the order's board");
+      }
+      if (stage.archivedAt) throw invalid('stageId', 'archived', 'the stage is archived');
+      if (!rights.move) {
+        throw new AppError('FORBIDDEN', 'the stage does not let this role move cards into it', {
+          stageId: stage.id,
+        });
+      }
+      if (stage.id === order.stageId) return [];
+      switch (stage.action) {
+        case 'CONFIRM':
+          if (order.status === 'DRAFT') await this.submitInTx(tx, ctx, order);
+          break;
+        case 'PICK':
+          if (order.status === 'CONFIRMED') {
+            await tx
+              .update(salesOrders)
+              .set({ status: 'PICKING', updatedAt: sql`now()` })
+              .where(eq(salesOrders.id, id));
+            await this.event(tx, ctx, id, 'CONFIRMED', 'PICKING', null);
+          }
+          break;
+        case 'SALE':
+          if (order.status !== 'PACKED') throw stateError(order, 'PACKED');
+          await this.saleInTx(tx, ctx, order);
+          break;
+        case 'CANCEL':
+          if (order.status !== 'CANCELLED') await this.cancelInTx(tx, ctx, order, input.reason);
+          break;
+        case 'NONE':
+          break;
+      }
+      await tx
+        .update(salesOrders)
+        .set({ stageId: stage.id, stageEnteredAt: sql`now()`, updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+      await tx.insert(salesStageMoves).values({
+        orderId: id,
+        fromStageId: order.stageId,
+        toStageId: stage.id,
+        actorId: actorUserId(ctx),
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'MOVE',
+        entity: 'sales_orders',
+        entityId: id,
+        before: { stageId: order.stageId },
+        after: { stageId: stage.id, action: stage.action },
+      });
+      return this.boards.printsOf(stage);
+    });
+    return { order: await this.get(id), print };
+  }
+
+  /** What the pick form proposes per line: the fixed shelf, else the shelves holding the product. */
+  async pickInfo(id: number): Promise<PickLineInfo[]> {
+    const order = await this.get(id);
+    const byWarehouse = new Map<number, number[]>();
+    for (const line of order.lines) {
+      byWarehouse.set(line.warehouseId, [
+        ...(byWarehouse.get(line.warehouseId) ?? []),
+        line.productId,
+      ]);
+    }
+    const fixed = new Map<string, number>();
+    for (const [warehouseId, productIds] of byWarehouse) {
+      for (const [productId, binId] of await this.locations.defaultBinOf(warehouseId, productIds)) {
+        fixed.set(`${warehouseId}:${productId}`, binId);
+      }
+    }
+    const stocks = new Map(
+      await Promise.all(
+        [...new Set(order.lines.map((line) => line.productId))].map(
+          async (productId) => [productId, await this.stock.ofProduct(productId)] as const,
+        ),
+      ),
+    );
+    return order.lines.map((line) => {
+      const bins = (stocks.get(line.productId)?.bins ?? [])
+        .filter((bin) => bin.warehouseId === line.warehouseId && bin.sellable && bin.onHand.gt(0))
+        .map((bin) => ({ id: bin.binId, code: bin.binCode, onHand: bin.onHand }));
+      const proposed =
+        fixed.get(`${line.warehouseId}:${line.productId}`) ??
+        [...bins].sort((a, b) => b.onHand.comparedTo(a.onHand))[0]?.id ??
+        null;
+      return { lineId: line.id, warehouseId: line.warehouseId, proposedBinId: proposed, bins };
+    });
+  }
+
+  /**
+   * The picked counts confirmed (ADR-0056 #5): CONFIRMED or PICKING → PACKED. Every line is
+   * named once; each moves its quantity from the chosen shelf into STAGING under the order's own
+   * document, and the order's reservations are consumed in the same posting. One pick per order.
+   */
+  async pick(ctx: AuthContext, id: number, input: readonly PickLineInput[]): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const order = await this.lock(tx, id);
+      if (order.status !== 'CONFIRMED' && order.status !== 'PICKING') {
+        throw stateError(order, 'CONFIRMED');
+      }
+      const lines = await this.linesOf(tx, id);
+      const byLine = new Map(lines.map((line) => [line.id, line]));
+      const seen = new Set<number>();
+      for (const [index, entry] of input.entries()) {
+        const line = byLine.get(entry.lineId);
+        if (!line) throw invalid(`lines.${index}.lineId`, 'ofOrder', 'a line of the order');
+        if (seen.has(entry.lineId)) throw invalid(`lines.${index}.lineId`, 'unique', 'once');
+        seen.add(entry.lineId);
+        if (entry.qty.isNegative() || entry.qty.gt(line.qtyBase)) {
+          throw invalid(`lines.${index}.qty`, 'range', 'between 0 and the ordered quantity');
+        }
+      }
+      if (seen.size !== lines.length) throw invalid('lines', 'complete', 'every line once');
+      for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
+        this.scope.assertCanWriteWarehouse(ctx, warehouseId);
+      }
+      const bins = new Map(
+        (await this.bins.getMany([...new Set(input.map((entry) => entry.binId))], tx)).map(
+          (bin) => [bin.id, bin],
+        ),
+      );
+      const products = new Map(
+        (
+          await this.catalog.getMany(
+            lines.map((line) => line.productId),
+            tx,
+          )
+        ).map((p) => [p.id, p]),
+      );
+      const staging = new Map<number, number>();
+      for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
+        staging.set(warehouseId, (await this.bins.systemBin(warehouseId, 'STAGING', tx)).id);
+      }
+      const movements: Movement[] = [];
+      for (const [index, entry] of input.entries()) {
+        const line = byLine.get(entry.lineId);
+        if (!line) continue;
+        const bin = bins.get(entry.binId);
+        if (!bin || bin.warehouseId !== line.warehouseId) {
+          throw invalid(`lines.${index}.binId`, 'ofWarehouse', "a shelf of the line's warehouse");
+        }
+        if (entry.qty.isZero()) continue;
+        const base = products.get(line.productId)?.baseUnit;
+        if (!base) throw notFound('product', line.productId);
+        const common = {
+          docType: 'SO' as const,
+          docId: id,
+          docLineId: line.id,
+          warehouseId: line.warehouseId,
+          productId: line.productId,
+          enteredQty: entry.qty,
+          productUnitId: base.id,
+          factorSnapshot: new Decimal(1),
+        };
+        movements.push(
+          {
+            ...common,
+            movementType: 'PICK_OUT',
+            leg: 1,
+            binId: bin.id,
+            qtyBase: entry.qty.negated(),
+          },
+          {
+            ...common,
+            movementType: 'PICK_IN',
+            leg: 2,
+            binId: staging.get(line.warehouseId) ?? 0,
+            qtyBase: entry.qty,
+          },
+        );
+      }
+      await this.posting.post(tx, ctx, {
+        docs: [{ docType: 'SO', docId: id, external: true }],
+        movements,
+        reservationConsume: { docType: 'SO', docLineIds: lines.map((line) => line.id) },
+      });
+      for (const entry of input) {
+        await tx
+          .update(salesOrderLines)
+          .set({ qtyPicked: entry.qty, pickBinId: entry.binId })
+          .where(eq(salesOrderLines.id, entry.lineId));
+      }
+      await tx
+        .update(salesOrders)
+        .set({
+          status: 'PACKED',
+          pickedAt: sql`now()`,
+          pickedBy: actorUserId(ctx),
+          updatedAt: sql`now()`,
+        })
+        .where(eq(salesOrders.id, id));
+      await this.event(tx, ctx, id, order.status, 'PACKED', null);
+      await this.audit.record(tx, ctx, {
+        action: 'PICK',
+        entity: 'sales_orders',
+        entityId: id,
+        after: {
+          lines: input.map((entry) => ({
+            lineId: entry.lineId,
+            qty: entry.qty.toFixed(),
+            binId: entry.binId,
+          })),
+          short: input.filter((entry) => entry.qty.lt(byLine.get(entry.lineId)?.qtyBase ?? 0))
+            .length,
+        },
       });
     });
     return this.get(id);
@@ -217,7 +578,16 @@ export class SalesOrdersService {
     await inTransaction(this.db, async (tx) => {
       const order = await this.lock(tx, id);
       if (order.status !== 'DRAFT') throw stateError(order, 'DRAFT');
-      const today = businessDate();
+      await this.submitInTx(tx, actor, order);
+    });
+    return this.get(id);
+  }
+
+  /** Prices the order's lines today and reserves them (replacing earlier reservations when asked). */
+  private async priceAndReserve(tx: Tx, actor: Actor, order: OrderRow, replace: boolean) {
+    const today = businessDate();
+    const id = order.id;
+    {
       for (const issue of orderHeaderIssues(
         {
           fulfilment: order.fulfilment,
@@ -326,8 +696,8 @@ export class SalesOrdersService {
       }
       if (parts.length > 0) await tx.insert(salesOrderLineParts).values(parts);
 
-      const reserved = await this.reservations.reserveInTx(tx, {
-        docType: 'SO',
+      const request = {
+        docType: 'SO' as const,
         docId: id,
         lines: lines.map((line) => ({
           lineId: line.id,
@@ -335,13 +705,25 @@ export class SalesOrdersService {
           productId: line.productId,
           qtyBase: line.qtyBase,
         })),
-      });
+      };
+      const reserved = replace
+        ? await this.reservations.replaceInTx(tx, request)
+        : await this.reservations.reserveInTx(tx, request);
       for (const entry of reserved) {
         await tx
           .update(salesOrderLines)
           .set({ qtyApproved: entry.reserved, qtyBackordered: entry.backordered })
           .where(eq(salesOrderLines.id, entry.lineId));
       }
+      return { quote, reserved };
+    }
+  }
+
+  private async submitInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
+    const id = order.id;
+    const today = businessDate();
+    {
+      const { quote, reserved } = await this.priceAndReserve(tx, actor, order, false);
       const { rows: clock } = await tx.execute<{ now: string | Date }>(sql`SELECT now() AS now`);
       const now = clock[0]?.now;
       const year = businessYear(now instanceof Date ? now : new Date(now ?? Date.now()));
@@ -373,17 +755,99 @@ export class SalesOrdersService {
           backordered: reserved.filter((entry) => entry.backordered.gt(0)).length,
         },
       });
+    }
+  }
+
+  /**
+   * The main sale (ADR-0056 #3): the picked quantity of every line leaves STAGING under the order's
+   * document; DELIVERED. The receivable comes with finance (delivery 3).
+   */
+  private async saleInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
+    const id = order.id;
+    const lines = await this.linesOf(tx, id);
+    const products = new Map(
+      (
+        await this.catalog.getMany(
+          lines.map((line) => line.productId),
+          tx,
+        )
+      ).map((p) => [p.id, p]),
+    );
+    const staging = new Map<number, number>();
+    for (const warehouseId of new Set(lines.map((line) => line.warehouseId))) {
+      staging.set(warehouseId, (await this.bins.systemBin(warehouseId, 'STAGING', tx)).id);
+    }
+    const movements: Movement[] = lines.flatMap((line) => {
+      const picked = line.qtyPicked ?? new Decimal(0);
+      const base = products.get(line.productId)?.baseUnit;
+      if (picked.isZero() || !base) return [];
+      return [
+        {
+          docType: 'SO' as const,
+          docId: id,
+          docLineId: line.id,
+          movementType: 'DELIVERY_ISSUE' as const,
+          leg: 1,
+          warehouseId: line.warehouseId,
+          binId: staging.get(line.warehouseId) ?? 0,
+          productId: line.productId,
+          qtyBase: picked.negated(),
+          enteredQty: picked,
+          productUnitId: base.id,
+          factorSnapshot: new Decimal(1),
+        },
+      ];
     });
-    return this.get(id);
+    await this.posting.post(tx, actor, {
+      docs: [{ docType: 'SO', docId: id, external: true }],
+      movements,
+    });
+    await tx
+      .update(salesOrderLines)
+      .set({ qtyDelivered: sql`coalesce(qty_picked, 0)` })
+      .where(eq(salesOrderLines.orderId, id));
+    await tx
+      .update(salesOrders)
+      .set({
+        status: 'DELIVERED',
+        deliveredAt: sql`now()`,
+        deliveredBy: actorUserId(actor),
+        updatedAt: sql`now()`,
+      })
+      .where(eq(salesOrders.id, id));
+    await this.event(tx, actor, id, 'PACKED', 'DELIVERED', null);
+    await this.audit.record(tx, actor, {
+      action: 'SALE',
+      entity: 'sales_orders',
+      entityId: id,
+      after: {
+        number: order.number,
+        total: order.total?.toFixed(0) ?? null,
+        lines: movements.length,
+      },
+    });
   }
 
   /** Cancels a draft or a confirmed order with a reason; a confirmed one releases its stock. */
   async cancel(actor: Actor, id: number, reason: string): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const order = await this.lock(tx, id);
+      await this.cancelInTx(tx, actor, order, reason);
+    });
+    return this.get(id);
+  }
+
+  private async cancelInTx(
+    tx: Tx,
+    actor: Actor,
+    order: OrderRow,
+    reason: string | null | undefined,
+  ): Promise<void> {
+    const id = order.id;
     const why = text(reason);
     if (why === null) throw invalid('reason', 'required', 'a reason');
     if (why.length > ORDER_LIMITS.maxCancelReason) throw invalid('reason', 'maxLength', 'too long');
-    await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
+    {
       if (!isCancellable(order.status)) throw stateError(order, 'CANCELLABLE');
       const released = await this.reservations.releaseInTx(tx, 'SO', id);
       await tx
@@ -404,8 +868,7 @@ export class SalesOrdersService {
         before: { status: order.status },
         after: { status: 'CANCELLED', reason: why, released },
       });
-    });
-    return this.get(id);
+    }
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<OrderDetail> {
@@ -447,17 +910,41 @@ export class SalesOrdersService {
       .from(orderStatusEvents)
       .where(eq(orderStatusEvents.orderId, id))
       .orderBy(asc(orderStatusEvents.id));
+    const moves = await executor
+      .select()
+      .from(salesStageMoves)
+      .where(eq(salesStageMoves.orderId, id))
+      .orderBy(asc(salesStageMoves.id));
+    const place = await this.boards.namesOf(order.boardId, order.stageId, executor);
+    const pickBins = new Map(
+      (
+        await this.bins.getMany(
+          lines.flatMap((line) => (line.pickBinId === null ? [] : [line.pickBinId])),
+          executor,
+        )
+      ).map((bin) => [bin.id, bin.code]),
+    );
     const {
       createdBy: _created,
       submittedBy: _submitted,
       cancelledBy: _cancelled,
+      pickedBy: _picked,
+      deliveredBy: _delivered,
       ...rest
     } = order;
     return {
       ...rest,
       customerCode: customer?.code ?? '',
       customerName: customer?.name ?? '',
-      lines: lines.map((line) => lineView(line, products, units, parts)),
+      boardName: place.boardName,
+      stageName: place.stageName,
+      lines: lines.map((line) => lineView(line, products, units, parts, pickBins)),
+      moves: moves.map((move) => ({
+        fromStageId: move.fromStageId,
+        toStageId: move.toStageId,
+        actorId: move.actorId,
+        createdAt: move.createdAt,
+      })),
       events: events.map((event) => ({
         fromStatus: event.fromStatus,
         toStatus: event.toStatus,
@@ -533,6 +1020,14 @@ export class SalesOrdersService {
   }
 
   // -------------------------------------------------------------------------------------------
+
+  private linesOf(tx: Tx, id: number): Promise<LineRow[]> {
+    return tx
+      .select()
+      .from(salesOrderLines)
+      .where(eq(salesOrderLines.orderId, id))
+      .orderBy(asc(salesOrderLines.lineNo));
+  }
 
   private async lock(tx: Tx, id: number): Promise<OrderRow> {
     const [order] = await tx.select().from(salesOrders).where(eq(salesOrders.id, id)).for('update');
@@ -691,6 +1186,7 @@ function lineView(
   products: ReadonlyMap<number, ProductSummary>,
   units: ReadonlyMap<number, { uomName: string }>,
   parts: readonly (typeof salesOrderLineParts.$inferSelect)[],
+  pickBins: ReadonlyMap<number, string>,
 ): OrderLine {
   const product = products.get(line.productId);
   return {
@@ -708,6 +1204,10 @@ function lineView(
     warehouseId: line.warehouseId,
     qtyApproved: line.qtyApproved,
     qtyBackordered: line.qtyBackordered,
+    qtyPicked: line.qtyPicked,
+    pickBinId: line.pickBinId,
+    pickBinCode: line.pickBinId === null ? null : (pickBins.get(line.pickBinId) ?? null),
+    qtyDelivered: line.qtyDelivered,
     subtotal: line.subtotal,
     discountAmount: line.discountAmount,
     total: line.total,

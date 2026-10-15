@@ -11,12 +11,17 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
+import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
   SalesOrderCancelDto,
   SalesOrderDetailDto,
   SalesOrderListQueryDto,
+  SalesOrderMoveRequestDto,
   SalesOrderPageDto,
+  SalesOrderPickLineInfoDto,
+  SalesOrderPickRequestDto,
   SalesOrderProductInfoDto,
   SalesOrderProductInfoQueryDto,
   SalesOrderRequestDto,
@@ -29,12 +34,21 @@ import {
 
 const READ = 'sales.orders.read';
 const MANAGE = 'sales.orders.manage';
+const PICK = 'sales.orders.pick';
+
+@ApiSchema({ name: 'SalesOrderMoveResult' })
+class SalesOrderMoveResultDto {
+  @ApiProperty({ type: SalesOrderDetailDto }) order: SalesOrderDetailDto;
+  @ApiProperty({ enum: PRINT_KINDS, isArray: true, description: 'Documents the stage prints' })
+  print: PrintKind[];
+}
 
 const iso = (value: Date | null): string | null => (value ? value.toISOString() : null);
 const money = (value: Decimal | null): string | null => (value ? value.toFixed(0) : null);
 
 const inputOf = (body: SalesOrderRequestDto): OrderInput => ({
   customerId: body.customerId,
+  boardId: body.boardId ?? null,
   fulfilment: body.fulfilment,
   deliveryDate: body.deliveryDate,
   addressId: body.addressId ?? null,
@@ -75,6 +89,13 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     confirmedAt: iso(order.confirmedAt),
     cancelledAt: iso(order.cancelledAt),
     cancelReason: order.cancelReason,
+    boardId: order.boardId,
+    boardName: order.boardName,
+    stageId: order.stageId,
+    stageName: order.stageName,
+    stageEnteredAt: iso(order.stageEnteredAt),
+    pickedAt: iso(order.pickedAt),
+    deliveredAt: iso(order.deliveredAt),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     lines: order.lines.map((line) => ({
@@ -92,6 +113,10 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
       warehouseId: line.warehouseId,
       qtyApproved: line.qtyApproved.toString(),
       qtyBackordered: line.qtyBackordered.toString(),
+      qtyPicked: line.qtyPicked?.toString() ?? null,
+      pickBinId: line.pickBinId,
+      pickBinCode: line.pickBinCode,
+      qtyDelivered: line.qtyDelivered?.toString() ?? null,
       subtotal: money(line.subtotal),
       discountAmount: money(line.discountAmount),
       total: money(line.total),
@@ -111,6 +136,12 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
           ? (part.applied as SalesOrderDetailDto['lines'][number]['parts'][number]['applied'])
           : [],
       })),
+    })),
+    moves: order.moves.map((move) => ({
+      fromStageId: move.fromStageId,
+      toStageId: move.toStageId,
+      actorId: move.actorId,
+      createdAt: move.createdAt.toISOString(),
     })),
     events: order.events.map((event) => ({
       fromStatus: event.fromStatus,
@@ -178,9 +209,12 @@ export class SalesOrdersController {
     return toDetail(await this.orders.create(ctx, inputOf(body)));
   }
 
-  /** Replaces a draft's header and lines. */
+  /**
+   * Replaces the header and lines of a draft or a reserved order; the stage's EDIT right decides
+   * on a board, `sales.orders.manage` off it.
+   */
   @Put(':id')
-  @RequirePermission(MANAGE)
+  @RequirePermission(READ)
   @ApiOkResponse({ type: SalesOrderDetailDto })
   async update(
     @CurrentUser() ctx: AuthContext,
@@ -188,6 +222,59 @@ export class SalesOrdersController {
     @Body() body: SalesOrderRequestDto,
   ): Promise<SalesOrderDetailDto> {
     return toDetail(await this.orders.update(ctx, id, inputOf(body)));
+  }
+
+  /** Moves the card to a stage of its board and runs the stage's action (ADR-0056 #3). */
+  @Post(':id/move')
+  @HttpCode(200)
+  @RequirePermission(READ)
+  @Idempotent()
+  @ApiOkResponse({ type: SalesOrderMoveResultDto })
+  async move(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SalesOrderMoveRequestDto,
+  ): Promise<SalesOrderMoveResultDto> {
+    const result = await this.orders.move(ctx, id, {
+      stageId: body.stageId,
+      reason: body.reason ?? null,
+    });
+    return { order: toDetail(result.order), print: result.print };
+  }
+
+  /** What the pick form proposes per line (ADR-0056 #5). */
+  @Get(':id/pick-info')
+  @RequirePermission(PICK)
+  @ApiOkResponse({ type: [SalesOrderPickLineInfoDto] })
+  async pickInfo(@Param('id', ParseIntPipe) id: number): Promise<SalesOrderPickLineInfoDto[]> {
+    return (await this.orders.pickInfo(id)).map((line) => ({
+      ...line,
+      bins: line.bins.map((bin) => ({ ...bin, onHand: bin.onHand.toString() })),
+    }));
+  }
+
+  /** The picked counts confirmed: stock to STAGING, reservations consumed, PACKED. */
+  @Post(':id/pick')
+  @HttpCode(200)
+  @RequirePermission(PICK)
+  @Idempotent()
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async pick(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SalesOrderPickRequestDto,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(
+      await this.orders.pick(
+        ctx,
+        id,
+        body.lines.map((line) => ({
+          lineId: line.lineId,
+          qty: new Decimal(line.qty),
+          binId: line.binId,
+        })),
+      ),
+    );
   }
 
   /** DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered). */

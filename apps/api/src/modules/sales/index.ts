@@ -7,10 +7,19 @@ export {
   type CreditDecision,
 } from './services/credit-checker';
 export {
+  type BoardView,
+  type OrderCard,
+  SalesBoardsService,
+  type StageCards,
+  type StageView,
+} from './services/sales-boards.service';
+export {
+  type MoveResult,
   type OrderDetail,
   type OrderInput,
   type OrderLine,
   type OrderLineInput,
   type OrderSummary,
+  type PickLineInput,
   SalesOrdersService,
 } from './services/sales-orders.service';

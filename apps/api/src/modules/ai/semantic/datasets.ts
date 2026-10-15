@@ -143,7 +143,7 @@ export const AI_DATASETS: readonly AiDataset[] = [
   {
     name: 'stock_movements',
     description:
-      'The stock ledger: every movement, one row per leg; quantity signed (+ in, − out). Bin moves and transfers have an out leg and an in leg, so they cancel out in company totals: count received goods with RECEIPT.',
+      'The stock ledger: every movement, one row per leg; quantity signed (+ in, − out). Bin moves and transfers have an out leg and an in leg, so they cancel out in company totals: count received goods with RECEIPT. Customer orders (doc_type SO) pick goods to STAGING (PICK_OUT, PICK_IN) and issue them at the sale (DELIVERY_ISSUE).',
     columns: [
       col('id', 'bigint'),
       col('posted_at', 'timestamptz', 'when it was recorded'),
@@ -436,8 +436,19 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col('discount_total', 'numeric'),
       col('total', 'numeric', 'what the customer pays; NULL for a draft'),
       col('line_count', 'bigint'),
+      col('board_id', 'bigint', 'the board the card sits on (ADR-0056); NULL = none'),
+      col('board_name', 'text'),
+      col('stage_id', 'bigint'),
+      col('stage_name', 'text', 'the stage the card is in'),
+      col('stage_entered_at', 'timestamptz'),
       col('submitted_at', 'timestamptz'),
       col('confirmed_at', 'timestamptz'),
+      col('picked_at', 'timestamptz', 'the picked counts confirmed; stock moved to STAGING'),
+      col(
+        'delivered_at',
+        'timestamptz',
+        'the main sale: stock issued, the customer owes the total',
+      ),
       col('cancelled_at', 'timestamptz'),
       col('cancel_reason', 'text'),
       col('created_at', 'timestamptz'),
@@ -466,6 +477,8 @@ export const AI_DATASETS: readonly AiDataset[] = [
       ...WAREHOUSE,
       col('qty_approved', 'numeric', 'base units reserved when confirmed'),
       col('qty_backordered', 'numeric', 'base units that were not available (backorder)'),
+      col('qty_picked', 'numeric', 'base units the picker confirmed; NULL until picked'),
+      col('qty_delivered', 'numeric', 'base units issued by the sale; NULL until sold'),
       col('subtotal', 'numeric'),
       col('discount_amount', 'numeric'),
       col('total', 'numeric', 'line total, whole MNT; NULL for a draft'),

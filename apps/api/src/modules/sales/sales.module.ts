@@ -4,8 +4,13 @@ import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
+import {
+  SalesBoardsController,
+  SalesStagesController,
+} from './controllers/sales-boards.controller';
 import { SalesOrdersController } from './controllers/sales-orders.controller';
 import { AllowAllCreditChecker, CreditChecker } from './services/credit-checker';
+import { SalesBoardsService } from './services/sales-boards.service';
 import { SalesOrdersService } from './services/sales-orders.service';
 
 /**
@@ -14,11 +19,18 @@ import { SalesOrdersService } from './services/sales-orders.service';
  */
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
-  providers: [SalesOrdersService, { provide: CreditChecker, useClass: AllowAllCreditChecker }],
-  exports: [SalesOrdersService],
+  providers: [
+    SalesOrdersService,
+    SalesBoardsService,
+    { provide: CreditChecker, useClass: AllowAllCreditChecker },
+  ],
+  exports: [SalesOrdersService, SalesBoardsService],
 })
 export class SalesModule {}
 
 /** The HTTP side of sales (api only). */
-@Module({ imports: [SalesModule], controllers: [SalesOrdersController] })
+@Module({
+  imports: [SalesModule],
+  controllers: [SalesOrdersController, SalesBoardsController, SalesStagesController],
+})
 export class SalesHttpModule {}

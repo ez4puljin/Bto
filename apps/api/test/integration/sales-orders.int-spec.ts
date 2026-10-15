@@ -238,13 +238,13 @@ describe('sales orders', () => {
     expect(await reserved(wh1.id, cola.id)).toBe('29.000');
     expect(await reserved(wh2.id, juice.id)).toBe('12.000');
 
-    // A confirmed order is not edited or submitted again.
+    // A confirmed order is not submitted again (editing it: sales-boards.int-spec, ADR-0056).
     expect(((await orders().submit(draft.id).expect(409)).body as ProblemJson).code).toBe(
       'ORDER_STATE_INVALID',
     );
-    await orders()
+    await salesApi(app, warehouseUser)
       .update(draft.id, orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '1' }]))
-      .expect(409);
+      .expect(403);
 
     // The next order finds only one piece of cola left.
     const next = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '3' }]));

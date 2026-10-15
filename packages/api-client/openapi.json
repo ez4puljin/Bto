@@ -7044,7 +7044,8 @@
                 "BM",
                 "TR",
                 "ADJ",
-                "ST"
+                "ST",
+                "SO"
               ]
             }
           },
@@ -11699,7 +11700,186 @@
             "bearer": []
           }
         ],
-        "summary": "Replaces a draft's header and lines.",
+        "summary": "Replaces the header and lines of a draft or a reserved order; the stage's EDIT right decides\non a board, `sales.orders.manage` off it.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/move": {
+      "post": {
+        "operationId": "SalesOrders_move",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderMoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderMoveResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Moves the card to a stage of its board and runs the stage's action (ADR-0056 #3).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/pick-info": {
+      "get": {
+        "operationId": "SalesOrders_pickInfo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesOrderPickLineInfo"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What the pick form proposes per line (ADR-0056 #5).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/pick": {
+      "post": {
+        "operationId": "SalesOrders_pick",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderPickRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The picked counts confirmed: stock to STAGING, reservations consumed, PACKED.",
         "tags": [
           "sales"
         ]
@@ -11799,6 +11979,629 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards": {
+      "get": {
+        "operationId": "SalesBoards_list",
+        "parameters": [
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesBoard"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesBoards_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesBoardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/defaults": {
+      "get": {
+        "operationId": "SalesBoards_defaults",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesChannelDefault"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesBoards_setDefault",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesChannelDefaultRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesChannelDefault"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/{id}": {
+      "get": {
+        "operationId": "SalesBoards_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesBoards_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesBoardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "delete": {
+        "operationId": "SalesBoards_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/{id}/cards": {
+      "get": {
+        "operationId": "SalesBoards_cards",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesStageCards"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/{id}/roles": {
+      "put": {
+        "operationId": "SalesBoards_setRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesBoardRolesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/{id}/stages": {
+      "post": {
+        "operationId": "SalesBoards_addStage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesStageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-boards/{id}/stage-order": {
+      "put": {
+        "operationId": "SalesBoards_reorder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesStageOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-stages/{id}": {
+      "put": {
+        "operationId": "SalesStages_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesStageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "delete": {
+        "operationId": "SalesStages_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBoard"
                 }
               }
             }
@@ -11935,7 +12738,9 @@
           "ai.reports.manage",
           "segments.manage",
           "sales.orders.read",
-          "sales.orders.manage"
+          "sales.orders.manage",
+          "sales.boards.manage",
+          "sales.orders.pick"
         ]
       },
       "RoleRef": {
@@ -21765,6 +22570,24 @@
             "type": "string",
             "description": "Base units backordered"
           },
+          "qtyPicked": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units picked; null until picked"
+          },
+          "pickBinId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pickBinCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "qtyDelivered": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units issued by the sale"
+          },
           "subtotal": {
             "type": "string",
             "nullable": true
@@ -21799,6 +22622,10 @@
           "warehouseId",
           "qtyApproved",
           "qtyBackordered",
+          "qtyPicked",
+          "pickBinId",
+          "pickBinCode",
+          "qtyDelivered",
           "subtotal",
           "discountAmount",
           "total",
@@ -21860,6 +22687,32 @@
           "fromStatus",
           "toStatus",
           "reason",
+          "actorId",
+          "createdAt"
+        ]
+      },
+      "SalesOrderMove": {
+        "type": "object",
+        "properties": {
+          "fromStageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "toStageId": {
+            "type": "number"
+          },
+          "actorId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "fromStageId",
+          "toStageId",
           "actorId",
           "createdAt"
         ]
@@ -21993,6 +22846,37 @@
             "type": "string",
             "nullable": true
           },
+          "boardId": {
+            "type": "number",
+            "nullable": true
+          },
+          "boardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageEnteredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "pickedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -22011,6 +22895,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SalesOrderEvent"
+            }
+          },
+          "moves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderMove"
             }
           }
         },
@@ -22040,10 +22930,18 @@
           "confirmedAt",
           "cancelledAt",
           "cancelReason",
+          "boardId",
+          "boardName",
+          "stageId",
+          "stageName",
+          "stageEnteredAt",
+          "pickedAt",
+          "deliveredAt",
           "createdAt",
           "updatedAt",
           "lines",
-          "events"
+          "events",
+          "moves"
         ]
       },
       "SalesOrderLineRequest": {
@@ -22070,6 +22968,12 @@
           "customerId": {
             "type": "number",
             "minimum": 1
+          },
+          "boardId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The board a new order goes on; null = the channel's default (ADR-0056)"
           },
           "fulfilment": {
             "enum": [
@@ -22128,6 +23032,135 @@
           "lines"
         ]
       },
+      "SalesOrderMoveRequest": {
+        "type": "object",
+        "properties": {
+          "stageId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A stage of the order's board"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "For a CANCEL stage"
+          }
+        },
+        "required": [
+          "stageId"
+        ]
+      },
+      "SalesOrderMoveResult": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/SalesOrderDetail"
+          },
+          "print": {
+            "type": "array",
+            "description": "Documents the stage prints",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PICK_LIST",
+                "DELIVERY_NOTE"
+              ]
+            }
+          }
+        },
+        "required": [
+          "order",
+          "print"
+        ]
+      },
+      "SalesOrderPickBin": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "onHand": {
+            "type": "string",
+            "description": "Base units on the shelf"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "onHand"
+        ]
+      },
+      "SalesOrderPickLineInfo": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "proposedBinId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The fixed shelf, else the fullest"
+          },
+          "bins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderPickBin"
+            }
+          }
+        },
+        "required": [
+          "lineId",
+          "warehouseId",
+          "proposedBinId",
+          "bins"
+        ]
+      },
+      "SalesOrderPickLineRequest": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "24",
+            "description": "Base units picked, 0 for none"
+          },
+          "binId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The shelf picked from"
+          }
+        },
+        "required": [
+          "lineId",
+          "qty",
+          "binId"
+        ]
+      },
+      "SalesOrderPickRequest": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "description": "Every line of the order once",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderPickLineRequest"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
       "SalesOrderCancelRequest": {
         "type": "object",
         "properties": {
@@ -22138,6 +23171,413 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "SalesBoardRolesRequest": {
+        "type": "object",
+        "properties": {
+          "VIEW": {
+            "maxItems": 100,
+            "description": "Roles that see the board; none = everyone",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "MANAGE": {
+            "maxItems": 100,
+            "description": "Roles that configure it",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "VIEW",
+          "MANAGE"
+        ]
+      },
+      "SalesStageRoles": {
+        "type": "object",
+        "properties": {
+          "VIEW": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "EDIT": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "MOVE": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "VIEW",
+          "EDIT",
+          "MOVE"
+        ]
+      },
+      "SalesStage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "boardId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "action": {
+            "enum": [
+              "NONE",
+              "CONFIRM",
+              "PICK",
+              "SALE",
+              "CANCEL"
+            ],
+            "type": "string"
+          },
+          "printPickList": {
+            "type": "boolean"
+          },
+          "printDeliveryNote": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/SalesStageRoles"
+          },
+          "canView": {
+            "type": "boolean",
+            "description": "The caller may see the stage"
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "The caller may edit orders in the stage"
+          },
+          "canMove": {
+            "type": "boolean",
+            "description": "The caller may move cards into the stage"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "name",
+          "position",
+          "action",
+          "printPickList",
+          "printDeliveryNote",
+          "archivedAt",
+          "roles",
+          "canView",
+          "canEdit",
+          "canMove"
+        ]
+      },
+      "SalesBoard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "position": {
+            "type": "number"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/SalesBoardRolesRequest"
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "The caller may configure the board"
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesStage"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "branchId",
+          "position",
+          "archivedAt",
+          "roles",
+          "canManage",
+          "stages"
+        ]
+      },
+      "SalesChannelDefault": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "boardId": {
+            "type": "number"
+          },
+          "stageId": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "channel",
+          "boardId",
+          "stageId"
+        ]
+      },
+      "SalesChannelDefaultRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "boardId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null clears the default"
+          },
+          "stageId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "channel"
+        ]
+      },
+      "SalesOrderCard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageEnteredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "channel",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "fulfilment",
+          "deliveryDate",
+          "total",
+          "lineCount",
+          "createdByName",
+          "stageEnteredAt"
+        ]
+      },
+      "SalesStageCards": {
+        "type": "object",
+        "properties": {
+          "stageId": {
+            "type": "number"
+          },
+          "cards": {
+            "description": "Newest first, at most 200",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderCard"
+            }
+          },
+          "count": {
+            "type": "number",
+            "description": "Cards in the stage, also beyond the first 200"
+          },
+          "total": {
+            "type": "string",
+            "description": "Sum of the frozen totals, whole MNT"
+          }
+        },
+        "required": [
+          "stageId",
+          "cards",
+          "count",
+          "total"
+        ]
+      },
+      "SalesBoardRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The branch the board is for"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SalesStageRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "action": {
+            "enum": [
+              "NONE",
+              "CONFIRM",
+              "PICK",
+              "SALE",
+              "CANCEL"
+            ],
+            "type": "string"
+          },
+          "printPickList": {
+            "type": "boolean"
+          },
+          "printDeliveryNote": {
+            "type": "boolean"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/SalesStageRoles"
+          }
+        },
+        "required": [
+          "name",
+          "action",
+          "printPickList",
+          "printDeliveryNote",
+          "roles"
+        ]
+      },
+      "SalesStageOrderRequest": {
+        "type": "object",
+        "properties": {
+          "stageIds": {
+            "description": "Every live stage of the board, in its new order",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "stageIds"
         ]
       },
       "ErrorCode": {
@@ -22202,6 +23642,7 @@
           "PRODUCT_NOT_IN_WAREHOUSE",
           "PRODUCT_NO_HOME",
           "PRODUCT_NOT_SELLABLE",
+          "STAGE_IN_USE",
           "COSTING_CLOSED",
           "TRANSFER_NOTHING_SHIPPED",
           "STOCKTAKE_BINS_UNFINISHED",

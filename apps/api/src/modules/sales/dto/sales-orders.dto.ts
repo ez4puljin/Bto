@@ -41,6 +41,15 @@ export class SalesOrderLineRequestDto {
 @ApiSchema({ name: 'SalesOrderRequest' })
 export class SalesOrderRequestDto {
   @ApiProperty() @IsInt() @Min(1) customerId: number;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: "The board a new order goes on; null = the channel's default (ADR-0056)",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  boardId?: number | null;
   @ApiProperty({ enum: FULFILMENTS }) @IsIn(FULFILMENTS) fulfilment: Fulfilment;
   @ApiProperty({ format: 'date', description: 'Today or later (Ulaanbaatar)' })
   @Matches(DATE)
@@ -152,6 +161,16 @@ export class SalesOrderLineDto {
   @ApiProperty({ description: "The product's home warehouse" }) warehouseId: number;
   @ApiProperty({ description: 'Base units reserved' }) qtyApproved: string;
   @ApiProperty({ description: 'Base units backordered' }) qtyBackordered: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Base units picked; null until picked',
+  })
+  qtyPicked: string | null;
+  @ApiProperty({ type: Number, nullable: true }) pickBinId: number | null;
+  @ApiProperty({ type: String, nullable: true }) pickBinCode: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Base units issued by the sale' })
+  qtyDelivered: string | null;
   @ApiProperty({ type: String, nullable: true }) subtotal: string | null;
   @ApiProperty({ type: String, nullable: true }) discountAmount: string | null;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
@@ -165,6 +184,64 @@ export class SalesOrderEventDto {
   @ApiProperty({ type: String, nullable: true }) reason: string | null;
   @ApiProperty({ type: Number, nullable: true }) actorId: number | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'SalesOrderMove' })
+export class SalesOrderMoveDto {
+  @ApiProperty({ type: Number, nullable: true }) fromStageId: number | null;
+  @ApiProperty() toStageId: number;
+  @ApiProperty({ type: Number, nullable: true }) actorId: number | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'SalesOrderMoveRequest' })
+export class SalesOrderMoveRequestDto {
+  @ApiProperty({ description: "A stage of the order's board" }) @IsInt() @Min(1) stageId: number;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'For a CANCEL stage' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(ORDER_LIMITS.maxCancelReason)
+  reason?: string | null;
+}
+
+@ApiSchema({ name: 'SalesOrderPickLineRequest' })
+export class SalesOrderPickLineRequestDto {
+  @ApiProperty() @IsInt() @Min(1) lineId: number;
+  @ApiProperty({ example: '24', description: 'Base units picked, 0 for none' })
+  @IsString()
+  @Matches(QTY)
+  qty: string;
+  @ApiProperty({ description: 'The shelf picked from' }) @IsInt() @Min(1) binId: number;
+}
+
+@ApiSchema({ name: 'SalesOrderPickRequest' })
+export class SalesOrderPickRequestDto {
+  @ApiProperty({
+    type: [SalesOrderPickLineRequestDto],
+    description: 'Every line of the order once',
+  })
+  @IsArray()
+  @ArrayMaxSize(ORDER_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => SalesOrderPickLineRequestDto)
+  lines: SalesOrderPickLineRequestDto[];
+}
+
+@ApiSchema({ name: 'SalesOrderPickBin' })
+export class SalesOrderPickBinDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty({ description: 'Base units on the shelf' }) onHand: string;
+}
+
+@ApiSchema({ name: 'SalesOrderPickLineInfo' })
+export class SalesOrderPickLineInfoDto {
+  @ApiProperty() lineId: number;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: Number, nullable: true, description: 'The fixed shelf, else the fullest' })
+  proposedBinId: number | null;
+  @ApiProperty({ type: [SalesOrderPickBinDto] }) bins: SalesOrderPickBinDto[];
 }
 
 @ApiSchema({ name: 'SalesOrderDetail' })
@@ -194,10 +271,18 @@ export class SalesOrderDetailDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) confirmedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) cancelledAt: string | null;
   @ApiProperty({ type: String, nullable: true }) cancelReason: string | null;
+  @ApiProperty({ type: Number, nullable: true }) boardId: number | null;
+  @ApiProperty({ type: String, nullable: true }) boardName: string | null;
+  @ApiProperty({ type: Number, nullable: true }) stageId: number | null;
+  @ApiProperty({ type: String, nullable: true }) stageName: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) stageEnteredAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) pickedAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) deliveredAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
   @ApiProperty({ type: [SalesOrderLineDto] }) lines: SalesOrderLineDto[];
   @ApiProperty({ type: [SalesOrderEventDto] }) events: SalesOrderEventDto[];
+  @ApiProperty({ type: [SalesOrderMoveDto] }) moves: SalesOrderMoveDto[];
 }
 
 @ApiSchema({ name: 'SalesOrderSummary' })
