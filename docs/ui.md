@@ -139,7 +139,7 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 - Toasts: a single `role="status"` element holding the text; `clearToasts()` runs after each test. While a modal dialog is open the page behind it, the toaster included, is hidden from roles: a dialog that stays open says what happened inside itself (`within(dialog)`).
 - Nothing in the shell calls the API; the home page reads only the attention counts the user may act on.
 - Confirmations: a `default` dialog's main button has the focus (`toHaveFocus()`), so `user.keyboard('{Enter}')` confirms.
-- Scans: `userEvent.setup({ delay: null }).keyboard('4006381333931{Enter}')` is a scanner burst; a person's typing needs a pause of 80 ms or more before it.
+- Scans: `await wedgeScan('4006381333931')` (`src/test/scan.ts`) is a scanner burst into whatever has the focus, 10 ms between keys by a faked `Date` (jsdom stamps events with it), so a loaded machine never turns it into typing. Never type a burst in real time (`delay: null`): under `pnpm check` its keys landed more than 50 ms apart. A person's typing needs a real pause of 80 ms or more before the scan.
 - Kept counts: `localStorage` is cleared after each test; `cleanup()` then `renderApp` again is a reload.
 
 ## 7. Name and sign-in

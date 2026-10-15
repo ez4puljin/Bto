@@ -20,6 +20,7 @@ import {
   warehouses,
 } from '@/test/inventory-fixtures';
 import { json, problem, renderApp, signedIn } from '@/test/render-app';
+import { wedgeScan } from '@/test/scan';
 
 type Schemas = components['schemas'];
 
@@ -267,7 +268,7 @@ describe('receipt editor', () => {
     await user.clear(qty);
     await user.type(qty, '2');
     await new Promise((resolve) => setTimeout(resolve, 80));
-    await userEvent.setup({ delay: null }).keyboard('4006381333931{Enter}');
+    await wedgeScan('4006381333931');
     await waitFor(() =>
       expect(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/1')).toHaveLength(1),
     );
@@ -289,12 +290,12 @@ describe('receipt editor', () => {
       },
     });
     renderApp('/inventory/receipts/5', fetchMock);
-    const user = userEvent.setup({ delay: null });
+    const user = userEvent.setup();
     const qty = await screen.findByRole('textbox', {
       name: `${mn.inventory.qty}: ${COLA.name} (хайрцаг)`,
     });
     await user.click(qty);
-    await user.keyboard('4006381333931{Enter}');
+    await wedgeScan('4006381333931');
     await waitFor(() =>
       expect(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/1')).toHaveLength(1),
     );
@@ -317,7 +318,7 @@ describe('receipt editor', () => {
     await waitFor(() =>
       expect(dialog.getByRole('button', { name: mn.inventory.receipt.post })).toHaveFocus(),
     );
-    await userEvent.setup({ delay: null }).keyboard('4006381333931{Enter}');
+    await wedgeScan('4006381333931');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(calls(fetchMock, 'GET', '/api/v1/barcodes/4006381333931')).toHaveLength(0);
     expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/post')).toHaveLength(0);

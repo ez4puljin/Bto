@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { i18n } from '@/lib/i18n';
+import { wedgeScan } from '@/test/scan';
 
 const ask = (variant: 'default' | 'destructive', onConfirm: () => void) =>
   render(
@@ -35,8 +36,7 @@ describe('confirmation dialogs (ADR-0047 #3, #4)', () => {
     ask('default', onConfirm);
     const dialog = within(await screen.findByRole('dialog'));
     await waitFor(() => expect(dialog.getByRole('button', { name: 'Батлах' })).toHaveFocus());
-    // A scanner types the code in a burst and ends it with Enter.
-    await userEvent.setup({ delay: null }).keyboard('4006381333931{Enter}');
+    await wedgeScan('4006381333931');
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
