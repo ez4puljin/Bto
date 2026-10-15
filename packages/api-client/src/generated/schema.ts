@@ -3141,6 +3141,376 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Invoices_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Invoices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invoices/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Invoices_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CreditNotes_list"];
+        put?: never;
+        post: operations["CreditNotes_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/credit-notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CreditNotes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payments_list"];
+        put?: never;
+        post: operations["Payments_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payments_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GlAccounts_list"];
+        put?: never;
+        post: operations["GlAccounts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["GlAccounts_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Which account the automatic entries hit (`finance.settings.manage`). */
+        put: operations["GlAccounts_setRole"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/{id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GlAccounts_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MoneyAccounts_list"];
+        put?: never;
+        post: operations["MoneyAccounts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["MoneyAccounts_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/money-accounts/{id}/book": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The account's book: posted vouchers newest first with the balance after each. */
+        get: operations["MoneyAccounts_book"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journal-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Journal_list"];
+        put?: never;
+        post: operations["Journal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journal-entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Journal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journal-entries/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Journal_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerBalances_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-balances/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerBalances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-balances/{customerId}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerBalances_entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FinanceAttention_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance-settings/numbering": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FinanceSettings_numbering"];
+        put: operations["FinanceSettings_setNumbering"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3165,7 +3535,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -6428,8 +6798,834 @@ export interface components {
             pipelineId?: number | null;
             stageId?: number | null;
         };
+        Invoice: {
+            id: number;
+            /** @example Н-20261016-0001 */
+            number: string;
+            /** @enum {string} */
+            status: "ISSUED" | "VOID";
+            /** @enum {string} */
+            settlement: "OPEN" | "PARTIAL" | "PAID";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            orderId: number | null;
+            orderNumber: string | null;
+            branchId: number | null;
+            branchName: string | null;
+            /** @example 2026-10-16 */
+            invoiceDate: string;
+            /** @example 2026-11-15 */
+            dueDate: string;
+            /** @description Issued, not settled and past due today */
+            overdue: boolean;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** @example 150000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 150000.00 */
+            total: string;
+            /** @example 13636.36 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            /** @example 150000.00 */
+            openAmount: string;
+            lineCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+        };
+        InvoicePage: {
+            data: components["schemas"]["Invoice"][];
+            nextCursor: string | null;
+            /** @description Matches; first page only */
+            total: number | null;
+        };
+        InvoiceLine: {
+            id: number;
+            lineNo: number;
+            orderLineId: number | null;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            /** @example хайрцаг */
+            uomName: string;
+            /** @enum {string} */
+            basis: "WAREHOUSE" | "LOOSE" | "RETAIL" | "RETAIL_BULK";
+            /** @example 2 */
+            qty: string;
+            /** @example 20 */
+            factorSnapshot: string;
+            /** @example 40 */
+            qtyBase: string;
+            warehouseId: number | null;
+            warehouseName: string | null;
+            /** @example 20000.00 */
+            listPrice: string;
+            /** @example 20000.00 */
+            unitPrice: string;
+            /** @example 40000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountAmount: string;
+            /** @example 40000.00 */
+            total: string;
+            /** @enum {string} */
+            vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
+            /** @example 10.00 */
+            vatRatePct: string;
+            /** @example 0.00 */
+            cityTaxRatePct: string;
+            /** @example 3636.36 */
+            vatAmount: string;
+            /** @example 0.00 */
+            cityTaxAmount: string;
+            /**
+             * @description Base units credit notes took back
+             * @example 0
+             */
+            returnedBase: string;
+        };
+        InvoiceAllocation: {
+            id: number;
+            /** @enum {string} */
+            sourceType: "PAYMENT" | "CREDIT_NOTE";
+            sourceId: number;
+            /** @example Т-20261016-0002 */
+            sourceNumber: string;
+            /** @example 2026-10-16 */
+            sourceDate: string;
+            /** @example 50000.00 */
+            amount: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            voidedAt: string | null;
+        };
+        InvoiceCreditNoteRef: {
+            id: number;
+            /** @example К-20261017-0001 */
+            number: string;
+            /** @example 2026-10-17 */
+            noteDate: string;
+            /** @example 20000.00 */
+            total: string;
+        };
+        InvoiceDetail: {
+            id: number;
+            /** @example Н-20261016-0001 */
+            number: string;
+            /** @enum {string} */
+            status: "ISSUED" | "VOID";
+            /** @enum {string} */
+            settlement: "OPEN" | "PARTIAL" | "PAID";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            orderId: number | null;
+            orderNumber: string | null;
+            branchId: number | null;
+            branchName: string | null;
+            /** @example 2026-10-16 */
+            invoiceDate: string;
+            /** @example 2026-11-15 */
+            dueDate: string;
+            /** @description Issued, not settled and past due today */
+            overdue: boolean;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** @example 150000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 150000.00 */
+            total: string;
+            /** @example 13636.36 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            /** @example 150000.00 */
+            openAmount: string;
+            lineCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            note: string | null;
+            journalEntryId: number | null;
+            journalNumber: string | null;
+            /** Format: date-time */
+            voidedAt: string | null;
+            voidedByName: string | null;
+            voidReason: string | null;
+            voidJournalEntryId: number | null;
+            lines: components["schemas"]["InvoiceLine"][];
+            allocations: components["schemas"]["InvoiceAllocation"][];
+            creditNotes: components["schemas"]["InvoiceCreditNoteRef"][];
+        };
+        VoidRequest: {
+            reason: string;
+        };
+        CreditNote: {
+            id: number;
+            /** @example К-20261017-0001 */
+            number: string;
+            invoiceId: number;
+            /** @example Н-20261016-0001 */
+            invoiceNumber: string;
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @example 2026-10-17 */
+            noteDate: string;
+            reason: string;
+            warehouseId: number | null;
+            warehouseName: string | null;
+            binId: number | null;
+            binCode: string | null;
+            /** @example 20000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 20000.00 */
+            total: string;
+            /** @example 1818.18 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            /**
+             * @description What it settled of the invoice
+             * @example 20000.00
+             */
+            allocatedAmount: string;
+            journalEntryId: number | null;
+            journalNumber: string | null;
+            lineCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+        };
+        CreditNotePage: {
+            data: components["schemas"]["CreditNote"][];
+            nextCursor: string | null;
+        };
+        CreditNoteLine: {
+            id: number;
+            lineNo: number;
+            invoiceLineId: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            /** @example хайрцаг */
+            uomName: string;
+            /** @example 1 */
+            qty: string;
+            /** @example 20 */
+            factorSnapshot: string;
+            /** @example 20 */
+            qtyBase: string;
+            /** @example 20000.00 */
+            unitPrice: string;
+            /** @example 20000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountAmount: string;
+            /** @example 20000.00 */
+            total: string;
+            /** @example 1818.18 */
+            vatAmount: string;
+            /** @example 0.00 */
+            cityTaxAmount: string;
+        };
+        CreditNoteDetail: {
+            id: number;
+            /** @example К-20261017-0001 */
+            number: string;
+            invoiceId: number;
+            /** @example Н-20261016-0001 */
+            invoiceNumber: string;
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @example 2026-10-17 */
+            noteDate: string;
+            reason: string;
+            warehouseId: number | null;
+            warehouseName: string | null;
+            binId: number | null;
+            binCode: string | null;
+            /** @example 20000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 20000.00 */
+            total: string;
+            /** @example 1818.18 */
+            vatTotal: string;
+            /** @example 0.00 */
+            cityTaxTotal: string;
+            /**
+             * @description What it settled of the invoice
+             * @example 20000.00
+             */
+            allocatedAmount: string;
+            journalEntryId: number | null;
+            journalNumber: string | null;
+            lineCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            lines: components["schemas"]["CreditNoteLine"][];
+        };
+        CreditNoteLineRequest: {
+            invoiceLineId: number;
+            /**
+             * @description In the invoice line's unit
+             * @example 1
+             */
+            qty: string;
+        };
+        CreditNoteRequest: {
+            invoiceId: number;
+            reason: string;
+            /**
+             * @description Default today
+             * @example 2026-10-17
+             */
+            noteDate?: string | null;
+            /** @description Where the goods go back; null = nothing comes back */
+            warehouseId?: number | null;
+            /** @description Default the RETURNS bin */
+            binId?: number | null;
+            lines: components["schemas"]["CreditNoteLineRequest"][];
+        };
+        Payment: {
+            id: number;
+            /** @example Т-20261016-0002 */
+            number: string;
+            /** @enum {string} */
+            status: "POSTED" | "VOID";
+            /** @enum {string} */
+            kind: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND" | "OTHER_IN" | "OTHER_OUT";
+            /** @enum {string} */
+            direction: "IN" | "OUT";
+            moneyAccountId: number;
+            /** @example CASH-1 */
+            moneyAccountCode: string;
+            moneyAccountName: string;
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string | null;
+            glAccountId: number | null;
+            glAccountCode: string | null;
+            glAccountName: string | null;
+            /** @example 150000.00 */
+            amount: string;
+            /**
+             * @description Settled by its live allocations
+             * @example 150000.00
+             */
+            allocatedAmount: string;
+            /** @example 2026-10-16 */
+            paidOn: string;
+            description: string | null;
+            reference: string | null;
+            counterpartyName: string | null;
+            collectedBy: number | null;
+            collectedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+        };
+        PaymentPage: {
+            data: components["schemas"]["Payment"][];
+            nextCursor: string | null;
+            /** @description Matches; first page only */
+            total: number | null;
+        };
+        PaymentAllocation: {
+            id: number;
+            invoiceId: number;
+            /** @example Н-20261016-0001 */
+            invoiceNumber: string;
+            /** @example 2026-11-15 */
+            invoiceDueDate: string;
+            /** @example 50000.00 */
+            amount: string;
+            /** Format: date-time */
+            voidedAt: string | null;
+        };
+        PaymentDetail: {
+            id: number;
+            /** @example Т-20261016-0002 */
+            number: string;
+            /** @enum {string} */
+            status: "POSTED" | "VOID";
+            /** @enum {string} */
+            kind: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND" | "OTHER_IN" | "OTHER_OUT";
+            /** @enum {string} */
+            direction: "IN" | "OUT";
+            moneyAccountId: number;
+            /** @example CASH-1 */
+            moneyAccountCode: string;
+            moneyAccountName: string;
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string | null;
+            glAccountId: number | null;
+            glAccountCode: string | null;
+            glAccountName: string | null;
+            /** @example 150000.00 */
+            amount: string;
+            /**
+             * @description Settled by its live allocations
+             * @example 150000.00
+             */
+            allocatedAmount: string;
+            /** @example 2026-10-16 */
+            paidOn: string;
+            description: string | null;
+            reference: string | null;
+            counterpartyName: string | null;
+            collectedBy: number | null;
+            collectedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            journalEntryId: number | null;
+            journalNumber: string | null;
+            /** Format: date-time */
+            voidedAt: string | null;
+            voidedByName: string | null;
+            voidReason: string | null;
+            voidJournalEntryId: number | null;
+            allocations: components["schemas"]["PaymentAllocation"][];
+        };
+        PaymentAllocationRequest: {
+            invoiceId: number;
+            /** @example 50000 */
+            amount: string;
+        };
+        PaymentRequest: {
+            /** @enum {string} */
+            kind: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND" | "OTHER_IN" | "OTHER_OUT";
+            moneyAccountId: number;
+            /** @description Customer kinds */
+            customerId?: number | null;
+            /** @description Other income or expense */
+            glAccountId?: number | null;
+            /** @example 150000 */
+            amount: string;
+            /** @example 2026-10-16 */
+            paidOn: string;
+            description?: string | null;
+            /** @description A bank reference or a receipt number */
+            reference?: string | null;
+            counterpartyName?: string | null;
+            /** @description The driver or staff member who handed the money in */
+            collectedBy?: number | null;
+            /** @description What a customer payment settles; omitted = oldest due first */
+            allocations?: components["schemas"]["PaymentAllocationRequest"][] | null;
+        };
+        GlAccount: {
+            id: number;
+            /** @example 120101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string|null} */
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /**
+             * @description Σ debit of the entries
+             * @example 150000.00
+             */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /**
+             * @description debit − credit; negative = credit
+             * @example 150000.00
+             */
+            balance: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        GlAccountRequest: {
+            /** @example 120102 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+        };
+        GlAccountPatch: {
+            code?: string;
+            name?: string;
+            /** @enum {string} */
+            kind?: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        GlAccountRoleRequest: {
+            /**
+             * @description null takes the role away
+             * @enum {string|null}
+             */
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | null;
+        };
+        AccountLedgerLine: {
+            id: number;
+            entryId: number;
+            /** @example Ж-20261016-0003 */
+            entryNumber: string;
+            /** @example 2026-10-16 */
+            entryDate: string;
+            entryDescription: string;
+            /** @enum {string} */
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            lineNo: number;
+            /** @example 150000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            customerId: number | null;
+            customerName: string | null;
+            description: string | null;
+            /**
+             * @description debit − credit after this line
+             * @example 150000.00
+             */
+            balanceAfter: string;
+        };
+        AccountLedgerPage: {
+            data: components["schemas"]["AccountLedgerLine"][];
+            nextCursor: string | null;
+            /**
+             * @description The balance before `from`
+             * @example 0.00
+             */
+            opening: string;
+        };
+        MoneyAccount: {
+            id: number;
+            /** @example CASH-1 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "CASH" | "BANK";
+            branchId: number | null;
+            branchName: string | null;
+            bankName: string | null;
+            bankAccountNo: string | null;
+            glAccountId: number;
+            /** @example 100101 */
+            glAccountCode: string;
+            glAccountName: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /**
+             * @description Σ in − Σ out of the posted vouchers
+             * @example 250000.00
+             */
+            balance: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        MoneyAccountRequest: {
+            /** @example KHAN-1 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "CASH" | "BANK";
+            branchId?: number | null;
+            bankName?: string | null;
+            bankAccountNo?: string | null;
+            /** @description The asset account the vouchers hit */
+            glAccountId: number;
+        };
+        MoneyAccountPatch: {
+            code?: string;
+            name?: string;
+            branchId?: number | null;
+            bankName?: string | null;
+            bankAccountNo?: string | null;
+            glAccountId?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        CashBookRow: {
+            id: number;
+            /** @example Т-20261016-0002 */
+            number: string;
+            /** @enum {string} */
+            status: "POSTED" | "VOID";
+            /** @enum {string} */
+            kind: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND" | "OTHER_IN" | "OTHER_OUT";
+            /** @enum {string} */
+            direction: "IN" | "OUT";
+            moneyAccountId: number;
+            /** @example CASH-1 */
+            moneyAccountCode: string;
+            moneyAccountName: string;
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string | null;
+            glAccountId: number | null;
+            glAccountCode: string | null;
+            glAccountName: string | null;
+            /** @example 150000.00 */
+            amount: string;
+            /**
+             * @description Settled by its live allocations
+             * @example 150000.00
+             */
+            allocatedAmount: string;
+            /** @example 2026-10-16 */
+            paidOn: string;
+            description: string | null;
+            reference: string | null;
+            counterpartyName: string | null;
+            collectedBy: number | null;
+            collectedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /**
+             * @description The account's balance after this voucher
+             * @example 250000.00
+             */
+            balanceAfter: string;
+        };
+        CashBookPage: {
+            data: components["schemas"]["CashBookRow"][];
+            nextCursor: string | null;
+            /**
+             * @description The balance before `from`
+             * @example 0.00
+             */
+            opening: string;
+        };
+        JournalEntry: {
+            id: number;
+            /** @example Ж-20261016-0003 */
+            number: string;
+            /** @example 2026-10-16 */
+            entryDate: string;
+            description: string;
+            /** @enum {string} */
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            /** @enum {string|null} */
+            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | null;
+            sourceId: number | null;
+            /** @description The document behind it */
+            sourceNumber: string | null;
+            reversesId: number | null;
+            reversesNumber: string | null;
+            reversedById: number | null;
+            reversedByNumber: string | null;
+            /**
+             * @description Σ debit
+             * @example 150000.00
+             */
+            amount: string;
+            lineCount: number;
+            postedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        JournalPage: {
+            data: components["schemas"]["JournalEntry"][];
+            nextCursor: string | null;
+        };
+        JournalLine: {
+            id: number;
+            lineNo: number;
+            accountId: number;
+            /** @example 120101 */
+            accountCode: string;
+            accountName: string;
+            /** @example 150000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            customerId: number | null;
+            customerName: string | null;
+            moneyAccountId: number | null;
+            moneyAccountName: string | null;
+            description: string | null;
+        };
+        JournalEntryDetail: {
+            id: number;
+            /** @example Ж-20261016-0003 */
+            number: string;
+            /** @example 2026-10-16 */
+            entryDate: string;
+            description: string;
+            /** @enum {string} */
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            /** @enum {string|null} */
+            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | null;
+            sourceId: number | null;
+            /** @description The document behind it */
+            sourceNumber: string | null;
+            reversesId: number | null;
+            reversesNumber: string | null;
+            reversedById: number | null;
+            reversedByNumber: string | null;
+            /**
+             * @description Σ debit
+             * @example 150000.00
+             */
+            amount: string;
+            lineCount: number;
+            postedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["JournalLine"][];
+        };
+        JournalLineRequest: {
+            accountId: number;
+            /**
+             * @description Default 0
+             * @example 150000
+             */
+            debit?: string;
+            /**
+             * @description Default 0
+             * @example 0
+             */
+            credit?: string;
+            customerId?: number | null;
+            moneyAccountId?: number | null;
+            description?: string | null;
+        };
+        JournalEntryRequest: {
+            /** @example 2026-10-16 */
+            entryDate: string;
+            description: string;
+            lines: components["schemas"]["JournalLineRequest"][];
+        };
+        JournalReverseRequest: {
+            description: string;
+        };
+        Aging: {
+            /** @example 150000.00 */
+            NOT_DUE: string;
+            /** @example 0.00 */
+            D1_30: string;
+            /** @example 0.00 */
+            D31_60: string;
+            /** @example 0.00 */
+            D61_90: string;
+            /** @example 0.00 */
+            D90_PLUS: string;
+        };
+        CustomerBalance: {
+            customerId: number;
+            /** @example 0099 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** @example 5000000.00 */
+            creditLimit: string | null;
+            creditHold: boolean;
+            /**
+             * @description Negative = in advance
+             * @example 150000.00
+             */
+            balance: string;
+            openInvoices: number;
+            /** @example 0.00 */
+            overdueAmount: string;
+            /** @example 2026-11-15 */
+            oldestDueDate: string | null;
+            aging: components["schemas"]["Aging"];
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        CustomerBalancesPage: {
+            data: components["schemas"]["CustomerBalance"][];
+            nextCursor: string | null;
+        };
+        LedgerEntry: {
+            id: number;
+            /** @example 2026-10-16 */
+            entryDate: string;
+            /** @enum {string} */
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            /** @enum {string} */
+            docType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL";
+            docId: number;
+            /** @example Н-20261016-0001 */
+            docNumber: string;
+            /** @example 150000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /** @example 150000.00 */
+            balanceAfter: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CustomerLedgerPage: {
+            data: components["schemas"]["LedgerEntry"][];
+            nextCursor: string | null;
+            /**
+             * @description The balance before `from`
+             * @example 0.00
+             */
+            opening: string;
+        };
+        FinanceAttention: {
+            /** @example 0.00 */
+            overdueAmount: string;
+            overdueCustomers: number;
+            /** @example 150000.00 */
+            openAmount: string;
+            openInvoices: number;
+        };
+        FinanceNumberFormat: {
+            /** @example Н-{year}{month}{day}- */
+            pattern: string;
+            /** @example 4 */
+            digits: number;
+        };
+        FinanceNumbering: {
+            INVOICE: components["schemas"]["FinanceNumberFormat"];
+            PAYMENT: components["schemas"]["FinanceNumberFormat"];
+            CREDIT_NOTE: components["schemas"]["FinanceNumberFormat"];
+            JOURNAL: components["schemas"]["FinanceNumberFormat"];
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        FinanceNumberFormatRequest: {
+            /**
+             * @description Literal characters and {year}, {month}, {day}; ends with a non-digit
+             * @example Н-{year}{month}{day}-
+             */
+            pattern: string;
+            /** @example 4 */
+            digits: number;
+        };
+        FinanceNumberingRequest: {
+            INVOICE: components["schemas"]["FinanceNumberFormatRequest"];
+            PAYMENT: components["schemas"]["FinanceNumberFormatRequest"];
+            CREDIT_NOTE: components["schemas"]["FinanceNumberFormatRequest"];
+            JOURNAL: components["schemas"]["FinanceNumberFormatRequest"];
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -14454,6 +15650,983 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesChannelDefault"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Invoices_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+                /** @description Part of the number, the order number or the customer */
+                q?: string;
+                customerId?: number;
+                orderId?: number;
+                branchId?: number;
+                settlement?: "OPEN" | "PARTIAL" | "PAID";
+                status?: "ISSUED" | "VOID";
+                /** @description Only overdue invoices */
+                overdue?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Invoices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Invoices_void: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreditNotes_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+                invoiceId?: number;
+                customerId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNotePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreditNotes_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditNoteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreditNotes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payments_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+                /** @description Part of the number, reference, counterparty or customer */
+                q?: string;
+                moneyAccountId?: number;
+                customerId?: number;
+                kind?: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND" | "OTHER_IN" | "OTHER_OUT";
+                direction?: "IN" | "OUT";
+                status?: "POSTED" | "VOID";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payments_record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payments_void: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlAccountRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlAccountPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_setRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlAccountRoleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_ledger: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountLedgerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MoneyAccounts_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoneyAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MoneyAccounts_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoneyAccountRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoneyAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MoneyAccounts_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoneyAccountPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoneyAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MoneyAccounts_book: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashBookPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Journal_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+                source?: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+                accountId?: number;
+                customerId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Journal_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalEntryRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Journal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Journal_reverse: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalReverseRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBalances_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Part of a customer's name or code */
+                q?: string;
+                /** @description Only customers with an overdue amount */
+                overdue?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerBalancesPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBalances_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBalances_entries: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLedgerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinanceAttention_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinanceSettings_numbering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinanceSettings_setNumbering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceNumberingRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceNumbering"];
                 };
             };
             /** @description RFC 9457 problem details */

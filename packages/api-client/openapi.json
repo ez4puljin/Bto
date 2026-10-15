@@ -13186,6 +13186,1848 @@
           "sales"
         ]
       }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "operationId": "Invoices_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, the order number or the customer",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "settlement",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "PARTIAL",
+                "PAID"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ISSUED",
+                "VOID"
+              ]
+            }
+          },
+          {
+            "name": "overdue",
+            "required": false,
+            "in": "query",
+            "description": "Only overdue invoices",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}": {
+      "get": {
+        "operationId": "Invoices_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/void": {
+      "post": {
+        "operationId": "Invoices_void",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/credit-notes": {
+      "get": {
+        "operationId": "CreditNotes_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNotePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "CreditNotes_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNoteDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/{id}": {
+      "get": {
+        "operationId": "CreditNotes_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNoteDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "operationId": "Payments_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, reference, counterparty or customer",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "moneyAccountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CUSTOMER_PAYMENT",
+                "CUSTOMER_REFUND",
+                "OTHER_IN",
+                "OTHER_OUT"
+              ]
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "IN",
+                "OUT"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "POSTED",
+                "VOID"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "Payments_record",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}": {
+      "get": {
+        "operationId": "Payments_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/void": {
+      "post": {
+        "operationId": "Payments_void",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts": {
+      "get": {
+        "operationId": "GlAccounts_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GlAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "GlAccounts_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts/{id}": {
+      "put": {
+        "operationId": "GlAccounts_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlAccountPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts/{id}/role": {
+      "put": {
+        "operationId": "GlAccounts_setRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlAccountRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Which account the automatic entries hit (`finance.settings.manage`).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts/{id}/ledger": {
+      "get": {
+        "operationId": "GlAccounts_ledger",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountLedgerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/money-accounts": {
+      "get": {
+        "operationId": "MoneyAccounts_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MoneyAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "MoneyAccounts_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoneyAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/money-accounts/{id}": {
+      "put": {
+        "operationId": "MoneyAccounts_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoneyAccountPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoneyAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/money-accounts/{id}/book": {
+      "get": {
+        "operationId": "MoneyAccounts_book",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashBookPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The account's book: posted vouchers newest first with the balance after each.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/journal-entries": {
+      "get": {
+        "operationId": "Journal_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AUTO_INVOICE",
+                "AUTO_PAYMENT",
+                "AUTO_CREDIT_NOTE",
+                "AUTO_VOID",
+                "MANUAL",
+                "OPENING"
+              ]
+            }
+          },
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "Journal_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/journal-entries/{id}": {
+      "get": {
+        "operationId": "Journal_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/journal-entries/{id}/reverse": {
+      "post": {
+        "operationId": "Journal_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalReverseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntryDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/customer-balances": {
+      "get": {
+        "operationId": "CustomerBalances_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of a customer's name or code",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "overdue",
+            "required": false,
+            "in": "query",
+            "description": "Only customers with an overdue amount",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBalancesPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/customer-balances/{customerId}": {
+      "get": {
+        "operationId": "CustomerBalances_get",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerBalance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/customer-balances/{customerId}/ledger": {
+      "get": {
+        "operationId": "CustomerBalances_entries",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerLedgerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/attention": {
+      "get": {
+        "operationId": "FinanceAttention_attention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance-settings/numbering": {
+      "get": {
+        "operationId": "FinanceSettings_numbering",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceNumbering"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "FinanceSettings_setNumbering",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinanceNumberingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceNumbering"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
     }
   },
   "info": {
@@ -13300,7 +15142,12 @@
           "sales.orders.read",
           "sales.orders.manage",
           "sales.boards.manage",
-          "sales.orders.pick"
+          "sales.orders.pick",
+          "finance.read",
+          "finance.payments.record",
+          "finance.invoices.manage",
+          "finance.journal.manage",
+          "finance.settings.manage"
         ]
       },
       "RoleRef": {
@@ -24521,6 +26368,2747 @@
           "channel"
         ]
       },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "status": {
+            "enum": [
+              "ISSUED",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "settlement": {
+            "enum": [
+              "OPEN",
+              "PARTIAL",
+              "PAID"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-11-15"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Issued, not settled and past due today"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "13636.36"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "settlement",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "orderId",
+          "orderNumber",
+          "branchId",
+          "branchName",
+          "invoiceDate",
+          "dueDate",
+          "overdue",
+          "paymentMethod",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "openAmount",
+          "lineCount",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "InvoicePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invoice"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "Matches; first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "InvoiceLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "orderLineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "basis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "RETAIL",
+              "RETAIL_BULK"
+            ],
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "20"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "40"
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "listPrice": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "vatRatePct": {
+            "type": "string",
+            "example": "10.00"
+          },
+          "cityTaxRatePct": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "3636.36"
+          },
+          "cityTaxAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "returnedBase": {
+            "type": "string",
+            "example": "0",
+            "description": "Base units credit notes took back"
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "orderLineId",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "uomName",
+          "basis",
+          "qty",
+          "factorSnapshot",
+          "qtyBase",
+          "warehouseId",
+          "warehouseName",
+          "listPrice",
+          "unitPrice",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "vatType",
+          "vatRatePct",
+          "cityTaxRatePct",
+          "vatAmount",
+          "cityTaxAmount",
+          "returnedBase"
+        ]
+      },
+      "InvoiceAllocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sourceType": {
+            "enum": [
+              "PAYMENT",
+              "CREDIT_NOTE"
+            ],
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "number"
+          },
+          "sourceNumber": {
+            "type": "string",
+            "example": "Т-20261016-0002"
+          },
+          "sourceDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "amount": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "sourceType",
+          "sourceId",
+          "sourceNumber",
+          "sourceDate",
+          "amount",
+          "createdAt",
+          "voidedAt"
+        ]
+      },
+      "InvoiceCreditNoteRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К-20261017-0001"
+          },
+          "noteDate": {
+            "type": "string",
+            "example": "2026-10-17"
+          },
+          "total": {
+            "type": "string",
+            "example": "20000.00"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "noteDate",
+          "total"
+        ]
+      },
+      "InvoiceDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "status": {
+            "enum": [
+              "ISSUED",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "settlement": {
+            "enum": [
+              "OPEN",
+              "PARTIAL",
+              "PAID"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-11-15"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Issued, not settled and past due today"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "13636.36"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "voidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidJournalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceLine"
+            }
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceAllocation"
+            }
+          },
+          "creditNotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceCreditNoteRef"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "settlement",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "orderId",
+          "orderNumber",
+          "branchId",
+          "branchName",
+          "invoiceDate",
+          "dueDate",
+          "overdue",
+          "paymentMethod",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "openAmount",
+          "lineCount",
+          "createdAt",
+          "createdByName",
+          "note",
+          "journalEntryId",
+          "journalNumber",
+          "voidedAt",
+          "voidedByName",
+          "voidReason",
+          "voidJournalEntryId",
+          "lines",
+          "allocations",
+          "creditNotes"
+        ]
+      },
+      "VoidRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreditNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К-20261017-0001"
+          },
+          "invoiceId": {
+            "type": "number"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "noteDate": {
+            "type": "string",
+            "example": "2026-10-17"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true
+          },
+          "binCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "1818.18"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "allocatedAmount": {
+            "type": "string",
+            "example": "20000.00",
+            "description": "What it settled of the invoice"
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "invoiceId",
+          "invoiceNumber",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "noteDate",
+          "reason",
+          "warehouseId",
+          "warehouseName",
+          "binId",
+          "binCode",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "allocatedAmount",
+          "journalEntryId",
+          "journalNumber",
+          "lineCount",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "CreditNotePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditNote"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CreditNoteLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "invoiceLineId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "qty": {
+            "type": "string",
+            "example": "1"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "20"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "20"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "1818.18"
+          },
+          "cityTaxAmount": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "invoiceLineId",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "uomName",
+          "qty",
+          "factorSnapshot",
+          "qtyBase",
+          "unitPrice",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "vatAmount",
+          "cityTaxAmount"
+        ]
+      },
+      "CreditNoteDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К-20261017-0001"
+          },
+          "invoiceId": {
+            "type": "number"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "noteDate": {
+            "type": "string",
+            "example": "2026-10-17"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true
+          },
+          "binCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "20000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "1818.18"
+          },
+          "cityTaxTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "allocatedAmount": {
+            "type": "string",
+            "example": "20000.00",
+            "description": "What it settled of the invoice"
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditNoteLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "invoiceId",
+          "invoiceNumber",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "noteDate",
+          "reason",
+          "warehouseId",
+          "warehouseName",
+          "binId",
+          "binCode",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cityTaxTotal",
+          "allocatedAmount",
+          "journalEntryId",
+          "journalNumber",
+          "lineCount",
+          "createdAt",
+          "createdByName",
+          "lines"
+        ]
+      },
+      "CreditNoteLineRequest": {
+        "type": "object",
+        "properties": {
+          "invoiceLineId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "1",
+            "description": "In the invoice line's unit"
+          }
+        },
+        "required": [
+          "invoiceLineId",
+          "qty"
+        ]
+      },
+      "CreditNoteRequest": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "noteDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-17",
+            "description": "Default today"
+          },
+          "warehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Where the goods go back; null = nothing comes back"
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Default the RETURNS bin"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditNoteLineRequest"
+            }
+          }
+        },
+        "required": [
+          "invoiceId",
+          "reason",
+          "lines"
+        ]
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Т-20261016-0002"
+          },
+          "status": {
+            "enum": [
+              "POSTED",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER_PAYMENT",
+              "CUSTOMER_REFUND",
+              "OTHER_IN",
+              "OTHER_OUT"
+            ],
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number"
+          },
+          "moneyAccountCode": {
+            "type": "string",
+            "example": "CASH-1"
+          },
+          "moneyAccountName": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "glAccountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "allocatedAmount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Settled by its live allocations"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "collectedBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "collectedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "kind",
+          "direction",
+          "moneyAccountId",
+          "moneyAccountCode",
+          "moneyAccountName",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "glAccountId",
+          "glAccountCode",
+          "glAccountName",
+          "amount",
+          "allocatedAmount",
+          "paidOn",
+          "description",
+          "reference",
+          "counterpartyName",
+          "collectedBy",
+          "collectedByName",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "PaymentPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "Matches; first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "PaymentAllocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "invoiceId": {
+            "type": "number"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "invoiceDueDate": {
+            "type": "string",
+            "example": "2026-11-15"
+          },
+          "amount": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "invoiceNumber",
+          "invoiceDueDate",
+          "amount",
+          "voidedAt"
+        ]
+      },
+      "PaymentDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Т-20261016-0002"
+          },
+          "status": {
+            "enum": [
+              "POSTED",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER_PAYMENT",
+              "CUSTOMER_REFUND",
+              "OTHER_IN",
+              "OTHER_OUT"
+            ],
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number"
+          },
+          "moneyAccountCode": {
+            "type": "string",
+            "example": "CASH-1"
+          },
+          "moneyAccountName": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "glAccountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "allocatedAmount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Settled by its live allocations"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "collectedBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "collectedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "voidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidJournalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentAllocation"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "kind",
+          "direction",
+          "moneyAccountId",
+          "moneyAccountCode",
+          "moneyAccountName",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "glAccountId",
+          "glAccountCode",
+          "glAccountName",
+          "amount",
+          "allocatedAmount",
+          "paidOn",
+          "description",
+          "reference",
+          "counterpartyName",
+          "collectedBy",
+          "collectedByName",
+          "createdAt",
+          "createdByName",
+          "journalEntryId",
+          "journalNumber",
+          "voidedAt",
+          "voidedByName",
+          "voidReason",
+          "voidJournalEntryId",
+          "allocations"
+        ]
+      },
+      "PaymentAllocationRequest": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "example": "50000"
+          }
+        },
+        "required": [
+          "invoiceId",
+          "amount"
+        ]
+      },
+      "PaymentRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "CUSTOMER_PAYMENT",
+              "CUSTOMER_REFUND",
+              "OTHER_IN",
+              "OTHER_OUT"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Customer kinds"
+          },
+          "glAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Other income or expense"
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "A bank reference or a receipt number"
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "collectedBy": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The driver or staff member who handed the money in"
+          },
+          "allocations": {
+            "nullable": true,
+            "description": "What a customer payment settles; omitted = oldest due first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentAllocationRequest"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "moneyAccountId",
+          "amount",
+          "paidOn"
+        ]
+      },
+      "GlAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "120101"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          },
+          "role": {
+            "nullable": true,
+            "enum": [
+              "AR",
+              "SALES",
+              "SALES_DISCOUNT",
+              "SALES_RETURN",
+              "VAT_PAYABLE",
+              "CITY_TAX_PAYABLE",
+              "CUSTOMER_ADVANCE",
+              "CASH",
+              "BANK",
+              "OTHER_INCOME",
+              "OTHER_EXPENSE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Σ debit of the entries"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "balance": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit; negative = credit"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "role",
+          "status",
+          "debit",
+          "credit",
+          "balance",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "GlAccountRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "120102"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "kind"
+        ]
+      },
+      "GlAccountPatch": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "GlAccountRoleRequest": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "nullable": true,
+            "enum": [
+              "AR",
+              "SALES",
+              "SALES_DISCOUNT",
+              "SALES_RETURN",
+              "VAT_PAYABLE",
+              "CITY_TAX_PAYABLE",
+              "CUSTOMER_ADVANCE",
+              "CASH",
+              "BANK",
+              "OTHER_INCOME",
+              "OTHER_EXPENSE"
+            ],
+            "type": "string",
+            "description": "null takes the role away"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "AccountLedgerLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "entryId": {
+            "type": "number"
+          },
+          "entryNumber": {
+            "type": "string",
+            "example": "Ж-20261016-0003"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "entryDescription": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "AUTO_INVOICE",
+              "AUTO_PAYMENT",
+              "AUTO_CREDIT_NOTE",
+              "AUTO_VOID",
+              "MANUAL",
+              "OPENING"
+            ],
+            "type": "string"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "balanceAfter": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit after this line"
+          }
+        },
+        "required": [
+          "id",
+          "entryId",
+          "entryNumber",
+          "entryDate",
+          "entryDescription",
+          "source",
+          "lineNo",
+          "debit",
+          "credit",
+          "customerId",
+          "customerName",
+          "description",
+          "balanceAfter"
+        ]
+      },
+      "AccountLedgerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountLedgerLine"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00",
+            "description": "The balance before `from`"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "opening"
+        ]
+      },
+      "MoneyAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "CASH-1"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankAccountNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountId": {
+            "type": "number"
+          },
+          "glAccountCode": {
+            "type": "string",
+            "example": "100101"
+          },
+          "glAccountName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "balance": {
+            "type": "string",
+            "example": "250000.00",
+            "description": "Σ in − Σ out of the posted vouchers"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind",
+          "branchId",
+          "branchName",
+          "bankName",
+          "bankAccountNo",
+          "glAccountId",
+          "glAccountCode",
+          "glAccountName",
+          "status",
+          "balance",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MoneyAccountRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "KHAN-1"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "bankAccountNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "glAccountId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The asset account the vouchers hit"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "kind",
+          "glAccountId"
+        ]
+      },
+      "MoneyAccountPatch": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "bankAccountNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "glAccountId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "CashBookRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Т-20261016-0002"
+          },
+          "status": {
+            "enum": [
+              "POSTED",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER_PAYMENT",
+              "CUSTOMER_REFUND",
+              "OTHER_IN",
+              "OTHER_OUT"
+            ],
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number"
+          },
+          "moneyAccountCode": {
+            "type": "string",
+            "example": "CASH-1"
+          },
+          "moneyAccountName": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "glAccountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "glAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "allocatedAmount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Settled by its live allocations"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "collectedBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "collectedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "balanceAfter": {
+            "type": "string",
+            "example": "250000.00",
+            "description": "The account's balance after this voucher"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "kind",
+          "direction",
+          "moneyAccountId",
+          "moneyAccountCode",
+          "moneyAccountName",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "glAccountId",
+          "glAccountCode",
+          "glAccountName",
+          "amount",
+          "allocatedAmount",
+          "paidOn",
+          "description",
+          "reference",
+          "counterpartyName",
+          "collectedBy",
+          "collectedByName",
+          "createdAt",
+          "createdByName",
+          "balanceAfter"
+        ]
+      },
+      "CashBookPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashBookRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00",
+            "description": "The balance before `from`"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "opening"
+        ]
+      },
+      "JournalEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Ж-20261016-0003"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "AUTO_INVOICE",
+              "AUTO_PAYMENT",
+              "AUTO_CREDIT_NOTE",
+              "AUTO_VOID",
+              "MANUAL",
+              "OPENING"
+            ],
+            "type": "string"
+          },
+          "sourceType": {
+            "nullable": true,
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "JOURNAL"
+            ],
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sourceNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "The document behind it"
+          },
+          "reversesId": {
+            "type": "number",
+            "nullable": true
+          },
+          "reversesNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversedById": {
+            "type": "number",
+            "nullable": true
+          },
+          "reversedByNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Σ debit"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "postedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "entryDate",
+          "description",
+          "source",
+          "sourceType",
+          "sourceId",
+          "sourceNumber",
+          "reversesId",
+          "reversesNumber",
+          "reversedById",
+          "reversedByNumber",
+          "amount",
+          "lineCount",
+          "postedByName",
+          "createdAt"
+        ]
+      },
+      "JournalPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "JournalLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "accountId": {
+            "type": "number"
+          },
+          "accountCode": {
+            "type": "string",
+            "example": "120101"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "accountId",
+          "accountCode",
+          "accountName",
+          "debit",
+          "credit",
+          "customerId",
+          "customerName",
+          "moneyAccountId",
+          "moneyAccountName",
+          "description"
+        ]
+      },
+      "JournalEntryDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Ж-20261016-0003"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "AUTO_INVOICE",
+              "AUTO_PAYMENT",
+              "AUTO_CREDIT_NOTE",
+              "AUTO_VOID",
+              "MANUAL",
+              "OPENING"
+            ],
+            "type": "string"
+          },
+          "sourceType": {
+            "nullable": true,
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "JOURNAL"
+            ],
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sourceNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "The document behind it"
+          },
+          "reversesId": {
+            "type": "number",
+            "nullable": true
+          },
+          "reversesNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversedById": {
+            "type": "number",
+            "nullable": true
+          },
+          "reversedByNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Σ debit"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "postedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "entryDate",
+          "description",
+          "source",
+          "sourceType",
+          "sourceId",
+          "sourceNumber",
+          "reversesId",
+          "reversesNumber",
+          "reversedById",
+          "reversedByNumber",
+          "amount",
+          "lineCount",
+          "postedByName",
+          "createdAt",
+          "lines"
+        ]
+      },
+      "JournalLineRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000",
+            "description": "Default 0"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0",
+            "description": "Default 0"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "accountId"
+        ]
+      },
+      "JournalEntryRequest": {
+        "type": "object",
+        "properties": {
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "lines": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLineRequest"
+            }
+          }
+        },
+        "required": [
+          "entryDate",
+          "description",
+          "lines"
+        ]
+      },
+      "JournalReverseRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "Aging": {
+        "type": "object",
+        "properties": {
+          "NOT_DUE": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "D1_30": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "D31_60": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "D61_90": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "D90_PLUS": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "NOT_DUE",
+          "D1_30",
+          "D31_60",
+          "D61_90",
+          "D90_PLUS"
+        ]
+      },
+      "CustomerBalance": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "0099"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "example": "5000000.00"
+          },
+          "creditHold": {
+            "type": "boolean"
+          },
+          "balance": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "Negative = in advance"
+          },
+          "openInvoices": {
+            "type": "number"
+          },
+          "overdueAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-15"
+          },
+          "aging": {
+            "$ref": "#/components/schemas/Aging"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "status",
+          "creditLimit",
+          "creditHold",
+          "balance",
+          "openInvoices",
+          "overdueAmount",
+          "oldestDueDate",
+          "aging",
+          "updatedAt"
+        ]
+      },
+      "CustomerBalancesPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerBalance"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "LedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "REFUND",
+              "ADJUSTMENT",
+              "OPENING",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "docType": {
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "JOURNAL"
+            ],
+            "type": "string"
+          },
+          "docId": {
+            "type": "number"
+          },
+          "docNumber": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "balanceAfter": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "entryDate",
+          "kind",
+          "docType",
+          "docId",
+          "docNumber",
+          "debit",
+          "credit",
+          "balanceAfter",
+          "createdAt"
+        ]
+      },
+      "CustomerLedgerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00",
+            "description": "The balance before `from`"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "opening"
+        ]
+      },
+      "FinanceAttention": {
+        "type": "object",
+        "properties": {
+          "overdueAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "overdueCustomers": {
+            "type": "number"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "openInvoices": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "overdueAmount",
+          "overdueCustomers",
+          "openAmount",
+          "openInvoices"
+        ]
+      },
+      "FinanceNumberFormat": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "example": "Н-{year}{month}{day}-"
+          },
+          "digits": {
+            "type": "number",
+            "example": 4
+          }
+        },
+        "required": [
+          "pattern",
+          "digits"
+        ]
+      },
+      "FinanceNumbering": {
+        "type": "object",
+        "properties": {
+          "INVOICE": {
+            "$ref": "#/components/schemas/FinanceNumberFormat"
+          },
+          "PAYMENT": {
+            "$ref": "#/components/schemas/FinanceNumberFormat"
+          },
+          "CREDIT_NOTE": {
+            "$ref": "#/components/schemas/FinanceNumberFormat"
+          },
+          "JOURNAL": {
+            "$ref": "#/components/schemas/FinanceNumberFormat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "INVOICE",
+          "PAYMENT",
+          "CREDIT_NOTE",
+          "JOURNAL",
+          "updatedAt"
+        ]
+      },
+      "FinanceNumberFormatRequest": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "maxLength": 24,
+            "example": "Н-{year}{month}{day}-",
+            "description": "Literal characters and {year}, {month}, {day}; ends with a non-digit"
+          },
+          "digits": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 8,
+            "example": 4
+          }
+        },
+        "required": [
+          "pattern",
+          "digits"
+        ]
+      },
+      "FinanceNumberingRequest": {
+        "type": "object",
+        "properties": {
+          "INVOICE": {
+            "$ref": "#/components/schemas/FinanceNumberFormatRequest"
+          },
+          "PAYMENT": {
+            "$ref": "#/components/schemas/FinanceNumberFormatRequest"
+          },
+          "CREDIT_NOTE": {
+            "$ref": "#/components/schemas/FinanceNumberFormatRequest"
+          },
+          "JOURNAL": {
+            "$ref": "#/components/schemas/FinanceNumberFormatRequest"
+          }
+        },
+        "required": [
+          "INVOICE",
+          "PAYMENT",
+          "CREDIT_NOTE",
+          "JOURNAL"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -24614,7 +29202,13 @@
           "EBARIMT_ATTRIBUTES_MISSING",
           "TIN_PENDING",
           "EBARIMT_INDETERMINATE",
-          "PAYMENT_NOT_VERIFIED"
+          "PAYMENT_NOT_VERIFIED",
+          "INVOICE_STATE_INVALID",
+          "PAYMENT_STATE_INVALID",
+          "ALLOCATION_EXCEEDS",
+          "JOURNAL_UNBALANCED",
+          "ACCOUNT_ROLE_TAKEN",
+          "ACCOUNT_ROLE_MISSING"
         ]
       },
       "ProblemFieldError": {

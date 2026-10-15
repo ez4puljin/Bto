@@ -81,3 +81,19 @@ export {
   salesStageRoles,
   salesStages,
 } from '../modules/sales/schema';
+export {
+  allocations,
+  arEntries,
+  creditNoteLines,
+  creditNotes,
+  customerBalances,
+  financeReconcileRuns,
+  financeSettings,
+  glAccounts,
+  invoiceLines,
+  invoices,
+  journalEntries,
+  journalLines,
+  moneyAccounts,
+  payments,
+} from '../modules/finance/schema';

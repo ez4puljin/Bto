@@ -24,6 +24,8 @@ export interface JobPayloads {
   'identity.housekeeping': ScheduledPayload;
   /** Nightly: the rows of old unsuccessful imports and sheets past their retention. */
   'imports.housekeeping': ScheduledPayload;
+  /** Nightly: the receivables cache against the ledger and the invoices (ADR-0060 #4). */
+  'finance.reconcile': ScheduledPayload;
 }
 
 /** Scheduled jobs carry no data: the schedule sends null (ADR-0040). */
@@ -77,6 +79,7 @@ export const JOB_QUEUES: Readonly<Record<JobName, Omit<Queue, 'name'>>> = {
   'inventory.snapshotMonthly': scheduledQueue(),
   'identity.housekeeping': scheduledQueue(),
   'imports.housekeeping': scheduledQueue(),
+  'finance.reconcile': scheduledQueue(),
 };
 
 export const JOB_NAME_PATTERN = /^[a-z]+\.[a-z][A-Za-z]*$/;

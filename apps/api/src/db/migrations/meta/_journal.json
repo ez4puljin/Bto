@@ -183,6 +183,13 @@
       "when": 1792050413656,
       "tag": "0025_sales_pipelines",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792082572354,
+      "tag": "0026_finance",
+      "breakpoints": true
     }
   ]
 }

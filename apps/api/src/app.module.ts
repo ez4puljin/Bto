@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { LlmModule } from './integrations/llm';
 import { AiHttpModule } from './modules/ai';
 import { CatalogHttpModule } from './modules/catalog';
+import { FinanceHttpModule } from './modules/finance';
 import { IdentityHttpModule } from './modules/identity';
 import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
@@ -33,6 +34,7 @@ import { SegmentsHttpModule } from './modules/segments';
     AiHttpModule,
     SegmentsHttpModule,
     SalesHttpModule,
+    FinanceHttpModule,
   ],
 })
 export class AppModule {}

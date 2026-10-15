@@ -41,7 +41,8 @@
     "catalog:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run catalog:reindex-search",
     "partners:reindex-search": "pnpm run build:packages && pnpm --filter @tugeel/api run partners:reindex-search",
     "inventory:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:reconcile",
-    "inventory:rebuild-balances": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:rebuild-balances"
+    "inventory:rebuild-balances": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:rebuild-balances",
+    "finance:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:reconcile"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

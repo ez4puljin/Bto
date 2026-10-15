@@ -26,7 +26,8 @@
     "catalog:reindex-search": "tsx src/modules/catalog/cli/reindex-search.ts",
     "partners:reindex-search": "tsx src/modules/partners/cli/reindex-search.ts",
     "inventory:reconcile": "tsx src/modules/inventory/cli/reconcile.ts",
-    "inventory:rebuild-balances": "tsx src/modules/inventory/cli/rebuild-balances.ts"
+    "inventory:rebuild-balances": "tsx src/modules/inventory/cli/rebuild-balances.ts",
+    "finance:reconcile": "tsx src/modules/finance/cli/reconcile.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.2",
