@@ -69,12 +69,14 @@ export { aiConversations, aiQuestions, aiReports } from '../modules/ai/schema';
 export { segmentProducts, segments } from '../modules/segments/schema';
 export {
   orderStatusEvents,
-  salesBoardRoles,
   salesBoards,
   salesChannelDefaults,
   salesOrderLineParts,
   salesOrderLines,
   salesOrders,
+  salesPipelineRoles,
+  salesPipelines,
+  salesSettings,
   salesStageMoves,
   salesStageRoles,
   salesStages,

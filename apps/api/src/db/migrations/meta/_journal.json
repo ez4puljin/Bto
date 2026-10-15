@@ -176,6 +176,13 @@
       "when": 1792037774790,
       "tag": "0024_sales_boards",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792050413656,
+      "tag": "0025_sales_pipelines",
+      "breakpoints": true
     }
   ]
 }

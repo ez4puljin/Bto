@@ -102,11 +102,16 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   cancelReason: null,
   boardId: null,
   boardName: null,
+  pipelineId: null,
+  pipelineName: null,
   stageId: null,
   stageName: null,
   stageEnteredAt: null,
   pickedAt: null,
   deliveredAt: null,
+  archivedAt: null,
+  createdByName: 'Оффис Сараа',
+  canEdit: true,
   createdAt: STAMP,
   updatedAt: STAMP,
   moves: [],
@@ -161,14 +166,14 @@ describe('orders menu', () => {
   it('shows orders to the office and hides them from people without the right', async () => {
     renderApp('/system/status', signedIn(OFFICE_ME));
     expect(
-      within(await findSidebar()).getByRole('link', { name: mn.nav.salesOrders }),
+      within(await findSidebar()).getByRole('link', { name: mn.nav.salesWarehouse }),
     ).toBeInTheDocument();
   });
 
   it('keeps them from a user without sales rights', async () => {
     renderApp('/system/status', signedIn(WORKER_ME));
     expect(
-      within(await findSidebar()).queryByRole('link', { name: mn.nav.salesOrders }),
+      within(await findSidebar()).queryByRole('link', { name: mn.nav.salesWarehouse }),
     ).toBeNull();
   });
 });
@@ -242,7 +247,8 @@ describe('new order', () => {
     expect(created?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await bodyOf(created)).toEqual({
       customerId: 9,
-      boardId: null,
+      pipelineId: null,
+      stageId: null,
       fulfilment: 'DELIVERY',
       deliveryDate: defaultDeliveryDate(),
       addressId: 50,

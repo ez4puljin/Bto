@@ -2,7 +2,7 @@ import { Decimal } from '@tugeel/shared/money';
 import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { useWarehouseName } from '@/features/inventory/helpers';
@@ -10,6 +10,7 @@ import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { type SalesOrder, useSalesOrder } from './api';
+import { useOrderBatch } from './pipelines-api';
 
 const isKind = (value: string | undefined): value is PrintKind =>
   value !== undefined && (PRINT_KINDS as readonly string[]).includes(value);
@@ -20,19 +21,65 @@ const isKind = (value: string | undefined): value is PrintKind =>
  * the browser's print dialog once loaded. Nothing is generated on the server.
  */
 export function SalesOrderPrintPage() {
-  const { t } = useTranslation();
   const params = useParams();
   const id = Number.parseInt(params.id ?? '', 10);
   const kind = isKind(params.kind) ? params.kind : 'PICK_LIST';
   const order = useSalesOrder(id);
+  return (
+    <PrintFrame
+      kind={kind}
+      orders={order.data ? [order.data] : undefined}
+      error={order.error}
+      title={order.data ? (order.data.number ?? String(order.data.id)) : ''}
+    />
+  );
+}
+
+/**
+ * Several orders on one printout (ADR-0057 #7, a stage's «Баримт хэвлэх»): `?ids=` names up to 100
+ * orders, each on its own sheet; a delivery note leaves out the drafts, which have no prices.
+ */
+export function SalesBatchPrintPage() {
+  const { t } = useTranslation();
+  const params = useParams();
+  const [search] = useSearchParams();
+  const kind = isKind(params.kind) ? params.kind : 'PICK_LIST';
+  const ids = (search.get('ids') ?? '')
+    .split(',')
+    .map((id) => Number.parseInt(id, 10))
+    .filter((id) => id > 0);
+  const batch = useOrderBatch(ids);
+  const orders = batch.data?.filter((order) => kind === 'PICK_LIST' || order.total !== null);
+  return (
+    <PrintFrame
+      kind={kind}
+      orders={orders}
+      error={batch.error}
+      title={t('sales.print.batchTitle', { count: orders?.length ?? 0 })}
+    />
+  );
+}
+
+function PrintFrame({
+  kind,
+  orders,
+  error,
+  title,
+}: {
+  kind: PrintKind;
+  orders: SalesOrder[] | undefined;
+  error: unknown;
+  title: string;
+}) {
+  const { t } = useTranslation();
   const printed = useRef(false);
   useEffect(() => {
-    if (!order.data || printed.current) return;
+    if (!orders || orders.length === 0 || printed.current) return;
     printed.current = true;
-    document.title = `${order.data.number ?? order.data.id} · ${t(`sales.printKinds.${kind}`)}`;
+    document.title = `${title} · ${t(`sales.printKinds.${kind}`)}`;
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
-  }, [order.data, kind, t]);
+  }, [orders, kind, title, t]);
 
   return (
     <div className="mx-auto max-w-3xl bg-background p-6 text-sm text-foreground print:p-0">
@@ -42,14 +89,15 @@ export function SalesOrderPrintPage() {
           {t('common.close')}
         </Button>
       </div>
-      <ProblemAlert problem={problemFromError(order.error)} />
-      {order.data ? (
-        kind === 'DELIVERY_NOTE' ? (
-          <DeliveryNote order={order.data} />
-        ) : (
-          <PickList order={order.data} />
-        )
-      ) : null}
+      <ProblemAlert problem={problemFromError(error)} />
+      {(orders ?? []).map((order, index, all) => (
+        <section
+          key={order.id}
+          className={index < all.length - 1 ? 'mb-10 break-after-page print:mb-0' : undefined}
+        >
+          {kind === 'DELIVERY_NOTE' ? <DeliveryNote order={order} /> : <PickList order={order} />}
+        </section>
+      ))}
     </div>
   );
 }

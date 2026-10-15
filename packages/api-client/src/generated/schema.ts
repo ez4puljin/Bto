@@ -2739,6 +2739,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-orders/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Up to 100 orders the caller sees, whole, for one printed page (ADR-0057 #7). */
+        get: operations["SalesOrders_batch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-orders/product-info": {
         parameters: {
             query?: never;
@@ -2836,8 +2853,41 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered). */
+        /** DRAFT → CONFIRMED: prices frozen, stock reserved (the rest backordered). */
         post: operations["SalesOrders_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Takes a finished order off the board; it stays in the list (ADR-0057 #5). */
+        post: operations["SalesOrders_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/{id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesOrders_unarchive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2867,25 +2917,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["SalesBoards_list"];
+        get: operations["SalesBoards_tree"];
         put?: never;
         post: operations["SalesBoards_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sales-boards/defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["SalesBoards_defaults"];
-        put: operations["SalesBoards_setDefault"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2899,48 +2933,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["SalesBoards_get"];
+        get?: never;
         put: operations["SalesBoards_update"];
         post?: never;
+        /** Archives a board without live pipelines. */
         delete: operations["SalesBoards_archive"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/sales-boards/{id}/cards": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["SalesBoards_cards"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sales-boards/{id}/roles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["SalesBoards_setRoles"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/sales-boards/{id}/stages": {
+    "/api/v1/sales-boards/{id}/unarchive": {
         parameters: {
             query?: never;
             header?: never;
@@ -2949,14 +2952,48 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["SalesBoards_addStage"];
+        post: operations["SalesBoards_unarchive"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/sales-boards/{id}/stage-order": {
+    "/api/v1/sales-pipelines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesPipelines_get"];
+        /** Saves the pipeline whole: settings, roles and its stages in their order. */
+        put: operations["SalesPipelines_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-pipelines/{id}/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cards of the pipeline's visible stages, each in its sort, with counts and totals. */
+        get: operations["SalesPipelines_cards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-pipelines": {
         parameters: {
             query?: never;
             header?: never;
@@ -2964,8 +3001,56 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["SalesBoards_reorder"];
-        post?: never;
+        put?: never;
+        post: operations["SalesPipelines_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-pipelines/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesPipelines_copy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-pipelines/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesPipelines_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-pipelines/{id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesPipelines_unarchive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2980,9 +3065,77 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["SalesStages_update"];
+        put?: never;
         post?: never;
+        /** Archives a stage holding no unfinished order; answers the pipeline. */
         delete: operations["SalesStages_archive"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-stages/{id}/sort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** How the stage orders its cards, for everyone. */
+        put: operations["SalesStages_sort"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-stages/{id}/archive-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archives every finished order of the stage the caller sees. */
+        post: operations["SalesStages_archiveCards"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-settings/numbering": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesSettings_numbering"];
+        put: operations["SalesSettings_setNumbering"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-settings/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesSettings_channels"];
+        /** Where a channel's new orders land; both ids null clears it. */
+        put: operations["SalesSettings_setChannel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5853,20 +6006,21 @@ export interface components {
             deliveryDate: string;
             total: string | null;
             lineCount: number;
+            pipelineId: number | null;
+            pipelineName: string | null;
+            stageId: number | null;
+            stageName: string | null;
+            /** Format: date-time */
+            archivedAt: string | null;
+            createdByName: string | null;
             /** Format: date-time */
             createdAt: string;
         };
         SalesOrderPage: {
             data: components["schemas"]["SalesOrderSummary"][];
             nextCursor: string | null;
-        };
-        SalesOrderProductInfo: {
-            productId: number;
-            homeWarehouseId: number | null;
-            /** @description Active and complete (ADR-0044) */
-            sellable: boolean;
-            /** @description Base units available in the home warehouse */
-            available: string;
+            /** @description Orders the filters keep (first page) */
+            total: number | null;
         };
         SalesOrderApplied: {
             programId: number;
@@ -5943,7 +6097,7 @@ export interface components {
         };
         SalesOrderDetail: {
             id: number;
-            /** @example SO-2026-000001 */
+            /** @example 20261015_0001 */
             number: string | null;
             /** @enum {string} */
             channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
@@ -5979,6 +6133,8 @@ export interface components {
             cancelReason: string | null;
             boardId: number | null;
             boardName: string | null;
+            pipelineId: number | null;
+            pipelineName: string | null;
             stageId: number | null;
             stageName: string | null;
             /** Format: date-time */
@@ -5988,12 +6144,25 @@ export interface components {
             /** Format: date-time */
             deliveredAt: string | null;
             /** Format: date-time */
+            archivedAt: string | null;
+            createdByName: string | null;
+            /** @description The caller may edit or archive the order (the stage's EDIT) */
+            canEdit: boolean;
+            /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
             lines: components["schemas"]["SalesOrderLine"][];
             events: components["schemas"]["SalesOrderEvent"][];
             moves: components["schemas"]["SalesOrderMove"][];
+        };
+        SalesOrderProductInfo: {
+            productId: number;
+            homeWarehouseId: number | null;
+            /** @description Active and complete (ADR-0044) */
+            sellable: boolean;
+            /** @description Base units available in the home warehouse */
+            available: string;
         };
         SalesOrderLineRequest: {
             productUnitId: number;
@@ -6005,8 +6174,10 @@ export interface components {
         };
         SalesOrderRequest: {
             customerId: number;
-            /** @description The board a new order goes on; null = the channel's default (ADR-0056) */
-            boardId?: number | null;
+            /** @description A new order's pipeline; null = the channel's default (ADR-0057) */
+            pipelineId?: number | null;
+            /** @description A stage without an action of that pipeline; null = the pipeline's landing stage */
+            stageId?: number | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /**
@@ -6025,7 +6196,7 @@ export interface components {
             lines: components["schemas"]["SalesOrderLineRequest"][];
         };
         SalesOrderMoveRequest: {
-            /** @description A stage of the order's board */
+            /** @description A stage of the order's pipeline */
             stageId: number;
             /** @description For a CANCEL stage */
             reason?: string | null;
@@ -6065,11 +6236,47 @@ export interface components {
         SalesOrderCancelRequest: {
             reason: string;
         };
-        SalesBoardRolesRequest: {
-            /** @description Roles that see the board; none = everyone */
+        SalesPipelineSummary: {
+            id: number;
+            boardId: number;
+            name: string;
+            position: number;
+            /** @enum {string} */
+            visibility: "PUBLIC" | "PRIVATE";
+            ownOrdersOnly: boolean;
+            /** Format: date-time */
+            archivedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /** @description The caller may configure it */
+            canManage: boolean;
+        };
+        SalesBoard: {
+            id: number;
+            name: string;
+            branchId: number | null;
+            position: number;
+            /** Format: date-time */
+            archivedAt: string | null;
+            /** @description The pipelines the caller sees */
+            pipelines: components["schemas"]["SalesPipelineSummary"][];
+        };
+        SalesBoardRequest: {
+            name: string;
+            /** @description The branch the board is for */
+            branchId?: number | null;
+        };
+        SalesCreated: {
+            id: number;
+        };
+        SalesPipelineRoles: {
+            /** @description A private pipeline: the roles that see it */
             VIEW: number[];
-            /** @description Roles that configure it */
+            /** @description Roles that configure it and see all its orders */
             MANAGE: number[];
+            /** @description Own orders only: the roles that still see every order */
+            ALL_ORDERS: number[];
         };
         SalesStageRoles: {
             VIEW: number[];
@@ -6078,13 +6285,15 @@ export interface components {
         };
         SalesStage: {
             id: number;
-            boardId: number;
+            pipelineId: number;
             name: string;
             position: number;
             /** @enum {string} */
             action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "CANCEL";
             printPickList: boolean;
             printDeliveryNote: boolean;
+            /** @enum {string} */
+            cardSort: "NEWEST" | "OLDEST" | "DELIVERY" | "TOTAL" | "WAITING";
             /** Format: date-time */
             archivedAt: string | null;
             roles: components["schemas"]["SalesStageRoles"];
@@ -6095,30 +6304,25 @@ export interface components {
             /** @description The caller may move cards into the stage */
             canMove: boolean;
         };
-        SalesBoard: {
+        SalesPipeline: {
             id: number;
+            boardId: number;
             name: string;
-            branchId: number | null;
             position: number;
+            /** @enum {string} */
+            visibility: "PUBLIC" | "PRIVATE";
+            ownOrdersOnly: boolean;
             /** Format: date-time */
             archivedAt: string | null;
-            roles: components["schemas"]["SalesBoardRolesRequest"];
-            /** @description The caller may configure the board */
+            /** Format: date-time */
+            createdAt: string;
+            roles: components["schemas"]["SalesPipelineRoles"];
+            /** @description The caller may configure the pipeline */
             canManage: boolean;
+            /** @description The caller sees every order, not only their own */
+            seesAll: boolean;
+            /** @description By position, archived ones included */
             stages: components["schemas"]["SalesStage"][];
-        };
-        SalesChannelDefault: {
-            /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
-            boardId: number;
-            stageId: number;
-        };
-        SalesChannelDefaultRequest: {
-            /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
-            /** @description null clears the default */
-            boardId?: number | null;
-            stageId?: number | null;
         };
         SalesOrderCard: {
             id: number;
@@ -6142,19 +6346,16 @@ export interface components {
         };
         SalesStageCards: {
             stageId: number;
-            /** @description Newest first, at most 200 */
+            /** @description In the stage's sort, at most 200 */
             cards: components["schemas"]["SalesOrderCard"][];
             /** @description Cards in the stage, also beyond the first 200 */
             count: number;
             /** @description Sum of the frozen totals, whole MNT */
             total: string;
         };
-        SalesBoardRequest: {
-            name: string;
-            /** @description The branch the board is for */
-            branchId?: number | null;
-        };
-        SalesStageRequest: {
+        SalesStageInput: {
+            /** @description A live stage; none = new */
+            id?: number | null;
             name: string;
             /** @enum {string} */
             action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "CANCEL";
@@ -6162,12 +6363,60 @@ export interface components {
             printDeliveryNote: boolean;
             roles: components["schemas"]["SalesStageRoles"];
         };
-        SalesStageOrderRequest: {
-            /** @description Every live stage of the board, in its new order */
-            stageIds: number[];
+        SalesPipelineRequest: {
+            boardId: number;
+            name: string;
+            /** @enum {string} */
+            visibility: "PUBLIC" | "PRIVATE";
+            ownOrdersOnly: boolean;
+            roles: components["schemas"]["SalesPipelineRoles"];
+            /** @description Every stage, in its order */
+            stages: components["schemas"]["SalesStageInput"][];
+        };
+        SalesPipelineCopyRequest: {
+            name: string;
+            boardId: number;
+        };
+        SalesStageSortRequest: {
+            /** @enum {string} */
+            sort: "NEWEST" | "OLDEST" | "DELIVERY" | "TOTAL" | "WAITING";
+        };
+        SalesArchived: {
+            /** @description Orders archived */
+            archived: number;
+        };
+        SalesNumbering: {
+            /** @example {year}{month}{day}_ */
+            pattern: string;
+            /** @example 4 */
+            digits: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        SalesNumberingRequest: {
+            /**
+             * @description Literal characters and {year}, {month}, {day}; ends with a non-digit
+             * @example {year}{month}{day}_
+             */
+            pattern: string;
+            /** @example 4 */
+            digits: number;
+        };
+        SalesChannelDefault: {
+            /** @enum {string} */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            pipelineId: number;
+            stageId: number;
+        };
+        SalesChannelDefaultRequest: {
+            /** @enum {string} */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** @description null clears the default */
+            pipelineId?: number | null;
+            stageId?: number | null;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -13176,10 +13425,22 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                status?: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
-                customerId?: number;
-                /** @description Part of the order number */
+                /** @description Part of the number, or of a customer name, code or phone */
                 q?: string;
+                customerId?: number;
+                /** @description Only the orders the caller entered */
+                mine?: boolean;
+                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+                fulfilment?: "PICKUP" | "DELIVERY";
+                paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
+                deliveryFrom?: string;
+                deliveryTo?: string;
+                /** @description A pipeline's id, or 'none' for orders without one */
+                pipeline?: string;
+                stageId?: number;
+                status?: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+                /** @description Archived orders; default exclude */
+                archived?: "exclude" | "include" | "only";
             };
             header?: never;
             path?: never;
@@ -13228,6 +13489,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_batch: {
+        parameters: {
+            query: {
+                /** @description Order ids, comma separated (at most 100) */
+                ids: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"][];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -13473,6 +13765,66 @@ export interface operations {
             };
         };
     };
+    SalesOrders_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_unarchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SalesOrders_cancel: {
         parameters: {
             query?: never;
@@ -13510,10 +13862,11 @@ export interface operations {
             };
         };
     };
-    SalesBoards_list: {
+    SalesBoards_tree: {
         parameters: {
             query?: {
-                archived?: string;
+                /** @description Managers: archived boards and pipelines too */
+                archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -13558,97 +13911,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalesBoard"];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    SalesBoards_defaults: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalesChannelDefault"][];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    SalesBoards_setDefault: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SalesChannelDefaultRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalesChannelDefault"][];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    SalesBoards_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalesBoard"];
+                    "application/json": components["schemas"]["SalesCreated"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -13677,13 +13940,11 @@ export interface operations {
             };
         };
         responses: {
-            200: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["SalesBoard"];
-                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
@@ -13724,9 +13985,112 @@ export interface operations {
             };
         };
     };
-    SalesBoards_cards: {
+    SalesBoards_unarchive: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesPipelines_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPipeline"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesPipelines_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesPipelineRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPipeline"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesPipelines_cards: {
+        parameters: {
+            query?: {
+                /** @description Part of the number, or of a customer name, code or phone */
+                q?: string;
+                customerId?: number;
+                /** @description Only the orders the caller entered */
+                mine?: boolean;
+                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+                fulfilment?: "PICKUP" | "DELIVERY";
+                paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
+                deliveryFrom?: string;
+                deliveryTo?: string;
+            };
             header?: never;
             path: {
                 id: number;
@@ -13754,52 +14118,16 @@ export interface operations {
             };
         };
     };
-    SalesBoards_setRoles: {
+    SalesPipelines_create: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SalesBoardRolesRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SalesBoard"];
-                };
-            };
-            /** @description RFC 9457 problem details */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    SalesBoards_addStage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SalesStageRequest"];
+                "application/json": components["schemas"]["SalesPipelineRequest"];
             };
         };
         responses: {
@@ -13808,7 +14136,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalesBoard"];
+                    "application/json": components["schemas"]["SalesPipeline"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -13822,7 +14150,7 @@ export interface operations {
             };
         };
     };
-    SalesBoards_reorder: {
+    SalesPipelines_copy: {
         parameters: {
             query?: never;
             header?: never;
@@ -13833,16 +14161,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SalesStageOrderRequest"];
+                "application/json": components["schemas"]["SalesPipelineCopyRequest"];
             };
         };
         responses: {
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalesBoard"];
+                    "application/json": components["schemas"]["SalesPipeline"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -13856,7 +14184,7 @@ export interface operations {
             };
         };
     };
-    SalesStages_update: {
+    SalesPipelines_archive: {
         parameters: {
             query?: never;
             header?: never;
@@ -13865,19 +14193,41 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SalesStageRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            200: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalesBoard"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    SalesPipelines_unarchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
@@ -13906,7 +14256,191 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalesBoard"];
+                    "application/json": components["schemas"]["SalesPipeline"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesStages_sort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesStageSortRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPipeline"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesStages_archiveCards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesArchived"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesSettings_numbering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesSettings_setNumbering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesNumberingRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesSettings_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesChannelDefault"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesSettings_setChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesChannelDefaultRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesChannelDefault"][];
                 };
             };
             /** @description RFC 9457 problem details */

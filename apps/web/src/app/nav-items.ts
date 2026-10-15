@@ -27,8 +27,6 @@ import {
   ScrollText,
   Settings,
   Shapes,
-  ShoppingCart,
-  SlidersVertical,
   SquareKanban,
   ShieldCheck,
   SlidersHorizontal,
@@ -51,6 +49,8 @@ export interface NavItem {
   label: NavKey;
   icon: LucideIcon;
   permission?: Permission;
+  /** Other paths whose pages belong to this entry (the breadcrumb, the recent pages). */
+  also?: readonly string[];
 }
 
 export interface NavGroup {
@@ -110,21 +110,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       {
         to: '/sales/boards',
-        label: 'nav.salesBoards',
+        label: 'nav.salesWarehouse',
         icon: SquareKanban,
         permission: 'sales.orders.read',
-      },
-      {
-        to: '/sales/orders',
-        label: 'nav.salesOrders',
-        icon: ShoppingCart,
-        permission: 'sales.orders.read',
-      },
-      {
-        to: '/sales/boards/settings',
-        label: 'nav.salesBoardSettings',
-        icon: SlidersVertical,
-        permission: 'sales.boards.manage',
+        also: ['/sales/orders'],
       },
     ],
   },
@@ -243,14 +232,18 @@ export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
 export function navTrail(
   pathname: string,
 ): { group: NavGroup; item: NavItem; exact: boolean } | null {
-  let best: { group: NavGroup; item: NavItem } | null = null;
+  let best: { group: NavGroup; item: NavItem; length: number } | null = null;
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
-      const inside = pathname === item.to || pathname.startsWith(`${item.to}/`);
-      if (inside && (!best || item.to.length > best.item.to.length)) best = { group, item };
+      for (const path of [item.to, ...(item.also ?? [])]) {
+        const inside = pathname === path || pathname.startsWith(`${path}/`);
+        if (inside && (!best || path.length > best.length)) {
+          best = { group, item, length: path.length };
+        }
+      }
     }
   }
-  return best ? { ...best, exact: pathname === best.item.to } : null;
+  return best ? { group: best.group, item: best.item, exact: pathname === best.item.to } : null;
 }
 
 export interface QuickAction {

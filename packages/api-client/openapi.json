@@ -11428,6 +11428,110 @@
             }
           },
           {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, or of a customer name, code or phone",
+            "schema": {
+              "maxLength": 60,
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders the caller entered",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "CUSTOMER_APP",
+                "SALES_REP",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "deliveryFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "pipeline",
+            "required": false,
+            "in": "query",
+            "description": "A pipeline's id, or 'none' for orders without one",
+            "schema": {
+              "pattern": "^(none|\\d{1,18})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "stageId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -11450,22 +11554,17 @@
             }
           },
           {
-            "name": "customerId",
+            "name": "archived",
             "required": false,
             "in": "query",
+            "description": "Archived orders; default exclude",
             "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Part of the order number",
-            "schema": {
-              "maxLength": 40,
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "exclude",
+                "include",
+                "only"
+              ]
             }
           }
         ],
@@ -11550,6 +11649,58 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/batch": {
+      "get": {
+        "operationId": "SalesOrders_batch",
+        "parameters": [
+          {
+            "name": "ids",
+            "required": true,
+            "in": "query",
+            "description": "Order ids, comma separated (at most 100)",
+            "schema": {
+              "pattern": "^\\d+(,\\d+){0,99}$",
+              "example": "12,15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesOrderDetail"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Up to 100 orders the caller sees, whole, for one printed page (ADR-0057 #7).",
         "tags": [
           "sales"
         ]
@@ -11934,7 +12085,98 @@
             "bearer": []
           }
         ],
-        "summary": "DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered).",
+        "summary": "DRAFT → CONFIRMED: prices frozen, stock reserved (the rest backordered).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/archive": {
+      "post": {
+        "operationId": "SalesOrders_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Takes a finished order off the board; it stays in the list (ADR-0057 #5).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/unarchive": {
+      "post": {
+        "operationId": "SalesOrders_unarchive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "sales"
         ]
@@ -12006,14 +12248,15 @@
     },
     "/api/v1/sales-boards": {
       "get": {
-        "operationId": "SalesBoards_list",
+        "operationId": "SalesBoards_tree",
         "parameters": [
           {
             "name": "archived",
             "required": false,
             "in": "query",
+            "description": "Managers: archived boards and pipelines too",
             "schema": {
-              "type": "string"
+              "type": "boolean"
             }
           }
         ],
@@ -12070,93 +12313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "sales"
-        ]
-      }
-    },
-    "/api/v1/sales-boards/defaults": {
-      "get": {
-        "operationId": "SalesBoards_defaults",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SalesChannelDefault"
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "sales"
-        ]
-      },
-      "put": {
-        "operationId": "SalesBoards_setDefault",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SalesChannelDefaultRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SalesChannelDefault"
-                  }
+                  "$ref": "#/components/schemas/SalesCreated"
                 }
               }
             }
@@ -12183,49 +12340,6 @@
       }
     },
     "/api/v1/sales-boards/{id}": {
-      "get": {
-        "operationId": "SalesBoards_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "sales"
-        ]
-      },
       "put": {
         "operationId": "SalesBoards_update",
         "parameters": [
@@ -12249,15 +12363,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
-                }
-              }
-            }
+          "204": {
+            "description": ""
           },
           "default": {
             "description": "RFC 9457 problem details",
@@ -12311,14 +12418,15 @@
             "bearer": []
           }
         ],
+        "summary": "Archives a board without live pipelines.",
         "tags": [
           "sales"
         ]
       }
     },
-    "/api/v1/sales-boards/{id}/cards": {
-      "get": {
-        "operationId": "SalesBoards_cards",
+    "/api/v1/sales-boards/{id}/unarchive": {
+      "post": {
+        "operationId": "SalesBoards_unarchive",
         "parameters": [
           {
             "name": "id",
@@ -12326,6 +12434,228 @@
             "in": "path",
             "schema": {
               "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-pipelines/{id}": {
+      "get": {
+        "operationId": "SalesPipelines_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPipeline"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesPipelines_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesPipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPipeline"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Saves the pipeline whole: settings, roles and its stages in their order.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-pipelines/{id}/cards": {
+      "get": {
+        "operationId": "SalesPipelines_cards",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, or of a customer name, code or phone",
+            "schema": {
+              "maxLength": 60,
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders the caller entered",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "CUSTOMER_APP",
+                "SALES_REP",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "deliveryFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date",
+              "type": "string"
             }
           }
         ],
@@ -12359,85 +12689,22 @@
             "bearer": []
           }
         ],
+        "summary": "The cards of the pipeline's visible stages, each in its sort, with counts and totals.",
         "tags": [
           "sales"
         ]
       }
     },
-    "/api/v1/sales-boards/{id}/roles": {
-      "put": {
-        "operationId": "SalesBoards_setRoles",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SalesBoardRolesRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "RFC 9457 problem details",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "sales"
-        ]
-      }
-    },
-    "/api/v1/sales-boards/{id}/stages": {
+    "/api/v1/sales-pipelines": {
       "post": {
-        "operationId": "SalesBoards_addStage",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
+        "operationId": "SalesPipelines_create",
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SalesStageRequest"
+                "$ref": "#/components/schemas/SalesPipelineRequest"
               }
             }
           }
@@ -12448,7 +12715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
+                  "$ref": "#/components/schemas/SalesPipeline"
                 }
               }
             }
@@ -12474,9 +12741,9 @@
         ]
       }
     },
-    "/api/v1/sales-boards/{id}/stage-order": {
-      "put": {
-        "operationId": "SalesBoards_reorder",
+    "/api/v1/sales-pipelines/{id}/copy": {
+      "post": {
+        "operationId": "SalesPipelines_copy",
         "parameters": [
           {
             "name": "id",
@@ -12492,21 +12759,97 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SalesStageOrderRequest"
+                "$ref": "#/components/schemas/SalesPipelineCopyRequest"
               }
             }
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
+                  "$ref": "#/components/schemas/SalesPipeline"
                 }
               }
             }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-pipelines/{id}/archive": {
+      "post": {
+        "operationId": "SalesPipelines_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-pipelines/{id}/unarchive": {
+      "post": {
+        "operationId": "SalesPipelines_unarchive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
           },
           "default": {
             "description": "RFC 9457 problem details",
@@ -12530,8 +12873,54 @@
       }
     },
     "/api/v1/sales-stages/{id}": {
+      "delete": {
+        "operationId": "SalesStages_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPipeline"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives a stage holding no unfinished order; answers the pipeline.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-stages/{id}/sort": {
       "put": {
-        "operationId": "SalesStages_update",
+        "operationId": "SalesStages_sort",
         "parameters": [
           {
             "name": "id",
@@ -12547,7 +12936,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SalesStageRequest"
+                "$ref": "#/components/schemas/SalesStageSortRequest"
               }
             }
           }
@@ -12558,7 +12947,90 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
+                  "$ref": "#/components/schemas/SalesPipeline"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "How the stage orders its cards, for everyone.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-stages/{id}/archive-cards": {
+      "post": {
+        "operationId": "SalesStages_archiveCards",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesArchived"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives every finished order of the stage the caller sees.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-settings/numbering": {
+      "get": {
+        "operationId": "SalesSettings_numbering",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesNumbering"
                 }
               }
             }
@@ -12583,25 +13055,26 @@
           "sales"
         ]
       },
-      "delete": {
-        "operationId": "SalesStages_archive",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
+      "put": {
+        "operationId": "SalesSettings_setNumbering",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesNumberingRequest"
+              }
             }
           }
-        ],
+        },
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalesBoard"
+                  "$ref": "#/components/schemas/SalesNumbering"
                 }
               }
             }
@@ -12622,6 +13095,93 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-settings/channels": {
+      "get": {
+        "operationId": "SalesSettings_channels",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesChannelDefault"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesSettings_setChannel",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesChannelDefaultRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesChannelDefault"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Where a channel's new orders land; both ids null clears it.",
         "tags": [
           "sales"
         ]
@@ -22354,6 +22914,31 @@
           "lineCount": {
             "type": "number"
           },
+          "pipelineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -22371,6 +22956,12 @@
           "deliveryDate",
           "total",
           "lineCount",
+          "pipelineId",
+          "pipelineName",
+          "stageId",
+          "stageName",
+          "archivedAt",
+          "createdByName",
           "createdAt"
         ]
       },
@@ -22386,37 +22977,17 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "Orders the filters keep (first page)"
           }
         },
         "required": [
           "data",
-          "nextCursor"
-        ]
-      },
-      "SalesOrderProductInfo": {
-        "type": "object",
-        "properties": {
-          "productId": {
-            "type": "number"
-          },
-          "homeWarehouseId": {
-            "type": "number",
-            "nullable": true
-          },
-          "sellable": {
-            "type": "boolean",
-            "description": "Active and complete (ADR-0044)"
-          },
-          "available": {
-            "type": "string",
-            "description": "Base units available in the home warehouse"
-          }
-        },
-        "required": [
-          "productId",
-          "homeWarehouseId",
-          "sellable",
-          "available"
+          "nextCursor",
+          "total"
         ]
       },
       "SalesOrderApplied": {
@@ -22726,7 +23297,7 @@
           "number": {
             "type": "string",
             "nullable": true,
-            "example": "SO-2026-000001"
+            "example": "20261015_0001"
           },
           "channel": {
             "enum": [
@@ -22854,6 +23425,14 @@
             "type": "string",
             "nullable": true
           },
+          "pipelineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
           "stageId": {
             "type": "number",
             "nullable": true
@@ -22876,6 +23455,19 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "The caller may edit or archive the order (the stage's EDIT)"
           },
           "createdAt": {
             "type": "string",
@@ -22932,16 +23524,47 @@
           "cancelReason",
           "boardId",
           "boardName",
+          "pipelineId",
+          "pipelineName",
           "stageId",
           "stageName",
           "stageEnteredAt",
           "pickedAt",
           "deliveredAt",
+          "archivedAt",
+          "createdByName",
+          "canEdit",
           "createdAt",
           "updatedAt",
           "lines",
           "events",
           "moves"
+        ]
+      },
+      "SalesOrderProductInfo": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "Active and complete (ADR-0044)"
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units available in the home warehouse"
+          }
+        },
+        "required": [
+          "productId",
+          "homeWarehouseId",
+          "sellable",
+          "available"
         ]
       },
       "SalesOrderLineRequest": {
@@ -22969,11 +23592,17 @@
             "type": "number",
             "minimum": 1
           },
-          "boardId": {
+          "pipelineId": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "The board a new order goes on; null = the channel's default (ADR-0056)"
+            "description": "A new order's pipeline; null = the channel's default (ADR-0057)"
+          },
+          "stageId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "A stage without an action of that pipeline; null = the pipeline's landing stage"
           },
           "fulfilment": {
             "enum": [
@@ -23038,7 +23667,7 @@
           "stageId": {
             "type": "number",
             "minimum": 1,
-            "description": "A stage of the order's board"
+            "description": "A stage of the order's pipeline"
           },
           "reason": {
             "type": "string",
@@ -23173,12 +23802,135 @@
           "reason"
         ]
       },
-      "SalesBoardRolesRequest": {
+      "SalesPipelineSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "boardId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "visibility": {
+            "enum": [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type": "string"
+          },
+          "ownOrdersOnly": {
+            "type": "boolean"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "canManage": {
+            "type": "boolean",
+            "description": "The caller may configure it"
+          }
+        },
+        "required": [
+          "id",
+          "boardId",
+          "name",
+          "position",
+          "visibility",
+          "ownOrdersOnly",
+          "archivedAt",
+          "createdAt",
+          "createdByName",
+          "canManage"
+        ]
+      },
+      "SalesBoard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "position": {
+            "type": "number"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "pipelines": {
+            "description": "The pipelines the caller sees",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesPipelineSummary"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "branchId",
+          "position",
+          "archivedAt",
+          "pipelines"
+        ]
+      },
+      "SalesBoardRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The branch the board is for"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SalesCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "SalesPipelineRoles": {
         "type": "object",
         "properties": {
           "VIEW": {
             "maxItems": 100,
-            "description": "Roles that see the board; none = everyone",
+            "description": "A private pipeline: the roles that see it",
             "type": "array",
             "items": {
               "type": "number"
@@ -23186,7 +23938,15 @@
           },
           "MANAGE": {
             "maxItems": 100,
-            "description": "Roles that configure it",
+            "description": "Roles that configure it and see all its orders",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "ALL_ORDERS": {
+            "maxItems": 100,
+            "description": "Own orders only: the roles that still see every order",
             "type": "array",
             "items": {
               "type": "number"
@@ -23195,7 +23955,8 @@
         },
         "required": [
           "VIEW",
-          "MANAGE"
+          "MANAGE",
+          "ALL_ORDERS"
         ]
       },
       "SalesStageRoles": {
@@ -23235,7 +23996,7 @@
           "id": {
             "type": "number"
           },
-          "boardId": {
+          "pipelineId": {
             "type": "number"
           },
           "name": {
@@ -23260,6 +24021,16 @@
           "printDeliveryNote": {
             "type": "boolean"
           },
+          "cardSort": {
+            "enum": [
+              "NEWEST",
+              "OLDEST",
+              "DELIVERY",
+              "TOTAL",
+              "WAITING"
+            ],
+            "type": "string"
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true,
@@ -23283,12 +24054,13 @@
         },
         "required": [
           "id",
-          "boardId",
+          "pipelineId",
           "name",
           "position",
           "action",
           "printPickList",
           "printDeliveryNote",
+          "cardSort",
           "archivedAt",
           "roles",
           "canView",
@@ -23296,35 +24068,53 @@
           "canMove"
         ]
       },
-      "SalesBoard": {
+      "SalesPipeline": {
         "type": "object",
         "properties": {
           "id": {
             "type": "number"
           },
+          "boardId": {
+            "type": "number"
+          },
           "name": {
             "type": "string"
           },
-          "branchId": {
-            "type": "number",
-            "nullable": true
-          },
           "position": {
             "type": "number"
+          },
+          "visibility": {
+            "enum": [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type": "string"
+          },
+          "ownOrdersOnly": {
+            "type": "boolean"
           },
           "archivedAt": {
             "type": "string",
             "nullable": true,
             "format": "date-time"
           },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "roles": {
-            "$ref": "#/components/schemas/SalesBoardRolesRequest"
+            "$ref": "#/components/schemas/SalesPipelineRoles"
           },
           "canManage": {
             "type": "boolean",
-            "description": "The caller may configure the board"
+            "description": "The caller may configure the pipeline"
+          },
+          "seesAll": {
+            "type": "boolean",
+            "description": "The caller sees every order, not only their own"
           },
           "stages": {
+            "description": "By position, archived ones included",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SalesStage"
@@ -23333,66 +24123,17 @@
         },
         "required": [
           "id",
+          "boardId",
           "name",
-          "branchId",
           "position",
+          "visibility",
+          "ownOrdersOnly",
           "archivedAt",
+          "createdAt",
           "roles",
           "canManage",
+          "seesAll",
           "stages"
-        ]
-      },
-      "SalesChannelDefault": {
-        "type": "object",
-        "properties": {
-          "channel": {
-            "enum": [
-              "ADMIN",
-              "CUSTOMER_APP",
-              "SALES_REP",
-              "POS"
-            ],
-            "type": "string"
-          },
-          "boardId": {
-            "type": "number"
-          },
-          "stageId": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "channel",
-          "boardId",
-          "stageId"
-        ]
-      },
-      "SalesChannelDefaultRequest": {
-        "type": "object",
-        "properties": {
-          "channel": {
-            "enum": [
-              "ADMIN",
-              "CUSTOMER_APP",
-              "SALES_REP",
-              "POS"
-            ],
-            "type": "string"
-          },
-          "boardId": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1,
-            "description": "null clears the default"
-          },
-          "stageId": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 1
-          }
-        },
-        "required": [
-          "channel"
         ]
       },
       "SalesOrderCard": {
@@ -23490,7 +24231,7 @@
             "type": "number"
           },
           "cards": {
-            "description": "Newest first, at most 200",
+            "description": "In the stage's sort, at most 200",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SalesOrderCard"
@@ -23512,27 +24253,15 @@
           "total"
         ]
       },
-      "SalesBoardRequest": {
+      "SalesStageInput": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 80
-          },
-          "branchId": {
+          "id": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "The branch the board is for"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "SalesStageRequest": {
-        "type": "object",
-        "properties": {
+            "description": "A live stage; none = new"
+          },
           "name": {
             "type": "string",
             "maxLength": 80
@@ -23565,19 +24294,190 @@
           "roles"
         ]
       },
-      "SalesStageOrderRequest": {
+      "SalesPipelineRequest": {
         "type": "object",
         "properties": {
-          "stageIds": {
-            "description": "Every live stage of the board, in its new order",
+          "boardId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "visibility": {
+            "enum": [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type": "string"
+          },
+          "ownOrdersOnly": {
+            "type": "boolean"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/SalesPipelineRoles"
+          },
+          "stages": {
+            "minItems": 1,
+            "description": "Every stage, in its order",
             "type": "array",
             "items": {
-              "type": "number"
+              "$ref": "#/components/schemas/SalesStageInput"
             }
           }
         },
         "required": [
-          "stageIds"
+          "boardId",
+          "name",
+          "visibility",
+          "ownOrdersOnly",
+          "roles",
+          "stages"
+        ]
+      },
+      "SalesPipelineCopyRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "boardId": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "name",
+          "boardId"
+        ]
+      },
+      "SalesStageSortRequest": {
+        "type": "object",
+        "properties": {
+          "sort": {
+            "enum": [
+              "NEWEST",
+              "OLDEST",
+              "DELIVERY",
+              "TOTAL",
+              "WAITING"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "sort"
+        ]
+      },
+      "SalesArchived": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "number",
+            "description": "Orders archived"
+          }
+        },
+        "required": [
+          "archived"
+        ]
+      },
+      "SalesNumbering": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "example": "{year}{month}{day}_"
+          },
+          "digits": {
+            "type": "number",
+            "example": 4
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pattern",
+          "digits",
+          "updatedAt"
+        ]
+      },
+      "SalesNumberingRequest": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "maxLength": 24,
+            "example": "{year}{month}{day}_",
+            "description": "Literal characters and {year}, {month}, {day}; ends with a non-digit"
+          },
+          "digits": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 8,
+            "example": 4
+          }
+        },
+        "required": [
+          "pattern",
+          "digits"
+        ]
+      },
+      "SalesChannelDefault": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "number"
+          },
+          "stageId": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "channel",
+          "pipelineId",
+          "stageId"
+        ]
+      },
+      "SalesChannelDefaultRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null clears the default"
+          },
+          "stageId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "channel"
         ]
       },
       "ErrorCode": {
@@ -23643,6 +24543,9 @@
           "PRODUCT_NO_HOME",
           "PRODUCT_NOT_SELLABLE",
           "STAGE_IN_USE",
+          "BOARD_NOT_EMPTY",
+          "PIPELINE_IN_USE",
+          "ORDER_NUMBER_TAKEN",
           "COSTING_CLOSED",
           "TRANSFER_NOTHING_SHIPPED",
           "STOCKTAKE_BINS_UNFINISHED",

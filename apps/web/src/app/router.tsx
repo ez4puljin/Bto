@@ -35,10 +35,10 @@ import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/di
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
-import { BoardSettingsPage } from '@/features/sales/board-settings-page';
-import { SalesBoardsPage } from '@/features/sales/boards-page';
-import { SalesOrderNewPage, SalesOrderPage, SalesOrdersPage } from '@/features/sales/orders-pages';
-import { SalesOrderPrintPage } from '@/features/sales/print-page';
+import { SalesOrderNewPage, SalesOrderPage } from '@/features/sales/orders-pages';
+import { SalesBatchPrintPage, SalesOrderPrintPage } from '@/features/sales/print-page';
+import { SalesSettingsPage } from '@/features/sales/settings-page';
+import { SalesWorkPage } from '@/features/sales/work-page';
 import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -65,6 +65,18 @@ export const routes: RouteObject[] = [
       <RequireAuth>
         <RequirePermission permission="sales.orders.read">
           <SalesOrderPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Several orders for paper, one per sheet (ADR-0057 #7).
+    path: '/sales/print/:kind',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="sales.orders.read">
+          <SalesBatchPrintPage />
         </RequirePermission>
       </RequireAuth>
     ),
@@ -191,7 +203,7 @@ export const routes: RouteObject[] = [
             path: 'sales/boards',
             element: (
               <RequirePermission permission="sales.orders.read">
-                <SalesBoardsPage />
+                <SalesWorkPage />
               </RequirePermission>
             ),
             handle: { wide: true },
@@ -200,19 +212,13 @@ export const routes: RouteObject[] = [
             path: 'sales/boards/settings',
             element: (
               <RequirePermission permission="sales.boards.manage">
-                <BoardSettingsPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: 'sales/orders',
-            element: (
-              <RequirePermission permission="sales.orders.read">
-                <SalesOrdersPage />
+                <SalesSettingsPage />
               </RequirePermission>
             ),
             handle: { wide: true },
           },
+          // The order list lives in the work page's list view (ADR-0057 #7).
+          { path: 'sales/orders', element: <Navigate to="/sales/boards?view=list" replace /> },
           {
             path: 'sales/orders/new',
             element: (

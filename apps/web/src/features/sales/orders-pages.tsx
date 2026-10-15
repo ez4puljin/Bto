@@ -5,32 +5,20 @@ import {
   FULFILMENTS,
   type Fulfilment,
   isCancellable,
-  ORDER_STATUSES,
   orderHeaderIssues,
   PAYMENT_METHODS,
   type PaymentMethod,
 } from '@tugeel/shared/sales';
 import { businessDate } from '@tugeel/shared/time';
-import { Plus, ShoppingCart, Trash2 } from 'lucide-react';
-import { useDeferredValue, useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FieldList } from '@/components/detail';
 import { FormField } from '@/components/form';
-import {
-  ChevronHead,
-  EmptyState,
-  FilterBar,
-  LinkRow,
-  ListCard,
-  LoadMore,
-  RowAction,
-  RowActions,
-  SearchField,
-  SkeletonRows,
-} from '@/components/list';
+import { ListCard, RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -67,14 +55,10 @@ import {
   useProductOrderInfo,
   useSalesOrder,
   useSalesOrderMutations,
-  useSalesOrders,
 } from './api';
-import { useSalesBoards } from './boards-api';
+import { useBoardTree, usePipeline } from './pipelines-api';
 
 const MANAGE = 'sales.orders.manage';
-
-const isStatus = (value: string | null): value is OrderStatus =>
-  value !== null && (ORDER_STATUSES as readonly string[]).includes(value);
 
 /** Whole tugriks with the sign («72,000₮»); empty for a total not frozen yet. */
 function useMoney() {
@@ -96,125 +80,19 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return <Badge variant={variant}>{t(`sales.statuses.${status}`)}</Badge>;
 }
 
-/** «Борлуулалт» → «Захиалга» (ADR-0055): the orders, newest first, by status and number. */
-export function SalesOrdersPage() {
-  const { t } = useTranslation();
-  const money = useMoney();
-  const canManage = useHasPermission(MANAGE);
-  const [params, setParams] = useSearchParams();
-  const statusParam = params.get('status');
-  const status = isStatus(statusParam) ? statusParam : undefined;
-  const [search, setSearch] = useState(params.get('q') ?? '');
-  const q = useDeferredValue(search.trim());
-  const orders = useSalesOrders({ status, q });
-  const rows = orders.data?.pages.flatMap((page) => page.data) ?? [];
-
-  const setStatus = (value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set('status', value);
-        else next.delete('status');
-        return next;
-      },
-      { replace: true },
-    );
-
-  return (
-    <div>
-      <PageHeader
-        title={t('sales.orders.title')}
-        actions={
-          canManage ? (
-            <Button asChild>
-              <Link to="/sales/orders/new">
-                <Plus />
-                {t('sales.orders.new')}
-              </Link>
-            </Button>
-          ) : null
-        }
-      />
-      <FilterBar>
-        <SearchField
-          aria-label={t('sales.orders.search')}
-          placeholder={t('sales.orders.search')}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <NativeSelect
-          variant="filter"
-          aria-label={t('sales.order.status')}
-          value={status ?? ''}
-          onChange={(event) => setStatus(event.target.value)}
-        >
-          <option value="">{t('sales.orders.allStatuses')}</option>
-          {(['DRAFT', 'CONFIRMED', 'CANCELLED'] as const).map((value) => (
-            <option key={value} value={value}>
-              {t(`sales.statuses.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
-      </FilterBar>
-      <ProblemAlert problem={problemFromError(orders.error)} />
-      <ListCard>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('sales.order.number')}</TableHead>
-              <TableHead>{t('sales.order.customer')}</TableHead>
-              <TableHead>{t('sales.order.fulfilment')}</TableHead>
-              <TableHead>{t('sales.order.deliveryDate')}</TableHead>
-              <TableHead className="text-right">{t('sales.order.lines')}</TableHead>
-              <TableHead className="text-right">{t('sales.order.total')}</TableHead>
-              <TableHead>{t('sales.order.status')}</TableHead>
-              <ChevronHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {orders.isPending ? <SkeletonRows columns={8} /> : null}
-            {rows.map((row) => (
-              <LinkRow key={row.id} to={`/sales/orders/${row.id}`}>
-                <TableCell className="font-mono">
-                  <Link to={`/sales/orders/${row.id}`} className="font-medium">
-                    {row.number ?? t('sales.order.draftNo', { id: row.id })}
-                  </Link>
-                </TableCell>
-                <TableCell className="whitespace-normal">
-                  {row.customerName}
-                  <span className="ml-2 font-mono text-xs text-muted-foreground">
-                    {row.customerCode}
-                  </span>
-                </TableCell>
-                <TableCell>{t(`sales.fulfilments.${row.fulfilment}`)}</TableCell>
-                <TableCell className="font-mono">{row.deliveryDate}</TableCell>
-                <TableCell className="text-right font-mono">{row.lineCount}</TableCell>
-                <TableCell className="text-right font-mono">{money(row.total)}</TableCell>
-                <TableCell>
-                  <OrderStatusBadge status={row.status} />
-                </TableCell>
-              </LinkRow>
-            ))}
-          </TableBody>
-        </Table>
-        {!orders.isPending && rows.length === 0 ? (
-          <EmptyState icon={ShoppingCart} title={t('sales.orders.empty')} />
-        ) : null}
-        <LoadMore query={orders} />
-      </ListCard>
-    </div>
-  );
-}
-
-/** «Шинэ захиалга»: the editor of a new order; saving keeps a draft, «Илгээх» confirms it. */
+/**
+ * «Шинэ захиалга»: the editor of a new order; saving keeps a draft, «Илгээх» confirms it. The
+ * work page passes the pipeline (`?pipeline=`) and, from a stage's «+», the stage (`?stage=`).
+ */
 export function SalesOrderNewPage() {
   const { t } = useTranslation();
   const [params] = useSearchParams();
-  const boardId = Number.parseInt(params.get('board') ?? '', 10) || null;
+  const pipelineId = Number.parseInt(params.get('pipeline') ?? '', 10) || null;
+  const stageId = Number.parseInt(params.get('stage') ?? '', 10) || null;
   return (
     <div className="space-y-4">
       <PageHeader title={t('sales.orders.new')} />
-      <OrderEditor order={null} boardId={boardId} />
+      <OrderEditor order={null} pipelineId={pipelineId} stageId={stageId} />
     </div>
   );
 }
@@ -246,7 +124,7 @@ export function SalesOrderPage() {
           </div>
         }
       />
-      {detail.status === 'DRAFT' && canManage ? (
+      {detail.status === 'DRAFT' && detail.canEdit ? (
         <OrderEditor key={detail.updatedAt} order={detail} />
       ) : (
         <OrderView order={detail} canManage={canManage} />
@@ -283,15 +161,19 @@ function linesOf(order: SalesOrder | null): CartLine[] {
  */
 function OrderEditor({
   order,
-  boardId: wanted,
+  pipelineId: wanted,
+  stageId,
 }: {
   order: SalesOrder | null;
-  boardId?: number | null;
+  pipelineId?: number | null;
+  stageId?: number | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const boards = useSalesBoards();
-  const [boardId, setBoardId] = useState<number | null>(order?.boardId ?? wanted ?? null);
+  const tree = useBoardTree();
+  const [pipelineId, setPipelineId] = useState<number | null>(order?.pipelineId ?? wanted ?? null);
+  const landing = usePipeline(!order && stageId ? (wanted ?? null) : null);
+  const stageName = landing.data?.stages.find((stage) => stage.id === stageId)?.name;
   const mutations = useSalesOrderMutations();
   const quote = useQuote();
   const action = useAction();
@@ -355,7 +237,8 @@ function OrderEditor({
     if (!customer) return null;
     return {
       customerId: customer.id,
-      boardId: order ? null : boardId,
+      pipelineId: order ? null : pipelineId,
+      stageId: order || pipelineId !== wanted ? null : (stageId ?? null),
       fulfilment,
       deliveryDate,
       addressId: fulfilment === 'DELIVERY' ? addressId : null,
@@ -432,18 +315,32 @@ function OrderEditor({
               />
             )}
           </FormField>
-          {!order && (boards.data?.length ?? 0) > 0 ? (
-            <FormField label={t('sales.boards.board')} htmlFor="order-board">
+          {!order && (tree.data ?? []).some((board) => board.pipelines.length > 0) ? (
+            <FormField
+              label={t('sales.order.pipeline')}
+              htmlFor="order-pipeline"
+              hint={
+                stageName && pipelineId === wanted
+                  ? t('sales.order.stageFixed', { name: stageName })
+                  : undefined
+              }
+            >
               <NativeSelect
-                id="order-board"
-                value={boardId ?? ''}
-                onChange={(event) => setBoardId(Number.parseInt(event.target.value, 10) || null)}
+                id="order-pipeline"
+                value={pipelineId ?? ''}
+                onChange={(event) => setPipelineId(Number.parseInt(event.target.value, 10) || null)}
               >
-                <option value="">{t('sales.boards.defaultBoard')}</option>
-                {(boards.data ?? []).map((board) => (
-                  <option key={board.id} value={board.id}>
-                    {board.name}
-                  </option>
+                <option value="">{t('sales.order.defaultPipeline')}</option>
+                {(tree.data ?? []).map((board) => (
+                  <optgroup key={board.id} label={board.name}>
+                    {board.pipelines
+                      .filter((pipeline) => pipeline.archivedAt === null)
+                      .map((pipeline) => (
+                        <option key={pipeline.id} value={pipeline.id}>
+                          {pipeline.name}
+                        </option>
+                      ))}
+                  </optgroup>
                 ))}
               </NativeSelect>
             </FormField>
@@ -759,13 +656,16 @@ export function OrderView({ order, canManage }: { order: SalesOrder; canManage: 
                 value: t(`sales.paymentMethods.${order.paymentMethod}`),
               },
               { label: t('sales.order.note'), value: order.note },
-              ...(order.boardName
+              ...(order.pipelineName
                 ? [
                     {
-                      label: t('sales.boards.board'),
-                      value: `${order.boardName} · ${order.stageName ?? ''}`,
+                      label: t('sales.order.place'),
+                      value: `${order.boardName ?? ''} / ${order.pipelineName} · ${order.stageName ?? ''}`,
                     },
                   ]
+                : []),
+              ...(order.createdByName
+                ? [{ label: t('sales.order.createdBy'), value: order.createdByName }]
                 : []),
               { label: t('sales.order.total'), value: money(order.total) },
               ...(order.cancelReason

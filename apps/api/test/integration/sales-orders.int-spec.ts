@@ -1,5 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { addDays, businessDate, businessYear } from '@tugeel/shared/time';
+
+/** Today's order number prefix in the default format (ADR-0057 #3). */
+const prefix = () => `${businessDate().replaceAll('-', '')}_`;
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
@@ -17,9 +20,10 @@ interface ProblemJson {
 }
 
 /**
- * Office orders (SPEC §5.7, ADR-0055): drafts, the submit that confirms, freezes the price parts
- * and reserves per line in the product's home warehouse (the rest backordered), cancelling with a
- * reason that releases the stock, rights and the refusals. Synthetic data only.
+ * Office orders (SPEC §5.7, ADR-0055, ADR-0057): drafts numbered when created in the company
+ * format, the submit that confirms, freezes the price parts and reserves per line in the product's
+ * home warehouse (the rest backordered), cancelling with a reason that releases the stock, rights,
+ * the refusals, the list and its filters. Synthetic data only.
  */
 describe('sales orders', () => {
   let app: NestExpressApplication;
@@ -199,8 +203,8 @@ describe('sales orders', () => {
         },
       ),
     );
+    expect(draft.number).toMatch(new RegExp(`^${prefix()}\\d{4}$`));
     expect(draft).toMatchObject({
-      number: null,
       status: 'DRAFT',
       addressText: 'Мөрөн, 3-р баг',
       contactName: 'Бат',
@@ -217,7 +221,8 @@ describe('sales orders', () => {
     const confirmed = (await orders().submit(draft.id, key).expect(200)).body as OrderJson;
     const replay = (await orders().submit(draft.id, key).expect(200)).body as OrderJson;
     expect(replay.number).toBe(confirmed.number);
-    expect(confirmed.number).toMatch(new RegExp(`^SO-${businessYear()}-\\d{6}$`));
+    // The submit keeps the number drawn when the draft was created.
+    expect(confirmed.number).toBe(draft.number);
     expect(confirmed).toMatchObject({ status: 'CONFIRMED', priceDate: today });
     expect(
       confirmed.lines.map((line) => [line.qtyApproved, line.qtyBackordered, line.total]),
@@ -290,11 +295,11 @@ describe('sales orders', () => {
     });
     const cancelled = (await orders().cancel(draft.id, 'Ноорог хэрэггүй').expect(200))
       .body as OrderJson;
-    expect(cancelled.number).toBeNull();
+    expect(cancelled.number).toBe(draft.number);
     const byNumber = (
       await http()
         .get('/api/v1/sales-orders')
-        .query({ q: `SO-${businessYear()}` })
+        .query({ q: prefix() })
         .set(bearer(office))
         .expect(200)
     ).body as { data: { number: string }[] };
@@ -304,5 +309,62 @@ describe('sales orders', () => {
       [String(draft.id)],
     );
     expect(audit.rows.map((row) => row.action)).toEqual(['CREATE', 'UPDATE', 'CANCEL']);
+  });
+
+  it('numbers new orders in the company format, one counter for all, and lists them', async () => {
+    const one = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]));
+    const two = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]));
+    const counter = (number: string | null) => Number.parseInt(number?.slice(-4) ?? '0', 10);
+    expect(counter(two.number)).toBe(counter(one.number) + 1);
+    const format = (
+      await http().get('/api/v1/sales-settings/numbering').set(bearer(office)).expect(200)
+    ).body as { pattern: string; digits: number; updatedAt: string | null };
+    expect(format).toEqual({ pattern: '{year}{month}{day}_', digits: 4, updatedAt: null });
+    // Only a manager changes it; formats that could repeat a number are refused.
+    const put = (token: string, body: Record<string, unknown>) =>
+      http().put('/api/v1/sales-settings/numbering').set(bearer(token)).send(body);
+    await put(office, { pattern: 'ORD-{year}-', digits: 5 }).expect(403);
+    for (const [body, path, code] of [
+      [{ pattern: '{year}{month}{day}', digits: 4 }, 'pattern', 'ENDS_WITH_DIGIT'],
+      [{ pattern: 'SO-{year}-', digits: 6 }, 'pattern', 'RESERVED'],
+      [{ pattern: '{week}_', digits: 4 }, 'pattern', 'UNKNOWN_TOKEN'],
+    ] as const) {
+      expect(((await put(admin, body).expect(422)).body as ProblemJson).errors).toEqual([
+        expect.objectContaining({ path, constraint: code }),
+      ]);
+    }
+    await put(admin, { pattern: 'ORD-{year}-', digits: 9 }).expect(422);
+    await put(admin, { pattern: 'ORD-{year}-', digits: 5 }).expect(200);
+    const ord = await orders().draft(orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]));
+    expect(ord.number).toBe(`ORD-${businessYear()}-00001`);
+    // Back to the day's format: its counter goes on.
+    await put(admin, { pattern: '{year}{month}{day}_', digits: 4 }).expect(200);
+    const three = await orders().draft(
+      orderBody(shop.id, [{ productUnitId: pcs(juice), qty: '1' }]),
+    );
+    expect(counter(three.number)).toBe(counter(two.number) + 1);
+
+    // The list: the total on the first page, a customer found by name, the archived ones apart.
+    const list = async (query: Record<string, unknown>) =>
+      (await http().get('/api/v1/sales-orders').query(query).set(bearer(office)).expect(200))
+        .body as {
+        data: { id: number; number: string | null }[];
+        nextCursor: string | null;
+        total: number | null;
+      };
+    const first = await list({ limit: 2, status: 'DRAFT' });
+    expect(first.total).toBeGreaterThanOrEqual(4);
+    expect(first.data).toHaveLength(2);
+    const next = await list({ limit: 2, status: 'DRAFT', cursor: first.nextCursor });
+    expect(next.total).toBeNull();
+    expect(
+      (await list({ q: 'Захиалгын дэлгүүр', status: 'DRAFT' })).data.map((row) => row.id),
+    ).toEqual(expect.arrayContaining([one.id, two.id, three.id, ord.id]));
+    expect((await list({ pipeline: 'none' })).data.map((row) => row.id)).toContain(one.id);
+    await orders().cancel(one.id, 'Тест').expect(200);
+    await http().post(`/api/v1/sales-orders/${one.id}/archive`).set(bearer(office)).expect(200);
+    expect((await list({ archived: 'only' })).data.map((row) => row.id)).toEqual([one.id]);
+    expect((await list({})).data.map((row) => row.id)).not.toContain(one.id);
+    for (const order of [two, three, ord]) await orders().cancel(order.id, 'Тест').expect(200);
   });
 });

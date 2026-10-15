@@ -1,34 +1,33 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { formatDocNumber } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import type { PriceBasis } from '@tugeel/shared/pricing';
 import {
+  FINISHED_STATUSES,
   type Fulfilment,
   isCancellable,
   isEditable,
+  isFinished,
   ORDER_LIMITS,
-  type OrderChannel,
   orderHeaderIssues,
   type OrderStatus,
   type PaymentMethod,
   type PrintKind,
 } from '@tugeel/shared/sales';
-import { businessDate, businessYear } from '@tugeel/shared/time';
-import { and, asc, desc, eq, ilike, lt, type SQL, sql } from 'drizzle-orm';
+import { businessDate } from '@tugeel/shared/time';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import { databaseErrorOf } from '../../../common/errors/problem-details';
 import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
 import {
   type Actor,
   actorUserId,
+  type AuditEntry,
   AuditService,
   type AuthContext,
-  NumberingService,
   ScopeService,
 } from '../../identity';
 import {
@@ -49,7 +48,10 @@ import {
   salesStageMoves,
 } from '../schema';
 import { CreditChecker } from './credit-checker';
-import { SalesBoardsService } from './sales-boards.service';
+import { type Access, isContext, SalesAccessService } from './sales-access.service';
+import { type OrderDetail, SalesOrderQueryService } from './sales-order-query.service';
+import { SalesPipelinesService } from './sales-pipelines.service';
+import { SalesSettingsService } from './sales-settings.service';
 
 type OrderRow = typeof salesOrders.$inferSelect;
 type LineRow = typeof salesOrderLines.$inferSelect;
@@ -62,8 +64,10 @@ export interface OrderLineInput {
 
 export interface OrderInput {
   customerId: number;
-  /** The board a new order goes on (ADR-0056 #2); null = the channel's default. */
-  boardId?: number | null;
+  /** The pipeline a new order goes in (ADR-0057 #4); null = the channel's default. */
+  pipelineId?: number | null;
+  /** A stage without an action of that pipeline («+»); null = the pipeline's landing stage. */
+  stageId?: number | null;
   fulfilment: Fulfilment;
   deliveryDate: string;
   addressId: number | null;
@@ -72,75 +76,6 @@ export interface OrderInput {
   paymentMethod: PaymentMethod;
   note: string | null;
   lines: readonly OrderLineInput[];
-}
-
-export interface OrderPart {
-  productUnitId: number;
-  uomName: string;
-  basis: PriceBasis;
-  qty: Decimal;
-  factorSnapshot: Decimal;
-  qtyBase: Decimal;
-  listPrice: Decimal;
-  unitPrice: Decimal;
-  subtotal: Decimal;
-  discountAmount: Decimal;
-  total: Decimal;
-  applied: unknown;
-}
-
-export interface OrderLine {
-  id: number;
-  lineNo: number;
-  productId: number;
-  productSku: string;
-  productName: string;
-  productUnitId: number;
-  unitName: string;
-  qty: Decimal;
-  factorSnapshot: Decimal;
-  qtyBase: Decimal;
-  baseUnitName: string;
-  warehouseId: number;
-  qtyApproved: Decimal;
-  qtyBackordered: Decimal;
-  /** The picked counts (ADR-0056 #5); null until picked. */
-  qtyPicked: Decimal | null;
-  pickBinId: number | null;
-  pickBinCode: string | null;
-  qtyDelivered: Decimal | null;
-  subtotal: Decimal | null;
-  discountAmount: Decimal | null;
-  total: Decimal | null;
-  parts: OrderPart[];
-}
-
-export interface OrderEvent {
-  fromStatus: OrderStatus | null;
-  toStatus: OrderStatus;
-  reason: string | null;
-  actorId: number | null;
-  createdAt: Date;
-}
-
-export interface StageMove {
-  fromStageId: number | null;
-  toStageId: number;
-  actorId: number | null;
-  createdAt: Date;
-}
-
-export interface OrderDetail extends Omit<
-  OrderRow,
-  'createdBy' | 'submittedBy' | 'cancelledBy' | 'pickedBy' | 'deliveredBy'
-> {
-  customerCode: string;
-  customerName: string;
-  boardName: string | null;
-  stageName: string | null;
-  lines: OrderLine[];
-  events: OrderEvent[];
-  moves: StageMove[];
 }
 
 /** One line of the pick form (ADR-0056 #5): the quantity to pick and where from. */
@@ -164,30 +99,6 @@ export interface MoveResult {
   print: PrintKind[];
 }
 
-export interface OrderSummary {
-  id: number;
-  number: string | null;
-  status: OrderStatus;
-  channel: OrderChannel;
-  customerId: number;
-  customerCode: string;
-  customerName: string;
-  fulfilment: Fulfilment;
-  deliveryDate: string;
-  total: Decimal | null;
-  lineCount: number;
-  createdAt: Date;
-}
-
-export interface OrderQuery {
-  status?: OrderStatus;
-  customerId?: number;
-  /** Part of the order number. */
-  q?: string;
-  cursor?: string;
-  limit?: number;
-}
-
 /** What the order screen shows for a product it may add (ADR-0055 #3). */
 export interface ProductOrderInfo {
   productId: number;
@@ -204,18 +115,18 @@ const text = (value: string | null | undefined): string | null => {
 };
 
 /**
- * Customer orders entered by the office (architecture §5.6, ADR-0055). A draft holds the header
- * and its lines; the submit confirms it in one transaction: the order row, then the customer row
- * (credit check), then the quote, then the stock rows of every line's home warehouse in key order,
- * the `SO-` number last. A confirmed order is never edited; it is cancelled with a reason, which
- * releases its reservations.
+ * Customer orders (architecture §5.6, ADR-0055, ADR-0056, ADR-0057). An order is numbered when
+ * created, in the company format; a draft holds the header and its lines; the submit confirms it
+ * in one transaction: the order row, then the customer row (credit check), then the quote, then
+ * the stock rows of every line's home warehouse in key order. Every action first locks the order
+ * and asks `SalesAccessService` whether the caller sees it (404 otherwise); the answer to a
+ * write is not filtered.
  */
 @Injectable()
 export class SalesOrdersService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
-    private readonly numbering: NumberingService,
     private readonly catalog: CatalogService,
     private readonly units: UnitConversionService,
     private readonly customers: CustomersService,
@@ -224,18 +135,30 @@ export class SalesOrdersService {
     private readonly reservations: ReservationService,
     private readonly quotes: PriceQuoteService,
     private readonly credit: CreditChecker,
-    private readonly boards: SalesBoardsService,
+    private readonly access: SalesAccessService,
+    private readonly pipelines: SalesPipelinesService,
+    private readonly queries: SalesOrderQueryService,
+    private readonly settings: SalesSettingsService,
     private readonly posting: StockPostingService,
     private readonly bins: BinsService,
     private readonly stock: StockQueryService,
     private readonly scope: ScopeService,
   ) {}
 
-  /** A draft, placed on its board's stage when one is configured (ADR-0056 #2). */
+  /**
+   * A draft, placed in its pipeline's stage when one is configured (ADR-0057 #4), numbered last
+   * in the same transaction (ADR-0057 #3).
+   */
   async create(ctx: AuthContext, input: OrderInput): Promise<OrderDetail> {
     const id = await inTransaction(this.db, async (tx) => {
       const header = await this.checkedHeader(tx, input);
-      const placement = await this.boards.placementFor(ctx, 'ADMIN', input.boardId ?? null, tx);
+      const placement = await this.pipelines.placementFor(
+        ctx,
+        'ADMIN',
+        input.pipelineId ?? null,
+        input.stageId ?? null,
+        tx,
+      );
       const [row] = await tx
         .insert(salesOrders)
         .values({
@@ -243,7 +166,11 @@ export class SalesOrdersService {
           channel: 'ADMIN',
           createdBy: actorUserId(ctx),
           ...(placement
-            ? { boardId: placement.boardId, stageId: placement.stageId, stageEnteredAt: sql`now()` }
+            ? {
+                pipelineId: placement.pipelineId,
+                stageId: placement.stageId,
+                stageEnteredAt: sql`now()`,
+              }
             : {}),
         })
         .returning({ id: salesOrders.id });
@@ -258,41 +185,37 @@ export class SalesOrdersService {
           actorId: actorUserId(ctx),
         });
       }
+      const number = await this.numberInTx(tx, row.id);
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'sales_orders',
         entityId: row.id,
-        after: { ...header, lines: input.lines.length, stageId: placement?.stageId ?? null },
+        after: {
+          ...header,
+          number,
+          lines: input.lines.length,
+          pipelineId: placement?.pipelineId ?? null,
+          stageId: placement?.stageId ?? null,
+        },
       });
       return row.id;
     });
-    return this.get(id);
+    return this.queries.detail(ctx, id);
   }
 
   /**
    * Replaces the header and lines of a draft, or of a confirmed order before picking (ADR-0056 #4):
    * the latter is priced again today and its reservations replaced in one lock pass; the number,
-   * board and stage stay. On a board, the stage's EDIT right is needed.
+   * pipeline and stage stay. In a pipeline, the stage's EDIT right is needed.
    */
   async update(ctx: AuthContext, id: number, input: OrderInput): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
+      const { order, access } = await this.lockSeen(ctx, tx, id);
       if (!isEditable(order.status)) throw stateError(order, 'EDITABLE');
       if (input.customerId !== order.customerId) {
         throw invalid('customerId', 'fixed', 'the customer of an order does not change');
       }
-      if (order.stageId !== null) {
-        const { rights } = await this.boards.stageRights(ctx, order.stageId, tx);
-        if (!rights.edit) {
-          throw new AppError('FORBIDDEN', 'the stage does not let this role edit orders', {
-            stageId: order.stageId,
-          });
-        }
-      } else if (!ctx.permissions.has('sales.orders.manage')) {
-        throw new AppError('FORBIDDEN', 'editing an order needs sales.orders.manage', {
-          permission: 'sales.orders.manage',
-        });
-      }
+      assertCanEdit(access, order);
       const header = await this.checkedHeader(tx, input);
       await tx
         .update(salesOrders)
@@ -336,13 +259,14 @@ export class SalesOrdersService {
         after: { ...header, lines: input.lines.length, ...(repriced ?? {}) },
       });
     });
-    return this.get(id);
+    return this.queries.detail(ctx, id);
   }
 
   /**
-   * Moves a card to a stage of its board (ADR-0056 #3) and runs the stage's action in the same
+   * Moves a card to a stage of its pipeline (ADR-0056 #3) and runs the stage's action in the same
    * transaction: CONFIRM submits a draft, PICK starts picking, SALE issues a picked order's stock,
-   * CANCEL cancels with the reason. Returns the documents the stage prints.
+   * CANCEL cancels with the reason. The order, then the pipeline and the stage FOR SHARE (ADR-0057
+   * #4). Returns the documents the stage prints.
    */
   async move(
     ctx: AuthContext,
@@ -350,18 +274,23 @@ export class SalesOrdersService {
     input: { stageId: number; reason?: string | null },
   ): Promise<MoveResult> {
     const print = await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
-      if (order.boardId === null || order.stageId === null) {
-        throw new AppError('ORDER_STATE_INVALID', 'the order is on no board', {
+      const { order } = await this.lockSeen(ctx, tx, id);
+      if (order.pipelineId === null || order.stageId === null) {
+        throw new AppError('ORDER_STATE_INVALID', 'the order is in no pipeline', {
           status: order.status,
           expected: 'ON_BOARD',
         });
       }
-      const { stage, rights } = await this.boards.stageRights(ctx, input.stageId, tx);
-      if (stage.boardId !== order.boardId) {
-        throw invalid('stageId', 'ofBoard', "a stage of the order's board");
+      if (order.archivedAt) {
+        throw new AppError('ORDER_STATE_INVALID', 'the order is archived', {
+          status: order.status,
+          expected: 'NOT_ARCHIVED',
+        });
       }
-      if (stage.archivedAt) throw invalid('stageId', 'archived', 'the stage is archived');
+      const { stage, rights } = await this.pipelines.stageFor(ctx, tx, input.stageId);
+      if (stage.pipelineId !== order.pipelineId) {
+        throw invalid('stageId', 'ofPipeline', "a stage of the order's pipeline");
+      }
       if (!rights.move) {
         throw new AppError('FORBIDDEN', 'the stage does not let this role move cards into it', {
           stageId: stage.id,
@@ -408,14 +337,14 @@ export class SalesOrdersService {
         before: { stageId: order.stageId },
         after: { stageId: stage.id, action: stage.action },
       });
-      return this.boards.printsOf(stage);
+      return this.pipelines.printsOf(stage);
     });
-    return { order: await this.get(id), print };
+    return { order: await this.queries.detail(ctx, id), print };
   }
 
   /** What the pick form proposes per line: the fixed shelf, else the shelves holding the product. */
-  async pickInfo(id: number): Promise<PickLineInfo[]> {
-    const order = await this.get(id);
+  async pickInfo(ctx: AuthContext, id: number): Promise<PickLineInfo[]> {
+    const order = await this.queries.get(ctx, id);
     const byWarehouse = new Map<number, number[]>();
     for (const line of order.lines) {
       byWarehouse.set(line.warehouseId, [
@@ -455,7 +384,7 @@ export class SalesOrdersService {
    */
   async pick(ctx: AuthContext, id: number, input: readonly PickLineInput[]): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
+      const { order } = await this.lockSeen(ctx, tx, id);
       if (order.status !== 'CONFIRMED' && order.status !== 'PICKING') {
         throw stateError(order, 'CONFIRMED');
       }
@@ -566,21 +495,21 @@ export class SalesOrdersService {
         },
       });
     });
-    return this.get(id);
+    return this.queries.detail(ctx, id);
   }
 
   /**
    * DRAFT → CONFIRMED in one transaction (ADR-0055 #1): the products checked again, the prices of
    * today frozen per part, the stock reserved per line in its product's home warehouse (the rest
-   * backordered), the `SO-` number allocated last.
+   * backordered); a draft from before ADR-0057 takes its number last.
    */
-  async submit(actor: Actor, id: number): Promise<OrderDetail> {
+  async submit(actor: Actor | AuthContext, id: number): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
+      const { order } = await this.lockSeen(actor, tx, id);
       if (order.status !== 'DRAFT') throw stateError(order, 'DRAFT');
       await this.submitInTx(tx, actor, order);
     });
-    return this.get(id);
+    return this.queries.detail(actor, id);
   }
 
   /** Prices the order's lines today and reserves them (replacing earlier reservations when asked). */
@@ -724,15 +653,10 @@ export class SalesOrdersService {
     const today = businessDate();
     {
       const { quote, reserved } = await this.priceAndReserve(tx, actor, order, false);
-      const { rows: clock } = await tx.execute<{ now: string | Date }>(sql`SELECT now() AS now`);
-      const now = clock[0]?.now;
-      const year = businessYear(now instanceof Date ? now : new Date(now ?? Date.now()));
-      const number = formatDocNumber('SO', year, await this.numbering.next(tx, 'SO', year));
       await tx
         .update(salesOrders)
         .set({
           status: 'CONFIRMED',
-          number,
           priceDate: today,
           subtotal: quote.subtotal,
           discountTotal: quote.discountTotal,
@@ -745,6 +669,8 @@ export class SalesOrdersService {
         .where(eq(salesOrders.id, id));
       await this.event(tx, actor, id, 'DRAFT', 'SUBMITTED', null);
       await this.event(tx, actor, id, 'SUBMITTED', 'CONFIRMED', null);
+      // A draft created before ADR-0057 had no number; the counter's lock comes last.
+      const number = order.number ?? (await this.numberInTx(tx, id));
       await this.audit.record(tx, actor, {
         action: 'CONFIRM',
         entity: 'sales_orders',
@@ -829,12 +755,92 @@ export class SalesOrdersService {
   }
 
   /** Cancels a draft or a confirmed order with a reason; a confirmed one releases its stock. */
-  async cancel(actor: Actor, id: number, reason: string): Promise<OrderDetail> {
+  async cancel(actor: Actor | AuthContext, id: number, reason: string): Promise<OrderDetail> {
     await inTransaction(this.db, async (tx) => {
-      const order = await this.lock(tx, id);
+      const { order } = await this.lockSeen(actor, tx, id);
       await this.cancelInTx(tx, actor, order, reason);
     });
-    return this.get(id);
+    return this.queries.detail(actor, id);
+  }
+
+  /** Takes a finished order off the board (ADR-0057 #5); the stage's EDIT right. */
+  async archive(ctx: AuthContext, id: number): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const { order, access } = await this.lockSeen(ctx, tx, id);
+      if (!isFinished(order.status)) throw stateError(order, 'FINISHED');
+      assertCanEdit(access, order);
+      if (order.archivedAt) return;
+      await tx
+        .update(salesOrders)
+        .set({ archivedAt: sql`now()`, archivedBy: actorUserId(ctx), updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+      await this.audit.record(tx, ctx, { action: 'ARCHIVE', entity: 'sales_orders', entityId: id });
+    });
+    return this.queries.detail(ctx, id);
+  }
+
+  /** Puts an archived order back on the board. */
+  async unarchive(ctx: AuthContext, id: number): Promise<OrderDetail> {
+    await inTransaction(this.db, async (tx) => {
+      const { order, access } = await this.lockSeen(ctx, tx, id);
+      assertCanEdit(access, order);
+      if (!order.archivedAt) return;
+      await tx
+        .update(salesOrders)
+        .set({ archivedAt: null, archivedBy: null, updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'UNARCHIVE',
+        entity: 'sales_orders',
+        entityId: id,
+      });
+    });
+    return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * Archives every finished order of a stage the caller sees (a stage's «⋯», ADR-0057 #5); the
+   * stage's EDIT right. Returns how many were archived.
+   */
+  async archiveFinished(ctx: AuthContext, stageId: number): Promise<number> {
+    return inTransaction(this.db, async (tx) => {
+      const { rights, access } = await this.pipelines.stageFor(ctx, tx, stageId);
+      if (!rights.edit) {
+        throw new AppError('FORBIDDEN', 'the stage does not let this role edit orders', {
+          stageId,
+        });
+      }
+      const archived = await tx
+        .update(salesOrders)
+        .set({ archivedAt: sql`now()`, archivedBy: actorUserId(ctx), updatedAt: sql`now()` })
+        .where(
+          and(
+            eq(salesOrders.stageId, stageId),
+            isNull(salesOrders.archivedAt),
+            inArray(salesOrders.status, [...FINISHED_STATUSES]),
+            access.visibleSql(),
+          ),
+        )
+        .returning({ id: salesOrders.id });
+      if (archived.length > 0) {
+        await this.audit.recordMany(
+          tx,
+          ctx,
+          archived.map((row): AuditEntry => ({
+            action: 'ARCHIVE',
+            entity: 'sales_orders',
+            entityId: row.id,
+            after: { stageId },
+          })),
+        );
+      }
+      return archived.length;
+    });
+  }
+
+  /** One order the caller sees (404 otherwise). */
+  get(actor: Actor | AuthContext, id: number): Promise<OrderDetail> {
+    return this.queries.get(actor, id);
   }
 
   private async cancelInTx(
@@ -871,135 +877,6 @@ export class SalesOrdersService {
     }
   }
 
-  async get(id: number, executor: Db | Tx = this.db): Promise<OrderDetail> {
-    const [order] = await executor.select().from(salesOrders).where(eq(salesOrders.id, id));
-    if (!order) throw notFound('sales order', id);
-    const lines = await executor
-      .select()
-      .from(salesOrderLines)
-      .where(eq(salesOrderLines.orderId, id))
-      .orderBy(asc(salesOrderLines.lineNo));
-    const parts =
-      lines.length === 0
-        ? []
-        : await executor
-            .select()
-            .from(salesOrderLineParts)
-            .where(
-              idIn(
-                salesOrderLineParts.lineId,
-                lines.map((line) => line.id),
-              ),
-            )
-            .orderBy(asc(salesOrderLineParts.lineId), asc(salesOrderLineParts.partNo));
-    const products = new Map(
-      (
-        await this.catalog.getMany(
-          lines.map((line) => line.productId),
-          executor,
-        )
-      ).map((product) => [product.id, product]),
-    );
-    const units = await this.units.describe(
-      lines.map((line) => line.productUnitId),
-      executor,
-    );
-    const [customer] = await this.customers.getMany([order.customerId], executor);
-    const events = await executor
-      .select()
-      .from(orderStatusEvents)
-      .where(eq(orderStatusEvents.orderId, id))
-      .orderBy(asc(orderStatusEvents.id));
-    const moves = await executor
-      .select()
-      .from(salesStageMoves)
-      .where(eq(salesStageMoves.orderId, id))
-      .orderBy(asc(salesStageMoves.id));
-    const place = await this.boards.namesOf(order.boardId, order.stageId, executor);
-    const pickBins = new Map(
-      (
-        await this.bins.getMany(
-          lines.flatMap((line) => (line.pickBinId === null ? [] : [line.pickBinId])),
-          executor,
-        )
-      ).map((bin) => [bin.id, bin.code]),
-    );
-    const {
-      createdBy: _created,
-      submittedBy: _submitted,
-      cancelledBy: _cancelled,
-      pickedBy: _picked,
-      deliveredBy: _delivered,
-      ...rest
-    } = order;
-    return {
-      ...rest,
-      customerCode: customer?.code ?? '',
-      customerName: customer?.name ?? '',
-      boardName: place.boardName,
-      stageName: place.stageName,
-      lines: lines.map((line) => lineView(line, products, units, parts, pickBins)),
-      moves: moves.map((move) => ({
-        fromStageId: move.fromStageId,
-        toStageId: move.toStageId,
-        actorId: move.actorId,
-        createdAt: move.createdAt,
-      })),
-      events: events.map((event) => ({
-        fromStatus: event.fromStatus,
-        toStatus: event.toStatus,
-        reason: event.reason,
-        actorId: event.actorId,
-        createdAt: event.createdAt,
-      })),
-    };
-  }
-
-  async list(query: OrderQuery): Promise<{ data: OrderSummary[]; nextCursor: string | null }> {
-    const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
-    const filters: SQL[] = [];
-    if (query.status) filters.push(eq(salesOrders.status, query.status));
-    if (query.customerId) filters.push(eq(salesOrders.customerId, query.customerId));
-    const q = text(query.q);
-    if (q) filters.push(ilike(salesOrders.number, `%${q.replace(/[\\%_]/g, '\\$&')}%`));
-    const after = decodeCursor(query.cursor);
-    if (typeof after?.id === 'number') filters.push(lt(salesOrders.id, after.id));
-    const rows = await this.db
-      .select({
-        id: salesOrders.id,
-        number: salesOrders.number,
-        status: salesOrders.status,
-        channel: salesOrders.channel,
-        customerId: salesOrders.customerId,
-        fulfilment: salesOrders.fulfilment,
-        deliveryDate: salesOrders.deliveryDate,
-        total: salesOrders.total,
-        createdAt: salesOrders.createdAt,
-        // Spelled out: a single-table select leaves columns unqualified.
-        lineCount: sql<string>`(SELECT count(*) FROM sales_order_lines l WHERE l.order_id = sales_orders.id)`,
-      })
-      .from(salesOrders)
-      .where(and(...filters))
-      .orderBy(desc(salesOrders.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ id: row.id }));
-    const customers = new Map(
-      (await this.customers.getMany(page.data.map((row) => row.customerId))).map((customer) => [
-        customer.id,
-        customer,
-      ]),
-    );
-    return {
-      data: page.data.map((row) => ({
-        ...row,
-        customerCode: customers.get(row.customerId)?.code ?? '',
-        customerName: customers.get(row.customerId)?.name ?? '',
-        lineCount: Number.parseInt(row.lineCount, 10),
-      })),
-      nextCursor: page.nextCursor,
-    };
-  }
-
   /** Each product's home warehouse, whether it may be sold and what is available there. */
   async productInfo(productIds: readonly number[]): Promise<ProductOrderInfo[]> {
     const ids = [...new Set(productIds)];
@@ -1029,10 +906,31 @@ export class SalesOrdersService {
       .orderBy(asc(salesOrderLines.lineNo));
   }
 
-  private async lock(tx: Tx, id: number): Promise<OrderRow> {
+  /** The order row FOR UPDATE, if the caller sees it (a trusted actor always does). */
+  private async lockSeen(
+    actor: Actor | AuthContext,
+    tx: Tx,
+    id: number,
+  ): Promise<{ order: OrderRow; access: Access }> {
     const [order] = await tx.select().from(salesOrders).where(eq(salesOrders.id, id)).for('update');
     if (!order) throw notFound('sales order', id);
-    return order;
+    const access = await this.access.load(actor, tx);
+    if (isContext(actor) && !access.canSee(order)) throw notFound('sales order', id);
+    return { order, access };
+  }
+
+  /** The order's number, drawn last in its transaction; a number met before answers 409. */
+  private async numberInTx(tx: Tx, id: number): Promise<string> {
+    const number = await this.settings.allocateNumber(tx);
+    try {
+      await tx.update(salesOrders).set({ number }).where(eq(salesOrders.id, id));
+    } catch (error) {
+      if (databaseErrorOf(error)?.code === '23505') {
+        throw new AppError('ORDER_NUMBER_TAKEN', `${number} was given before`, { number });
+      }
+      throw error;
+    }
+    return number;
   }
 
   /** The header as stored: checked, trimmed, the address copied from the customer's. */
@@ -1174,58 +1072,19 @@ export class SalesOrdersService {
 const sellable = (product: ProductSummary): boolean =>
   product.status === 'ACTIVE' && product.saleReadyAt !== null;
 
+/** The caller's EDIT right on the order's stage (or `sales.orders.manage` off any pipeline). */
+function assertCanEdit(access: Access, order: OrderRow): void {
+  if (access.canEdit(order)) return;
+  throw new AppError(
+    'FORBIDDEN',
+    'the stage does not let this role edit orders',
+    order.stageId === null ? { permission: 'sales.orders.manage' } : { stageId: order.stageId },
+  );
+}
+
 function stateError(order: OrderRow, expected: string): AppError {
   return new AppError('ORDER_STATE_INVALID', `the order is ${order.status}`, {
     status: order.status,
     expected,
   });
-}
-
-function lineView(
-  line: LineRow,
-  products: ReadonlyMap<number, ProductSummary>,
-  units: ReadonlyMap<number, { uomName: string }>,
-  parts: readonly (typeof salesOrderLineParts.$inferSelect)[],
-  pickBins: ReadonlyMap<number, string>,
-): OrderLine {
-  const product = products.get(line.productId);
-  return {
-    id: line.id,
-    lineNo: line.lineNo,
-    productId: line.productId,
-    productSku: product?.sku ?? '',
-    productName: product?.name ?? '',
-    productUnitId: line.productUnitId,
-    unitName: units.get(line.productUnitId)?.uomName ?? '',
-    qty: line.qty,
-    factorSnapshot: line.factorSnapshot,
-    qtyBase: line.qtyBase,
-    baseUnitName: product?.baseUnit.uomName ?? '',
-    warehouseId: line.warehouseId,
-    qtyApproved: line.qtyApproved,
-    qtyBackordered: line.qtyBackordered,
-    qtyPicked: line.qtyPicked,
-    pickBinId: line.pickBinId,
-    pickBinCode: line.pickBinId === null ? null : (pickBins.get(line.pickBinId) ?? null),
-    qtyDelivered: line.qtyDelivered,
-    subtotal: line.subtotal,
-    discountAmount: line.discountAmount,
-    total: line.total,
-    parts: parts
-      .filter((part) => part.lineId === line.id)
-      .map((part) => ({
-        productUnitId: part.productUnitId,
-        uomName: part.uomName,
-        basis: part.basis,
-        qty: part.qty,
-        factorSnapshot: part.factorSnapshot,
-        qtyBase: part.qtyBase,
-        listPrice: part.listPrice,
-        unitPrice: part.unitPrice,
-        subtotal: part.subtotal,
-        discountAmount: part.discountAmount,
-        total: part.total,
-        applied: part.applied,
-      })),
-  };
 }

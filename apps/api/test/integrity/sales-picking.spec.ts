@@ -200,7 +200,7 @@ describe('integrity: order picking', () => {
       orders.submit(actor, other.id),
     ]);
     expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
-    const after = await orders.get(edited.id);
+    const after = await orders.get(actor, edited.id);
     expect(after.number).toBe(edited.number);
     expect(after.lines.map((line) => line.qtyApproved.toFixed())).toEqual(['3', '2']);
     for (const id of [edited.id, other.id]) await orders.cancel(actor, id, 'Тест');

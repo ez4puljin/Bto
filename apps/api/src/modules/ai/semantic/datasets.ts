@@ -414,10 +414,14 @@ export const AI_DATASETS: readonly AiDataset[] = [
   {
     name: 'sales_orders',
     description:
-      "Customer orders (migration 0023, ADR-0055). One row per order. Sales are orders with status CONFIRMED or later; 'DRAFT' and 'CANCELLED' are not sales. Totals are whole MNT including VAT, frozen when the order was submitted.",
+      "Customer orders (migration 0023, ADR-0055, ADR-0057). One row per order. Sales are orders with status CONFIRMED or later; 'DRAFT' and 'CANCELLED' are not sales. Totals are whole MNT including VAT, frozen when the order was submitted. Orders sit in a stage of a pipeline, pipelines are grouped in boards.",
     columns: [
       col('id', 'bigint'),
-      col('number', 'text', "e.g. 'SO-2026-000123'; NULL for a draft"),
+      col(
+        'number',
+        'text',
+        "given when the order is created, e.g. '20261015_0001' (older orders 'SO-2026-000123')",
+      ),
       col(
         'status',
         'text',
@@ -436,8 +440,10 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col('discount_total', 'numeric'),
       col('total', 'numeric', 'what the customer pays; NULL for a draft'),
       col('line_count', 'bigint'),
-      col('board_id', 'bigint', 'the board the card sits on (ADR-0056); NULL = none'),
+      col('board_id', 'bigint', "the board (a group of pipelines) of the order's pipeline"),
       col('board_name', 'text'),
+      col('pipeline_id', 'bigint', 'the pipeline the card sits in (ADR-0057); NULL = none'),
+      col('pipeline_name', 'text'),
       col('stage_id', 'bigint'),
       col('stage_name', 'text', 'the stage the card is in'),
       col('stage_entered_at', 'timestamptz'),
@@ -451,6 +457,7 @@ export const AI_DATASETS: readonly AiDataset[] = [
       ),
       col('cancelled_at', 'timestamptz'),
       col('cancel_reason', 'text'),
+      col('archived_at', 'timestamptz', 'a finished order taken off the board; NULL = on it'),
       col('created_at', 'timestamptz'),
       col('created_by_name', 'text'),
     ],

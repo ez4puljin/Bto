@@ -4,7 +4,7 @@ import request from 'supertest';
 import { idempotency } from './catalog';
 import { bearer } from './identity';
 
-/** Customer orders (ADR-0055) through HTTP, as the office enters them. */
+/** Customer orders (ADR-0055, ADR-0057) through HTTP, as the office enters them. */
 
 export interface OrderLineJson {
   id: number;
@@ -49,8 +49,13 @@ export interface OrderJson {
   cancelReason: string | null;
   boardId: number | null;
   boardName: string | null;
+  pipelineId: number | null;
+  pipelineName: string | null;
   stageId: number | null;
   stageName: string | null;
+  archivedAt: string | null;
+  createdByName: string | null;
+  canEdit: boolean;
   lines: OrderLineJson[];
   events: { fromStatus: string | null; toStatus: string; reason: string | null }[];
   moves: { fromStageId: number | null; toStageId: number }[];

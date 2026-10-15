@@ -118,7 +118,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `DELETE /sales-stages/:id` | Archive from the board's menu (manager or MANAGE) |
 | `PUT /sales-stages/:id/sort` | `{ sort }`; stage EDIT |
 | `POST /sales-stages/:id/archive-cards` | Every finished, unarchived order of the stage → `{ archived }`; stage EDIT |
-| `GET /sales-settings/numbering`, `PUT /sales-settings/numbering` | `{ pattern, digits }`, with `next` (the number the next order would take). PUT: `sales.boards.manage`; issues at `pattern` / `digits` |
+| `GET /sales-settings/numbering`, `PUT /sales-settings/numbering` | `{ pattern, digits, updatedAt }` (the shared defaults until first saved). PUT: `sales.boards.manage`; the shared rules' issues at `pattern` / `digits`. The dialog's example is computed in the browser (`renderOrderNumber`, counter 1) |
 | `GET /sales-settings/channels`, `PUT /sales-settings/channels` | Where each channel's new orders land (pipeline, stage); PUT: `sales.boards.manage` |
 
 ## 5. Rules worth knowing

@@ -15,6 +15,7 @@ import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
+  SalesOrderBatchQueryDto,
   SalesOrderCancelDto,
   SalesOrderDetailDto,
   SalesOrderListQueryDto,
@@ -26,11 +27,8 @@ import {
   SalesOrderProductInfoQueryDto,
   SalesOrderRequestDto,
 } from '../dto/sales-orders.dto';
-import {
-  type OrderDetail,
-  type OrderInput,
-  SalesOrdersService,
-} from '../services/sales-orders.service';
+import { type OrderDetail, SalesOrderQueryService } from '../services/sales-order-query.service';
+import { type OrderInput, SalesOrdersService } from '../services/sales-orders.service';
 
 const READ = 'sales.orders.read';
 const MANAGE = 'sales.orders.manage';
@@ -48,7 +46,8 @@ const money = (value: Decimal | null): string | null => (value ? value.toFixed(0
 
 const inputOf = (body: SalesOrderRequestDto): OrderInput => ({
   customerId: body.customerId,
-  boardId: body.boardId ?? null,
+  pipelineId: body.pipelineId ?? null,
+  stageId: body.stageId ?? null,
   fulfilment: body.fulfilment,
   deliveryDate: body.deliveryDate,
   addressId: body.addressId ?? null,
@@ -91,11 +90,16 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     cancelReason: order.cancelReason,
     boardId: order.boardId,
     boardName: order.boardName,
+    pipelineId: order.pipelineId,
+    pipelineName: order.pipelineName,
     stageId: order.stageId,
     stageName: order.stageName,
     stageEnteredAt: iso(order.stageEnteredAt),
     pickedAt: iso(order.pickedAt),
     deliveredAt: iso(order.deliveredAt),
+    archivedAt: iso(order.archivedAt),
+    createdByName: order.createdByName,
+    canEdit: order.canEdit,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     lines: order.lines.map((line) => ({
@@ -154,27 +158,55 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
 }
 
 /**
- * Customer orders (SO-, ADR-0055): `sales.orders.read` lists and opens them; `sales.orders.manage`
- * enters drafts, submits (which confirms and reserves) and cancels.
+ * Customer orders (ADR-0055, ADR-0057): `sales.orders.read` lists and opens those the caller sees;
+ * `sales.orders.manage` enters drafts, submits (which confirms and reserves) and cancels.
  */
 @ApiTags('sales')
 @Controller('sales-orders')
 export class SalesOrdersController {
-  constructor(private readonly orders: SalesOrdersService) {}
+  constructor(
+    private readonly orders: SalesOrdersService,
+    private readonly queries: SalesOrderQueryService,
+  ) {}
 
   @Get()
   @RequirePermission(READ)
   @ApiOkResponse({ type: SalesOrderPageDto })
-  async list(@Query() query: SalesOrderListQueryDto): Promise<SalesOrderPageDto> {
-    const page = await this.orders.list(query);
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesOrderListQueryDto,
+  ): Promise<SalesOrderPageDto> {
+    const page = await this.queries.list(ctx, {
+      ...query,
+      pipeline:
+        query.pipeline === undefined
+          ? undefined
+          : query.pipeline === 'none'
+            ? 'none'
+            : Number.parseInt(query.pipeline, 10),
+    });
     return {
       data: page.data.map((row) => ({
         ...row,
         total: money(row.total),
+        archivedAt: iso(row.archivedAt),
         createdAt: row.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,
+      total: page.total,
     };
+  }
+
+  /** Up to 100 orders the caller sees, whole, for one printed page (ADR-0057 #7). */
+  @Get('batch')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [SalesOrderDetailDto] })
+  async batch(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesOrderBatchQueryDto,
+  ): Promise<SalesOrderDetailDto[]> {
+    const ids = query.ids.split(',').map((id) => Number.parseInt(id, 10));
+    return (await this.queries.batch(ctx, ids)).map(toDetail);
   }
 
   /** What the order screen shows for products it adds: home warehouse, sellable, available. */
@@ -194,8 +226,11 @@ export class SalesOrdersController {
   @Get(':id')
   @RequirePermission(READ)
   @ApiOkResponse({ type: SalesOrderDetailDto })
-  async get(@Param('id', ParseIntPipe) id: number): Promise<SalesOrderDetailDto> {
-    return toDetail(await this.orders.get(id));
+  async get(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(await this.orders.get(ctx, id));
   }
 
   @Post()
@@ -246,8 +281,11 @@ export class SalesOrdersController {
   @Get(':id/pick-info')
   @RequirePermission(PICK)
   @ApiOkResponse({ type: [SalesOrderPickLineInfoDto] })
-  async pickInfo(@Param('id', ParseIntPipe) id: number): Promise<SalesOrderPickLineInfoDto[]> {
-    return (await this.orders.pickInfo(id)).map((line) => ({
+  async pickInfo(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesOrderPickLineInfoDto[]> {
+    return (await this.orders.pickInfo(ctx, id)).map((line) => ({
       ...line,
       bins: line.bins.map((bin) => ({ ...bin, onHand: bin.onHand.toString() })),
     }));
@@ -277,7 +315,7 @@ export class SalesOrdersController {
     );
   }
 
-  /** DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered). */
+  /** DRAFT → CONFIRMED: prices frozen, stock reserved (the rest backordered). */
   @Post(':id/submit')
   @HttpCode(200)
   @RequirePermission(MANAGE)
@@ -288,6 +326,29 @@ export class SalesOrdersController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<SalesOrderDetailDto> {
     return toDetail(await this.orders.submit(ctx, id));
+  }
+
+  /** Takes a finished order off the board; it stays in the list (ADR-0057 #5). */
+  @Post(':id/archive')
+  @HttpCode(200)
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async archive(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(await this.orders.archive(ctx, id));
+  }
+
+  @Post(':id/unarchive')
+  @HttpCode(200)
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: SalesOrderDetailDto })
+  async unarchive(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesOrderDetailDto> {
+    return toDetail(await this.orders.unarchive(ctx, id));
   }
 
   @Post(':id/cancel')

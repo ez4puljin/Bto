@@ -1,31 +1,44 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import {
   BOARD_LIMITS,
+  CARD_SORTS,
+  type CardSort,
   FULFILMENTS,
   type Fulfilment,
   ORDER_CHANNELS,
   ORDER_STATUSES,
   type OrderChannel,
   type OrderStatus,
+  PAYMENT_METHODS,
+  type PaymentMethod,
+  PIPELINE_VISIBILITIES,
+  type PipelineVisibility,
   STAGE_ACTIONS,
   type StageAction,
 } from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
+const flag = ({ value }: { value: unknown }) => value === true || value === 'true';
+
+// ---------------------------------------------------------------------------------------------
+// Boards
 
 @ApiSchema({ name: 'SalesBoardRequest' })
 export class SalesBoardRequestDto {
@@ -37,19 +50,47 @@ export class SalesBoardRequestDto {
   branchId?: number | null;
 }
 
-@ApiSchema({ name: 'SalesBoardRolesRequest' })
-export class SalesBoardRolesRequestDto {
-  @ApiProperty({ type: [Number], description: 'Roles that see the board; none = everyone' })
-  @IsArray()
-  @ArrayMaxSize(100)
-  @IsInt({ each: true })
-  VIEW: number[];
-  @ApiProperty({ type: [Number], description: 'Roles that configure it' })
-  @IsArray()
-  @ArrayMaxSize(100)
-  @IsInt({ each: true })
-  MANAGE: number[];
+@ApiSchema({ name: 'SalesBoardTreeQuery' })
+export class SalesBoardTreeQueryDto {
+  @ApiPropertyOptional({ description: 'Managers: archived boards and pipelines too' })
+  @IsOptional()
+  @Transform(flag)
+  @IsBoolean()
+  archived?: boolean;
 }
+
+@ApiSchema({ name: 'SalesPipelineSummary' })
+export class SalesPipelineSummaryDto {
+  @ApiProperty() id: number;
+  @ApiProperty() boardId: number;
+  @ApiProperty() name: string;
+  @ApiProperty() position: number;
+  @ApiProperty({ enum: PIPELINE_VISIBILITIES }) visibility: PipelineVisibility;
+  @ApiProperty() ownOrdersOnly: boolean;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
+  @ApiProperty({ description: 'The caller may configure it' }) canManage: boolean;
+}
+
+@ApiSchema({ name: 'SalesBoard' })
+export class SalesBoardDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: Number, nullable: true }) branchId: number | null;
+  @ApiProperty() position: number;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
+  @ApiProperty({ type: [SalesPipelineSummaryDto], description: 'The pipelines the caller sees' })
+  pipelines: SalesPipelineSummaryDto[];
+}
+
+@ApiSchema({ name: 'SalesCreated' })
+export class SalesCreatedDto {
+  @ApiProperty() id: number;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pipelines and stages
 
 @ApiSchema({ name: 'SalesStageRoles' })
 export class SalesStageRolesDto {
@@ -70,8 +111,35 @@ export class SalesStageRolesDto {
   MOVE: number[];
 }
 
-@ApiSchema({ name: 'SalesStageRequest' })
-export class SalesStageRequestDto {
+@ApiSchema({ name: 'SalesPipelineRoles' })
+export class SalesPipelineRolesDto {
+  @ApiProperty({ type: [Number], description: 'A private pipeline: the roles that see it' })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  VIEW: number[];
+  @ApiProperty({ type: [Number], description: 'Roles that configure it and see all its orders' })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  MANAGE: number[];
+  @ApiProperty({
+    type: [Number],
+    description: 'Own orders only: the roles that still see every order',
+  })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  ALL_ORDERS: number[];
+}
+
+@ApiSchema({ name: 'SalesStageInput' })
+export class SalesStageInputDto {
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'A live stage; none = new' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  id?: number | null;
   @ApiProperty() @Transform(trimmed) @IsString() @MaxLength(BOARD_LIMITS.maxName) name: string;
   @ApiProperty({ enum: STAGE_ACTIONS }) @IsIn(STAGE_ACTIONS) action: StageAction;
   @ApiProperty() @IsBoolean() printPickList: boolean;
@@ -82,39 +150,48 @@ export class SalesStageRequestDto {
   roles: SalesStageRolesDto;
 }
 
-@ApiSchema({ name: 'SalesStageOrderRequest' })
-export class SalesStageOrderRequestDto {
-  @ApiProperty({ type: [Number], description: 'Every live stage of the board, in its new order' })
+@ApiSchema({ name: 'SalesPipelineRequest' })
+export class SalesPipelineRequestDto {
+  @ApiProperty() @IsInt() @Min(1) boardId: number;
+  @ApiProperty() @Transform(trimmed) @IsString() @MaxLength(BOARD_LIMITS.maxName) name: string;
+  @ApiProperty({ enum: PIPELINE_VISIBILITIES })
+  @IsIn(PIPELINE_VISIBILITIES)
+  visibility: PipelineVisibility;
+  @ApiProperty() @IsBoolean() ownOrdersOnly: boolean;
+  @ApiProperty({ type: SalesPipelineRolesDto })
+  @ValidateNested()
+  @Type(() => SalesPipelineRolesDto)
+  roles: SalesPipelineRolesDto;
+  @ApiProperty({ type: [SalesStageInputDto], description: 'Every stage, in its order' })
   @IsArray()
+  @ArrayMinSize(1)
   @ArrayMaxSize(BOARD_LIMITS.maxStages)
-  @IsInt({ each: true })
-  stageIds: number[];
+  @ValidateNested({ each: true })
+  @Type(() => SalesStageInputDto)
+  stages: SalesStageInputDto[];
 }
 
-@ApiSchema({ name: 'SalesChannelDefaultRequest' })
-export class SalesChannelDefaultRequestDto {
-  @ApiProperty({ enum: ORDER_CHANNELS }) @IsIn(ORDER_CHANNELS) channel: OrderChannel;
-  @ApiPropertyOptional({ type: Number, nullable: true, description: 'null clears the default' })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  boardId?: number | null;
-  @ApiPropertyOptional({ type: Number, nullable: true })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  stageId?: number | null;
+@ApiSchema({ name: 'SalesPipelineCopyRequest' })
+export class SalesPipelineCopyRequestDto {
+  @ApiProperty() @Transform(trimmed) @IsString() @MaxLength(BOARD_LIMITS.maxName) name: string;
+  @ApiProperty() @IsInt() @Min(1) boardId: number;
+}
+
+@ApiSchema({ name: 'SalesStageSortRequest' })
+export class SalesStageSortRequestDto {
+  @ApiProperty({ enum: CARD_SORTS }) @IsIn(CARD_SORTS) sort: CardSort;
 }
 
 @ApiSchema({ name: 'SalesStage' })
 export class SalesStageDto {
   @ApiProperty() id: number;
-  @ApiProperty() boardId: number;
+  @ApiProperty() pipelineId: number;
   @ApiProperty() name: string;
   @ApiProperty() position: number;
   @ApiProperty({ enum: STAGE_ACTIONS }) action: StageAction;
   @ApiProperty() printPickList: boolean;
   @ApiProperty() printDeliveryNote: boolean;
+  @ApiProperty({ enum: CARD_SORTS }) cardSort: CardSort;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
   @ApiProperty({ type: SalesStageRolesDto }) roles: SalesStageRolesDto;
   @ApiProperty({ description: 'The caller may see the stage' }) canView: boolean;
@@ -122,23 +199,54 @@ export class SalesStageDto {
   @ApiProperty({ description: 'The caller may move cards into the stage' }) canMove: boolean;
 }
 
-@ApiSchema({ name: 'SalesBoard' })
-export class SalesBoardDto {
+@ApiSchema({ name: 'SalesPipeline' })
+export class SalesPipelineDto {
   @ApiProperty() id: number;
+  @ApiProperty() boardId: number;
   @ApiProperty() name: string;
-  @ApiProperty({ type: Number, nullable: true }) branchId: number | null;
   @ApiProperty() position: number;
+  @ApiProperty({ enum: PIPELINE_VISIBILITIES }) visibility: PipelineVisibility;
+  @ApiProperty() ownOrdersOnly: boolean;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
-  @ApiProperty({ type: SalesBoardRolesRequestDto }) roles: SalesBoardRolesRequestDto;
-  @ApiProperty({ description: 'The caller may configure the board' }) canManage: boolean;
-  @ApiProperty({ type: [SalesStageDto] }) stages: SalesStageDto[];
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: SalesPipelineRolesDto }) roles: SalesPipelineRolesDto;
+  @ApiProperty({ description: 'The caller may configure the pipeline' }) canManage: boolean;
+  @ApiProperty({ description: 'The caller sees every order, not only their own' }) seesAll: boolean;
+  @ApiProperty({ type: [SalesStageDto], description: 'By position, archived ones included' })
+  stages: SalesStageDto[];
 }
 
-@ApiSchema({ name: 'SalesChannelDefault' })
-export class SalesChannelDefaultDto {
-  @ApiProperty({ enum: ORDER_CHANNELS }) channel: OrderChannel;
-  @ApiProperty() boardId: number;
-  @ApiProperty() stageId: number;
+// ---------------------------------------------------------------------------------------------
+// Cards and the filters the board and the list share
+
+@ApiSchema({ name: 'SalesOrderFiltersQuery' })
+export class SalesOrderFiltersQueryDto {
+  @ApiPropertyOptional({ description: 'Part of the number, or of a customer name, code or phone' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(60)
+  q?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) customerId?: number;
+  @ApiPropertyOptional({ description: 'Only the orders the caller entered' })
+  @IsOptional()
+  @Transform(flag)
+  @IsBoolean()
+  mine?: boolean;
+  @ApiPropertyOptional({ enum: ORDER_CHANNELS })
+  @IsOptional()
+  @IsIn(ORDER_CHANNELS)
+  channel?: OrderChannel;
+  @ApiPropertyOptional({ enum: FULFILMENTS })
+  @IsOptional()
+  @IsIn(FULFILMENTS)
+  fulfilment?: Fulfilment;
+  @ApiPropertyOptional({ enum: PAYMENT_METHODS })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS)
+  paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @Matches(DATE) deliveryFrom?: string;
+  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @Matches(DATE) deliveryTo?: string;
 }
 
 @ApiSchema({ name: 'SalesOrderCard' })
@@ -161,8 +269,13 @@ export class SalesOrderCardDto {
 @ApiSchema({ name: 'SalesStageCards' })
 export class SalesStageCardsDto {
   @ApiProperty() stageId: number;
-  @ApiProperty({ type: [SalesOrderCardDto], description: 'Newest first, at most 200' })
+  @ApiProperty({ type: [SalesOrderCardDto], description: "In the stage's sort, at most 200" })
   cards: SalesOrderCardDto[];
   @ApiProperty({ description: 'Cards in the stage, also beyond the first 200' }) count: number;
   @ApiProperty({ description: 'Sum of the frozen totals, whole MNT' }) total: string;
+}
+
+@ApiSchema({ name: 'SalesArchived' })
+export class SalesArchivedDto {
+  @ApiProperty({ description: 'Orders archived' }) archived: number;
 }

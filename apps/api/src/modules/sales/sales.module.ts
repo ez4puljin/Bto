@@ -4,33 +4,57 @@ import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
-import {
-  SalesBoardsController,
-  SalesStagesController,
-} from './controllers/sales-boards.controller';
+import { SalesBoardsController } from './controllers/sales-boards.controller';
 import { SalesOrdersController } from './controllers/sales-orders.controller';
+import {
+  SalesPipelinesController,
+  SalesStagesController,
+} from './controllers/sales-pipelines.controller';
+import { SalesSettingsController } from './controllers/sales-settings.controller';
 import { AllowAllCreditChecker, CreditChecker } from './services/credit-checker';
+import { SalesAccessService } from './services/sales-access.service';
 import { SalesBoardsService } from './services/sales-boards.service';
+import { SalesOrderQueryService } from './services/sales-order-query.service';
 import { SalesOrdersService } from './services/sales-orders.service';
+import { SalesPipelinesService } from './services/sales-pipelines.service';
+import { SalesSettingsService } from './services/sales-settings.service';
 
 /**
- * Sales (docs/modules/sales.md, ADR-0055): customer orders. The credit check allows every order
- * until finance binds its own checker in delivery 3.
+ * Sales (docs/modules/sales.md, ADR-0055, ADR-0056, ADR-0057): customer orders on boards,
+ * pipelines and stages. The credit check allows every order until finance binds its own checker
+ * in delivery 3.
  */
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
   providers: [
-    SalesOrdersService,
+    SalesAccessService,
     SalesBoardsService,
+    SalesPipelinesService,
+    SalesSettingsService,
+    SalesOrderQueryService,
+    SalesOrdersService,
     { provide: CreditChecker, useClass: AllowAllCreditChecker },
   ],
-  exports: [SalesOrdersService, SalesBoardsService],
+  exports: [
+    SalesAccessService,
+    SalesBoardsService,
+    SalesPipelinesService,
+    SalesSettingsService,
+    SalesOrderQueryService,
+    SalesOrdersService,
+  ],
 })
 export class SalesModule {}
 
 /** The HTTP side of sales (api only). */
 @Module({
   imports: [SalesModule],
-  controllers: [SalesOrdersController, SalesBoardsController, SalesStagesController],
+  controllers: [
+    SalesOrdersController,
+    SalesBoardsController,
+    SalesPipelinesController,
+    SalesStagesController,
+    SalesSettingsController,
+  ],
 })
 export class SalesHttpModule {}

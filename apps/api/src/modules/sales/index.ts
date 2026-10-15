@@ -7,19 +7,44 @@ export {
   type CreditDecision,
 } from './services/credit-checker';
 export {
-  type BoardView,
-  type OrderCard,
-  SalesBoardsService,
-  type StageCards,
+  type Access,
+  type PipelineRights,
+  type PipelineView,
+  SalesAccessService,
+  type StageRights,
   type StageView,
+} from './services/sales-access.service';
+export {
+  type BoardNode,
+  type PipelineSummary,
+  SalesBoardsService,
 } from './services/sales-boards.service';
 export {
-  type MoveResult,
+  type OrderCard,
   type OrderDetail,
-  type OrderInput,
+  type OrderFilters,
   type OrderLine,
-  type OrderLineInput,
+  type OrderQuery,
   type OrderSummary,
+  SalesOrderQueryService,
+  type StageCards,
+} from './services/sales-order-query.service';
+export {
+  type MoveResult,
+  type OrderInput,
+  type OrderLineInput,
   type PickLineInput,
   SalesOrdersService,
 } from './services/sales-orders.service';
+export {
+  type PipelineDetail,
+  type PipelineInput,
+  SalesPipelinesService,
+  type StageInput,
+} from './services/sales-pipelines.service';
+export {
+  type ChannelDefault,
+  type NumberFormat,
+  ORDER_NUMBER_SCOPE,
+  SalesSettingsService,
+} from './services/sales-settings.service';

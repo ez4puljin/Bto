@@ -1,12 +1,15 @@
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import {
   BOARD_LIMITS,
-  BOARD_RIGHTS,
+  CARD_SORTS,
+  FINISHED_STATUSES,
   FULFILMENTS,
   ORDER_CHANNELS,
   ORDER_LIMITS,
   ORDER_STATUSES,
   PAYMENT_METHODS,
+  PIPELINE_RIGHTS,
+  PIPELINE_VISIBILITIES,
   STAGE_ACTIONS,
   STAGE_RIGHTS,
 } from '@tugeel/shared/sales';
@@ -17,6 +20,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   pgTable,
   primaryKey,
@@ -32,10 +36,11 @@ import { branches, roles, users, warehouses } from '../identity/schema';
 import { bins } from '../inventory/schema';
 import { customerAddresses, customers } from '../partners/schema';
 
-// The tables owned by the sales module (docs/modules/sales.md, ADR-0055, ADR-0056). Migration
-// 0023_sales_orders adds by hand the REVOKEs that keep orders, their lines, parts and events from
-// being deleted: an order is cancelled, never removed, and its history stays. 0024_sales_boards
-// adds the boards and keeps stage moves from being changed.
+// The tables owned by the sales module (docs/modules/sales.md, ADR-0055, ADR-0056, ADR-0057).
+// Migration 0023_sales_orders adds by hand the REVOKEs that keep orders, their lines, parts and
+// events from being deleted: an order is cancelled, never removed, and its history stays.
+// 0024_sales_boards adds the boards and keeps stage moves from being changed; 0025_sales_pipelines
+// puts the pipelines between the boards and the stages and adds the number format.
 
 const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
 const ref = (name: string) => bigint(name, { mode: 'number' });
@@ -49,9 +54,10 @@ const inList = (column: AnyPgColumn, values: readonly string[]): SQL =>
   )})`;
 
 /**
- * A customer order (architecture §5.6). A draft has no number and no prices; the office's submit
- * confirms it in one transaction (ADR-0055): `SO-` number, prices frozen on the lines, stock
- * reserved per line. The address is copied from the customer's address at the time.
+ * A customer order (architecture §5.6). It is numbered when created, in the company format
+ * (ADR-0057 #3); a draft has no prices; the office's submit confirms it in one transaction
+ * (ADR-0055): prices frozen on the lines, stock reserved per line. The address is copied from the
+ * customer's address at the time.
  */
 export const salesOrders = pgTable(
   'sales_orders',
@@ -75,10 +81,14 @@ export const salesOrders = pgTable(
     contactPhone: text('contact_phone'),
     paymentMethod: text('payment_method', { enum: PAYMENT_METHODS }).notNull(),
     note: text('note'),
-    /** Where the card sits (ADR-0056 #2); null for an order entered before boards existed. */
-    boardId: ref('board_id').references(() => salesBoards.id),
-    stageId: ref('stage_id').references(() => salesStages.id),
+    /** Where the card sits (ADR-0057 #4); null when no pipeline was configured. */
+    pipelineId: ref('pipeline_id').references(() => salesPipelines.id),
+    /** A stage of that pipeline (the composite key below). */
+    stageId: ref('stage_id'),
     stageEnteredAt: timestamp('stage_entered_at', { withTimezone: true }),
+    /** A finished order taken off the board (ADR-0057 #5); it stays in the list. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    archivedBy: userRef('archived_by'),
     /** The picked counts confirmed (PACKED). */
     pickedAt: timestamp('picked_at', { withTimezone: true }),
     pickedBy: userRef('picked_by'),
@@ -104,13 +114,17 @@ export const salesOrders = pgTable(
     uniqueIndex('sales_orders_number').on(t.number),
     index('sales_orders_customer_idx').on(t.customerId, t.id),
     index('sales_orders_status_idx').on(t.status, t.id),
+    index('sales_orders_stage_live_idx')
+      .on(t.stageId, t.id)
+      .where(sql`${t.archivedAt} IS NULL`),
+    index('sales_orders_pipeline_idx').on(t.pipelineId, t.id),
     check('sales_orders_status', inList(t.status, ORDER_STATUSES)),
     check('sales_orders_channel', inList(t.channel, ORDER_CHANNELS)),
     check('sales_orders_fulfilment', inList(t.fulfilment, FULFILMENTS)),
     check('sales_orders_payment_method', inList(t.paymentMethod, PAYMENT_METHODS)),
     check(
       'sales_orders_submitted',
-      sql`(${t.submittedAt} IS NULL) = (${t.number} IS NULL) AND (${t.submittedAt} IS NULL) = (${t.priceDate} IS NULL) AND (${t.submittedAt} IS NULL) = (${t.total} IS NULL)`,
+      sql`(${t.submittedAt} IS NULL OR ${t.number} IS NOT NULL) AND (${t.submittedAt} IS NULL) = (${t.priceDate} IS NULL) AND (${t.submittedAt} IS NULL) = (${t.total} IS NULL)`,
     ),
     check(
       'sales_orders_draft',
@@ -121,8 +135,17 @@ export const salesOrders = pgTable(
       sql`(${t.status} = 'CANCELLED') = (${t.cancelledAt} IS NOT NULL)`,
     ),
     check(
-      'sales_orders_board',
-      sql`(${t.boardId} IS NULL) = (${t.stageId} IS NULL) AND (${t.stageId} IS NULL) = (${t.stageEnteredAt} IS NULL)`,
+      'sales_orders_place',
+      sql`(${t.pipelineId} IS NULL) = (${t.stageId} IS NULL) AND (${t.stageId} IS NULL) = (${t.stageEnteredAt} IS NULL)`,
+    ),
+    foreignKey({
+      name: 'sales_orders_stage_fk',
+      columns: [t.pipelineId, t.stageId],
+      foreignColumns: [salesStages.pipelineId, salesStages.id],
+    }),
+    check(
+      'sales_orders_archived',
+      sql`(${t.archivedBy} IS NULL OR ${t.archivedAt} IS NOT NULL) AND (${t.archivedAt} IS NULL OR ${inList(t.status, FINISHED_STATUSES)})`,
     ),
     check(
       'sales_orders_picked',
@@ -278,8 +301,8 @@ export const orderStatusEvents = pgTable(
 );
 
 /**
- * A board of order stages (ADR-0056 #1): the owner's workflow per branch. Archived, never deleted.
- * Rights by role in `sales_board_roles`; none means everyone holding the sales rights.
+ * A board (ADR-0057 #1): a group of pipelines, such as a place or a branch. Archived, never
+ * deleted; it has no roles of its own and shows when one of its pipelines does.
  */
 export const salesBoards = pgTable(
   'sales_boards',
@@ -302,9 +325,12 @@ export const salesBoards = pgTable(
   ],
 );
 
-/** A stage of a board: a column of cards, with what arriving there does (ADR-0056 #1, #3). */
-export const salesStages = pgTable(
-  'sales_stages',
+/**
+ * A pipeline (ADR-0057 #1): a row of stages inside a board group, with who sees it and whether
+ * its users see only their own orders. Archived, never deleted.
+ */
+export const salesPipelines = pgTable(
+  'sales_pipelines',
   {
     id: id(),
     boardId: ref('board_id')
@@ -312,7 +338,77 @@ export const salesStages = pgTable(
       .references(() => salesBoards.id),
     name: text('name').notNull(),
     position: smallint('position').notNull(),
+    visibility: text('visibility', { enum: PIPELINE_VISIBILITIES }).notNull().default('PUBLIC'),
+    ownOrdersOnly: boolean('own_orders_only').notNull().default(false),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('sales_pipelines_board_idx').on(t.boardId, t.position),
+    check(
+      'sales_pipelines_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${sql.raw(String(BOARD_LIMITS.maxName))}`,
+    ),
+    check('sales_pipelines_position', sql`${t.position} >= 0`),
+    check('sales_pipelines_visibility', inList(t.visibility, PIPELINE_VISIBILITIES)),
+  ],
+);
+
+/** Roles that may see a private pipeline, manage it, or see all of its orders; dropped with the role. */
+export const salesPipelineRoles = pgTable(
+  'sales_pipeline_roles',
+  {
+    pipelineId: ref('pipeline_id')
+      .notNull()
+      .references(() => salesPipelines.id),
+    roleId: ref('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    right: text('right', { enum: PIPELINE_RIGHTS }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.pipelineId, t.roleId, t.right] }),
+    check('sales_pipeline_roles_right', inList(t.right, PIPELINE_RIGHTS)),
+  ],
+);
+
+/**
+ * The sales settings, one row (ADR-0057 #3): the company's order number format. No row means the
+ * shared defaults (`ORDER_NUMBER_DEFAULTS`).
+ */
+export const salesSettings = pgTable(
+  'sales_settings',
+  {
+    id: smallint('id').primaryKey(),
+    numberPattern: text('number_pattern').notNull(),
+    numberDigits: smallint('number_digits').notNull(),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check('sales_settings_single', sql`${t.id} = 1`),
+    check(
+      'sales_settings_pattern',
+      sql`length(${t.numberPattern}) BETWEEN 1 AND 24 AND ${t.numberPattern} !~ '[0-9}]$'`,
+    ),
+    check('sales_settings_digits', sql`${t.numberDigits} BETWEEN 1 AND 8`),
+  ],
+);
+
+/** A stage of a pipeline: a column of cards, with what arriving there does (ADR-0056 #1, #3). */
+export const salesStages = pgTable(
+  'sales_stages',
+  {
+    id: id(),
+    pipelineId: ref('pipeline_id')
+      .notNull()
+      .references(() => salesPipelines.id),
+    name: text('name').notNull(),
+    position: smallint('position').notNull(),
     action: text('action', { enum: STAGE_ACTIONS }).notNull().default('NONE'),
+    cardSort: text('card_sort', { enum: CARD_SORTS }).notNull().default('NEWEST'),
     printPickList: boolean('print_pick_list').notNull().default(false),
     printDeliveryNote: boolean('print_delivery_note').notNull().default(false),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
@@ -320,31 +416,15 @@ export const salesStages = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    index('sales_stages_board_idx').on(t.boardId, t.position),
+    index('sales_stages_pipeline_idx').on(t.pipelineId, t.position),
+    unique('sales_stages_pipeline_stage').on(t.pipelineId, t.id),
     check(
       'sales_stages_name',
       sql`length(${t.name}) BETWEEN 1 AND ${sql.raw(String(BOARD_LIMITS.maxName))}`,
     ),
     check('sales_stages_position', sql`${t.position} >= 0`),
     check('sales_stages_action', inList(t.action, STAGE_ACTIONS)),
-  ],
-);
-
-/** Roles that may see or manage a board; dropped with the role. */
-export const salesBoardRoles = pgTable(
-  'sales_board_roles',
-  {
-    boardId: ref('board_id')
-      .notNull()
-      .references(() => salesBoards.id),
-    roleId: ref('role_id')
-      .notNull()
-      .references(() => roles.id, { onDelete: 'cascade' }),
-    right: text('right', { enum: BOARD_RIGHTS }).notNull(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.boardId, t.roleId, t.right] }),
-    check('sales_board_roles_right', inList(t.right, BOARD_RIGHTS)),
+    check('sales_stages_card_sort', inList(t.cardSort, CARD_SORTS)),
   ],
 );
 
@@ -366,21 +446,26 @@ export const salesStageRoles = pgTable(
   ],
 );
 
-/** Where a new order of a channel lands (ADR-0056 #2). */
+/** Where a new order of a channel lands (ADR-0056 #2, ADR-0057 #4). */
 export const salesChannelDefaults = pgTable(
   'sales_channel_defaults',
   {
     channel: text('channel', { enum: ORDER_CHANNELS }).primaryKey(),
-    boardId: ref('board_id')
+    pipelineId: ref('pipeline_id')
       .notNull()
-      .references(() => salesBoards.id),
-    stageId: ref('stage_id')
-      .notNull()
-      .references(() => salesStages.id),
+      .references(() => salesPipelines.id),
+    stageId: ref('stage_id').notNull(),
     updatedBy: userRef('updated_by'),
     updatedAt: updatedAt(),
   },
-  (t) => [check('sales_channel_defaults_channel', inList(t.channel, ORDER_CHANNELS))],
+  (t) => [
+    check('sales_channel_defaults_channel', inList(t.channel, ORDER_CHANNELS)),
+    foreignKey({
+      name: 'sales_channel_defaults_stage_fk',
+      columns: [t.pipelineId, t.stageId],
+      foreignColumns: [salesStages.pipelineId, salesStages.id],
+    }),
+  ],
 );
 
 /** Every move of a card: from which stage to which, by whom, when. */
