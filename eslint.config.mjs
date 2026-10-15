@@ -208,6 +208,8 @@ export default defineConfig([
     '**/.expo/**',
     '**/.vite/**',
     'tmp/**',
+    // Other Claude Code sessions' worktrees: checkouts of their own, linted there.
+    '.claude/**',
     'packages/api-client/src/generated/**',
     'apps/api/src/db/migrations/**',
     'tools/lint-guards/fixtures/**',

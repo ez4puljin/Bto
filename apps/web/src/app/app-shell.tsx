@@ -2,6 +2,7 @@ import { Menu, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useMatches } from 'react-router';
+import { useAuthState } from '@/app/auth-context';
 import { CommandPalette } from '@/app/command-palette';
 import { navTrail } from '@/app/nav-items';
 import { Sidebar } from '@/app/sidebar';
@@ -26,12 +27,14 @@ export function AppShell() {
   const menuButton = useRef<HTMLButtonElement>(null);
   const firstLink = useRef<HTMLAnchorElement>(null);
   const wide = useMatches().some((match) => isWide(match.handle));
+  const auth = useAuthState();
+  const userId = auth.status === 'authenticated' ? auth.me.id : null;
 
   useEffect(() => {
     setMenuOpen(false);
     const trail = navTrail(location.pathname);
-    if (trail) rememberRecentPage(trail.item.to);
-  }, [location.pathname]);
+    if (trail && userId !== null) rememberRecentPage(userId, trail.item.to);
+  }, [location.pathname, userId]);
 
   // Ctrl/⌘+K anywhere opens the search. Matched on the physical key too: with the Mongolian
   // keyboard layout active, `key` is a Cyrillic letter.

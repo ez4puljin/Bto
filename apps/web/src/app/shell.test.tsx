@@ -35,18 +35,27 @@ describe('recent pages', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('keeps the newest menu paths first, each once, at most five', () => {
-    for (const path of ['/a', '/b', '/c', '/b', '/d', '/e', '/f']) rememberRecentPage(path);
-    expect(readRecentPages()).toEqual(['/f', '/e', '/d', '/b', '/c']);
-    expect(readRecentPages()).toHaveLength(MAX_RECENT);
+    for (const path of ['/a', '/b', '/c', '/b', '/d', '/e', '/f']) rememberRecentPage(1, path);
+    expect(readRecentPages(1)).toEqual(['/f', '/e', '/d', '/b', '/c']);
+    expect(readRecentPages(1)).toHaveLength(MAX_RECENT);
+  });
+
+  it('keeps each user apart on one browser and never reads the old shared list (ADR-0053)', () => {
+    localStorage.setItem('tugeel.recent.v1', JSON.stringify(['/segments']));
+    rememberRecentPage(1, '/catalog/products');
+    rememberRecentPage(2, '/catalog/pending');
+    expect(readRecentPages(1)).toEqual(['/catalog/products']);
+    expect(readRecentPages(2)).toEqual(['/catalog/pending']);
+    expect(readRecentPages(3)).toEqual([]);
   });
 
   it('survives a blocked or broken storage', () => {
-    localStorage.setItem('tugeel.recent.v1', '{not json');
-    expect(readRecentPages()).toEqual([]);
+    localStorage.setItem('tugeel.recent.v1:1', '{not json');
+    expect(readRecentPages(1)).toEqual([]);
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
-    expect(() => rememberRecentPage('/catalog/products')).not.toThrow();
+    expect(() => rememberRecentPage(1, '/catalog/products')).not.toThrow();
   });
 });
 

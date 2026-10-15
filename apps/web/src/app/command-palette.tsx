@@ -62,6 +62,7 @@ function Palette({ close }: { close: () => void }) {
     () => (state.status === 'authenticated' ? state.me.permissions : []),
     [state],
   );
+  const userId = state.status === 'authenticated' ? state.me.id : 0;
   const canReadCustomers = permissions.includes('partners.customers.read');
 
   useEffect(() => {
@@ -102,7 +103,7 @@ function Palette({ close }: { close: () => void }) {
     const typed = query.trim();
     if (typed === '') {
       const visible = new Map(pages.map((page) => [page.to, page]));
-      const recent = readRecentPages().flatMap((path) => {
+      const recent = readRecentPages(userId).flatMap((path) => {
         const page = visible.get(path);
         return page ? [{ ...page, id: `recent:${path}` }] : [];
       });
@@ -160,6 +161,7 @@ function Palette({ close }: { close: () => void }) {
   }, [
     t,
     permissions,
+    userId,
     query,
     searching,
     canReadCustomers,

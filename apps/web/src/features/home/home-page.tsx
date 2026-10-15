@@ -12,7 +12,7 @@ import { AttentionTiles } from './attention-tiles';
 /**
  * «Нүүр» (ADR-0042): a greeting with today's date, the work waiting for this person («Анхаарах»,
  * ADR-0047 #7), shortcuts to the day's work (each behind the right to do it) and the pages this
- * browser opened last. «Системийн төлөв» lives in «Систем».
+ * user opened last in this browser (ADR-0053). «Системийн төлөв» lives in «Систем».
  */
 export function HomePage() {
   const { t } = useTranslation();
@@ -22,6 +22,7 @@ export function HomePage() {
     [state],
   );
   const fullName = state.status === 'authenticated' ? state.me.fullName : '';
+  const userId = state.status === 'authenticated' ? state.me.id : 0;
   // Mongolian names put the given name last: «Агуулахын Дорж» is greeted as Дорж.
   const name = fullName.trim().split(/\s+/u).at(-1) ?? fullName;
   const actions = visibleQuickActions(permissions);
@@ -31,11 +32,11 @@ export function HomePage() {
         group.items.map((item) => [item.to, { item, group }] as const),
       ),
     );
-    return readRecentPages().flatMap((path) => {
+    return readRecentPages(userId).flatMap((path) => {
       const found = items.get(path);
       return found ? [found] : [];
     });
-  }, [permissions]);
+  }, [permissions, userId]);
 
   return (
     <div className="space-y-7">

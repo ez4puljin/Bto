@@ -1,4 +1,7 @@
 # Prettier 3 also reads .gitignore.
+# Claude Code keeps other sessions' worktrees here (git ignores them through .git/info/exclude);
+# each is a checkout of its own, checked there.
+.claude/
 pnpm-lock.yaml
 pnpm-workspace.yaml
 packages/api-client/openapi.json
