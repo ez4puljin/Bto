@@ -75,6 +75,13 @@ const MANAGE = 'sales.orders.manage';
 const isStatus = (value: string | null): value is OrderStatus =>
   value !== null && (ORDER_STATUSES as readonly string[]).includes(value);
 
+/** Whole tugriks with the sign («72,000₮»); empty for a total not frozen yet. */
+function useMoney() {
+  const { t } = useTranslation();
+  return (value: string | null) =>
+    value === null ? '' : t('pricing.money', { amount: formatMnt(value) });
+}
+
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const { t } = useTranslation();
   const variant =
@@ -88,11 +95,10 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return <Badge variant={variant}>{t(`sales.statuses.${status}`)}</Badge>;
 }
 
-const money = (value: string | null) => (value === null ? '' : formatMnt(value));
-
 /** «Борлуулалт» → «Захиалга» (ADR-0055): the orders, newest first, by status and number. */
 export function SalesOrdersPage() {
   const { t } = useTranslation();
+  const money = useMoney();
   const canManage = useHasPermission(MANAGE);
   const [params, setParams] = useSearchParams();
   const statusParam = params.get('status');
@@ -677,6 +683,8 @@ function useCustomerDetails(id: number | null) {
 /** A confirmed (or cancelled) order: its header, lines with what was reserved, prices, history. */
 function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean }) {
   const { t } = useTranslation();
+  const money = useMoney();
+  const live = order.status !== 'CANCELLED';
   const warehouseName = useWarehouseName();
   const mutations = useSalesOrderMutations();
   const action = useAction();
@@ -730,7 +738,7 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
           />
         </CardContent>
       </Card>
-      {backordered.length > 0 && order.status !== 'CANCELLED' ? (
+      {backordered.length > 0 && live ? (
         <p className="text-sm text-warning">
           {t('sales.order.backorderedLines', { count: backordered.length })}
         </p>
@@ -742,8 +750,12 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
               <TableHead>{t('sales.order.product')}</TableHead>
               <TableHead className="text-right">{t('sales.order.qty')}</TableHead>
               <TableHead>{t('sales.order.warehouse')}</TableHead>
-              <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
-              <TableHead className="text-right">{t('sales.order.backordered')}</TableHead>
+              {live ? (
+                <>
+                  <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
+                  <TableHead className="text-right">{t('sales.order.backordered')}</TableHead>
+                </>
+              ) : null}
               <TableHead className="text-right">{t('sales.order.total')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -758,20 +770,24 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
                   {t('sales.order.qtyIn', { qty: plainDecimal(line.qty), unit: line.unitName })}
                 </TableCell>
                 <TableCell>{warehouseName(line.warehouseId)}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {t('sales.order.qtyIn', {
-                    qty: plainDecimal(line.qtyApproved),
-                    unit: line.baseUnitName,
-                  })}
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {new Decimal(line.qtyBackordered).gt(0)
-                    ? t('sales.order.qtyIn', {
-                        qty: plainDecimal(line.qtyBackordered),
+                {live ? (
+                  <>
+                    <TableCell className="text-right font-mono">
+                      {t('sales.order.qtyIn', {
+                        qty: plainDecimal(line.qtyApproved),
                         unit: line.baseUnitName,
-                      })
-                    : ''}
-                </TableCell>
+                      })}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {new Decimal(line.qtyBackordered).gt(0)
+                        ? t('sales.order.qtyIn', {
+                            qty: plainDecimal(line.qtyBackordered),
+                            unit: line.baseUnitName,
+                          })
+                        : ''}
+                    </TableCell>
+                  </>
+                ) : null}
                 <TableCell className="text-right font-mono">{money(line.total)}</TableCell>
               </TableRow>
             ))}
