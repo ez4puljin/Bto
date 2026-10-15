@@ -13,6 +13,7 @@ export const IMPORT_KINDS = [
   'SUPPLIERS',
   'OPENING_STOCK',
   'LEVELS',
+  'PRICES',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -23,9 +24,11 @@ export function isImportKind(value: unknown): value is ImportKind {
 /**
  * How a column's cells are read: `code` keeps digits as written (SKUs, customer codes, TINs,
  * phones), `list` holds several codes in one cell (barcodes), `decimal` is a number, `link` takes a
- * hyperlink's address (Google Maps links), `text` anything else.
+ * hyperlink's address (Google Maps links), `day` a date written as text (YYYY-MM-DD: a date cell is
+ * refused, as everywhere), `text` anything else. Code, list and day columns are text cells in the
+ * templates.
  */
-export type ColumnType = 'text' | 'code' | 'list' | 'decimal' | 'link';
+export type ColumnType = 'text' | 'code' | 'list' | 'decimal' | 'link' | 'day';
 
 export interface ImportColumn {
   key: string;
@@ -99,6 +102,18 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('minQty', 'decimal'),
     column('maxQty', 'decimal'),
   ],
+  // Price terms (ADR-0054): the template lists every active product; name, base unit and packs are
+  // for reading only. An empty price keeps the product's terms.
+  PRICES: [
+    column('sku', 'code', true),
+    column('name', 'text'),
+    column('baseUnit', 'text'),
+    column('packs', 'text'),
+    column('warehousePrice', 'decimal'),
+    column('profile', 'text'),
+    column('wholePack', 'text'),
+    column('validFrom', 'day'),
+  ],
 };
 
 export const IMPORT_LIMITS = {
@@ -129,6 +144,11 @@ export const ROW_ERROR_CODES = [
   'OUT_OF_RANGE',
   'ALREADY_IMPORTED',
   'MIN_ABOVE_MAX',
+  'PAST_DATE',
+  'NOT_WHOLE',
+  'ARCHIVED',
+  'NO_PROFILE_VALUES',
+  'NO_PACKS',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 

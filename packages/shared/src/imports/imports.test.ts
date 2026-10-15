@@ -26,7 +26,8 @@ describe('import templates', () => {
       expect(IMPORT_COLUMNS[kind].some((spec) => spec.required)).toBe(true);
     }
     expect(isImportKind('PRODUCTS')).toBe(true);
-    expect(isImportKind('PRICES')).toBe(false);
+    expect(isImportKind('PRICES')).toBe(true);
+    expect(isImportKind('ORDERS')).toBe(false);
   });
 
   it('matches header cells to columns whatever their order, marks and case', () => {
@@ -62,6 +63,11 @@ describe('cells', () => {
     expect(readCell(0.1 + 0.2, 'decimal')).toEqual({ text: '0.3' });
     expect(readCell(1250.5, 'decimal')).toEqual({ text: '1250.5' });
     expect(readCell(24, 'decimal')).toEqual({ text: '24' });
+  });
+
+  it('reads a day as text and refuses a date cell', () => {
+    expect(readCell(' 2026-10-20 ', 'day')).toEqual({ text: '2026-10-20' });
+    expect(readCell(new Date(2026, 9, 20), 'day')).toEqual({ text: null, problem: 'DATE_IN_CELL' });
   });
 
   it('reads rich text, formulas, hyperlinks and refuses dates and error values', () => {

@@ -5,10 +5,12 @@ import { CatalogModule } from '../catalog';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
+import { PricingModule } from '../pricing';
 import { ImportsController } from './controllers/imports.controller';
 import { CustomersImporter } from './importers/customers.importer';
 import { LevelsImporter } from './importers/levels.importer';
 import { OpeningStockImporter } from './importers/opening-stock.importer';
+import { PricesImporter } from './importers/prices.importer';
 import { ProductsImporter } from './importers/products.importer';
 import { SuppliersImporter } from './importers/suppliers.importer';
 import { CommitImportJob } from './jobs/commit-import.job';
@@ -25,13 +27,14 @@ const CORE_SERVICES = [
   ImportPipelineService,
   ImportsService,
   OpeningStockImporter,
+  PricesImporter,
   ProductsImporter,
   SuppliersImporter,
 ];
 
 /** Import services every process may use (the api requests, the worker carries out). */
 @Module({
-  imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule],
+  imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
   providers: CORE_SERVICES,
   exports: CORE_SERVICES,
 })

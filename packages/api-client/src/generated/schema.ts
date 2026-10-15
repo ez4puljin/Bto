@@ -4909,7 +4909,7 @@ export interface components {
             warnings?: {
                 [key: string]: number;
             };
-            /** @description What the commit did, by action */
+            /** @description What the commit did, by action; COMPLETED: products a price import completed (ADR-0054) */
             applied?: {
                 [key: string]: number;
             };
@@ -4932,7 +4932,7 @@ export interface components {
         ImportJob: {
             id: number;
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
             fileName: string;
             /** @enum {string} */
             status: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
@@ -4990,7 +4990,7 @@ export interface components {
         };
         ImportCreateRequest: {
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
             /** @description An uploaded file of kind imports.source */
             fileId: number;
             /** @example Бараа.xlsx */
@@ -10994,7 +10994,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS";
+                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
             };
             cookie?: never;
         };
@@ -11025,7 +11025,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS";
+                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
                 status?: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
             };
             header?: never;

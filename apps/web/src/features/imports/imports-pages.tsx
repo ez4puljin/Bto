@@ -301,6 +301,11 @@ function JobSummary({ job }: { job: ImportJob }) {
           })}
         </p>
       ) : null}
+      {(job.summary?.applied?.COMPLETED ?? 0) > 0 ? (
+        <p className="text-sm">
+          {t('imports.completed', { count: job.summary?.applied?.COMPLETED ?? 0 })}
+        </p>
+      ) : null}
       {job.errorRows > 0 ? (
         <p className="text-sm font-medium text-destructive">
           {t('imports.errorRows', { count: job.errorRows })}
@@ -370,7 +375,9 @@ function JobActions({ job }: { job: ImportJob }) {
       <ConfirmDialog
         open={confirm === 'revert'}
         title={t('imports.revertTitle')}
-        description={t('imports.revertDescription')}
+        description={t(
+          job.kind === 'PRICES' ? 'imports.revertPricesDescription' : 'imports.revertDescription',
+        )}
         confirmLabel={t('imports.revert')}
         pending={mutations.revert.isPending}
         problem={action.problem}

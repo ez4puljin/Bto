@@ -91,7 +91,7 @@ describe('imports', () => {
     expect(response.headers['content-disposition']).toContain('tugeel-opening-stock.xlsx');
     expect((response.body as Buffer).subarray(0, 2).toString()).toBe('PK');
     await http().get('/api/v1/imports/templates/PRODUCTS').set(bearer(worker)).expect(403);
-    await http().get('/api/v1/imports/templates/PRICES').set(bearer(admin)).expect(422);
+    await http().get('/api/v1/imports/templates/ORDERS').set(bearer(admin)).expect(422);
   });
 
   it('previews products with their problems and refuses a file with any error', async () => {

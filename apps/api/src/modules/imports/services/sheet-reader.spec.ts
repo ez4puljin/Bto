@@ -128,4 +128,31 @@ describe('import sheet reader (ADR-0036 #1)', () => {
     }
     expect(columnLabels('OPENING_STOCK', 'qty')).toEqual(['Тоо', 'Тоо ширхэг', 'Үлдэгдэл']);
   });
+
+  it('fills the price sheet with its rows and a reference sheet the reader skips (ADR-0054)', async () => {
+    const template = await buildTemplate('PRICES', {
+      rows: [
+        { sku: '0012', name: 'Ус', baseUnit: 'ш', warehousePrice: 1500, validFrom: null },
+        { sku: '0013', name: 'Кола', packs: 'хайрцаг 24', profile: 'Ундаа', wholePack: 'хайрцаг' },
+      ],
+      sheets: [{ name: 'Тохиргоо', header: ['Нэр', 'Задгай, %'], rows: [['Ундаа', '15']] }],
+    });
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(template as unknown as ArrayBuffer);
+    expect(book.worksheets.map((sheet) => sheet.name)).toEqual(['Үнэ', 'Тохиргоо', 'Заавар']);
+    const sheet = book.worksheets[0];
+    if (!sheet) throw new Error('no sheet');
+    expect(sheet.getCell('A2').numFmt).toBe('@');
+    expect(sheet.getCell('H2').numFmt).toBe('@');
+    sheet.getCell('H2').value = '2026-12-01';
+    const result = await readSheet(
+      Readable.from(Buffer.from(await book.xlsx.writeBuffer())),
+      'PRICES',
+    );
+    if (!result.ok) throw new Error(result.issue.code);
+    expect(result.rows.map((row) => row.values)).toEqual([
+      expect.objectContaining({ sku: '0012', warehousePrice: '1500', validFrom: '2026-12-01' }),
+      expect.objectContaining({ sku: '0013', profile: 'Ундаа', wholePack: 'хайрцаг' }),
+    ]);
+  });
 });

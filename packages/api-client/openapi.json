@@ -8786,7 +8786,8 @@
                 "CUSTOMERS",
                 "SUPPLIERS",
                 "OPENING_STOCK",
-                "LEVELS"
+                "LEVELS",
+                "PRICES"
               ],
               "type": "string"
             }
@@ -8860,7 +8861,8 @@
                 "CUSTOMERS",
                 "SUPPLIERS",
                 "OPENING_STOCK",
-                "LEVELS"
+                "LEVELS",
+                "PRICES"
               ]
             }
           },
@@ -18799,7 +18801,7 @@
             "additionalProperties": {
               "type": "number"
             },
-            "description": "What the commit did, by action"
+            "description": "What the commit did, by action; COMPLETED: products a price import completed (ADR-0054)"
           },
           "refreshed": {
             "type": "boolean",
@@ -18847,7 +18849,8 @@
               "CUSTOMERS",
               "SUPPLIERS",
               "OPENING_STOCK",
-              "LEVELS"
+              "LEVELS",
+              "PRICES"
             ],
             "type": "string"
           },
@@ -19073,7 +19076,8 @@
               "CUSTOMERS",
               "SUPPLIERS",
               "OPENING_STOCK",
-              "LEVELS"
+              "LEVELS",
+              "PRICES"
             ],
             "type": "string"
           },

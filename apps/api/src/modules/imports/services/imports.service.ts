@@ -9,6 +9,7 @@ import { JobsService } from '../../../common/jobs/jobs.service';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type AuthContext, AuditService, StorageService } from '../../identity';
 import { type ImportAction, type ImportStatus, importJobs, importRows } from '../schema';
+import { PricesImporter } from '../importers/prices.importer';
 import { buildTemplate } from './import-template';
 
 type JobRow = typeof importJobs.$inferSelect;
@@ -65,10 +66,12 @@ export class ImportsService {
     private readonly audit: AuditService,
     private readonly jobs: JobsService,
     private readonly storage: StorageService,
+    private readonly prices: PricesImporter,
   ) {}
 
-  template(kind: ImportKind): Promise<Buffer> {
-    return buildTemplate(kind);
+  /** The template of a kind; the price sheet starts from every active product (ADR-0054 #2). */
+  async template(kind: ImportKind): Promise<Buffer> {
+    return buildTemplate(kind, kind === 'PRICES' ? await this.prices.template() : undefined);
   }
 
   /** Attaches an uploaded sheet and queues its check (POST /imports). */

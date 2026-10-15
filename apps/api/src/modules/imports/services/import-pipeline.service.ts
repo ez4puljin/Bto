@@ -19,6 +19,7 @@ import type {
 } from '../importers/importer';
 import { LevelsImporter } from '../importers/levels.importer';
 import { OpeningStockImporter } from '../importers/opening-stock.importer';
+import { PricesImporter } from '../importers/prices.importer';
 import { ProductsImporter } from '../importers/products.importer';
 import { SuppliersImporter } from '../importers/suppliers.importer';
 import { type ImportAction, importJobs, importRows } from '../schema';
@@ -54,6 +55,7 @@ export class ImportPipelineService {
     suppliers: SuppliersImporter,
     opening: OpeningStockImporter,
     levels: LevelsImporter,
+    prices: PricesImporter,
   ) {
     this.importers = new Map<ImportKind, Importer>([
       ['PRODUCTS', products],
@@ -61,6 +63,7 @@ export class ImportPipelineService {
       ['SUPPLIERS', suppliers],
       ['OPENING_STOCK', opening],
       ['LEVELS', levels],
+      ['PRICES', prices],
     ]);
   }
 
@@ -170,7 +173,7 @@ export class ImportPipelineService {
         const { rows: locks } = await tx.execute<{ count: string }>(
           sql`SELECT count(*)::text AS count FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()`,
         );
-        const counts = countActions(applied);
+        const counts = { ...countActions(applied), ...importer.appliedNotes?.(applied) };
         await tx
           .update(importJobs)
           .set({

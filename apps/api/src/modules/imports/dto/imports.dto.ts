@@ -47,7 +47,8 @@ export class ImportSummaryDto {
   @ApiPropertyOptional({
     type: 'object',
     additionalProperties: { type: 'number' },
-    description: 'What the commit did, by action',
+    description:
+      'What the commit did, by action; COMPLETED: products a price import completed (ADR-0054)',
   })
   applied?: Record<string, number>;
   @ApiPropertyOptional({ description: 'The commit found the data changed and checked again' })

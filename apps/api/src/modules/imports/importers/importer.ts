@@ -64,6 +64,8 @@ export interface Importer<P = unknown> {
     progress: Progress,
   ): Promise<AppliedRow[]>;
   revert(tx: Tx, actor: Actor, job: ImportJobRow, rows: readonly CommittedRow[]): Promise<void>;
+  /** Counts beyond the actions for the job summary (e.g. products a price import completed). */
+  appliedNotes?(rows: readonly AppliedRow[]): Record<string, number>;
 }
 
 const WARNINGS: ReadonlySet<string> = new Set(ROW_WARNING_CODES);

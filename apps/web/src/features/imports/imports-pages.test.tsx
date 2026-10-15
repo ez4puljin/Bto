@@ -206,3 +206,46 @@ describe('import check', () => {
     ).toMatch(UUID);
   });
 });
+
+describe('price sheet (ADR-0054)', () => {
+  it('offers the price template and says what a committed price import completed', async () => {
+    renderApp(
+      '/imports',
+      signedIn(ADMIN_ME, { 'GET /api/v1/imports': () => json({ data: [], nextCursor: null }) }),
+    );
+    expect(await screen.findByText(mn.imports.kindHints.PRICES)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.PRICES}`),
+    ).toBeInTheDocument();
+  });
+
+  it('counts the completed products and explains the revert of prices', async () => {
+    const committed: Schemas['ImportJob'] = {
+      ...JOB,
+      kind: 'PRICES',
+      fileName: 'Үнэ.xlsx',
+      status: 'COMMITTED',
+      errorRows: 0,
+      canRevert: true,
+      committedAt: STAMP,
+      summary: {
+        actions: { CREATE: 2, UPDATE: 1, UNCHANGED: 0 },
+        applied: { CREATE: 2, UPDATE: 1, UNCHANGED: 0, COMPLETED: 2 },
+      },
+    };
+    renderApp(
+      '/imports/5',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/imports/5': () => json(committed),
+        'GET /api/v1/imports/5/rows': () => json({ data: [], nextCursor: null }),
+      }),
+    );
+    const user = userEvent.setup();
+    expect(
+      await screen.findByText('2 бараа «Үнэ хүлээгдэж буй»-аас гарч захиалгад орно'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: mn.imports.revert }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(mn.imports.revertPricesDescription)).toBeInTheDocument();
+  });
+});
