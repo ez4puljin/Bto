@@ -2723,6 +2723,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesOrders_list"];
+        put?: never;
+        post: operations["SalesOrders_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/product-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the order screen shows for products it adds: home warehouse, sellable, available. */
+        get: operations["SalesOrders_productInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesOrders_get"];
+        /** Replaces a draft's header and lines. */
+        put: operations["SalesOrders_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered). */
+        post: operations["SalesOrders_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SalesOrders_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2747,7 +2830,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4493,7 +4576,7 @@ export interface components {
         };
         ReconciliationDiff: {
             /** @enum {string} */
-            level: "BIN" | "WAREHOUSE" | "SELLABLE";
+            level: "BIN" | "WAREHOUSE" | "SELLABLE" | "RESERVED";
             warehouseId: number;
             binId: number | null;
             productId: number;
@@ -5572,8 +5655,172 @@ export interface components {
             /** @description The list's visible columns; the file keeps the list's order */
             columns: ("sku" | "name" | "category" | "baseUnit" | "units" | "warehousePrice" | "priceProfile" | "baseBarcodes" | "unitBarcodes" | "weight" | "homeWarehouse" | "fixedBins" | "supplier" | "status")[];
         };
+        SalesOrderSummary: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            /** @enum {string} */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            total: string | null;
+            lineCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesOrderPage: {
+            data: components["schemas"]["SalesOrderSummary"][];
+            nextCursor: string | null;
+        };
+        SalesOrderProductInfo: {
+            productId: number;
+            homeWarehouseId: number | null;
+            /** @description Active and complete (ADR-0044) */
+            sellable: boolean;
+            /** @description Base units available in the home warehouse */
+            available: string;
+        };
+        SalesOrderApplied: {
+            programId: number;
+            name: string;
+            scope: string;
+            effect: string;
+            threshold: string;
+            value: string;
+            amount: string | null;
+        };
+        SalesOrderPart: {
+            productUnitId: number;
+            uomName: string;
+            /** @enum {string} */
+            basis: "WAREHOUSE" | "LOOSE" | "RETAIL" | "RETAIL_BULK";
+            qty: string;
+            factorSnapshot: string;
+            qtyBase: string;
+            listPrice: string;
+            unitPrice: string;
+            subtotal: string;
+            discountAmount: string;
+            total: string;
+            applied: components["schemas"]["SalesOrderApplied"][];
+        };
+        SalesOrderLine: {
+            id: number;
+            lineNo: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            /** @example хайрцаг */
+            unitName: string;
+            /** @description In the unit */
+            qty: string;
+            factorSnapshot: string;
+            qtyBase: string;
+            /** @example ш */
+            baseUnitName: string;
+            /** @description The product's home warehouse */
+            warehouseId: number;
+            /** @description Base units reserved */
+            qtyApproved: string;
+            /** @description Base units backordered */
+            qtyBackordered: string;
+            subtotal: string | null;
+            discountAmount: string | null;
+            total: string | null;
+            parts: components["schemas"]["SalesOrderPart"][];
+        };
+        SalesOrderEvent: {
+            /** @enum {string|null} */
+            fromStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED" | null;
+            /** @enum {string} */
+            toStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            reason: string | null;
+            actorId: number | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesOrderDetail: {
+            id: number;
+            /** @example SO-2026-000001 */
+            number: string | null;
+            /** @enum {string} */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            addressId: number | null;
+            addressText: string | null;
+            addressLat: string | null;
+            addressLng: string | null;
+            contactName: string | null;
+            contactPhone: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note: string | null;
+            /** Format: date */
+            priceDate: string | null;
+            subtotal: string | null;
+            discountTotal: string | null;
+            total: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date-time */
+            confirmedAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lines: components["schemas"]["SalesOrderLine"][];
+            events: components["schemas"]["SalesOrderEvent"][];
+        };
+        SalesOrderLineRequest: {
+            productUnitId: number;
+            /**
+             * @description In the unit
+             * @example 2
+             */
+            qty: string;
+        };
+        SalesOrderRequest: {
+            customerId: number;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /**
+             * Format: date
+             * @description Today or later (Ulaanbaatar)
+             */
+            deliveryDate: string;
+            /** @description Required for DELIVERY */
+            addressId?: number | null;
+            contactName?: string | null;
+            /** @example 99112233 */
+            contactPhone?: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note?: string | null;
+            lines: components["schemas"]["SalesOrderLineRequest"][];
+        };
+        SalesOrderCancelRequest: {
+            reason: string;
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -12563,6 +12810,242 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+                customerId?: number;
+                /** @description Part of the order number */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_productInfo: {
+        parameters: {
+            query: {
+                /** @description Product ids, comma separated (at most 200) */
+                productIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderProductInfo"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_submit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesOrders_cancel: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderCancelRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

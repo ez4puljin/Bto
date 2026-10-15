@@ -34,7 +34,8 @@ export const GLOSSARY = {
   credit: 'customers.credit_limit, credit_hold and payment_term_days',
   discount: 'discount_programs',
   warehouse: "warehouses; kind 'STORE' is the supermarket",
-  sales: 'not in the system yet: sales, invoices, receivables and profit come with later modules',
+  sales:
+    "sales_orders and sales_order_lines (orders CONFIRMED or later; not 'DRAFT' or 'CANCELLED'); invoices, receivables and profit come with later modules",
 } as const;
 export type GlossaryKey = keyof typeof GLOSSARY;
 

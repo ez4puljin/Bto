@@ -12,6 +12,7 @@ import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
 import { PartnersHttpModule } from './modules/partners';
 import { PricingHttpModule } from './modules/pricing';
+import { SalesHttpModule } from './modules/sales';
 import { SegmentsHttpModule } from './modules/segments';
 
 /** The HTTP API (ROLE=api). Business modules are added here, one per session. */
@@ -31,6 +32,7 @@ import { SegmentsHttpModule } from './modules/segments';
     PricingHttpModule,
     AiHttpModule,
     SegmentsHttpModule,
+    SalesHttpModule,
   ],
 })
 export class AppModule {}

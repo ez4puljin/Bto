@@ -11401,6 +11401,428 @@
           "segments"
         ]
       }
+    },
+    "/api/v1/sales-orders": {
+      "get": {
+        "operationId": "SalesOrders_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SUBMITTED",
+                "APPROVAL_PENDING",
+                "CONFIRMED",
+                "PICKING",
+                "PACKED",
+                "DISPATCHED",
+                "DELIVERED",
+                "DELIVERY_FAILED",
+                "INVOICED",
+                "CLOSED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the order number",
+            "schema": {
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesOrders_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/product-info": {
+      "get": {
+        "operationId": "SalesOrders_productInfo",
+        "parameters": [
+          {
+            "name": "productIds",
+            "required": true,
+            "in": "query",
+            "description": "Product ids, comma separated (at most 200)",
+            "schema": {
+              "pattern": "^\\d+(,\\d+){0,199}$",
+              "example": "12,15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesOrderProductInfo"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "What the order screen shows for products it adds: home warehouse, sellable, available.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}": {
+      "get": {
+        "operationId": "SalesOrders_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesOrders_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replaces a draft's header and lines.",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/submit": {
+      "post": {
+        "operationId": "SalesOrders_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → CONFIRMED: number, prices frozen, stock reserved (the rest backordered).",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/cancel": {
+      "post": {
+        "operationId": "SalesOrders_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales"
+        ]
+      }
     }
   },
   "info": {
@@ -11511,7 +11933,9 @@
           "pricing.prices.manage",
           "ai.ask",
           "ai.reports.manage",
-          "segments.manage"
+          "segments.manage",
+          "sales.orders.read",
+          "sales.orders.manage"
         ]
       },
       "RoleRef": {
@@ -17612,7 +18036,8 @@
             "enum": [
               "BIN",
               "WAREHOUSE",
-              "SELLABLE"
+              "SELLABLE",
+              "RESERVED"
             ],
             "type": "string"
           },
@@ -21061,6 +21486,660 @@
           "columns"
         ]
       },
+      "SalesOrderSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "channel",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "fulfilment",
+          "deliveryDate",
+          "total",
+          "lineCount",
+          "createdAt"
+        ]
+      },
+      "SalesOrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesOrderProductInfo": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "Active and complete (ADR-0044)"
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units available in the home warehouse"
+          }
+        },
+        "required": [
+          "productId",
+          "homeWarehouseId",
+          "sellable",
+          "available"
+        ]
+      },
+      "SalesOrderApplied": {
+        "type": "object",
+        "properties": {
+          "programId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "programId",
+          "name",
+          "scope",
+          "effect",
+          "threshold",
+          "value",
+          "amount"
+        ]
+      },
+      "SalesOrderPart": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "basis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "RETAIL",
+              "RETAIL_BULK"
+            ],
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "factorSnapshot": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "listPrice": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "discountAmount": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderApplied"
+            }
+          }
+        },
+        "required": [
+          "productUnitId",
+          "uomName",
+          "basis",
+          "qty",
+          "factorSnapshot",
+          "qtyBase",
+          "listPrice",
+          "unitPrice",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "applied"
+        ]
+      },
+      "SalesOrderLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "qty": {
+            "type": "string",
+            "description": "In the unit"
+          },
+          "factorSnapshot": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "baseUnitName": {
+            "type": "string",
+            "example": "ш"
+          },
+          "warehouseId": {
+            "type": "number",
+            "description": "The product's home warehouse"
+          },
+          "qtyApproved": {
+            "type": "string",
+            "description": "Base units reserved"
+          },
+          "qtyBackordered": {
+            "type": "string",
+            "description": "Base units backordered"
+          },
+          "subtotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderPart"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "qty",
+          "factorSnapshot",
+          "qtyBase",
+          "baseUnitName",
+          "warehouseId",
+          "qtyApproved",
+          "qtyBackordered",
+          "subtotal",
+          "discountAmount",
+          "total",
+          "parts"
+        ]
+      },
+      "SalesOrderEvent": {
+        "type": "object",
+        "properties": {
+          "fromStatus": {
+            "nullable": true,
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "toStatus": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "fromStatus",
+          "toStatus",
+          "reason",
+          "actorId",
+          "createdAt"
+        ]
+      },
+      "SalesOrderDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "SO-2026-000001"
+          },
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "addressId": {
+            "type": "number",
+            "nullable": true
+          },
+          "addressText": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLat": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLng": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "subtotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountTotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLine"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderEvent"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "channel",
+          "status",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "fulfilment",
+          "deliveryDate",
+          "addressId",
+          "addressText",
+          "addressLat",
+          "addressLng",
+          "contactName",
+          "contactPhone",
+          "paymentMethod",
+          "note",
+          "priceDate",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "submittedAt",
+          "confirmedAt",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "updatedAt",
+          "lines",
+          "events"
+        ]
+      },
+      "SalesOrderLineRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "2",
+            "description": "In the unit"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "SalesOrderRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Today or later (Ulaanbaatar)"
+          },
+          "addressId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Required for DELIVERY"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "example": "99112233"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineRequest"
+            }
+          }
+        },
+        "required": [
+          "customerId",
+          "fulfilment",
+          "deliveryDate",
+          "paymentMethod",
+          "lines"
+        ]
+      },
+      "SalesOrderCancelRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -21121,6 +22200,8 @@
           "BIN_ARCHIVED",
           "DOC_STATE_INVALID",
           "PRODUCT_NOT_IN_WAREHOUSE",
+          "PRODUCT_NO_HOME",
+          "PRODUCT_NOT_SELLABLE",
           "COSTING_CLOSED",
           "TRANSFER_NOTHING_SHIPPED",
           "STOCKTAKE_BINS_UNFINISHED",
