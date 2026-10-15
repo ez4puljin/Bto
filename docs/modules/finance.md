@@ -120,13 +120,26 @@ Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'1
 
 ## 9. Screens (`apps/web`)
 
-Delivery 3 slice 5 (docs/ui.md): «Санхүү» — invoices with the panel and printing, payments with the record dialog and the voucher, the cash book, customer balances and ledgers (+ the «Тооцоо» card on the customer page), the journal with the manual entry dialog, the accounts, the settings; the home tile «Хугацаа хэтэрсэн авлага»; the order panel's invoice link and the `CREDIT_BLOCKED` message with its amounts.
+`apps/web/src/features/finance/` (docs/ui.md «Finance records»), the «Санхүү» menu group behind `finance.read`:
+
+| Route | Screen |
+|---|---|
+| `/finance/invoices` (+ `?invoice=`) | the list with search, settlement, overdue and date filters; the invoice panel (facts, totals, lines, allocations, credit notes; «Хэвлэх» A4 / 80 mm; «⋯» void with a reason, credit note by line quantities into a warehouse's RETURNS bin or none) |
+| `/finance/invoices/:id/print`, `/finance/payments/:id/print` | the invoice and the voucher for paper, outside the shell, `?format=a4` / `80mm` (ADR-0058) |
+| `/finance/payments` (+ `?new=1`, `?payment=`) | the vouchers with filters; «Төлбөр бүртгэх» (kind, money account, customer or journal account, amount, date, reference, the driver who handed it in; the open invoices oldest due first or allocated by hand, the rest shown as an advance); the voucher panel with its allocations, printing and voiding |
+| `/finance/cash` (+ `?account=`) | the money accounts as cards with balances, the chosen one's book newest first with the balance after each voucher and the opening before `from` |
+| `/finance/customers`, `/finance/customers/:id` (+ `?new=1`) | who owes what with aging and credit terms; one customer's balance card and ledger with «Төлбөр бүртгэх» for that customer; `CustomerBalanceCard` («Тооцоо») on `/partners/customers/:id` |
+| `/finance/journal` (+ `?new=1`, `?entry=`), `/finance/accounts`, `/finance/accounts/:id` | the journal with «Гараар бичилт» (lines that must balance before sending) and the entry panel (a manual entry's «Эсрэг бичилт»); the chart with turnover and balances, account dialogs, the role dialog (`finance.settings.manage`), an account's ledger |
+| `/finance/settings` (`finance.settings.manage`) | the four number formats with today's example; the money accounts |
+
+Also: the home tile «Хугацаа хэтэрсэн авлагатай харилцагч» (`GET /finance/attention`, opens the balances filtered to overdue), the order panel's «Нэхэмжлэх» fact with the settlement badge, and `ProblemAlert` rendering `CREDIT_BLOCKED` as one line per reason with the formatted amounts.
 
 ## 10. Tests
 
 - `packages/shared/src/finance/finance.test.ts`: the tax split table (ADR-0010), part filling, FIFO, aging, settlement, numbers.
 - Integration: `finance-invoicing` (the sale → invoice, taxes, entry, ledger; nothing delivered; void and its refusal), `finance-payments` (FIFO, advance, chosen allocations, void, cash book, other income / expense, refund), `finance-credit` (limit for cash too, own order not counted twice, no limit, overdue, hold), `finance-credit-notes` (RETURNS, allocation, over-return, settled invoice → advance, price correction), `finance-books` (seeded chart and roles, manual entries, unbalanced, reversals, money accounts, numbering); `ai-views` covers the four views; `customers` expects the 30-day default; `sales-boards` expects INVOICED.
 - Integrity (`--runInBand`): `finance-guards` (REVOKEs for app, triggers for migrator, the balanced-entry trigger at commit), `finance-ledger` (reconcile OK → drift recorded and repaired → OK), `finance-races` (two confirmations vs one limit; two payments vs one invoice).
+- Web (Vitest, `features/finance/*.test.tsx` on `finance-fixtures.ts`): the menu by role, the invoice list → panel → void, the payment dialog (FIFO preview, the request body, the voucher panel), the cash book, the balances → ledger, the home tile; the journal panel, the manual entry refused unbalanced then posted, the role refusal, the number formats and a new bank account; both print pages calling `window.print` once.
 
 ## 11. Open items
 
