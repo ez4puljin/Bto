@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0059`.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0060`.
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -74,6 +74,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0056](ADR-0056-order-boards.md) | Order boards and stages: a free workflow over the order states, picking confirmed by counts, two kinds of sale | Accepted | 2026-10-15 |
 | [ADR-0057](ADR-0057-sales-pipelines.md) | Boards hold pipelines; the warehouse sales page, own-orders-only pipelines and the company order number format | Accepted | 2026-10-15 |
 | [ADR-0058](ADR-0058-print-formats-and-payment-labels.md) | Sales documents on A4 or an 80 mm roll; the payment method as each order's label, its author on the card | Accepted | 2026-10-15 |
+| [ADR-0059](ADR-0059-order-panel.md) | The order panel: an erxes-like deal view where the order is read, edited, moved and filled | Accepted | 2026-10-15 |
 
 ## Template
 

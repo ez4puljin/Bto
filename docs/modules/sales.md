@@ -10,10 +10,11 @@ Status (all built in delivery 2 on 2026-10-15):
   - finished orders can be archived and each stage has a shared card sort;
   - orders are numbered when created, in the company format.
 - **Labels and paper** (ADR-0058): each order's label is its payment method, the card names who entered it, and both documents print on A4 or an 80 mm roll.
+- **The order panel** (ADR-0059): an erxes-like deal view where an order is read, edited (header and products), moved along its stages and filled; new orders start from their customer in a dialog.
 
 Sales reps come in delivery 7 and the POS in delivery 9.
 - **Code:** `apps/api/src/modules/sales/`; shared rules in `packages/shared/src/sales`; screens in `apps/web/src/features/sales/`.
-- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
+- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0059 (the order panel), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
 - **Architecture:** §5.3 (reservations) and §5.6 (the state machine).
 
 sales depends on these modules, always through their `index.ts`:
@@ -102,7 +103,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `GET /sales-orders?pipelineId \| pipeline=none&stageId&status&archived=exclude\|include\|only&q&customerId&mine&channel&fulfilment&paymentMethod&deliveryFrom&deliveryTo` | Keyset, newest first. Only what the caller may see. `q` matches the number, or customers through `idsWhere`. Rows carry the pipeline and stage names, `archivedAt`, `createdByName` and `paymentMethod` (the label, ADR-0058). `total` on the first page |
 | `GET /sales-orders/batch?ids=…` | Up to 100 orders, full, for printing; unseen ids are left out |
 | `GET /sales-orders/product-info?productIds=1,2` | Per product: home warehouse, `sellable` (active and complete), base units available there |
-| `GET /sales-orders/:id` | Header (board, pipeline, stage, the caller's `rights`), lines with parts, events, moves. 404 when not visible |
+| `GET /sales-orders/:id` | Header (board, pipeline, stage, the caller's `rights`), lines with parts, events and moves with `actorName` (moves also `fromStageName` / `toStageName`, ADR-0059). 404 when not visible |
 | `POST /sales-orders` (`Idempotency-Key`) | A draft, **numbered**: header + lines (≤ 200), `pipelineId?`, `stageId?` (#4). Refusals: `PRODUCT_NOT_SELLABLE`, `PRODUCT_NO_HOME`, `errors[].path = lines.N`, the shared header checks; the customer must be active |
 | `PUT /sales-orders/:id` | DRAFT or CONFIRMED until picking. Replaces header and lines (the customer does not change). Needs the stage's EDIT right, or `sales.orders.manage` without a pipeline |
 | `POST /sales-orders/:id/submit`, `/cancel` (200, `Idempotency-Key`) | DRAFT → CONFIRMED; `{ reason }` → CANCELLED |
@@ -199,7 +200,7 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - **Left panel:** the boards, each folding out into the pipelines the user sees; it folds away, and on phones it is a select.
   - **Header:** the breadcrumb, the pipeline's name with its board, «Самбарын тохиргоо» and «Шинэ захиалга».
     - «Самбарын тохиргоо» opens the settings page for managers, or the pipeline's sheet in place for a MANAGE role.
-    - «Шинэ захиалга» takes the pipeline along.
+    - «Шинэ захиалга» opens the create dialog with the pipeline (ADR-0059).
   - **Bar:**
     - «Захиалга хайх»;
     - «Шүүлтүүр» with chips: customer (for holders of `partners.customers.read`), delivery date, «Миний оруулсан», channel, fulfilment, payment;
@@ -217,21 +218,20 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
     - «Шат архивлах»: managers.
   - A card shows its label beside the number (the payment method: «Зээл» orange, «Бэлнээр» green, «Дансаар» blue) and «Оруулсан: name · channel» (ADR-0058).
   - Cards are dragged between columns or moved through their «Зөөх» menu; a CANCEL stage asks the reason first. After a move, the stage's documents are offered as buttons after the paper switch.
-  - A card opens a side `Sheet` with:
-    - the order;
-    - the status and the label under the title;
-    - «Захиалгыг нээх»;
-    - the paper switch «A4 | 80 мм» and the print buttons;
-    - the pick form, for pickers;
-    - «Архивлах» / «Сэргээх», for finished orders.
+  - A card opens the order panel (below); «+» opens the create dialog on that stage.
 - **List view.**
   - Scope «Энэ дамжлага / Бүгд / Дамжлагагүй», filters «Шат», «Төлөв», «Архивласан».
   - Columns: number, customer, stage, status, delivery date, total, payment (the label), entered by, channel, created. A `ColumnChooser` is kept per user.
-  - «Цааш үзэх» loads more; a row opens the side sheet.
-- **Order pages.** `/sales/orders/new?pipeline=&stage=` and an order's page (header with board / pipeline · stage).
-  - The editor: «Захиалгын мэдээлэл» (customer, pickup or delivery, date, address, contact, payment, note, the pipeline grouped by board) and «Бараа» (product search, unit, quantity, the home warehouse and its stock).
-  - «Үнэ тооцоолох» shows the quote; `StickyActions` holds «Хадгалах» and «Илгээх».
-  - A confirmed or cancelled order is read-only, with its backorders, parts, history and «Цуцлах».
+  - «Цааш үзэх» loads more; a row opens the order panel.
+- **The order panel** (ADR-0059; `order-panel.tsx` and its sections), opened from a card or a list row; the URL keeps `?order=&tab=`:
+  - **Header:** number, customer · board / pipeline, status, payment label, «Архивласан»; the paper switch, «Бэлтгэх хуудас», «Падаан» (with prices); «⋯»: «Илгээх» (a draft outside every pipeline, `sales.orders.manage`), «Архивлах» / «Сэргээх» (finished, EDIT), «Цуцлах» (cancellable, `sales.orders.manage`, a reason).
+  - **«Ерөнхий»:** the stage steps and select (moves by the board's rules; waits while edits are unsaved), the facts as chips (customer, delivery date, fulfilment, payment, branch, board / pipeline, entered by and when, total), the note, the five latest activity entries.
+  - **«Мэдээлэл»:** the header in a `DetailCard`, edited while the order may change (DRAFT or CONFIRMED, `canEdit`); saved with the stored lines (a confirmed order is priced and reserved again).
+  - **«Бараа»:** search by name or code (`matchesQuery`), warehouse and «Бэлтгэсэн эсэх» filters, the lines with unit, quantity, unit price by part, amount, reserved, backordered, picked; editing adds products (`ProductSearch`), changes units and quantities, removes lines, and «Хадгалах» sends them with the stored header; frozen prices, or a quote of the edited lines as an estimate (`useLinesQuote`, 300 ms after a change); unsellable products block saving.
+  - **«Бэлтгэх»:** the pick form, for pickers while CONFIRMED or PICKING.
+  - **«Түүх»:** created (and where it landed), stage moves, state changes with reasons, archiving; newest first.
+  - Unsaved edits survive a change of section; closing asks first.
+- **New order:** «Шинэ захиалга» or a stage's «+» opens a dialog (`?new=1&stage=`): customer, payment (default «Бэлнээр»), pipeline (the stage shown when fixed). It creates the numbered draft without lines (a pickup for tomorrow) and opens its panel on «Бараа». `/sales/orders/new` and `/sales/orders/:id` redirect to the dialog and the panel.
 - **Printing** (ADR-0056 #7), pages without the shell that print themselves in the browser's dialog:
   - `/sales/orders/:id/print/:kind`: one document;
   - `/sales/print/:kind?ids=…`: up to 100, one per sheet;
@@ -278,7 +278,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - archive;
   - own orders only on every path;
   - hidden stages;
-  - the card's `paymentMethod` and `createdByName` (ADR-0058).
+  - the card's `paymentMethod` and `createdByName` (ADR-0058);
+  - the names in an order's moves and events (ADR-0059).
 
 **Integrity**
 - `sales-races.spec.ts`: the last 30 pieces, opposite line orders, cancels.
@@ -286,7 +287,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 - `sales-pipelines.spec.ts`: archiving a stage while moving into it; concurrent creates numbered without gaps.
 
 **Web**
-- `features/sales/sales-pages.test.tsx`
+- `features/sales/sales-pages.test.tsx`: the menu; a new order from its customer to submitted; a confirmed order's reservations and cancelling; the header edited in «Мэдээлэл»; a reader without edits
+- `order-panel.test.tsx`: stage steps and a CANCEL stage's question, the activity with names, the products' search and filters, unsaved edits across sections and on closing, the pick section
 - `work-page.test.tsx`
 - `settings-page.test.tsx`
 - `print-page.test.tsx`: the pick list by warehouse on the roll, the paper from the address or the computer, the switch

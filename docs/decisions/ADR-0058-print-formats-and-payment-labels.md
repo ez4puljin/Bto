@@ -6,6 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0056 (#7: two paper sizes for the documents, the order's payment and author in their header; #8: a card shows its label and who entered it), ADR-0057 (#7: the list view gains a payment column) |
+| Amended by | ADR-0059 (#3: the print buttons sit in the order panel's header) |
 
 ## Context
 
