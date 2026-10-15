@@ -6,6 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | architecture §5.6 (office orders skip a separate CONFIRM step while credit checks allow all; a line's warehouse is its product's home), §5.3 (`reserve()` as built); builds on ADR-0009 (#6), ADR-0010, ADR-0044, ADR-0048 |
+| Amended by | ADR-0056 (#1: a confirmed order may be edited until picking, re-quoted and re-reserved in one lock pass; the submit is the CONFIRM stage action; picking by confirmed counts and the sale as stage actions) |
 
 ## Context
 

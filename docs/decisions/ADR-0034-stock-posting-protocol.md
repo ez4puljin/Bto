@@ -6,7 +6,7 @@
 | Date | 2026-10-11 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0007 (posting steps), `docs/architecture.md` §5.3 (`post()` signature and steps) |
-| Amended by | ADR-0035 (transfer legs 5/6, the `TR` document, `allocateNumber`, chunked statements) |
+| Amended by | ADR-0035 (transfer legs 5/6, the `TR` document, `allocateNumber`, chunked statements); ADR-0056 (#5: `ExternalPostingDoc` for `SO` / `PK` documents, neither locked nor numbered by `post()`; `reservationConsume` by document lines in the same warehouse UPDATE) |
 
 ## Context
 
