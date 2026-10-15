@@ -39,6 +39,8 @@ Migration `0005_inventory` (generated, then CHECKs, triggers and REVOKEs by hand
 
 Document headers (`goods_receipts`, `bin_moves`, `adjustments`, `stocktakes`, `transfers`) and the caches are `REVOKE DELETE, TRUNCATE … FROM app`; draft lines are deleted by their service only. The warehouse's «Тавиургүй» shelf (`NOSHELF`) is an ordinary STORAGE bin the opening-stock import creates on demand (sellable).
 
+External documents on the ledger (`external: true`, numbered by their own module): `SO` and `PK` from sales, `CN` from finance (credit notes, `RETURN_IN` into the RETURNS bin by default; ADR-0060 #6). `movements()` reads their numbers from `sales_orders.number` and `credit_notes.number`.
+
 ## 3. Public API (`modules/inventory/index.ts`)
 
 | Export | Use |

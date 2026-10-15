@@ -65,6 +65,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm user:create-admin --username <name> --full-name "<name>"` | create (or recover) an ADMIN and print a 30-minute one-time code; the user sets the password at `/set-password` |
 | `pnpm catalog:reindex-search [--all]` / `pnpm partners:reindex-search [--all]` | recompute product / customer and supplier search keys after `SEARCH_KEYS_VERSION` changes (`--all`: every row; ADR-0028) |
 | `pnpm inventory:reconcile` / `pnpm inventory:rebuild-balances` | compare `bin_stock` / `warehouse_stock` with the ledger and record a run (exit 2 on drift) / recompute the cache quantities from the ledger, keeping averages, then reconcile (find the cause of a drift first; `docs/modules/inventory.md` §7) |
+| `pnpm finance:reconcile` | compare `customer_balances` with the receivables ledger and the open invoices, rewrite every row and record a run (exit 2 on drift; `docs/modules/finance.md` §7) |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |

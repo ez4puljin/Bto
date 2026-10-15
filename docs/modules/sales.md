@@ -24,7 +24,7 @@ sales depends on these modules, always through their `index.ts`:
 - `pricing`: the quote.
 - `inventory`: home warehouses, `ReservationService`, `StockPostingService`.
 
-Nothing imports `sales` yet (delivery and finance will).
+Finance answers the two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and imports only those contracts from `sales/index.ts`; delivery will import sales too.
 
 ## 1. Owner's answers behind the design (2026-10-15)
 
@@ -79,14 +79,15 @@ AI views (ADR-0045):
 
 | Export | Use |
 |---|---|
-| `SalesModule` / `SalesHttpModule` | the services; + the controllers (api). `CreditChecker` is bound to `AllowAllCreditChecker` (finance replaces it in delivery 3) |
+| `SalesModule` / `SalesHttpModule` | the services; + the controllers (api). The credit checker and the sale sink are resolved from finance through `ModuleRef` (`strict: false`); without finance every order passes and a sale ends DELIVERED |
 | `SalesOrdersService.create / update / submit / move / pickInfo / pick / cancel / archive / unarchive / get / list / productInfo` | the order paths; each takes the caller's `AuthContext`. A SYSTEM actor skips the rights check |
 | `SalesAccessService.load(ctx)` | the caller's rights on pipelines and stages, and the SQL predicate every order read and action uses (ADR-0057 #2) |
 | `SalesBoardsService` | the board groups: `tree`, create, rename, archive |
 | `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `stageRights`, `namesOf`, `printsOf` |
 | `SalesOrderQueryService` | reads for the screens: `cards`, `list`, `details(ids)` |
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
-| `CreditChecker`, `AllowAllCreditChecker`, `CreditDecision` | `check(tx, lockedCustomer, amount)` → OK / NEEDS_APPROVAL / BLOCKED |
+| `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
+| `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
 
 ## 4. REST surface
 
@@ -148,7 +149,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 - **Stage actions (ADR-0056 #3)** run inside the move's transaction after the order row and the stage rights are checked:
   - CONFIRM submits a draft (below) and leaves a confirmed order alone.
   - PICK sets CONFIRMED → PICKING.
-  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`.
+  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`; with finance bound it hands the sale sink a snapshot (header, lines with delivered base quantities and frozen parts, the branch of the pipeline's board or of the first line's warehouse) and, when an invoice comes back, sets INVOICED with an event whose reason is the invoice number (ADR-0060 #3).
   - CANCEL cancels with the reason (`reason` required). NONE moves only.
   - Moving back undoes nothing. Every move writes a `sales_stage_moves` row and an audit `MOVE`. Moves between pipelines are refused.
 - **Picking (ADR-0056 #5).**
@@ -161,7 +162,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
   3. the customer row (`lockForUpdate`; inactive → `CUSTOMER_INACTIVE`);
   4. products sellable with a home;
   5. `PriceQuoteService.quote` (`PRICE_MISSING`);
-  6. `CreditChecker`;
+  6. the credit check (ADR-0060 #2): the customer's other CONFIRMED … DELIVERED orders summed under the lock, then `CreditChecker.check`; a refusal is 409 `CREDIT_BLOCKED` with the amounts;
   7. parts and totals written;
   8. `ReservationService.reserveInTx` (rows in (warehouse, product) order; the rest backordered);
   9. a number only for an older draft that has none;
@@ -305,6 +306,6 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - a receipt printer through the print agent (ADR-0022);
   - the suggested shelf on the pick list before picking (ADR-0058 follow-up);
   - free labels per pipeline beside the payment label.
-- **Delivery 3:** the credit check (APPROVAL_PENDING), `customer_balances.open_orders`, invoices from delivered quantities.
+- **Delivery 3 (done 2026-10-16, ADR-0060):** the credit check without tolerance, invoices from delivered quantities (`docs/modules/finance.md`). No `open_orders` cache: sales sums its own open orders under the customer lock. Still open: CLOSED when the invoice is paid; payments shown in the order panel.
 - **Customer app, sales reps:** the 24-hour re-quote applies once a submit no longer confirms at once.
 - **Delivery 9:** the POS page («ПОС борлуулалт»).

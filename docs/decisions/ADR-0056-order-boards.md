@@ -6,7 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0055 (#1: a reserved order may be edited; the submit is one stage action among others), ADR-0034 (#5: `post()` takes external documents and consumes reservations), architecture §5.3 (`reservationConsume` as built), §5.6 (stages instead of picking waves and packing; the interim confirm-delivery screen becomes the SALE stage), §4 (no `pickings` / `packages` tables) |
-| Amended by | ADR-0057 (#1: boards group pipelines, which hold the stages, a visibility, an own-orders-only switch and ALL_ORDERS roles; a stage's VIEW hides its orders on every read; #2: placement in a pipeline and a stage chosen through «+»; #8: the warehouse sales page with board and list views, the settings page); ADR-0058 (#7: the documents on A4 or an 80 mm roll, with the payment and the author in their header; #8: a card shows its payment label and who entered it); ADR-0059 (#8: the side sheet becomes the order panel; the activity names who moved a card) |
+| Amended by | ADR-0057 (#1: boards group pipelines, which hold the stages, a visibility, an own-orders-only switch and ALL_ORDERS roles; a stage's VIEW hides its orders on every read; #2: placement in a pipeline and a stage chosen through «+»; #8: the warehouse sales page with board and list views, the settings page); ADR-0058 (#7: the documents on A4 or an 80 mm roll, with the payment and the author in their header; #8: a card shows its payment label and who entered it); ADR-0059 (#8: the side sheet becomes the order panel; the activity names who moved a card); ADR-0060 (#3: the SALE stage invoices the order through a finance hook and ends INVOICED) |
 
 ## Context
 

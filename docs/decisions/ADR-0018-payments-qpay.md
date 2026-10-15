@@ -5,6 +5,7 @@
 | Status | Deferred (principles accepted now; implementation in delivery 5, reused in delivery 6, bank reconciliation in delivery 10) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0060 (payments are recorded by hand from cash and internet banking; QPay stays deferred) |
 
 ## Context
 

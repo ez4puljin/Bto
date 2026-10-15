@@ -5,7 +5,7 @@
 | Status | Deferred (principles accepted now; implementation in delivery 3, POS path in delivery 9) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0026 (the week-1 spike runs from the owner's machine over Tailscale; production PosAPI comes with the go-live phase; the gate date is unchanged) |
+| Amended by | ADR-0026 (the week-1 spike runs from the owner's machine over Tailscale; production PosAPI comes with the go-live phase; the gate date is unchanged); ADR-0060 (the invoice an e-Barimt receipt will be built from exists; the receipt itself stays deferred) |
 
 ## Context
 

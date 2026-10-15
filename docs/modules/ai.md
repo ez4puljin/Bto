@@ -49,6 +49,10 @@ Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the sche
 | `ai.discount_programs` | discount program, with its status today and its steps as text |
 | `ai.sales_orders` | customer order: number, status, customer, pickup or delivery, date, payment method, frozen totals, line count (0023, ADR-0055); its board, pipeline and stage by name, picked, delivered and archived times (0024, 0025, ADR-0056, ADR-0057). No row rights: `ai.ask` holders see every order, also on own-orders-only pipelines |
 | `ai.sales_order_lines` | order line: product, unit and quantity, base quantity, home warehouse, reserved and backordered quantities, picked and delivered quantities, totals (0023, 0024) |
+| `ai.invoices` | invoice: number, status, customer, order, branch, dates, payment method, totals and taxes, paid and open amounts, settlement, overdue and days overdue, line count (0026, ADR-0060) |
+| `ai.invoice_lines` | invoice line: product, unit, quantities, prices, discount, total, tax type, rates and amounts, returned base quantity (0026) |
+| `ai.payments` | voucher of the cash and bank books: kind, direction, money account and its branch, customer or journal account, amount, date, reference, who collected and recorded it, void fields (0026) |
+| `ai.customer_balances` | customer: balance (negative = advance), open invoices, overdue amount, oldest due date, credit limit and hold (0026) |
 
 The views never read `auth_sessions`, `password_resets`, `idempotency_keys`, `files`, `audit_log` or `import_rows`, and from `users` only `id` and `full_name`. `AI_DATASETS` (`semantic/datasets.ts`) describes every view and column in English. The prompt, the guard and the tests all use it. Mongolian names, the glossary and example questions live in `mn.json` (`ai.datasets`, `ai.glossary`, `ai.examples`).
 
@@ -142,7 +146,7 @@ Verified in the browser on 2026-10-13 at phone width (the dev database, no provi
 
 ## 11. Opening a module's data to the assistant
 
-When `sales`, `finance` or another module is built:
+When another module is built (sales did in 0023–0025, finance in 0026):
 
 1. Add views in schema `ai` in that module's migration.
 2. Add their `AI_DATASETS` entries and the Mongolian names in `mn.json`.
@@ -154,6 +158,5 @@ A migration that changes a column an `ai.*` view uses recreates the view in the 
 
 - The owner's first real questions with their own key: collect wrong answers and improve the glossary, the examples or the views.
 - SPEC §11 #24 (legal advice on sending personal data abroad) and #25 (provider retention terms, monthly budget).
-- `sales` and `finance` add their views (§11).
 - `temp_file_limit` on the managed database at go-live (architecture A6).
 - Later, if asked: charts, scheduled reports, a monthly cost limit.
