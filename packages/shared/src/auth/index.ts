@@ -40,6 +40,9 @@ export const PERMISSIONS = [
   'ai.reports.manage',
   // Segments (ADR-0049): creating, changing and archiving them; everyone reads and uses them.
   'segments.manage',
+  // Customer orders (ADR-0055): reading them, and entering, submitting and cancelling them.
+  'sales.orders.read',
+  'sales.orders.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -81,7 +84,12 @@ export function isSystemRole(value: unknown): value is SystemRole {
 /** ADMIN holds every permission; the other roles grow as their modules are built. */
 export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permission[]>> = {
   ADMIN: PERMISSIONS,
-  OFFICE: ['partners.customers.read', 'partners.customers.manage'],
+  OFFICE: [
+    'partners.customers.read',
+    'partners.customers.manage',
+    'sales.orders.read',
+    'sales.orders.manage',
+  ],
   PROCUREMENT: [],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
   WAREHOUSE: [
@@ -91,6 +99,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.adjustments.manage',
     'inventory.stocktakes.manage',
     'inventory.transfers.manage',
+    'sales.orders.read',
   ],
   // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms, enters
   // the supplier prices of goods receipts (ADR-0033) and the products' e-Barimt data (ADR-0044).
@@ -102,6 +111,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'partners.customers.manage',
     'partners.credit.manage',
     'inventory.costs.manage',
+    'sales.orders.read',
   ],
   HR: [],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
