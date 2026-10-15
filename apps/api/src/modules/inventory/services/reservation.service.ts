@@ -129,6 +129,82 @@ export class ReservationService {
     return released.length;
   }
 
+  /**
+   * Replaces a document's reservations with new lines in one lock pass (an edited order, ADR-0056
+   * #4): the old and the new (warehouse, product) keys are locked together in key order, the old
+   * rows RELEASED, the new lines reserved against what is then available, and each row's
+   * `reserved` moved by the net difference. Two separate passes could take rows out of the global
+   * order and deadlock against a submit.
+   */
+  async replaceInTx(
+    tx: Tx,
+    input: { docType: StockDocType; docId: number; lines: readonly ReservationLine[] },
+  ): Promise<ReservedLine[]> {
+    const { rows: held } = await tx.execute<{ warehouse_id: string; product_id: string }>(sql`
+      SELECT DISTINCT warehouse_id::text, product_id::text FROM stock_reservations
+       WHERE doc_type = ${input.docType} AND doc_id = ${input.docId} AND status = 'ACTIVE'`);
+    const rows = await this.lockRows(tx, [
+      ...held.map((row) => ({
+        warehouseId: Number.parseInt(row.warehouse_id, 10),
+        productId: Number.parseInt(row.product_id, 10),
+      })),
+      ...input.lines,
+    ]);
+    const { rows: released } = await tx.execute<{
+      warehouse_id: string;
+      product_id: string;
+      qty: string;
+    }>(sql`
+      WITH released AS (
+        UPDATE stock_reservations SET status = 'RELEASED', updated_at = now()
+         WHERE doc_type = ${input.docType} AND doc_id = ${input.docId} AND status = 'ACTIVE'
+        RETURNING warehouse_id, product_id, qty_base)
+      SELECT warehouse_id::text, product_id::text, sum(qty_base)::text AS qty
+        FROM released GROUP BY warehouse_id, product_id`);
+    const freed = new Map(
+      released.map((row) => [`${row.warehouse_id}:${row.product_id}`, new Decimal(row.qty)]),
+    );
+    const left = new Map<string, Decimal>();
+    for (const row of rows) {
+      const key = `${row.warehouse_id}:${row.product_id}`;
+      const reserved = new Decimal(row.reserved).minus(freed.get(key) ?? ZERO);
+      left.set(key, Decimal.max(ZERO, new Decimal(row.sellable_on_hand).minus(reserved)));
+    }
+    const taken = new Map<string, Decimal>();
+    const result = input.lines.map((line): ReservedLine => {
+      const key = `${line.warehouseId}:${line.productId}`;
+      const available = left.get(key) ?? ZERO;
+      const reserved = Decimal.min(available, line.qtyBase);
+      left.set(key, available.minus(reserved));
+      if (reserved.gt(0)) taken.set(key, (taken.get(key) ?? ZERO).plus(reserved));
+      return { lineId: line.lineId, reserved, backordered: line.qtyBase.minus(reserved) };
+    });
+    const updates = rows.flatMap((row) => {
+      const key = `${row.warehouse_id}:${row.product_id}`;
+      const delta = (taken.get(key) ?? ZERO).minus(freed.get(key) ?? ZERO);
+      return delta.isZero() ? [] : [{ id: row.id, qty: delta.toFixed(3) }];
+    });
+    await this.addReserved(tx, updates);
+    const byLine = new Map(input.lines.map((line) => [line.lineId, line]));
+    const inserts = result.flatMap((entry) => {
+      const line = byLine.get(entry.lineId);
+      return line && entry.reserved.gt(0)
+        ? [
+            {
+              warehouseId: line.warehouseId,
+              productId: line.productId,
+              docType: input.docType,
+              docId: input.docId,
+              docLineId: line.lineId,
+              qtyBase: entry.reserved,
+            },
+          ]
+        : [];
+    });
+    if (inserts.length > 0) await tx.insert(stockReservations).values(inserts);
+    return result;
+  }
+
   /** Each product's available stock per warehouse (warehouses holding none are left out). */
   async availableOf(productIds: readonly number[]): Promise<Map<number, Availability[]>> {
     const balances = await this.stock.balancesOf(productIds);

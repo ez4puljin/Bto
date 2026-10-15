@@ -12,6 +12,7 @@ import {
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate, businessMonthStart, businessYear, isIsoDate } from '@tugeel/shared/time';
 import { and, desc, eq, gte, inArray, lt, lte, type SQL, sql } from 'drizzle-orm';
+import { idIn } from '../../../common/db/days';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -26,6 +27,7 @@ import {
   bins,
   goodsReceipts,
   reconciliationRuns,
+  stockReservations,
   stocktakes,
   transfers,
 } from '../schema';
@@ -46,12 +48,39 @@ export interface PostingDoc {
   allocateNumber?: boolean;
 }
 
+/**
+ * A document another module owns (ADR-0056 #6, ADR-0034 #5): `post()` neither locks, finishes nor
+ * numbers it — the owner holds its header row FOR UPDATE and guards its state in the same
+ * transaction.
+ */
+export type ExternalDocType = Extract<StockDocType, 'SO' | 'PK'>;
+
+export interface ExternalPostingDoc {
+  docType: ExternalDocType;
+  docId: number;
+  external: true;
+}
+
+export type AnyPostingDoc = PostingDoc | ExternalPostingDoc;
+
+const isInternal = (doc: AnyPostingDoc): doc is PostingDoc => !('external' in doc);
+
+/**
+ * The reservations a posting consumes (ADR-0056 #6): the ACTIVE rows of these document lines are
+ * marked CONSUMED (a line with an outbound movement) or RELEASED (a line picked at zero), and
+ * `warehouse_stock.reserved` drops by their quantity in the same UPDATE that moves the stock.
+ */
+export interface ReservationConsume {
+  docType: StockDocType;
+  docLineIds: readonly number[];
+}
+
 /** Filters of the movement history; dates are Ulaanbaatar business days, both inclusive. */
 export interface MovementQuery {
   productId?: number;
   warehouseId?: number;
   binId?: number;
-  docType?: PostedDocType;
+  docType?: StockDocType;
   from?: string;
   to?: string;
   cursor?: string;
@@ -224,7 +253,15 @@ const legKey = (docLineId: number, movementType: MovementType, leg: number) =>
 /** Bigint columns of raw queries arrive as strings. */
 const toInt = (value: string | null) => (value === null ? null : Number.parseInt(value, 10));
 const toId = (value: string) => Number.parseInt(value, 10);
-const DOC_ORDER: Record<PostedDocType, number> = { ADJ: 0, BM: 1, GR: 2, ST: 3, TR: 4 };
+const DOC_ORDER: Record<PostedDocType | ExternalDocType, number> = {
+  ADJ: 0,
+  BM: 1,
+  GR: 2,
+  ST: 3,
+  TR: 4,
+  PK: 5,
+  SO: 6,
+};
 const MAX_DIFFS = 100;
 /** Rows per multi-row statement: far below the 65,535 bind parameters of one statement. */
 const CHUNK = 1_000;
@@ -248,7 +285,11 @@ export class StockPostingService {
   async post(
     tx: Tx,
     actor: Actor,
-    input: { docs: readonly PostingDoc[]; movements: readonly Movement[] },
+    input: {
+      docs: readonly AnyPostingDoc[];
+      movements: readonly Movement[];
+      reservationConsume?: ReservationConsume;
+    },
   ): Promise<PostingResult> {
     const docs = [...input.docs].sort(
       (a, b) => DOC_ORDER[a.docType] - DOC_ORDER[b.docType] || a.docId - b.docId,
@@ -262,15 +303,21 @@ export class StockPostingService {
       );
     }
 
-    // 1. Document headers, re-checked under their row lock (callers already hold it).
-    for (const doc of docs) await this.lockDoc(tx, doc);
+    // 1. Document headers, re-checked under their row lock (callers already hold it). External
+    //    documents are their owner's business (ADR-0056 #6).
+    const internal = docs.filter(isInternal);
+    for (const doc of internal) await this.lockDoc(tx, doc);
 
     const postedAt = await transactionTime(tx);
     const effectiveDate = businessDate(postedAt);
     const unitCosts = new Map<string, Decimal>();
     const movements = [...input.movements];
+    // 1b. The reservations to consume, read without a lock: only the document's own writers touch
+    //     them, and every one of them holds the document's header row (ADR-0056 #6).
+    const consume = input.reservationConsume;
+    const consumeKeys = consume ? await this.reservationKeys(tx, consume) : [];
 
-    if (movements.length > 0) {
+    if (movements.length > 0 || consumeKeys.length > 0) {
       // 2. Bins: shared locks in id order; refuse counted and archived bins.
       const binStates = await this.lockBins(tx, movements);
       for (const movement of movements) {
@@ -292,8 +339,19 @@ export class StockPostingService {
       await this.ensureCacheRows(tx, movements);
 
       // 4. Lock balances: warehouse rows, then bin rows, each in key order.
-      const warehouseRows = await this.lockWarehouseRows(tx, movements);
+      const warehouseRows = await this.lockWarehouseKeys(tx, [
+        ...movements.map((m) => ({
+          warehouseId: m.warehouseId,
+          productId: m.productId,
+          lotId: m.lotId ?? null,
+        })),
+        ...consumeKeys,
+      ]);
       const binRows = await this.lockBinRows(tx, movements);
+      // 4b. The reservations consumed, summed per warehouse row (ADR-0056 #6).
+      const consumed = consume
+        ? await this.consumeReservations(tx, consume, movements, warehouseRows)
+        : new Map<string, Decimal>();
 
       // 5. New quantities; nothing may go below zero.
       const binDelta = new Map<string, Decimal>();
@@ -406,20 +464,22 @@ export class StockPostingService {
       // 8. Balances: the locked rows, a chunk per UPDATE.
       const warehouseUpdates = [...warehouseRows].flatMap(([key, row]) => {
         const balance = state.get(key);
-        return balance ? [{ id: row.id, ...balance }] : [];
+        return balance ? [{ id: row.id, ...balance, consumed: consumed.get(key) ?? ZERO }] : [];
       });
+      // One statement moves the stock and frees the reservation (D2); `reserved` below zero is
+      // drift, caught by the table's CHECK.
       for (const rows of chunks(warehouseUpdates)) {
         await tx.execute(sql`
           UPDATE warehouse_stock ws
              SET on_hand = v.on_hand, sellable_on_hand = v.sellable, avg_cost = v.avg_cost,
-                 updated_at = ${postedAt}
+                 reserved = ws.reserved - v.consumed, updated_at = ${postedAt}
             FROM (VALUES ${sql.join(
               rows.map(
                 (row) =>
-                  sql`(${row.id}::bigint, ${row.onHand.toFixed()}::numeric, ${row.sellable.toFixed()}::numeric, ${row.avg.toFixed()}::numeric)`,
+                  sql`(${row.id}::bigint, ${row.onHand.toFixed()}::numeric, ${row.sellable.toFixed()}::numeric, ${row.avg.toFixed()}::numeric, ${row.consumed.toFixed()}::numeric)`,
               ),
               sql`, `,
-            )}) AS v (id, on_hand, sellable, avg_cost)
+            )}) AS v (id, on_hand, sellable, avg_cost, consumed)
            WHERE ws.id = v.id`);
       }
       const binUpdates = [...binDelta].flatMap(([key, delta]) => {
@@ -437,9 +497,9 @@ export class StockPostingService {
       }
     }
 
-    // 9. Documents: status, dates and their number, allocated last.
+    // 9. Documents: status, dates and their number, allocated last (inventory's own only).
     const numbers = new Map<number, string>();
-    for (const doc of docs) {
+    for (const doc of internal) {
       let number: string | null = null;
       if (doc.allocateNumber !== false) {
         const value = await this.numbering.next(tx, doc.docType, businessYear(postedAt));
@@ -651,6 +711,7 @@ export class StockPostingService {
           WHEN 'ADJ' THEN (SELECT d.number FROM adjustments d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'ST' THEN (SELECT d.number FROM stocktakes d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'TR' THEN (SELECT d.number FROM transfers d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'SO' THEN (SELECT d.number FROM sales_orders d WHERE d.id = "stock_ledger"."doc_id")
         END`,
         enteredQty: stockLedger.enteredQty,
         productUnitId: stockLedger.productUnitId,
@@ -1169,18 +1230,69 @@ export class StockPostingService {
     }
   }
 
-  private lockWarehouseRows(
+  /** The (warehouse, product, lot) keys of the lines' ACTIVE reservations, without a lock. */
+  private async reservationKeys(
     tx: Tx,
+    consume: ReservationConsume,
+  ): Promise<{ warehouseId: number; productId: number; lotId: number | null }[]> {
+    if (consume.docLineIds.length === 0) return [];
+    const rows = await tx
+      .selectDistinct({
+        warehouseId: stockReservations.warehouseId,
+        productId: stockReservations.productId,
+        lotId: stockReservations.lotId,
+      })
+      .from(stockReservations)
+      .where(
+        and(
+          eq(stockReservations.docType, consume.docType),
+          idIn(stockReservations.docLineId, consume.docLineIds),
+          eq(stockReservations.status, 'ACTIVE'),
+        ),
+      );
+    return rows;
+  }
+
+  /**
+   * Marks the lines' ACTIVE reservations CONSUMED (a line that moved stock out) or RELEASED (a line
+   * picked at zero) and returns the quantity freed per locked warehouse row (ADR-0056 #6).
+   */
+  private async consumeReservations(
+    tx: Tx,
+    consume: ReservationConsume,
     movements: readonly Movement[],
-  ): Promise<Map<string, WarehouseRow>> {
-    return this.lockWarehouseKeys(
-      tx,
-      movements.map((m) => ({
-        warehouseId: m.warehouseId,
-        productId: m.productId,
-        lotId: m.lotId ?? null,
-      })),
-    );
+    warehouseRows: ReadonlyMap<string, WarehouseRow>,
+  ): Promise<Map<string, Decimal>> {
+    const picked = [
+      ...new Set(
+        movements
+          .filter((m) => m.docType === consume.docType && m.qtyBase.isNegative())
+          .map((m) => m.docLineId),
+      ),
+    ];
+    const { rows } = await tx.execute<{
+      warehouse_id: string;
+      product_id: string;
+      lot_id: string | null;
+      qty: string;
+    }>(sql`
+      WITH done AS (
+        UPDATE stock_reservations
+           SET status = CASE WHEN doc_line_id = ANY(${sql.param(picked)}::bigint[]) THEN 'CONSUMED' ELSE 'RELEASED' END,
+               updated_at = now()
+         WHERE doc_type = ${consume.docType}
+           AND doc_line_id = ANY(${sql.param([...consume.docLineIds])}::bigint[])
+           AND status = 'ACTIVE'
+        RETURNING warehouse_id, product_id, lot_id, qty_base)
+      SELECT warehouse_id::text, product_id::text, lot_id::text, sum(qty_base)::text AS qty
+        FROM done GROUP BY warehouse_id, product_id, lot_id`);
+    const freed = new Map<string, Decimal>();
+    for (const row of rows) {
+      const key = wsKey(toId(row.warehouse_id), toId(row.product_id), toInt(row.lot_id));
+      if (!warehouseRows.has(key)) throw new Error(`reservation on an unlocked balance ${key}`);
+      freed.set(key, new Decimal(row.qty));
+    }
+    return freed;
   }
 
   /** Locks warehouse balances NULL-safely in key order; outbound keys may have no row (insufficient). */
@@ -1327,7 +1439,7 @@ function uniqueBy<T>(items: readonly T[], key: (item: T) => string): T[] {
 }
 
 /** Movements must belong to the posted documents and agree with the ledger's rules. */
-function validateMovements(docs: readonly PostingDoc[], movements: readonly Movement[]): void {
+function validateMovements(docs: readonly AnyPostingDoc[], movements: readonly Movement[]): void {
   const allowed = new Set(docs.map((doc) => `${doc.docType}:${doc.docId}`));
   for (const movement of movements) {
     if (!allowed.has(`${movement.docType}:${movement.docId}`)) {

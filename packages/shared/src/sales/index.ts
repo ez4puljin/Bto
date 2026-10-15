@@ -34,6 +34,32 @@ export type Fulfilment = (typeof FULFILMENTS)[number];
 export const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CREDIT'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+/**
+ * What a stage does when a card arrives (ADR-0056 #3): nothing; CONFIRM submits a draft (number,
+ * prices, reservations — the "incomplete sale"); PICK starts picking; SALE issues the picked stock
+ * out of STAGING (the "main sale"); CANCEL cancels with a reason.
+ */
+export const STAGE_ACTIONS = ['NONE', 'CONFIRM', 'PICK', 'SALE', 'CANCEL'] as const;
+export type StageAction = (typeof STAGE_ACTIONS)[number];
+
+/** The documents a stage may print when a card arrives. */
+export const PRINT_KINDS = ['PICK_LIST', 'DELIVERY_NOTE'] as const;
+export type PrintKind = (typeof PRINT_KINDS)[number];
+
+export const BOARD_RIGHTS = ['VIEW', 'MANAGE'] as const;
+export type BoardRight = (typeof BOARD_RIGHTS)[number];
+export const STAGE_RIGHTS = ['VIEW', 'EDIT', 'MOVE'] as const;
+export type StageRight = (typeof STAGE_RIGHTS)[number];
+
+export const BOARD_LIMITS = { maxName: 80, maxStages: 30, maxBoards: 50 } as const;
+
+/** The states an order may be edited in (ADR-0056 #4): until picking starts. */
+export const EDITABLE_STATUSES: readonly OrderStatus[] = ['DRAFT', 'CONFIRMED'];
+
+export function isEditable(status: OrderStatus): boolean {
+  return EDITABLE_STATUSES.includes(status);
+}
+
 export const ORDER_LIMITS = {
   maxLines: 200,
   maxNote: 500,

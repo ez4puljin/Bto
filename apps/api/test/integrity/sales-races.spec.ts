@@ -3,12 +3,12 @@ import { Decimal } from '@tugeel/shared/money';
 import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
-import { systemActor } from '../../src/modules/identity';
+import type { AuthContext } from '../../src/modules/identity';
 import { type OrderInput, SalesOrdersService } from '../../src/modules/sales';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi } from '../harness/inventory';
+import { expectReconciled, inventoryApi, staffContext } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 import { pricingApi } from '../harness/pricing';
 
@@ -25,7 +25,7 @@ describe('integrity: sales orders', () => {
   let flour: ProductJson;
   let sugar: ProductJson;
   const customers: number[] = [];
-  const actor = systemActor('sales-races');
+  let actor: AuthContext;
   const http = () => request(app.getHttpServer());
   const pcs = (product: ProductJson) => unitOf(product, 'PCS').id;
 
@@ -45,7 +45,9 @@ describe('integrity: sales orders', () => {
     app = await createHttpApp();
     sql = await connectAs('app');
     orders = app.get(SalesOrdersService);
-    const admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
+    const adminUser = await seedUser(app, { roles: ['ADMIN'] });
+    actor = staffContext(adminUser.id, 'ADMIN');
+    const admin = (await login(app, adminUser)).accessToken;
     const inventory = inventoryApi(app, admin);
     const wh = await inventory.warehouse('RACE-SO');
     const bin = await inventory.bin(wh.id, 'A-01-01');

@@ -43,6 +43,9 @@ export const PERMISSIONS = [
   // Customer orders (ADR-0055): reading them, and entering, submitting and cancelling them.
   'sales.orders.read',
   'sales.orders.manage',
+  // Boards and stages (ADR-0056): configuring them; confirming picked counts.
+  'sales.boards.manage',
+  'sales.orders.pick',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -100,6 +103,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.stocktakes.manage',
     'inventory.transfers.manage',
     'sales.orders.read',
+    'sales.orders.pick',
   ],
   // The accountant also types TINs the lookup cannot find (SPEC §5.3), sets credit terms, enters
   // the supplier prices of goods receipts (ADR-0033) and the products' e-Barimt data (ADR-0044).

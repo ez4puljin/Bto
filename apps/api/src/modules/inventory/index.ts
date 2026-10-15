@@ -51,8 +51,11 @@ export {
   type ReceiptSummary,
 } from './services/receipts.service';
 export {
+  type AnyPostingDoc,
   type BinSnapshot,
   type CostedLine,
+  type ExternalDocType,
+  type ExternalPostingDoc,
   MAX_MOVEMENTS_PER_POST,
   type Movement,
   type PostedDocType,
@@ -60,6 +63,7 @@ export {
   type PostingResult,
   type ReconciliationDiff,
   type ReconciliationRun,
+  type ReservationConsume,
   type SnapshotPartitions,
   StockPostingService,
   type Valuation,
