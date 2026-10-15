@@ -196,8 +196,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 
 - **«Борлуулалт» → «Агуулахын борлуулалт»** (`/sales/boards`, `sales.orders.read`, ADR-0057). The page:
   - **Left panel:** the boards, each folding out into the pipelines the user sees; it folds away, and on phones it is a select.
-  - **Header:** the breadcrumb, the pipeline's name with its board, «Тохиргоо» and «Шинэ захиалга».
-    - «Тохиргоо» opens the settings page for managers, or the pipeline's sheet in place for a MANAGE role.
+  - **Header:** the breadcrumb, the pipeline's name with its board, «Самбарын тохиргоо» and «Шинэ захиалга».
+    - «Самбарын тохиргоо» opens the settings page for managers, or the pipeline's sheet in place for a MANAGE role.
     - «Шинэ захиалга» takes the pipeline along.
   - **Bar:**
     - «Захиалга хайх»;
@@ -210,7 +210,7 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - One column per visible stage: name, count, total.
   - «+» on stages without an action where the user may move: the order editor opens with the pipeline and the stage.
   - The stage's «⋯» menu:
-    - «Эрэмбэлэх»: the five sorts, ticked; EDIT.
+    - «Эрэмбэлэх»: the five sorts as a radio group in the menu itself (no submenu), ticked; EDIT.
     - «Баримт хэвлэх»: the kind, then a checklist of the stage's cards, all ticked, up to 100, drafts disabled for the delivery note; opens one printable page.
     - «Дууссан картуудыг архивлах»: EDIT, after a question.
     - «Шат архивлах»: managers.
