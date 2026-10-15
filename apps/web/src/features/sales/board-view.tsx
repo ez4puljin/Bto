@@ -509,7 +509,7 @@ function StagePrintForm({
         <DialogDescription>
           {printing.column.count > cards.length
             ? t('sales.work.printFirst', { count: cards.length })
-            : t('sales.boards.printDescription')}
+            : t('sales.work.printDescription')}
         </DialogDescription>
       </DialogHeader>
       <SegmentedControl

@@ -178,7 +178,7 @@ export function SalesSettingsPage() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={t('sales.pipelines.rowMenu', { name: entry.name })}
+                      aria-label={t('sales.pipelines.boardMenu', { name: entry.name })}
                     >
                       <Ellipsis />
                     </Button>
