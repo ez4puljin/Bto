@@ -206,4 +206,24 @@ describe('printing orders', () => {
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
     print.mockRestore();
   });
+
+  it('prints once although the page draws again while the print is pending', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const fetchMock = signedIn(ADMIN_ME, {
+      // The names arrive after the order: the print waits for them.
+      'GET /api/v1/warehouses': () =>
+        new Promise<Response>((resolve) => setTimeout(() => resolve(list([WH1, WH2])), 120)),
+      'GET /api/v1/sales-orders/5': () => json(order(5, { lines: [line(1, 1), line(2, 2)] })),
+    });
+    renderApp('/sales/orders/5/print/PICK_LIST?format=a4', fetchMock);
+    expect(
+      await screen.findByRole('heading', { name: `${WH2.name} · ${lineCount(1)}` }),
+    ).toBeInTheDocument();
+    // A new paper within the 300 ms draws the page again; the pending print still comes.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: mn.sales.print.formats.MM80 }));
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    expect(document.title).toBe(`20261015_0005 · ${mn.sales.printKinds.PICK_LIST}`);
+    print.mockRestore();
+  });
 });

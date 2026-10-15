@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { useWarehouses } from '@/features/identity/api';
 import { useWarehouseName } from '@/features/inventory/helpers';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, plainDecimal } from '@/lib/money';
@@ -89,14 +90,22 @@ function PrintFrame({
   const [saved, choose] = usePrintFormat();
   const format = parsePrintFormat(search.get('format')) ?? saved;
   const narrow = format === 'MM80';
+  const warehouses = useWarehouses();
+  // Ready once the documents and the warehouse names are in; a later render never cancels the
+  // pending print (it only waits on `ready`), and it fires once.
+  const ready = (orders?.length ?? 0) > 0 && !warehouses.isPending;
   const printed = useRef(false);
   useEffect(() => {
-    if (!orders || orders.length === 0 || printed.current) return;
-    printed.current = true;
-    document.title = `${title} · ${t(`sales.printKinds.${kind}`)}`;
-    const timer = window.setTimeout(() => window.print(), 300);
+    if (ready) document.title = `${title} · ${t(`sales.printKinds.${kind}`)}`;
+  }, [ready, title, kind, t]);
+  useEffect(() => {
+    if (!ready || printed.current) return;
+    const timer = window.setTimeout(() => {
+      printed.current = true;
+      window.print();
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [orders, kind, title, t]);
+  }, [ready]);
   const change = (next: PrintFormat) => {
     choose(next);
     setSearch(

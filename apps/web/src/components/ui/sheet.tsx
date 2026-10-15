@@ -63,10 +63,11 @@ function SheetContent({
   return (
     <SheetPortal>
       <SheetOverlay />
+      {/* `*:shrink-0`: the sheet scrolls; a card's overflow-hidden would otherwise let the column squeeze it. */}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 outline-none data-open:animate-in data-closed:animate-out",
+          "fixed z-50 flex flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 outline-none *:shrink-0 data-open:animate-in data-closed:animate-out",
           side === "right" &&
             "inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-open:slide-in-from-right data-closed:slide-out-to-right",
           side === "left" &&
