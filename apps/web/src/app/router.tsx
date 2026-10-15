@@ -35,7 +35,10 @@ import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/di
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
+import { BoardSettingsPage } from '@/features/sales/board-settings-page';
+import { SalesBoardsPage } from '@/features/sales/boards-page';
 import { SalesOrderNewPage, SalesOrderPage, SalesOrdersPage } from '@/features/sales/orders-pages';
+import { SalesOrderPrintPage } from '@/features/sales/print-page';
 import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -55,6 +58,18 @@ import { SystemStatusPage } from '@/features/system/system-status-page';
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
   { path: '/set-password', element: <SetPasswordPage />, errorElement: <RouteErrorBoundary /> },
+  {
+    // A document for paper, without the shell (ADR-0056 #7).
+    path: '/sales/orders/:id/print/:kind',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="sales.orders.read">
+          <SalesOrderPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
   {
     path: '/',
     element: (
@@ -172,6 +187,23 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
+          {
+            path: 'sales/boards',
+            element: (
+              <RequirePermission permission="sales.orders.read">
+                <SalesBoardsPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
+          {
+            path: 'sales/boards/settings',
+            element: (
+              <RequirePermission permission="sales.boards.manage">
+                <BoardSettingsPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: 'sales/orders',
             element: (

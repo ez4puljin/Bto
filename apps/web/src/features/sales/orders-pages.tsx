@@ -69,6 +69,7 @@ import {
   useSalesOrderMutations,
   useSalesOrders,
 } from './api';
+import { useSalesBoards } from './boards-api';
 
 const MANAGE = 'sales.orders.manage';
 
@@ -208,10 +209,12 @@ export function SalesOrdersPage() {
 /** «Шинэ захиалга»: the editor of a new order; saving keeps a draft, «Илгээх» confirms it. */
 export function SalesOrderNewPage() {
   const { t } = useTranslation();
+  const [params] = useSearchParams();
+  const boardId = Number.parseInt(params.get('board') ?? '', 10) || null;
   return (
     <div className="space-y-4">
       <PageHeader title={t('sales.orders.new')} />
-      <OrderEditor order={null} />
+      <OrderEditor order={null} boardId={boardId} />
     </div>
   );
 }
@@ -278,9 +281,17 @@ function linesOf(order: SalesOrder | null): CartLine[] {
  * home warehouse and the stock available there. «Үнэ тооцоолох» shows today's prices; «Илгээх»
  * saves, confirms and reserves.
  */
-function OrderEditor({ order }: { order: SalesOrder | null }) {
+function OrderEditor({
+  order,
+  boardId: wanted,
+}: {
+  order: SalesOrder | null;
+  boardId?: number | null;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const boards = useSalesBoards();
+  const [boardId, setBoardId] = useState<number | null>(order?.boardId ?? wanted ?? null);
   const mutations = useSalesOrderMutations();
   const quote = useQuote();
   const action = useAction();
@@ -344,6 +355,7 @@ function OrderEditor({ order }: { order: SalesOrder | null }) {
     if (!customer) return null;
     return {
       customerId: customer.id,
+      boardId: order ? null : boardId,
       fulfilment,
       deliveryDate,
       addressId: fulfilment === 'DELIVERY' ? addressId : null,
@@ -420,6 +432,22 @@ function OrderEditor({ order }: { order: SalesOrder | null }) {
               />
             )}
           </FormField>
+          {!order && (boards.data?.length ?? 0) > 0 ? (
+            <FormField label={t('sales.boards.board')} htmlFor="order-board">
+              <NativeSelect
+                id="order-board"
+                value={boardId ?? ''}
+                onChange={(event) => setBoardId(Number.parseInt(event.target.value, 10) || null)}
+              >
+                <option value="">{t('sales.boards.defaultBoard')}</option>
+                {(boards.data ?? []).map((board) => (
+                  <option key={board.id} value={board.id}>
+                    {board.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormField>
+          ) : null}
           <FormField label={t('sales.order.fulfilment')} htmlFor="order-fulfilment">
             <NativeSelect
               id="order-fulfilment"
@@ -681,7 +709,7 @@ function useCustomerDetails(id: number | null) {
 }
 
 /** A confirmed (or cancelled) order: its header, lines with what was reserved, prices, history. */
-function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean }) {
+export function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean }) {
   const { t } = useTranslation();
   const money = useMoney();
   const live = order.status !== 'CANCELLED';
@@ -692,6 +720,7 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
   const [reason, setReason] = useState('');
   const [cancelKey] = useState(randomUuid);
   const backordered = order.lines.filter((line) => new Decimal(line.qtyBackordered).gt(0));
+  const picked = order.lines.some((line) => line.qtyPicked !== null);
 
   const cancel = () =>
     void action.run(async () => {
@@ -730,6 +759,14 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
                 value: t(`sales.paymentMethods.${order.paymentMethod}`),
               },
               { label: t('sales.order.note'), value: order.note },
+              ...(order.boardName
+                ? [
+                    {
+                      label: t('sales.boards.board'),
+                      value: `${order.boardName} · ${order.stageName ?? ''}`,
+                    },
+                  ]
+                : []),
               { label: t('sales.order.total'), value: money(order.total) },
               ...(order.cancelReason
                 ? [{ label: t('sales.order.cancelReason'), value: order.cancelReason }]
@@ -755,6 +792,9 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
                   <TableHead className="text-right">{t('sales.order.reserved')}</TableHead>
                   <TableHead className="text-right">{t('sales.order.backordered')}</TableHead>
                 </>
+              ) : null}
+              {picked ? (
+                <TableHead className="text-right">{t('sales.order.picked')}</TableHead>
               ) : null}
               <TableHead className="text-right">{t('sales.order.total')}</TableHead>
             </TableRow>
@@ -787,6 +827,17 @@ function OrderView({ order, canManage }: { order: SalesOrder; canManage: boolean
                         : ''}
                     </TableCell>
                   </>
+                ) : null}
+                {picked ? (
+                  <TableCell className="text-right font-mono">
+                    {line.qtyPicked === null
+                      ? ''
+                      : t('sales.order.pickedIn', {
+                          qty: plainDecimal(line.qtyPicked),
+                          unit: line.baseUnitName,
+                          bin: line.pickBinCode ?? '',
+                        })}
+                  </TableCell>
                 ) : null}
                 <TableCell className="text-right font-mono">{money(line.total)}</TableCell>
               </TableRow>

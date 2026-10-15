@@ -225,6 +225,7 @@ export function RowAction(props: {
   icon: LucideIcon;
   onClick: () => void;
   destructive?: boolean;
+  disabled?: boolean;
 }) {
   const Icon = props.icon;
   return (
@@ -237,6 +238,7 @@ export function RowAction(props: {
       )}
       aria-label={props.label}
       title={props.label}
+      disabled={props.disabled}
       onClick={props.onClick}
     >
       <Icon />

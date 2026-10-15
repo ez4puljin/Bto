@@ -242,6 +242,7 @@ describe('new order', () => {
     expect(created?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await bodyOf(created)).toEqual({
       customerId: 9,
+      boardId: null,
       fulfilment: 'DELIVERY',
       deliveryDate: defaultDeliveryDate(),
       addressId: 50,

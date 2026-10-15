@@ -28,6 +28,8 @@ import {
   Settings,
   Shapes,
   ShoppingCart,
+  SlidersVertical,
+  SquareKanban,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -107,10 +109,22 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'nav.groups.sales',
     items: [
       {
+        to: '/sales/boards',
+        label: 'nav.salesBoards',
+        icon: SquareKanban,
+        permission: 'sales.orders.read',
+      },
+      {
         to: '/sales/orders',
         label: 'nav.salesOrders',
         icon: ShoppingCart,
         permission: 'sales.orders.read',
+      },
+      {
+        to: '/sales/boards/settings',
+        label: 'nav.salesBoardSettings',
+        icon: SlidersVertical,
+        permission: 'sales.boards.manage',
       },
     ],
   },

@@ -51,10 +51,11 @@ export function useSalesOrders(filter: SalesOrderFilter) {
   });
 }
 
-export function useSalesOrder(id: number) {
+export function useSalesOrder(id: number, options: { enabled?: boolean } = {}) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.orders, id],
+    enabled: options.enabled ?? true,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/sales-orders/{id}', { params: { path: { id } }, signal })),
   });
