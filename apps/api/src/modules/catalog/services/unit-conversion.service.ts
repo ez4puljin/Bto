@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
 import { isValidEnteredQty, toBase } from '@tugeel/shared/units';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { idIn } from '../../../common/db/days';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
@@ -93,7 +94,7 @@ export class UnitConversionService {
       })
       .from(productUnits)
       .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
-      .where(inArray(productUnits.id, [...unitIds]));
+      .where(idIn(productUnits.id, unitIds));
     return new Map(
       rows.map(({ supersededAt, ...row }) => [
         row.unitId,
@@ -111,7 +112,7 @@ export class UnitConversionService {
     const rows = await executor
       .select({ unitId: productUnits.id })
       .from(productUnits)
-      .where(and(inArray(productUnits.productId, [...productIds]), eq(productUnits.isBase, true)));
+      .where(and(idIn(productUnits.productId, productIds), eq(productUnits.isBase, true)));
     const units = await this.describe(
       rows.map((row) => row.unitId),
       executor,
@@ -129,9 +130,7 @@ export class UnitConversionService {
     const rows = await executor
       .select({ unitId: productUnits.id })
       .from(productUnits)
-      .where(
-        and(inArray(productUnits.productId, [...productIds]), isNull(productUnits.supersededAt)),
-      )
+      .where(and(idIn(productUnits.productId, productIds), isNull(productUnits.supersededAt)))
       .orderBy(
         asc(productUnits.productId),
         desc(productUnits.isBase),

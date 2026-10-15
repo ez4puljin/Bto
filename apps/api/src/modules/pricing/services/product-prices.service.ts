@@ -1,6 +1,6 @@
 import type { SegmentCondition } from '@tugeel/shared/segments';
 import { Inject, Injectable } from '@nestjs/common';
-import type { Decimal } from '@tugeel/shared/money';
+import { Decimal } from '@tugeel/shared/money';
 import {
   type PackUnit,
   type PriceProfileValues,
@@ -12,7 +12,7 @@ import {
   wholeUnitProblem,
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
-import { type SQL, and, asc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { type SQL, and, asc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -106,6 +106,31 @@ export interface TermsInForce {
   profileId: number;
   wholeUomId: number | null;
 }
+
+/** A product's terms as plain values (an import keeps them for its revert, ADR-0054 #6). */
+export interface TermsSnapshot {
+  /** Whole MNT as text. */
+  warehousePrice: string;
+  profileId: number;
+  wholeUomId: number | null;
+}
+
+/** What `setManyInTx` wrote for one product. */
+export interface WrittenTerms {
+  productId: number;
+  /** The inserted row, its first day and the end it was given. */
+  rowId: number;
+  validFrom: string;
+  validTo: string | null;
+  /** The terms in force on `validFrom` before, closed that day; null without any. */
+  before: TermsSnapshot | null;
+}
+
+/** An imported row to take back (`restoreManyInTx`). */
+export type TermsRestore = WrittenTerms;
+
+/** Rows per multi-row write: far below the bind-parameter limit of one statement. */
+const WRITE_CHUNK = 1_000;
 
 export interface SetTermsInput {
   productId: number;
@@ -287,7 +312,7 @@ export class ProductPricesService {
       .from(productPrices)
       .where(
         and(
-          inArray(productPrices.productId, [...new Set(productIds)]),
+          idIn(productPrices.productId, [...new Set(productIds)]),
           lte(productPrices.validFrom, date),
           or(isNull(productPrices.validTo), gt(productPrices.validTo, sql`${date}::date`)),
         ),
@@ -444,6 +469,212 @@ export class ProductPricesService {
       return result;
     });
   }
+
+  /**
+   * Sets many products' terms inside the caller's transaction (the price sheet import, ADR-0054 #4),
+   * each by `set`'s rule: from its day on, terms equal to those in force that day change nothing.
+   * Up to 20,000 products: instead of their advisory locks the table is locked SHARE ROW EXCLUSIVE
+   * (single and bulk changes wait for it, or it for them), then the profiles FOR SHARE in id order.
+   * The caller checked the rows; they are checked again here, as `set` would.
+   */
+  async setManyInTx(
+    tx: Tx,
+    actor: Actor,
+    inputs: readonly SetTermsInput[],
+  ): Promise<WrittenTerms[]> {
+    if (inputs.length === 0) return [];
+    const today = businessDate();
+    const byProduct = new Map<number, SetTermsInput>();
+    for (const input of inputs) {
+      assertNotPast('validFrom', input.validFrom, today);
+      if (byProduct.has(input.productId)) {
+        throw invalid('productId', 'unique', 'one row per product');
+      }
+      byProduct.set(input.productId, input);
+    }
+    const ids = [...byProduct.keys()].sort((a, b) => a - b);
+    await tx.execute(sql`LOCK TABLE product_prices IN SHARE ROW EXCLUSIVE MODE`);
+    const earliest = new Map<number, string>();
+    for (const input of inputs) {
+      const day = earliest.get(input.profileId);
+      if (day === undefined || input.validFrom < day)
+        earliest.set(input.profileId, input.validFrom);
+    }
+    for (const [profileId, day] of [...earliest].sort(([a], [b]) => a - b)) {
+      const profile = await this.profiles.lockForPricesInTx(tx, profileId);
+      assertLive(profile);
+      if (profile.firstFrom === null || profile.firstFrom > day) {
+        throw invalid('profileId', 'inForce', 'the price profile has no values on that day');
+      }
+    }
+    const units = await this.units.currentUnits(ids, tx);
+    for (const id of ids) {
+      const problem = wholeUnitProblem(
+        packUnitsOf(units.get(id) ?? []),
+        byProduct.get(id)?.wholeUomId ?? null,
+      );
+      if (problem) throw invalid('wholeUomId', 'packUnit', `product ${id}: ${problem}`);
+    }
+    const rowsOf = await this.rowsByProduct(tx, ids);
+    const closes: { id: number; validTo: string }[] = [];
+    const inserts: (typeof productPrices.$inferInsert)[] = [];
+    const planned: Omit<WrittenTerms, 'rowId'>[] = [];
+    const audits: AuditEntry[] = [];
+    for (const id of ids) {
+      const input = byProduct.get(id);
+      if (!input) continue;
+      const plan = planChange(
+        rowsOf.get(id) ?? [],
+        input.validFrom,
+        (row) =>
+          row.warehousePrice.eq(input.warehousePrice) &&
+          row.profileId === input.profileId &&
+          row.wholeUomId === input.wholeUomId,
+      );
+      if (!plan) continue;
+      if (plan.close) closes.push({ id: plan.close.id, validTo: input.validFrom });
+      inserts.push({
+        productId: id,
+        warehousePrice: input.warehousePrice,
+        profileId: input.profileId,
+        wholeUomId: input.wholeUomId,
+        validFrom: input.validFrom,
+        validTo: plan.validTo,
+        createdBy: actorUserId(actor),
+      });
+      planned.push({
+        productId: id,
+        validFrom: input.validFrom,
+        validTo: plan.validTo,
+        before: plan.close ? snapshotOf(plan.close) : null,
+      });
+      audits.push({
+        action: 'UPDATE',
+        entity: 'product_prices',
+        entityId: id,
+        before: plan.close ? termsAudit(plan.close) : null,
+        after: {
+          validFrom: input.validFrom,
+          warehousePrice: input.warehousePrice.toFixed(0),
+          profileId: input.profileId,
+          wholeUomId: input.wholeUomId,
+        },
+      });
+    }
+    await closeRows(tx, closes);
+    const rowIds = await insertRows(tx, inserts);
+    await this.audit.recordMany(tx, actor, audits);
+    return planned.flatMap((row) => {
+      const rowId = rowIds.get(row.productId);
+      return rowId === undefined ? [] : [{ ...row, rowId }];
+    });
+  }
+
+  /**
+   * Takes imported terms back from today (ADR-0054 #6), inside the caller's transaction and under
+   * the import's table lock. Rows are never deleted, so the revert writes forward: an imported row
+   * that still holds (same end, not ended) is closed today, or on its first day when it has not
+   * started (it never applies), and the terms it replaced continue from then up to its end. A row
+   * changed since is left alone. Returns the products taken back.
+   */
+  async restoreManyInTx(tx: Tx, actor: Actor, entries: readonly TermsRestore[]): Promise<number[]> {
+    if (entries.length === 0) return [];
+    const today = businessDate();
+    await tx.execute(sql`LOCK TABLE product_prices IN SHARE ROW EXCLUSIVE MODE`);
+    const profileIds = [
+      ...new Set(entries.flatMap((entry) => (entry.before ? [entry.before.profileId] : []))),
+    ].sort((a, b) => a - b);
+    for (const id of profileIds) await this.profiles.lockForPricesInTx(tx, id);
+    const rowsOf = await this.rowsByProduct(
+      tx,
+      entries.map((entry) => entry.productId),
+    );
+    const closes: { id: number; validTo: string }[] = [];
+    const inserts: (typeof productPrices.$inferInsert)[] = [];
+    const audits: AuditEntry[] = [];
+    const restored: number[] = [];
+    for (const entry of entries) {
+      const row = rowsOf.get(entry.productId)?.find((own) => own.id === entry.rowId);
+      if (!row || !applied(row) || row.validTo !== entry.validTo) continue;
+      if (row.validTo !== null && row.validTo <= today) continue;
+      const from = row.validFrom > today ? row.validFrom : today;
+      closes.push({ id: row.id, validTo: from });
+      if (entry.before) {
+        inserts.push({
+          productId: entry.productId,
+          warehousePrice: new Decimal(entry.before.warehousePrice),
+          profileId: entry.before.profileId,
+          wholeUomId: entry.before.wholeUomId,
+          validFrom: from,
+          validTo: row.validTo,
+          createdBy: actorUserId(actor),
+        });
+      }
+      audits.push({
+        action: 'UPDATE',
+        entity: 'product_prices',
+        entityId: entry.productId,
+        before: termsAudit(row),
+        after: entry.before
+          ? { validFrom: from, ...entry.before }
+          : { validFrom: from, ended: true },
+      });
+      restored.push(entry.productId);
+    }
+    await closeRows(tx, closes);
+    await insertRows(tx, inserts);
+    await this.audit.recordMany(tx, actor, audits);
+    return restored.sort((a, b) => a - b);
+  }
+
+  private async rowsByProduct(
+    tx: Tx,
+    productIds: readonly number[],
+  ): Promise<Map<number, TermsRow[]>> {
+    const byProduct = new Map<number, TermsRow[]>();
+    if (productIds.length === 0) return byProduct;
+    const rows = await tx
+      .select()
+      .from(productPrices)
+      .where(idIn(productPrices.productId, [...new Set(productIds)]));
+    for (const row of rows) {
+      const list = byProduct.get(row.productId) ?? [];
+      list.push(row);
+      byProduct.set(row.productId, list);
+    }
+    return byProduct;
+  }
+}
+
+/** Ends rows on given days, many per statement. */
+async function closeRows(
+  tx: Tx,
+  closes: readonly { id: number; validTo: string }[],
+): Promise<void> {
+  for (let start = 0; start < closes.length; start += WRITE_CHUNK) {
+    const chunk = closes.slice(start, start + WRITE_CHUNK);
+    await tx.execute(sql`
+      UPDATE product_prices SET valid_to = v.valid_to
+      FROM unnest(${sql.param(chunk.map((row) => row.id))}::bigint[],
+                  ${sql.param(chunk.map((row) => row.validTo))}::date[]) AS v(id, valid_to)
+      WHERE product_prices.id = v.id`);
+  }
+}
+
+/** Inserts terms rows, many per statement; product id → the new row's id (one row per product). */
+async function insertRows(
+  tx: Tx,
+  rows: readonly (typeof productPrices.$inferInsert)[],
+): Promise<Map<number, number>> {
+  const ids = new Map<number, number>();
+  for (let start = 0; start < rows.length; start += WRITE_CHUNK) {
+    const inserted = await tx
+      .insert(productPrices)
+      .values(rows.slice(start, start + WRITE_CHUNK))
+      .returning({ id: productPrices.id, productId: productPrices.productId });
+    for (const row of inserted) ids.set(row.productId, row.id);
+  }
+  return ids;
 }
 
 /** A product's current units as the shared pricing functions take them. */
@@ -468,6 +699,14 @@ function valuesOnly(version: PriceProfileValues): PriceProfileValues {
     retailBulkMinQty: version.retailBulkMinQty,
     retailBulkMarkupPct: version.retailBulkMarkupPct,
     rounding: version.rounding,
+  };
+}
+
+function snapshotOf(row: TermsRow): TermsSnapshot {
+  return {
+    warehousePrice: row.warehousePrice.toFixed(0),
+    profileId: row.profileId,
+    wholeUomId: row.wholeUomId,
   };
 }
 

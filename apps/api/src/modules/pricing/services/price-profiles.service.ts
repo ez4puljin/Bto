@@ -61,6 +61,19 @@ export interface NewPriceProfile {
   values: PriceProfileValues;
 }
 
+/** A profile as the price sheet import reads it (ADR-0054). */
+export interface ImportProfile {
+  id: number;
+  name: string;
+  /** `nameKey(name)`: live names never repeat. */
+  nameKey: string;
+  archived: boolean;
+  /** The start of its first version that applied; null without one. */
+  firstFrom: string | null;
+  /** Its values today; null without. */
+  current: PriceProfileValues | null;
+}
+
 /** A profile row locked for a product's price terms (ADR-0048 #2). */
 export interface LockedProfile {
   id: number;
@@ -291,6 +304,32 @@ export class PriceProfilesService {
       .map((row) => row.validFrom)
       .sort();
     return { ...profile, firstFrom: starts[0] ?? null };
+  }
+
+  /**
+   * Every profile with its first applied day and its values today, archived ones included: the
+   * price sheet import finds profiles by name and lists the live ones in its template (ADR-0054).
+   */
+  async forImport(executor: Db | Tx = this.db): Promise<ImportProfile[]> {
+    const rows = await executor.select().from(priceProfiles).orderBy(asc(priceProfiles.name));
+    const versions = (await executor.select().from(priceProfileVersions)).filter(applied);
+    const today = businessDate();
+    return rows.map((row) => {
+      const own = versions.filter((version) => version.profileId === row.id);
+      const current = own.find((version) => inForceOn(version, today));
+      return {
+        id: row.id,
+        name: row.name,
+        nameKey: row.nameKey,
+        archived: row.archivedAt !== null,
+        firstFrom:
+          own
+            .map((version) => version.validFrom)
+            .sort()
+            .at(0) ?? null,
+        current: current ? valuesOf(current) : null,
+      };
+    });
   }
 
   /** Names of profiles by id, archived ones included (price terms keep theirs). */

@@ -94,6 +94,17 @@ export class CatalogImportService {
     };
   }
 
+  /** Every active product by code, for the price sheet template (ADR-0054 #2). */
+  async activeProducts(
+    executor: Db | Tx = this.db,
+  ): Promise<{ id: number; sku: string; name: string }[]> {
+    return executor
+      .select({ id: products.id, sku: products.sku, name: products.name })
+      .from(products)
+      .where(eq(products.status, 'ACTIVE'))
+      .orderBy(asc(products.sku));
+  }
+
   /** Products by SKU with their current units and barcodes. */
   async productsBySku(
     skus: readonly string[],

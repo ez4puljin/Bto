@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { wholeUnitProblem } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import { sql } from 'drizzle-orm';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { CatalogService, ProductLifecycleService, UnitConversionService } from '../../catalog';
@@ -107,6 +108,56 @@ export class SaleReadinessService {
       const done = new Set(completed);
       return { completed, alreadyComplete: ids.filter((id) => !done.has(id)) };
     });
+  }
+
+  /**
+   * Completes, inside the caller's transaction, those of the products that are waiting and can be
+   * priced today by `complete`'s checks (the price sheet import, ADR-0054 #5); the others are left
+   * as they are, with no limit on the count. Returns the completed products and the moment they
+   * were marked (the transaction's), which the import's revert needs.
+   */
+  async completeManyInTx(
+    tx: Tx,
+    actor: Actor,
+    productIds: readonly number[],
+  ): Promise<{ completed: number[]; at: Date | null }> {
+    const ids = [...new Set(productIds)].sort((a, b) => a - b);
+    if (ids.length === 0) return { completed: [], at: null };
+    const waiting = (await this.lifecycle.lockForSaleReadyInTx(tx, ids)).filter(
+      (row) => row.status === 'ACTIVE' && row.saleReadyAt === null,
+    );
+    const waitingIds = waiting.map((row) => row.id);
+    const today = businessDate();
+    const terms = await this.prices.inForce(waitingIds, today, tx);
+    const versions = await this.profiles.versionsInForce(
+      [...terms.values()].map((own) => own.profileId),
+      today,
+      tx,
+    );
+    const units = await this.units.currentUnits(waitingIds, tx);
+    const checked = new Map<number, Record<string, unknown>>();
+    for (const id of waitingIds) {
+      const own = terms.get(id);
+      if (!own || !versions.has(own.profileId)) continue;
+      if (wholeUnitProblem(packUnitsOf(units.get(id) ?? []), own.wholeUomId)) continue;
+      checked.set(id, {
+        warehousePrice: own.warehousePrice.toFixed(0),
+        profileId: own.profileId,
+        wholeUomId: own.wholeUomId,
+        date: today,
+      });
+    }
+    const completed = await this.lifecycle.markSaleReadyInTx(
+      tx,
+      actor,
+      [...checked.keys()],
+      checked,
+    );
+    if (completed.length === 0) return { completed, at: null };
+    const { rows } = await tx.execute<{ at: string }>(
+      sql`SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at`,
+    );
+    return { completed, at: rows[0] ? new Date(rows[0].at) : null };
   }
 
   /** Products the price clerk still has to complete, up to `cap` (the home tile, ADR-0047 #7). */

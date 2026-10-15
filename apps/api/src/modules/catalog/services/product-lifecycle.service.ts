@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, isNull, sql } from 'drizzle-orm';
+import { idIn } from '../../../common/db/days';
 import type { Tx } from '../../../common/db/db.types';
 import { type Actor, AuditService } from '../../identity';
 import { products } from '../schema';
@@ -35,7 +36,7 @@ export class ProductLifecycleService {
         saleReadyAt: products.saleReadyAt,
       })
       .from(products)
-      .where(inArray(products.id, [...ids]))
+      .where(idIn(products.id, ids))
       .orderBy(asc(products.id))
       .for('update');
   }
@@ -54,7 +55,7 @@ export class ProductLifecycleService {
     const rows = await tx
       .update(products)
       .set({ saleReadyAt: sql`now()`, updatedAt: sql`now()` })
-      .where(and(inArray(products.id, [...ids]), isNull(products.saleReadyAt)))
+      .where(and(idIn(products.id, ids), isNull(products.saleReadyAt)))
       .returning({ id: products.id, saleReadyAt: products.saleReadyAt });
     await this.audit.recordMany(
       tx,
@@ -68,5 +69,50 @@ export class ProductLifecycleService {
       })),
     );
     return rows.map((row) => row.id).sort((a, b) => a - b);
+  }
+
+  /**
+   * Returns products a reverted price import completed to «Үнэ хүлээгдэж буй» (ADR-0054 #6): only
+   * those still marked at the import's moment (`saleReadyAt`, within the millisecond a JS date
+   * keeps), so a product completed again since stays complete. One UNCOMPLETE audit row each.
+   */
+  async markWaitingInTx(
+    tx: Tx,
+    actor: Actor,
+    entries: readonly { id: number; saleReadyAt: Date }[],
+  ): Promise<number[]> {
+    const done: number[] = [];
+    const byMoment = new Map<number, number[]>();
+    for (const entry of entries) {
+      const time = entry.saleReadyAt.getTime();
+      byMoment.set(time, [...(byMoment.get(time) ?? []), entry.id]);
+    }
+    for (const [time, ids] of byMoment) {
+      const at = new Date(time).toISOString();
+      const rows = await tx
+        .update(products)
+        .set({ saleReadyAt: null, updatedAt: sql`now()` })
+        .where(
+          and(
+            idIn(products.id, ids),
+            sql`${products.saleReadyAt} > ${at}::timestamptz - interval '1 millisecond'`,
+            sql`${products.saleReadyAt} < ${at}::timestamptz + interval '1 millisecond'`,
+          ),
+        )
+        .returning({ id: products.id });
+      await this.audit.recordMany(
+        tx,
+        actor,
+        rows.map((row) => ({
+          action: 'UNCOMPLETE',
+          entity: 'products',
+          entityId: row.id,
+          before: { saleReadyAt: at },
+          after: { saleReadyAt: null },
+        })),
+      );
+      done.push(...rows.map((row) => row.id));
+    }
+    return done.sort((a, b) => a - b);
   }
 }

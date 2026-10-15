@@ -9,6 +9,7 @@ export {
   type ProgramStatus,
 } from './services/discount-programs.service';
 export {
+  type ImportProfile,
   type NewPriceProfile,
   type PriceProfile,
   type PriceProfileVersion,
@@ -29,6 +30,9 @@ export {
   type ProductPriceView,
   type SetTermsInput,
   type TermsInForce,
+  type TermsRestore,
+  type TermsSnapshot,
+  type WrittenTerms,
 } from './services/product-prices.service';
 export {
   MAX_SALE_READY,
