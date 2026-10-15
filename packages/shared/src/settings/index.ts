@@ -16,9 +16,9 @@ export const SETTINGS = {
   'auth.staff_session_hours': { kind: 'integer', min: 1, max: 168, default: 12 },
   /**
    * Days a customer has to pay an invoice, the same for everyone unless a customer has its own
-   * (owner answer 2026-10-11; the number is the accountant's, TODO-VERIFY before delivery 3).
+   * (owner answers 2026-10-11 and 2026-10-16: 30 days, ADR-0060 #2).
    */
-  'credit.payment_term_days': { kind: 'integer', min: 0, max: 365 },
+  'credit.payment_term_days': { kind: 'integer', min: 0, max: 365, default: 30 },
 } as const satisfies Record<string, SettingDefinition>;
 
 export interface SettingDefinition {

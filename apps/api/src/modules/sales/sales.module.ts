@@ -11,7 +11,6 @@ import {
   SalesStagesController,
 } from './controllers/sales-pipelines.controller';
 import { SalesSettingsController } from './controllers/sales-settings.controller';
-import { AllowAllCreditChecker, CreditChecker } from './services/credit-checker';
 import { SalesAccessService } from './services/sales-access.service';
 import { SalesBoardsService } from './services/sales-boards.service';
 import { SalesOrderQueryService } from './services/sales-order-query.service';
@@ -21,8 +20,8 @@ import { SalesSettingsService } from './services/sales-settings.service';
 
 /**
  * Sales (docs/modules/sales.md, ADR-0055, ADR-0056, ADR-0057): customer orders on boards,
- * pipelines and stages. The credit check allows every order until finance binds its own checker
- * in delivery 3.
+ * pipelines and stages. Finance binds the credit checker and the sale sink (ADR-0060 #1,
+ * `hooks.ts`); without it every order passes and a sale ends DELIVERED.
  */
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
@@ -33,7 +32,6 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
-    { provide: CreditChecker, useClass: AllowAllCreditChecker },
   ],
   exports: [
     SalesAccessService,

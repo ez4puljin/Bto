@@ -131,7 +131,7 @@ export class ReconciliationStatusDto {
   @ApiProperty({ type: ReconciliationRunDto, nullable: true }) lastRun: ReconciliationRunDto | null;
 }
 
-const MOVEMENT_DOC_TYPES = ['GR', 'BM', 'TR', 'ADJ', 'ST', 'SO'] as const;
+const MOVEMENT_DOC_TYPES = ['GR', 'BM', 'TR', 'ADJ', 'ST', 'SO', 'CN'] as const;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Movement history filters (SPEC §8.2 #1); dates are Ulaanbaatar business days, inclusive. */

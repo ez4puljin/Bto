@@ -42,7 +42,8 @@ const MODULE_DEPS = {
   imports: ['identity', 'catalog', 'partners', 'inventory', 'pricing'],
   pricing: ['identity', 'catalog', 'partners'],
   sales: ['identity', 'catalog', 'partners', 'pricing', 'inventory', 'ebarimt'],
-  finance: ['identity', 'partners', 'ebarimt'],
+  // ADR-0060: sales only for its hook tokens and snapshot types; finance never reads a sales table.
+  finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt'],
   ebarimt: ['identity', 'catalog'],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],

@@ -522,7 +522,8 @@ describe('sales boards', () => {
       print: string[];
     };
     expect(sold.print).toEqual(['DELIVERY_NOTE']);
-    expect(sold.order).toMatchObject({ status: 'DELIVERED', stageName: 'Борлуулалт' });
+    // Finance invoices the sale in the same transaction (ADR-0060 #3): the order ends INVOICED.
+    expect(sold.order).toMatchObject({ status: 'INVOICED', stageName: 'Борлуулалт' });
     expect(sold.order.lines[0]).toMatchObject({ qtyDelivered: '14' });
     expect(await stockOf(cola.id)).toEqual([
       { bin: 'A-01-01', on_hand: '6.000', ws: '6.000', reserved: '0.000' },
@@ -540,7 +541,15 @@ describe('sales boards', () => {
       draft.number,
     ]);
     const events = (await orders.get(draft.id)).events.map((event) => event.toStatus);
-    expect(events).toEqual(['DRAFT', 'SUBMITTED', 'CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED']);
+    expect(events).toEqual([
+      'DRAFT',
+      'SUBMITTED',
+      'CONFIRMED',
+      'PICKING',
+      'PACKED',
+      'DELIVERED',
+      'INVOICED',
+    ]);
     expect(cardsOf(await api(office).cards(pipeline.id), stage('Борлуулалт').id)).toMatchObject({
       count: 1,
       total: '15000',

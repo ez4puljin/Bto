@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Decimal } from '@tugeel/shared/money';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import {
@@ -28,6 +29,7 @@ import {
   type AuditEntry,
   AuditService,
   type AuthContext,
+  OrgService,
   ScopeService,
 } from '../../identity';
 import {
@@ -38,16 +40,24 @@ import {
   StockPostingService,
   StockQueryService,
 } from '../../inventory';
-import { CustomerAddressesService, CustomersService } from '../../partners';
+import { CustomerAddressesService, CustomersService, type LockedCustomer } from '../../partners';
 import { PriceQuoteService } from '../../pricing';
 import {
+  CREDIT_CHECKER,
+  type CreditChecker,
+  SALE_SINK,
+  type SaleSink,
+  type SaleSnapshot,
+} from '../hooks';
+import {
   orderStatusEvents,
+  salesBoards,
   salesOrderLineParts,
   salesOrderLines,
   salesOrders,
+  salesPipelines,
   salesStageMoves,
 } from '../schema';
-import { CreditChecker } from './credit-checker';
 import { type Access, isContext, SalesAccessService } from './sales-access.service';
 import { type OrderDetail, SalesOrderQueryService } from './sales-order-query.service';
 import { SalesPipelinesService } from './sales-pipelines.service';
@@ -120,10 +130,14 @@ const text = (value: string | null | undefined): string | null => {
  * in one transaction: the order row, then the customer row (credit check), then the quote, then
  * the stock rows of every line's home warehouse in key order. Every action first locks the order
  * and asks `SalesAccessService` whether the caller sees it (404 otherwise); the answer to a
- * write is not filtered.
+ * write is not filtered. Finance joins through two hooks (ADR-0060 #1): the credit checker at the
+ * submit and the sale sink at the sale; without them every order passes and a sale ends DELIVERED.
  */
 @Injectable()
-export class SalesOrdersService {
+export class SalesOrdersService implements OnModuleInit {
+  private creditChecker: CreditChecker | null = null;
+  private saleSink: SaleSink | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
@@ -134,7 +148,6 @@ export class SalesOrdersService {
     private readonly locations: ProductLocationsService,
     private readonly reservations: ReservationService,
     private readonly quotes: PriceQuoteService,
-    private readonly credit: CreditChecker,
     private readonly access: SalesAccessService,
     private readonly pipelines: SalesPipelinesService,
     private readonly queries: SalesOrderQueryService,
@@ -143,7 +156,23 @@ export class SalesOrdersService {
     private readonly bins: BinsService,
     private readonly stock: StockQueryService,
     private readonly scope: ScopeService,
+    private readonly org: OrgService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    this.creditChecker = this.hook<CreditChecker>(CREDIT_CHECKER);
+    this.saleSink = this.hook<SaleSink>(SALE_SINK);
+  }
+
+  /** A hook finance binds, or null when finance is not loaded (the worker, sales-only tests). */
+  private hook<T>(token: symbol): T | null {
+    try {
+      return this.moduleRef.get<T>(token, { strict: false });
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * A draft, placed in its pipeline's stage when one is configured (ADR-0057 #4), numbered last
@@ -572,13 +601,7 @@ export class SalesOrdersService {
           })),
         );
       }
-      const decision = await this.credit.check(tx, customer, quote.total);
-      if (decision !== 'OK') {
-        throw new AppError(
-          decision === 'BLOCKED' ? 'CREDIT_BLOCKED' : 'CREDIT_NEEDS_APPROVAL',
-          'the credit check did not pass',
-        );
-      }
+      await this.assertCredit(tx, customer, id, quote.total);
 
       const parts: (typeof salesOrderLineParts.$inferInsert)[] = [];
       for (const [index, line] of lines.entries()) {
@@ -648,6 +671,45 @@ export class SalesOrdersService {
     }
   }
 
+  /**
+   * The credit check (ADR-0060 #2): the customer's other confirmed orders not yet invoiced are
+   * summed under the customer lock and handed to finance's checker with this order's total; a
+   * refusal says why, with the amounts. Without a checker every order passes.
+   */
+  private async assertCredit(
+    tx: Tx,
+    customer: LockedCustomer,
+    orderId: number,
+    amount: Decimal,
+  ): Promise<void> {
+    if (!this.creditChecker) return;
+    const [open] = await tx
+      .select({ total: sql<string>`coalesce(sum(${salesOrders.total}), 0)` })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.customerId, customer.id),
+          inArray(salesOrders.status, ['CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED']),
+          sql`${salesOrders.id} <> ${orderId}`,
+        ),
+      );
+    const decision = await this.creditChecker.check(tx, {
+      customer,
+      orderId,
+      amount,
+      openOrders: new Decimal(open?.total ?? 0),
+    });
+    if (decision.ok) return;
+    throw new AppError('CREDIT_BLOCKED', `the credit check refused: ${decision.reason}`, {
+      reason: decision.reason,
+      exposure: decision.exposure.toFixed(0),
+      limit: decision.limit?.toFixed(0) ?? null,
+      excess: decision.excess.toFixed(0),
+      overdueAmount: decision.overdueAmount.toFixed(0),
+      oldestDueDate: decision.oldestDueDate,
+    });
+  }
+
   private async submitInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
     const id = order.id;
     const today = businessDate();
@@ -686,7 +748,8 @@ export class SalesOrdersService {
 
   /**
    * The main sale (ADR-0056 #3): the picked quantity of every line leaves STAGING under the order's
-   * document; DELIVERED. The receivable comes with finance (delivery 3).
+   * document; DELIVERED. Finance's sale sink then invoices the delivered quantities (ADR-0060 #3)
+   * and the order ends INVOICED in the same transaction.
    */
   private async saleInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
     const id = order.id;
@@ -742,6 +805,16 @@ export class SalesOrdersService {
       })
       .where(eq(salesOrders.id, id));
     await this.event(tx, actor, id, 'PACKED', 'DELIVERED', null);
+    const invoice = this.saleSink
+      ? await this.saleSink.onSold(tx, actor, await this.snapshotOf(tx, order, lines, products))
+      : null;
+    if (invoice) {
+      await tx
+        .update(salesOrders)
+        .set({ status: 'INVOICED', updatedAt: sql`now()` })
+        .where(eq(salesOrders.id, id));
+      await this.event(tx, actor, id, 'DELIVERED', 'INVOICED', invoice.number);
+    }
     await this.audit.record(tx, actor, {
       action: 'SALE',
       entity: 'sales_orders',
@@ -750,8 +823,87 @@ export class SalesOrdersService {
         number: order.number,
         total: order.total?.toFixed(0) ?? null,
         lines: movements.length,
+        invoice: invoice?.number ?? null,
       },
     });
+  }
+
+  /** The sold order by value for finance (ADR-0060 #1): header, branch, lines with their parts. */
+  private async snapshotOf(
+    tx: Tx,
+    order: OrderRow,
+    lines: readonly LineRow[],
+    products: ReadonlyMap<number, ProductSummary>,
+  ): Promise<SaleSnapshot> {
+    const parts =
+      lines.length === 0
+        ? []
+        : await tx
+            .select()
+            .from(salesOrderLineParts)
+            .where(
+              idIn(
+                salesOrderLineParts.lineId,
+                lines.map((line) => line.id),
+              ),
+            )
+            .orderBy(asc(salesOrderLineParts.lineId), asc(salesOrderLineParts.partNo));
+    let branchId: number | null = null;
+    if (order.pipelineId !== null) {
+      const [board] = await tx
+        .select({ branchId: salesBoards.branchId })
+        .from(salesPipelines)
+        .innerJoin(salesBoards, eq(salesBoards.id, salesPipelines.boardId))
+        .where(eq(salesPipelines.id, order.pipelineId));
+      branchId = board?.branchId ?? null;
+    }
+    const first = lines[0];
+    if (branchId === null && first) {
+      branchId = (await this.org.getWarehouse(first.warehouseId, tx)).branchId;
+    }
+    return {
+      orderId: order.id,
+      orderNumber: order.number ?? String(order.id),
+      customerId: order.customerId,
+      branchId,
+      channel: order.channel,
+      fulfilment: order.fulfilment,
+      deliveryDate: order.deliveryDate,
+      paymentMethod: order.paymentMethod,
+      note: order.note,
+      lines: lines.map((line) => {
+        const product = products.get(line.productId);
+        return {
+          orderLineId: line.id,
+          lineNo: line.lineNo,
+          productId: line.productId,
+          sku: product?.sku ?? '',
+          name: product?.name ?? '',
+          baseUnit: {
+            productUnitId: product?.baseUnit.id ?? line.productUnitId,
+            uomName: product?.baseUnit.uomName ?? '',
+          },
+          vatType: product?.vatType ?? 'VAT_ABLE',
+          cityTax: product?.cityTax ?? null,
+          warehouseId: line.warehouseId,
+          qtyBase: line.qtyBase,
+          qtyDelivered: line.qtyPicked ?? new Decimal(0),
+          parts: parts
+            .filter((part) => part.lineId === line.id)
+            .map((part) => ({
+              productUnitId: part.productUnitId,
+              uomName: part.uomName,
+              basis: part.basis,
+              qty: part.qty,
+              factorSnapshot: part.factorSnapshot,
+              qtyBase: part.qtyBase,
+              listPrice: part.listPrice,
+              unitPrice: part.unitPrice,
+              discountAmount: part.discountAmount,
+            })),
+        };
+      }),
+    };
   }
 
   /** Cancels a draft or a confirmed order with a reason; a confirmed one releases its stock. */

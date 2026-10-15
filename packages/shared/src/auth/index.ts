@@ -46,6 +46,13 @@ export const PERMISSIONS = [
   // Boards and stages (ADR-0056): configuring them; confirming picked counts.
   'sales.boards.manage',
   'sales.orders.pick',
+  // Finance (ADR-0060): reading invoices, balances and books; recording money; voiding invoices
+  // and crediting returns; manual journal entries and accounts; numbering, money accounts, roles.
+  'finance.read',
+  'finance.payments.record',
+  'finance.invoices.manage',
+  'finance.journal.manage',
+  'finance.settings.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -87,11 +94,13 @@ export function isSystemRole(value: unknown): value is SystemRole {
 /** ADMIN holds every permission; the other roles grow as their modules are built. */
 export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permission[]>> = {
   ADMIN: PERMISSIONS,
+  // The office sees customer balances and invoices while entering orders (ADR-0060).
   OFFICE: [
     'partners.customers.read',
     'partners.customers.manage',
     'sales.orders.read',
     'sales.orders.manage',
+    'finance.read',
   ],
   PROCUREMENT: [],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
@@ -116,6 +125,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'partners.credit.manage',
     'inventory.costs.manage',
     'sales.orders.read',
+    // Finance I (ADR-0060): invoices, payments, credit notes and the journal are the accountant's.
+    'finance.read',
+    'finance.payments.record',
+    'finance.invoices.manage',
+    'finance.journal.manage',
   ],
   HR: [],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).

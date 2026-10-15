@@ -41,7 +41,12 @@ export type {
   UnitView,
 } from './services/products.service';
 export { PRODUCT_STATUSES, VAT_TYPES, type VatType } from './schema';
-export { type ProductTaxRates, TaxService } from './services/tax.service';
+export {
+  type CompanyTaxRates,
+  type ProductTaxRates,
+  type TaxProduct,
+  TaxService,
+} from './services/tax.service';
 export {
   type ConvertedQty,
   type UnitInfo,

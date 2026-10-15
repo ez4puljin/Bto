@@ -2,10 +2,16 @@
 // named exports only (ESLint G2 rejects `export *`).
 export { SalesHttpModule, SalesModule } from './sales.module';
 export {
-  AllowAllCreditChecker,
-  CreditChecker,
+  CREDIT_CHECKER,
+  type CreditChecker,
+  type CreditCheckInput,
   type CreditDecision,
-} from './services/credit-checker';
+  SALE_SINK,
+  type SaleSink,
+  type SaleSnapshot,
+  type SoldLine,
+  type SoldPart,
+} from './hooks';
 export {
   type Access,
   type PipelineRights,

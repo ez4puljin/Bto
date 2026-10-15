@@ -92,6 +92,11 @@
       "types": "./dist/sales/index.d.ts",
       "default": "./dist/sales/index.js"
     },
+    "./finance": {
+      "@tugeel/source": "./src/finance/index.ts",
+      "types": "./dist/finance/index.d.ts",
+      "default": "./dist/finance/index.js"
+    },
     "./segments": {
       "@tugeel/source": "./src/segments/index.ts",
       "types": "./dist/segments/index.d.ts",

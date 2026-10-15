@@ -57,7 +57,7 @@ describe('customers', () => {
       phone: '+97699112233',
       tinPending: false,
       creditLimit: null,
-      paymentTerm: { days: null, source: 'UNSET' },
+      paymentTerm: { days: 30, source: 'DEFAULT' },
     });
     expect(first.addresses).toEqual([
       expect.objectContaining({ isDefault: true, gpsSource: 'OFFICE', lat: UB.lat, lng: UB.lng }),
