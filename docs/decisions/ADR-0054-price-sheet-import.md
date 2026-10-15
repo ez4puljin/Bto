@@ -28,6 +28,7 @@ The owner's answers (2026-10-15):
    - **Rows.** One row per active product, by code, with the terms in force today: price, profile name and whole pack.
    - **Sheets.** A second sheet lists the live profiles with their percentages and rounding; the third is the instructions.
    - **Format.** Codes and the day are text cells.
+   - **Size.** A price sheet may hold up to 50,000 rows (other kinds 20,000): the development database alone has more than 20,000 active products, so a filled template must not exceed the limit. Untouched rows may be deleted.
 3. **Rows.**
    - **Empty price.** The row keeps the product's terms (UNCHANGED).
    - **Filled price** needs:

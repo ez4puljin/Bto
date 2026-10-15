@@ -4,6 +4,7 @@ import {
   IMPORT_COLUMNS,
   IMPORT_KINDS,
   isImportKind,
+  maxRowsOf,
   matchHeaders,
   normalizeHeader,
   parseDecimal,
@@ -28,6 +29,8 @@ describe('import templates', () => {
     expect(isImportKind('PRODUCTS')).toBe(true);
     expect(isImportKind('PRICES')).toBe(true);
     expect(isImportKind('ORDERS')).toBe(false);
+    expect(maxRowsOf('PRODUCTS')).toBe(20_000);
+    expect(maxRowsOf('PRICES')).toBe(50_000);
   });
 
   it('matches header cells to columns whatever their order, marks and case', () => {

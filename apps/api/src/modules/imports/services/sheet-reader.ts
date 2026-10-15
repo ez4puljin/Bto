@@ -5,6 +5,7 @@ import {
   type FileIssueCode,
   IMPORT_COLUMNS,
   IMPORT_LIMITS,
+  maxRowsOf,
   type ImportKind,
   matchHeaders,
   readCell,
@@ -101,8 +102,8 @@ export async function readSheet(body: Readable, kind: ImportKind): Promise<Sheet
       if (cell.warning) issues.push({ column: key, code: cell.warning });
     }
     if (!filled) continue;
-    if (rows.length >= IMPORT_LIMITS.maxRows) {
-      return issue('TOO_MANY_ROWS', { max: IMPORT_LIMITS.maxRows });
+    if (rows.length >= maxRowsOf(kind)) {
+      return issue('TOO_MANY_ROWS', { max: maxRowsOf(kind) });
     }
     rows.push({ rowNo: number, values, issues });
   }

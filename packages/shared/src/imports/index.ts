@@ -116,9 +116,16 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
   ],
 };
 
+/** The most data rows a file of a kind may hold. */
+export function maxRowsOf(kind: ImportKind): number {
+  return kind === 'PRICES' ? IMPORT_LIMITS.maxPriceRows : IMPORT_LIMITS.maxRows;
+}
+
 export const IMPORT_LIMITS = {
   /** Data rows per file. */
   maxRows: 20_000,
+  /** The price sheet lists every active product, so it may hold more (ADR-0054). */
+  maxPriceRows: 50_000,
   maxColumns: 60,
   maxCellLength: 1_000,
   /** The header row is looked for in this many rows from the top. */
