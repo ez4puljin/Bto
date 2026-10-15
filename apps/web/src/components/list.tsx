@@ -110,16 +110,22 @@ export function FilterChip(props: {
 
 /**
  * An Apple segmented control: a few mutually exclusive views of a list (in force / planned / all).
- * The segments are tabs, so tests and screen readers find them by name.
+ * The segments are tabs, so tests and screen readers find them by name; `name` names the group
+ * when its segments alone do not say what they choose (a paper size).
  */
 export function SegmentedControl<T extends string>(props: {
   options: readonly T[];
   value: T;
   label: (value: T) => string;
   onChange: (value: T) => void;
+  name?: string;
 }) {
   return (
-    <div role="tablist" className="inline-flex rounded-lg bg-black/[0.05] p-0.5">
+    <div
+      role="tablist"
+      aria-label={props.name}
+      className="inline-flex rounded-lg bg-black/[0.05] p-0.5"
+    >
       {props.options.map((value) => {
         const selected = value === props.value;
         return (

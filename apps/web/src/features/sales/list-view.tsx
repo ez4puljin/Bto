@@ -20,7 +20,7 @@ import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import type { OrderStatus } from './api';
-import { OrderStatusBadge } from './orders-pages';
+import { OrderStatusBadge, PaymentLabel } from './orders-pages';
 import {
   type FilterQuery,
   type ListQuery,
@@ -40,6 +40,7 @@ const COLUMNS = [
   'status',
   'deliveryDate',
   'total',
+  'payment',
   'createdBy',
   'channel',
   'createdAt',
@@ -243,6 +244,11 @@ export function ListView({
                   ) : null}
                   {shown('total') ? (
                     <TableCell className="text-right font-mono">{money(row.total)}</TableCell>
+                  ) : null}
+                  {shown('payment') ? (
+                    <TableCell>
+                      <PaymentLabel method={row.paymentMethod} />
+                    </TableCell>
                   ) : null}
                   {shown('createdBy') ? <TableCell>{row.createdByName ?? ''}</TableCell> : null}
                   {shown('channel') ? (

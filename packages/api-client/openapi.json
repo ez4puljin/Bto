@@ -22903,6 +22903,14 @@
             ],
             "type": "string"
           },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
           "deliveryDate": {
             "type": "string",
             "format": "date"
@@ -22953,6 +22961,7 @@
           "customerCode",
           "customerName",
           "fulfilment",
+          "paymentMethod",
           "deliveryDate",
           "total",
           "lineCount",
@@ -24188,6 +24197,15 @@
             ],
             "type": "string"
           },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string",
+            "description": "The card's label (ADR-0058)"
+          },
           "deliveryDate": {
             "type": "string",
             "format": "date"
@@ -24217,6 +24235,7 @@
           "customerCode",
           "customerName",
           "fulfilment",
+          "paymentMethod",
           "deliveryDate",
           "total",
           "lineCount",

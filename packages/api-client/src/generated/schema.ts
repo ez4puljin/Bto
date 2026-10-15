@@ -6002,6 +6002,8 @@ export interface components {
             customerName: string;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
             /** Format: date */
             deliveryDate: string;
             total: string | null;
@@ -6336,6 +6338,11 @@ export interface components {
             customerName: string;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
+            /**
+             * @description The card's label (ADR-0058)
+             * @enum {string}
+             */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
             /** Format: date */
             deliveryDate: string;
             total: string | null;

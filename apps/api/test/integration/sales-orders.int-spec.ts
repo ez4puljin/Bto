@@ -287,11 +287,15 @@ describe('sales orders', () => {
         .query({ status: 'DRAFT', customerId: shop.id })
         .set(bearer(office))
         .expect(200)
-    ).body as { data: { id: number; lineCount: number; customerName: string }[] };
+    ).body as {
+      data: { id: number; lineCount: number; customerName: string; paymentMethod: string }[];
+    };
+    // The edit sent the default payment, so the row's label follows it (ADR-0058).
     expect(drafts.data[0]).toMatchObject({
       id: draft.id,
       lineCount: 1,
       customerName: 'Захиалгын дэлгүүр',
+      paymentMethod: 'CASH',
     });
     const cancelled = (await orders().cancel(draft.id, 'Ноорог хэрэггүй').expect(200))
       .body as OrderJson;

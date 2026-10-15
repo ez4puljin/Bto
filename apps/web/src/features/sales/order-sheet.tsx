@@ -30,8 +30,10 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type SalesOrder, useSalesOrder } from './api';
-import { OrderView } from './orders-pages';
+import { OrderStatusBadge, OrderView, PaymentLabel } from './orders-pages';
 import { openPrint, orderPrintPath, usePickInfo, useSalesMutations } from './pipelines-api';
+import { usePrintFormat } from './print-format';
+import { PrintFormatToggle } from './print-format-toggle';
 
 /**
  * The order beside the board or the list (ADR-0056, ADR-0057): the documents to print, the pick
@@ -52,7 +54,6 @@ export function OrderSheet({ orderId, onClose }: { orderId: number | null; onClo
       else await mutations.unarchiveOrder.mutateAsync(detail.id);
       toast.success(archived ? t('sales.work.archivedOrder') : t('sales.work.unarchivedOrder'));
     });
-  const print = (kind: PrintKind) => detail && openPrint(orderPrintPath(detail.id, kind));
   return (
     <Sheet
       open={orderId !== null}
@@ -77,24 +78,19 @@ export function OrderSheet({ orderId, onClose }: { orderId: number | null; onClo
         {detail ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
+              <OrderStatusBadge status={detail.status} />
+              <PaymentLabel method={detail.paymentMethod} />
               {detail.archivedAt ? (
                 <Badge variant="outline">{t('sales.work.archivedBadge')}</Badge>
               ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               {detail.status === 'DRAFT' || detail.status === 'CONFIRMED' ? (
                 <Button asChild variant="outline">
                   <Link to={`/sales/orders/${detail.id}`}>{t('sales.boards.openOrder')}</Link>
                 </Button>
               ) : null}
-              <Button variant="outline" onClick={() => print('PICK_LIST')}>
-                <Printer />
-                {t('sales.printKinds.PICK_LIST')}
-              </Button>
-              {detail.total !== null ? (
-                <Button variant="outline" onClick={() => print('DELIVERY_NOTE')}>
-                  <Printer />
-                  {t('sales.printKinds.DELIVERY_NOTE')}
-                </Button>
-              ) : null}
+              <PrintButtons order={detail} />
               {detail.canEdit && isFinished(detail.status) && !detail.archivedAt ? (
                 <Button
                   variant="outline"
@@ -124,6 +120,28 @@ export function OrderSheet({ orderId, onClose }: { orderId: number | null; onClo
         ) : null}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** The paper (ADR-0058), then the order's documents: the delivery note once it has prices. */
+function PrintButtons({ order }: { order: SalesOrder }) {
+  const { t } = useTranslation();
+  const [format, setFormat] = usePrintFormat();
+  const print = (kind: PrintKind) => openPrint(orderPrintPath(order.id, kind, format));
+  return (
+    <>
+      <PrintFormatToggle value={format} onChange={setFormat} />
+      <Button variant="outline" onClick={() => print('PICK_LIST')}>
+        <Printer />
+        {t('sales.printKinds.PICK_LIST')}
+      </Button>
+      {order.total !== null ? (
+        <Button variant="outline" onClick={() => print('DELIVERY_NOTE')}>
+          <Printer />
+          {t('sales.printKinds.DELIVERY_NOTE')}
+        </Button>
+      ) : null}
+    </>
   );
 }
 

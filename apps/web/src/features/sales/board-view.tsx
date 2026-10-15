@@ -42,7 +42,7 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
-import { OrderStatusBadge } from './orders-pages';
+import { OrderStatusBadge, PaymentLabel } from './orders-pages';
 import {
   batchPrintPath,
   type FilterQuery,
@@ -55,6 +55,8 @@ import {
   useSalesMutations,
   useStageCards,
 } from './pipelines-api';
+import { usePrintFormat } from './print-format';
+import { PrintFormatToggle } from './print-format-toggle';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
 
@@ -318,13 +320,16 @@ function Card({
       }}
     >
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          className="text-left font-medium underline-offset-4 hover:underline"
-          onClick={onOpen}
-        >
-          {title}
-        </button>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <button
+            type="button"
+            className="text-left font-medium underline-offset-4 hover:underline"
+            onClick={onOpen}
+          >
+            {title}
+          </button>
+          <PaymentLabel method={card.paymentMethod} />
+        </div>
         {targets.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -356,9 +361,16 @@ function Card({
         <span className="font-mono">{card.deliveryDate}</span>
         <OrderStatusBadge status={card.status} />
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-        <span>{t(`sales.channels.${card.channel}`)}</span>
-        {card.createdByName ? <span>· {card.createdByName}</span> : null}
+      <div className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+        {card.createdByName ? (
+          <span className="text-foreground">
+            {t('sales.work.cardCreatedBy', { name: card.createdByName })}
+          </span>
+        ) : null}
+        <span>
+          {card.createdByName ? '· ' : ''}
+          {t(`sales.channels.${card.channel}`)}
+        </span>
       </div>
     </article>
   );
@@ -412,6 +424,7 @@ function useMover() {
 
 function MoveDialogs({ mover }: { mover: ReturnType<typeof useMover> }) {
   const { t } = useTranslation();
+  const [format, setFormat] = usePrintFormat();
   return (
     <>
       <ProblemAlert problem={mover.pending || mover.print ? null : mover.problem} />
@@ -444,12 +457,15 @@ function MoveDialogs({ mover }: { mover: ReturnType<typeof useMover> }) {
             <DialogTitle>{t('sales.boards.printTitle')}</DialogTitle>
             <DialogDescription>{t('sales.boards.printDescription')}</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <PrintFormatToggle value={format} onChange={setFormat} />
             {(mover.print?.kinds ?? []).map((kind) => (
               <Button
                 key={kind}
                 variant="outline"
-                onClick={() => mover.print && openPrint(orderPrintPath(mover.print.orderId, kind))}
+                onClick={() =>
+                  mover.print && openPrint(orderPrintPath(mover.print.orderId, kind, format))
+                }
               >
                 <Printer />
                 {t(`sales.printKinds.${kind}`)}
@@ -495,6 +511,7 @@ function StagePrintForm({
 }) {
   const { t } = useTranslation();
   const [kind, setKind] = useState<PrintKind>('PICK_LIST');
+  const [format, setFormat] = usePrintFormat();
   const cards = printing.column.cards.slice(0, BOARD_LIMITS.maxPrint);
   const printable = (card: OrderCard) => kind === 'PICK_LIST' || card.total !== null;
   const [ticked, setTicked] = useState<ReadonlySet<number>>(
@@ -512,12 +529,15 @@ function StagePrintForm({
             : t('sales.work.printDescription')}
         </DialogDescription>
       </DialogHeader>
-      <SegmentedControl
-        options={PRINT_KINDS}
-        value={kind}
-        label={(value) => t(`sales.printKinds.${value}`)}
-        onChange={setKind}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl
+          options={PRINT_KINDS}
+          value={kind}
+          label={(value) => t(`sales.printKinds.${value}`)}
+          onChange={setKind}
+        />
+        <PrintFormatToggle value={format} onChange={setFormat} />
+      </div>
       {kind === 'DELIVERY_NOTE' && cards.some((card) => !printable(card)) ? (
         <p className="text-xs text-muted-foreground">{t('sales.work.printDraftsSkipped')}</p>
       ) : null}
@@ -569,6 +589,7 @@ function StagePrintForm({
               batchPrintPath(
                 kind,
                 chosen.map((card) => card.id),
+                format,
               ),
             );
             onClose();

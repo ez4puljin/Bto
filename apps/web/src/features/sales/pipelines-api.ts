@@ -9,6 +9,7 @@ import { type components, idempotencyKey } from '@tugeel/api-client';
 import type { CardSort, OrderChannel, PrintKind } from '@tugeel/shared/sales';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
+import { type PrintFormat, printFormatParam } from './print-format';
 
 type Schemas = components['schemas'];
 export type SalesBoard = Schemas['SalesBoard'];
@@ -321,12 +322,16 @@ export function openPrint(path: string): void {
   window.open(path, '_blank', 'noopener');
 }
 
-/** The printable page of one order (ADR-0056 #7), opened in a new tab. */
-export function orderPrintPath(orderId: number, kind: PrintKind): string {
-  return `/sales/orders/${orderId}/print/${kind}`;
+/** The printable page of one order (ADR-0056 #7) on this computer's paper (ADR-0058). */
+export function orderPrintPath(orderId: number, kind: PrintKind, format: PrintFormat): string {
+  return `/sales/orders/${orderId}/print/${kind}?format=${printFormatParam(format)}`;
 }
 
-/** The printable page of several orders, one per sheet (ADR-0057 #7). */
-export function batchPrintPath(kind: PrintKind, ids: readonly number[]): string {
-  return `/sales/print/${kind}?ids=${ids.join(',')}`;
+/** The printable page of several orders, one per sheet (ADR-0057 #7, ADR-0058). */
+export function batchPrintPath(
+  kind: PrintKind,
+  ids: readonly number[],
+  format: PrintFormat,
+): string {
+  return `/sales/print/${kind}?ids=${ids.join(',')}&format=${printFormatParam(format)}`;
 }

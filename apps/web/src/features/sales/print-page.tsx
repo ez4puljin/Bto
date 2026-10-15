@@ -1,6 +1,6 @@
 import { Decimal } from '@tugeel/shared/money';
 import { PRINT_KINDS, type PrintKind } from '@tugeel/shared/sales';
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -9,8 +9,17 @@ import { useWarehouseName } from '@/features/inventory/helpers';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { cn } from '@/lib/utils';
 import { type SalesOrder, useSalesOrder } from './api';
 import { useOrderBatch } from './pipelines-api';
+import {
+  PAGE_RULES,
+  type PrintFormat,
+  parsePrintFormat,
+  printFormatParam,
+  usePrintFormat,
+} from './print-format';
+import { PrintFormatToggle } from './print-format-toggle';
 
 const isKind = (value: string | undefined): value is PrintKind =>
   value !== undefined && (PRINT_KINDS as readonly string[]).includes(value);
@@ -60,6 +69,10 @@ export function SalesBatchPrintPage() {
   );
 }
 
+/**
+ * The paper of both pages (ADR-0058): `?format=` or this computer's choice, its `@page`, an A4
+ * sheet or an 80 mm strip on the screen; the buttons and the paper switch stay off the printout.
+ */
 function PrintFrame({
   kind,
   orders,
@@ -72,6 +85,10 @@ function PrintFrame({
   title: string;
 }) {
   const { t } = useTranslation();
+  const [search, setSearch] = useSearchParams();
+  const [saved, choose] = usePrintFormat();
+  const format = parsePrintFormat(search.get('format')) ?? saved;
+  const narrow = format === 'MM80';
   const printed = useRef(false);
   useEffect(() => {
     if (!orders || orders.length === 0 || printed.current) return;
@@ -80,30 +97,112 @@ function PrintFrame({
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
   }, [orders, kind, title, t]);
+  const change = (next: PrintFormat) => {
+    choose(next);
+    setSearch(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.set('format', printFormatParam(next));
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   return (
-    <div className="mx-auto max-w-3xl bg-background p-6 text-sm text-foreground print:p-0">
-      <div className="mb-4 flex gap-2 print:hidden">
+    <div className="p-6 text-foreground print:p-0">
+      <style>{PAGE_RULES[format]}</style>
+      <div className="mx-auto mb-4 flex max-w-3xl flex-wrap items-center gap-2 print:hidden">
         <Button onClick={() => window.print()}>{t('sales.print.print')}</Button>
         <Button variant="outline" onClick={() => window.close()}>
           {t('common.close')}
         </Button>
+        <PrintFormatToggle value={format} onChange={change} />
       </div>
-      <ProblemAlert problem={problemFromError(error)} />
-      {(orders ?? []).map((order, index, all) => (
-        <section
-          key={order.id}
-          className={index < all.length - 1 ? 'mb-10 break-after-page print:mb-0' : undefined}
-        >
-          {kind === 'DELIVERY_NOTE' ? <DeliveryNote order={order} /> : <PickList order={order} />}
-        </section>
-      ))}
+      <div className="mx-auto max-w-3xl">
+        <ProblemAlert problem={problemFromError(error)} />
+      </div>
+      <div
+        data-format={format}
+        className={
+          narrow
+            ? 'mx-auto w-[80mm] max-w-full bg-background px-[4mm] py-[3mm] text-xs leading-snug shadow-card print:mx-0 print:w-full print:max-w-[80mm] print:shadow-none'
+            : 'mx-auto max-w-3xl bg-background p-6 text-sm print:max-w-none print:p-0'
+        }
+      >
+        {(orders ?? []).map((order, index, all) => (
+          <section
+            key={order.id}
+            className={
+              index < all.length - 1
+                ? cn('break-after-page print:mb-0', narrow ? 'mb-6' : 'mb-10')
+                : undefined
+            }
+          >
+            {kind === 'DELIVERY_NOTE' ? (
+              <DeliveryNote order={order} narrow={narrow} />
+            ) : (
+              <PickList order={order} narrow={narrow} />
+            )}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
 
-function Heading({ order, title }: { order: SalesOrder; title: string }) {
+/**
+ * The company, the document and its number, then the order's header with how it is paid and who
+ * entered it (ADR-0058). On the roll everything is black: a thermal printer fades grey.
+ */
+function Heading({ order, title, narrow }: { order: SalesOrder; title: string; narrow: boolean }) {
   const { t } = useTranslation();
+  const rows = [
+    { label: t('sales.order.customer'), value: `${order.customerName} · ${order.customerCode}` },
+    {
+      label: t('sales.order.fulfilment'),
+      value: `${t(`sales.fulfilments.${order.fulfilment}`)} · ${order.deliveryDate}`,
+    },
+    ...(order.addressText ? [{ label: t('sales.order.address'), value: order.addressText }] : []),
+    ...(order.contactName || order.contactPhone
+      ? [
+          {
+            label: t('sales.order.contactName'),
+            value: [order.contactName, order.contactPhone].filter(Boolean).join(' · '),
+          },
+        ]
+      : []),
+    {
+      label: t('sales.order.paymentMethod'),
+      value: t(`sales.paymentMethods.${order.paymentMethod}`),
+    },
+    ...(order.createdByName
+      ? [{ label: t('sales.order.createdBy'), value: order.createdByName }]
+      : []),
+    ...(order.note ? [{ label: t('sales.order.note'), value: order.note }] : []),
+  ];
+  const number = order.number ?? t('sales.order.draftNo', { id: order.id });
+  if (narrow) {
+    return (
+      <header className="border-b border-dashed border-foreground pb-2">
+        <h1 className="text-center font-semibold">{t('brand.company')}</h1>
+        <h2 className="mt-1 text-center text-sm font-bold">
+          {title} · {number}
+        </h2>
+        <p className="text-center">
+          {t('sales.print.printedAt', { at: formatUbDateTime(Date.now()) })}
+        </p>
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2">
+          {rows.map((row) => (
+            <Fragment key={row.label}>
+              <dt>{row.label}</dt>
+              <dd className="min-w-0 font-medium">{row.value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      </header>
+    );
+  }
   return (
     <header className="mb-4 border-b border-border pb-3">
       <div className="flex items-baseline justify-between gap-4">
@@ -111,64 +210,88 @@ function Heading({ order, title }: { order: SalesOrder; title: string }) {
         <span className="text-xs text-muted-foreground">{formatUbDateTime(Date.now())}</span>
       </div>
       <h2 className="mt-2 text-base font-semibold">
-        {title} · {order.number ?? t('sales.order.draftNo', { id: order.id })}
+        {title} · {number}
       </h2>
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
-        <dt className="text-muted-foreground">{t('sales.order.customer')}</dt>
-        <dd>
-          {order.customerName} · {order.customerCode}
-        </dd>
-        <dt className="text-muted-foreground">{t('sales.order.fulfilment')}</dt>
-        <dd>
-          {t(`sales.fulfilments.${order.fulfilment}`)} · {order.deliveryDate}
-        </dd>
-        {order.addressText ? (
-          <>
-            <dt className="text-muted-foreground">{t('sales.order.address')}</dt>
-            <dd>{order.addressText}</dd>
-          </>
-        ) : null}
-        {order.contactName || order.contactPhone ? (
-          <>
-            <dt className="text-muted-foreground">{t('sales.order.contactName')}</dt>
-            <dd>{[order.contactName, order.contactPhone].filter(Boolean).join(' · ')}</dd>
-          </>
-        ) : null}
-        {order.note ? (
-          <>
-            <dt className="text-muted-foreground">{t('sales.order.note')}</dt>
-            <dd>{order.note}</dd>
-          </>
-        ) : null}
+        {rows.map((row) => (
+          <Fragment key={row.label}>
+            <dt className="text-muted-foreground">{row.label}</dt>
+            <dd>{row.value}</dd>
+          </Fragment>
+        ))}
       </dl>
     </header>
   );
 }
 
-function PickList({ order }: { order: SalesOrder }) {
+/**
+ * The pick list: a section per warehouse, its name and line count on top (ADR-0056 #7, ADR-0058);
+ * on the roll each line takes two or three short rows instead of a table's columns.
+ */
+function PickList({ order, narrow }: { order: SalesOrder; narrow: boolean }) {
   const { t } = useTranslation();
   const warehouseName = useWarehouseName();
-  const warehouses = [...new Set(order.lines.map((line) => line.warehouseId))];
+  const sections = [...new Set(order.lines.map((line) => line.warehouseId))].map((warehouseId) => {
+    const lines = order.lines.filter((line) => line.warehouseId === warehouseId);
+    return {
+      warehouseId,
+      lines,
+      title: `${warehouseName(warehouseId)} · ${t('sales.order.lineCount', { count: lines.length })}`,
+    };
+  });
+  const qty = (value: string, unit: string) =>
+    t('sales.order.qtyIn', { qty: plainDecimal(value), unit });
   return (
     <>
-      <Heading order={order} title={t('sales.printKinds.PICK_LIST')} />
-      {warehouses.map((warehouseId) => (
-        <section key={warehouseId} className="mb-4">
-          <h3 className="mb-1 font-semibold">{warehouseName(warehouseId)}</h3>
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="py-1 pr-2 font-medium">{t('sales.order.product')}</th>
-                <th className="py-1 pr-2 text-right font-medium">{t('sales.order.qty')}</th>
-                <th className="py-1 pr-2 text-right font-medium">{t('sales.print.baseQty')}</th>
-                <th className="py-1 pr-2 font-medium">{t('sales.pick.bin')}</th>
-                <th className="py-1 font-medium">{t('sales.print.picked')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.lines
-                .filter((line) => line.warehouseId === warehouseId)
-                .map((line) => (
+      <Heading order={order} title={t('sales.printKinds.PICK_LIST')} narrow={narrow} />
+      {sections.map((section) =>
+        narrow ? (
+          <section key={section.warehouseId} className="mt-3">
+            <h3 className="border-y-2 border-foreground py-0.5 text-sm font-bold">
+              {section.title}
+            </h3>
+            <ol>
+              {section.lines.map((line) => (
+                <li key={line.id} className="border-b border-dashed border-foreground py-1">
+                  <p className="font-semibold">{line.productName}</p>
+                  <p className="flex justify-between gap-2">
+                    <span className="font-mono">{line.productSku}</span>
+                    <span className="font-semibold">{qty(line.qty, line.unitName)}</span>
+                  </p>
+                  <p className="flex justify-between gap-2">
+                    <span>
+                      {t('sales.print.baseQty')}: {qty(line.qtyApproved, line.baseUnitName)}
+                    </span>
+                    <span>
+                      {line.qtyPicked === null
+                        ? '☐ ______'
+                        : `${t('sales.print.picked')}: ${plainDecimal(line.qtyPicked)}`}
+                    </span>
+                  </p>
+                  {line.pickBinCode ? (
+                    <p>
+                      {t('sales.pick.bin')}: {line.pickBinCode}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : (
+          <section key={section.warehouseId} className="mb-4">
+            <h3 className="mb-1 font-semibold">{section.title}</h3>
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="py-1 pr-2 font-medium">{t('sales.order.product')}</th>
+                  <th className="py-1 pr-2 text-right font-medium">{t('sales.order.qty')}</th>
+                  <th className="py-1 pr-2 text-right font-medium">{t('sales.print.baseQty')}</th>
+                  <th className="py-1 pr-2 font-medium">{t('sales.pick.bin')}</th>
+                  <th className="py-1 font-medium">{t('sales.print.picked')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.lines.map((line) => (
                   <tr key={line.id} className="border-b border-border/60">
                     <td className="py-1 pr-2">
                       <span className="mr-2 font-mono text-muted-foreground">
@@ -177,13 +300,10 @@ function PickList({ order }: { order: SalesOrder }) {
                       {line.productName}
                     </td>
                     <td className="py-1 pr-2 text-right font-mono">
-                      {t('sales.order.qtyIn', { qty: plainDecimal(line.qty), unit: line.unitName })}
+                      {qty(line.qty, line.unitName)}
                     </td>
                     <td className="py-1 pr-2 text-right font-mono">
-                      {t('sales.order.qtyIn', {
-                        qty: plainDecimal(line.qtyApproved),
-                        unit: line.baseUnitName,
-                      })}
+                      {qty(line.qtyApproved, line.baseUnitName)}
                     </td>
                     <td className="py-1 pr-2 font-mono">{line.pickBinCode ?? ''}</td>
                     <td className="py-1 font-mono">
@@ -191,21 +311,82 @@ function PickList({ order }: { order: SalesOrder }) {
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-      <p className="mt-6 text-xs text-muted-foreground">{t('sales.print.pickFooter')}</p>
+              </tbody>
+            </table>
+          </section>
+        ),
+      )}
+      <p className={narrow ? 'mt-3' : 'mt-6 text-xs text-muted-foreground'}>
+        {t('sales.print.pickFooter')}
+      </p>
     </>
   );
 }
 
-function DeliveryNote({ order }: { order: SalesOrder }) {
+/** The delivery note: prices by part, the totals and two signatures; on the roll a row per part. */
+function DeliveryNote({ order, narrow }: { order: SalesOrder; narrow: boolean }) {
   const { t } = useTranslation();
   const money = (value: string) => t('pricing.money', { amount: formatMnt(value) });
+  const delivered = (line: SalesOrder['lines'][number]) =>
+    line.qtyDelivered !== null && !new Decimal(line.qtyDelivered).eq(line.qtyBase)
+      ? t('sales.print.delivered', {
+          qty: plainDecimal(line.qtyDelivered),
+          unit: line.baseUnitName,
+        })
+      : null;
+  if (narrow) {
+    return (
+      <>
+        <Heading order={order} title={t('sales.printKinds.DELIVERY_NOTE')} narrow />
+        <ul className="mt-2">
+          {order.lines.map((line) => (
+            <li key={line.id} className="border-b border-dashed border-foreground py-1">
+              <p className="font-semibold">{line.productName}</p>
+              {line.parts.length > 0 ? (
+                line.parts.map((part, index) => (
+                  <p key={index} className="flex justify-between gap-2">
+                    <span>
+                      {t('sales.print.partLine', {
+                        qty: plainDecimal(part.qty),
+                        unit: part.uomName,
+                        price: formatMnt(part.unitPrice),
+                      })}
+                    </span>
+                    <span className="font-mono">{money(part.total)}</span>
+                  </p>
+                ))
+              ) : (
+                <p className="flex justify-between gap-2">
+                  <span>
+                    {t('sales.order.qtyIn', { qty: plainDecimal(line.qty), unit: line.unitName })}
+                  </span>
+                  <span className="font-mono">{line.total === null ? '' : money(line.total)}</span>
+                </p>
+              )}
+              {delivered(line) ? <p>{delivered(line)}</p> : null}
+            </li>
+          ))}
+        </ul>
+        {order.total !== null ? (
+          <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-2">
+            <dt>{t('pricing.quote.columns.subtotal')}</dt>
+            <dd className="text-right font-mono">{money(order.subtotal ?? '0')}</dd>
+            <dt>{t('pricing.quote.columns.discount')}</dt>
+            <dd className="text-right font-mono">{money(order.discountTotal ?? '0')}</dd>
+            <dt className="font-bold">{t('pricing.quote.columns.total')}</dt>
+            <dd className="text-right font-mono font-bold">{money(order.total)}</dd>
+          </dl>
+        ) : null}
+        <div className="mt-6 space-y-6">
+          <p>{t('sales.print.signedBy')}</p>
+          <p>{t('sales.print.receivedBy')}</p>
+        </div>
+      </>
+    );
+  }
   return (
     <>
-      <Heading order={order} title={t('sales.printKinds.DELIVERY_NOTE')} />
+      <Heading order={order} title={t('sales.printKinds.DELIVERY_NOTE')} narrow={false} />
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="border-b border-border">
@@ -223,13 +404,8 @@ function DeliveryNote({ order }: { order: SalesOrder }) {
               <td className="py-1 pr-2">
                 <span className="mr-2 font-mono text-muted-foreground">{line.productSku}</span>
                 {line.productName}
-                {line.qtyDelivered !== null && !new Decimal(line.qtyDelivered).eq(line.qtyBase) ? (
-                  <div className="text-xs text-muted-foreground">
-                    {t('sales.print.delivered', {
-                      qty: plainDecimal(line.qtyDelivered),
-                      unit: line.baseUnitName,
-                    })}
-                  </div>
+                {delivered(line) ? (
+                  <div className="text-xs text-muted-foreground">{delivered(line)}</div>
                 ) : null}
               </td>
               <td className="py-1 pr-2 text-right font-mono">

@@ -38,7 +38,14 @@ interface CardsJson {
   stageId: number;
   count: number;
   total: string;
-  cards: { id: number; number: string | null; status: string; customerName: string }[];
+  cards: {
+    id: number;
+    number: string | null;
+    status: string;
+    customerName: string;
+    paymentMethod: string;
+    createdByName: string | null;
+  }[];
 }
 interface PageJson {
   data: { id: number; stageName: string | null; archivedAt: string | null }[];
@@ -385,7 +392,15 @@ describe('sales boards', () => {
       count: 1,
       total: '0',
       cards: [
-        { id: draft.id, number: draft.number, status: 'DRAFT', customerName: 'Самбарын дэлгүүр' },
+        {
+          id: draft.id,
+          number: draft.number,
+          status: 'DRAFT',
+          customerName: 'Самбарын дэлгүүр',
+          // The card's label and who entered it (ADR-0058).
+          paymentMethod: 'CASH',
+          createdByName: expect.any(String),
+        },
       ],
     });
 

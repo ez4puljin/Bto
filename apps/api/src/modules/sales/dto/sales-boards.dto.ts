@@ -259,6 +259,8 @@ export class SalesOrderCardDto {
   @ApiProperty() customerCode: string;
   @ApiProperty() customerName: string;
   @ApiProperty({ enum: FULFILMENTS }) fulfilment: Fulfilment;
+  @ApiProperty({ enum: PAYMENT_METHODS, description: "The card's label (ADR-0058)" })
+  paymentMethod: PaymentMethod;
   @ApiProperty({ format: 'date' }) deliveryDate: string;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
   @ApiProperty() lineCount: number;

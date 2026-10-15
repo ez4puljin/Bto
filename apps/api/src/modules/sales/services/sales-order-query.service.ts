@@ -153,6 +153,7 @@ export interface OrderSummary {
   customerCode: string;
   customerName: string;
   fulfilment: Fulfilment;
+  paymentMethod: PaymentMethod;
   deliveryDate: string;
   total: Decimal | null;
   lineCount: number;
@@ -175,6 +176,7 @@ export interface OrderCard {
   customerCode: string;
   customerName: string;
   fulfilment: Fulfilment;
+  paymentMethod: PaymentMethod;
   deliveryDate: string;
   total: Decimal | null;
   lineCount: number;
@@ -289,6 +291,7 @@ export class SalesOrderQueryService {
       channel: OrderChannel;
       customer_id: string | number;
       fulfilment: Fulfilment;
+      payment_method: PaymentMethod;
       delivery_date: string;
       total: string | null;
       stage_id: string | number;
@@ -302,6 +305,7 @@ export class SalesOrderQueryService {
           SELECT ${salesOrders.id} AS id, ${salesOrders.number} AS number,
                  ${salesOrders.status} AS status, ${salesOrders.channel} AS channel,
                  ${salesOrders.customerId} AS customer_id, ${salesOrders.fulfilment} AS fulfilment,
+                 ${salesOrders.paymentMethod} AS payment_method,
                  ${salesOrders.deliveryDate}::text AS delivery_date, ${salesOrders.total}::text AS total,
                  ${salesOrders.stageId} AS stage_id, ${salesOrders.stageEnteredAt} AS stage_entered_at,
                  ${salesOrders.createdBy} AS created_by,
@@ -350,6 +354,7 @@ export class SalesOrderQueryService {
               customerCode: customers.get(customerId)?.code ?? '',
               customerName: customers.get(customerId)?.name ?? '',
               fulfilment: row.fulfilment,
+              paymentMethod: row.payment_method,
               deliveryDate: row.delivery_date,
               total: row.total === null ? null : new Decimal(row.total),
               lineCount: int(row.line_count),
@@ -389,6 +394,7 @@ export class SalesOrderQueryService {
         channel: salesOrders.channel,
         customerId: salesOrders.customerId,
         fulfilment: salesOrders.fulfilment,
+        paymentMethod: salesOrders.paymentMethod,
         deliveryDate: salesOrders.deliveryDate,
         total: salesOrders.total,
         pipelineId: salesOrders.pipelineId,

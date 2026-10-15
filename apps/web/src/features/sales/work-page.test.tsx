@@ -9,6 +9,7 @@ import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/tes
 
 type Schemas = components['schemas'];
 const STAMP = '2026-10-15T02:00:00.000Z';
+const PAPER_KEY = 'tugeel.printFormat.v1';
 
 const OFFICE_ME: Me = {
   ...ADMIN_ME,
@@ -89,6 +90,7 @@ const CARD: Schemas['SalesOrderCard'] = {
   customerCode: '1001',
   customerName: 'Номин дэлгүүр',
   fulfilment: 'DELIVERY',
+  paymentMethod: 'CREDIT',
   deliveryDate: '2026-10-16',
   total: null,
   lineCount: 1,
@@ -101,7 +103,16 @@ const CARDS: Schemas['SalesStageCards'][] = [
     stageId: 2,
     count: 1,
     total: '72000',
-    cards: [{ ...CARD, id: 6, number: '20261015_0006', status: 'CONFIRMED', total: '72000' }],
+    cards: [
+      {
+        ...CARD,
+        id: 6,
+        number: '20261015_0006',
+        status: 'CONFIRMED',
+        paymentMethod: 'CASH',
+        total: '72000',
+      },
+    ],
   },
   { stageId: 3, count: 0, total: '0', cards: [] },
   {
@@ -164,6 +175,7 @@ const ROW: Schemas['SalesOrderSummary'] = {
   customerCode: '1001',
   customerName: 'Номин дэлгүүр',
   fulfilment: 'DELIVERY',
+  paymentMethod: 'CREDIT',
   deliveryDate: '2026-10-16',
   total: null,
   lineCount: 1,
@@ -215,6 +227,12 @@ describe('warehouse sales page', () => {
     expect(
       within(confirmed).queryByRole('link', { name: `${mn.sales.work.addHere}: Нярав Хяналт` }),
     ).toBeNull();
+    // Every card: how it is paid and who entered it (ADR-0058).
+    expect(within(first).getByText(mn.sales.paymentMethods.CREDIT)).toBeInTheDocument();
+    expect(within(confirmed).getByText(mn.sales.paymentMethods.CASH)).toBeInTheDocument();
+    expect(
+      within(first).getByText(mn.sales.work.cardCreatedBy.replace('{{name}}', 'Оффис Сараа')),
+    ).toBeInTheDocument();
   });
 
   it('moves a card through its menu with a key and offers the stage’s documents', async () => {
@@ -245,12 +263,24 @@ describe('warehouse sales page', () => {
     expect(moved?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await bodyOf(moved)).toEqual({ stageId: 2 });
     const dialog = await screen.findByRole('dialog', { name: mn.sales.boards.printTitle });
+    const paper = within(dialog).getByRole('tablist', { name: mn.sales.print.paper });
+    expect(within(paper).getByRole('tab', { name: mn.sales.print.formats.A4 })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await user.click(within(paper).getByRole('tab', { name: mn.sales.print.formats.MM80 }));
     await user.click(within(dialog).getByRole('button', { name: mn.sales.printKinds.PICK_LIST }));
-    expect(open).toHaveBeenCalledWith('/sales/orders/5/print/PICK_LIST', '_blank', 'noopener');
+    expect(open).toHaveBeenCalledWith(
+      '/sales/orders/5/print/PICK_LIST?format=80mm',
+      '_blank',
+      'noopener',
+    );
+    expect(localStorage.getItem(PAPER_KEY)).toBe('80mm');
     open.mockRestore();
   });
 
   it('sorts a stage, prints its cards and archives the finished ones from its menu', async () => {
+    localStorage.setItem(PAPER_KEY, '80mm');
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const fetchMock = signedIn(
       OFFICE_ME,
@@ -295,7 +325,14 @@ describe('warehouse sales page', () => {
     await user.click(
       within(printing).getByRole('button', { name: mn.sales.work.print.replace('{{count}}', '1') }),
     );
-    expect(open).toHaveBeenCalledWith('/sales/print/DELIVERY_NOTE?ids=6', '_blank', 'noopener');
+    expect(
+      within(printing).getByRole('tab', { name: mn.sales.print.formats.MM80 }),
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(open).toHaveBeenCalledWith(
+      '/sales/print/DELIVERY_NOTE?ids=6&format=80mm',
+      '_blank',
+      'noopener',
+    );
     // Archive the finished cards of «Цуцалсан» after a question.
     await user.click(
       within(await stageMenu('Цуцалсан')).getByRole('menuitem', {
@@ -316,6 +353,7 @@ describe('warehouse sales page', () => {
   });
 
   it('opens an order beside the board and archives it once finished', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const fetchMock = signedIn(
       OFFICE_ME,
       routes({
@@ -328,10 +366,19 @@ describe('warehouse sales page', () => {
     await user.click(await within(cancelled).findByRole('button', { name: '20261015_0007' }));
     const sheet = await screen.findByRole('dialog', { name: '20261015_0007' });
     expect(within(sheet).getByText('Мөрөн, 3-р баг')).toBeInTheDocument();
+    // The label and the header's payment row say the same.
+    expect(within(sheet).getAllByText(mn.sales.paymentMethods.CASH)).toHaveLength(2);
+    await user.click(within(sheet).getByRole('button', { name: mn.sales.printKinds.PICK_LIST }));
+    expect(open).toHaveBeenCalledWith(
+      '/sales/orders/7/print/PICK_LIST?format=a4',
+      '_blank',
+      'noopener',
+    );
     await user.click(within(sheet).getByRole('button', { name: mn.sales.work.archive }));
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/sales-orders/7/archive')).toHaveLength(1),
     );
+    open.mockRestore();
   });
 
   it('filters the cards and shows the list view, remembered for the user', async () => {
@@ -357,6 +404,10 @@ describe('warehouse sales page', () => {
     await user.click(screen.getByRole('button', { name: mn.sales.work.display }));
     await user.click(await screen.findByRole('menuitemradio', { name: mn.sales.work.views.LIST }));
     expect(await screen.findByRole('button', { name: '20261015_0005' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: mn.sales.work.columns.payment }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: mn.sales.paymentMethods.CREDIT })).toBeInTheDocument();
     const listed = calls(fetchMock, 'GET', '/api/v1/sales-orders').at(-1);
     expect(queryOf(listed)).toMatchObject({ pipeline: '10', mine: 'true', archived: 'exclude' });
     expect(localStorage.getItem(`tugeel.salesWork.v1:${OFFICE_ME.id}`)).toContain('"view":"LIST"');
