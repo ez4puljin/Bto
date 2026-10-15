@@ -91,10 +91,11 @@ export function useCustomers(filter: CustomerFilter, options: ListReadOptions = 
   });
 }
 
-export function useCustomer(id: number) {
+export function useCustomer(id: number, options: { enabled?: boolean } = {}) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.customers, id],
+    enabled: options.enabled ?? true,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/customers/{id}', { params: { path: { id } }, signal })),
   });

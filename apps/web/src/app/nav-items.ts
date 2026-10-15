@@ -27,6 +27,7 @@ import {
   ScrollText,
   Settings,
   Shapes,
+  ShoppingCart,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -100,6 +101,17 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'partners.customers.read',
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
+    ],
+  },
+  {
+    label: 'nav.groups.sales',
+    items: [
+      {
+        to: '/sales/orders',
+        label: 'nav.salesOrders',
+        icon: ShoppingCart,
+        permission: 'sales.orders.read',
+      },
     ],
   },
   {

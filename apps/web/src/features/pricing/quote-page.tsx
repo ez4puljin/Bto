@@ -2,11 +2,10 @@ import { businessDate } from '@tugeel/shared/time';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ListCard, RowAction, RowActions } from '@/components/list';
+import { RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,13 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useProduct } from '@/features/catalog/api';
 import { ProductSearch } from '@/features/inventory/shared';
-import { formatMnt, plainDecimal } from '@/lib/money';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type PriceList, type Quote, type QuotePart, useQuote } from './api';
-import { useProgramText } from './program-text';
+import { type PriceList, type Quote, useQuote } from './api';
+import { QuoteResult, UnitSelect } from './quote-table';
 
 interface CartLine {
   key: string;
@@ -141,7 +138,9 @@ export function PriceQuotePage() {
                     </TableCell>
                     <TableCell>
                       <UnitSelect
-                        line={line}
+                        productId={line.productId}
+                        unitId={line.unitId}
+                        name={line.name}
                         onChange={(unitId) =>
                           change(
                             lines.map((row) => (row.key === line.key ? { ...row, unitId } : row)),
@@ -187,131 +186,7 @@ export function PriceQuotePage() {
         </CardContent>
       </Card>
       <ProblemAlert problem={action.problem} />
-      {result ? <QuoteResult result={result} lines={lines} /> : null}
+      {result ? <QuoteResult result={result} names={lines} /> : null}
     </div>
-  );
-}
-
-function UnitSelect(props: { line: CartLine; onChange: (unitId: number) => void }) {
-  const { t } = useTranslation();
-  const product = useProduct(props.line.productId);
-  const units = (product.data?.units ?? []).filter((unit) => unit.supersededAt === null);
-  const base = units.find((unit) => unit.isBase);
-  return (
-    <NativeSelect
-      aria-label={`${t('pricing.quote.unit')}: ${props.line.name}`}
-      className="w-44"
-      value={props.line.unitId}
-      onChange={(event) => props.onChange(Number.parseInt(event.target.value, 10))}
-    >
-      {units.length === 0 ? <option value={props.line.unitId} /> : null}
-      {units.map((unit) => (
-        <option key={unit.id} value={unit.id}>
-          {unit.isBase || !base
-            ? unit.uomName
-            : t('catalog.units.factorOf', {
-                unit: unit.uomName,
-                factor: plainDecimal(unit.factorToBase),
-                base: base.uomName,
-              })}
-        </option>
-      ))}
-    </NativeSelect>
-  );
-}
-
-function QuoteResult({ result, lines }: { result: Quote; lines: CartLine[] }) {
-  const { t } = useTranslation();
-  const text = useProgramText();
-  const money = (value: string) => t('pricing.money', { amount: formatMnt(value) });
-  const applied = (part: QuotePart) =>
-    part.applied.map((entry) => {
-      const value = text.value(entry.effect, entry.value);
-      return entry.amount === null
-        ? t('pricing.quote.applied', { name: entry.name, value })
-        : t('pricing.quote.appliedAmount', {
-            name: entry.name,
-            value,
-            amount: formatMnt(entry.amount),
-          });
-    });
-
-  return (
-    <ListCard>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('pricing.quote.columns.product')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.qty')}</TableHead>
-            <TableHead>{t('pricing.quote.columns.basis')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.listPrice')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.unitPrice')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.subtotal')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.discount')}</TableHead>
-            <TableHead className="text-right">{t('pricing.quote.columns.total')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {result.lines.flatMap((line, index) => {
-            const name = lines[index]?.name;
-            const key = lines[index]?.key ?? String(index);
-            if (!line.priced) {
-              return [
-                <TableRow key={key}>
-                  <TableCell className="align-top whitespace-normal">
-                    <div className="font-medium">{name}</div>
-                    <span className="text-xs text-destructive">{t('pricing.quote.missing')}</span>
-                  </TableCell>
-                  <TableCell className="text-right align-top font-mono">
-                    {plainDecimal(line.qty)}
-                  </TableCell>
-                  <TableCell colSpan={6} />
-                </TableRow>,
-              ];
-            }
-            return line.parts.map((part, at) => (
-              <TableRow key={`${key}:${at}`}>
-                <TableCell className="align-top whitespace-normal">
-                  {at === 0 ? <div className="font-medium">{name}</div> : null}
-                  <ul className="text-xs text-muted-foreground">
-                    {applied(part).map((entry) => (
-                      <li key={entry}>{entry}</li>
-                    ))}
-                  </ul>
-                </TableCell>
-                <TableCell className="text-right align-top font-mono">
-                  {t('pricing.quote.partQty', { qty: plainDecimal(part.qty), unit: part.uomName })}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge variant="outline">{t(`pricing.bases.${part.basis}`)}</Badge>
-                </TableCell>
-                <TableCell className="text-right align-top font-mono">
-                  {money(part.listPrice)}
-                </TableCell>
-                <TableCell className="text-right align-top font-mono">
-                  {money(part.unitPrice)}
-                </TableCell>
-                <TableCell className="text-right align-top font-mono">
-                  {money(part.subtotal)}
-                </TableCell>
-                <TableCell className="text-right align-top font-mono">
-                  {money(part.discountAmount)}
-                </TableCell>
-                <TableCell className="text-right align-top font-mono font-medium">
-                  {money(part.total)}
-                </TableCell>
-              </TableRow>
-            ));
-          })}
-        </TableBody>
-      </Table>
-      <p className="border-t border-border/80 px-4 py-3 text-right font-medium">
-        {t('pricing.quote.totals', {
-          subtotal: formatMnt(result.subtotal),
-          discount: formatMnt(result.discountTotal),
-          total: formatMnt(result.total),
-        })}
-      </p>
-    </ListCard>
   );
 }

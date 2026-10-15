@@ -35,6 +35,7 @@ import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/di
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
+import { SalesOrderNewPage, SalesOrderPage, SalesOrdersPage } from '@/features/sales/orders-pages';
 import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segments/segment-pages';
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
@@ -171,6 +172,33 @@ export const routes: RouteObject[] = [
             ),
           },
           { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
+          {
+            path: 'sales/orders',
+            element: (
+              <RequirePermission permission="sales.orders.read">
+                <SalesOrdersPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
+          {
+            path: 'sales/orders/new',
+            element: (
+              <RequirePermission permission="sales.orders.manage">
+                <SalesOrderNewPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
+          {
+            path: 'sales/orders/:id',
+            element: (
+              <RequirePermission permission="sales.orders.read">
+                <SalesOrderPage />
+              </RequirePermission>
+            ),
+            handle: { wide: true },
+          },
           { path: 'segments', element: <SegmentsPage />, handle: { wide: true } },
           {
             path: 'segments/new',
