@@ -25,6 +25,7 @@ import { BinsService } from './services/bins.service';
 import { ProductLocationsService } from './services/product-locations.service';
 import { ProductRegistrationService } from './services/product-registration.service';
 import { ReceiptsService } from './services/receipts.service';
+import { ReservationService } from './services/reservation.service';
 import { StockPostingService } from './services/stock-posting.service';
 import { StockQueryService } from './services/stock-query.service';
 import { StocktakesService } from './services/stocktakes.service';
@@ -38,6 +39,7 @@ const CORE_SERVICES = [
   BinsService,
   ProductLocationsService,
   ProductRegistrationService,
+  ReservationService,
   ReceiptsService,
   StockPostingService,
   StockQueryService,

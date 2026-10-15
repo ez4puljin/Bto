@@ -65,6 +65,12 @@ export {
   type Valuation,
 } from './services/stock-posting.service';
 export {
+  type Availability,
+  type ReservationLine,
+  ReservationService,
+  type ReservedLine,
+} from './services/reservation.service';
+export {
   type BinContent,
   type LowStockRow,
   type LowStockStatus,

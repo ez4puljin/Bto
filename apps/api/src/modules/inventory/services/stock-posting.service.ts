@@ -144,7 +144,8 @@ export interface Valuation {
 }
 
 export interface ReconciliationDiff {
-  level: 'BIN' | 'WAREHOUSE' | 'SELLABLE';
+  /** RESERVED: the cache's reserved quantity against the ACTIVE reservations (ADR-0055). */
+  level: 'BIN' | 'WAREHOUSE' | 'SELLABLE' | 'RESERVED';
   warehouseId: number;
   binId: number | null;
   productId: number;
@@ -886,9 +887,21 @@ export class StockPostingService {
           FROM wh_ledger k
           FULL JOIN warehouse_stock c ON c.warehouse_id = k.warehouse_id AND c.product_id = k.product_id
                                      AND coalesce(c.lot_id, 0) = coalesce(k.lot_id, 0)
-         WHERE coalesce(k.sellable, 0) <> coalesce(c.sellable_on_hand, 0))
+         WHERE coalesce(k.sellable, 0) <> coalesce(c.sellable_on_hand, 0)),
+      held AS (
+        SELECT warehouse_id, product_id, lot_id, sum(qty_base) AS qty
+          FROM stock_reservations WHERE status = 'ACTIVE' GROUP BY warehouse_id, product_id, lot_id),
+      reserved_diff AS (
+        SELECT 'RESERVED' AS level, coalesce(k.warehouse_id, c.warehouse_id) AS warehouse_id, NULL::bigint AS bin_id,
+               coalesce(k.product_id, c.product_id) AS product_id, coalesce(k.lot_id, c.lot_id) AS lot_id,
+               coalesce(k.qty, 0) AS ledger, coalesce(c.reserved, 0) AS cache
+          FROM held k
+          FULL JOIN warehouse_stock c ON c.warehouse_id = k.warehouse_id AND c.product_id = k.product_id
+                                     AND coalesce(c.lot_id, 0) = coalesce(k.lot_id, 0)
+         WHERE coalesce(k.qty, 0) <> coalesce(c.reserved, 0))
       SELECT level, warehouse_id::text, bin_id::text, product_id::text, lot_id::text, ledger::text, cache::text
-        FROM (SELECT * FROM bin_diff UNION ALL SELECT * FROM wh_diff UNION ALL SELECT * FROM sellable_diff) d
+        FROM (SELECT * FROM bin_diff UNION ALL SELECT * FROM wh_diff UNION ALL SELECT * FROM sellable_diff
+              UNION ALL SELECT * FROM reserved_diff) d
        ORDER BY level, warehouse_id, bin_id NULLS FIRST, product_id, lot_id NULLS FIRST`);
     return rows.map((row) => ({
       level: row.level,

@@ -451,13 +451,18 @@ export class StockQueryService {
     };
   }
 
+  /** Warehouse balances per product (warehouses holding or reserving none left out). */
+  balancesOf(productIds: readonly number[]): Promise<Map<number, WarehouseBalance[]>> {
+    return this.balances(productIds);
+  }
+
   /** Warehouse balances per product, lots summed; the value is Σ on hand × average per row. */
   private async balances(
     productIds: readonly number[],
     warehouseId?: number,
   ): Promise<Map<number, WarehouseBalance[]>> {
     if (productIds.length === 0) return new Map();
-    const filters: SQL[] = [inArray(warehouseStock.productId, [...productIds])];
+    const filters: SQL[] = [idIn(warehouseStock.productId, productIds)];
     if (warehouseId) filters.push(eq(warehouseStock.warehouseId, warehouseId));
     filters.push(sql`(${warehouseStock.onHand} <> 0 OR ${warehouseStock.reserved} <> 0)`);
     const rows = await this.db

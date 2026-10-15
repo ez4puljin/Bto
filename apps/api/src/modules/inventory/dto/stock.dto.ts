@@ -105,7 +105,8 @@ export class StockQueryDto extends PageQueryDto {
 
 @ApiSchema({ name: 'ReconciliationDiff' })
 export class ReconciliationDiffDto {
-  @ApiProperty({ enum: ['BIN', 'WAREHOUSE', 'SELLABLE'] }) level: 'BIN' | 'WAREHOUSE' | 'SELLABLE';
+  @ApiProperty({ enum: ['BIN', 'WAREHOUSE', 'SELLABLE', 'RESERVED'] })
+  level: 'BIN' | 'WAREHOUSE' | 'SELLABLE' | 'RESERVED';
   @ApiProperty() warehouseId: number;
   @ApiProperty({ type: Number, nullable: true }) binId: number | null;
   @ApiProperty() productId: number;
