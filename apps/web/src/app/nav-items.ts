@@ -3,6 +3,13 @@ import type { Permission } from '@tugeel/shared/auth';
 import {
   Activity,
   ArrowLeftRight,
+  BookOpenText,
+  CalendarClock,
+  Coins,
+  FileText,
+  Landmark,
+  ListTree,
+  WalletCards,
   BadgePercent,
   Boxes,
   Building2,
@@ -114,6 +121,43 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: SquareKanban,
         permission: 'sales.orders.read',
         also: ['/sales/orders'],
+      },
+    ],
+  },
+  {
+    label: 'nav.groups.finance',
+    items: [
+      {
+        to: '/finance/invoices',
+        label: 'nav.invoices',
+        icon: FileText,
+        permission: 'finance.read',
+      },
+      { to: '/finance/payments', label: 'nav.payments', icon: Coins, permission: 'finance.read' },
+      { to: '/finance/cash', label: 'nav.cash', icon: WalletCards, permission: 'finance.read' },
+      {
+        to: '/finance/customers',
+        label: 'nav.customerBalances',
+        icon: Landmark,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/journal',
+        label: 'nav.journal',
+        icon: BookOpenText,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/accounts',
+        label: 'nav.glAccounts',
+        icon: ListTree,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/settings',
+        label: 'nav.financeSettings',
+        icon: Settings,
+        permission: 'finance.settings.manage',
       },
     ],
   },
@@ -298,7 +342,8 @@ export type AttentionCount =
   | 'stocktakesToReview'
   | 'receiptsToCost'
   | 'lowStock'
-  | 'productsWaitingForPrices';
+  | 'productsWaitingForPrices'
+  | 'overdueReceivables';
 
 export interface AttentionTile {
   count: AttentionCount;
@@ -353,6 +398,13 @@ export const ATTENTION_TILES: readonly AttentionTile[] = [
     icon: Tag,
     permission: 'pricing.prices.manage',
     to: '/catalog/pending',
+  },
+  {
+    count: 'overdueReceivables',
+    label: 'home.attention.overdueReceivables',
+    icon: CalendarClock,
+    permission: 'finance.read',
+    to: '/finance/customers?overdue=1',
   },
   {
     count: 'lowStock',

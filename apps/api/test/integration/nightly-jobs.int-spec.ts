@@ -28,6 +28,7 @@ const NIGHTLY: readonly JobName[] = [
   'inventory.snapshotMonthly',
   'imports.housekeeping',
   'identity.housekeeping',
+  'finance.reconcile',
 ];
 
 /** `stock_snapshot_daily_p2026_10` for 2026-10-01. */
@@ -450,6 +451,12 @@ describe('nightly jobs', () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ).toEqual([
         {
+          name: 'finance.reconcile',
+          cron: '15 3 * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
+        {
           name: 'identity.housekeeping',
           cron: '30 4 * * *',
           timezone: 'Asia/Ulaanbaatar',
@@ -504,6 +511,12 @@ describe('nightly jobs', () => {
         sheetsDeleted: 0,
       });
       expect(outputs.get('identity.housekeeping')).toMatchObject({ sessions: 0, filesPurged: 0 });
+      // The receivables cache of an empty ledger: nothing to check, nothing drifted (ADR-0060 #4).
+      expect(outputs.get('finance.reconcile')).toMatchObject({
+        status: 'OK',
+        checked: 0,
+        drifted: 0,
+      });
       const { rows } = await sql.query<{ triggered_by: string; on_hand: string }>(
         `SELECT r.triggered_by, d.on_hand::text
            FROM reconciliation_runs r

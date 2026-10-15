@@ -12029,7 +12029,7 @@ export interface operations {
                 productId?: number;
                 warehouseId?: number;
                 binId?: number;
-                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST" | "SO";
+                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST" | "SO" | "CN";
                 from?: string;
                 to?: string;
             };

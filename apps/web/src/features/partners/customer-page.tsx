@@ -15,6 +15,7 @@ import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { CustomerBalanceCard } from '@/features/finance/customer-balance-card';
 import { AddressesCard } from './addresses-card';
 import { type CustomerDetail, useCustomer, usePartnersMutations } from './api';
 import { ContactsCard } from './contacts-card';
@@ -90,6 +91,7 @@ export function CustomerPage() {
         )}
       />
       <CreditCard customer={detail} canEdit={canCredit} />
+      <CustomerBalanceCard customerId={id} />
       <AddressesCard customer={detail} canManage={canManage} />
       <ContactsCard
         contacts={detail.contacts}

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { AppShell } from '@/app/app-shell';
 import { NotFoundPage } from '@/app/not-found-page';
@@ -51,6 +52,15 @@ import {
 } from '@/features/partners/supplier-pages';
 import { HomePage } from '@/features/home/home-page';
 import { AiPage } from '@/features/ai/ai-page';
+import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
+import { CashPage } from '@/features/finance/cash-page';
+import { CustomerBalancesPage } from '@/features/finance/customer-balances-page';
+import { CustomerLedgerPage } from '@/features/finance/customer-ledger-page';
+import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
+import { InvoicesPage } from '@/features/finance/invoices-page';
+import { JournalPage } from '@/features/finance/journal-page';
+import { PaymentsPage } from '@/features/finance/payments-page';
+import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AiReportsPage } from '@/features/ai/reports-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
@@ -83,6 +93,29 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorBoundary />,
   },
   {
+    // An invoice or a voucher for paper, without the shell (ADR-0060 #11).
+    path: '/finance/invoices/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <InvoicePrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/finance/payments/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <PaymentPrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: '/',
     element: (
       <RequireAuth>
@@ -96,6 +129,7 @@ export const routes: RouteObject[] = [
         errorElement: <RouteErrorBoundary />,
         children: [
           { index: true, element: <HomePage /> },
+          ...financeRoutes(),
           { path: 'system/status', element: <SystemStatusPage /> },
           { path: 'account', element: <AccountPage /> },
           { path: 'catalog/products', element: <ProductsPage />, handle: { wide: true } },
@@ -355,4 +389,29 @@ export const routes: RouteObject[] = [
 
 export function createAppRouter() {
   return createBrowserRouter(routes);
+}
+
+/** The «Санхүү» pages (ADR-0060 #11), every one behind finance.read; the settings behind their right. */
+function financeRoutes(): RouteObject[] {
+  const read = (element: ReactNode) => (
+    <RequirePermission permission="finance.read">{element}</RequirePermission>
+  );
+  return [
+    { path: 'finance/invoices', element: read(<InvoicesPage />), handle: { wide: true } },
+    { path: 'finance/payments', element: read(<PaymentsPage />), handle: { wide: true } },
+    { path: 'finance/cash', element: read(<CashPage />), handle: { wide: true } },
+    { path: 'finance/customers', element: read(<CustomerBalancesPage />), handle: { wide: true } },
+    { path: 'finance/customers/:id', element: read(<CustomerLedgerPage />) },
+    { path: 'finance/journal', element: read(<JournalPage />), handle: { wide: true } },
+    { path: 'finance/accounts', element: read(<AccountsPage />), handle: { wide: true } },
+    { path: 'finance/accounts/:id', element: read(<AccountLedgerPage />), handle: { wide: true } },
+    {
+      path: 'finance/settings',
+      element: (
+        <RequirePermission permission="finance.settings.manage">
+          <FinanceSettingsPage />
+        </RequirePermission>
+      ),
+    },
+  ];
 }

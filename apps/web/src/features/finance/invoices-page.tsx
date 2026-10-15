@@ -1,0 +1,173 @@
+import { SETTLEMENTS } from '@tugeel/shared/finance';
+import { FileText } from 'lucide-react';
+import { useDeferredValue, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
+import {
+  ChevronHead,
+  DateFilter,
+  EmptyState,
+  FilterBar,
+  FilterToggle,
+  LinkRow,
+  ListCard,
+  LoadMore,
+  SearchField,
+  SkeletonRows,
+} from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
+import { PageHeader } from '@/components/page-header';
+import { ProblemAlert } from '@/components/problem-alert';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { formatMnt } from '@/lib/money';
+import { problemFromError } from '@/lib/problem';
+import { type Settlement, useInvoices } from './api';
+import { SettlementBadge } from './badges';
+import { InvoicePanel } from './invoice-panel';
+
+const isSettlement = (value: string | null): value is Settlement =>
+  SETTLEMENTS.some((entry) => entry === value);
+
+/**
+ * Invoices (ADR-0060 #11): the sale issues them; the accountant searches by number, order or
+ * customer, filters by settlement, overdue and dates, and opens one in the panel (`?invoice=`).
+ */
+export function InvoicesPage() {
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const q = useDeferredValue(search.trim());
+  const settlementParam = params.get('settlement');
+  const settlement = isSettlement(settlementParam) ? settlementParam : undefined;
+  const status = settlementParam === 'VOID' ? ('VOID' as const) : undefined;
+  const overdue = params.get('overdue') === '1' ? true : undefined;
+  const from = params.get('from') ?? undefined;
+  const to = params.get('to') ?? undefined;
+  const openId = Number.parseInt(params.get('invoice') ?? '', 10);
+  const invoices = useInvoices({ q, settlement, status, overdue, from, to });
+  const rows = invoices.data?.pages.flatMap((page) => page.data) ?? [];
+  const total = invoices.data?.pages[0]?.total ?? null;
+
+  const setParam = (key: string, value: string | undefined) =>
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+
+  return (
+    <div>
+      <PageHeader
+        title={t('finance.invoices.title')}
+        meta={total !== null ? t('finance.invoices.count', { count: total }) : undefined}
+      />
+      <FilterBar>
+        <SearchField
+          aria-label={t('common.search')}
+          placeholder={t('finance.invoices.searchPlaceholder')}
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setParam('q', event.target.value.trim());
+          }}
+        />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('finance.fields.status')}
+          value={settlementParam ?? ''}
+          onChange={(event) => setParam('settlement', event.target.value)}
+        >
+          <option value="">{t('finance.invoices.allSettlements')}</option>
+          {SETTLEMENTS.map((value) => (
+            <option key={value} value={value}>
+              {t(`finance.settlements.${value}`)}
+            </option>
+          ))}
+          <option value="VOID">{t('finance.invoices.voidOnly')}</option>
+        </NativeSelect>
+        <FilterToggle
+          label={t('finance.invoices.overdueOnly')}
+          checked={overdue === true}
+          onCheckedChange={(checked) => setParam('overdue', checked ? '1' : undefined)}
+        />
+        <DateFilter
+          label={t('finance.fields.from')}
+          value={from}
+          onChange={(value) => setParam('from', value)}
+        />
+        <DateFilter
+          label={t('finance.fields.to')}
+          value={to}
+          onChange={(value) => setParam('to', value)}
+        />
+      </FilterBar>
+      <ProblemAlert problem={problemFromError(invoices.error)} />
+      <ListCard>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('finance.fields.number')}</TableHead>
+              <TableHead>{t('finance.fields.date')}</TableHead>
+              <TableHead>{t('finance.fields.dueDate')}</TableHead>
+              <TableHead>{t('finance.fields.customer')}</TableHead>
+              <TableHead className="text-right">{t('finance.fields.total')}</TableHead>
+              <TableHead className="text-right">{t('finance.fields.open')}</TableHead>
+              <TableHead>{t('finance.fields.status')}</TableHead>
+              <ChevronHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices.isPending ? <SkeletonRows columns={8} /> : null}
+            {rows.map((invoice) => (
+              <LinkRow key={invoice.id} to={`?${withParam(params, 'invoice', String(invoice.id))}`}>
+                <TableCell className="font-mono">{invoice.number}</TableCell>
+                <TableCell className="font-mono">{invoice.invoiceDate}</TableCell>
+                <TableCell className="font-mono">{invoice.dueDate}</TableCell>
+                <TableCell>{invoice.customerName}</TableCell>
+                <TableCell className="text-right font-mono">{formatMnt(invoice.total)}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatMnt(invoice.openAmount)}
+                </TableCell>
+                <TableCell>
+                  <span className="flex flex-wrap gap-1">
+                    <SettlementBadge
+                      settlement={invoice.settlement}
+                      status={invoice.status}
+                      overdue={invoice.overdue}
+                    />
+                  </span>
+                </TableCell>
+              </LinkRow>
+            ))}
+          </TableBody>
+        </Table>
+        {!invoices.isPending && rows.length === 0 ? (
+          <EmptyState icon={FileText} title={t('finance.invoices.empty')} />
+        ) : null}
+        <LoadMore query={invoices} />
+      </ListCard>
+      <InvoicePanel
+        invoiceId={openId > 0 ? openId : null}
+        onClose={() => setParam('invoice', undefined)}
+      />
+    </div>
+  );
+}
+
+/** The current query with one parameter changed, for a row's link. */
+function withParam(params: URLSearchParams, key: string, value: string): string {
+  const next = new URLSearchParams(params);
+  next.set(key, value);
+  return next.toString();
+}

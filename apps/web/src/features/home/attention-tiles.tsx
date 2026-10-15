@@ -2,6 +2,7 @@ import type { Permission } from '@tugeel/shared/auth';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { ATTENTION_TILES, type AttentionTile } from '@/app/nav-items';
+import { useFinanceAttention } from '@/features/finance/api';
 import { useInventoryAttention, usePricingAttention } from './api';
 
 /**
@@ -13,14 +14,17 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
   const { t } = useTranslation();
   const tiles = ATTENTION_TILES.filter((tile) => permissions.includes(tile.permission));
   const inventory = useInventoryAttention(
-    tiles.some((tile) => tile.count !== 'productsWaitingForPrices'),
+    tiles.some(
+      (tile) => tile.count !== 'productsWaitingForPrices' && tile.count !== 'overdueReceivables',
+    ),
   );
   const pricing = usePricingAttention(
     tiles.some((tile) => tile.count === 'productsWaitingForPrices'),
   );
+  const finance = useFinanceAttention(tiles.some((tile) => tile.count === 'overdueReceivables'));
 
   const shown = tiles.flatMap((tile) => {
-    const counted = countOf(tile, inventory.data, pricing.data);
+    const counted = countOf(tile, inventory.data, pricing.data, finance.data);
     return counted && counted.count > 0 ? [{ tile, ...counted }] : [];
   });
   if (shown.length === 0) return null;
@@ -63,7 +67,12 @@ function countOf(
   tile: AttentionTile,
   inventory: ReturnType<typeof useInventoryAttention>['data'],
   pricing: ReturnType<typeof usePricingAttention>['data'],
+  finance: ReturnType<typeof useFinanceAttention>['data'],
 ): { count: number; cap: number; to: string } | null {
+  if (tile.count === 'overdueReceivables') {
+    // Customers, not invoices: the list opens on them (ADR-0060 #11); no cap on the server.
+    return finance ? { count: finance.overdueCustomers, cap: 1000, to: tile.to } : null;
+  }
   if (tile.count === 'productsWaitingForPrices') {
     return pricing
       ? { count: pricing.productsWaitingForPrices, cap: pricing.cap, to: tile.to }

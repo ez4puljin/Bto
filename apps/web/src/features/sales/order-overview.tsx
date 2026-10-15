@@ -2,8 +2,11 @@ import { isEditable } from '@tugeel/shared/sales';
 import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
+import { useOrderInvoice } from '@/features/finance/api';
+import { SettlementBadge } from '@/features/finance/badges';
 import { useBranches } from '@/features/identity/api';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
@@ -41,6 +44,8 @@ export function OrderOverview({
     branchId === null
       ? null
       : (branches.data?.find((entry) => entry.id === branchId)?.name ?? null);
+  const invoiced = order.status === 'INVOICED' || order.status === 'CLOSED';
+  const invoice = useOrderInvoice(order.id, invoiced);
   const facts: { label: string; value: ReactNode }[] = [
     { label: t('sales.order.customer'), value: `${order.customerName} · ${order.customerCode}` },
     { label: t('sales.order.deliveryDate'), value: order.deliveryDate },
@@ -62,6 +67,30 @@ export function OrderOverview({
         at: formatUbDateTime(Date.parse(order.createdAt)),
       }),
     },
+    ...(invoiced
+      ? [
+          {
+            label: t('sales.order.invoice'),
+            value: invoice.data ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <Link
+                  className="font-mono text-link underline-offset-2 hover:underline"
+                  to={`/finance/invoices?invoice=${invoice.data.id}`}
+                >
+                  {invoice.data.number}
+                </Link>
+                <SettlementBadge
+                  settlement={invoice.data.settlement}
+                  status={invoice.data.status}
+                  overdue={invoice.data.overdue}
+                />
+              </span>
+            ) : (
+              t('sales.order.noInvoice')
+            ),
+          },
+        ]
+      : []),
     {
       label: t('sales.order.total'),
       value:
