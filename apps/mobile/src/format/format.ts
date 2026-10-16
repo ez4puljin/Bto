@@ -8,6 +8,17 @@ export function formatMnt(value: string): string {
   return `${sign}${grouped}${cents === '00' ? '' : `.${cents}`}`;
 }
 
+/** Up to two initials of a name for an avatar ("Туршилтын Төлөөлөгч" → "ТТ"). */
+export function initialsOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .slice(0, 2)
+    .map((word) => [...word][0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 /** A NUMERIC quantity without trailing zeros ("12.000" → "12", "2.500" → "2.5"). */
 export function formatQty(value: string): string {
   return new Decimal(value).toFixed();

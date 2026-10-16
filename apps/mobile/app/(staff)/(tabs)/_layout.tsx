@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { ClipboardList, Home, ShoppingCart, Store, User } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useNotificationSummary } from '../../../src/api/notifications';
 import { useShop } from '../../../src/state/shop';
 import { colors, fonts } from '../../../src/theme/tokens';
 
@@ -8,6 +9,7 @@ import { colors, fonts } from '../../../src/theme/tokens';
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { cart } = useShop();
+  const unread = useNotificationSummary().data?.unread ?? 0;
   return (
     <Tabs
       screenOptions={{
@@ -53,6 +55,9 @@ export default function TabsLayout() {
         options={{
           title: t('mobile.tabs.profile'),
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+          // The bell's count (ADR-0062 #3): the profile holds the notifications.
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.destructive },
         }}
       />
     </Tabs>
