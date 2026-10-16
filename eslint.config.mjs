@@ -49,7 +49,8 @@ const MODULE_DEPS = {
   pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance'],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
-  notifications: ['identity', 'partners'],
+  // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
+  notifications: ['identity', 'partners', 'catalog', 'sales'],
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
   ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai

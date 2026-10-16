@@ -46,7 +46,9 @@ import { PriceQuoteService } from '../../pricing';
 import {
   CREDIT_CHECKER,
   type CreditChecker,
+  SALE_LISTENER,
   SALE_SINK,
+  type SaleListener,
   type SaleSink,
   type SaleSnapshot,
 } from '../hooks';
@@ -133,11 +135,13 @@ const text = (value: string | null | undefined): string | null => {
  * and asks `SalesAccessService` whether the caller sees it (404 otherwise); the answer to a
  * write is not filtered. Finance joins through two hooks (ADR-0060 #1): the credit checker at the
  * submit and the sale sink at the sale; without them every order passes and a sale ends DELIVERED.
+ * A third hook tells notifications of every sale (ADR-0062 #4).
  */
 @Injectable()
 export class SalesOrdersService implements OnModuleInit {
   private creditChecker: CreditChecker | null = null;
   private saleSink: SaleSink | null = null;
+  private saleListener: SaleListener | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -164,9 +168,10 @@ export class SalesOrdersService implements OnModuleInit {
   onModuleInit(): void {
     this.creditChecker = this.hook<CreditChecker>(CREDIT_CHECKER);
     this.saleSink = this.hook<SaleSink>(SALE_SINK);
+    this.saleListener = this.hook<SaleListener>(SALE_LISTENER);
   }
 
-  /** A hook finance binds, or null when finance is not loaded (the worker, sales-only tests). */
+  /** A bound hook, or null when its module is not loaded (the worker, sales-only tests). */
   private hook<T>(token: symbol): T | null {
     try {
       return this.moduleRef.get<T>(token, { strict: false });
@@ -785,7 +790,8 @@ export class SalesOrdersService implements OnModuleInit {
   /**
    * The main sale (ADR-0056 #3): the picked quantity of every line leaves STAGING under the order's
    * document; DELIVERED. Finance's sale sink then invoices the delivered quantities (ADR-0060 #3)
-   * and the order ends INVOICED in the same transaction.
+   * and the order ends INVOICED in the same transaction; the sale listener hears of it last
+   * (ADR-0062 #4).
    */
   private async saleInTx(tx: Tx, actor: Actor, order: OrderRow): Promise<void> {
     const id = order.id;
@@ -851,6 +857,15 @@ export class SalesOrdersService implements OnModuleInit {
         .where(eq(salesOrders.id, id));
       await this.event(tx, actor, id, 'DELIVERED', 'INVOICED', invoice.number);
     }
+    await this.saleListener?.onSale(tx, {
+      orderId: id,
+      orderNumber: order.number ?? String(id),
+      channel: order.channel,
+      createdBy: order.createdBy,
+      customerId: order.customerId,
+      orderTotal: order.total?.toFixed(0) ?? null,
+      invoiceNumber: invoice?.number ?? null,
+    });
     await this.audit.record(tx, actor, {
       action: 'SALE',
       entity: 'sales_orders',

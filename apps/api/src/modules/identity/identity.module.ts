@@ -27,6 +27,7 @@ import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/log
 import { NumberingService } from './services/numbering.service';
 import { OrgService } from './services/org.service';
 import { PasswordHasher } from './services/password-hasher.service';
+import { PermissionHoldersService } from './services/permission-holders.service';
 import { RolesService } from './services/roles.service';
 import { ScopeService } from './services/scope.service';
 import { SettingsService } from './services/settings.service';
@@ -39,6 +40,7 @@ const CORE_SERVICES = [
   AuditService,
   NumberingService,
   OrgService,
+  PermissionHoldersService,
   ScopeService,
   SettingsService,
   StorageService,
