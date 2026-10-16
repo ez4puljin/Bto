@@ -56,8 +56,11 @@ function productParams(query: ShopQuery) {
   };
 }
 
-/** The shop, page by page, as the filters and the search ask; the first page holds the total. */
-export function useProducts(query: ShopQuery) {
+/**
+ * The shop, page by page, as the filters and the search ask; the first page holds the total.
+ * `enabled` waits for the stored filters, so the first page is not asked twice.
+ */
+export function useProducts(query: ShopQuery, enabled = true) {
   const { session } = useSignedIn();
   return useInfiniteQuery({
     queryKey: ['rep', 'products', productParams(query)],
@@ -76,6 +79,7 @@ export function useProducts(query: ShopQuery) {
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

@@ -55,7 +55,7 @@ export default function ShopScreen() {
   const [sheet, setSheet] = useState<'closed' | 'filters' | 'suppliers'>('closed');
   const q = useDebounced(text.trim(), 350);
   const shown = filters ?? EMPTY_FILTERS;
-  const products = useProducts({ ...shown, q });
+  const products = useProducts({ ...shown, q }, filters !== null);
   const suppliers = useSuppliers(shown.supplierIds.length > 0);
   const rows = useMemo(
     () => products.data?.pages.flatMap((page) => page.data) ?? [],
