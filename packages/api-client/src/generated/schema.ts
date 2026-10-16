@@ -3511,6 +3511,422 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosSettings_get"];
+        put: operations["PosSettings_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/edge-nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosEdgeNodes_list"];
+        put?: never;
+        post: operations["PosEdgeNodes_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/edge-nodes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosEdgeNodes_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/edge-nodes/{id}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosEdgeNodes_issueToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/tills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosTills_list"];
+        put?: never;
+        post: operations["PosTills_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/tills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosTills_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/tills/{id}/pairing-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosTills_pairingCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/cashiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosCashiers_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/cashiers/{userId}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosCashiers_setPin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/cashiers/{userId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PosCashiers_setStatus"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/cashiers/{userId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosCashiers_unlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosShifts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/shifts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosShifts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/shifts/{id}/handover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosShifts_handOver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosSales_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sales/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosSales_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/shortfalls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosShortfalls_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/shortfalls/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosShortfalls_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync-rejections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosRejections_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync-rejections/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosRejections_replayOne"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosAttention_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosSync_events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosSync_heartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/dev/shifts/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosDev_openShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/dev/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosDev_sell"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/dev/shifts/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PosDev_closeShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3535,7 +3951,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -5035,7 +5451,7 @@ export interface components {
             number: string | null;
             warehouseId: number;
             /** @enum {string} */
-            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "OPENING_REVERSAL";
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "OPENING_REVERSAL" | "POS_SHORTFALL";
             /** @enum {string} */
             status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
             lineCount: number;
@@ -5079,7 +5495,7 @@ export interface components {
             number: string | null;
             warehouseId: number;
             /** @enum {string} */
-            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "OPENING_REVERSAL";
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "OPENING_REVERSAL" | "POS_SHORTFALL";
             /** @enum {string} */
             status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED";
             note: string | null;
@@ -5116,13 +5532,13 @@ export interface components {
              * @description OPENING: approvers only
              * @enum {string}
              */
-            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            reason: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "POS_SHORTFALL";
             note?: string | null;
             lines?: components["schemas"]["AdjustmentLineRequest"][];
         };
         AdjustmentUpdateRequest: {
             /** @enum {string} */
-            reason?: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING";
+            reason?: "DAMAGED" | "EXPIRED" | "SHORTAGE" | "SURPLUS" | "OPENING" | "POS_SHORTFALL";
             note?: string | null;
         };
         AdjustmentCostRequest: {
@@ -7239,7 +7655,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -7279,7 +7695,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -7290,7 +7706,7 @@ export interface components {
             entryDate: string;
             entryDescription: string;
             /** @enum {string} */
-            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
             lineNo: number;
             /** @example 150000.00 */
             debit: string;
@@ -7423,9 +7839,9 @@ export interface components {
             entryDate: string;
             description: string;
             /** @enum {string} */
-            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
             /** @enum {string|null} */
-            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | null;
+            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | "POS_SHIFT" | null;
             sourceId: number | null;
             /** @description The document behind it */
             sourceNumber: string | null;
@@ -7472,9 +7888,9 @@ export interface components {
             entryDate: string;
             description: string;
             /** @enum {string} */
-            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+            source: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
             /** @enum {string|null} */
-            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | null;
+            sourceType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL" | "POS_SHIFT" | null;
             sourceId: number | null;
             /** @description The document behind it */
             sourceNumber: string | null;
@@ -7624,8 +8040,665 @@ export interface components {
             CREDIT_NOTE: components["schemas"]["FinanceNumberFormatRequest"];
             JOURNAL: components["schemas"]["FinanceNumberFormatRequest"];
         };
+        PosSettings: {
+            storeWarehouseId: number | null;
+            storeWarehouseName: string | null;
+            handoverMoneyAccountId: number | null;
+            handoverMoneyAccountName: string | null;
+            /** @example 14 */
+            returnWindowDays: number;
+            /** @example 60 */
+            snapshotIntervalSec: number;
+            supervisorRequired: boolean;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        PosSettingsPatch: {
+            storeWarehouseId?: number | null;
+            handoverMoneyAccountId?: number | null;
+            returnWindowDays?: number;
+            snapshotIntervalSec?: number;
+            supervisorRequired?: boolean;
+        };
+        PosEdgeNode: {
+            id: number;
+            /** @example SM1 */
+            code: string;
+            name: string;
+            warehouseId: number;
+            warehouseName: string | null;
+            /** @description First 8 hex of the token hash */
+            tokenPrefix: string | null;
+            /** Format: date-time */
+            tokenIssuedAt: string | null;
+            appVersion: string | null;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+            /** Format: date-time */
+            lastPullAt: string | null;
+            /** Format: date-time */
+            lastPushAt: string | null;
+            /** @description Documents the edge still has to replay */
+            backlog: number;
+            clockSkewMs: number | null;
+            snapshotVersion: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PosEdgeNodeRequest: {
+            /**
+             * @description A-Z, 0-9, _ and -, 1–16
+             * @example SM1
+             */
+            code: string;
+            name: string;
+            /** @description The STORE warehouse the tills sell from */
+            warehouseId: number;
+        };
+        PosEdgeNodePatch: {
+            name?: string;
+            warehouseId?: number;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        PosEdgeToken: {
+            /** @description Shown once; the edge keeps it in its environment */
+            token: string;
+            prefix: string;
+        };
+        PosTill: {
+            id: number;
+            edgeNodeId: number;
+            /** @example К3 */
+            code: string;
+            name: string;
+            printerHost: string | null;
+            /** @example 9100 */
+            printerPort: number;
+            drawerKick: boolean;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            lastSaleAt: string | null;
+            /** Format: date-time */
+            pairingExpiresAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PosTillRequest: {
+            edgeNodeId: number;
+            /**
+             * @description Capitals, digits and dashes, 1–8
+             * @example К3
+             */
+            code: string;
+            name: string;
+            /** @example 192.168.1.31 */
+            printerHost?: string | null;
+            /** @example 9100 */
+            printerPort?: number;
+            drawerKick?: boolean;
+        };
+        PosTillPatch: {
+            name?: string;
+            printerHost?: string | null;
+            printerPort?: number;
+            drawerKick?: boolean;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+        };
+        PosPairingCode: {
+            /**
+             * @description Shown once
+             * @example 482913
+             */
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        PosCashier: {
+            userId: number;
+            username: string;
+            fullName: string;
+            /** @enum {string} */
+            userStatus: "ACTIVE" | "DISABLED";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            pinSetAt: string;
+            pinSetByName: string | null;
+            failedCount: number;
+            /** Format: date-time */
+            lockedUntil: string | null;
+        };
+        PosPinRequest: {
+            /**
+             * @description Six digits
+             * @example 123456
+             */
+            pin: string;
+        };
+        PosCashierStatusRequest: {
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+        };
+        PosShift: {
+            id: number;
+            /** @example К3-261016-Э1 */
+            number: string;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED" | "HANDED_OVER";
+            edgeNodeId: number;
+            edgeNodeCode: string;
+            tillId: number;
+            tillCode: string;
+            tillName: string;
+            cashierUserId: number;
+            cashierName: string | null;
+            /** Format: date-time */
+            openedAt: string;
+            /** @example 50000.00 */
+            openingFloat: string;
+            /** Format: date-time */
+            closedAt: string | null;
+            countedCash: string | null;
+            floatKept: string | null;
+            expectedCash: string | null;
+            /** @description counted − expected */
+            variance: string | null;
+            note: string | null;
+            salesCount: number;
+            returnsCount: number;
+            /** @example 320000.00 */
+            cashSales: string;
+            /** @example 0.00 */
+            cashRefunds: string;
+            /** @example 120000.00 */
+            cardSales: string;
+            /** @example 0.00 */
+            cardRefunds: string;
+            /** @example 440000.00 */
+            salesTotal: string;
+            /** @example 0.00 */
+            returnsTotal: string;
+            /** @example 40000.00 */
+            salesVat: string;
+            /** @example 0.00 */
+            returnsVat: string;
+            journalEntryId: number | null;
+            journalNumber: string | null;
+            handoverPaymentId: number | null;
+            handoverNumber: string | null;
+            /** Format: date-time */
+            handedOverAt: string | null;
+            handedOverByName: string | null;
+        };
+        PosShiftPage: {
+            data: components["schemas"]["PosShift"][];
+            nextCursor: string | null;
+        };
+        PosHandoverRequest: {
+            /** @description Default: the settings’ box */
+            moneyAccountId?: number | null;
+            /**
+             * @description Default: counted − float kept
+             * @example 314000
+             */
+            amount?: string | null;
+            /**
+             * @description Default: today
+             * @example 2026-10-16
+             */
+            paidOn?: string | null;
+        };
+        PosSale: {
+            id: number;
+            /** @example К3-261016-0045 */
+            number: string;
+            /** @enum {string} */
+            kind: "SALE" | "RETURN";
+            edgeNodeId: number;
+            tillId: number;
+            tillCode: string;
+            shiftId: number;
+            shiftNumber: string;
+            cashierUserId: number;
+            cashierName: string | null;
+            approvedByName: string | null;
+            /** Format: date-time */
+            soldAt: string;
+            /** @example 2026-10-16 */
+            soldDay: string;
+            /** @example 12000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 12000.00 */
+            total: string;
+            /** @example 1090.91 */
+            vatTotal: string;
+            /** @example 12000.00 */
+            cashAmount: string;
+            /** @example 0.00 */
+            cardAmount: string;
+            /** @enum {string} */
+            receiptType: "B2C" | "B2B";
+            customerTin: string | null;
+            customerName: string | null;
+            /** @enum {string} */
+            ebarimtStatus: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+            ddtd: string | null;
+            refundsSaleId: number | null;
+            refundsSaleNumber: string | null;
+            lineCount: number;
+            shortfallCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PosSalePage: {
+            data: components["schemas"]["PosSale"][];
+            nextCursor: string | null;
+            /** @description On the first page only */
+            total: number | null;
+        };
+        PosSaleLine: {
+            id: number;
+            lineNo: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            uomName: string;
+            /** @example 2 */
+            qty: string;
+            /** @example 1 */
+            factorSnapshot: string;
+            /** @example 2 */
+            qtyBase: string;
+            /** @enum {string} */
+            basis: "WAREHOUSE" | "LOOSE" | "RETAIL" | "RETAIL_BULK";
+            /** @example 6000.00 */
+            listPrice: string;
+            /** @example 6000.00 */
+            unitPrice: string;
+            /** @example 0.00 */
+            discountAmount: string;
+            /** @example 12000.00 */
+            subtotal: string;
+            /** @example 12000.00 */
+            total: string;
+            /** @enum {string} */
+            vatType: "VAT_ABLE" | "VAT_FREE" | "VAT_ZERO" | "NO_VAT";
+            /** @example 10.00 */
+            vatRatePct: string;
+            /** @example 1090.91 */
+            vatAmount: string;
+            refundsLineId: number | null;
+            damaged: boolean;
+            /** @example 0 */
+            returnedBase: string;
+        };
+        PosTender: {
+            id: number;
+            tenderNo: number;
+            /** @enum {string} */
+            kind: "CASH" | "CARD";
+            /** @example 12000.00 */
+            amount: string;
+            /** @example 20000.00 */
+            tendered: string | null;
+            terminalId: string | null;
+            rrn: string | null;
+            maskedPan: string | null;
+        };
+        PosShortfall: {
+            id: number;
+            saleId: number;
+            saleNumber: string;
+            saleLineId: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            warehouseId: number;
+            /** @example 3 */
+            qtyBase: string;
+            adjustmentId: number;
+            /** @example ADJ-2026-000012 */
+            adjustmentNumber: string;
+            /** Format: date-time */
+            resolvedAt: string | null;
+            resolvedByName: string | null;
+            note: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PosSaleReturn: {
+            id: number;
+            number: string;
+            /** Format: date-time */
+            soldAt: string;
+            /** @example 6000.00 */
+            total: string;
+        };
+        PosSaleDetail: {
+            id: number;
+            /** @example К3-261016-0045 */
+            number: string;
+            /** @enum {string} */
+            kind: "SALE" | "RETURN";
+            edgeNodeId: number;
+            tillId: number;
+            tillCode: string;
+            shiftId: number;
+            shiftNumber: string;
+            cashierUserId: number;
+            cashierName: string | null;
+            approvedByName: string | null;
+            /** Format: date-time */
+            soldAt: string;
+            /** @example 2026-10-16 */
+            soldDay: string;
+            /** @example 12000.00 */
+            subtotal: string;
+            /** @example 0.00 */
+            discountTotal: string;
+            /** @example 12000.00 */
+            total: string;
+            /** @example 1090.91 */
+            vatTotal: string;
+            /** @example 12000.00 */
+            cashAmount: string;
+            /** @example 0.00 */
+            cardAmount: string;
+            /** @enum {string} */
+            receiptType: "B2C" | "B2B";
+            customerTin: string | null;
+            customerName: string | null;
+            /** @enum {string} */
+            ebarimtStatus: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+            ddtd: string | null;
+            refundsSaleId: number | null;
+            refundsSaleNumber: string | null;
+            lineCount: number;
+            shortfallCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            consumerNo: string | null;
+            posapiDate: string | null;
+            billIdSuffix: string | null;
+            inactiveId: string | null;
+            snapshotVersion: string | null;
+            note: string | null;
+            lines: components["schemas"]["PosSaleLine"][];
+            tenders: components["schemas"]["PosTender"][];
+            shortfalls: components["schemas"]["PosShortfall"][];
+            returns: components["schemas"]["PosSaleReturn"][];
+        };
+        PosShortfallPage: {
+            data: components["schemas"]["PosShortfall"][];
+            nextCursor: string | null;
+        };
+        PosResolveShortfallRequest: {
+            note?: string | null;
+        };
+        PosSyncRejection: {
+            id: number;
+            edgeNodeId: number;
+            edgeNodeCode: string;
+            clientId: string;
+            /** @enum {string} */
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            /** @example POS_TOTALS_MISMATCH */
+            code: string;
+            params: {
+                [key: string]: unknown;
+            } | null;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            replayedAt: string | null;
+            replayedByName: string | null;
+        };
+        PosRejectionPage: {
+            data: components["schemas"]["PosSyncRejection"][];
+            nextCursor: string | null;
+        };
+        PosSyncOutcome: {
+            /** Format: uuid */
+            clientId: string;
+            /** @enum {string} */
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            /** @enum {string} */
+            status: "APPLIED" | "DUPLICATE" | "REJECTED";
+            id: number | null;
+            number: string | null;
+            code: string | null;
+            params: {
+                [key: string]: unknown;
+            } | null;
+        };
+        PosAttention: {
+            openShifts: number;
+            shiftsToHandOver: number;
+            openShortfalls: number;
+            rejections: number;
+        };
+        PosSaleDocLine: {
+            lineNo: number;
+            productId: number;
+            productUnitId: number;
+            /** @example 2 */
+            qty: string;
+            /** @example 1 */
+            factorSnapshot: string;
+            /** @enum {string} */
+            basis: "WAREHOUSE" | "LOOSE" | "RETAIL" | "RETAIL_BULK";
+            /** @example 6000 */
+            listPrice: string;
+            /** @example 6000 */
+            unitPrice: string;
+            /** @example 0 */
+            discountAmount: string;
+            /** @example 12000 */
+            subtotal: string;
+            /** @example 12000 */
+            total: string;
+            /** @example 10 */
+            vatRatePct: string;
+            /** @example 1090.91 */
+            vatAmount: string;
+            applied?: Record<string, never>[];
+            refundsLineNo?: number | null;
+            damaged?: boolean;
+        };
+        PosSaleDocTender: {
+            /** @enum {string} */
+            kind: "CASH" | "CARD";
+            /** @example 12000 */
+            amount: string;
+            /** @example 20000 */
+            tendered?: string | null;
+            terminalId?: string | null;
+            rrn?: string | null;
+            maskedPan?: string | null;
+        };
+        PosEbarimtFacts: {
+            /** @enum {string} */
+            status: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+            ddtd?: string | null;
+            posapiDate?: string | null;
+            billIdSuffix?: string | null;
+            inactiveId?: string | null;
+        };
+        PosSaleDoc: {
+            /** Format: uuid */
+            clientId: string;
+            /** @enum {string} */
+            kind: "SALE" | "RETURN";
+            /** @example К3 */
+            tillCode: string;
+            /** Format: uuid */
+            shiftClientId: string;
+            cashierUserId: number;
+            approvedByUserId?: number | null;
+            /** @example К3-261016-0045 */
+            number: string;
+            /** Format: date-time */
+            soldAt: string;
+            /**
+             * @default B2C
+             * @enum {string}
+             */
+            receiptType: "B2C" | "B2B";
+            customerTin?: string | null;
+            customerName?: string | null;
+            consumerNo?: string | null;
+            /** Format: uuid */
+            refundsSaleClientId?: string | null;
+            lines: components["schemas"]["PosSaleDocLine"][];
+            tenders: components["schemas"]["PosSaleDocTender"][];
+            /** @example 12000 */
+            subtotal: string;
+            /** @example 0 */
+            discountTotal: string;
+            /** @example 12000 */
+            total: string;
+            /** @example 1090.91 */
+            vatTotal: string;
+            note?: string | null;
+            snapshotVersion?: string | null;
+            ebarimt?: components["schemas"]["PosEbarimtFacts"] | null;
+        };
+        PosShiftOpenDoc: {
+            /** Format: uuid */
+            clientId: string;
+            /** @example К3 */
+            tillCode: string;
+            cashierUserId: number;
+            /** @example К3-261016-Э1 */
+            number: string;
+            /** Format: date-time */
+            openedAt: string;
+            /** @example 50000 */
+            openingFloat: string;
+        };
+        PosShiftCloseDoc: {
+            /**
+             * Format: uuid
+             * @description The shift’s clientId
+             */
+            clientId: string;
+            /** Format: date-time */
+            closedAt: string;
+            /** @example 364000 */
+            countedCash: string;
+            /** @example 50000 */
+            floatKept: string;
+            note?: string | null;
+        };
+        PosReceiptStatusDoc: {
+            /** Format: uuid */
+            saleClientId: string;
+            ebarimt: components["schemas"]["PosEbarimtFacts"];
+        };
+        PosTillBoundDoc: {
+            /** @example К3 */
+            tillCode: string;
+            /** @description sha-256 hex of the device token */
+            deviceTokenHash: string;
+            userAgent?: string | null;
+            boundByUserId?: number | null;
+            /** Format: date-time */
+            boundAt: string;
+        };
+        PosSyncEvent: {
+            /** @enum {string} */
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            /**
+             * Format: uuid
+             * @description The document’s id; a batch never repeats one
+             */
+            clientId: string;
+            sale?: components["schemas"]["PosSaleDoc"];
+            shiftOpened?: components["schemas"]["PosShiftOpenDoc"];
+            shiftClosed?: components["schemas"]["PosShiftCloseDoc"];
+            receiptStatus?: components["schemas"]["PosReceiptStatusDoc"];
+            tillBound?: components["schemas"]["PosTillBoundDoc"];
+        };
+        PosSyncBatch: {
+            /** @description In the order they happened */
+            events: components["schemas"]["PosSyncEvent"][];
+        };
+        PosSyncResponse: {
+            results: components["schemas"]["PosSyncOutcome"][];
+            /** Format: date-time */
+            serverTime: string;
+        };
+        PosHeartbeat: {
+            appVersion?: string | null;
+            backlog: number;
+            clockSkewMs?: number | null;
+            snapshotVersion?: string | null;
+        };
+        PosHeartbeatResponse: {
+            edgeNodeId: number;
+            code: string;
+            /** Format: date-time */
+            serverTime: string;
+            settings: components["schemas"]["PosSettings"];
+        };
+        PosDevOpenShiftRequest: {
+            tillId: number;
+            cashierUserId: number;
+            /** @example 50000 */
+            openingFloat: string;
+        };
+        PosDevSaleLine: {
+            productUnitId: number;
+            /** @example 2 */
+            qty: string;
+        };
+        PosDevTender: {
+            /** @enum {string} */
+            kind: "CASH" | "CARD";
+            /** @example 12000 */
+            amount: string;
+            /** @example 20000 */
+            tendered?: string | null;
+        };
+        PosDevSaleRequest: {
+            shiftId: number;
+            cashierUserId: number;
+            approvedByUserId?: number | null;
+            lines: components["schemas"]["PosDevSaleLine"][];
+            tenders: components["schemas"]["PosDevTender"][];
+            /**
+             * @default B2C
+             * @enum {string}
+             */
+            receiptType: "B2C" | "B2B";
+            customerTin?: string | null;
+            customerName?: string | null;
+            note?: string | null;
+        };
+        PosDevCloseShiftRequest: {
+            /** @example 364000 */
+            countedCash: string;
+            /** @example 50000 */
+            floatKept: string;
+            note?: string | null;
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -12029,7 +13102,7 @@ export interface operations {
                 productId?: number;
                 warehouseId?: number;
                 binId?: number;
-                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST" | "SO" | "CN";
+                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST" | "SO" | "CN" | "POS";
                 from?: string;
                 to?: string;
             };
@@ -16319,7 +17392,7 @@ export interface operations {
                 limit?: number;
                 from?: string;
                 to?: string;
-                source?: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING";
+                source?: "AUTO_INVOICE" | "AUTO_PAYMENT" | "AUTO_CREDIT_NOTE" | "AUTO_VOID" | "MANUAL" | "OPENING" | "AUTO_POS_SHIFT";
                 accountId?: number;
                 customerId?: number;
             };
@@ -16627,6 +17700,953 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinanceNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSettings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSettings_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosSettingsPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosEdgeNodes_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEdgeNode"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosEdgeNodes_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosEdgeNodeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEdgeNode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosEdgeNodes_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosEdgeNodePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEdgeNode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosEdgeNodes_issueToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosEdgeToken"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosTills_list: {
+        parameters: {
+            query?: {
+                edgeNodeId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosTill"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosTills_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosTillRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosTill"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosTills_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosTillPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosTill"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosTills_pairingCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosPairingCode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosCashiers_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCashier"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosCashiers_setPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosPinRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCashier"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosCashiers_setStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosCashierStatusRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCashier"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosCashiers_unlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCashier"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShifts_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                edgeNodeId?: number;
+                tillId?: number;
+                cashierUserId?: number;
+                status?: "OPEN" | "CLOSED" | "HANDED_OVER";
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShiftPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShifts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShifts_handOver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosHandoverRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSales_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Part of the number, ДДТД, TIN or buyer name */
+                q?: string;
+                edgeNodeId?: number;
+                tillId?: number;
+                shiftId?: number;
+                cashierUserId?: number;
+                kind?: "SALE" | "RETURN";
+                ebarimtStatus?: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSalePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSales_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSaleDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShortfalls_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                productId?: number;
+                resolved?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShortfallPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosShortfalls_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosResolveShortfallRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShortfall"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosRejections_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                edgeNodeId?: number;
+                replayed?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosRejectionPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosRejections_replayOne: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSyncOutcome"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosAttention_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSync_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosSyncBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSyncResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSync_heartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosHeartbeat"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosHeartbeatResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosDev_openShift: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDevOpenShiftRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosDev_sell: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDevSaleRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSaleDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosDev_closeShift: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosDevCloseShiftRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosShift"];
                 };
             };
             /** @description RFC 9457 problem details */

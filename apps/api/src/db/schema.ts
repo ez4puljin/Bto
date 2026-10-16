@@ -97,3 +97,16 @@ export {
   moneyAccounts,
   payments,
 } from '../modules/finance/schema';
+export {
+  posCashiers,
+  posEdgeNodes,
+  posSaleLines,
+  posSales,
+  posSettings,
+  posShifts,
+  posShortfalls,
+  posSyncRejections,
+  posTenders,
+  posTillDevices,
+  posTills,
+} from '../modules/pos/schema';

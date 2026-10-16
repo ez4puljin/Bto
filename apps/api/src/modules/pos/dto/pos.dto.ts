@@ -1,0 +1,947 @@
+import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import {
+  EBARIMT_STATUSES,
+  type EbarimtStatus,
+  POS_EVENT_KINDS,
+  POS_LIMITS,
+  POS_STATUSES,
+  type PosEventKind,
+  type PosStatus,
+  RECEIPT_TYPES,
+  type ReceiptType,
+  SALE_KINDS,
+  type SaleKind,
+  SHIFT_STATUSES,
+  type ShiftStatus,
+  SYNC_RESULTS,
+  type SyncResult,
+  TENDER_KINDS,
+  type TenderKind,
+} from '@tugeel/shared/pos';
+import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { PageQueryDto } from '../../../common/pagination/page';
+import { VAT_TYPES, type VatType } from '../../catalog';
+
+const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
+const QTY = /^\d{1,11}(\.\d{1,3})?$/;
+const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
+const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIN = /^[0-9]{11,14}$/;
+const CONSUMER = /^([0-9]{8}|11\*{6})$/;
+const HASH = /^[0-9a-f]{64}$/;
+
+const trimmed = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
+/** "true"/"false" query strings as booleans (other values fail @IsBoolean). */
+const queryBoolean = ({ value }: { value: unknown }) => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
+
+// ---------------------------------------------------------------- settings
+
+@ApiSchema({ name: 'PosSettings' })
+export class PosSettingsDto {
+  @ApiProperty({ type: Number, nullable: true }) storeWarehouseId: number | null;
+  @ApiProperty({ type: String, nullable: true }) storeWarehouseName: string | null;
+  @ApiProperty({ type: Number, nullable: true }) handoverMoneyAccountId: number | null;
+  @ApiProperty({ type: String, nullable: true }) handoverMoneyAccountName: string | null;
+  @ApiProperty({ example: 14 }) returnWindowDays: number;
+  @ApiProperty({ example: 60 }) snapshotIntervalSec: number;
+  @ApiProperty() supervisorRequired: boolean;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
+}
+
+@ApiSchema({ name: 'PosSettingsPatch' })
+export class PosSettingsPatchDto {
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  storeWarehouseId?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  handoverMoneyAccountId?: number | null;
+  @ApiPropertyOptional({ minimum: 0, maximum: POS_LIMITS.maxReturnWindowDays })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(POS_LIMITS.maxReturnWindowDays)
+  returnWindowDays?: number;
+  @ApiPropertyOptional({
+    minimum: POS_LIMITS.minSnapshotIntervalSec,
+    maximum: POS_LIMITS.maxSnapshotIntervalSec,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(POS_LIMITS.minSnapshotIntervalSec)
+  @Max(POS_LIMITS.maxSnapshotIntervalSec)
+  snapshotIntervalSec?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() supervisorRequired?: boolean;
+}
+
+// ---------------------------------------------------------------- edge nodes
+
+@ApiSchema({ name: 'PosEdgeNode' })
+export class EdgeNodeDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'SM1' }) code: string;
+  @ApiProperty() name: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'First 8 hex of the token hash' })
+  tokenPrefix: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) tokenIssuedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) appVersion: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastSeenAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastPullAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastPushAt: string | null;
+  @ApiProperty({ description: 'Documents the edge still has to replay' }) backlog: number;
+  @ApiProperty({ type: Number, nullable: true }) clockSkewMs: number | null;
+  @ApiProperty({ type: String, nullable: true }) snapshotVersion: string | null;
+  @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
+}
+
+@ApiSchema({ name: 'PosEdgeNodeRequest' })
+export class EdgeNodeRequestDto {
+  @ApiProperty({ example: 'SM1', description: 'A-Z, 0-9, _ and -, 1–16' })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxCode)
+  code: string;
+  @ApiProperty({ maxLength: POS_LIMITS.maxName })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  name: string;
+  @ApiProperty({ description: 'The STORE warehouse the tills sell from' })
+  @IsInt()
+  @Min(1)
+  warehouseId: number;
+}
+
+@ApiSchema({ name: 'PosEdgeNodePatch' })
+export class EdgeNodePatchDto {
+  @ApiPropertyOptional({ maxLength: POS_LIMITS.maxName })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) warehouseId?: number;
+  @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
+}
+
+@ApiSchema({ name: 'PosEdgeToken' })
+export class EdgeTokenDto {
+  @ApiProperty({ description: 'Shown once; the edge keeps it in its environment' }) token: string;
+  @ApiProperty() prefix: string;
+}
+
+// ---------------------------------------------------------------- tills
+
+@ApiSchema({ name: 'PosTill' })
+export class TillDto {
+  @ApiProperty() id: number;
+  @ApiProperty() edgeNodeId: number;
+  @ApiProperty({ example: 'К3' }) code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) printerHost: string | null;
+  @ApiProperty({ example: 9100 }) printerPort: number;
+  @ApiProperty() drawerKick: boolean;
+  @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastSaleAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  pairingExpiresAt: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
+}
+
+@ApiSchema({ name: 'PosTillRequest' })
+export class TillRequestDto {
+  @ApiProperty() @IsInt() @Min(1) edgeNodeId: number;
+  @ApiProperty({ example: 'К3', description: 'Capitals, digits and dashes, 1–8' })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxTillCode)
+  code: string;
+  @ApiProperty({ maxLength: POS_LIMITS.maxName })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  name: string;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '192.168.1.31' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(253)
+  printerHost?: string | null;
+  @ApiPropertyOptional({ example: 9100 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65_535)
+  printerPort?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() drawerKick?: boolean;
+}
+
+@ApiSchema({ name: 'PosTillPatch' })
+export class TillPatchDto {
+  @ApiPropertyOptional({ maxLength: POS_LIMITS.maxName })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  name?: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(253)
+  printerHost?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(65_535) printerPort?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() drawerKick?: boolean;
+  @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
+}
+
+@ApiSchema({ name: 'PosTillsQuery' })
+export class TillsQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) edgeNodeId?: number;
+}
+
+@ApiSchema({ name: 'PosPairingCode' })
+export class PairingCodeDto {
+  @ApiProperty({ example: '482913', description: 'Shown once' }) code: string;
+  @ApiProperty({ type: String, format: 'date-time' }) expiresAt: string;
+}
+
+// ---------------------------------------------------------------- cashiers
+
+@ApiSchema({ name: 'PosCashier' })
+export class CashierDto {
+  @ApiProperty() userId: number;
+  @ApiProperty() username: string;
+  @ApiProperty() fullName: string;
+  @ApiProperty({ enum: ['ACTIVE', 'DISABLED'] }) userStatus: 'ACTIVE' | 'DISABLED';
+  @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
+  @ApiProperty({ type: String, format: 'date-time' }) pinSetAt: string;
+  @ApiProperty({ type: String, nullable: true }) pinSetByName: string | null;
+  @ApiProperty() failedCount: number;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lockedUntil: string | null;
+}
+
+@ApiSchema({ name: 'PosPinRequest' })
+export class PinRequestDto {
+  @ApiProperty({ example: '123456', description: 'Six digits' })
+  @IsString()
+  @Matches(/^[0-9]{6}$/)
+  pin: string;
+}
+
+@ApiSchema({ name: 'PosCashierStatusRequest' })
+export class CashierStatusDto {
+  @ApiProperty({ enum: POS_STATUSES }) @IsIn(POS_STATUSES) status: PosStatus;
+}
+
+// ---------------------------------------------------------------- shifts
+
+@ApiSchema({ name: 'PosShift' })
+export class ShiftDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'К3-261016-Э1' }) number: string;
+  @ApiProperty({ enum: SHIFT_STATUSES }) status: ShiftStatus;
+  @ApiProperty() edgeNodeId: number;
+  @ApiProperty() edgeNodeCode: string;
+  @ApiProperty() tillId: number;
+  @ApiProperty() tillCode: string;
+  @ApiProperty() tillName: string;
+  @ApiProperty() cashierUserId: number;
+  @ApiProperty({ type: String, nullable: true }) cashierName: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) openedAt: string;
+  @ApiProperty({ example: '50000.00' }) openingFloat: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) closedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) countedCash: string | null;
+  @ApiProperty({ type: String, nullable: true }) floatKept: string | null;
+  @ApiProperty({ type: String, nullable: true }) expectedCash: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'counted − expected' })
+  variance: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty() salesCount: number;
+  @ApiProperty() returnsCount: number;
+  @ApiProperty({ example: '320000.00' }) cashSales: string;
+  @ApiProperty({ example: '0.00' }) cashRefunds: string;
+  @ApiProperty({ example: '120000.00' }) cardSales: string;
+  @ApiProperty({ example: '0.00' }) cardRefunds: string;
+  @ApiProperty({ example: '440000.00' }) salesTotal: string;
+  @ApiProperty({ example: '0.00' }) returnsTotal: string;
+  @ApiProperty({ example: '40000.00' }) salesVat: string;
+  @ApiProperty({ example: '0.00' }) returnsVat: string;
+  @ApiProperty({ type: Number, nullable: true }) journalEntryId: number | null;
+  @ApiProperty({ type: String, nullable: true }) journalNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true }) handoverPaymentId: number | null;
+  @ApiProperty({ type: String, nullable: true }) handoverNumber: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) handedOverAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) handedOverByName: string | null;
+}
+
+@ApiSchema({ name: 'PosShiftListQuery' })
+export class ShiftListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) edgeNodeId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) cashierUserId?: number;
+  @ApiPropertyOptional({ enum: SHIFT_STATUSES })
+  @IsOptional()
+  @IsIn(SHIFT_STATUSES)
+  status?: ShiftStatus;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+}
+
+@ApiSchema({ name: 'PosShiftPage' })
+export class ShiftPageDto {
+  @ApiProperty({ type: [ShiftDto] }) data: ShiftDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'PosHandoverRequest' })
+export class HandoverRequestDto {
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Default: the settings’ box' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  moneyAccountId?: number | null;
+  @ApiPropertyOptional({ example: '314000', description: 'Default: counted − float kept' })
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  amount?: string | null;
+  @ApiPropertyOptional({ example: '2026-10-16', description: 'Default: today' })
+  @IsOptional()
+  @Matches(DATE)
+  paidOn?: string | null;
+}
+
+// ---------------------------------------------------------------- sales
+
+@ApiSchema({ name: 'PosSale' })
+export class SaleDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'К3-261016-0045' }) number: string;
+  @ApiProperty({ enum: SALE_KINDS }) kind: SaleKind;
+  @ApiProperty() edgeNodeId: number;
+  @ApiProperty() tillId: number;
+  @ApiProperty() tillCode: string;
+  @ApiProperty() shiftId: number;
+  @ApiProperty() shiftNumber: string;
+  @ApiProperty() cashierUserId: number;
+  @ApiProperty({ type: String, nullable: true }) cashierName: string | null;
+  @ApiProperty({ type: String, nullable: true }) approvedByName: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) soldAt: string;
+  @ApiProperty({ example: '2026-10-16' }) soldDay: string;
+  @ApiProperty({ example: '12000.00' }) subtotal: string;
+  @ApiProperty({ example: '0.00' }) discountTotal: string;
+  @ApiProperty({ example: '12000.00' }) total: string;
+  @ApiProperty({ example: '1090.91' }) vatTotal: string;
+  @ApiProperty({ example: '12000.00' }) cashAmount: string;
+  @ApiProperty({ example: '0.00' }) cardAmount: string;
+  @ApiProperty({ enum: RECEIPT_TYPES }) receiptType: ReceiptType;
+  @ApiProperty({ type: String, nullable: true }) customerTin: string | null;
+  @ApiProperty({ type: String, nullable: true }) customerName: string | null;
+  @ApiProperty({ enum: EBARIMT_STATUSES }) ebarimtStatus: EbarimtStatus;
+  @ApiProperty({ type: String, nullable: true }) ddtd: string | null;
+  @ApiProperty({ type: Number, nullable: true }) refundsSaleId: number | null;
+  @ApiProperty({ type: String, nullable: true }) refundsSaleNumber: string | null;
+  @ApiProperty() lineCount: number;
+  @ApiProperty() shortfallCount: number;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'PosSaleLine' })
+export class SaleLineDto {
+  @ApiProperty() id: number;
+  @ApiProperty() lineNo: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() productSku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() productUnitId: number;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ example: '2' }) qty: string;
+  @ApiProperty({ example: '1' }) factorSnapshot: string;
+  @ApiProperty({ example: '2' }) qtyBase: string;
+  @ApiProperty({ enum: PRICE_BASES }) basis: PriceBasis;
+  @ApiProperty({ example: '6000.00' }) listPrice: string;
+  @ApiProperty({ example: '6000.00' }) unitPrice: string;
+  @ApiProperty({ example: '0.00' }) discountAmount: string;
+  @ApiProperty({ example: '12000.00' }) subtotal: string;
+  @ApiProperty({ example: '12000.00' }) total: string;
+  @ApiProperty({ enum: VAT_TYPES }) vatType: VatType;
+  @ApiProperty({ example: '10.00' }) vatRatePct: string;
+  @ApiProperty({ example: '1090.91' }) vatAmount: string;
+  @ApiProperty({ type: Number, nullable: true }) refundsLineId: number | null;
+  @ApiProperty() damaged: boolean;
+  @ApiProperty({ example: '0' }) returnedBase: string;
+}
+
+@ApiSchema({ name: 'PosTender' })
+export class TenderDto {
+  @ApiProperty() id: number;
+  @ApiProperty() tenderNo: number;
+  @ApiProperty({ enum: TENDER_KINDS }) kind: TenderKind;
+  @ApiProperty({ example: '12000.00' }) amount: string;
+  @ApiProperty({ type: String, nullable: true, example: '20000.00' }) tendered: string | null;
+  @ApiProperty({ type: String, nullable: true }) terminalId: string | null;
+  @ApiProperty({ type: String, nullable: true }) rrn: string | null;
+  @ApiProperty({ type: String, nullable: true }) maskedPan: string | null;
+}
+
+@ApiSchema({ name: 'PosShortfall' })
+export class ShortfallDto {
+  @ApiProperty() id: number;
+  @ApiProperty() saleId: number;
+  @ApiProperty() saleNumber: string;
+  @ApiProperty() saleLineId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() productSku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ example: '3' }) qtyBase: string;
+  @ApiProperty() adjustmentId: number;
+  @ApiProperty({ example: 'ADJ-2026-000012' }) adjustmentNumber: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) resolvedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) resolvedByName: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'PosSaleReturn' })
+export class SaleReturnDto {
+  @ApiProperty() id: number;
+  @ApiProperty() number: string;
+  @ApiProperty({ type: String, format: 'date-time' }) soldAt: string;
+  @ApiProperty({ example: '6000.00' }) total: string;
+}
+
+@ApiSchema({ name: 'PosSaleDetail' })
+export class SaleDetailDto extends SaleDto {
+  @ApiProperty({ type: String, nullable: true }) consumerNo: string | null;
+  @ApiProperty({ type: String, nullable: true }) posapiDate: string | null;
+  @ApiProperty({ type: String, nullable: true }) billIdSuffix: string | null;
+  @ApiProperty({ type: String, nullable: true }) inactiveId: string | null;
+  @ApiProperty({ type: String, nullable: true }) snapshotVersion: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: [SaleLineDto] }) lines: SaleLineDto[];
+  @ApiProperty({ type: [TenderDto] }) tenders: TenderDto[];
+  @ApiProperty({ type: [ShortfallDto] }) shortfalls: ShortfallDto[];
+  @ApiProperty({ type: [SaleReturnDto] }) returns: SaleReturnDto[];
+}
+
+@ApiSchema({ name: 'PosSaleListQuery' })
+export class SaleListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional({ description: 'Part of the number, ДДТД, TIN or buyer name' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(80)
+  q?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) edgeNodeId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) shiftId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) cashierUserId?: number;
+  @ApiPropertyOptional({ enum: SALE_KINDS }) @IsOptional() @IsIn(SALE_KINDS) kind?: SaleKind;
+  @ApiPropertyOptional({ enum: EBARIMT_STATUSES })
+  @IsOptional()
+  @IsIn(EBARIMT_STATUSES)
+  ebarimtStatus?: EbarimtStatus;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+}
+
+@ApiSchema({ name: 'PosSalePage' })
+export class SalePageDto {
+  @ApiProperty({ type: [SaleDto] }) data: SaleDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'On the first page only' })
+  total: number | null;
+}
+
+// ---------------------------------------------------------------- shortfalls, rejections, attention
+
+@ApiSchema({ name: 'PosShortfallListQuery' })
+export class ShortfallListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) productId?: number;
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  resolved?: boolean;
+}
+
+@ApiSchema({ name: 'PosShortfallPage' })
+export class ShortfallPageDto {
+  @ApiProperty({ type: [ShortfallDto] }) data: ShortfallDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'PosResolveShortfallRequest' })
+export class ResolveShortfallDto {
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+}
+
+@ApiSchema({ name: 'PosSyncRejection' })
+export class RejectionDto {
+  @ApiProperty() id: number;
+  @ApiProperty() edgeNodeId: number;
+  @ApiProperty() edgeNodeCode: string;
+  @ApiProperty() clientId: string;
+  @ApiProperty({ enum: POS_EVENT_KINDS }) kind: PosEventKind;
+  @ApiProperty({ example: 'POS_TOTALS_MISMATCH' }) code: string;
+  @ApiProperty({ type: Object, nullable: true }) params: Record<string, unknown> | null;
+  @ApiProperty({ type: Object }) payload: Record<string, unknown>;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) replayedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) replayedByName: string | null;
+}
+
+@ApiSchema({ name: 'PosRejectionListQuery' })
+export class RejectionListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) edgeNodeId?: number;
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  replayed?: boolean;
+}
+
+@ApiSchema({ name: 'PosRejectionPage' })
+export class RejectionPageDto {
+  @ApiProperty({ type: [RejectionDto] }) data: RejectionDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'PosAttention' })
+export class PosAttentionDto {
+  @ApiProperty() openShifts: number;
+  @ApiProperty() shiftsToHandOver: number;
+  @ApiProperty() openShortfalls: number;
+  @ApiProperty() rejections: number;
+}
+
+// ---------------------------------------------------------------- sync (the edge's documents)
+
+@ApiSchema({ name: 'PosEbarimtFacts' })
+export class EbarimtFactsDto {
+  @ApiProperty({ enum: EBARIMT_STATUSES }) @IsIn(EBARIMT_STATUSES) status: EbarimtStatus;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  ddtd?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  posapiDate?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  billIdSuffix?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  inactiveId?: string | null;
+}
+
+@ApiSchema({ name: 'PosSaleDocLine' })
+export class SaleDocLineDto {
+  @ApiProperty() @IsInt() @Min(1) lineNo: number;
+  @ApiProperty() @IsInt() @Min(1) productId: number;
+  @ApiProperty() @IsInt() @Min(1) productUnitId: number;
+  @ApiProperty({ example: '2' }) @IsString() @Matches(QTY) qty: string;
+  @ApiProperty({ example: '1' }) @IsString() @Matches(FACTOR) factorSnapshot: string;
+  @ApiProperty({ enum: PRICE_BASES }) @IsIn(PRICE_BASES) basis: PriceBasis;
+  @ApiProperty({ example: '6000' }) @IsString() @Matches(MONEY) listPrice: string;
+  @ApiProperty({ example: '6000' }) @IsString() @Matches(MONEY) unitPrice: string;
+  @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) discountAmount: string;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) subtotal: string;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) total: string;
+  @ApiProperty({ example: '10' }) @IsString() @Matches(PERCENT) vatRatePct: string;
+  @ApiProperty({ example: '1090.91' }) @IsString() @Matches(MONEY) vatAmount: string;
+  @ApiPropertyOptional({ type: [Object] }) @IsOptional() @IsArray() applied?: unknown[];
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  refundsLineNo?: number | null;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() damaged?: boolean;
+}
+
+@ApiSchema({ name: 'PosSaleDocTender' })
+export class SaleDocTenderDto {
+  @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) amount: string;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '20000' })
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  tendered?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxCardField)
+  terminalId?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxCardField)
+  rrn?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxCardField)
+  maskedPan?: string | null;
+}
+
+@ApiSchema({ name: 'PosSaleDoc' })
+export class SaleDocDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
+  @ApiProperty({ enum: SALE_KINDS }) @IsIn(SALE_KINDS) kind: SaleKind;
+  @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
+  @ApiProperty({ format: 'uuid' }) @IsUUID() shiftClientId: string;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  approvedByUserId?: number | null;
+  @ApiProperty({ example: 'К3-261016-0045' })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(40)
+  number: string;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() soldAt: string;
+  @ApiPropertyOptional({ enum: RECEIPT_TYPES, default: 'B2C' })
+  @IsOptional()
+  @IsIn(RECEIPT_TYPES)
+  receiptType?: ReceiptType;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @Matches(TIN)
+  customerTin?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  customerName?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @Matches(CONSUMER)
+  consumerNo?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  refundsSaleClientId?: string | null;
+  @ApiProperty({ type: [SaleDocLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => SaleDocLineDto)
+  lines: SaleDocLineDto[];
+  @ApiProperty({ type: [SaleDocTenderDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxTenders)
+  @ValidateNested({ each: true })
+  @Type(() => SaleDocTenderDto)
+  tenders: SaleDocTenderDto[];
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) subtotal: string;
+  @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) discountTotal: string;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) total: string;
+  @ApiProperty({ example: '1090.91' }) @IsString() @Matches(MONEY) vatTotal: string;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  snapshotVersion?: string | null;
+  @ApiPropertyOptional({ type: EbarimtFactsDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EbarimtFactsDto)
+  ebarimt?: EbarimtFactsDto | null;
+}
+
+@ApiSchema({ name: 'PosShiftOpenDoc' })
+export class ShiftOpenDocDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
+  @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiProperty({ example: 'К3-261016-Э1' })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(40)
+  number: string;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() openedAt: string;
+  @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) openingFloat: string;
+}
+
+@ApiSchema({ name: 'PosShiftCloseDoc' })
+export class ShiftCloseDocDto {
+  @ApiProperty({ format: 'uuid', description: 'The shift’s clientId' }) @IsUUID() clientId: string;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() closedAt: string;
+  @ApiProperty({ example: '364000' }) @IsString() @Matches(MONEY) countedCash: string;
+  @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) floatKept: string;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+}
+
+@ApiSchema({ name: 'PosReceiptStatusDoc' })
+export class ReceiptStatusDocDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() saleClientId: string;
+  @ApiProperty({ type: EbarimtFactsDto })
+  @ValidateNested()
+  @Type(() => EbarimtFactsDto)
+  ebarimt: EbarimtFactsDto;
+}
+
+@ApiSchema({ name: 'PosTillBoundDoc' })
+export class TillBoundDocDto {
+  @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
+  @ApiProperty({ description: 'sha-256 hex of the device token' })
+  @IsString()
+  @Matches(HASH)
+  deviceTokenHash: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  userAgent?: string | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  boundByUserId?: number | null;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() boundAt: string;
+}
+
+/** One replayed document: `kind` says which of the optional bodies is filled. */
+@ApiSchema({ name: 'PosSyncEvent' })
+export class SyncEventDto {
+  @ApiProperty({ enum: POS_EVENT_KINDS }) @IsIn(POS_EVENT_KINDS) kind: PosEventKind;
+  @ApiProperty({ format: 'uuid', description: 'The document’s id; a batch never repeats one' })
+  @IsUUID()
+  clientId: string;
+  @ApiPropertyOptional({ type: SaleDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SaleDocDto)
+  sale?: SaleDocDto;
+  @ApiPropertyOptional({ type: ShiftOpenDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShiftOpenDocDto)
+  shiftOpened?: ShiftOpenDocDto;
+  @ApiPropertyOptional({ type: ShiftCloseDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ShiftCloseDocDto)
+  shiftClosed?: ShiftCloseDocDto;
+  @ApiPropertyOptional({ type: ReceiptStatusDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ReceiptStatusDocDto)
+  receiptStatus?: ReceiptStatusDocDto;
+  @ApiPropertyOptional({ type: TillBoundDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TillBoundDocDto)
+  tillBound?: TillBoundDocDto;
+}
+
+@ApiSchema({ name: 'PosSyncBatch' })
+export class SyncBatchDto {
+  @ApiProperty({ type: [SyncEventDto], description: 'In the order they happened' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxEventsPerBatch)
+  @ValidateNested({ each: true })
+  @Type(() => SyncEventDto)
+  events: SyncEventDto[];
+}
+
+@ApiSchema({ name: 'PosSyncOutcome' })
+export class SyncOutcomeDto {
+  @ApiProperty({ format: 'uuid' }) clientId: string;
+  @ApiProperty({ enum: POS_EVENT_KINDS }) kind: PosEventKind;
+  @ApiProperty({ enum: SYNC_RESULTS }) status: SyncResult;
+  @ApiProperty({ type: Number, nullable: true }) id: number | null;
+  @ApiProperty({ type: String, nullable: true }) number: string | null;
+  @ApiProperty({ type: String, nullable: true }) code: string | null;
+  @ApiProperty({ type: Object, nullable: true }) params: Record<string, unknown> | null;
+}
+
+@ApiSchema({ name: 'PosSyncResponse' })
+export class SyncResponseDto {
+  @ApiProperty({ type: [SyncOutcomeDto] }) results: SyncOutcomeDto[];
+  @ApiProperty({ type: String, format: 'date-time' }) serverTime: string;
+}
+
+@ApiSchema({ name: 'PosHeartbeat' })
+export class HeartbeatDto {
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  appVersion?: string | null;
+  @ApiProperty({ minimum: 0 }) @IsInt() @Min(0) backlog: number;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  clockSkewMs?: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  snapshotVersion?: string | null;
+}
+
+@ApiSchema({ name: 'PosHeartbeatResponse' })
+export class HeartbeatResponseDto {
+  @ApiProperty() edgeNodeId: number;
+  @ApiProperty() code: string;
+  @ApiProperty({ type: String, format: 'date-time' }) serverTime: string;
+  @ApiProperty({ type: PosSettingsDto }) settings: PosSettingsDto;
+}
+
+// ---------------------------------------------------------------- the test till (development)
+
+@ApiSchema({ name: 'PosDevOpenShiftRequest' })
+export class DevOpenShiftDto {
+  @ApiProperty() @IsInt() @Min(1) tillId: number;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) openingFloat: string;
+}
+
+@ApiSchema({ name: 'PosDevSaleLine' })
+export class DevSaleLineDto {
+  @ApiProperty() @IsInt() @Min(1) productUnitId: number;
+  @ApiProperty({ example: '2' }) @IsString() @Matches(QTY) qty: string;
+}
+
+@ApiSchema({ name: 'PosDevTender' })
+export class DevTenderDto {
+  @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) amount: string;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '20000' })
+  @IsOptional()
+  @IsString()
+  @Matches(MONEY)
+  tendered?: string | null;
+}
+
+@ApiSchema({ name: 'PosDevSaleRequest' })
+export class DevSaleDto {
+  @ApiProperty() @IsInt() @Min(1) shiftId: number;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  approvedByUserId?: number | null;
+  @ApiProperty({ type: [DevSaleLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => DevSaleLineDto)
+  lines: DevSaleLineDto[];
+  @ApiProperty({ type: [DevTenderDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxTenders)
+  @ValidateNested({ each: true })
+  @Type(() => DevTenderDto)
+  tenders: DevTenderDto[];
+  @ApiPropertyOptional({ enum: RECEIPT_TYPES, default: 'B2C' })
+  @IsOptional()
+  @IsIn(RECEIPT_TYPES)
+  receiptType?: ReceiptType;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @Matches(TIN)
+  customerTin?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  customerName?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+}
+
+@ApiSchema({ name: 'PosDevCloseShiftRequest' })
+export class DevCloseShiftDto {
+  @ApiProperty({ example: '364000' }) @IsString() @Matches(MONEY) countedCash: string;
+  @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) floatKept: string;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
+}

@@ -7046,7 +7046,8 @@
                 "ADJ",
                 "ST",
                 "SO",
-                "CN"
+                "CN",
+                "POS"
               ]
             }
           },
@@ -14492,7 +14493,8 @@
                 "AUTO_CREDIT_NOTE",
                 "AUTO_VOID",
                 "MANUAL",
-                "OPENING"
+                "OPENING",
+                "AUTO_POS_SHIFT"
               ]
             }
           },
@@ -15029,6 +15031,1636 @@
           "finance"
         ]
       }
+    },
+    "/api/v1/pos/settings": {
+      "get": {
+        "operationId": "PosSettings_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "put": {
+        "operationId": "PosSettings_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosSettingsPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/edge-nodes": {
+      "get": {
+        "operationId": "PosEdgeNodes_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosEdgeNode"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosEdgeNodes_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosEdgeNodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosEdgeNode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/edge-nodes/{id}": {
+      "put": {
+        "operationId": "PosEdgeNodes_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosEdgeNodePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosEdgeNode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/edge-nodes/{id}/token": {
+      "post": {
+        "operationId": "PosEdgeNodes_issueToken",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosEdgeToken"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tills": {
+      "get": {
+        "operationId": "PosTills_list",
+        "parameters": [
+          {
+            "name": "edgeNodeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosTill"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosTills_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosTillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosTill"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tills/{id}": {
+      "put": {
+        "operationId": "PosTills_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosTillPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosTill"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/tills/{id}/pairing-code": {
+      "post": {
+        "operationId": "PosTills_pairingCode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosPairingCode"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/cashiers": {
+      "get": {
+        "operationId": "PosCashiers_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosCashier"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/cashiers/{userId}/pin": {
+      "put": {
+        "operationId": "PosCashiers_setPin",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosPinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCashier"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/cashiers/{userId}/status": {
+      "put": {
+        "operationId": "PosCashiers_setStatus",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCashierStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCashier"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/cashiers/{userId}/unlock": {
+      "post": {
+        "operationId": "PosCashiers_unlock",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCashier"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/shifts": {
+      "get": {
+        "operationId": "PosShifts_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "edgeNodeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cashierUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "CLOSED",
+                "HANDED_OVER"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShiftPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/shifts/{id}": {
+      "get": {
+        "operationId": "PosShifts_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShift"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/shifts/{id}/handover": {
+      "post": {
+        "operationId": "PosShifts_handOver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosHandoverRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShift"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sales": {
+      "get": {
+        "operationId": "PosSales_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of the number, ДДТД, TIN or buyer name",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "name": "edgeNodeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "shiftId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cashierUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SALE",
+                "RETURN"
+              ]
+            }
+          },
+          {
+            "name": "ebarimtStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NONE",
+                "PENDING",
+                "CONFIRMED",
+                "INDETERMINATE",
+                "ERROR",
+                "CANCELLED",
+                "UNCONFIRMED_RETURN"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSalePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sales/{id}": {
+      "get": {
+        "operationId": "PosSales_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSaleDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/shortfalls": {
+      "get": {
+        "operationId": "PosShortfalls_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "resolved",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShortfallPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/shortfalls/{id}/resolve": {
+      "post": {
+        "operationId": "PosShortfalls_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosResolveShortfallRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShortfall"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sync-rejections": {
+      "get": {
+        "operationId": "PosRejections_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "edgeNodeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "replayed",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosRejectionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sync-rejections/{id}/replay": {
+      "post": {
+        "operationId": "PosRejections_replayOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSyncOutcome"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/attention": {
+      "get": {
+        "operationId": "PosAttention_attention",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosAttention"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/events": {
+      "post": {
+        "operationId": "PosSync_events",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosSyncBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSyncResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/heartbeat": {
+      "post": {
+        "operationId": "PosSync_heartbeat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosHeartbeat"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosHeartbeatResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
+    "/api/v1/pos/dev/shifts/open": {
+      "post": {
+        "operationId": "PosDev_openShift",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDevOpenShiftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShift"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos-dev"
+        ]
+      }
+    },
+    "/api/v1/pos/dev/sales": {
+      "post": {
+        "operationId": "PosDev_sell",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDevSaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSaleDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos-dev"
+        ]
+      }
+    },
+    "/api/v1/pos/dev/shifts/{id}/close": {
+      "post": {
+        "operationId": "PosDev_closeShift",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosDevCloseShiftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosShift"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos-dev"
+        ]
+      }
     }
   },
   "info": {
@@ -15148,7 +16780,11 @@
           "finance.payments.record",
           "finance.invoices.manage",
           "finance.journal.manage",
-          "finance.settings.manage"
+          "finance.settings.manage",
+          "pos.read",
+          "pos.manage",
+          "pos.till.operate",
+          "pos.till.supervise"
         ]
       },
       "RoleRef": {
@@ -20439,7 +22075,8 @@
               "SHORTAGE",
               "SURPLUS",
               "OPENING",
-              "OPENING_REVERSAL"
+              "OPENING_REVERSAL",
+              "POS_SHORTFALL"
             ],
             "type": "string"
           },
@@ -20580,7 +22217,8 @@
               "SHORTAGE",
               "SURPLUS",
               "OPENING",
-              "OPENING_REVERSAL"
+              "OPENING_REVERSAL",
+              "POS_SHORTFALL"
             ],
             "type": "string"
           },
@@ -20689,7 +22327,8 @@
               "EXPIRED",
               "SHORTAGE",
               "SURPLUS",
-              "OPENING"
+              "OPENING",
+              "POS_SHORTFALL"
             ],
             "type": "string",
             "description": "OPENING: approvers only"
@@ -20721,7 +22360,8 @@
               "EXPIRED",
               "SHORTAGE",
               "SURPLUS",
-              "OPENING"
+              "OPENING",
+              "POS_SHORTFALL"
             ],
             "type": "string"
           },
@@ -27853,7 +29493,11 @@
               "CASH",
               "BANK",
               "OTHER_INCOME",
-              "OTHER_EXPENSE"
+              "OTHER_EXPENSE",
+              "POS_CASH",
+              "CARD_CLEARING",
+              "POS_SALES",
+              "CASH_VARIANCE"
             ],
             "type": "string"
           },
@@ -27974,7 +29618,11 @@
               "CASH",
               "BANK",
               "OTHER_INCOME",
-              "OTHER_EXPENSE"
+              "OTHER_EXPENSE",
+              "POS_CASH",
+              "CARD_CLEARING",
+              "POS_SALES",
+              "CASH_VARIANCE"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -28011,7 +29659,8 @@
               "AUTO_CREDIT_NOTE",
               "AUTO_VOID",
               "MANUAL",
-              "OPENING"
+              "OPENING",
+              "AUTO_POS_SHIFT"
             ],
             "type": "string"
           },
@@ -28445,7 +30094,8 @@
               "AUTO_CREDIT_NOTE",
               "AUTO_VOID",
               "MANUAL",
-              "OPENING"
+              "OPENING",
+              "AUTO_POS_SHIFT"
             ],
             "type": "string"
           },
@@ -28455,7 +30105,8 @@
               "INVOICE",
               "PAYMENT",
               "CREDIT_NOTE",
-              "JOURNAL"
+              "JOURNAL",
+              "POS_SHIFT"
             ],
             "type": "string"
           },
@@ -28626,7 +30277,8 @@
               "AUTO_CREDIT_NOTE",
               "AUTO_VOID",
               "MANUAL",
-              "OPENING"
+              "OPENING",
+              "AUTO_POS_SHIFT"
             ],
             "type": "string"
           },
@@ -28636,7 +30288,8 @@
               "INVOICE",
               "PAYMENT",
               "CREDIT_NOTE",
-              "JOURNAL"
+              "JOURNAL",
+              "POS_SHIFT"
             ],
             "type": "string"
           },
@@ -29110,6 +30763,2246 @@
           "JOURNAL"
         ]
       },
+      "PosSettings": {
+        "type": "object",
+        "properties": {
+          "storeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "storeWarehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "handoverMoneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "handoverMoneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "returnWindowDays": {
+            "type": "number",
+            "example": 14
+          },
+          "snapshotIntervalSec": {
+            "type": "number",
+            "example": 60
+          },
+          "supervisorRequired": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "storeWarehouseId",
+          "storeWarehouseName",
+          "handoverMoneyAccountId",
+          "handoverMoneyAccountName",
+          "returnWindowDays",
+          "snapshotIntervalSec",
+          "supervisorRequired",
+          "updatedAt"
+        ]
+      },
+      "PosSettingsPatch": {
+        "type": "object",
+        "properties": {
+          "storeWarehouseId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "handoverMoneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "returnWindowDays": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 365
+          },
+          "snapshotIntervalSec": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 3600
+          },
+          "supervisorRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PosEdgeNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "SM1"
+          },
+          "name": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenPrefix": {
+            "type": "string",
+            "nullable": true,
+            "description": "First 8 hex of the token hash"
+          },
+          "tokenIssuedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "appVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastPullAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastPushAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "backlog": {
+            "type": "number",
+            "description": "Documents the edge still has to replay"
+          },
+          "clockSkewMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "snapshotVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "warehouseId",
+          "warehouseName",
+          "tokenPrefix",
+          "tokenIssuedAt",
+          "appVersion",
+          "lastSeenAt",
+          "lastPullAt",
+          "lastPushAt",
+          "backlog",
+          "clockSkewMs",
+          "snapshotVersion",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PosEdgeNodeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 16,
+            "example": "SM1",
+            "description": "A-Z, 0-9, _ and -, 1–16"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The STORE warehouse the tills sell from"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "warehouseId"
+        ]
+      },
+      "PosEdgeNodePatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "PosEdgeToken": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Shown once; the edge keeps it in its environment"
+          },
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "prefix"
+        ]
+      },
+      "PosTill": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "К3"
+          },
+          "name": {
+            "type": "string"
+          },
+          "printerHost": {
+            "type": "string",
+            "nullable": true
+          },
+          "printerPort": {
+            "type": "number",
+            "example": 9100
+          },
+          "drawerKick": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "lastSaleAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "pairingExpiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "edgeNodeId",
+          "code",
+          "name",
+          "printerHost",
+          "printerPort",
+          "drawerKick",
+          "status",
+          "lastSaleAt",
+          "pairingExpiresAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PosTillRequest": {
+        "type": "object",
+        "properties": {
+          "edgeNodeId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3",
+            "description": "Capitals, digits and dashes, 1–8"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "printerHost": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 253,
+            "example": "192.168.1.31"
+          },
+          "printerPort": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535,
+            "example": 9100
+          },
+          "drawerKick": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "edgeNodeId",
+          "code",
+          "name"
+        ]
+      },
+      "PosTillPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "printerHost": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 253
+          },
+          "printerPort": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "drawerKick": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        }
+      },
+      "PosPairingCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "482913",
+            "description": "Shown once"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt"
+        ]
+      },
+      "PosCashier": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "userStatus": {
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "pinSetAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pinSetByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "lockedUntil": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "userId",
+          "username",
+          "fullName",
+          "userStatus",
+          "status",
+          "pinSetAt",
+          "pinSetByName",
+          "failedCount",
+          "lockedUntil"
+        ]
+      },
+      "PosPinRequest": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$",
+            "example": "123456",
+            "description": "Six digits"
+          }
+        },
+        "required": [
+          "pin"
+        ]
+      },
+      "PosCashierStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "PosShift": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К3-261016-Э1"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "CLOSED",
+              "HANDED_OVER"
+            ],
+            "type": "string"
+          },
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "edgeNodeCode": {
+            "type": "string"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "tillName": {
+            "type": "string"
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openingFloat": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "countedCash": {
+            "type": "string",
+            "nullable": true
+          },
+          "floatKept": {
+            "type": "string",
+            "nullable": true
+          },
+          "expectedCash": {
+            "type": "string",
+            "nullable": true
+          },
+          "variance": {
+            "type": "string",
+            "nullable": true,
+            "description": "counted − expected"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesCount": {
+            "type": "number"
+          },
+          "returnsCount": {
+            "type": "number"
+          },
+          "cashSales": {
+            "type": "string",
+            "example": "320000.00"
+          },
+          "cashRefunds": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "cardSales": {
+            "type": "string",
+            "example": "120000.00"
+          },
+          "cardRefunds": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "salesTotal": {
+            "type": "string",
+            "example": "440000.00"
+          },
+          "returnsTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "salesVat": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "returnsVat": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "journalNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "handoverPaymentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "handoverNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "handedOverAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "handedOverByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "edgeNodeId",
+          "edgeNodeCode",
+          "tillId",
+          "tillCode",
+          "tillName",
+          "cashierUserId",
+          "cashierName",
+          "openedAt",
+          "openingFloat",
+          "closedAt",
+          "countedCash",
+          "floatKept",
+          "expectedCash",
+          "variance",
+          "note",
+          "salesCount",
+          "returnsCount",
+          "cashSales",
+          "cashRefunds",
+          "cardSales",
+          "cardRefunds",
+          "salesTotal",
+          "returnsTotal",
+          "salesVat",
+          "returnsVat",
+          "journalEntryId",
+          "journalNumber",
+          "handoverPaymentId",
+          "handoverNumber",
+          "handedOverAt",
+          "handedOverByName"
+        ]
+      },
+      "PosShiftPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosShift"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosHandoverRequest": {
+        "type": "object",
+        "properties": {
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Default: the settings’ box"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "example": "314000",
+            "description": "Default: counted − float kept"
+          },
+          "paidOn": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-16",
+            "description": "Default: today"
+          }
+        }
+      },
+      "PosSale": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К3-261016-0045"
+          },
+          "kind": {
+            "enum": [
+              "SALE",
+              "RETURN"
+            ],
+            "type": "string"
+          },
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "number"
+          },
+          "shiftNumber": {
+            "type": "string"
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "soldDay": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "1090.91"
+          },
+          "cashAmount": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "cardAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string"
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ebarimtStatus": {
+            "enum": [
+              "NONE",
+              "PENDING",
+              "CONFIRMED",
+              "INDETERMINATE",
+              "ERROR",
+              "CANCELLED",
+              "UNCONFIRMED_RETURN"
+            ],
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundsSaleId": {
+            "type": "number",
+            "nullable": true
+          },
+          "refundsSaleNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "shortfallCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "kind",
+          "edgeNodeId",
+          "tillId",
+          "tillCode",
+          "shiftId",
+          "shiftNumber",
+          "cashierUserId",
+          "cashierName",
+          "approvedByName",
+          "soldAt",
+          "soldDay",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cashAmount",
+          "cardAmount",
+          "receiptType",
+          "customerTin",
+          "customerName",
+          "ebarimtStatus",
+          "ddtd",
+          "refundsSaleId",
+          "refundsSaleNumber",
+          "lineCount",
+          "shortfallCount",
+          "createdAt"
+        ]
+      },
+      "PosSalePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSale"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "On the first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "PosSaleLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "1"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "2"
+          },
+          "basis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "RETAIL",
+              "RETAIL_BULK"
+            ],
+            "type": "string"
+          },
+          "listPrice": {
+            "type": "string",
+            "example": "6000.00"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "6000.00"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "vatType": {
+            "enum": [
+              "VAT_ABLE",
+              "VAT_FREE",
+              "VAT_ZERO",
+              "NO_VAT"
+            ],
+            "type": "string"
+          },
+          "vatRatePct": {
+            "type": "string",
+            "example": "10.00"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "1090.91"
+          },
+          "refundsLineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "damaged": {
+            "type": "boolean"
+          },
+          "returnedBase": {
+            "type": "string",
+            "example": "0"
+          }
+        },
+        "required": [
+          "id",
+          "lineNo",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "uomName",
+          "qty",
+          "factorSnapshot",
+          "qtyBase",
+          "basis",
+          "listPrice",
+          "unitPrice",
+          "discountAmount",
+          "subtotal",
+          "total",
+          "vatType",
+          "vatRatePct",
+          "vatAmount",
+          "refundsLineId",
+          "damaged",
+          "returnedBase"
+        ]
+      },
+      "PosTender": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "tenderNo": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "tendered": {
+            "type": "string",
+            "nullable": true,
+            "example": "20000.00"
+          },
+          "terminalId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rrn": {
+            "type": "string",
+            "nullable": true
+          },
+          "maskedPan": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "tenderNo",
+          "kind",
+          "amount",
+          "tendered",
+          "terminalId",
+          "rrn",
+          "maskedPan"
+        ]
+      },
+      "PosShortfall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "saleId": {
+            "type": "number"
+          },
+          "saleNumber": {
+            "type": "string"
+          },
+          "saleLineId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "qtyBase": {
+            "type": "string",
+            "example": "3"
+          },
+          "adjustmentId": {
+            "type": "number"
+          },
+          "adjustmentNumber": {
+            "type": "string",
+            "example": "ADJ-2026-000012"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "resolvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "saleNumber",
+          "saleLineId",
+          "productId",
+          "productSku",
+          "productName",
+          "warehouseId",
+          "qtyBase",
+          "adjustmentId",
+          "adjustmentNumber",
+          "resolvedAt",
+          "resolvedByName",
+          "note",
+          "createdAt"
+        ]
+      },
+      "PosSaleReturn": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "example": "6000.00"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "soldAt",
+          "total"
+        ]
+      },
+      "PosSaleDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "К3-261016-0045"
+          },
+          "kind": {
+            "enum": [
+              "SALE",
+              "RETURN"
+            ],
+            "type": "string"
+          },
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "number"
+          },
+          "shiftNumber": {
+            "type": "string"
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "soldDay": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "1090.91"
+          },
+          "cashAmount": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "cardAmount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string"
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ebarimtStatus": {
+            "enum": [
+              "NONE",
+              "PENDING",
+              "CONFIRMED",
+              "INDETERMINATE",
+              "ERROR",
+              "CANCELLED",
+              "UNCONFIRMED_RETURN"
+            ],
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundsSaleId": {
+            "type": "number",
+            "nullable": true
+          },
+          "refundsSaleNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "shortfallCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "billIdSuffix": {
+            "type": "string",
+            "nullable": true
+          },
+          "inactiveId": {
+            "type": "string",
+            "nullable": true
+          },
+          "snapshotVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSaleLine"
+            }
+          },
+          "tenders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosTender"
+            }
+          },
+          "shortfalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosShortfall"
+            }
+          },
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSaleReturn"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "kind",
+          "edgeNodeId",
+          "tillId",
+          "tillCode",
+          "shiftId",
+          "shiftNumber",
+          "cashierUserId",
+          "cashierName",
+          "approvedByName",
+          "soldAt",
+          "soldDay",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal",
+          "cashAmount",
+          "cardAmount",
+          "receiptType",
+          "customerTin",
+          "customerName",
+          "ebarimtStatus",
+          "ddtd",
+          "refundsSaleId",
+          "refundsSaleNumber",
+          "lineCount",
+          "shortfallCount",
+          "createdAt",
+          "consumerNo",
+          "posapiDate",
+          "billIdSuffix",
+          "inactiveId",
+          "snapshotVersion",
+          "note",
+          "lines",
+          "tenders",
+          "shortfalls",
+          "returns"
+        ]
+      },
+      "PosShortfallPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosShortfall"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosResolveShortfallRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
+      "PosSyncRejection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "edgeNodeCode": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "TILL_BOUND",
+              "SHIFT_OPENED",
+              "SALE",
+              "RETURN",
+              "SHIFT_CLOSED",
+              "RECEIPT_STATUS"
+            ],
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "POS_TOTALS_MISMATCH"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replayedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "replayedByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "edgeNodeId",
+          "edgeNodeCode",
+          "clientId",
+          "kind",
+          "code",
+          "params",
+          "payload",
+          "createdAt",
+          "replayedAt",
+          "replayedByName"
+        ]
+      },
+      "PosRejectionPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSyncRejection"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosSyncOutcome": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "TILL_BOUND",
+              "SHIFT_OPENED",
+              "SALE",
+              "RETURN",
+              "SHIFT_CLOSED",
+              "RECEIPT_STATUS"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "APPLIED",
+              "DUPLICATE",
+              "REJECTED"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "clientId",
+          "kind",
+          "status",
+          "id",
+          "number",
+          "code",
+          "params"
+        ]
+      },
+      "PosAttention": {
+        "type": "object",
+        "properties": {
+          "openShifts": {
+            "type": "number"
+          },
+          "shiftsToHandOver": {
+            "type": "number"
+          },
+          "openShortfalls": {
+            "type": "number"
+          },
+          "rejections": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "openShifts",
+          "shiftsToHandOver",
+          "openShortfalls",
+          "rejections"
+        ]
+      },
+      "PosSaleDocLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          },
+          "factorSnapshot": {
+            "type": "string",
+            "example": "1"
+          },
+          "basis": {
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "RETAIL",
+              "RETAIL_BULK"
+            ],
+            "type": "string"
+          },
+          "listPrice": {
+            "type": "string",
+            "example": "6000"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "6000"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "0"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "12000"
+          },
+          "total": {
+            "type": "string",
+            "example": "12000"
+          },
+          "vatRatePct": {
+            "type": "string",
+            "example": "10"
+          },
+          "vatAmount": {
+            "type": "string",
+            "example": "1090.91"
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "refundsLineNo": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "damaged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "productUnitId",
+          "qty",
+          "factorSnapshot",
+          "basis",
+          "listPrice",
+          "unitPrice",
+          "discountAmount",
+          "subtotal",
+          "total",
+          "vatRatePct",
+          "vatAmount"
+        ]
+      },
+      "PosSaleDocTender": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000"
+          },
+          "tendered": {
+            "type": "string",
+            "nullable": true,
+            "example": "20000"
+          },
+          "terminalId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "rrn": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "maskedPan": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "kind",
+          "amount"
+        ]
+      },
+      "PosEbarimtFacts": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "NONE",
+              "PENDING",
+              "CONFIRMED",
+              "INDETERMINATE",
+              "ERROR",
+              "CANCELLED",
+              "UNCONFIRMED_RETURN"
+            ],
+            "type": "string"
+          },
+          "ddtd": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "posapiDate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "billIdSuffix": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "inactiveId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "PosSaleDoc": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "enum": [
+              "SALE",
+              "RETURN"
+            ],
+            "type": "string"
+          },
+          "tillCode": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3"
+          },
+          "shiftClientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "approvedByUserId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "К3-261016-0045"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string",
+            "default": "B2C"
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "consumerNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "refundsSaleClientId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSaleDocLine"
+            }
+          },
+          "tenders": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSaleDocTender"
+            }
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "12000"
+          },
+          "discountTotal": {
+            "type": "string",
+            "example": "0"
+          },
+          "total": {
+            "type": "string",
+            "example": "12000"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "1090.91"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "snapshotVersion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 80
+          },
+          "ebarimt": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosEbarimtFacts"
+              }
+            ]
+          }
+        },
+        "required": [
+          "clientId",
+          "kind",
+          "tillCode",
+          "shiftClientId",
+          "cashierUserId",
+          "number",
+          "soldAt",
+          "lines",
+          "tenders",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "vatTotal"
+        ]
+      },
+      "PosShiftOpenDoc": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tillCode": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3"
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "К3-261016-Э1"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openingFloat": {
+            "type": "string",
+            "example": "50000"
+          }
+        },
+        "required": [
+          "clientId",
+          "tillCode",
+          "cashierUserId",
+          "number",
+          "openedAt",
+          "openingFloat"
+        ]
+      },
+      "PosShiftCloseDoc": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The shift’s clientId"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "countedCash": {
+            "type": "string",
+            "example": "364000"
+          },
+          "floatKept": {
+            "type": "string",
+            "example": "50000"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "clientId",
+          "closedAt",
+          "countedCash",
+          "floatKept"
+        ]
+      },
+      "PosReceiptStatusDoc": {
+        "type": "object",
+        "properties": {
+          "saleClientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ebarimt": {
+            "$ref": "#/components/schemas/PosEbarimtFacts"
+          }
+        },
+        "required": [
+          "saleClientId",
+          "ebarimt"
+        ]
+      },
+      "PosTillBoundDoc": {
+        "type": "object",
+        "properties": {
+          "tillCode": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3"
+          },
+          "deviceTokenHash": {
+            "type": "string",
+            "description": "sha-256 hex of the device token"
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "boundByUserId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "boundAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "tillCode",
+          "deviceTokenHash",
+          "boundAt"
+        ]
+      },
+      "PosSyncEvent": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "TILL_BOUND",
+              "SHIFT_OPENED",
+              "SALE",
+              "RETURN",
+              "SHIFT_CLOSED",
+              "RECEIPT_STATUS"
+            ],
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The document’s id; a batch never repeats one"
+          },
+          "sale": {
+            "$ref": "#/components/schemas/PosSaleDoc"
+          },
+          "shiftOpened": {
+            "$ref": "#/components/schemas/PosShiftOpenDoc"
+          },
+          "shiftClosed": {
+            "$ref": "#/components/schemas/PosShiftCloseDoc"
+          },
+          "receiptStatus": {
+            "$ref": "#/components/schemas/PosReceiptStatusDoc"
+          },
+          "tillBound": {
+            "$ref": "#/components/schemas/PosTillBoundDoc"
+          }
+        },
+        "required": [
+          "kind",
+          "clientId"
+        ]
+      },
+      "PosSyncBatch": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "minItems": 1,
+            "description": "In the order they happened",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSyncEvent"
+            }
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "PosSyncResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSyncOutcome"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "results",
+          "serverTime"
+        ]
+      },
+      "PosHeartbeat": {
+        "type": "object",
+        "properties": {
+          "appVersion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "backlog": {
+            "type": "number",
+            "minimum": 0
+          },
+          "clockSkewMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "snapshotVersion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "backlog"
+        ]
+      },
+      "PosHeartbeatResponse": {
+        "type": "object",
+        "properties": {
+          "edgeNodeId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/PosSettings"
+          }
+        },
+        "required": [
+          "edgeNodeId",
+          "code",
+          "serverTime",
+          "settings"
+        ]
+      },
+      "PosDevOpenShiftRequest": {
+        "type": "object",
+        "properties": {
+          "tillId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "openingFloat": {
+            "type": "string",
+            "example": "50000"
+          }
+        },
+        "required": [
+          "tillId",
+          "cashierUserId",
+          "openingFloat"
+        ]
+      },
+      "PosDevSaleLine": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "qty"
+        ]
+      },
+      "PosDevTender": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "CASH",
+              "CARD"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000"
+          },
+          "tendered": {
+            "type": "string",
+            "nullable": true,
+            "example": "20000"
+          }
+        },
+        "required": [
+          "kind",
+          "amount"
+        ]
+      },
+      "PosDevSaleRequest": {
+        "type": "object",
+        "properties": {
+          "shiftId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "approvedByUserId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosDevSaleLine"
+            }
+          },
+          "tenders": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosDevTender"
+            }
+          },
+          "receiptType": {
+            "enum": [
+              "B2C",
+              "B2B"
+            ],
+            "type": "string",
+            "default": "B2C"
+          },
+          "customerTin": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "shiftId",
+          "cashierUserId",
+          "lines",
+          "tenders"
+        ]
+      },
+      "PosDevCloseShiftRequest": {
+        "type": "object",
+        "properties": {
+          "countedCash": {
+            "type": "string",
+            "example": "364000"
+          },
+          "floatKept": {
+            "type": "string",
+            "example": "50000"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "countedCash",
+          "floatKept"
+        ]
+      },
       "ErrorCode": {
         "type": "string",
         "enum": [
@@ -29209,7 +33102,18 @@
           "ALLOCATION_EXCEEDS",
           "JOURNAL_UNBALANCED",
           "ACCOUNT_ROLE_TAKEN",
-          "ACCOUNT_ROLE_MISSING"
+          "ACCOUNT_ROLE_MISSING",
+          "POS_NOT_CONFIGURED",
+          "POS_TOTALS_MISMATCH",
+          "POS_TAX_MISMATCH",
+          "POS_SHIFT_STATE_INVALID",
+          "POS_TILL_BUSY",
+          "POS_TILL_INACTIVE",
+          "POS_CASHIER_INACTIVE",
+          "POS_RETURN_EXCEEDS",
+          "POS_RETURN_WINDOW",
+          "POS_NUMBER_TAKEN",
+          "POS_DEV_ONLY"
         ]
       },
       "ProblemFieldError": {
