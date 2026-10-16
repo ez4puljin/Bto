@@ -28,6 +28,7 @@ import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
 import { StocktakePage, StocktakesPage } from '@/features/inventory/stocktakes-pages';
 import { ImportPage, ImportsPage } from '@/features/imports/imports-pages';
+import { AppNoticesPage } from '@/features/notifications/notice-pages';
 import {
   DiscountProgramCreatePage,
   DiscountProgramEditPage,
@@ -151,6 +152,14 @@ export const routes: RouteObject[] = [
           ...financeRoutes(),
           ...posRoutes(),
           { path: 'system/status', element: <SystemStatusPage /> },
+          {
+            path: 'system/app-notices',
+            element: (
+              <RequirePermission permission="notifications.send">
+                <AppNoticesPage />
+              </RequirePermission>
+            ),
+          },
           { path: 'account', element: <AccountPage /> },
           { path: 'catalog/products', element: <ProductsPage />, handle: { wide: true } },
           {

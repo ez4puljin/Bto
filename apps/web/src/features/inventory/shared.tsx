@@ -80,17 +80,20 @@ export function ProductSearch({
   id,
   onPick,
   pickLabel,
+  saleReady,
 }: {
   /** Set when a visible label names the search box. */
   id?: string;
   onPick: (product: ProductSummary) => void;
   /** The button of each found product; default «Нэмэх». */
   pickLabel?: string;
+  /** Only products whose prices are complete (an app notice's products, ADR-0062). */
+  saleReady?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
-  const products = useProducts({ q, status: 'ACTIVE' });
+  const products = useProducts({ q, status: 'ACTIVE', ...(saleReady ? { saleReady } : {}) });
   const rows = q ? (products.data?.pages[0]?.data ?? []).slice(0, 8) : [];
 
   return (
@@ -114,6 +117,7 @@ export function ProductSearch({
               <span className="font-mono text-sm text-muted-foreground">{product.sku}</span>
               <span className="text-sm">{product.name}</span>
               <Button
+                type="button"
                 size="xs"
                 variant="outline"
                 className="ml-auto"
