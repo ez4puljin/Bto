@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build:packages": "pnpm --filter \"./packages/**\" run --if-present build",
-    "lint": "eslint --config eslint.config.mjs --max-warnings 0 .",
+    "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js --config eslint.config.mjs --max-warnings 0 .",
     "lint:guards": "node --test tools/lint-guards/guards.test.mjs",
     "typecheck": "pnpm -r run --if-present typecheck",
     "gen:api": "pnpm --filter @tugeel/api run openapi:export && pnpm --filter @tugeel/api-client run generate",
