@@ -3975,6 +3975,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_list"];
+        put?: never;
+        post: operations["SalesRep_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/products/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_productBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_customers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_customer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3999,7 +4111,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "sales.orders.rep";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -8794,6 +8906,215 @@ export interface components {
                 [key: string]: string | number | boolean;
             };
             errors?: components["schemas"]["ProblemFieldError"][];
+        };
+        SalesRepStage: {
+            id: number;
+            name: string;
+            /**
+             * @description NONE: a draft; CONFIRM: reserved at once
+             * @enum {string}
+             */
+            action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "CANCEL";
+        };
+        SalesRepPipeline: {
+            id: number;
+            name: string;
+            stages: components["schemas"]["SalesRepStage"][];
+        };
+        SalesRepBoard: {
+            id: number;
+            name: string;
+            pipelines: components["schemas"]["SalesRepPipeline"][];
+        };
+        SalesRepContext: {
+            /**
+             * Format: date
+             * @description The server's business date (Ulaanbaatar)
+             */
+            today: string;
+            /** @description Stages the rep may place orders on */
+            boards: components["schemas"]["SalesRepBoard"][];
+            /** @description The SALES_REP channel's stage */
+            defaultStageId: number | null;
+        };
+        SalesRepOrderRequest: {
+            customerId: number;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /**
+             * Format: date
+             * @description Today or later (Ulaanbaatar)
+             */
+            deliveryDate: string;
+            /** @description Required for DELIVERY */
+            addressId?: number | null;
+            contactName?: string | null;
+            /** @example 99112233 */
+            contactPhone?: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note?: string | null;
+            lines: components["schemas"]["SalesOrderLineRequest"][];
+            /** @description The stage chosen in the app (one of GET /sales-rep/context) */
+            stageId: number;
+        };
+        SalesRepOrderPart: {
+            uomName: string;
+            /** @description WAREHOUSE, LOOSE, RETAIL or RETAIL_BULK */
+            basis: string;
+            qty: string;
+            unitPrice: string;
+            total: string;
+        };
+        SalesRepOrderLine: {
+            lineNo: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            unitName: string;
+            qty: string;
+            qtyBase: string;
+            baseUnitName: string;
+            /** @description Reserved, base units */
+            qtyApproved: string;
+            /** @description Short, base units */
+            qtyBackordered: string;
+            total: string | null;
+            parts: components["schemas"]["SalesRepOrderPart"][];
+        };
+        SalesRepOrderEvent: {
+            /** @enum {string|null} */
+            fromStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED" | null;
+            /** @enum {string} */
+            toStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            reason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesRepOrder: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            addressText: string | null;
+            contactName: string | null;
+            contactPhone: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note: string | null;
+            subtotal: string | null;
+            discountTotal: string | null;
+            total: string | null;
+            boardName: string | null;
+            pipelineName: string | null;
+            stageName: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["SalesRepOrderLine"][];
+            events: components["schemas"]["SalesRepOrderEvent"][];
+        };
+        SalesRepOrderSummary: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerId: number;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** Format: date */
+            deliveryDate: string;
+            /** @description Null for a draft */
+            total: string | null;
+            lineCount: number;
+            pipelineName: string | null;
+            stageName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesRepMonthSummary: {
+            count: number;
+            /** @description MNT: the orders not cancelled */
+            total: string;
+            drafts: number;
+        };
+        SalesRepOrderPage: {
+            data: components["schemas"]["SalesRepOrderSummary"][];
+            nextCursor: string | null;
+            /** @description First page only */
+            summary: components["schemas"]["SalesRepMonthSummary"] | null;
+        };
+        SalesRepProductUnit: {
+            /** @description The product unit id an order line takes */
+            id: number;
+            uomName: string;
+            factorToBase: string;
+            isBase: boolean;
+            barcodes: string[];
+            /** @description MNT, one unit at the WHOLESALE list */
+            wholesale: string | null;
+            /** @enum {string|null} */
+            basis: "WAREHOUSE" | "LOOSE" | "MIXED" | null;
+        };
+        SalesRepProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            categoryId: number;
+            /** @description Relative to the server */
+            thumbUrl: string | null;
+            /** @description An order accepts it (active, complete, with a home warehouse) */
+            sellable: boolean;
+            /** @description Base units free in the home warehouse */
+            available: string;
+            units: components["schemas"]["SalesRepProductUnit"][];
+        };
+        SalesRepProductPage: {
+            data: components["schemas"]["SalesRepProduct"][];
+            nextCursor: string | null;
+        };
+        SalesRepCustomer: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description The default address */
+            address: string | null;
+        };
+        SalesRepCustomerPage: {
+            data: components["schemas"]["SalesRepCustomer"][];
+            nextCursor: string | null;
+        };
+        SalesRepCustomerAddress: {
+            id: number;
+            label: string | null;
+            /** @description Null for a point without text */
+            address: string | null;
+            isDefault: boolean;
+        };
+        SalesRepCustomerContact: {
+            name: string | null;
+            phone: string | null;
+        };
+        SalesRepCustomerDetail: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description Active, the default first */
+            addresses: components["schemas"]["SalesRepCustomerAddress"][];
+            contacts: components["schemas"]["SalesRepCustomerContact"][];
         };
     };
     responses: never;
@@ -18811,6 +19132,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepContext"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_list: {
+        parameters: {
+            query: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description The Ulaanbaatar month the orders were made */
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesRepOrderRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_products: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name words, code or barcode */
+                q?: string;
+                /** @description With its subcategories */
+                categoryId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepProductPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_productBatch: {
+        parameters: {
+            query: {
+                /** @description Product ids, comma separated (at most 200) */
+                productIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepProduct"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_customers: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name, code, phone or registration number */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepCustomerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepCustomerDetail"];
                 };
             };
             /** @description RFC 9457 problem details */

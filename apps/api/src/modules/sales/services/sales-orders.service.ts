@@ -9,6 +9,7 @@ import {
   isEditable,
   isFinished,
   ORDER_LIMITS,
+  type OrderChannel,
   orderHeaderIssues,
   type OrderStatus,
   type PaymentMethod,
@@ -60,7 +61,7 @@ import {
 } from '../schema';
 import { type Access, isContext, SalesAccessService } from './sales-access.service';
 import { type OrderDetail, SalesOrderQueryService } from './sales-order-query.service';
-import { SalesPipelinesService } from './sales-pipelines.service';
+import { type Placement, SalesPipelinesService } from './sales-pipelines.service';
 import { SalesSettingsService } from './sales-settings.service';
 
 type OrderRow = typeof salesOrders.$inferSelect;
@@ -179,57 +180,80 @@ export class SalesOrdersService implements OnModuleInit {
    * in the same transaction (ADR-0057 #3).
    */
   async create(ctx: AuthContext, input: OrderInput): Promise<OrderDetail> {
-    const id = await inTransaction(this.db, async (tx) => {
-      const header = await this.checkedHeader(tx, input);
-      const placement = await this.pipelines.placementFor(
-        ctx,
-        'ADMIN',
-        input.pipelineId ?? null,
-        input.stageId ?? null,
-        tx,
-      );
-      const [row] = await tx
-        .insert(salesOrders)
-        .values({
-          ...header,
-          channel: 'ADMIN',
-          createdBy: actorUserId(ctx),
-          ...(placement
-            ? {
-                pipelineId: placement.pipelineId,
-                stageId: placement.stageId,
-                stageEnteredAt: sql`now()`,
-              }
-            : {}),
-        })
-        .returning({ id: salesOrders.id });
-      if (!row) throw new Error('sales order insert returned no row');
-      await this.writeLines(tx, row.id, input.lines);
-      await this.event(tx, ctx, row.id, null, 'DRAFT', null);
-      if (placement) {
-        await tx.insert(salesStageMoves).values({
-          orderId: row.id,
-          fromStageId: null,
-          toStageId: placement.stageId,
-          actorId: actorUserId(ctx),
-        });
-      }
-      const number = await this.numberInTx(tx, row.id);
-      await this.audit.record(tx, ctx, {
-        action: 'CREATE',
-        entity: 'sales_orders',
-        entityId: row.id,
-        after: {
-          ...header,
-          number,
-          lines: input.lines.length,
-          pipelineId: placement?.pipelineId ?? null,
-          stageId: placement?.stageId ?? null,
-        },
-      });
-      return row.id;
-    });
+    const id = await inTransaction(this.db, (tx) =>
+      this.createInTx(tx, ctx, input, {
+        channel: 'ADMIN',
+        placement: () =>
+          this.pipelines.placementFor(
+            ctx,
+            'ADMIN',
+            input.pipelineId ?? null,
+            input.stageId ?? null,
+            tx,
+          ),
+      }),
+    );
     return this.queries.detail(ctx, id);
+  }
+
+  /**
+   * A draft on its channel inside the caller's transaction: the header checked, then placed where
+   * `placement` says (the office: `create`; the rep app: ADR-0061 #6), numbered last unless
+   * `numberLater` (a submit in the same transaction draws the number after the stock's locks).
+   */
+  async createInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    input: OrderInput,
+    options: {
+      channel: OrderChannel;
+      placement: () => Promise<Placement | null>;
+      numberLater?: boolean;
+    },
+  ): Promise<number> {
+    const header = await this.checkedHeader(tx, input);
+    const placement = await options.placement();
+    const [row] = await tx
+      .insert(salesOrders)
+      .values({
+        ...header,
+        channel: options.channel,
+        createdBy: actorUserId(ctx),
+        ...(placement
+          ? {
+              pipelineId: placement.pipelineId,
+              stageId: placement.stageId,
+              stageEnteredAt: sql`now()`,
+            }
+          : {}),
+      })
+      .returning({ id: salesOrders.id });
+    if (!row) throw new Error('sales order insert returned no row');
+    await this.writeLines(tx, row.id, input.lines);
+    await this.event(tx, ctx, row.id, null, 'DRAFT', null);
+    if (placement) {
+      await tx.insert(salesStageMoves).values({
+        orderId: row.id,
+        fromStageId: null,
+        toStageId: placement.stageId,
+        actorId: actorUserId(ctx),
+      });
+    }
+    const number = options.numberLater ? null : await this.numberInTx(tx, row.id);
+    await this.audit.record(tx, ctx, {
+      action: 'CREATE',
+      entity: 'sales_orders',
+      entityId: row.id,
+      after: {
+        ...header,
+        number,
+        ...(options.channel === 'ADMIN' ? {} : { channel: options.channel }),
+        lines: input.lines.length,
+        pipelineId: placement?.pipelineId ?? null,
+        stageId: placement?.stageId ?? null,
+      },
+    });
+    return row.id;
   }
 
   /**
@@ -541,6 +565,17 @@ export class SalesOrdersService implements OnModuleInit {
     return this.queries.detail(actor, id);
   }
 
+  /**
+   * Submits a draft made in the caller's transaction (the rep app's CONFIRM stage, ADR-0061 #6):
+   * the row locked, then the submit as `submit` does it; no visibility check, the caller placed it.
+   */
+  async submitDraftInTx(tx: Tx, actor: Actor, id: number): Promise<void> {
+    const [order] = await tx.select().from(salesOrders).where(eq(salesOrders.id, id)).for('update');
+    if (!order) throw notFound('sales order', id);
+    if (order.status !== 'DRAFT') throw stateError(order, 'DRAFT');
+    await this.submitInTx(tx, actor, order);
+  }
+
   /** Prices the order's lines today and reserves them (replacing earlier reservations when asked). */
   private async priceAndReserve(tx: Tx, actor: Actor, order: OrderRow, replace: boolean) {
     const today = businessDate();
@@ -715,6 +750,9 @@ export class SalesOrdersService implements OnModuleInit {
     const today = businessDate();
     {
       const { quote, reserved } = await this.priceAndReserve(tx, actor, order, false);
+      // An unnumbered draft (from before ADR-0057, or the rep app's, ADR-0061 #6) takes its number
+      // here: the counter's lock after the stock's, and before the CONFIRMED row that needs it.
+      const number = order.number ?? (await this.numberInTx(tx, id));
       await tx
         .update(salesOrders)
         .set({
@@ -731,8 +769,6 @@ export class SalesOrdersService implements OnModuleInit {
         .where(eq(salesOrders.id, id));
       await this.event(tx, actor, id, 'DRAFT', 'SUBMITTED', null);
       await this.event(tx, actor, id, 'SUBMITTED', 'CONFIRMED', null);
-      // A draft created before ADR-0057 had no number; the counter's lock comes last.
-      const number = order.number ?? (await this.numberInTx(tx, id));
       await this.audit.record(tx, actor, {
         action: 'CONFIRM',
         entity: 'sales_orders',

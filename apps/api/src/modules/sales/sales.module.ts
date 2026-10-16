@@ -10,12 +10,15 @@ import {
   SalesPipelinesController,
   SalesStagesController,
 } from './controllers/sales-pipelines.controller';
+import { SalesRepController } from './controllers/sales-rep.controller';
 import { SalesSettingsController } from './controllers/sales-settings.controller';
 import { SalesAccessService } from './services/sales-access.service';
 import { SalesBoardsService } from './services/sales-boards.service';
 import { SalesOrderQueryService } from './services/sales-order-query.service';
 import { SalesOrdersService } from './services/sales-orders.service';
 import { SalesPipelinesService } from './services/sales-pipelines.service';
+import { SalesRepOrdersService } from './services/sales-rep-orders.service';
+import { SalesRepShopService } from './services/sales-rep-shop.service';
 import { SalesSettingsService } from './services/sales-settings.service';
 
 /**
@@ -32,6 +35,8 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
+    SalesRepOrdersService,
+    SalesRepShopService,
   ],
   exports: [
     SalesAccessService,
@@ -40,6 +45,8 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesSettingsService,
     SalesOrderQueryService,
     SalesOrdersService,
+    SalesRepOrdersService,
+    SalesRepShopService,
   ],
 })
 export class SalesModule {}
@@ -53,6 +60,7 @@ export class SalesModule {}
     SalesPipelinesController,
     SalesStagesController,
     SalesSettingsController,
+    SalesRepController,
   ],
 })
 export class SalesHttpModule {}

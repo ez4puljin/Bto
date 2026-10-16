@@ -257,6 +257,39 @@ export class ProductPricesService {
   }
 
   /**
+   * The unit table `view()` gives one product, for many products on a day (the rep app's shop,
+   * ADR-0061 #7): one of each current unit on both lists, without discount programs. Products
+   * without terms, or whose profile has no values that day, are left out.
+   */
+  async tablesOf(
+    productIds: readonly number[],
+    date: string = businessDate(),
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, UnitPrices[]>> {
+    const terms = await this.inForce(productIds, date, executor);
+    if (terms.size === 0) return new Map();
+    const versions = await this.profiles.versionsInForce(
+      [...terms.values()].map((own) => own.profileId),
+      date,
+      executor,
+    );
+    const units = await this.units.currentUnits([...terms.keys()], executor);
+    const tables = new Map<number, UnitPrices[]>();
+    for (const [productId, own] of terms) {
+      const profile = versions.get(own.profileId);
+      if (!profile) continue;
+      tables.set(
+        productId,
+        unitPriceTable(
+          { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
+          quoteUnitsOf(units.get(productId) ?? []),
+        ),
+      );
+    }
+    return tables;
+  }
+
+  /**
    * The products one segment condition on prices keeps, ascending (ADR-0049 #3), by the terms in
    * force on a day: using these profiles (`IN`) or any (`ANY`), or a warehouse price within
    * whole-MNT bounds, both included (`BETWEEN`).

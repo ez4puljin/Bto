@@ -16777,6 +16777,449 @@
           "pos-dev"
         ]
       }
+    },
+    "/api/v1/sales-rep/context": {
+      "get": {
+        "operationId": "SalesRep_context",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepContext"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/orders": {
+      "post": {
+        "operationId": "SalesRep_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesRepOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrder"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      },
+      "get": {
+        "operationId": "SalesRep_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "description": "The Ulaanbaatar month the orders were made",
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/orders/{id}": {
+      "get": {
+        "operationId": "SalesRep_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrder"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/products": {
+      "get": {
+        "operationId": "SalesRep_products",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name words, code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "With its subcategories",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepProductPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/products/batch": {
+      "get": {
+        "operationId": "SalesRep_productBatch",
+        "parameters": [
+          {
+            "name": "productIds",
+            "required": true,
+            "in": "query",
+            "description": "Product ids, comma separated (at most 200)",
+            "schema": {
+              "pattern": "^\\d+(,\\d+){0,199}$",
+              "example": "12,15",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRepProduct"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/customers": {
+      "get": {
+        "operationId": "SalesRep_customers",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, code, phone or registration number",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepCustomerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/customers/{id}": {
+      "get": {
+        "operationId": "SalesRep_customer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepCustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
     }
   },
   "info": {
@@ -16900,7 +17343,8 @@
           "pos.read",
           "pos.manage",
           "pos.till.operate",
-          "pos.till.supervise"
+          "pos.till.supervise",
+          "sales.orders.rep"
         ]
       },
       "RoleRef": {
@@ -33385,6 +33829,845 @@
           "title",
           "status",
           "code"
+        ]
+      },
+      "SalesRepStage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "action": {
+            "enum": [
+              "NONE",
+              "CONFIRM",
+              "PICK",
+              "SALE",
+              "CANCEL"
+            ],
+            "type": "string",
+            "description": "NONE: a draft; CONFIRM: reserved at once"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "action"
+        ]
+      },
+      "SalesRepPipeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepStage"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "stages"
+        ]
+      },
+      "SalesRepBoard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pipelines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepPipeline"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "pipelines"
+        ]
+      },
+      "SalesRepContext": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "description": "The server's business date (Ulaanbaatar)"
+          },
+          "boards": {
+            "description": "Stages the rep may place orders on",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepBoard"
+            }
+          },
+          "defaultStageId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The SALES_REP channel's stage"
+          }
+        },
+        "required": [
+          "today",
+          "boards",
+          "defaultStageId"
+        ]
+      },
+      "SalesRepOrderRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Today or later (Ulaanbaatar)"
+          },
+          "addressId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Required for DELIVERY"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "example": "99112233"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineRequest"
+            }
+          },
+          "stageId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The stage chosen in the app (one of GET /sales-rep/context)"
+          }
+        },
+        "required": [
+          "customerId",
+          "fulfilment",
+          "deliveryDate",
+          "paymentMethod",
+          "lines",
+          "stageId"
+        ]
+      },
+      "SalesRepOrderPart": {
+        "type": "object",
+        "properties": {
+          "uomName": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string",
+            "description": "WAREHOUSE, LOOSE, RETAIL or RETAIL_BULK"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uomName",
+          "basis",
+          "qty",
+          "unitPrice",
+          "total"
+        ]
+      },
+      "SalesRepOrderLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "baseUnitName": {
+            "type": "string"
+          },
+          "qtyApproved": {
+            "type": "string",
+            "description": "Reserved, base units"
+          },
+          "qtyBackordered": {
+            "type": "string",
+            "description": "Short, base units"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderPart"
+            }
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "qty",
+          "qtyBase",
+          "baseUnitName",
+          "qtyApproved",
+          "qtyBackordered",
+          "total",
+          "parts"
+        ]
+      },
+      "SalesRepOrderEvent": {
+        "type": "object",
+        "properties": {
+          "fromStatus": {
+            "nullable": true,
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "toStatus": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "fromStatus",
+          "toStatus",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "SalesRepOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "addressText": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountTotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "boardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderLine"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderEvent"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "fulfilment",
+          "deliveryDate",
+          "addressText",
+          "contactName",
+          "contactPhone",
+          "paymentMethod",
+          "note",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "boardName",
+          "pipelineName",
+          "stageName",
+          "cancelReason",
+          "createdAt",
+          "lines",
+          "events"
+        ]
+      },
+      "SalesRepOrderSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a draft"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "customerId",
+          "customerName",
+          "fulfilment",
+          "paymentMethod",
+          "deliveryDate",
+          "total",
+          "lineCount",
+          "pipelineName",
+          "stageName",
+          "createdAt"
+        ]
+      },
+      "SalesRepMonthSummary": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "description": "MNT: the orders not cancelled"
+          },
+          "drafts": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "drafts"
+        ]
+      },
+      "SalesRepOrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "nullable": true,
+            "description": "First page only",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesRepMonthSummary"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "summary"
+        ]
+      },
+      "SalesRepProductUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The product unit id an order line takes"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "factorToBase": {
+            "type": "string"
+          },
+          "isBase": {
+            "type": "boolean"
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wholesale": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one unit at the WHOLESALE list"
+          },
+          "basis": {
+            "nullable": true,
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "MIXED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "uomName",
+          "factorToBase",
+          "isBase",
+          "barcodes",
+          "wholesale",
+          "basis"
+        ]
+      },
+      "SalesRepProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "An order accepts it (active, complete, with a home warehouse)"
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units free in the home warehouse"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductUnit"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "thumbUrl",
+          "sellable",
+          "available",
+          "units"
+        ]
+      },
+      "SalesRepProductPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "The default address"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address"
+        ]
+      },
+      "SalesRepCustomerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomer"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepCustomerAddress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a point without text"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "address",
+          "isDefault"
+        ]
+      },
+      "SalesRepCustomerContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "SalesRepCustomerDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "addresses": {
+            "description": "Active, the default first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerAddress"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerContact"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "addresses",
+          "contacts"
         ]
       }
     }
