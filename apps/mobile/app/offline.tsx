@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { useSession } from '../src/state/session';
 import { colors, spacing } from '../src/theme/tokens';
-import { Button, EmptyState, Screen } from '../src/ui/kit';
+import { PillButton } from '../src/ui/controls';
+import { EmptyState } from '../src/ui/kit';
+import { BarButton, Page } from '../src/ui/layout';
 
 /** A stored session the server could not be asked about: try again when the Wi-Fi is back. */
 export default function OfflineScreen() {
@@ -20,25 +22,26 @@ export default function OfflineScreen() {
   };
 
   return (
-    <Screen bottom style={styles.body}>
-      <EmptyState
-        icon={<WifiOff size={48} color={colors.muted} />}
-        title={t('mobile.offline.title')}
-        hint={t('mobile.offline.hint', { server: session?.server ?? '' })}
-      />
-      <View style={styles.actions}>
-        <Button title={t('mobile.offline.retry')} onPress={() => void retry()} loading={busy} />
-        <Button
-          variant="ghost"
-          title={t('mobile.server.change')}
-          onPress={() => void setServer(null)}
+    <Page edges={['top', 'bottom']}>
+      <View style={styles.body}>
+        <EmptyState
+          icon={<WifiOff size={48} strokeWidth={1.5} color={colors.input} />}
+          title={t('mobile.offline.title')}
+          hint={t('mobile.offline.hint', { server: session?.server ?? '' })}
         />
+        <PillButton title={t('mobile.offline.retry')} onPress={() => void retry()} loading={busy} />
+        <BarButton title={t('mobile.server.change')} onPress={() => void setServer(null)} />
       </View>
-    </Screen>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { justifyContent: 'center', padding: spacing.lg },
-  actions: { gap: spacing.sm },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
 });

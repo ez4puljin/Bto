@@ -5,6 +5,7 @@ import {
   cartIssues,
   cartReducer,
   EMPTY_CART,
+  lineOf,
   MAX_LINES,
   orderRequestOf,
   qtyOf,
@@ -17,6 +18,7 @@ const unit = (productUnitId: number, isBase = true) => ({
   sku: `SKU${productUnitId}`,
   name: 'Кола',
   uomName: isBase ? 'ш' : 'хайрцаг',
+  uomCode: isBase ? 'PCS' : 'BOX',
   factorToBase: isBase ? '1' : '12',
   isBase,
   wholesale: isBase ? '1150' : '12000',
@@ -41,6 +43,24 @@ describe('the cart (ADR-0061 #8)', () => {
     );
   });
 
+  it('keeps one line per product from its page: another unit replaces it in place', () => {
+    const pieces = { ...unit(1), productId: 7 };
+    const boxes = { ...unit(2, false), productId: 7 };
+    let cart = cartReducer(EMPTY_CART, { type: 'add', line: unit(5), qty: 1 });
+    cart = cartReducer(cart, { type: 'setLine', line: pieces, qty: 6 });
+    cart = cartReducer(cart, { type: 'add', line: unit(6), qty: 1 });
+    cart = cartReducer(cart, { type: 'setLine', line: boxes, qty: 2 });
+    expect(cart.lines.map((line) => [line.productUnitId, line.qty])).toEqual([
+      [5, '1'],
+      [2, '2'],
+      [6, '1'],
+    ]);
+    expect(lineOf(cart, 7)?.uomCode).toBe('BOX');
+    cart = cartReducer(cart, { type: 'setLine', line: boxes, qty: 0 });
+    expect(lineOf(cart, 7)).toBeUndefined();
+    expect(cart.lines).toHaveLength(2);
+  });
+
   it('holds at most the lines an order takes', () => {
     let cart: Cart = EMPTY_CART;
     for (let id = 1; id <= MAX_LINES + 5; id += 1) {
@@ -57,6 +77,32 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cart).toMatchObject({ fulfilment: 'PICKUP', addressId: null });
     cart = cartReducer(cart, { type: 'address', addressId: 32 });
     expect(cart).toMatchObject({ fulfilment: 'DELIVERY', addressId: 32 });
+    // Pickup and back keeps the chosen address.
+    cart = cartReducer(cart, { type: 'pickup' });
+    expect(orderRequestOf(cart, 1).addressId).toBeNull();
+    cart = cartReducer(cart, { type: 'delivery' });
+    expect(cart).toMatchObject({ fulfilment: 'DELIVERY', addressId: 32 });
+  });
+
+  it('takes the customer’s first contact unless one was typed, and cuts it to the limits', () => {
+    const customer = { id: 9, code: '1009', name: 'Дэлгүүр' };
+    let cart = cartReducer(EMPTY_CART, {
+      type: 'customer',
+      customer,
+      defaultAddressId: null,
+      contact: { name: 'Бат', phone: '99112233' },
+    });
+    expect(cart).toMatchObject({ contactName: 'Бат', contactPhone: '99112233' });
+    cart = cartReducer(cart, { type: 'contact', name: 'Дорж' });
+    cart = cartReducer(cart, {
+      type: 'customer',
+      customer: { ...customer, id: 10 },
+      defaultAddressId: null,
+      contact: { name: 'Сүх', phone: null },
+    });
+    expect(cart).toMatchObject({ contactName: 'Дорж', contactPhone: '99112233' });
+    cart = cartReducer(cart, { type: 'contact', phone: '9'.repeat(40) });
+    expect(cart.contactPhone).toHaveLength(30);
   });
 
   it('lists what keeps it from being sent, and builds the order body', () => {
@@ -80,6 +126,7 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cartIssues(cart, today, 5)).toEqual(['deliveryDate']);
     cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-16' });
     cart = cartReducer(cart, { type: 'note', note: '  Өглөө  ' });
+    cart = cartReducer(cart, { type: 'contact', name: ' Бат ', phone: '' });
     expect(cartIssues(cart, today, 5)).toEqual([]);
     expect(orderRequestOf(cart, 5)).toEqual({
       stageId: 5,
@@ -87,12 +134,19 @@ describe('the cart (ADR-0061 #8)', () => {
       fulfilment: 'PICKUP',
       deliveryDate: '2026-10-16',
       addressId: null,
+      contactName: 'Бат',
+      contactPhone: null,
       paymentMethod: 'CREDIT',
       note: 'Өглөө',
       lines: [{ productUnitId: 1, qty: '3' }],
     });
     const sent = cartReducer(cart, { type: 'sent' });
-    expect(sent).toMatchObject({ lines: [], customer: null, paymentMethod: 'CREDIT' });
+    expect(sent).toMatchObject({
+      lines: [],
+      customer: null,
+      contactName: '',
+      paymentMethod: 'CREDIT',
+    });
   });
 
   it('reads a stored cart back safely', () => {
@@ -101,7 +155,11 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cartFrom({ lines: [unit(1)], note: 'n' })).toMatchObject({
       note: 'n',
       fulfilment: 'DELIVERY',
+      contactName: '',
     });
+    // A cart stored before units had codes.
+    const { uomCode: _code, ...old } = unit(1);
+    expect(cartFrom({ lines: [old] }).lines[0]?.uomCode).toBeNull();
   });
 });
 

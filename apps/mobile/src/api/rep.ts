@@ -1,11 +1,15 @@
 import type { components } from '@tugeel/api-client';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { canonical } from '../cart/send';
+import type { ShopQuery } from '../shop/filters';
 import { useSignedIn } from '../state/session';
 import { unwrap } from './problem';
 
 export type RepContext = components['schemas']['SalesRepContext'];
+export type RepWarehouse = components['schemas']['SalesRepWarehouse'];
 export type RepProduct = components['schemas']['SalesRepProduct'];
+export type RepUnit = components['schemas']['SalesRepProductUnit'];
+export type RepSupplier = components['schemas']['SalesRepSupplier'];
 export type RepCustomer = components['schemas']['SalesRepCustomer'];
 export type RepCustomerDetail = components['schemas']['SalesRepCustomerDetail'];
 export type RepOrder = components['schemas']['SalesRepOrder'];
@@ -15,7 +19,14 @@ export type Quote = components['schemas']['Quote'];
 
 const PAGE = 30;
 
-/** Today, the stages the rep may place on and the default one (ADR-0061 #5). */
+/** Days and a search of the rep's orders (ADR-0066). */
+export interface OrderRange {
+  from: string;
+  to: string;
+  q: string;
+}
+
+/** Today, the stages the rep may place on, the warehouses and branches (ADR-0061 #5, ADR-0066). */
 export function useRepContext() {
   const { session } = useSignedIn();
   return useQuery({
@@ -34,18 +45,29 @@ export function useCategories() {
   });
 }
 
-export function useProducts(q: string, categoryId: number | null) {
+function productParams(query: ShopQuery) {
+  return {
+    ...(query.q ? { q: query.q } : {}),
+    ...(query.categoryIds.length > 0 ? { categoryIds: [...query.categoryIds] } : {}),
+    ...(query.warehouseId !== null ? { warehouseId: query.warehouseId } : {}),
+    ...(query.supplierIds.length > 0 ? { supplierIds: [...query.supplierIds] } : {}),
+    ...(query.inStock ? { inStock: true } : {}),
+    sort: query.sort,
+  };
+}
+
+/** The shop, page by page, as the filters and the search ask; the first page holds the total. */
+export function useProducts(query: ShopQuery) {
   const { session } = useSignedIn();
   return useInfiniteQuery({
-    queryKey: ['rep', 'products', q, categoryId],
+    queryKey: ['rep', 'products', productParams(query)],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await session.client.GET('/api/v1/sales-rep/products', {
           params: {
             query: {
-              ...(q ? { q } : {}),
-              ...(categoryId ? { categoryId } : {}),
+              ...productParams(query),
               ...(pageParam ? { cursor: pageParam } : {}),
               limit: PAGE,
             },
@@ -57,18 +79,50 @@ export function useProducts(q: string, categoryId: number | null) {
   });
 }
 
-/** Products by id, as the shop would list them (a scanned barcode, a product page). */
-export function useProductsOf(ids: readonly number[]) {
+/** How many products a filter would show (the filter sheet's «N бараа харуулах»). */
+export function useProductCount(query: ShopQuery, enabled: boolean) {
   const { session } = useSignedIn();
   return useQuery({
-    queryKey: ['rep', 'products', 'of', [...ids].sort((a, b) => a - b).join(',')],
+    queryKey: ['rep', 'products', 'count', productParams(query)],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/products', {
+          params: { query: { ...productParams(query), limit: 1 } },
+        }),
+      ).total,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Products by id, as the shop would list them (a product page, the cart, a notice); with
+ * `priceBefore`, each base price on that day too (a price-drop notice's old price).
+ */
+export function useProductsOf(ids: readonly number[], priceBefore?: string) {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'products', 'of', [...ids].sort((a, b) => a - b).join(','), priceBefore],
     queryFn: async () =>
       unwrap(
         await session.client.GET('/api/v1/sales-rep/products/batch', {
-          params: { query: { productIds: ids.join(',') } },
+          params: {
+            query: { productIds: ids.join(','), ...(priceBefore ? { priceBefore } : {}) },
+          },
         }),
       ),
     enabled: ids.length > 0,
+  });
+}
+
+/** The main suppliers of the shop's products, the most products first. */
+export function useSuppliers(enabled = true) {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'suppliers'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/sales-rep/suppliers')),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -108,19 +162,30 @@ export function useCustomer(id: number | null) {
   });
 }
 
-export function useOrders(month: string) {
+/** The rep's own orders made on the days of a range, newest first, with the range's summary. */
+export function useOrders(range: OrderRange | null) {
   const { session } = useSignedIn();
+  const q = range?.q.trim() ?? '';
   return useInfiniteQuery({
-    queryKey: ['rep', 'orders', month],
+    queryKey: ['rep', 'orders', range?.from, range?.to, q],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await session.client.GET('/api/v1/sales-rep/orders', {
-          params: { query: { month, ...(pageParam ? { cursor: pageParam } : {}), limit: PAGE } },
+          params: {
+            query: {
+              from: range?.from ?? '',
+              to: range?.to ?? '',
+              ...(q ? { q } : {}),
+              ...(pageParam ? { cursor: pageParam } : {}),
+              limit: PAGE,
+            },
+          },
         }),
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    enabled: /^\d{4}-\d{2}$/.test(month),
+    enabled: range !== null,
+    placeholderData: keepPreviousData,
   });
 }
 

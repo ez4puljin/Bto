@@ -1,3 +1,4 @@
+import { Decimal } from '@tugeel/shared/money';
 import { addDays } from '@tugeel/shared/time';
 import { ubDate } from '../dates/dates';
 
@@ -86,4 +87,41 @@ export function unreadIds<N extends FeedNotice, M extends FeedNotification>(
     noticeIds: notices.filter((notice) => !notice.read).map((notice) => notice.id),
     notificationIds: notifications.filter((row) => !row.read).map((row) => row.id),
   };
+}
+
+/** The popup again, on the notices just shown («Дахин харах»): those of `ids`, in that order. */
+export function replayQueue<N extends FeedNotice>(
+  notices: readonly N[],
+  ids: readonly number[],
+): N[] {
+  return ids.flatMap((id) => notices.filter((notice) => notice.id === id));
+}
+
+/** The ids a replay is asked for (`?ids=3,5`); nothing that is not a positive id. */
+export function idsParam(value: string | undefined): number[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .filter((part) => /^[1-9]\d{0,14}$/.test(part))
+    .map((part) => Number.parseInt(part, 10));
+}
+
+/** A percentage a promotion names («Ус, ундаа 5% хямдарлаа» → "5"), for its picture. */
+export function percentIn(text: string): string | null {
+  const match = /(\d{1,2}(?:[.,]\d)?)\s?%/.exec(text);
+  return match?.[1]?.replace(',', '.') ?? null;
+}
+
+/** How much cheaper a price became, in whole percent, HALF_UP; null when it did not drop. */
+export function dropPercent(before: string | null, now: string | null): string | null {
+  if (before === null || now === null) return null;
+  const old = new Decimal(before);
+  const fresh = new Decimal(now);
+  if (!old.gt(fresh) || !old.gt(0)) return null;
+  return old
+    .minus(fresh)
+    .dividedBy(old)
+    .times(100)
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+    .toFixed();
 }

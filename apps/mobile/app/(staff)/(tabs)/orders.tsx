@@ -1,146 +1,289 @@
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { problemFrom } from '../../../src/api/problem';
-import { useOrders, useRepContext } from '../../../src/api/rep';
-import { monthOf, shiftMonth, shortDate, ubDate } from '../../../src/dates/dates';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
+import { type RepOrderSummary, useOrders, useRepContext } from '../../../src/api/rep';
 import {
-  Card,
-  EmptyState,
-  Money,
-  PaymentLabel,
-  ProblemText,
-  Screen,
-  StatusPill,
-} from '../../../src/ui/kit';
+  type DateRange,
+  dayNameOf,
+  monthDay,
+  presetOf,
+  presetRange,
+  type RangePreset,
+} from '../../../src/dates/calendar';
+import { ubDate, ubTime, weekdayOf } from '../../../src/dates/dates';
+import { formatMillions, formatMnt } from '../../../src/format/format';
+import { DateRangeSheet } from '../../../src/orders/date-range-sheet';
+import { useDebounced } from '../../../src/state/use-debounced';
+import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { ChoiceChip, SearchField } from '../../../src/ui/controls';
+import { Separator } from '../../../src/ui/grouped';
+import { ProblemText } from '../../../src/ui/kit';
+import { LargeTitle, Page } from '../../../src/ui/layout';
+import { StatRow } from '../../../src/ui/stat-row';
+import { PaymentDot, StatusPill } from '../../../src/ui/status';
+import { useTabBarInset } from '../../../src/ui/tab-bar';
 
-/** «Захиалга»: the rep's own orders of a month, newest first (ADR-0061 #5). */
+const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
+
+/**
+ * «Миний захиалгууд» (the MyOrders board, ADR-0066 #7): a customer search, the days (today, a
+ * week, this month, or any range from the calendar), the range's count, confirmed total and drafts,
+ * and the rep's own orders by day, newest first.
+ */
 export default function OrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const inset = useTabBarInset();
   const context = useRepContext();
-  const thisMonth = context.data ? monthOf(context.data.today) : null;
-  const [month, setMonth] = useState<string | null>(null);
-  useEffect(() => {
-    if (month === null && thisMonth) setMonth(thisMonth);
-  }, [month, thisMonth]);
-  const orders = useOrders(month ?? '');
+  const today = context.data?.today ?? null;
+  const [picked, setPicked] = useState<DateRange | null>(null);
+  const [text, setText] = useState('');
+  const [sheet, setSheet] = useState(false);
+  const q = useDebounced(text.trim(), 350);
+  const range = picked ?? (today ? presetRange('month', today) : null);
+  const orders = useOrders(range ? { ...range, q } : null);
   const rows = useMemo(() => orders.data?.pages.flatMap((page) => page.data) ?? [], [orders.data]);
   const summary = orders.data?.pages[0]?.summary ?? null;
+  const preset = range && today ? presetOf(range, today) : null;
+
+  const sections = useMemo(() => {
+    const groups: { day: string; data: RepOrderSummary[] }[] = [];
+    for (const row of rows) {
+      const day = ubDate(row.createdAt);
+      const last = groups[groups.length - 1];
+      if (last && last.day === day) last.data.push(row);
+      else groups.push({ day, data: [row] });
+    }
+    return groups;
+  }, [rows]);
+
+  const dayTitle = (day: string) => {
+    const weekday = weekdayOf(day) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const date = t('mobile.orders.dayDate', {
+      day: monthDay(day),
+      weekday: t(`mobile.weekdaysLong.${weekday}`),
+    });
+    const name = today ? dayNameOf(day, today) : 'date';
+    return name === 'today' || name === 'yesterday'
+      ? t('mobile.checkout.namedDay', { name: t(`mobile.days.${name}`), day: date })
+      : date;
+  };
+  const totalText = summary
+    ? (() => {
+        const millions = formatMillions(summary.total);
+        return millions
+          ? t('mobile.orders.millions', { amount: millions })
+          : t('pricing.money', { amount: formatMnt(summary.total) });
+      })()
+    : t('common.none');
+
+  const header = (
+    <View>
+      <View style={styles.bar} />
+      <LargeTitle style={styles.title}>{t('mobile.orders.title')}</LargeTitle>
+      <SearchField
+        value={text}
+        onChangeText={setText}
+        placeholder={t('mobile.orders.search')}
+        accessibilityLabel={t('mobile.orders.search')}
+        style={styles.search}
+      />
+      <View style={styles.chips}>
+        {today
+          ? PAGE_PRESETS.map((entry) => (
+              <ChoiceChip
+                key={entry}
+                compact
+                label={t(`mobile.dateRange.presets.${entry}`)}
+                selected={preset === entry}
+                onPress={() => setPicked(presetRange(entry, today))}
+              />
+            ))
+          : null}
+        <ChoiceChip
+          compact
+          label={
+            preset === null && range
+              ? t('mobile.orders.range', { from: monthDay(range.from), to: monthDay(range.to) })
+              : t('mobile.orders.pickDates')
+          }
+          selected={preset === null && range !== null}
+          icon={
+            <CalendarDays
+              size={15}
+              strokeWidth={2}
+              color={preset === null && range ? colors.primaryForeground : colors.foreground}
+            />
+          }
+          onPress={() => setSheet(true)}
+        />
+      </View>
+      <View style={styles.stats}>
+        <StatRow
+          items={[
+            {
+              value: summary ? String(summary.count) : t('common.none'),
+              label: t('mobile.orders.count'),
+            },
+            { value: totalText, label: t('mobile.orders.confirmed') },
+            {
+              value: summary ? String(summary.drafts) : t('common.none'),
+              label: t('mobile.orders.drafts'),
+            },
+          ]}
+        />
+      </View>
+      {orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null}
+    </View>
+  );
 
   return (
-    <Screen>
-      <View style={styles.months}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.orders.previous')}
-          onPress={() => month && setMonth(shiftMonth(month, -1))}
-          style={styles.arrow}
-        >
-          <ChevronLeft size={24} color={colors.primary} />
-        </Pressable>
-        <Text style={type.heading}>{month ?? ''}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.orders.next')}
-          disabled={!month || month === thisMonth}
-          onPress={() => month && setMonth(shiftMonth(month, 1))}
-          style={[styles.arrow, (!month || month === thisMonth) && styles.disabled]}
-        >
-          <ChevronRight size={24} color={colors.primary} />
-        </Pressable>
-      </View>
-      <FlatList
-        data={rows}
+    <Page>
+      <SectionList
+        sections={sections}
         keyExtractor={(order) => String(order.id)}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <>
-            {orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null}
-            {summary ? (
-              <Card style={styles.summary}>
-                <Text style={type.secondary}>
-                  {t('mobile.orders.summary', { n: summary.count, drafts: summary.drafts })}
-                </Text>
-                <Money value={summary.total} style={type.heading} />
-              </Card>
-            ) : null}
-          </>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push(`/order/${item.id}`)}
-            style={styles.row}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.lg }]}
+        ListHeaderComponent={header}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        renderSectionHeader={({ section }) => (
+          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
+            {dayTitle(section.day)}
+          </Text>
+        )}
+        renderItem={({ item, index, section }) => (
+          <View
+            style={[
+              styles.cell,
+              index === 0 && styles.firstCell,
+              index === section.data.length - 1 && styles.lastCell,
+            ]}
           >
-            <View style={styles.rowHead}>
-              <Text style={type.bodyStrong}>{item.number ?? t('common.none')}</Text>
-              <StatusPill status={item.status} />
-            </View>
-            <Text style={type.body} numberOfLines={1}>
-              {item.customerName}
-            </Text>
-            <View style={styles.rowHead}>
-              <Text style={type.caption}>
-                {t('mobile.orders.line', {
-                  created: shortDate(ubDate(item.createdAt)),
-                  delivery: shortDate(item.deliveryDate),
-                  lines: item.lineCount,
-                })}
-              </Text>
-              <Money value={item.total} />
-            </View>
-            <View style={styles.rowHead}>
-              <Text style={type.caption}>{item.stageName ?? ''}</Text>
-              <PaymentLabel method={item.paymentMethod} />
-            </View>
-          </Pressable>
+            {index > 0 ? <Separator /> : null}
+            <OrderRow order={item} onPress={() => router.push(`/order/${item.id}`)} />
+          </View>
         )}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage();
         }}
-        refreshing={orders.isRefetching}
+        refreshing={orders.isRefetching && !orders.isFetchingNextPage}
         onRefresh={() => void orders.refetch()}
         ListEmptyComponent={
-          orders.isLoading ? (
+          orders.isLoading || !range ? (
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
-            <EmptyState
-              icon={<ClipboardList size={40} color={colors.muted} />}
-              title={t('mobile.orders.empty')}
-            />
+            <View style={styles.empty}>
+              <Text style={type.heading}>{t('mobile.orders.empty')}</Text>
+              <Text style={[type.body, styles.muted]}>{t('mobile.orders.emptyHint')}</Text>
+            </View>
           )
         }
         ListFooterComponent={
-          orders.isFetchingNextPage ? <ActivityIndicator color={colors.primary} /> : null
+          orders.isFetchingNextPage ? (
+            <ActivityIndicator style={styles.loading} color={colors.primary} />
+          ) : null
         }
       />
-    </Screen>
+      {today && range ? (
+        <DateRangeSheet
+          visible={sheet}
+          today={today}
+          range={range}
+          onApply={(next) => {
+            setPicked(next);
+            setSheet(false);
+          }}
+          onClose={() => setSheet(false)}
+        />
+      ) : null}
+    </Page>
+  );
+}
+
+function OrderRow({ order, onPress }: { order: RepOrderSummary; onPress: () => void }) {
+  const { t } = useTranslation();
+  const muted = order.total === null || order.status === 'CANCELLED';
+  const meta = [
+    t(`sales.paymentMethods.${order.paymentMethod}`),
+    order.stageName,
+    ubTime(order.createdAt),
+  ]
+    .filter((part) => part)
+    .join(' · ');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
+      <View style={styles.rowText}>
+        <Text style={styles.number}>{order.number ?? t('common.none')}</Text>
+        <Text style={styles.customer} numberOfLines={1}>
+          {order.customerName}
+        </Text>
+        <View style={styles.meta}>
+          <PaymentDot method={order.paymentMethod} />
+          <Text style={type.caption} numberOfLines={1}>
+            {meta}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.rowRight}>
+        <Text style={[styles.total, muted && styles.muted]}>
+          {order.total === null
+            ? t('mobile.orders.priceLater')
+            : t('pricing.money', { amount: formatMnt(order.total) })}
+        </Text>
+        <StatusPill status={order.status} />
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  months: {
+  list: { paddingHorizontal: spacing.lg },
+  bar: { height: 44 },
+  title: { marginTop: 2, marginHorizontal: spacing.xs },
+  search: { marginTop: spacing.md },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: 2,
+  },
+  stats: { marginTop: spacing.md },
+  day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  cell: { backgroundColor: colors.card },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.lg,
+    paddingRight: 14,
   },
-  arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  disabled: { opacity: 0.3 },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  summary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  row: {
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    padding: spacing.md,
-    gap: spacing.xs,
+  pressed: { backgroundColor: colors.accent },
+  rowText: { flex: 1, gap: 2 },
+  number: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.foreground,
+    fontVariant: ['tabular-nums'],
   },
-  rowHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  loading: { marginTop: spacing.xxl },
+  customer: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.label2 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowRight: { alignItems: 'flex-end', gap: 6 },
+  total: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  muted: { color: colors.muted },
+  loading: { marginTop: spacing.xl },
+  empty: { marginTop: 40, alignItems: 'center', gap: 6 },
 });

@@ -1,30 +1,44 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { BellOff, ChevronLeft, Package } from 'lucide-react-native';
+import { BellOff, Package } from 'lucide-react-native';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useMarkRead, useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
 import { useProductsOf } from '../../../src/api/rep';
+import { lineOf } from '../../../src/cart/cart';
 import { KIND_STYLES, useNoticeEyebrow } from '../../../src/notifications/kinds';
+import { useAddOne } from '../../../src/shop/use-add';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { EmptyState, ProblemText, Screen, SectionTitle } from '../../../src/ui/kit';
-import { ProductRow } from '../../../src/ui/product-row';
+import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { EmptyState, ProblemText } from '../../../src/ui/kit';
+import { NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { ProductCard } from '../../../src/ui/product-card';
+
+const GAP = 12;
 
 /**
- * A notice opened from the popup or the list (ADR-0062 #3): its picture and text, then its
- * products in the admin's order, priced and stocked as in «Бараа», with − n + per unit.
+ * A notice opened from the popup or the list (ADR-0062 #3): its picture and words, then its
+ * products in the admin's order, as cards of «Бараа» (ADR-0066).
  */
 export default function NoticeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const noticeId = Number.parseInt(id ?? '', 10);
   const { server } = useSignedIn();
-  const { cart, dispatch, pending } = useShop();
+  const { cart, pending } = useShop();
+  const add = useAddOne();
   const summary = useNotificationSummary();
   const { mutate: markRead } = useMarkRead();
   const eyebrow = useNoticeEyebrow();
@@ -43,21 +57,21 @@ export default function NoticeScreen() {
       return product ? [product] : [];
     });
   }, [query.data, notice?.productIds]);
+  const cardWidth = (width - spacing.lg * 2 - GAP) / 2;
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-        <ChevronLeft size={24} color={colors.primary} />
-        <Text style={[type.body, { color: colors.link }]}>{t('common.back')}</Text>
-      </Pressable>
-      {summary.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
-      {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
-      {summary.isSuccess && !notice ? (
-        <EmptyState
-          icon={<BellOff size={40} color={colors.muted} />}
-          title={t('mobile.notifications.gone')}
-        />
-      ) : null}
+    <Page white>
+      <NavBar back={t('common.back')} onBack={() => router.back()} />
+      <View style={styles.pad}>
+        {summary.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
+        {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
+        {summary.isSuccess && !notice ? (
+          <EmptyState
+            icon={<BellOff size={40} strokeWidth={1.5} color={colors.input} />}
+            title={t('mobile.notifications.gone')}
+          />
+        ) : null}
+      </View>
       {notice ? (
         <ScrollView contentContainerStyle={styles.body}>
           {notice.imageUrl ? (
@@ -67,49 +81,57 @@ export default function NoticeScreen() {
               contentFit="cover"
             />
           ) : null}
-          <Text style={[type.caption, { color: KIND_STYLES[notice.kind].strong }]}>
+          <Text style={[styles.eyebrow, { color: KIND_STYLES[notice.kind].strong }]}>
             {eyebrow(notice)}
           </Text>
-          <Text style={type.title}>{notice.title}</Text>
-          <Text style={type.body}>{notice.body}</Text>
+          <Text accessibilityRole="header" style={type.title2}>
+            {notice.title}
+          </Text>
+          <Text style={styles.text}>{notice.body}</Text>
           {productIds.length > 0 ? (
-            <View style={styles.products}>
-              <SectionTitle>{t('mobile.notifications.products')}</SectionTitle>
+            <>
+              <SectionHeader>{t('mobile.notifications.products')}</SectionHeader>
               {query.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
               {query.error ? <ProblemText problem={problemFrom(query.error)} /> : null}
               {query.isSuccess && products.length === 0 ? (
                 <EmptyState
-                  icon={<Package size={40} color={colors.muted} />}
+                  icon={<Package size={40} strokeWidth={1.5} color={colors.input} />}
                   title={t('mobile.notifications.productsGone')}
                 />
               ) : null}
-              {products.map((product) => (
-                <ProductRow
-                  key={product.id}
-                  product={product}
-                  server={server}
-                  cart={cart}
-                  dispatch={dispatch}
-                  locked={pending !== null}
-                  onOpen={() => router.push(`/product/${product.id}`)}
-                />
-              ))}
-            </View>
+              <View style={styles.grid}>
+                {products.map((product) => (
+                  <View key={product.id} style={{ width: cardWidth }}>
+                    <ProductCard
+                      product={product}
+                      server={server}
+                      line={lineOf(cart, product.id)}
+                      locked={pending !== null}
+                      onOpen={() => router.push(`/product/${product.id}`)}
+                      onAdd={() => add(product)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </>
           ) : null}
         </ScrollView>
       ) : null}
-    </Screen>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, minHeight: 44 },
-  body: { padding: spacing.lg, gap: spacing.md },
+  pad: { paddingHorizontal: spacing.lg },
+  body: { paddingHorizontal: spacing.lg, paddingBottom: 40, gap: 6 },
   image: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: radii.card,
-    backgroundColor: colors.fill,
+    borderRadius: radii.tile,
+    backgroundColor: colors.imageFill,
+    marginBottom: spacing.sm,
   },
-  products: { gap: spacing.sm, marginTop: spacing.sm },
+  eyebrow: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18 },
+  text: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.label2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: GAP, rowGap: 22 },
 });

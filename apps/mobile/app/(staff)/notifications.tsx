@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Bell, ChevronLeft } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -12,18 +12,22 @@ import {
 } from '../../src/api/notifications';
 import { problemFrom } from '../../src/api/problem';
 import { useRepContext } from '../../src/api/rep';
+import { monthDay } from '../../src/dates/calendar';
 import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { dayName, type FeedItem, feedOf, unreadIds } from '../../src/notifications/feed';
 import { FeedBadge, useNoticeEyebrow } from '../../src/notifications/kinds';
-import { colors, radii, spacing, type } from '../../src/theme/tokens';
-import { EmptyState, ProblemText, Screen, Title } from '../../src/ui/kit';
+import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { Separator } from '../../src/ui/grouped';
+import { EmptyState, ProblemText } from '../../src/ui/kit';
+import { BarButton, FootNote, LargeTitle, NavBar, Page } from '../../src/ui/layout';
 
 type Item = FeedItem<MyNotice, MyNotification>;
 
 /**
- * «Мэдэгдэл» (ADR-0062 #3): the running notices and the rep's sold orders, newest first by day.
- * A notice opens its page, a sold order the order; «Бүгдийг уншсан» marks what is loaded.
+ * «Мэдэгдэл» (the Notifications board; ADR-0062 #3, ADR-0066): the running notices and the rep's
+ * sold orders, by day, newest first, in one white group a day. A notice opens its page, a sold
+ * order the order; «Бүгдийг уншсан» marks what is loaded.
  */
 export default function NotificationsScreen() {
   const { t } = useTranslation();
@@ -43,7 +47,7 @@ export default function NotificationsScreen() {
   const today = context.data?.today ?? null;
   const dayTitle = (day: string) => {
     const name = today ? dayName(day, today) : 'date';
-    return name === 'date' ? day : t(`mobile.notifications.${name}`);
+    return name === 'date' ? monthDay(day) : t(`mobile.notifications.${name}`);
   };
 
   const open = (item: Item) => {
@@ -56,40 +60,53 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <Screen>
-      <View style={styles.bar}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}>
-          <ChevronLeft size={24} color={colors.primary} />
-          <Text style={[type.body, { color: colors.link }]}>{t('common.back')}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !anyUnread || isPending }}
-          disabled={!anyUnread || isPending}
-          onPress={() => markRead(unread)}
-          style={styles.readAll}
-        >
-          <Text style={[type.body, { color: anyUnread ? colors.link : colors.muted }]}>
-            {t('mobile.notifications.readAll')}
-          </Text>
-        </Pressable>
-      </View>
+    <Page>
+      <NavBar
+        back={t('mobile.tabs.profile')}
+        onBack={() => router.back()}
+        right={
+          <BarButton
+            title={t('mobile.notifications.readAll')}
+            disabled={!anyUnread || isPending}
+            onPress={() => markRead(unread)}
+          />
+        }
+      />
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.key}
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          <View style={styles.head}>
-            <Title>{t('mobile.notifications.title')}</Title>
+          <View>
+            <LargeTitle style={styles.title}>{t('mobile.notifications.title')}</LargeTitle>
             {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
             {mine.error ? <ProblemText problem={problemFrom(mine.error)} /> : null}
           </View>
         }
         renderSectionHeader={({ section }) => (
-          <Text style={[type.caption, styles.day]}>{dayTitle(section.day)}</Text>
+          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
+            {dayTitle(section.day)}
+          </Text>
         )}
-        renderItem={({ item }) => <FeedRow item={item} onPress={() => open(item)} />}
+        renderItem={({ item, index, section }) => (
+          <View
+            style={[
+              styles.cell,
+              index === 0 && styles.firstCell,
+              index === section.data.length - 1 && styles.lastCell,
+            ]}
+          >
+            {index > 0 ? <Separator /> : null}
+            <FeedRow item={item} onPress={() => open(item)} />
+          </View>
+        )}
+        ListFooterComponent={
+          <View>
+            {mine.isFetchingNextPage ? <ActivityIndicator color={colors.primary} /> : null}
+            {sections.length > 0 ? <FootNote>{t('mobile.notifications.footer')}</FootNote> : null}
+          </View>
+        }
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           if (mine.hasNextPage && !mine.isFetchingNextPage) void mine.fetchNextPage();
@@ -104,17 +121,14 @@ export default function NotificationsScreen() {
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
             <EmptyState
-              icon={<Bell size={40} color={colors.muted} />}
+              icon={<Bell size={40} strokeWidth={1.5} color={colors.input} />}
               title={t('mobile.notifications.empty')}
               hint={t('mobile.notifications.emptyHint')}
             />
           )
         }
-        ListFooterComponent={
-          mine.isFetchingNextPage ? <ActivityIndicator color={colors.primary} /> : null
-        }
       />
-    </Screen>
+    </Page>
   );
 }
 
@@ -122,80 +136,80 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
   const { t } = useTranslation();
   const eyebrow = useNoticeEyebrow();
   const read = item.type === 'notice' ? item.notice.read : item.notification.read;
+  const title =
+    item.type === 'notice'
+      ? item.notice.title
+      : t('mobile.notifications.sold', { number: item.notification.orderNumber });
+  const text =
+    item.type === 'notice'
+      ? [item.notice.body, eyebrow(item.notice)].join(' · ')
+      : [
+          item.notification.customerName,
+          item.notification.orderTotal
+            ? t('pricing.money', { amount: formatMnt(item.notification.orderTotal) })
+            : null,
+          item.notification.invoiceNumber
+            ? t('mobile.notifications.soldInvoice', { number: item.notification.invoiceNumber })
+            : null,
+        ]
+          .filter((part) => part !== null)
+          .join(' · ');
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+    >
       <FeedBadge kind={item.type === 'notice' ? item.notice.kind : 'ORDER_SOLD'} />
-      <View style={styles.grow}>
-        <View style={styles.rowHead}>
-          <Text style={[type.bodyStrong, styles.grow]} numberOfLines={2}>
-            {item.type === 'notice'
-              ? item.notice.title
-              : t('mobile.notifications.sold', { number: item.notification.orderNumber })}
+      <View style={styles.text}>
+        <View style={styles.head}>
+          <Text style={styles.rowTitle} numberOfLines={2}>
+            {title}
           </Text>
-          <Text style={type.caption}>{ubTime(item.at)}</Text>
-          {read ? null : (
-            <View style={styles.unread} accessibilityLabel={t('mobile.notifications.unreadDot')} />
-          )}
+          <Text style={type.secondary}>{ubTime(item.at)}</Text>
         </View>
-        {item.type === 'notice' ? (
-          <>
-            <Text style={type.secondary} numberOfLines={2}>
-              {item.notice.body}
-            </Text>
-            <Text style={type.caption}>{eyebrow(item.notice)}</Text>
-          </>
-        ) : (
-          <>
-            <Text style={type.secondary} numberOfLines={1}>
-              {item.notification.customerName}
-            </Text>
-            <Text style={type.caption}>
-              {[
-                item.notification.orderTotal
-                  ? t('mobile.notifications.soldTotal', {
-                      amount: t('pricing.money', {
-                        amount: formatMnt(item.notification.orderTotal),
-                      }),
-                    })
-                  : null,
-                item.notification.invoiceNumber
-                  ? t('mobile.notifications.soldInvoice', {
-                      number: item.notification.invoiceNumber,
-                    })
-                  : null,
-              ]
-                .filter((part) => part !== null)
-                .join(' · ')}
-            </Text>
-          </>
-        )}
+        <Text style={styles.body} numberOfLines={3}>
+          {text}
+        </Text>
       </View>
+      {read ? null : (
+        <View style={styles.unread} accessibilityLabel={t('mobile.notifications.unreadDot')} />
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, minHeight: 44 },
-  readAll: { padding: spacing.md, minHeight: 44, justifyContent: 'center' },
-  head: { gap: spacing.sm, marginBottom: spacing.sm },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
-  day: { marginTop: spacing.md, marginBottom: spacing.xs, textTransform: 'uppercase' },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+  title: { marginTop: 2, marginHorizontal: spacing.xs },
+  day: { marginTop: 22, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  cell: { backgroundColor: colors.card },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   row: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.lg,
+    paddingRight: 14,
   },
-  grow: { flex: 1, gap: 2 },
-  rowHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  unread: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-    backgroundColor: colors.primary,
+  pressed: { backgroundColor: colors.accent },
+  text: { flex: 1, gap: 2 },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
+  rowTitle: {
+    flex: 1,
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.foreground,
+  },
+  body: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.label2 },
+  unread: { width: 10, height: 10, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
   loading: { marginTop: spacing.xxl },
 });

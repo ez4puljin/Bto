@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { initialsOf } from '../format/format';
-import { dayName, feedOf, popupQueue, unreadIds } from './feed';
+import {
+  dayName,
+  dropPercent,
+  feedOf,
+  idsParam,
+  percentIn,
+  popupQueue,
+  replayQueue,
+  unreadIds,
+} from './feed';
 
 const notice = (
   id: number,
@@ -65,5 +74,29 @@ describe('initials', () => {
     expect(initialsOf('  бат  ')).toBe('Б');
     expect(initialsOf('Бат Эрдэнэ Дорж')).toBe('БЭ');
     expect(initialsOf('')).toBe('');
+  });
+});
+
+describe('the popup pictures and its replay (ADR-0066)', () => {
+  it('replays the notices asked for, in that order', () => {
+    const notices = [1, 2, 3].map((id) => ({
+      id,
+      popup: true,
+      read: true,
+      validFrom: '2026-10-16',
+      createdAt: '2026-10-16T01:00:00Z',
+    }));
+    expect(replayQueue(notices, [3, 1, 9]).map((notice) => notice.id)).toEqual([3, 1]);
+    expect(idsParam('3,x,0,5')).toEqual([3, 5]);
+    expect(idsParam(undefined)).toEqual([]);
+  });
+
+  it('reads a percentage from a promotion and the drop of a price', () => {
+    expect(percentIn('Ус, ундаа 5% хямдарлаа')).toBe('5');
+    expect(percentIn('12,5 % хямд')).toBe('12.5');
+    expect(percentIn('Шинэ бараа')).toBeNull();
+    expect(dropPercent('29100', '27600')).toBe('5');
+    expect(dropPercent('1000', '1000')).toBeNull();
+    expect(dropPercent(null, '950')).toBeNull();
   });
 });

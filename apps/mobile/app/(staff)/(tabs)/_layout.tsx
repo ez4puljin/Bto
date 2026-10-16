@@ -1,63 +1,61 @@
-import { Tabs } from 'expo-router';
-import { ClipboardList, Home, ShoppingCart, Store, User } from 'lucide-react-native';
+import { Tabs } from 'expo-router/js-tabs';
+import { CircleUserRound, ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import type { ColorValue } from 'react-native';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts } from '../../../src/theme/tokens';
+import { colors } from '../../../src/theme/tokens';
+import { FloatingTabBar } from '../../../src/ui/tab-bar';
 
-/** «Нүүр», «Дэлгүүр», «Сагс», «Захиалга», «Профайл»: the reference app's order of screens. */
+/**
+ * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0066): the cart's
+ * count of lines, and the unread count of the bell on «Профайл» (ADR-0062 #3).
+ */
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { cart } = useShop();
   const unread = useNotificationSummary().data?.unread ?? 0;
+  const icon =
+    (Icon: typeof House) =>
+    ({ color, focused }: { color: ColorValue; focused: boolean }) => (
+      <Icon
+        size={24}
+        color={typeof color === 'string' ? color : colors.foreground}
+        strokeWidth={focused ? 2 : 1.8}
+      />
+    );
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
-      }}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.canvas } }}
     >
       <Tabs.Screen
         name="index"
-        options={{
-          title: t('mobile.tabs.home'),
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-        }}
+        options={{ title: t('mobile.tabs.home'), tabBarIcon: icon(House) }}
       />
       <Tabs.Screen
         name="shop"
-        options={{
-          title: t('mobile.tabs.shop'),
-          tabBarIcon: ({ color, size }) => <Store color={color} size={size} />,
-        }}
+        options={{ title: t('mobile.tabs.shop'), tabBarIcon: icon(Package) }}
       />
       <Tabs.Screen
         name="cart"
         options={{
           title: t('mobile.tabs.cart'),
-          tabBarIcon: ({ color, size }) => <ShoppingCart color={color} size={size} />,
-          tabBarBadge: cart.lines.length > 0 ? cart.lines.length : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.primary },
+          tabBarIcon: icon(ShoppingCart),
+          tabBarAccessibilityLabel: t('mobile.tabs.cartCount', { n: cart.lines.length }),
+          ...(cart.lines.length > 0 ? { tabBarBadge: cart.lines.length } : {}),
         }}
       />
       <Tabs.Screen
         name="orders"
-        options={{
-          title: t('mobile.tabs.orders'),
-          tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
-        }}
+        options={{ title: t('mobile.tabs.orders'), tabBarIcon: icon(ClipboardList) }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t('mobile.tabs.profile'),
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
-          // The bell's count (ADR-0062 #3): the profile holds the notifications.
-          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.destructive },
+          tabBarIcon: icon(CircleUserRound),
+          ...(unread > 0 ? { tabBarBadge: unread > 99 ? '99+' : unread } : {}),
         }}
       />
     </Tabs>

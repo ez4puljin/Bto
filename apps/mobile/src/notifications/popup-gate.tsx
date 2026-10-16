@@ -6,8 +6,8 @@ import { SUMMARY_KEY, useNotificationSummary } from '../api/notifications';
 import { useShop } from '../state/shop';
 import { popupQueue } from './feed';
 
-/** Screens a popup never covers: the camera and the customer picker of the cart. */
-const BUSY_PATHS = new Set(['/scan', '/customers', '/notice-popup']);
+/** Screens a popup never covers: the camera, the customer, the checkout, a new password. */
+const BUSY_PATHS = new Set(['/scan', '/customers', '/checkout', '/password', '/notice-popup']);
 
 /**
  * Opens the notice popup (ADR-0062 #3) when the app starts and each time it returns to the

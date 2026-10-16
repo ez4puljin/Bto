@@ -1,38 +1,33 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Search, UserRound, X } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, Store } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { problemFrom, unwrap } from '../../src/api/problem';
 import { type RepCustomer, useCustomers } from '../../src/api/rep';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
-import { colors, radii, spacing, TOUCH, type } from '../../src/theme/tokens';
-import { EmptyState, ProblemText, Screen } from '../../src/ui/kit';
+import { useDebounced } from '../../src/state/use-debounced';
+import { colors, radii, spacing, type } from '../../src/theme/tokens';
+import { SearchField } from '../../src/ui/controls';
+import { Separator } from '../../src/ui/grouped';
+import { EmptyState, ProblemText } from '../../src/ui/kit';
+import { BarButton, LargeTitle, Page } from '../../src/ui/layout';
 
-/** Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. */
+/**
+ * Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. The pick
+ * brings the default address and, for an empty contact, the customer's first contact (ADR-0066).
+ */
 export default function CustomersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useSignedIn();
-  const { dispatch } = useShop();
+  const { cart, dispatch } = useShop();
   const [text, setText] = useState('');
-  const [q, setQ] = useState('');
+  const q = useDebounced(text.trim(), 350);
   const [picking, setPicking] = useState<number | null>(null);
-  useEffect(() => {
-    const timer = setTimeout(() => setQ(text.trim()), 350);
-    return () => clearTimeout(timer);
-  }, [text]);
   const customers = useCustomers(q);
   const rows = useMemo(
     () => customers.data?.pages.flatMap((page) => page.data) ?? [],
@@ -53,10 +48,12 @@ export default function CustomersScreen() {
       });
       const preferred =
         detail.addresses.find((address) => address.isDefault) ?? detail.addresses[0];
+      const contact = detail.contacts.find((entry) => entry.name || entry.phone);
       dispatch({
         type: 'customer',
         customer: { id: detail.id, code: detail.code, name: detail.name },
         defaultAddressId: preferred?.id ?? null,
+        contact: contact ?? (detail.phone ? { name: null, phone: detail.phone } : null),
       });
       router.back();
     } catch {
@@ -65,50 +62,60 @@ export default function CustomersScreen() {
   };
 
   return (
-    <Screen bottom>
-      <View style={styles.head}>
-        <View style={styles.field}>
-          <Search size={18} color={colors.muted} />
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={t('mobile.customers.search')}
-            placeholderTextColor={colors.muted}
-            style={[type.body, styles.input]}
-            autoFocus
-            autoCorrect={false}
-          />
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={() => router.back()}
-          style={styles.close}
-        >
-          <X size={24} color={colors.foreground} />
-        </Pressable>
+    <Page edges={['top', 'bottom']}>
+      <View style={styles.bar}>
+        <BarButton title={t('common.cancel')} onPress={() => router.back()} />
+      </View>
+      <LargeTitle style={styles.title}>{t('mobile.customers.title')}</LargeTitle>
+      <View style={styles.search}>
+        <SearchField
+          value={text}
+          onChangeText={setText}
+          placeholder={t('mobile.customers.search')}
+          accessibilityLabel={t('mobile.customers.search')}
+          autoFocus
+        />
       </View>
       <FlatList
         data={rows}
         keyExtractor={(customer) => String(customer.id)}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void pick(item)}
-            style={styles.row}
-            disabled={picking !== null}
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              styles.cell,
+              index === 0 && styles.firstCell,
+              index === rows.length - 1 && styles.lastCell,
+            ]}
           >
-            <UserRound size={22} color={colors.primary} />
-            <View style={styles.grow}>
-              <Text style={type.bodyStrong}>{item.name}</Text>
-              <Text style={type.caption}>
-                {[item.code, item.phone, item.address].filter(Boolean).join(' · ')}
-              </Text>
-            </View>
-            {picking === item.id ? <ActivityIndicator color={colors.primary} /> : null}
-          </Pressable>
+            {index > 0 ? <Separator inset={spacing.lg + 34 + spacing.md} /> : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void pick(item)}
+              disabled={picking !== null}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            >
+              <View style={styles.icon}>
+                <Store size={18} strokeWidth={2} color={colors.primaryForeground} />
+              </View>
+              <View style={styles.grow}>
+                <Text style={type.row} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={type.secondary} numberOfLines={1}>
+                  {[t('mobile.checkout.code', { code: item.code }), item.phone, item.address]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </View>
+              {picking === item.id ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : cart.customer?.id === item.id ? (
+                <Check size={20} strokeWidth={2.6} color={colors.primary} />
+              ) : null}
+            </Pressable>
+          </View>
         )}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
@@ -126,42 +133,35 @@ export default function CustomersScreen() {
           )
         }
       />
-    </Screen>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  head: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  field: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: TOUCH,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  input: { flex: 1, paddingVertical: spacing.sm },
-  close: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: spacing.lg, gap: spacing.sm },
+  bar: { height: 44, paddingHorizontal: spacing.lg, justifyContent: 'center' },
+  title: { marginHorizontal: 20, marginTop: 2 },
+  search: { paddingHorizontal: spacing.lg, paddingTop: 10 },
+  list: { padding: spacing.lg },
+  cell: { backgroundColor: colors.card },
+  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radii.card,
-    padding: spacing.md,
-    minHeight: 56,
+    minHeight: 60,
+    paddingLeft: spacing.lg,
+    paddingRight: 14,
   },
-  grow: { flex: 1, gap: 2 },
+  pressed: { backgroundColor: colors.accent },
+  icon: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: colors.tint.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grow: { flex: 1, gap: 1 },
   loading: { marginTop: spacing.xxl },
 });

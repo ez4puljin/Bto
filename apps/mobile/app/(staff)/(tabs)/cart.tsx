@@ -1,336 +1,362 @@
-import { defaultDeliveryDate, PAYMENT_METHODS } from '@tugeel/shared/sales';
+import { Decimal } from '@tugeel/shared/money';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ShoppingCart, Trash2, UserRound } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { AppProblem } from '../../../src/api/problem';
-import { useCustomer, useQuote, useRepContext } from '../../../src/api/rep';
-import { type CartIssue, cartIssues, linesOf } from '../../../src/cart/cart';
-import { useSendOrder } from '../../../src/cart/use-send';
-import { deliveryDays, shortDate, weekdayOf } from '../../../src/dates/dates';
-import { formatMnt, formatQty } from '../../../src/format/format';
-import { placeOf } from '../../../src/state/placement';
-import { useShop } from '../../../src/state/shop';
-import { colors, spacing, type } from '../../../src/theme/tokens';
 import {
-  Button,
-  Card,
-  Chip,
-  EmptyState,
-  Money,
-  ProblemText,
-  Screen,
-  SectionTitle,
-  Stepper,
-  TextField,
-  Title,
-} from '../../../src/ui/kit';
+  ArrowRight,
+  ChevronDown,
+  CircleMinus,
+  Package,
+  Plus,
+  ShoppingCart,
+} from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { type Quote, type RepProduct, useProductsOf, useQuote } from '../../../src/api/rep';
+import { type CartLine, linesOf } from '../../../src/cart/cart';
+import { formatMnt } from '../../../src/format/format';
+import { useUnitWords } from '../../../src/shop/unit-words';
+import { useSignedIn } from '../../../src/state/session';
+import { useShop } from '../../../src/state/shop';
+import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { PillButton } from '../../../src/ui/controls';
+import { Separator } from '../../../src/ui/grouped';
+import { EmptyState } from '../../../src/ui/kit';
+import { BarButton, LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
+import { PendingSendCard } from '../../../src/ui/pending-send';
+import { useTabBarInset } from '../../../src/ui/tab-bar';
 
-/** «Сагс»: the lines priced by the server, the customer, delivery, date, payment, and «Илгээх». */
+/**
+ * «Сагс» (the Cart board, ADR-0066): one row per product with its pieces, the server's line total
+ * and the unit pill that opens the product; «Засах» shows the remove buttons; the server's total;
+ * «Захиалга илгээх» goes on to the customer's details.
+ */
 export default function CartScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { cart, dispatch, stageId } = useShop();
-  const context = useRepContext();
-  const today = context.data?.today ?? null;
+  const inset = useTabBarInset();
+  const { server } = useSignedIn();
+  const { cart, dispatch, pending } = useShop();
+  const [editing, setEditing] = useState(false);
   const quote = useQuote(linesOf(cart));
-  const customer = useCustomer(cart.customer?.id ?? null);
-  const { send, resend, forget, sending, pending } = useSendOrder();
-  const [problem, setProblem] = useState<AppProblem | null>(null);
-  const [unknown, setUnknown] = useState(false);
-  const place = context.data ? placeOf(context.data, stageId) : null;
+  const ids = useMemo(() => [...new Set(cart.lines.map((line) => line.productId))], [cart.lines]);
+  const products = useProductsOf(ids);
+  const productOf = (id: number) => products.data?.find((product) => product.id === id);
   const locked = pending !== null;
-
-  // The proposed date is tomorrow; a stored date in the past moves to it too.
-  useEffect(() => {
-    if (today && (!cart.deliveryDate || cart.deliveryDate < today)) {
-      dispatch({ type: 'deliveryDate', date: defaultDeliveryDate(today) });
-    }
-  }, [today, cart.deliveryDate, dispatch]);
-
-  const issues: CartIssue[] = today ? cartIssues(cart, today, place ? stageId : null) : ['lines'];
-  const lineErrors = new Set(
-    (problem?.errors ?? []).flatMap((entry) => {
-      const match = /^lines\.(\d+)/.exec(entry.path);
-      return match ? [Number.parseInt(match[1] ?? '-1', 10)] : [];
-    }),
-  );
-
-  const afterSend = (result: Awaited<ReturnType<typeof send>>) => {
-    if (!result) return;
-    if (result.kind === 'sent') {
-      setProblem(null);
-      setUnknown(false);
-      router.push(`/order/${result.order.id}`);
-    } else if (result.kind === 'unknown') {
-      setUnknown(true);
-    } else {
-      setUnknown(false);
-      setProblem(result.problem);
-    }
-  };
-
-  const confirmSend = () => {
-    Alert.alert(
-      t('mobile.cart.confirmTitle'),
-      t(place?.confirms ? 'mobile.cart.confirmReserves' : 'mobile.cart.confirmDraft', {
-        stage: place?.stageName ?? '',
-      }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('mobile.cart.send'), onPress: () => void send().then(afterSend) },
-      ],
-    );
-  };
 
   if (cart.lines.length === 0 && !locked) {
     return (
-      <Screen style={styles.empty}>
-        <EmptyState
-          icon={<ShoppingCart size={48} color={colors.muted} />}
-          title={t('mobile.cart.empty')}
-          hint={t('mobile.cart.emptyHint')}
-        />
-        <Button title={t('mobile.home.openShop')} onPress={() => router.push('/shop')} />
-      </Screen>
+      <Page>
+        <View style={[styles.empty, { paddingBottom: inset }]}>
+          <EmptyState
+            icon={<ShoppingCart size={48} strokeWidth={1.5} color={colors.input} />}
+            title={t('mobile.cart.empty')}
+            hint={t('mobile.cart.emptyHint')}
+          />
+          <PillButton
+            title={t('mobile.cart.browse')}
+            onPress={() => router.navigate('/shop')}
+            style={styles.browse}
+          />
+        </View>
+      </Page>
     );
   }
 
-  const addresses = customer.data?.addresses ?? [];
+  const unpriced = quote.data?.lines.some((line) => !line.priced) === true;
+  const discount = quote.data ? new Decimal(quote.data.discountTotal) : new Decimal(0);
+
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Title>{t('mobile.tabs.cart')}</Title>
-
-        {locked ? (
-          <Card style={styles.warning}>
-            <Text style={type.bodyStrong}>{t('mobile.cart.pendingTitle')}</Text>
-            <Text style={type.body}>
-              {unknown ? t('mobile.cart.unknownHint') : t('mobile.cart.pendingHint')}
-            </Text>
-            <Button
-              title={t('mobile.cart.resend')}
-              loading={sending}
-              onPress={() => void resend().then(afterSend)}
+    <Page>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
+        <View style={styles.bar}>
+          {locked ? null : (
+            <BarButton
+              title={editing ? t('mobile.cart.done') : t('common.edit')}
+              onPress={() => setEditing(!editing)}
+              strong={editing}
             />
-            <Button
-              variant="ghost"
-              title={t('mobile.cart.checkOrders')}
-              onPress={() => router.push('/orders')}
-            />
-            <Button
-              variant="danger"
-              title={t('mobile.cart.forget')}
-              onPress={() =>
-                Alert.alert(t('mobile.cart.forgetTitle'), t('mobile.cart.forgetHint'), [
-                  { text: t('common.cancel'), style: 'cancel' },
-                  {
-                    text: t('mobile.cart.forget'),
-                    style: 'destructive',
-                    onPress: () => void forget(),
-                  },
-                ])
-              }
-            />
-          </Card>
-        ) : null}
+          )}
+        </View>
+        <LargeTitle style={styles.title}>{t('mobile.tabs.cart')}</LargeTitle>
+        <Text style={[type.body, styles.subtitle]}>
+          {t('mobile.cart.count', { n: cart.lines.length })}
+        </Text>
 
-        {cart.lines.map((line, index) => {
-          const priced = quote.data?.lines[index];
-          return (
-            <Card key={line.productUnitId} style={lineErrors.has(index) && styles.lineError}>
-              <View style={styles.lineHead}>
-                <View style={styles.grow}>
-                  <Text style={type.bodyStrong} numberOfLines={2}>
-                    {line.name}
-                  </Text>
-                  <Text style={type.caption}>{line.sku}</Text>
-                </View>
-                {!locked ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('common.delete')}
-                    onPress={() => dispatch({ type: 'remove', productUnitId: line.productUnitId })}
-                    hitSlop={8}
-                  >
-                    <Trash2 size={20} color={colors.muted} />
-                  </Pressable>
-                ) : null}
-              </View>
-              {priced?.priced ? (
-                <Text style={type.secondary}>
-                  {priced.parts
-                    .map((part) =>
-                      t('mobile.cart.part', {
-                        qty: formatQty(part.qty),
-                        unit: part.uomName,
-                        price: formatMnt(part.unitPrice),
-                      }),
-                    )
-                    .join(' + ')}
-                </Text>
-              ) : priced ? (
-                <Text style={[type.secondary, styles.error]}>{t('mobile.cart.noPrice')}</Text>
-              ) : null}
-              <View style={styles.lineFoot}>
-                {locked ? (
-                  <Text style={type.bodyStrong}>{`${line.qty} ${line.uomName}`}</Text>
-                ) : (
-                  <Stepper
-                    label={line.uomName}
-                    value={Number.parseInt(line.qty, 10)}
-                    onChange={(qty) =>
-                      dispatch({ type: 'setQty', productUnitId: line.productUnitId, qty })
-                    }
-                  />
-                )}
-                <Money value={priced?.priced ? priced.total : null} />
-              </View>
-            </Card>
-          );
-        })}
+        {locked ? <PendingSendCard /> : null}
 
-        <Card>
-          <View style={styles.total}>
-            <Text style={type.secondary}>{t('mobile.cart.subtotal')}</Text>
-            <Money value={quote.data?.subtotal} style={type.body} />
-          </View>
-          <View style={styles.total}>
-            <Text style={type.secondary}>{t('mobile.cart.discount')}</Text>
-            <Money value={quote.data?.discountTotal} style={type.body} />
-          </View>
-          <View style={styles.total}>
-            <Text style={type.heading}>{t('mobile.cart.total')}</Text>
-            <Money value={quote.data?.total} style={type.heading} />
-          </View>
-          <Text style={type.caption}>{t('mobile.cart.priceNote')}</Text>
-        </Card>
-
-        <SectionTitle>{t('mobile.cart.customer')}</SectionTitle>
-        <Card>
-          <Pressable
-            accessibilityRole="button"
-            disabled={locked}
-            onPress={() => router.push('/customers')}
-            style={styles.customer}
-          >
-            <UserRound size={22} color={colors.primary} />
-            <View style={styles.grow}>
-              <Text style={type.bodyStrong}>
-                {cart.customer ? cart.customer.name : t('mobile.cart.chooseCustomer')}
-              </Text>
-              {cart.customer ? <Text style={type.caption}>{cart.customer.code}</Text> : null}
-            </View>
-          </Pressable>
-          {cart.customer ? (
-            <View style={styles.chips}>
-              {addresses.map((address) => (
-                <Chip
-                  key={address.id}
-                  label={address.label ?? address.address ?? t('mobile.cart.address')}
-                  selected={cart.fulfilment === 'DELIVERY' && cart.addressId === address.id}
-                  onPress={() => !locked && dispatch({ type: 'address', addressId: address.id })}
-                />
-              ))}
-              <Chip
-                label={t('sales.fulfilments.PICKUP')}
-                selected={cart.fulfilment === 'PICKUP'}
-                onPress={() => !locked && dispatch({ type: 'pickup' })}
+        <SectionHeader style={styles.section}>{t('mobile.cart.lines')}</SectionHeader>
+        <View style={styles.group}>
+          {cart.lines.map((line, index) => (
+            <View key={line.productUnitId}>
+              {index > 0 ? <Separator inset={80} /> : null}
+              <CartRow
+                line={line}
+                product={productOf(line.productId)}
+                priced={quote.data?.lines[index]}
+                server={server}
+                editing={editing && !locked}
+                locked={locked}
+                onOpen={() => router.push(`/product/${line.productId}`)}
+                onRemove={() => dispatch({ type: 'remove', productUnitId: line.productUnitId })}
               />
             </View>
-          ) : null}
-        </Card>
-
-        <SectionTitle>{t('mobile.cart.deliveryDate')}</SectionTitle>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {(today ? deliveryDays(today) : []).map((day, index) => (
-            <Chip
-              key={day}
-              label={
-                index === 0
-                  ? t('mobile.cart.today')
-                  : index === 1
-                    ? t('mobile.cart.tomorrow')
-                    : `${shortDate(day)} ${t(`mobile.weekdays.${weekdayOf(day)}` as 'mobile.weekdays.0')}`
-              }
-              selected={cart.deliveryDate === day}
-              onPress={() => !locked && dispatch({ type: 'deliveryDate', date: day })}
-            />
           ))}
-        </ScrollView>
-
-        <SectionTitle>{t('mobile.cart.payment')}</SectionTitle>
-        <View style={styles.chips}>
-          {PAYMENT_METHODS.map((method) => (
-            <Chip
-              key={method}
-              label={t(`sales.paymentMethods.${method}`)}
-              selected={cart.paymentMethod === method}
-              onPress={() => !locked && dispatch({ type: 'payment', method })}
-            />
-          ))}
+          {locked ? null : (
+            <>
+              <Separator />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.navigate('/shop')}
+                style={({ pressed }) => [styles.addRow, pressed && styles.pressed]}
+              >
+                <Plus size={22} strokeWidth={2.2} color={colors.primary} />
+                <Text style={[type.row, styles.accent]}>{t('mobile.cart.addMore')}</Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
-        <TextField
-          label={t('mobile.cart.note')}
-          value={cart.note}
-          editable={!locked}
-          onChangeText={(note) => dispatch({ type: 'note', note })}
-          multiline
-        />
-
-        <Card>
-          <Text style={type.caption}>{t('mobile.home.landsOn')}</Text>
-          <Text style={type.bodyStrong}>
-            {place ? `${place.pipelineName} › ${place.stageName}` : t('mobile.settings.notChosen')}
-          </Text>
-          {!place ? (
-            <Button
-              variant="secondary"
-              title={t('mobile.settings.title')}
-              onPress={() => router.push('/settings')}
-            />
+        <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
+        <View style={styles.group}>
+          <View style={styles.totalRow}>
+            <Text style={type.heading}>{t('mobile.cart.total')}</Text>
+            <Text style={styles.total}>
+              {quote.data
+                ? t('pricing.money', { amount: formatMnt(quote.data.total) })
+                : t('common.none')}
+            </Text>
+          </View>
+          {discount.gt(0) ? (
+            <>
+              <Separator />
+              <View style={styles.discountRow}>
+                <Text style={type.body}>{t('mobile.cart.discount')}</Text>
+                <Text style={[type.bodyStrong, styles.green]}>
+                  {t('mobile.cart.minus', { amount: formatMnt(discount.toFixed(0)) })}
+                </Text>
+              </View>
+            </>
           ) : null}
-        </Card>
+          <Separator />
+          <Text style={[type.secondary, styles.note]}>{t('mobile.cart.priceNote')}</Text>
+        </View>
 
-        <ProblemText problem={problem} />
-        {!locked ? (
-          <>
-            {issues.length > 0 ? (
-              <Text style={[type.secondary, styles.center]}>
-                {t(`mobile.cart.issues.${issues[0] ?? 'lines'}`)}
-              </Text>
-            ) : null}
-            <Button
-              title={t('mobile.cart.send')}
-              onPress={confirmSend}
-              loading={sending}
-              disabled={issues.length > 0 || quote.isLoading}
-            />
-          </>
+        {unpriced ? (
+          <Text style={[type.secondary, styles.warning]}>{t('mobile.cart.unpriced')}</Text>
         ) : null}
+        {locked ? null : (
+          <PillButton
+            title={t('mobile.cart.next')}
+            trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
+            height={56}
+            disabled={quote.isLoading || unpriced}
+            onPress={() => router.push('/checkout')}
+            style={styles.next}
+          />
+        )}
       </ScrollView>
-    </Screen>
+    </Page>
+  );
+}
+
+/** «12 ширхэг · 29,100₮/ш» and the unit pill of one line. */
+function CartRow({
+  line,
+  product,
+  priced,
+  server,
+  editing,
+  locked,
+  onOpen,
+  onRemove,
+}: {
+  line: CartLine;
+  product: RepProduct | undefined;
+  priced: Quote['lines'][number] | undefined;
+  server: string;
+  editing: boolean;
+  locked: boolean;
+  onOpen: () => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const words = useUnitWords();
+  const base = product?.units.find((unit) => unit.isBase);
+  const baseWords = base ? words(base) : null;
+  const pieces = new Decimal(line.factorToBase).times(line.qty).toFixed();
+  const parts = priced?.priced ? priced.parts : [];
+  // One part in whole packs costs the warehouse price a piece; loose pieces their own price.
+  const perPiece =
+    parts.length === 1 && parts[0]?.basis === 'WAREHOUSE'
+      ? product?.basePrice
+      : parts.length === 1 && parts[0]?.productUnitId === base?.id
+        ? parts[0]?.unitPrice
+        : null;
+  const detail =
+    parts.length > 1
+      ? parts
+          .map((part) => {
+            const unit = product?.units.find((entry) => entry.id === part.productUnitId);
+            return `${part.qty} ${unit ? words(unit).name : part.uomName}`;
+          })
+          .join(' + ')
+      : [
+          baseWords ? `${pieces} ${baseWords.name}` : null,
+          perPiece && baseWords
+            ? t('mobile.cart.perPiece', { amount: formatMnt(perPiece), unit: baseWords.short })
+            : null,
+        ]
+          .filter((part) => part !== null)
+          .join(' · ');
+
+  return (
+    <View style={styles.row}>
+      {editing ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.cart.removeLine', { name: line.name })}
+          onPress={onRemove}
+          hitSlop={8}
+        >
+          <CircleMinus
+            size={24}
+            strokeWidth={2}
+            color={colors.primaryForeground}
+            fill={colors.tint.red}
+          />
+        </Pressable>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={line.name}
+        onPress={onOpen}
+        style={styles.thumb}
+      >
+        {line.thumbUrl ? (
+          <Image
+            source={{ uri: `${server}${line.thumbUrl}` }}
+            style={styles.image}
+            contentFit="cover"
+          />
+        ) : (
+          <Package size={24} strokeWidth={1.5} color={colors.input} />
+        )}
+      </Pressable>
+      <View style={styles.text}>
+        <Text style={styles.name} numberOfLines={2}>
+          {line.name}
+        </Text>
+        {detail ? (
+          <Text style={type.secondary} numberOfLines={1}>
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.right}>
+        <Text style={[styles.lineTotal, priced && !priced.priced && styles.red]}>
+          {priced?.priced
+            ? t('pricing.money', { amount: formatMnt(priced.total ?? '0') })
+            : priced
+              ? t('mobile.cart.noPrice')
+              : t('common.none')}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.cart.changeQty', { name: line.name })}
+          disabled={locked}
+          onPress={onOpen}
+          style={styles.qtyPill}
+        >
+          <Text style={styles.qtyText}>{`${line.qty} ${words(line).name}`}</Text>
+          {locked ? null : <ChevronDown size={14} strokeWidth={2.4} color={colors.muted} />}
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
-  empty: { justifyContent: 'center', padding: spacing.lg, gap: spacing.lg },
-  warning: { backgroundColor: colors.warningSoft },
-  lineError: { borderWidth: 1, borderColor: colors.destructive },
-  lineHead: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  lineFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  grow: { flex: 1, gap: 2 },
-  error: { color: colors.destructive },
-  total: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  customer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chipRow: { flexDirection: 'row', gap: spacing.sm },
-  center: { textAlign: 'center' },
+  body: { paddingHorizontal: spacing.lg },
+  bar: { height: 44, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
+  title: { marginTop: 2, marginHorizontal: spacing.xs },
+  subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
+  section: { marginTop: 22 },
+  group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 10,
+    paddingLeft: spacing.lg,
+    paddingRight: 14,
+  },
+  thumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: colors.imageFill,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: { width: '100%', height: '100%' },
+  text: { flex: 1 },
+  name: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  right: { alignItems: 'flex-end', gap: 6 },
+  lineTotal: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  red: { color: colors.destructive, fontSize: 13 },
+  qtyPill: {
+    height: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingLeft: 10,
+    paddingRight: spacing.sm,
+    borderRadius: 14,
+    backgroundColor: colors.fieldFill,
+  },
+  qtyText: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18, color: colors.foreground },
+  addRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+  },
+  pressed: { backgroundColor: colors.accent },
+  accent: { color: colors.primary },
+  totalRow: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+  },
+  total: {
+    fontFamily: fonts.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.3,
+    color: colors.foreground,
+  },
+  discountRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+  },
+  green: { color: colors.success },
+  note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
+  warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
+  next: { marginTop: 20 },
+  empty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
+  browse: { alignSelf: 'stretch' },
 });

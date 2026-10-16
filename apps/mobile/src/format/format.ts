@@ -8,6 +8,21 @@ export function formatMnt(value: string): string {
   return `${sign}${grouped}${cents === '00' ? '' : `.${cents}`}`;
 }
 
+/** A count with thousands grouped (6763 → "6,763"). */
+export function formatCount(value: number): string {
+  return String(Math.trunc(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * Millions of MNT to one decimal place, HALF_UP ("2095200" → "2.1"), for a total that would not
+ * fit a summary's cell; null under a million (the screen shows it whole).
+ */
+export function formatMillions(value: string): string | null {
+  const amount = new Decimal(value);
+  if (amount.abs().lt(1_000_000)) return null;
+  return amount.dividedBy(1_000_000).toDecimalPlaces(1, Decimal.ROUND_HALF_UP).toFixed();
+}
+
 /** Up to two initials of a name for an avatar ("Туршилтын Төлөөлөгч" → "ТТ"). */
 export function initialsOf(name: string): string {
   return name

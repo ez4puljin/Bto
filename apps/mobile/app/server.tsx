@@ -2,11 +2,13 @@ import Constants from 'expo-constants';
 import { Server } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { isHealthAnswer, normalizeServerUrl } from '../src/server/server-url';
 import { useSession } from '../src/state/session';
 import { colors, spacing, type } from '../src/theme/tokens';
-import { Button, Card, Screen, TextField, Title } from '../src/ui/kit';
+import { PillButton } from '../src/ui/controls';
+import { Group, InputRow } from '../src/ui/grouped';
+import { FootNote, LargeTitle, Page } from '../src/ui/layout';
 
 /** The PC's address the build put in (`pnpm mobile:apk`), else empty. */
 function builtInServer(): string {
@@ -54,50 +56,69 @@ export default function ServerScreen() {
   };
 
   return (
-    <Screen bottom>
+    <Page edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.body}
+        style={styles.grow}
       >
-        <View style={styles.header}>
-          <Server size={40} color={colors.primary} />
-          <Title>{t('app.name')}</Title>
-          <Text style={type.secondary}>{t('mobile.server.intro')}</Text>
-        </View>
-        <Card>
-          <TextField
-            label={t('mobile.server.label')}
-            value={address}
-            onChangeText={(value) => {
-              setAddress(value);
-              setCheck('idle');
-            }}
-            placeholder={t('mobile.server.hint')}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            returnKeyType="go"
-            onSubmitEditing={() => void connect()}
-          />
-          <Button
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <View style={styles.icon}>
+              <Server size={28} strokeWidth={2} color={colors.primaryForeground} />
+            </View>
+            <LargeTitle>{t('app.name')}</LargeTitle>
+            <Text style={[type.body, styles.muted]}>{t('mobile.server.intro')}</Text>
+          </View>
+          <View>
+            <Group>
+              <InputRow
+                label={t('mobile.server.label')}
+                labelWidth={90}
+                value={address}
+                onChangeText={(value) => {
+                  setAddress(value);
+                  setCheck('idle');
+                }}
+                placeholder={t('mobile.server.hint')}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="go"
+                onSubmitEditing={() => void connect()}
+              />
+            </Group>
+            {check === 'failed' ? (
+              <Text style={[type.secondary, styles.error]}>{t('mobile.server.failed')}</Text>
+            ) : null}
+            {check === 'invalid' ? (
+              <Text style={[type.secondary, styles.error]}>{t('mobile.server.invalid')}</Text>
+            ) : null}
+            <FootNote>{t('mobile.server.example')}</FootNote>
+          </View>
+          <PillButton
             title={t('mobile.server.connect')}
             onPress={() => void connect()}
             loading={check === 'checking'}
           />
-          {check === 'failed' ? (
-            <Text style={[type.body, styles.error]}>{t('mobile.server.failed')}</Text>
-          ) : null}
-          {check === 'invalid' ? (
-            <Text style={[type.body, styles.error]}>{t('mobile.server.invalid')}</Text>
-          ) : null}
-        </Card>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </Screen>
+    </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, padding: spacing.lg, gap: spacing.xl, justifyContent: 'center' },
+  grow: { flex: 1 },
+  body: { flexGrow: 1, padding: spacing.lg, gap: 20, justifyContent: 'center' },
   header: { alignItems: 'center', gap: spacing.sm },
-  error: { color: colors.destructive },
+  icon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  muted: { color: colors.muted, textAlign: 'center' },
+  error: { marginTop: spacing.sm, marginHorizontal: spacing.xs, color: colors.destructive },
 });
