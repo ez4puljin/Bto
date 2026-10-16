@@ -21,14 +21,17 @@ import {
   FolderTree,
   History,
   Hourglass,
+  KeyRound,
   LayoutGrid,
   type LucideIcon,
+  Monitor,
   Move,
   Package,
   PackageCheck,
   PackageMinus,
   PackagePlus,
   ReceiptText,
+  ReceiptText as ReceiptIcon,
   Ruler,
   ScanBarcode,
   ScrollText,
@@ -39,6 +42,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Store,
+  TabletSmartphone,
   Tag,
   Tags,
   Truck,
@@ -58,6 +62,8 @@ export interface NavItem {
   permission?: Permission;
   /** Other paths whose pages belong to this entry (the breadcrumb, the recent pages). */
   also?: readonly string[];
+  /** Shown in development builds only (the supermarket's test till, ADR-0063 #8). */
+  devOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -158,6 +164,28 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.financeSettings',
         icon: Settings,
         permission: 'finance.settings.manage',
+      },
+    ],
+  },
+  {
+    label: 'nav.groups.pos',
+    items: [
+      { to: '/pos/shifts', label: 'nav.posShifts', icon: Hourglass, permission: 'pos.read' },
+      { to: '/pos/sales', label: 'nav.posSales', icon: ReceiptIcon, permission: 'pos.read' },
+      { to: '/pos/tills', label: 'nav.posTills', icon: Monitor, permission: 'pos.read' },
+      { to: '/pos/cashiers', label: 'nav.posCashiers', icon: KeyRound, permission: 'pos.read' },
+      {
+        to: '/pos/settings',
+        label: 'nav.posSettings',
+        icon: Settings,
+        permission: 'pos.manage',
+      },
+      {
+        to: '/pos/test-till',
+        label: 'nav.posTestTill',
+        icon: TabletSmartphone,
+        permission: 'pos.manage',
+        devOnly: true,
       },
     ],
   },
@@ -263,7 +291,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.permission || permissions.includes(item.permission)),
+    items: group.items.filter(
+      (item) =>
+        (!item.permission || permissions.includes(item.permission)) &&
+        (!item.devOnly || import.meta.env.DEV),
+    ),
   })).filter((group) => group.items.length > 0);
 }
 
@@ -343,7 +375,8 @@ export type AttentionCount =
   | 'receiptsToCost'
   | 'lowStock'
   | 'productsWaitingForPrices'
-  | 'overdueReceivables';
+  | 'overdueReceivables'
+  | 'shiftsToHandOver';
 
 export interface AttentionTile {
   count: AttentionCount;
@@ -405,6 +438,13 @@ export const ATTENTION_TILES: readonly AttentionTile[] = [
     icon: CalendarClock,
     permission: 'finance.read',
     to: '/finance/customers?overdue=1',
+  },
+  {
+    count: 'shiftsToHandOver',
+    label: 'home.attention.shiftsToHandOver',
+    icon: Hourglass,
+    permission: 'finance.payments.record',
+    to: '/pos/shifts?status=CLOSED',
   },
   {
     count: 'lowStock',

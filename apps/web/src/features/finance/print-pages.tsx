@@ -65,7 +65,7 @@ export function PaymentPrintPage() {
  * its `@page`, an A4 sheet or an 80 mm strip; the buttons stay off the printout; the browser's
  * print dialog opens once the document is in.
  */
-function PrintFrame({
+export function PrintFrame({
   ready,
   error,
   title,

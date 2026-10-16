@@ -62,6 +62,13 @@ import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AiReportsPage } from '@/features/ai/reports-page';
+import { PosCashiersPage } from '@/features/pos/cashiers-page';
+import { PosSalesPage } from '@/features/pos/sales-page';
+import { PosSalePrintPage } from '@/features/pos/sale-print-page';
+import { PosSettingsPage } from '@/features/pos/settings-page';
+import { PosShiftsPage } from '@/features/pos/shifts-page';
+import { PosTestTillPage } from '@/features/pos/test-till-page';
+import { PosTillsPage } from '@/features/pos/tills-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
@@ -105,6 +112,18 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorBoundary />,
   },
   {
+    // A copy of a till's receipt for paper, without the lottery or the QR (ADR-0063 #8).
+    path: '/pos/sales/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="pos.read">
+          <PosSalePrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: '/finance/payments/:id/print',
     element: (
       <RequireAuth>
@@ -130,6 +149,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           ...financeRoutes(),
+          ...posRoutes(),
           { path: 'system/status', element: <SystemStatusPage /> },
           { path: 'account', element: <AccountPage /> },
           { path: 'catalog/products', element: <ProductsPage />, handle: { wide: true } },
@@ -389,6 +409,26 @@ export const routes: RouteObject[] = [
 
 export function createAppRouter() {
   return createBrowserRouter(routes);
+}
+
+/** The «Супермаркет» pages (ADR-0063 #8): reads behind pos.read, the settings and the test till behind pos.manage. */
+function posRoutes(): RouteObject[] {
+  const read = (element: ReactNode) => (
+    <RequirePermission permission="pos.read">{element}</RequirePermission>
+  );
+  const manage = (element: ReactNode) => (
+    <RequirePermission permission="pos.manage">{element}</RequirePermission>
+  );
+  return [
+    { path: 'pos/shifts', element: read(<PosShiftsPage />), handle: { wide: true } },
+    { path: 'pos/sales', element: read(<PosSalesPage />), handle: { wide: true } },
+    { path: 'pos/tills', element: read(<PosTillsPage />), handle: { wide: true } },
+    { path: 'pos/cashiers', element: read(<PosCashiersPage />), handle: { wide: true } },
+    { path: 'pos/settings', element: manage(<PosSettingsPage />) },
+    ...(import.meta.env.DEV
+      ? [{ path: 'pos/test-till', element: manage(<PosTestTillPage />), handle: { wide: true } }]
+      : []),
+  ];
 }
 
 /** The «Санхүү» pages (ADR-0060 #11), every one behind finance.read; the settings behind their right. */
