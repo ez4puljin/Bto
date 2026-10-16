@@ -9,3 +9,9 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+*.ttf binary
+*.webp binary
+*.apk binary
+*.aab binary
+*.jks binary
+*.keystore binary

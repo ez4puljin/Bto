@@ -216,6 +216,10 @@ export default defineConfig([
     'packages/api-client/src/generated/**',
     'apps/api/src/db/migrations/**',
     'tools/lint-guards/fixtures/**',
+    // The staff app's generated native projects (expo prebuild, ADR-0061).
+    'apps/mobile/android/**',
+    'apps/mobile/ios/**',
+    'apps/mobile/expo-env.d.ts',
   ]),
   {
     name: 'guard/G6',
@@ -237,13 +241,49 @@ export default defineConfig([
   { name: 'js', files: JS, languageOptions: { globals: globals.node } },
   {
     name: 'js-commonjs',
-    files: ['**/*.cjs', 'apps/api/**/*.js'],
+    files: ['**/*.cjs', 'apps/api/**/*.js', 'apps/mobile/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: globals.node },
   },
   {
     name: 'type-imports',
-    files: ['apps/web/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/mobile/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
     rules: { '@typescript-eslint/consistent-type-imports': 'error' },
+  },
+  {
+    // The staff app (ADR-0061): hooks rules, and none of the shared modules Hermes cannot run
+    // (Intl time zones, \p{…} regexes, normalize()): the server sends «today».
+    name: 'mobile',
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@tugeel/shared/time',
+              importNames: [
+                'businessDate',
+                'businessDateTime',
+                'businessYear',
+                'businessMonthStart',
+              ],
+              message:
+                'Hermes has no reliable time zones: take «today» from the server (ADR-0061).',
+            },
+          ],
+          patterns: [
+            {
+              regex: '^@tugeel/shared/(text|taxpayer|imports|inventory)$',
+              message:
+                'Not for the phone: it needs Intl or Unicode regexes Hermes lacks (ADR-0061).',
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     name: 'web',

@@ -21,3 +21,12 @@ tools
 **/.data
 tmp
 CLAUDE.local.md
+# The staff app is built on the owner's PC (ADR-0061); its package.json stays for the lockfile.
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.expo
+apps/mobile/build
+**/*.apk
+**/*.aab
+**/*.keystore
+**/*.jks
