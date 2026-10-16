@@ -9,6 +9,7 @@ import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
+import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { FilesController } from './controllers/files.controller';
 import { AuditController, OrgController, SettingsController } from './controllers/org.controller';
 import { RolesController } from './controllers/roles.controller';
@@ -93,6 +94,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   ],
   controllers: [
     AuthController,
+    MobileAuthController,
     UsersController,
     RolesController,
     OrgController,
