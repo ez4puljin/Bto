@@ -157,6 +157,19 @@ export class PaymentsService {
   ) {}
 
   async record(ctx: AuthContext, input: PaymentInput): Promise<PaymentDetail> {
+    const { id } = await inTransaction(this.db, (tx) => this.recordInTx(tx, ctx, input));
+    return this.get(id);
+  }
+
+  /**
+   * Records a voucher inside the caller's transaction (the POS shift hand-over, ADR-0064 #3):
+   * the same checks and postings as `record`; the new payment’s id and number.
+   */
+  async recordInTx(
+    tx: Tx,
+    ctx: AuthContext,
+    input: PaymentInput,
+  ): Promise<{ id: number; number: string }> {
     const direction = PAYMENT_KIND_DIRECTION[input.kind];
     const customerKind = input.kind === 'CUSTOMER_PAYMENT' || input.kind === 'CUSTOMER_REFUND';
     if (!input.amount.gt(0) || input.amount.decimalPlaces() > MONEY_SCALE) {
@@ -175,108 +188,102 @@ export class PaymentsService {
     if (input.collectedBy !== null && !(await this.names.namesOf([input.collectedBy])).size) {
       throw invalid('collectedBy', 'exists', `user ${input.collectedBy} does not exist`);
     }
-    const id = await inTransaction(this.db, async (tx) => {
-      const account = await this.moneyAccounts.lockActive(tx, input.moneyAccountId);
-      const glAccountId = customerKind ? null : input.glAccountId;
-      if (glAccountId !== null) {
-        await this.accounts.activeByIds([glAccountId], () => 'glAccountId', tx);
-      }
-      const customerId = customerKind ? input.customerId : null;
-      let customerName: string | null = null;
-      if (customerId !== null) {
-        await this.customers.lockForUpdate(tx, customerId);
-        customerName = (await this.customers.getMany([customerId], tx))[0]?.name ?? null;
-      }
-      const number = await this.settings.allocateNumber(tx, 'PAYMENT', input.paidOn);
-      const [payment] = await tx
-        .insert(payments)
-        .values({
-          number,
-          kind: input.kind,
-          direction,
-          moneyAccountId: account.id,
-          customerId,
-          glAccountId,
-          amount: input.amount,
-          paidOn: input.paidOn,
-          description: input.description?.trim() || null,
-          reference: input.reference?.trim() || null,
-          counterpartyName: input.counterpartyName?.trim() || null,
-          collectedBy: input.collectedBy,
-          createdBy: ctx.userId,
-        })
-        .returning({ id: payments.id });
-      if (!payment) throw new Error('payments insert returned no row');
-      let allocated = new Decimal(0);
-      if (input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
-        allocated = await this.allocate(tx, payment.id, customerId, input);
-      }
-      const zero = new Decimal(0);
-      const cash = { accountId: account.glAccountId, moneyAccountId: account.id };
-      const ar = async () => ({ accountId: (await this.accounts.byRole('AR', tx)).id, customerId });
-      const other = { accountId: glAccountId ?? 0 };
-      const lines: JournalLineInput[] =
-        input.kind === 'CUSTOMER_PAYMENT'
+    const account = await this.moneyAccounts.lockActive(tx, input.moneyAccountId);
+    const glAccountId = customerKind ? null : input.glAccountId;
+    if (glAccountId !== null) {
+      await this.accounts.activeByIds([glAccountId], () => 'glAccountId', tx);
+    }
+    const customerId = customerKind ? input.customerId : null;
+    let customerName: string | null = null;
+    if (customerId !== null) {
+      await this.customers.lockForUpdate(tx, customerId);
+      customerName = (await this.customers.getMany([customerId], tx))[0]?.name ?? null;
+    }
+    const number = await this.settings.allocateNumber(tx, 'PAYMENT', input.paidOn);
+    const [payment] = await tx
+      .insert(payments)
+      .values({
+        number,
+        kind: input.kind,
+        direction,
+        moneyAccountId: account.id,
+        customerId,
+        glAccountId,
+        amount: input.amount,
+        paidOn: input.paidOn,
+        description: input.description?.trim() || null,
+        reference: input.reference?.trim() || null,
+        counterpartyName: input.counterpartyName?.trim() || null,
+        collectedBy: input.collectedBy,
+        createdBy: ctx.userId,
+      })
+      .returning({ id: payments.id });
+    if (!payment) throw new Error('payments insert returned no row');
+    let allocated = new Decimal(0);
+    if (input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
+      allocated = await this.allocate(tx, payment.id, customerId, input);
+    }
+    const zero = new Decimal(0);
+    const cash = { accountId: account.glAccountId, moneyAccountId: account.id };
+    const ar = async () => ({ accountId: (await this.accounts.byRole('AR', tx)).id, customerId });
+    const other = { accountId: glAccountId ?? 0 };
+    const lines: JournalLineInput[] =
+      input.kind === 'CUSTOMER_PAYMENT'
+        ? [
+            { ...cash, debit: input.amount, credit: zero },
+            { ...(await ar()), debit: zero, credit: input.amount },
+          ]
+        : input.kind === 'CUSTOMER_REFUND'
           ? [
-              { ...cash, debit: input.amount, credit: zero },
-              { ...(await ar()), debit: zero, credit: input.amount },
+              { ...(await ar()), debit: input.amount, credit: zero },
+              { ...cash, debit: zero, credit: input.amount },
             ]
-          : input.kind === 'CUSTOMER_REFUND'
+          : input.kind === 'OTHER_IN'
             ? [
-                { ...(await ar()), debit: input.amount, credit: zero },
-                { ...cash, debit: zero, credit: input.amount },
+                { ...cash, debit: input.amount, credit: zero },
+                { ...other, debit: zero, credit: input.amount },
               ]
-            : input.kind === 'OTHER_IN'
-              ? [
-                  { ...cash, debit: input.amount, credit: zero },
-                  { ...other, debit: zero, credit: input.amount },
-                ]
-              : [
-                  { ...other, debit: input.amount, credit: zero },
-                  { ...cash, debit: zero, credit: input.amount },
-                ];
-      const entry = await this.journal.post(tx, ctx, {
-        entryDate: input.paidOn,
-        description: label(number, customerName ?? input.counterpartyName ?? input.description),
-        source: 'AUTO_PAYMENT',
-        sourceType: 'PAYMENT',
-        sourceId: payment.id,
-        lines,
-      });
-      await tx
-        .update(payments)
-        .set({ journalEntryId: entry.id })
-        .where(eq(payments.id, payment.id));
-      if (customerId !== null) {
-        await this.ledger.record(tx, {
-          customerId,
-          entryDate: input.paidOn,
-          kind: input.kind === 'CUSTOMER_PAYMENT' ? 'PAYMENT' : 'REFUND',
-          docType: 'PAYMENT',
-          docId: payment.id,
-          docNumber: number,
-          debit: input.kind === 'CUSTOMER_REFUND' ? input.amount : zero,
-          credit: input.kind === 'CUSTOMER_PAYMENT' ? input.amount : zero,
-        });
-      }
-      await this.audit.record(tx, ctx, {
-        action: 'CREATE',
-        entity: 'payments',
-        entityId: payment.id,
-        after: {
-          number,
-          kind: input.kind,
-          moneyAccountId: account.id,
-          customerId,
-          glAccountId,
-          amount: input.amount.toFixed(MONEY_SCALE),
-          allocated: allocated.toFixed(MONEY_SCALE),
-          paidOn: input.paidOn,
-        },
-      });
-      return payment.id;
+            : [
+                { ...other, debit: input.amount, credit: zero },
+                { ...cash, debit: zero, credit: input.amount },
+              ];
+    const entry = await this.journal.post(tx, ctx, {
+      entryDate: input.paidOn,
+      description: label(number, customerName ?? input.counterpartyName ?? input.description),
+      source: 'AUTO_PAYMENT',
+      sourceType: 'PAYMENT',
+      sourceId: payment.id,
+      lines,
     });
-    return this.get(id);
+    await tx.update(payments).set({ journalEntryId: entry.id }).where(eq(payments.id, payment.id));
+    if (customerId !== null) {
+      await this.ledger.record(tx, {
+        customerId,
+        entryDate: input.paidOn,
+        kind: input.kind === 'CUSTOMER_PAYMENT' ? 'PAYMENT' : 'REFUND',
+        docType: 'PAYMENT',
+        docId: payment.id,
+        docNumber: number,
+        debit: input.kind === 'CUSTOMER_REFUND' ? input.amount : zero,
+        credit: input.kind === 'CUSTOMER_PAYMENT' ? input.amount : zero,
+      });
+    }
+    await this.audit.record(tx, ctx, {
+      action: 'CREATE',
+      entity: 'payments',
+      entityId: payment.id,
+      after: {
+        number,
+        kind: input.kind,
+        moneyAccountId: account.id,
+        customerId,
+        glAccountId,
+        amount: input.amount.toFixed(MONEY_SCALE),
+        allocated: allocated.toFixed(MONEY_SCALE),
+        paidOn: input.paidOn,
+      },
+    });
+    return { id: payment.id, number };
   }
 
   /** Voids a posted voucher: its allocations come back onto the invoices, the entry is reversed. */

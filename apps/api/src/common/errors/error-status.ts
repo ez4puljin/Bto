@@ -107,4 +107,18 @@ export const ERROR_HTTP_STATUS = {
   JOURNAL_UNBALANCED: 422,
   ACCOUNT_ROLE_TAKEN: 409,
   ACCOUNT_ROLE_MISSING: 409,
+  // pos (ADR-0063, ADR-0064): the store is not set up; a replayed document whose arithmetic or
+  // taxes differ; a shift, till or cashier in the wrong state; a return outside its sale; a
+  // number a till already used; the test till outside development
+  POS_NOT_CONFIGURED: 409,
+  POS_TOTALS_MISMATCH: 422,
+  POS_TAX_MISMATCH: 422,
+  POS_SHIFT_STATE_INVALID: 409,
+  POS_TILL_BUSY: 409,
+  POS_TILL_INACTIVE: 409,
+  POS_CASHIER_INACTIVE: 409,
+  POS_RETURN_EXCEEDS: 422,
+  POS_RETURN_WINDOW: 422,
+  POS_NUMBER_TAKEN: 409,
+  POS_DEV_ONLY: 404,
 } as const satisfies Record<ErrorCode, number>;

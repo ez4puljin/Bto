@@ -53,7 +53,7 @@ export interface SystemAdjustmentLine {
 
 export interface SystemAdjustmentInput {
   warehouseId: number;
-  reason: 'OPENING' | 'OPENING_REVERSAL';
+  reason: 'OPENING' | 'OPENING_REVERSAL' | 'POS_SHORTFALL';
   note?: string | null;
   /** The OPENING adjustment a reversal takes back. */
   reversesAdjustmentId?: number;
@@ -765,9 +765,12 @@ export class AdjustmentsService {
   }
 }
 
-/** OPENING_REVERSAL is posted only when an import is reverted (ADR-0036). */
+/** OPENING_REVERSAL (an import reverted, ADR-0036) and POS_SHORTFALL (a till sold what the shelf
+ * lacked, ADR-0063 #5) are posted by the system only. */
 function assertRequestable(reason: AdjustmentReason): void {
-  if (reason === 'OPENING_REVERSAL') throw invalid('reason', 'system', 'a system reason');
+  if (reason === 'OPENING_REVERSAL' || reason === 'POS_SHORTFALL') {
+    throw invalid('reason', 'system', 'a system reason');
+  }
 }
 
 function direction(reason: AdjustmentReason): -1 | 1 {

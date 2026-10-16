@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { FINANCE_LIMITS, type FinanceDocKind, type JournalSource } from '@tugeel/shared/finance';
+import {
+  FINANCE_LIMITS,
+  type JournalSource,
+  type JournalSourceDocType,
+} from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
@@ -41,7 +45,7 @@ export interface JournalEntryInput {
   entryDate: string;
   description: string;
   source: JournalSource;
-  sourceType?: FinanceDocKind | null;
+  sourceType?: JournalSourceDocType | null;
   sourceId?: number | null;
   reversesId?: number | null;
   lines: readonly JournalLineInput[];
@@ -58,7 +62,7 @@ export interface JournalEntrySummary {
   entryDate: string;
   description: string;
   source: JournalSource;
-  sourceType: FinanceDocKind | null;
+  sourceType: JournalSourceDocType | null;
   sourceId: number | null;
   sourceNumber: string | null;
   reversesId: number | null;
@@ -552,10 +556,10 @@ export class JournalService {
 
   /** The numbers of the documents behind automatic entries, by `${type}:${id}`. */
   private async sourceNumbers(
-    entries: readonly { sourceType: FinanceDocKind | null; sourceId: number | null }[],
+    entries: readonly { sourceType: JournalSourceDocType | null; sourceId: number | null }[],
   ): Promise<Map<string, string>> {
     const result = new Map<string, string>();
-    const idsOf = (type: FinanceDocKind) =>
+    const idsOf = (type: JournalSourceDocType) =>
       entries.flatMap((entry) =>
         entry.sourceType === type && entry.sourceId !== null ? [entry.sourceId] : [],
       );

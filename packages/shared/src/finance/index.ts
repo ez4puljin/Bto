@@ -100,6 +100,12 @@ export const GL_ROLES = [
   'BANK',
   'OTHER_INCOME',
   'OTHER_EXPENSE',
+  // The supermarket POS (ADR-0064): the tills' cash until it is handed over, card money until the
+  // bank settles it, the store's sales, and what a count missed or found.
+  'POS_CASH',
+  'CARD_CLEARING',
+  'POS_SALES',
+  'CASH_VARIANCE',
 ] as const;
 export type GlRole = (typeof GL_ROLES)[number];
 
@@ -110,8 +116,13 @@ export const JOURNAL_SOURCES = [
   'AUTO_VOID',
   'MANUAL',
   'OPENING',
+  'AUTO_POS_SHIFT',
 ] as const;
 export type JournalSource = (typeof JOURNAL_SOURCES)[number];
+
+/** The documents a journal entry may come from: the numbered finance documents and a POS shift. */
+export const JOURNAL_SOURCE_DOC_TYPES = [...FINANCE_DOC_KINDS, 'POS_SHIFT'] as const;
+export type JournalSourceDocType = (typeof JOURNAL_SOURCE_DOC_TYPES)[number];
 
 export const AR_ENTRY_KINDS = [
   'INVOICE',
@@ -330,4 +341,9 @@ export const DEFAULT_GL_ACCOUNTS: readonly {
   { code: '520101', kind: 'INCOME', role: 'SALES_RETURN' },
   { code: '520201', kind: 'INCOME', role: 'SALES_DISCOUNT' },
   { code: '730101', kind: 'EXPENSE', role: 'OTHER_EXPENSE' },
+  // The supermarket POS (ADR-0064 #2).
+  { code: '100102', kind: 'ASSET', role: 'POS_CASH' },
+  { code: '120301', kind: 'ASSET', role: 'CARD_CLEARING' },
+  { code: '510102', kind: 'INCOME', role: 'POS_SALES' },
+  { code: '740101', kind: 'EXPENSE', role: 'CASH_VARIANCE' },
 ];

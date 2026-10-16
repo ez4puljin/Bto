@@ -14,8 +14,10 @@ import {
   type GlRole,
   INVOICE_STATUSES,
   type InvoiceStatus,
+  JOURNAL_SOURCE_DOC_TYPES,
   JOURNAL_SOURCES,
   type JournalSource,
+  type JournalSourceDocType,
   MONEY_ACCOUNT_KINDS,
   type MoneyAccountKind,
   PAYMENT_DIRECTIONS,
@@ -357,7 +359,8 @@ export class JournalEntryDto {
   @ApiProperty({ example: '2026-10-16' }) entryDate: string;
   @ApiProperty() description: string;
   @ApiProperty({ enum: JOURNAL_SOURCES }) source: JournalSource;
-  @ApiProperty({ enum: FINANCE_DOC_KINDS, nullable: true }) sourceType: FinanceDocKind | null;
+  @ApiProperty({ enum: JOURNAL_SOURCE_DOC_TYPES, nullable: true })
+  sourceType: JournalSourceDocType | null;
   @ApiProperty({ type: Number, nullable: true }) sourceId: number | null;
   @ApiProperty({ type: String, nullable: true, description: 'The document behind it' })
   sourceNumber: string | null;

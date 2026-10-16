@@ -48,6 +48,12 @@ export const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32).optional(),
   /** HMAC key of one-time password codes (ADR-0027); api only. */
   AUTH_PEPPER: z.string().min(32).optional(),
+  /**
+   * The key the cashiers' PIN hashes are salted with (ADR-0063 #6); shared by the api and the
+   * store's edge, so a hash copied to the store is useless without it. Falls back to AUTH_PEPPER
+   * until the owner sets it.
+   */
+  POS_PIN_PEPPER: z.string().min(32).optional(),
   /** `Secure` flag of the refresh cookie; defaults to true only in production (LAN http in dev). */
   COOKIE_SECURE: z.stringbool().optional(),
   /**

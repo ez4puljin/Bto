@@ -53,7 +53,7 @@ export interface PostingDoc {
  * numbers it — the owner holds its header row FOR UPDATE and guards its state in the same
  * transaction.
  */
-export type ExternalDocType = Extract<StockDocType, 'SO' | 'PK' | 'CN'>;
+export type ExternalDocType = Extract<StockDocType, 'SO' | 'PK' | 'CN' | 'POS'>;
 
 export interface ExternalPostingDoc {
   docType: ExternalDocType;
@@ -262,6 +262,7 @@ const DOC_ORDER: Record<PostedDocType | ExternalDocType, number> = {
   PK: 5,
   SO: 6,
   CN: 7,
+  POS: 8,
 };
 const MAX_DIFFS = 100;
 /** Rows per multi-row statement: far below the 65,535 bind parameters of one statement. */
@@ -714,6 +715,7 @@ export class StockPostingService {
           WHEN 'TR' THEN (SELECT d.number FROM transfers d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'SO' THEN (SELECT d.number FROM sales_orders d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'CN' THEN (SELECT d.number FROM credit_notes d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'POS' THEN (SELECT d.number FROM pos_sales d WHERE d.id = "stock_ledger"."doc_id")
         END`,
         enteredQty: stockLedger.enteredQty,
         productUnitId: stockLedger.productUnitId,

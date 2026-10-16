@@ -210,6 +210,8 @@ export const ADJUSTMENT_REASONS = {
   OPENING: 1,
   /** Takes back an opening-stock adjustment when its import is reverted (system only, ADR-0036). */
   OPENING_REVERSAL: -1,
+  /** What the shelf lacked when a till sold it anyway (system only, ADR-0063 #5). */
+  POS_SHORTFALL: 1,
 } as const satisfies Record<string, -1 | 1>;
 export type AdjustmentReason = keyof typeof ADJUSTMENT_REASONS;
 export const ADJUSTMENT_REASON_CODES = [
@@ -219,6 +221,7 @@ export const ADJUSTMENT_REASON_CODES = [
   'SURPLUS',
   'OPENING',
   'OPENING_REVERSAL',
+  'POS_SHORTFALL',
 ] as const satisfies readonly AdjustmentReason[];
 export const USER_ADJUSTMENT_REASONS = ['DAMAGED', 'EXPIRED', 'SHORTAGE', 'SURPLUS'] as const;
 

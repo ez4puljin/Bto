@@ -45,6 +45,8 @@ const MODULE_DEPS = {
   // ADR-0060: sales only for its hook tokens and snapshot types; finance never reads a sales table.
   finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt'],
   ebarimt: ['identity', 'catalog'],
+  // ADR-0063: the supermarket POS posts stock through inventory and money through finance.
+  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance'],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   notifications: ['identity', 'partners'],

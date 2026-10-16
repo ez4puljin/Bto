@@ -53,6 +53,12 @@ export const PERMISSIONS = [
   'finance.invoices.manage',
   'finance.journal.manage',
   'finance.settings.manage',
+  // The supermarket POS (ADR-0063): reading tills, shifts and sales; configuring tills, cashiers,
+  // PINs and the store's edge node; working a till; approving returns and no-sale drawer opens.
+  'pos.read',
+  'pos.manage',
+  'pos.till.operate',
+  'pos.till.supervise',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -81,6 +87,7 @@ export const SYSTEM_ROLES = [
   'ACCOUNTANT',
   'HR',
   'POS_CASHIER',
+  'POS_SUPERVISOR',
   'SALES_REP',
   'DRIVER',
 ] as const;
@@ -101,6 +108,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'sales.orders.read',
     'sales.orders.manage',
     'finance.read',
+    'pos.read',
   ],
   PROCUREMENT: [],
   // Warehouse staff count goods in and out but never see costs; an admin approves adjustments.
@@ -130,10 +138,19 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'finance.payments.record',
     'finance.invoices.manage',
     'finance.journal.manage',
+    // The supermarket's shifts and their cash (ADR-0064 #3).
+    'pos.read',
   ],
   HR: [],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
-  POS_CASHIER: ['inventory.transfers.manage'],
+  POS_CASHIER: ['inventory.transfers.manage', 'pos.till.operate'],
+  // The senior cashier approves returns and drawer opens at the till (owner 2026-10-16).
+  POS_SUPERVISOR: [
+    'inventory.transfers.manage',
+    'pos.till.operate',
+    'pos.till.supervise',
+    'pos.read',
+  ],
   SALES_REP: [],
   DRIVER: [],
 };

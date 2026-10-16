@@ -174,6 +174,30 @@ export class StockQueryService {
     return { ...withTotals(product, balances), bins: rows };
   }
 
+  /**
+   * The on-hand base quantity of these products on one bin, lots summed, the rows locked FOR UPDATE
+   * so two documents cannot both see the last units (the POS shortfall rule, ADR-0063 #5). A product
+   * without a row is at 0.
+   */
+  async lockOnHandInBin(
+    tx: Tx,
+    binId: number,
+    productIds: readonly number[],
+  ): Promise<Map<number, Decimal>> {
+    const result = new Map<number, Decimal>();
+    if (productIds.length === 0) return result;
+    const rows = await tx
+      .select({ productId: binStock.productId, onHand: binStock.onHand })
+      .from(binStock)
+      .where(and(eq(binStock.binId, binId), idIn(binStock.productId, productIds)))
+      .orderBy(binStock.productId, binStock.id)
+      .for('update');
+    for (const row of rows) {
+      result.set(row.productId, (result.get(row.productId) ?? ZERO).plus(row.onHand));
+    }
+    return result;
+  }
+
   async ofBin(binId: number): Promise<BinContent> {
     const bin = await this.bins.get(binId);
     const rows = await this.db

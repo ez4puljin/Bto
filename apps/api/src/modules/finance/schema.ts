@@ -5,6 +5,7 @@ import {
   GL_ACCOUNT_KINDS,
   GL_ROLES,
   INVOICE_STATUSES,
+  JOURNAL_SOURCE_DOC_TYPES,
   JOURNAL_SOURCES,
   MONEY_ACCOUNT_KINDS,
   PAYMENT_DIRECTIONS,
@@ -159,7 +160,7 @@ export const journalEntries = pgTable(
     entryDate: date('entry_date').notNull(),
     description: text('description').notNull(),
     source: text('source', { enum: JOURNAL_SOURCES }).notNull(),
-    sourceType: text('source_type', { enum: DOC_TYPES }),
+    sourceType: text('source_type', { enum: JOURNAL_SOURCE_DOC_TYPES }),
     sourceId: ref('source_id'),
     reversesId: ref('reverses_id').references((): AnyPgColumn => journalEntries.id),
     postedBy: userRef('posted_by'),
@@ -176,7 +177,7 @@ export const journalEntries = pgTable(
     check('journal_entries_source', inList(t.source, JOURNAL_SOURCES)),
     check(
       'journal_entries_source_doc',
-      sql`(${t.sourceType} IS NULL) = (${t.sourceId} IS NULL) AND (${t.sourceType} IS NULL OR ${inList(t.sourceType, DOC_TYPES)})`,
+      sql`(${t.sourceType} IS NULL) = (${t.sourceId} IS NULL) AND (${t.sourceType} IS NULL OR ${inList(t.sourceType, JOURNAL_SOURCE_DOC_TYPES)})`,
     ),
   ],
 );
