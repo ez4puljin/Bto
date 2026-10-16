@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0065`. `ADR-0062` (app notifications) is reserved for the `rep-app` worktree branch.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0065`.
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -77,7 +77,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0059](ADR-0059-order-panel.md) | The order panel: an erxes-like deal view where the order is read, edited, moved and filled | Accepted | 2026-10-15 |
 | [ADR-0060](ADR-0060-finance-i.md) | Finance I: invoices at the sale, an append-only receivables ledger, strict credit control, cash and bank books, credit notes and a small general journal | Accepted | 2026-10-16 |
 | [ADR-0061](ADR-0061-sales-rep-app.md) | The sales-rep app v1: an Expo staff app built on the owner's PC, native token refresh and a sales-rep facade | Accepted | 2026-10-15 |
-| ADR-0062 | *Reserved: app notifications (the `rep-app` branch)* | — | — |
+| [ADR-0062](ADR-0062-app-notices.md) | App notices v1: the admin's notices in the sales-rep app, and the rep's sold orders | Accepted | 2026-10-16 |
 | [ADR-0063](ADR-0063-pos-store-edge.md) | The supermarket POS runs on a store edge server; the centre records what the tills did (a `pos` module, client uuids and till numbers, ordered replay, the shortfall rule, cashier PINs, edge tokens) | Accepted | 2026-10-16 |
 | [ADR-0064](ADR-0064-pos-money.md) | POS money: no invoices, one journal entry per closed shift, the cash handed to the accountant as a voucher | Accepted | 2026-10-16 |
 

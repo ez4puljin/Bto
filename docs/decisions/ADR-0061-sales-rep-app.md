@@ -6,6 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0006 (#2: SDK 57 pinned now; #3: local Gradle release APKs instead of EAS until go-live; #4: the camera path first), ADR-0016 (#1: Vitest unit tests for the app's pure modules instead of `jest-expo` for now), ADR-0027 (#8: a body-token transport for native clients beside the web's cookie), ADR-0056 (#2) and ADR-0057 (#4: a rep's order lands on the stage the rep chose; a CONFIRM stage submits it in the same transaction) |
+| Amended by | ADR-0062 (#1: the app shows the admin's notices — a popup at start, a bell with a count on «Профайл», a notifications screen, a notice's products — and the rep's sold orders) |
 
 ## Context
 
