@@ -11,17 +11,18 @@ Status (all built in delivery 2 on 2026-10-15):
   - orders are numbered when created, in the company format.
 - **Labels and paper** (ADR-0058): each order's label is its payment method, the card names who entered it, and both documents print on A4 or an 80 mm roll.
 - **The order panel** (ADR-0059): an erxes-like deal view where an order is read, edited (header and products), moved along its stages and filled; new orders start from their customer in a dialog.
+- **The sales-rep app's API** (ADR-0061, built 2026-10-15 for `apps/mobile`): `/sales-rep/*` gives a rep the stages they may place orders on, the shop (sale-ready products with wholesale unit prices and free stock), active customers, a new order created on the chosen stage (confirmed in the same transaction on a CONFIRM stage) and their own orders by month.
 
-Sales reps come in delivery 7 and the POS in delivery 9.
-- **Code:** `apps/api/src/modules/sales/`; shared rules in `packages/shared/src/sales`; screens in `apps/web/src/features/sales/`.
-- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0059 (the order panel), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
+The rest of the sales reps' work (zones, visits, collections) comes in delivery 7 and the POS in delivery 9.
+- **Code:** `apps/api/src/modules/sales/` (the rep facade: `controllers/sales-rep.controller.ts`, `services/sales-rep-orders.service.ts`, `services/sales-rep-shop.service.ts`, `services/rep-access.ts`); shared rules in `packages/shared/src/sales`; screens in `apps/web/src/features/sales/`; the app in `apps/mobile` (`docs/modules/mobile.md`).
+- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0059 (the order panel), ADR-0061 (the sales-rep app), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
 - **Architecture:** §5.3 (reservations) and §5.6 (the state machine).
 
 sales depends on these modules, always through their `index.ts`:
 - `identity`: audit, numbering, access.
-- `catalog`: products, units.
-- `partners`: customers, addresses, and the customer search `CustomersService.idsWhere`.
-- `pricing`: the quote.
+- `catalog`: products, units; `ProductQueryService` for the rep's shop.
+- `partners`: customers, addresses, and the customer search `CustomersService.idsWhere`; `list` / `get` for the rep's customer picker.
+- `pricing`: the quote; `ProductPricesService.tablesOf` for the shop's unit prices.
 - `inventory`: home warehouses, `ReservationService`, `StockPostingService`.
 
 Finance answers the two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and imports only those contracts from `sales/index.ts`; delivery will import sales too.
@@ -81,13 +82,16 @@ AI views (ADR-0045):
 |---|---|
 | `SalesModule` / `SalesHttpModule` | the services; + the controllers (api). The credit checker and the sale sink are resolved from finance through `ModuleRef` (`strict: false`); without finance every order passes and a sale ends DELIVERED |
 | `SalesOrdersService.create / update / submit / move / pickInfo / pick / cancel / archive / unarchive / get / list / productInfo` | the order paths; each takes the caller's `AuthContext`. A SYSTEM actor skips the rights check |
+| `SalesOrdersService.createInTx(tx, ctx, input, { channel, placement, numberLater? })`, `submitDraftInTx(tx, actor, id)` | a draft on a channel and its submit inside the caller's transaction (the rep facade, ADR-0061 #6): `placement` runs after the header checks; `numberLater` leaves the number to the submit, drawn after the stock's locks |
 | `SalesAccessService.load(ctx)` | the caller's rights on pipelines and stages, and the SQL predicate every order read and action uses (ADR-0057 #2) |
 | `SalesBoardsService` | the board groups: `tree`, create, rename, archive |
-| `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `stageRights`, `namesOf`, `printsOf` |
+| `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `lockStage(tx, stageId)` (the pipeline, then the stage, FOR SHARE), `stageRights`, `namesOf`, `printsOf` |
 | `SalesOrderQueryService` | reads for the screens: `cards`, `list`, `details(ids)` |
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
 | `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
+
+`SalesRepOrdersService` (`context`, `create`, `list`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported.
 
 ## 4. REST surface
 
@@ -96,6 +100,7 @@ Permissions:
 - `sales.orders.manage` (OFFICE, ADMIN; assignable) creates, submits and cancels.
 - `sales.orders.pick` (WAREHOUSE, ADMIN) picks.
 - `sales.boards.manage` (ADMIN; assignable) configures.
+- `sales.orders.rep` (SALES_REP, ADMIN; assignable) opens `/sales-rep/*` only (ADR-0061 #5): a rep holds neither `sales.orders.read` nor `manage`, nor `partners.customers.read`.
 
 Every board, pipeline and stage route carries `sales.orders.read`; the service checks the rest.
 
@@ -123,6 +128,17 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `POST /sales-stages/:id/archive-cards` | Every finished, unarchived order of the stage → `{ archived }`; stage EDIT |
 | `GET /sales-settings/numbering`, `PUT /sales-settings/numbering` | `{ pattern, digits, updatedAt }` (the shared defaults until first saved). PUT: `sales.boards.manage`; the shared rules' issues at `pattern` / `digits`. The dialog's example is computed in the browser (`renderOrderNumber`, counter 1) |
 | `GET /sales-settings/channels`, `PUT /sales-settings/channels` | Where each channel's new orders land (pipeline, stage); PUT: `sales.boards.manage` |
+
+**The rep app** (`/sales-rep/*`, every route `sales.orders.rep`, ADR-0061 #5):
+
+| Method and path | Notes |
+|---|---|
+| `GET /sales-rep/context` | `{ today, boards, defaultStageId }`: the server's business date (the phone never computes one); the boards → pipelines → stages the caller may place on (#5 below); the SALES_REP channel default when it is one of them |
+| `POST /sales-rep/orders` (`Idempotency-Key`) | The office order's header and lines with `stageId` instead of `pipelineId`; 201 with the order. A stage the caller may not place on: `VALIDATION_FAILED` at `stageId` (`repStage`). Otherwise the office's refusals (`PRODUCT_NOT_SELLABLE`, `PRODUCT_NO_HOME`, `CUSTOMER_INACTIVE`, `PRICE_MISSING`, `errors[].path = lines.N`) |
+| `GET /sales-rep/orders?month=YYYY-MM&cursor&limit` | The caller's own SALES_REP orders created in that Ulaanbaatar month, newest first; the first page carries `summary { count, total, drafts }` (total of the orders not cancelled) |
+| `GET /sales-rep/orders/:id` | Header, lines with parts, reserved and backordered quantities, events. 404 for any order the caller did not create through the app |
+| `GET /sales-rep/products?q&categoryId&cursor&limit`, `GET /sales-rep/products/batch?productIds=1,2` | ACTIVE, sale-ready products (`ProductQueryService`), each with its units' WHOLESALE price today and its `basis`, the home warehouse and the base units available there, `sellable`. The batch keeps only products the list would show |
+| `GET /sales-rep/customers?q&cursor&limit`, `GET /sales-rep/customers/:id` | ACTIVE customers (`CustomersService.list`, so `visibleTo` applies): id, code, name, phone, address. One customer: its live addresses (the default first) and contacts; 404 when not ACTIVE. No credit data |
 
 ## 5. Rules worth knowing
 
@@ -165,8 +181,12 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
   6. the credit check (ADR-0060 #2): the customer's other CONFIRMED … DELIVERED orders summed under the lock, then `CreditChecker.check`; a refusal is 409 `CREDIT_BLOCKED` with the amounts;
   7. parts and totals written;
   8. `ReservationService.reserveInTx` (rows in (warehouse, product) order; the rest backordered);
-  9. a number only for an older draft that has none;
+  9. a number for a draft that has none (an older draft, or the rep app's on a CONFIRM stage), before the CONFIRMED row;
   10. events SUBMITTED and CONFIRMED, audit `CONFIRM`.
+- **The rep app (ADR-0061 #5, #6).**
+  - A rep may place an order on a stage when its pipeline is live and PUBLIC or visible to one of the rep's roles, the stage is live with action NONE or CONFIRM, and its MOVE right has no roles or one of the rep's (`repMayPlace`, `services/rep-access.ts`). A holder of `sales.boards.manage` may place on any live NONE or CONFIRM stage. Admins limit reps per stage with MOVE roles.
+  - One transaction: `lockStage` (the pipeline, then the stage, FOR SHARE), the rule checked on what was locked, `createInTx` on the `SALES_REP` channel; a NONE stage keeps a numbered draft, a CONFIRM stage runs `submitDraftInTx` (the submit above) and the number is drawn last. Any refusal rolls everything back.
+  - Reads go by `created_by = caller AND channel = 'SALES_REP'`, never through `Access.visibleSql()`; the office sees the rep's orders through the pipeline rules as usual.
 - **Prices** are today's (Ulaanbaatar) at the submit; the delivery date does not change them.
 - **Cancel** releases the order's ACTIVE reservations (`releaseInTx`) and records the reason.
 - **Backorders** stay on the line.
@@ -181,7 +201,7 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 ## 7. Audit
 
 - **`sales_orders`:**
-  - CREATE (number, pipeline, stage);
+  - CREATE (number, pipeline, stage; the rep app's order on a CONFIRM stage has its number in the CONFIRM row);
   - UPDATE (a draft or a reserved order: the new total and backorders);
   - CONFIRM (total, backordered lines);
   - MOVE (stage before and after, the action);
@@ -281,9 +301,22 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - hidden stages;
   - the card's `paymentMethod` and `createdByName` (ADR-0058);
   - the names in an order's moves and events (ADR-0059).
+- `sales-rep.int-spec.ts` (ADR-0061):
+  - reps kept to the app (no office order route, no customer list) and the office kept out of it;
+  - the NONE and CONFIRM stages a rep may place on, and the channel default;
+  - a numbered draft on a NONE stage, on the rep channel, reserving nothing;
+  - a CONFIRM stage confirming in the same transaction: prices frozen, stock reserved, the rest short;
+  - refusals leave nothing behind (a stage of another kind, an unseen stage, bad data);
+  - a repeated send replayed, the same key with another body refused;
+  - only the rep's own rep orders, by Ulaanbaatar month;
+  - the rep's order on the office board, where the office moves it on.
+- `sales-rep-shop.int-spec.ts`: active, sale-ready products with the prices pricing gives and free stock; products by id, leaving out those the shop would not list; active customers with their addresses, the default first; the routes need the rep permission.
+
+**Unit:** `rep-access.spec.ts`: the placement rule (open stages, the permission and live rows, MOVE roles and private pipelines, managers).
 
 **Integrity**
 - `sales-races.spec.ts`: the last 30 pieces, opposite line orders, cancels.
+- `sales-rep-races.spec.ts` (ADR-0061): five reps on a CONFIRM stage and the office's confirm over the last 30 pieces: 30 reserved, the rest backordered, six distinct numbers.
 - `sales-picking.spec.ts`: short picks, pick vs submit, edit vs submit, no second pick.
 - `sales-pipelines.spec.ts`: archiving a stage while moving into it; concurrent creates numbered without gaps.
 
@@ -308,4 +341,5 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - free labels per pipeline beside the payment label.
 - **Delivery 3 (done 2026-10-16, ADR-0060):** the credit check without tolerance, invoices from delivered quantities (`docs/modules/finance.md`). No `open_orders` cache: sales sums its own open orders under the customer lock. Still open: CLOSED when the invoice is paid; payments shown in the order panel.
 - **Customer app, sales reps:** the 24-hour re-quote applies once a submit no longer confirms at once.
+- **Delivery 7 (rep zones):** `GET /sales-rep/customers/:id` and the customer check of a rep's order read the customer by id; they must go through `CustomersService.visibleTo` once it scopes reps to zones.
 - **Delivery 9:** the POS page («ПОС борлуулалт»).

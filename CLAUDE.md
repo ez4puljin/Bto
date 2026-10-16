@@ -69,6 +69,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
+| `pnpm mobile:apk` | the staff app's release APK, built on this PC (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 
 **`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
 
