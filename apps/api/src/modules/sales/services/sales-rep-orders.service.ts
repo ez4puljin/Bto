@@ -173,7 +173,9 @@ export class SalesRepOrdersService {
         pipelineId: salesOrders.pipelineId,
         stageId: salesOrders.stageId,
         createdAt: salesOrders.createdAt,
-        lineCount: sql<number>`(SELECT count(*)::int FROM sales_order_lines l WHERE l.order_id = ${salesOrders.id})`,
+        // Spelled out: a single-table select leaves columns unqualified, and a bare "id" here
+        // would be the line's own.
+        lineCount: sql<number>`(SELECT count(*)::int FROM sales_order_lines l WHERE l.order_id = sales_orders.id)`,
       })
       .from(salesOrders)
       .where(and(mine, after === null ? undefined : lt(salesOrders.id, after)))

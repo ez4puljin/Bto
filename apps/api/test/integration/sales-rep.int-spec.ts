@@ -341,6 +341,16 @@ describe('sales rep orders', () => {
     expect(mine.data.map((row) => row.id)).not.toContain(officeOrder.id);
     expect(mine.data.length).toBeGreaterThanOrEqual(3);
     expect(mine.summary).toMatchObject({ count: mine.data.length });
+    // Each row counts its own order's lines (a bare "id" in the subquery once matched the line's).
+    const { rows: lines } = await sql.query<{ id: number; lines: number }>(
+      `SELECT order_id::int AS id, count(*)::int AS lines FROM sales_order_lines
+        WHERE order_id = ANY($1::bigint[]) GROUP BY order_id`,
+      [mine.data.map((row) => row.id)],
+    );
+    expect(lines).toHaveLength(mine.data.length);
+    expect(Object.fromEntries(mine.data.map((row) => [row.id, row.lineCount]))).toEqual(
+      Object.fromEntries(lines.map((row) => [row.id, row.lines])),
+    );
     await repApi(app, repA).get(theirs.id).expect(404);
     await repApi(app, repA).get(officeOrder.id).expect(404);
     await repApi(app, repB)

@@ -16,7 +16,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { AppProblem } from '../api/problem';
+import { type AppProblem, creditMessage } from '../api/problem';
 import { formatMnt } from '../format/format';
 import { colors, radii, spacing, TOUCH, type } from '../theme/tokens';
 
@@ -270,11 +270,13 @@ export function EmptyState({
   );
 }
 
-/** The Mongolian message of a failed call: no answer, or the server's error code. */
+/** The Mongolian message of a failed call: no answer, the credit refusal, or the error code. */
 export function useProblemText() {
   const { t } = useTranslation();
   return (problem: AppProblem): string => {
     if (problem.code === 'NETWORK') return t('mobile.errors.network');
+    const credit = creditMessage(problem);
+    if (credit) return t(credit.key, credit.params);
     if (isErrorCode(problem.code)) return t(`errors.${problem.code}`, problem.params ?? {});
     return t('errors.unexpected');
   };
