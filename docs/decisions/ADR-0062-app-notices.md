@@ -39,7 +39,7 @@ The owner's answers (2026-10-16, one structured round):
 3. **On the phone.**
    - The app reads a summary when it starts, when it returns to the foreground, and every 60 seconds for the bell's count.
    - Unread pop-up notices that are running appear one by one in the middle of the screen, but only when the app starts or returns to the foreground, never from the 60-second refresh. They do not appear over the cart's sending or the camera.
-   - Closing a notice counts as reading it: it does not pop up again, the bell's count drops, and it stays in the list. The design's «Өнөөдөр дахин харуулахгүй» tick is left out.
+   - A notice counts as read once it has popped up, however it is left («Хаах», the back button, «Бараа харах»). It does not pop up again, the bell's count drops, and it stays in the list. The design's «Өнөөдөр дахин харуулахгүй» tick is left out.
    - «Бараа харах» opens the notice's products, priced and stocked as in «Бараа».
    - The notifications screen merges the running notices with the rep's own notifications, newest first, grouped by day.
 4. **The rep's sold orders.**

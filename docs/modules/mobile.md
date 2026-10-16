@@ -1,6 +1,6 @@
 # App `mobile` — contract
 
-Status: **v1 built** 2026-10-15 (the sales-rep app, ADR-0061), pulled forward from deliveries 4 and 7 at the owner's request. Code: `apps/mobile/` (Expo, the `staff` variant of ADR-0006), the API it uses in `apps/api/src/modules/sales/` (`/sales-rep/*`) and `apps/api/src/modules/identity/` (`/auth/mobile/*`). Decisions: ADR-0006, ADR-0016, ADR-0025, ADR-0027, ADR-0061.
+Status: **v1 built** 2026-10-15 (the sales-rep app, ADR-0061), pulled forward from deliveries 4 and 7 at the owner's request. Code: `apps/mobile/` (Expo, the `staff` variant of ADR-0006), the API it uses in `apps/api/src/modules/sales/` (`/sales-rep/*`) and `apps/api/src/modules/identity/` (`/auth/mobile/*`). Decisions: ADR-0006, ADR-0016, ADR-0025, ADR-0027, ADR-0061, ADR-0062 (notices, 2026-10-16).
 
 ## 1. Scope (v1, owner 2026-10-15)
 
@@ -11,7 +11,8 @@ The sales rep's app, modelled on the screens of the erxes SR app the owner uses 
 - **«Дэлгүүр»:** categories, search by name, code or barcode, the camera scanner; each product's units (piece, box…) with the server's wholesale price, the home warehouse's free stock, − n + per unit.
 - **«Сагс»:** the lines priced by the server (`POST /pricing/quote`: whole packs and loose parts, discount programs), the customer (search), the address or pickup, the delivery date (tomorrow by default, from the server's «today»), the payment (Бэлнээр / Дансаар / Зээл), a note, «Илгээх».
 - **«Захиалга»:** the rep's own orders by month (Ulaanbaatar), with status, stage, payment label; an order's page with lines, reserved and short quantities.
-- **«Профайл»:** the account, the server, the order settings, logout.
+- **«Профайл»** (redesigned 2026-10-16, ADR-0062): the bell with the unread count in the top right corner (also on the Profile tab), the user's initials, name, login and role, the order settings with the chosen stage, the server, logout, «Сервер солих», the version.
+- **Notices (ADR-0062, `docs/modules/notifications.md`):** the admin's unread popup notices one at a time in the middle of the screen when the app starts or returns to the foreground (never over the camera, the customer picker or a pending send; shown = read); «Мэдэгдэл» with the running notices and the rep's sold orders by day; a notice's page with its products and − n +.
 - **Settings «Захиалга бүртгэх тохиргоо»:** the board → pipeline → stage new orders land on, among those the rep may place on.
 
 Not in v1: payments and returns (with finance, delivery 3), new customers, biometric login, offline mode (ADR-0020), visit plans, iOS, keyboard-wedge scanners, EAS.
@@ -39,8 +40,10 @@ apps/mobile/
   scripts/build-apk.mjs    `pnpm mobile:apk`; apk-env.mjs (pure helpers), expo.mjs (the Expo CLI)
   app/                     Expo Router: _layout (phases), server, login, offline, not-rep,
                            (staff)/(tabs)/{index,shop,cart,orders,profile}, (staff)/{product/[id],
-                           order/[id],customers,scan,settings}
-  src/api/                 session.ts (tokens), problem.ts, rep.ts (TanStack hooks)
+                           order/[id],customers,scan,settings,notifications,notice/[id]},
+                           (staff)/notice-popup (a transparentModal route)
+  src/api/                 session.ts (tokens), problem.ts, rep.ts, notifications.ts (TanStack hooks)
+  src/notifications/       feed.ts (the list by day, the popup queue), kinds.tsx, popup-gate.tsx
   src/cart/                cart.ts (reducer, the order body), send.ts (the pending send), use-send.ts
   src/state/               session.tsx (server + session), shop.tsx (cart, stage, pending send),
                            placement.ts
@@ -62,7 +65,7 @@ apps/mobile/
 
 ## 6. API used
 
-`GET /health`; `/auth/mobile/{login,refresh,logout}`, `GET /auth/me`; `GET /sales-rep/context`, `GET /sales-rep/products`, `GET /sales-rep/products/batch`, `GET /sales-rep/customers`, `GET /sales-rep/customers/:id`, `POST /sales-rep/orders`, `GET /sales-rep/orders?month=`, `GET /sales-rep/orders/:id`; `POST /pricing/quote`, `GET /categories`, `GET /barcodes/:code` (these three need only a signed-in user); product pictures from `/api/v1/files/public/<key>`. Rights: `sales.orders.rep` (the SALES_REP role); `docs/modules/sales.md` §4.
+`GET /health`; `/auth/mobile/{login,refresh,logout}`, `GET /auth/me`; `GET /sales-rep/context`, `GET /sales-rep/products`, `GET /sales-rep/products/batch`, `GET /sales-rep/customers`, `GET /sales-rep/customers/:id`, `POST /sales-rep/orders`, `GET /sales-rep/orders?month=`, `GET /sales-rep/orders/:id`; `POST /pricing/quote`, `GET /categories`, `GET /barcodes/:code` (these three need only a signed-in user); `GET /me/notifications/summary` (at start, on foreground, every 60 s), `GET /me/notifications`, `POST /me/notifications/read`; product and notice pictures from `/api/v1/files/public/<key>`. Rights: `sales.orders.rep` (the SALES_REP role); `docs/modules/sales.md` §4.
 
 ## 7. Data on the phone (ADR-0061 #8)
 
@@ -98,12 +101,13 @@ Do not run it while `pnpm check` runs: the load makes the integrity suite time o
 
 ## 10. Tests
 
-- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, other server, logout offline), the cart reducer and order body, the pending send, the placement rule, dates without time zones, money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace.
-- **API:** `auth-mobile.int-spec.ts`, `sales-rep.int-spec.ts`, `sales-rep-shop.int-spec.ts`, `sales-rep-races.spec.ts` (integrity), `rep-access.spec.ts`.
+- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, other server, logout offline), the cart reducer and order body, the pending send, the placement rule, dates without time zones, money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace, the credit refusal's text (`creditMessage`), the notifications feed by day, the popup queue and initials.
+- **API:** `auth-mobile.int-spec.ts`, `sales-rep.int-spec.ts`, `sales-rep-shop.int-spec.ts`, `sales-rep-races.spec.ts` (integrity), `rep-access.spec.ts`, `notifications.int-spec.ts`, `notifications-guards.spec.ts` (integrity).
 - **On the phone:** the owner's walk (server, login, shop, scan, cart, send on a NONE and a CONFIRM stage, own orders by month, a lost connection while sending).
 
 ## 11. Open items
 
 - **TODO-VERIFY (owner):** the package id `mn.butenorgil.bto.staff`, permanent once handed out; a release key and how APKs reach the reps; a logo (1024×1024 PNG) instead of the placeholder «B»; the reps' phones (Android ≥ 7, arm64).
 - Payments, returns, receivables on the customer card (with finance, delivery 3); visit plans and rep zones (delivery 5/7; the customer reads by id must then pass `CustomersService.visibleTo`, `docs/modules/sales.md` §10); biometric unlock; keyboard-wedge scanners (delivery 4's warehouse flows).
-- EAS Build and Update, the Play internal track and HTTPS at go-live (row 12).
+- EAS Build and Update, the Play internal track and HTTPS at go-live (row 12); push for notices then (ADR-0062 #7).
+- The new design of the other screens («Бараа» with the filter, the cart's customer step, the keypad, «Миний захиалгууд» with dates; the owner's design artifact of 2026-10-16) comes in a later session.

@@ -25,7 +25,7 @@ sales depends on these modules, always through their `index.ts`:
 - `pricing`: the quote; `ProductPricesService.tablesOf` for the shop's unit prices.
 - `inventory`: home warehouses, `ReservationService`, `StockPostingService`.
 
-Finance answers the two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and imports only those contracts from `sales/index.ts`; delivery will import sales too.
+Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and notifications the third (`SALE_LISTENER`, ADR-0062 #4); both import only those contracts from `sales/index.ts`; delivery will import sales too.
 
 ## 1. Owner's answers behind the design (2026-10-15)
 
@@ -90,6 +90,7 @@ AI views (ADR-0045):
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
 | `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
+| `SALE_LISTENER`, `SaleListener`, `SaleNotice` | the hook notifications binds (ADR-0062 #4): `onSale(tx, notice)` with the order id and number, channel, author, customer, frozen total and invoice number, inside the sale's transaction; one statement, never caught |
 
 `SalesRepOrdersService` (`context`, `create`, `list`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported.
 
@@ -165,7 +166,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 - **Stage actions (ADR-0056 #3)** run inside the move's transaction after the order row and the stage rights are checked:
   - CONFIRM submits a draft (below) and leaves a confirmed order alone.
   - PICK sets CONFIRMED → PICKING.
-  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`; with finance bound it hands the sale sink a snapshot (header, lines with delivered base quantities and frozen parts, the branch of the pipeline's board or of the first line's warehouse) and, when an invoice comes back, sets INVOICED with an event whose reason is the invoice number (ADR-0060 #3).
+  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`; with finance bound it hands the sale sink a snapshot (header, lines with delivered base quantities and frozen parts, the branch of the pipeline's board or of the first line's warehouse) and, when an invoice comes back, sets INVOICED with an event whose reason is the invoice number (ADR-0060 #3). Then, with or without finance, it tells the sale listener (ADR-0062 #4: a SALES_REP order's author gets «… борлуулалт боллоо»), and records the SALE audit row last.
   - CANCEL cancels with the reason (`reason` required). NONE moves only.
   - Moving back undoes nothing. Every move writes a `sales_stage_moves` row and an audit `MOVE`. Moves between pipelines are refused.
 - **Picking (ADR-0056 #5).**

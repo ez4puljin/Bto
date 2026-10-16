@@ -41,6 +41,7 @@ Planned additions owned by identity: `print_stations` and `print_jobs` in delive
 | `WAREHOUSE_CREATED_HOOK` / `WarehouseCreatedHook` | optional provider called inside the transaction that creates a warehouse, including the TRANSIT warehouse created at the first boot; bound by `InventoryModule` to `SystemBinsService` (system bins, 2026-10-11), which also backfills the warehouses that existed before at boot (`InventoryBootstrap`) |
 | `Idempotent(options?)` | marks a document-creating POST; the global `IdempotencyInterceptor` requires `Idempotency-Key` (UUID), replays the stored response and answers `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_KEY_IN_PROGRESS`. `{ storeWithout: [field] }` keeps top-level response fields out of the stored replay (the AI answer's rows, ADR-0045) |
 | `UserNamesService.namesOf(userIds)` / `summariesOf(userIds)` | id → full name for other modules' lists ("saved by"); `summariesOf` adds the login and the status for modules that keep a list of staff (the POS cashiers, ADR-0063); nothing else about the user (ADR-0045) |
+| `PermissionHoldersService.activeHolders(permission, { excludeAdminOnly })` | the ids of the active users whose roles carry a code, ascending; `excludeAdminOnly` leaves out those who hold it only through ADMIN (the recipients of app notices, ADR-0062 #2) |
 
 Rules for other modules: never read or write identity tables directly (G1 boundaries); every new route carries exactly one access decorator, otherwise the guard answers 403 `params.reason = 'NO_ACCESS_RULE'`.
 
@@ -76,6 +77,7 @@ Every auth response carries `Cache-Control: no-store`; request bodies are JSON o
 - Invariants: the last active ADMIN cannot be disabled or demoted (`LAST_ADMIN`, serialised by `SELECT … FROM roles WHERE code = 'ADMIN' FOR UPDATE`); nobody edits their own roles, scopes or status (`SELF_EDIT_FORBIDDEN`); a role with users cannot be deleted (`ROLE_IN_USE`).
 
 - Finance (ADR-0060 #9): `finance.read` (OFFICE, ACCOUNTANT, ADMIN), `finance.payments.record`, `finance.invoices.manage`, `finance.journal.manage` (ACCOUNTANT, ADMIN), `finance.settings.manage` (ADMIN; assignable to a custom role).
+- App notices (ADR-0062 #5): `notifications.send` «Апп мэдэгдэл илгээх» (ADMIN; assignable to a custom role). Its file kind `notifications.notice_image` is public, JPEG / PNG / WebP up to 1 MB.
 
 ## 5. Settings keys (`@tugeel/shared/settings`)
 
