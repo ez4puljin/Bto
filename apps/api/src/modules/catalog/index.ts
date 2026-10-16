@@ -34,10 +34,13 @@ export { type ProductListQuery, ProductQueryService } from './services/product-q
 export type {
   NewUnitInput,
   ProductDetail,
+  ProductImageUrls,
   ProductListItem,
   ProductPatch,
+  ProductSort,
   ProductStatus,
   ProductSummary,
+  UnitFlags,
   UnitView,
 } from './services/products.service';
 export { PRODUCT_STATUSES, VAT_TYPES, type VatType } from './schema';
