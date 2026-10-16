@@ -4087,6 +4087,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AppNotices_list"];
+        put?: never;
+        post: operations["AppNotices_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app-notices/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AppNotices_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyNotifications_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyNotifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MyNotifications_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4111,7 +4191,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "sales.orders.rep";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "sales.orders.rep" | "notifications.send";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4444,7 +4524,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -9115,6 +9195,126 @@ export interface components {
             /** @description Active, the default first */
             addresses: components["schemas"]["SalesRepCustomerAddress"][];
             contacts: components["schemas"]["SalesRepCustomerContact"][];
+        };
+        AppNoticeProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            thumbUrl: string | null;
+        };
+        AppNotice: {
+            id: number;
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            title: string;
+            body: string;
+            /** @description Relative to the server */
+            imageUrl: string | null;
+            popup: boolean;
+            /** Format: date */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+            /**
+             * @description On the business date of the answer
+             * @enum {string}
+             */
+            state: "SCHEDULED" | "RUNNING" | "ENDED" | "WITHDRAWN";
+            /** @description In the order the admin chose */
+            products: components["schemas"]["AppNoticeProduct"][];
+            /** @description Active holders of sales.orders.rep beside ADMIN */
+            recipients: number;
+            /** @description Those recipients who read or closed it */
+            reads: number;
+            createdBy: number;
+            createdByName: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            withdrawnAt: string | null;
+            withdrawnByName: string | null;
+        };
+        AppNoticePage: {
+            data: components["schemas"]["AppNotice"][];
+            nextCursor: string | null;
+        };
+        AppNoticeRequest: {
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            /** @description Characters, trimmed */
+            title: string;
+            /** @description Characters, trimmed */
+            body: string;
+            /** @description An uploaded file of kind notifications.notice_image */
+            imageFileId?: number | null;
+            /** @description Active, sale-ready products in the order the app shows them */
+            productIds: number[];
+            /**
+             * @description The first day, today or later (Ulaanbaatar)
+             * @example 2026-10-16
+             */
+            validFrom: string;
+            /**
+             * @description Up to, not including; null runs until withdrawn
+             * @example 2026-10-31
+             */
+            validTo?: string | null;
+            /** @description Pops up in the middle of the screen when the app opens */
+            popup: boolean;
+        };
+        MyNotice: {
+            id: number;
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            title: string;
+            body: string;
+            /** @description Relative to the server */
+            imageUrl: string | null;
+            popup: boolean;
+            /**
+             * Format: date
+             * @description The day it first shows
+             */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+            /** @description In the order the admin chose */
+            productIds: number[];
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MyNotificationSummary: {
+            /** @description Unread running notices plus unread own notifications */
+            unread: number;
+            /** @description The running notices, newest first (at most 50) */
+            notices: components["schemas"]["MyNotice"][];
+        };
+        MyNotification: {
+            id: number;
+            /** @enum {string} */
+            kind: "ORDER_SOLD";
+            orderId: number | null;
+            orderNumber: string;
+            customerName: string;
+            /** @description Whole MNT, frozen at the submit */
+            orderTotal: string | null;
+            invoiceNumber: string | null;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MyNotificationPage: {
+            data: components["schemas"]["MyNotification"][];
+            nextCursor: string | null;
+        };
+        MyNotificationReadRequest: {
+            noticeIds?: number[];
+            notificationIds?: number[];
+        };
+        MyNotificationReadResult: {
+            /** @description The unread count after marking */
+            unread: number;
         };
     };
     responses: never;
@@ -19390,6 +19590,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepCustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNoticePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppNoticeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNotice"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNotice"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationSummary"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyNotificationReadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationReadResult"];
                 };
             };
             /** @description RFC 9457 problem details */

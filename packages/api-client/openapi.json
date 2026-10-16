@@ -17220,6 +17220,301 @@
           "sales-rep"
         ]
       }
+    },
+    "/api/v1/app-notices": {
+      "get": {
+        "operationId": "AppNotices_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNoticePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      },
+      "post": {
+        "operationId": "AppNotices_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppNoticeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/app-notices/{id}/withdraw": {
+      "post": {
+        "operationId": "AppNotices_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications/summary": {
+      "get": {
+        "operationId": "MyNotifications_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications": {
+      "get": {
+        "operationId": "MyNotifications_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications/read": {
+      "post": {
+        "operationId": "MyNotifications_read",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyNotificationReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationReadResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
     }
   },
   "info": {
@@ -17344,7 +17639,8 @@
           "pos.manage",
           "pos.till.operate",
           "pos.till.supervise",
-          "sales.orders.rep"
+          "sales.orders.rep",
+          "notifications.send"
         ]
       },
       "RoleRef": {
@@ -18562,6 +18858,7 @@
             "enum": [
               "catalog.product_image",
               "catalog.product_thumb",
+              "notifications.notice_image",
               "imports.source"
             ],
             "type": "string"
@@ -34668,6 +34965,406 @@
           "phone",
           "addresses",
           "contacts"
+        ]
+      },
+      "AppNoticeProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "thumbUrl"
+        ]
+      },
+      "AppNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "popup": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          },
+          "state": {
+            "enum": [
+              "SCHEDULED",
+              "RUNNING",
+              "ENDED",
+              "WITHDRAWN"
+            ],
+            "type": "string",
+            "description": "On the business date of the answer"
+          },
+          "products": {
+            "description": "In the order the admin chose",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppNoticeProduct"
+            }
+          },
+          "recipients": {
+            "type": "number",
+            "description": "Active holders of sales.orders.rep beside ADMIN"
+          },
+          "reads": {
+            "type": "number",
+            "description": "Those recipients who read or closed it"
+          },
+          "createdBy": {
+            "type": "number"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "withdrawnByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "imageUrl",
+          "popup",
+          "validFrom",
+          "validTo",
+          "state",
+          "products",
+          "recipients",
+          "reads",
+          "createdBy",
+          "createdByName",
+          "createdAt",
+          "withdrawnAt",
+          "withdrawnByName"
+        ]
+      },
+      "AppNoticePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppNotice"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "AppNoticeRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Characters, trimmed"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Characters, trimmed"
+          },
+          "imageFileId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An uploaded file of kind notifications.notice_image"
+          },
+          "productIds": {
+            "uniqueItems": true,
+            "maxItems": 20,
+            "description": "Active, sale-ready products in the order the app shows them",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-16",
+            "description": "The first day, today or later (Ulaanbaatar)"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-31",
+            "description": "Up to, not including; null runs until withdrawn"
+          },
+          "popup": {
+            "type": "boolean",
+            "description": "Pops up in the middle of the screen when the app opens"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "body",
+          "productIds",
+          "validFrom",
+          "popup"
+        ]
+      },
+      "MyNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "popup": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The day it first shows"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          },
+          "productIds": {
+            "description": "In the order the admin chose",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "imageUrl",
+          "popup",
+          "validFrom",
+          "validTo",
+          "productIds",
+          "read",
+          "createdAt"
+        ]
+      },
+      "MyNotificationSummary": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number",
+            "description": "Unread running notices plus unread own notifications"
+          },
+          "notices": {
+            "description": "The running notices, newest first (at most 50)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyNotice"
+            }
+          }
+        },
+        "required": [
+          "unread",
+          "notices"
+        ]
+      },
+      "MyNotification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "ORDER_SOLD"
+            ],
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "orderTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT, frozen at the submit"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "orderId",
+          "orderNumber",
+          "customerName",
+          "orderTotal",
+          "invoiceNumber",
+          "read",
+          "createdAt"
+        ]
+      },
+      "MyNotificationPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyNotification"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "MyNotificationReadRequest": {
+        "type": "object",
+        "properties": {
+          "noticeIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "notificationIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "MyNotificationReadResult": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number",
+            "description": "The unread count after marking"
+          }
+        },
+        "required": [
+          "unread"
         ]
       }
     }

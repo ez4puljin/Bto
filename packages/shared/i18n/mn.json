@@ -566,7 +566,8 @@
       "pos_shifts": "Кассын ээлж",
       "pos_sales": "Кассын борлуулалт",
       "pos_shortfalls": "Үлдэгдлийн зөрүү",
-      "pos_sync_rejections": "Касс серверийн татгалзсан баримт"
+      "pos_sync_rejections": "Касс серверийн татгалзсан баримт",
+      "app_notices": "Апп мэдэгдэл"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -604,7 +605,8 @@
       "STOP": "Зогсоосон",
       "COMPLETE": "Бүрэн болгосон",
       "ADD_PRODUCTS": "Бараа нэмсэн",
-      "REMOVE_PRODUCTS": "Бараа хассан"
+      "REMOVE_PRODUCTS": "Бараа хассан",
+      "WITHDRAW": "Буцаасан"
     }
   },
   "errors": {
