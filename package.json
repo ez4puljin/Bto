@@ -24,6 +24,7 @@
     "lint": "eslint --config eslint.config.mjs --max-warnings 0 .",
     "lint:guards": "node --test tools/lint-guards/guards.test.mjs",
     "typecheck": "pnpm -r run --if-present typecheck",
+    "ui:shots": "node tools/ui-shots/shots.mjs",
     "gen:api": "pnpm --filter @tugeel/api run openapi:export && pnpm --filter @tugeel/api-client run generate",
     "gen:api:check": "node scripts/gen-api-check.mjs",
     "db:provision": "pnpm --filter @tugeel/api run db:provision",
