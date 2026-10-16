@@ -47,6 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { image: './assets/splash-icon.png', imageWidth: 96, backgroundColor: '#FFFFFF' },
     ],
     ['expo-build-properties', { android: { usesCleartextTraffic: !production } }],
+    './plugins/with-cmake-object-path.cjs',
   ],
   extra: {
     /** The PC's address on the office network, filled in by `pnpm mobile:apk`. */
