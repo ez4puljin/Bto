@@ -146,10 +146,15 @@ describe('app notices list', () => {
     const user = userEvent.setup();
 
     const dialog = await screen.findByRole('dialog');
-    const preview = within(within(dialog).getByRole('region', { name: mn.notifications.preview.title }));
+    const preview = within(
+      within(dialog).getByRole('region', { name: mn.notifications.preview.title }),
+    );
     expect(preview.getByText(mn.notifications.preview.placeholderTitle)).toBeInTheDocument();
 
-    await user.selectOptions(within(dialog).getByLabelText(mn.notifications.form.kind), 'PRICE_DROP');
+    await user.selectOptions(
+      within(dialog).getByLabelText(mn.notifications.form.kind),
+      'PRICE_DROP',
+    );
     await user.type(within(dialog).getByLabelText(mn.notifications.form.title), 'Кола хямдарлаа');
     await user.type(within(dialog).getByLabelText(mn.notifications.form.body), 'Кола 10% хямд.');
     expect(preview.getByText('Кола хямдарлаа')).toBeInTheDocument();
