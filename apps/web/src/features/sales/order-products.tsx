@@ -21,7 +21,7 @@ import { isQty, useWarehouseName } from '@/features/inventory/helpers';
 import { ProductSearch } from '@/features/inventory/shared';
 import { useLinesQuote } from '@/features/pricing/api';
 import { UnitSelect } from '@/features/pricing/quote-table';
-import { formatMnt, plainDecimal } from '@/lib/money';
+import { formatMnt, formatQty, formatTugrik, plainDecimal } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useDebounced } from '@/lib/use-debounced';
@@ -249,6 +249,8 @@ export function OrderProducts({
       </FilterBar>
       {editable && (adding || lines.length === 0) ? (
         <ProductSearch
+          // «Бараа нэмэх» (or an order without lines) puts the cursor here.
+          autoFocus
           onPick={(product) => {
             // The search stays open for the next product.
             setAdding(true);
@@ -330,19 +332,19 @@ export function OrderProducts({
                         onChange={(event) => update(line.key, { qty: event.target.value.trim() })}
                       />
                     ) : (
-                      <span className="font-mono">{plainDecimal(line.qty)}</span>
+                      <span className="font-mono">{formatQty(line.qty)}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono whitespace-nowrap">
                     {price && !price.priced ? (
                       <span className="text-destructive">{t('sales.panel.products.noPrice')}</span>
                     ) : price && price.parts.length === 1 && price.parts[0] ? (
-                      t('pricing.money', { amount: formatMnt(price.parts[0].unitPrice) })
+                      formatTugrik(price.parts[0].unitPrice)
                     ) : (
                       (price?.parts ?? []).map((part, index) => (
                         <div key={index}>
                           {t('sales.print.partLine', {
-                            qty: plainDecimal(part.qty),
+                            qty: formatQty(part.qty),
                             unit: part.uomName,
                             price: formatMnt(part.unitPrice),
                           })}
@@ -351,13 +353,13 @@ export function OrderProducts({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {price?.total ? t('pricing.money', { amount: formatMnt(price.total) }) : ''}
+                    {price?.total ? formatTugrik(price.total) : ''}
                   </TableCell>
                   {confirmed ? (
                     <TableCell className="text-right font-mono">
                       {stored
                         ? t('sales.order.qtyIn', {
-                            qty: plainDecimal(stored.qtyApproved),
+                            qty: formatQty(stored.qtyApproved),
                             unit: stored.baseUnitName,
                           })
                         : ''}
@@ -367,7 +369,7 @@ export function OrderProducts({
                     <TableCell className="text-right font-mono">
                       {stored && new Decimal(stored.qtyBackordered).gt(0)
                         ? t('sales.order.qtyIn', {
-                            qty: plainDecimal(stored.qtyBackordered),
+                            qty: formatQty(stored.qtyBackordered),
                             unit: stored.baseUnitName,
                           })
                         : ''}
@@ -378,7 +380,7 @@ export function OrderProducts({
                       {stored === undefined || stored.qtyPicked === null
                         ? ''
                         : t('sales.order.pickedIn', {
-                            qty: plainDecimal(stored.qtyPicked),
+                            qty: formatQty(stored.qtyPicked),
                             unit: stored.baseUnitName,
                             bin: stored.pickBinCode ?? '',
                           })}
@@ -410,14 +412,18 @@ export function OrderProducts({
         ) : null}
       </ListCard>
       <ProblemAlert problem={action.problem} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm">
+      {/* The footer sticks to the panel's foot, so «Хадгалах» stays in reach under long lists. */}
+      <div className="sticky -bottom-5 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-popover/95 px-5 py-3 backdrop-blur-md">
+        <div className="min-w-0 text-sm">
           <p className="font-medium">
             {t('sales.panel.products.summary', {
               count: lines.length,
               total: total === null ? '0' : formatMnt(total),
             })}
           </p>
+          {invalid ? (
+            <p className="text-[13px] text-destructive">{t('sales.panel.products.badQty')}</p>
+          ) : null}
           {!frozen && lines.length > 0 ? (
             <p className="text-[13px] text-muted-foreground">
               {t('sales.panel.products.estimated')}
@@ -454,9 +460,6 @@ export function OrderProducts({
           </div>
         ) : null}
       </div>
-      {invalid ? (
-        <p className="text-[13px] text-destructive">{t('sales.panel.products.badQty')}</p>
-      ) : null}
     </div>
   );
 }

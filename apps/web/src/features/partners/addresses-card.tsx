@@ -87,7 +87,7 @@ export function AddressesCard({
                     </div>
                   ) : (
                     <div>
-                      <Badge variant="outline">{t('partners.addresses.noGps')}</Badge>
+                      <Badge variant="warning">{t('partners.addresses.noGps')}</Badge>
                     </div>
                   )}
                   {address.note ? (
@@ -180,7 +180,7 @@ function AddressDialog(props: {
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent closeLabel={t('common.close')} size="md">
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>

@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils';
 
 /*
  * The form kit (ADR-0043, docs/ui.md §4): settings-style forms like Apple's — sections of rows,
- * the label on the left and the field on the right on wide screens (stacked on phones), and the
+ * the label on the left and the field on the right where the row is wide enough (stacked in a
+ * phone or a narrow side column: a container query, ADR-0066), and the
  * actions at the foot, «Болих» then the main button on the right. The read view (`FieldList`)
  * uses the same rows, so reading and editing line up.
  */
@@ -59,27 +60,29 @@ export function FormRow(props: {
   children: ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        'grid gap-1.5 px-3.5 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4',
-        props.align === 'center'
-          ? 'grid-cols-[minmax(0,1fr)_auto] items-center gap-3'
-          : 'sm:items-start',
-      )}
-    >
-      <Label
-        htmlFor={props.htmlFor}
+    <div className="@container">
+      <div
         className={cn(
-          'leading-snug text-foreground/80',
-          props.align === 'center' ? null : 'sm:pt-2.5',
+          'grid gap-1.5 px-3.5 py-3 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4',
+          props.align === 'center'
+            ? 'grid-cols-[minmax(0,1fr)_auto] items-center gap-3'
+            : '@md:items-start',
         )}
       >
-        {props.label}
-      </Label>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {props.children}
-        {props.hint ? <p className="text-xs text-muted-foreground">{props.hint}</p> : null}
-        <FieldError message={props.error} />
+        <Label
+          htmlFor={props.htmlFor}
+          className={cn(
+            'leading-snug text-foreground/80',
+            props.align === 'center' ? null : '@md:pt-2.5',
+          )}
+        >
+          {props.label}
+        </Label>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          {props.children}
+          {props.hint ? <p className="text-xs text-muted-foreground">{props.hint}</p> : null}
+          <FieldError message={props.error} />
+        </div>
       </div>
     </div>
   );

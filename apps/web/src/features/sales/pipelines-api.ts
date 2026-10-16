@@ -9,7 +9,7 @@ import { type components, idempotencyKey } from '@tugeel/api-client';
 import type { CardSort, OrderChannel, PrintKind } from '@tugeel/shared/sales';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
-import { type PrintFormat, printFormatParam } from './print-format';
+import { type PrintFormat, printFormatParam } from '@/lib/print-format';
 
 type Schemas = components['schemas'];
 export type SalesBoard = Schemas['SalesBoard'];
@@ -334,4 +334,9 @@ export function batchPrintPath(
   format: PrintFormat,
 ): string {
   return `/sales/print/${kind}?ids=${ids.join(',')}&format=${printFormatParam(format)}`;
+}
+
+/** Where an order sits: «board / pipeline», or the pipeline alone when its board reads the same. */
+export function placeName(boardName: string | null | undefined, pipelineName: string): string {
+  return boardName && boardName !== pipelineName ? `${boardName} / ${pipelineName}` : pipelineName;
 }

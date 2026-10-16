@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckboxGroup } from '@/components/checkbox-group';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormField } from '@/components/form';
 import { RowAction, RowActions, SegmentedControl } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
@@ -87,6 +88,21 @@ export function PipelineSheet({
       })),
   );
   const [editing, setEditing] = useState<StageRow | 'new' | null>(null);
+  // Closing with edits not saved asks first (the order panel's question).
+  const snapshot = JSON.stringify({
+    name,
+    board,
+    visibility,
+    ownOrdersOnly,
+    roles,
+    stages: stages.map(({ key: _key, ...stage }) => stage),
+  });
+  const [initial] = useState(snapshot);
+  const [leaving, setLeaving] = useState(false);
+  const requestClose = () => {
+    if (snapshot !== initial) setLeaving(true);
+    else onClose();
+  };
   const setRight = (right: PipelineRight, value: number[]) =>
     setRoles((current) => ({ ...current, [right]: value }));
   const move = (from: number, to: number) =>
@@ -119,193 +135,206 @@ export function PipelineSheet({
     });
 
   return (
-    <Sheet open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <SheetContent closeLabel={t('common.close')} className="sm:max-w-3xl">
-        <SheetHeader>
-          <SheetTitle>
-            {pipeline ? t('sales.pipelines.editPipeline') : t('sales.pipelines.newPipeline')}
-          </SheetTitle>
-          <SheetDescription>
-            {pipeline?.name ?? t('sales.pipelines.newDescription')}
-          </SheetDescription>
-        </SheetHeader>
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="general">{t('sales.pipelines.tabs.general')}</TabsTrigger>
-            <TabsTrigger value="stages">
-              {t('sales.pipelines.tabs.stages')}
-              <Badge variant="secondary">{stages.length}</Badge>
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="general" className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label={t('sales.boards.name')} htmlFor="pipeline-name">
-                <Input
-                  id="pipeline-name"
-                  autoFocus
-                  value={name}
-                  maxLength={80}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </FormField>
-              <FormField label={t('sales.pipelines.board')} htmlFor="pipeline-board">
-                <NativeSelect
-                  id="pipeline-board"
-                  value={board ?? ''}
-                  onChange={(event) => setBoard(Number.parseInt(event.target.value, 10) || null)}
-                >
-                  {boards
-                    .filter((entry) => entry.archivedAt === null || entry.id === board)
-                    .map((entry) => (
-                      <option key={entry.id} value={entry.id}>
-                        {entry.name}
-                      </option>
-                    ))}
-                </NativeSelect>
-              </FormField>
-            </div>
-            <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">{t('sales.pipelines.visibility')}</legend>
-              <SegmentedControl
-                options={VISIBILITIES}
-                value={visibility}
-                label={(value) => t(`sales.pipelines.visibilities.${value}`)}
-                onChange={setVisibility}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t(`sales.pipelines.visibilityHints.${visibility}`)}
-              </p>
-            </fieldset>
-            {visibility === 'PRIVATE' ? (
-              <RolesField
-                right="VIEW"
-                options={options}
-                value={roles.VIEW}
-                onChange={(value) => setRight('VIEW', value)}
-              />
-            ) : null}
-            <RolesField
-              right="MANAGE"
-              hint={t('sales.pipelines.manageHint')}
-              options={options}
-              value={roles.MANAGE}
-              onChange={(value) => setRight('MANAGE', value)}
-            />
-            <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="pipeline-own">{t('sales.pipelines.ownOrdersOnly')}</Label>
-                <Switch
-                  id="pipeline-own"
-                  checked={ownOrdersOnly}
-                  onCheckedChange={setOwnOrdersOnly}
-                />
+    <>
+      <Sheet open onOpenChange={(open) => (open ? undefined : requestClose())}>
+        <SheetContent closeLabel={t('common.close')} className="sm:max-w-3xl">
+          <SheetHeader>
+            <SheetTitle>
+              {pipeline ? t('sales.pipelines.editPipeline') : t('sales.pipelines.newPipeline')}
+            </SheetTitle>
+            <SheetDescription>
+              {pipeline?.name ?? t('sales.pipelines.newDescription')}
+            </SheetDescription>
+          </SheetHeader>
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="general">{t('sales.pipelines.tabs.general')}</TabsTrigger>
+              <TabsTrigger value="stages">
+                {t('sales.pipelines.tabs.stages')}
+                <Badge variant="secondary">{stages.length}</Badge>
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="general" className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label={t('sales.boards.name')} htmlFor="pipeline-name">
+                  <Input
+                    id="pipeline-name"
+                    autoFocus
+                    value={name}
+                    maxLength={80}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </FormField>
+                <FormField label={t('sales.pipelines.board')} htmlFor="pipeline-board">
+                  <NativeSelect
+                    id="pipeline-board"
+                    value={board ?? ''}
+                    onChange={(event) => setBoard(Number.parseInt(event.target.value, 10) || null)}
+                  >
+                    {boards
+                      .filter((entry) => entry.archivedAt === null || entry.id === board)
+                      .map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name}
+                        </option>
+                      ))}
+                  </NativeSelect>
+                </FormField>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('sales.pipelines.ownOrdersOnlyHint')}
-              </p>
-              {ownOrdersOnly ? (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-medium">{t('sales.pipelines.visibility')}</legend>
+                <SegmentedControl
+                  options={VISIBILITIES}
+                  value={visibility}
+                  label={(value) => t(`sales.pipelines.visibilities.${value}`)}
+                  onChange={setVisibility}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t(`sales.pipelines.visibilityHints.${visibility}`)}
+                </p>
+              </fieldset>
+              {visibility === 'PRIVATE' ? (
                 <RolesField
-                  right="ALL_ORDERS"
+                  right="VIEW"
                   options={options}
-                  value={roles.ALL_ORDERS}
-                  onChange={(value) => setRight('ALL_ORDERS', value)}
+                  value={roles.VIEW}
+                  onChange={(value) => setRight('VIEW', value)}
                 />
               ) : null}
-            </div>
-          </TabsContent>
-          <TabsContent value="stages" className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">{t('sales.pipelines.stagesHint')}</p>
-            <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
-              {stages.map((stage, index) => (
-                <li key={stage.key} className="flex items-center gap-3 px-3 py-2">
-                  <span className="w-5 font-mono text-muted-foreground">{index + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{stage.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {[
-                        t(`sales.stageActions.${stage.action}`),
-                        stage.printPickList ? t('sales.printKinds.PICK_LIST') : null,
-                        stage.printDeliveryNote ? t('sales.printKinds.DELIVERY_NOTE') : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
+              <RolesField
+                right="MANAGE"
+                hint={t('sales.pipelines.manageHint')}
+                options={options}
+                value={roles.MANAGE}
+                onChange={(value) => setRight('MANAGE', value)}
+              />
+              <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="pipeline-own">{t('sales.pipelines.ownOrdersOnly')}</Label>
+                  <Switch
+                    id="pipeline-own"
+                    checked={ownOrdersOnly}
+                    onCheckedChange={setOwnOrdersOnly}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('sales.pipelines.ownOrdersOnlyHint')}
+                </p>
+                {ownOrdersOnly ? (
+                  <RolesField
+                    right="ALL_ORDERS"
+                    options={options}
+                    value={roles.ALL_ORDERS}
+                    onChange={(value) => setRight('ALL_ORDERS', value)}
+                  />
+                ) : null}
+              </div>
+            </TabsContent>
+            <TabsContent value="stages" className="flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground">{t('sales.pipelines.stagesHint')}</p>
+              <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                {stages.map((stage, index) => (
+                  <li key={stage.key} className="flex items-center gap-3 px-3 py-2">
+                    <span className="w-5 font-mono text-muted-foreground">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{stage.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {[
+                          t(`sales.stageActions.${stage.action}`),
+                          stage.printPickList ? t('sales.printKinds.PICK_LIST') : null,
+                          stage.printDeliveryNote ? t('sales.printKinds.DELIVERY_NOTE') : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
                     </div>
-                  </div>
-                  <RowActions>
-                    <RowAction
-                      label={`${t('sales.boards.up')}: ${stage.name}`}
-                      icon={ArrowUp}
-                      disabled={index === 0}
-                      onClick={() => move(index, index - 1)}
-                    />
-                    <RowAction
-                      label={`${t('sales.boards.down')}: ${stage.name}`}
-                      icon={ArrowDown}
-                      disabled={index === stages.length - 1}
-                      onClick={() => move(index, index + 1)}
-                    />
-                    <RowAction
-                      label={`${t('common.edit')}: ${stage.name}`}
-                      icon={Pencil}
-                      onClick={() => setEditing(stage)}
-                    />
-                    <RowAction
-                      label={`${t('sales.pipelines.removeStage')}: ${stage.name}`}
-                      icon={Trash2}
-                      destructive
-                      disabled={stages.length === 1}
-                      onClick={() =>
-                        setStages((current) => current.filter((entry) => entry.key !== stage.key))
-                      }
-                    />
-                  </RowActions>
-                </li>
-              ))}
-            </ol>
-            <div>
-              <Button variant="outline" onClick={() => setEditing('new')}>
-                <Plus />
-                {t('sales.boards.newStage')}
-              </Button>
-            </div>
-          </TabsContent>
-        </Tabs>
-        <ProblemAlert problem={action.problem} />
-        <SheetFooter className="mt-auto flex-row justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            disabled={pending || !name.trim() || board === null || stages.length === 0}
-            onClick={save}
+                    <RowActions>
+                      <RowAction
+                        label={`${t('sales.boards.up')}: ${stage.name}`}
+                        icon={ArrowUp}
+                        disabled={index === 0}
+                        onClick={() => move(index, index - 1)}
+                      />
+                      <RowAction
+                        label={`${t('sales.boards.down')}: ${stage.name}`}
+                        icon={ArrowDown}
+                        disabled={index === stages.length - 1}
+                        onClick={() => move(index, index + 1)}
+                      />
+                      <RowAction
+                        label={`${t('common.edit')}: ${stage.name}`}
+                        icon={Pencil}
+                        onClick={() => setEditing(stage)}
+                      />
+                      <RowAction
+                        label={`${t('sales.pipelines.removeStage')}: ${stage.name}`}
+                        icon={Trash2}
+                        destructive
+                        disabled={stages.length === 1}
+                        onClick={() =>
+                          setStages((current) => current.filter((entry) => entry.key !== stage.key))
+                        }
+                      />
+                    </RowActions>
+                  </li>
+                ))}
+              </ol>
+              <div>
+                <Button variant="outline" onClick={() => setEditing('new')}>
+                  <Plus />
+                  {t('sales.boards.newStage')}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <ProblemAlert problem={action.problem} />
+          <SheetFooter className="mt-auto flex-row justify-end gap-2">
+            <Button variant="ghost" onClick={requestClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              disabled={pending || !name.trim() || board === null || stages.length === 0}
+              onClick={save}
+            >
+              {pipeline ? t('common.save') : t('sales.pipelines.create')}
+            </Button>
+          </SheetFooter>
+          <Dialog
+            open={editing !== null}
+            onOpenChange={(open) => (open ? undefined : setEditing(null))}
           >
-            {pipeline ? t('common.save') : t('sales.pipelines.create')}
-          </Button>
-        </SheetFooter>
-        <Dialog
-          open={editing !== null}
-          onOpenChange={(open) => (open ? undefined : setEditing(null))}
-        >
-          {editing !== null ? (
-            <StageDialog
-              stage={editing === 'new' ? null : editing}
-              onSave={(saved) => {
-                setStages((current) =>
-                  editing === 'new'
-                    ? [...current, { ...saved, key: randomUuid() }]
-                    : current.map((entry) =>
-                        entry.key === editing.key
-                          ? { ...saved, id: entry.id, key: entry.key }
-                          : entry,
-                      ),
-                );
-                setEditing(null);
-              }}
-            />
-          ) : null}
-        </Dialog>
-      </SheetContent>
-    </Sheet>
+            {editing !== null ? (
+              <StageDialog
+                stage={editing === 'new' ? null : editing}
+                onSave={(saved) => {
+                  setStages((current) =>
+                    editing === 'new'
+                      ? [...current, { ...saved, key: randomUuid() }]
+                      : current.map((entry) =>
+                          entry.key === editing.key
+                            ? { ...saved, id: entry.id, key: entry.key }
+                            : entry,
+                        ),
+                  );
+                  setEditing(null);
+                }}
+              />
+            ) : null}
+          </Dialog>
+        </SheetContent>
+      </Sheet>
+      <ConfirmDialog
+        open={leaving}
+        title={t('sales.panel.leaveTitle')}
+        description={t('sales.pipelines.leaveDescription')}
+        confirmLabel={t('sales.panel.leave')}
+        onConfirm={() => {
+          setLeaving(false);
+          onClose();
+        }}
+        onClose={() => setLeaving(false)}
+      />
+    </>
   );
 }
 

@@ -15,6 +15,7 @@ import {
   LinkRow,
   ListCard,
   LoadMore,
+  SegmentedControl,
   SkeletonRows,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
@@ -24,7 +25,7 @@ import { ScanBox } from '@/components/scan-box';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -43,8 +44,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
@@ -82,10 +84,12 @@ type Scope = (typeof SCOPES)[number];
 const UNIT_COST = /^\d{1,10}(\.\d{1,4})?$/;
 /** Shelf codes listed on a page before «+N». */
 const CODES_SHOWN = 60;
+const REVIEW_VIEWS = ['differences', 'all'] as const;
 
 const isStatus = (value: string | null): value is StocktakeStatus =>
   STATUSES.some((status) => status === value);
-const signed = (value: string) => (value.startsWith('-') ? value : `+${value}`);
+const signed = (value: string) =>
+  value.startsWith('-') ? formatQty(value) : `+${formatQty(value)}`;
 
 /**
  * Stocktakes (ST-, ADR-0038): warehouse staff count shelf by shelf without seeing what the system
@@ -94,7 +98,8 @@ const signed = (value: string) => (value.startsWith('-') ? value : `+${value}`);
 export function StocktakesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('inventory.stocktakes.manage');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const warehouses = useWarehouseOptions(SHELF_KINDS);
   const warehouseName = useWarehouseName();
   const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
@@ -104,17 +109,6 @@ export function StocktakesPage() {
   const stocktakes = useStocktakes({ warehouseId, status });
   const rows = stocktakes.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -157,7 +151,7 @@ export function StocktakesPage() {
         </NativeSelect>
       </FilterBar>
       <ProblemAlert problem={problemFromError(stocktakes.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -174,7 +168,10 @@ export function StocktakesPage() {
             {rows.map((row) => (
               <LinkRow key={row.id} to={`/inventory/stocktakes/${row.id}`}>
                 <TableCell className="font-mono">
-                  <Link to={`/inventory/stocktakes/${row.id}`} className="font-medium">
+                  <Link
+                    to={`/inventory/stocktakes/${row.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
                     {row.number ?? t('inventory.stocktake.noNumber', { id: row.id })}
                   </Link>
                 </TableCell>
@@ -273,7 +270,7 @@ function StocktakeCreateDialog({ onCancel }: { onCancel: () => void }) {
 
   return (
     // Wider than the default: the label scan box and its camera button share a row.
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent closeLabel={t('common.close')} size="md">
       <form
         className="space-y-4"
         onSubmit={(event) => {
@@ -456,28 +453,28 @@ export function StocktakePage() {
         return canManage && writer ? (
           <StocktakeDraft detail={detail} />
         ) : (
-          <BinCodes bins={detail.bins} />
+          <StocktakeSummary detail={detail} />
         );
       case 'COUNTING':
         return counter ? (
           <StocktakeCounter key={detail.id} detail={detail} />
         ) : (
-          <BinCodes bins={detail.bins} />
+          <StocktakeSummary detail={detail} />
         );
       case 'REVIEW':
         return canApprove && writer ? (
           <StocktakeReview detail={detail} />
         ) : (
-          <p className="text-sm">{t('inventory.stocktake.waiting')}</p>
+          <StocktakeSummary detail={detail} text={t('inventory.stocktake.waiting')} />
         );
       case 'APPROVED':
         return canApprove ? (
           <StocktakeReview detail={detail} />
         ) : (
-          <p className="text-sm">{t('inventory.stocktake.approvedNote')}</p>
+          <StocktakeSummary detail={detail} text={t('inventory.stocktake.approvedNote')} />
         );
       case 'CANCELLED':
-        return <p className="text-sm">{t('inventory.stocktake.cancelledNote')}</p>;
+        return <StocktakeSummary detail={detail} text={t('inventory.stocktake.cancelledNote')} />;
     }
   })();
 
@@ -503,9 +500,28 @@ export function StocktakePage() {
           </>
         }
       />
-      {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {body}
     </div>
+  );
+}
+
+/**
+ * A stocktake read by someone who does not count or approve it: where it stands and its shelves in
+ * one card, the note as the card's description (as on every document).
+ */
+function StocktakeSummary({ detail, text }: { detail: StocktakeDetail; text?: string }) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('inventory.stocktake.binsTitle', { count: detail.bins.length })}</CardTitle>
+        {detail.note ? <CardDescription>{detail.note}</CardDescription> : null}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {text ? <p className="text-sm">{text}</p> : null}
+        <BinCodes bins={detail.bins} />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -560,6 +576,7 @@ function StocktakeDraft({ detail }: { detail: StocktakeDetail }) {
     <Card>
       <CardHeader>
         <CardTitle>{t('inventory.stocktake.binsTitle', { count: detail.bins.length })}</CardTitle>
+        {detail.note ? <CardDescription>{detail.note}</CardDescription> : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <BinCodes bins={detail.bins} />
@@ -599,7 +616,8 @@ function StocktakeDraft({ detail }: { detail: StocktakeDetail }) {
 /** What a counted line shows: a count, or 0 marked as not found when nobody counted it. */
 function countedText(line: StocktakeLine, none: string, notFound: (qty: string) => string) {
   if (line.countedQty === null) return none;
-  return line.countedAt === null ? notFound(line.countedQty) : line.countedQty;
+  const counted = formatQty(line.countedQty);
+  return line.countedAt === null ? notFound(counted) : counted;
 }
 
 /**
@@ -669,6 +687,11 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
   return (
     <>
       <Card>
+        {detail.note ? (
+          <CardHeader>
+            <CardDescription>{detail.note}</CardDescription>
+          </CardHeader>
+        ) : null}
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="font-medium">
@@ -688,23 +711,18 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
               <span className="text-muted-foreground">{t('inventory.stocktake.valuesNote')}</span>
             ) : null}
           </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={all ? 'outline' : 'default'}
-              aria-pressed={!all}
-              onClick={() => setAll(false)}
-            >
-              {t('inventory.stocktake.onlyDifferences')}
-            </Button>
-            <Button
-              size="sm"
-              variant={all ? 'default' : 'outline'}
-              aria-pressed={all}
-              onClick={() => setAll(true)}
-            >
-              {t('inventory.stocktake.allLines')}
-            </Button>
+          <div>
+            {/* Two views of one table: a segmented control, never two blue buttons. */}
+            <SegmentedControl
+              options={REVIEW_VIEWS}
+              value={all ? 'all' : 'differences'}
+              label={(view) =>
+                view === 'all'
+                  ? t('inventory.stocktake.allLines')
+                  : t('inventory.stocktake.onlyDifferences')
+              }
+              onChange={(view) => setAll(view === 'all')}
+            />
           </div>
           <ProblemAlert
             problem={confirm ? null : (action.problem ?? problemFromError(lines.error))}
@@ -746,7 +764,7 @@ function StocktakeReview({ detail }: { detail: StocktakeDetail }) {
                       {line.productName}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {line.expectedQty ?? t('common.none')}
+                      {line.expectedQty ? formatQty(line.expectedQty) : t('common.none')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {countedText(line, t('common.none'), (qty) =>

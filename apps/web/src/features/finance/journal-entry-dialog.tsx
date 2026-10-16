@@ -112,7 +112,7 @@ export function JournalEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-3xl">
+      <DialogContent closeLabel={t('common.close')} size="xl">
         <DialogHeader>
           <DialogTitle>{t('finance.journal.dialog.title')}</DialogTitle>
           <DialogDescription>{t('finance.journal.dialog.description')}</DialogDescription>
@@ -132,7 +132,7 @@ export function JournalEntryDialog({
             <FormField
               label={t('finance.journal.dialog.descriptionField')}
               htmlFor="entry-description"
-              error={checked && !description.trim() ? t('validation.required') : undefined}
+              error={checked && !description.trim() ? 'validation.required' : undefined}
             >
               <Input
                 id="entry-description"

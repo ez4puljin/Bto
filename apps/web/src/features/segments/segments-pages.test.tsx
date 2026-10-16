@@ -219,8 +219,13 @@ describe('segments (ADR-0049)', () => {
     });
     const { router } = renderApp('/segments/new?entity=PRODUCT', fetchMock);
     const user = userEvent.setup();
-    // The first condition is a search with no word yet: the shared rules name what is missing.
+    // The first condition is a search with no word yet: a fresh form says nothing about it, Save
+    // makes the shared rules name what is missing.
+    const save = await screen.findByRole('button', { name: mn.common.save });
+    expect(screen.queryByText(mn.segments.issues.VALUE_MISSING)).toBeNull();
+    await user.click(save);
     expect(await screen.findByText(mn.segments.issues.VALUE_MISSING)).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/segments')).toHaveLength(0);
     await user.type(
       screen.getByRole('textbox', {
         name: `${mn.segments.text}: ${mn.segments.group.replace('{{n}}', '1')}, 1`,

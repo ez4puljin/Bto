@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronHead, LinkRow } from '@/components/list';
+import { ChevronHead, LinkRow, TruncateCell } from '@/components/list';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -15,6 +15,7 @@ import { useProductLocationsOf } from '@/features/inventory/api';
 import { useProductSuppliersOf } from '@/features/partners/api';
 import { useCurrentPricesOf } from '@/features/pricing/api';
 import { problemFromError } from '@/lib/problem';
+import { cn } from '@/lib/utils';
 import type { ProductListItem } from './api';
 import type { ProductCellContext, ProductColumn } from './product-columns';
 
@@ -69,7 +70,9 @@ export const ProductTable = memo(function ProductTable(props: {
             </TableHead>
           ) : null}
           {props.columns.map((column) => (
-            <TableHead key={column.key}>{t(`catalog.products.columns.${column.key}`)}</TableHead>
+            <TableHead key={column.key} className={column.numeric ? 'text-right' : undefined}>
+              {t(`catalog.products.columns.${column.key}`)}
+            </TableHead>
           ))}
           <ChevronHead />
         </TableRow>
@@ -141,8 +144,9 @@ const ProductPageRows = memo(function ProductPageRows(props: {
           selected={selection?.selected.has(row.id) ?? false}
         >
           {selection ? (
-            <TableCell className="w-10 p-0">
-              <label className="flex cursor-pointer items-center px-3 py-3">
+            <TableCell className="w-10 p-0 first:pl-0">
+              {/* The whole cell ticks the row, its box in line with the header's. */}
+              <label className="flex cursor-pointer items-center py-2.5 pr-3 pl-4">
                 <Checkbox
                   aria-label={t('common.selectRow', { name: row.sku })}
                   checked={selection.selected.has(row.id)}
@@ -151,11 +155,25 @@ const ProductPageRows = memo(function ProductPageRows(props: {
               </label>
             </TableCell>
           ) : null}
-          {columns.map((column) => (
-            <TableCell key={column.key} className={column.className}>
-              {column.cell(row, cellContext)}
-            </TableCell>
-          ))}
+          {columns.map((column) =>
+            column.truncate ? (
+              <TruncateCell
+                key={column.key}
+                text={column.truncate.text(row, cellContext) ?? ''}
+                fill={column.truncate.fill}
+                className={column.className}
+              >
+                {column.cell(row, cellContext)}
+              </TruncateCell>
+            ) : (
+              <TableCell
+                key={column.key}
+                className={cn(column.numeric && 'text-right font-mono', column.className)}
+              >
+                {column.cell(row, cellContext)}
+              </TableCell>
+            ),
+          )}
         </LinkRow>
       ))}
     </>

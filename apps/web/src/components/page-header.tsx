@@ -11,7 +11,9 @@ export interface Crumb {
 
 /**
  * The top of every page (ADR-0042): where the page sits (menu group › list, from the menu itself;
- * deeper pages add `crumbs`), the large title, a meta row (code, status, dates) and the actions.
+ * deeper pages add `crumbs`), the large title, a meta row (code, status, dates), an optional
+ * one-line `description` and the actions. A trail of the menu group alone (a list page) shows on
+ * phones only: on a desktop the sidebar says it (ADR-0066).
  * The current page is never a crumb and a crumb that repeats the next one or the title is dropped,
  * so the title text appears once. Also names the browser tab «Title · Bto».
  */
@@ -20,10 +22,13 @@ export function PageHeader({
   meta,
   actions,
   media,
+  description,
   crumbs = [],
 }: {
   title: string;
   meta?: ReactNode;
+  /** One muted line under the title: what the page is for (never a status or a code). */
+  description?: ReactNode;
   actions?: ReactNode;
   /** A picture beside the title (a product's photo). */
   media?: ReactNode;
@@ -61,23 +66,24 @@ export function PageHeader({
     </li>
   ));
 
+  // The actions sit on the title's line (ADR-0066), whatever lines follow the title.
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-      <div className="min-w-0">
-        {shown.length > 0 ? (
-          linked ? (
-            <nav aria-label={t('shell.breadcrumb')} className="mb-1">
-              <ol className="flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground">
-                {items}
-              </ol>
-            </nav>
-          ) : (
-            <ol className="mb-1 flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground">
+    <div className="mb-4">
+      {shown.length > 0 ? (
+        linked ? (
+          <nav aria-label={t('shell.breadcrumb')} className="mb-1">
+            <ol className="flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground">
               {items}
             </ol>
-          )
-        ) : null}
-        <div className="flex items-center gap-4">
+          </nav>
+        ) : (
+          <ol className="mb-1 flex flex-wrap items-center gap-1 text-[13px] text-muted-foreground md:hidden">
+            {items}
+          </ol>
+        )
+      ) : null}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 items-center gap-4">
           {media ? <div className="shrink-0">{media}</div> : null}
           <div className="min-w-0">
             <h1 className="text-[26px] leading-tight font-semibold tracking-tight text-balance">
@@ -88,12 +94,15 @@ export function PageHeader({
                 {meta}
               </div>
             ) : null}
+            {description ? (
+              <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">{description}</p>
+            ) : null}
           </div>
         </div>
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
+        ) : null}
       </div>
-      {actions ? (
-        <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>
-      ) : null}
     </div>
   );
 }

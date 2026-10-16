@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
@@ -104,9 +104,18 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     await user.click(
       await screen.findByRole('button', { name: `${mn.pos.actions.newToken}: SM1` }),
     );
+    // The old token stops at once: a destructive question, «Болих» keeps the focus.
     const confirm = within(await screen.findByRole('dialog', { name: mn.pos.nodes.tokenTitle }));
+    expect(confirm.getByRole('button', { name: mn.pos.actions.newToken })).not.toHaveFocus();
     await user.click(confirm.getByRole('button', { name: mn.pos.actions.newToken }));
     expect(await screen.findByText('tgs_1_secretsecretsecretsecretsecret12')).toBeInTheDocument();
+    // A click beside the code does not lose it.
+    const shown = screen
+      .getByText('tgs_1_secretsecretsecretsecretsecret12')
+      .closest('[role="dialog"]');
+    fireEvent.pointerDown(document.body);
+    expect(shown).toBeInTheDocument();
+    expect(screen.getByText('tgs_1_secretsecretsecretsecretsecret12')).toBeInTheDocument();
   });
 
   it('sets a cashier’s PIN without ever reading it back', async () => {
@@ -152,8 +161,12 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     renderApp('/pos/shifts', fetchMock);
     const row = await screen.findByRole('row', { name: /К1-261016-Э1/ });
     expect(within(row).getByText(mn.pos.shiftStatuses.CLOSED)).toBeInTheDocument();
-    expect(within(row).getByText('-300')).toBeInTheDocument();
-    await user.click(within(row).getByText('К1-261016-Э1'));
+    // A cash shortage reads in red, with the tugrik sign of every amount in a list.
+    expect(within(row).getByText('-300₮')).toHaveClass('text-destructive');
+    // The number is the row's link to its panel, for the keyboard.
+    const number = within(row).getByRole('link', { name: 'К1-261016-Э1' });
+    expect(number).toHaveAttribute('href', '/pos/shifts?shift=21');
+    await user.click(number);
     const panel = within(
       await screen.findByRole('dialog', {
         name: mn.pos.shifts.panelTitle.replace('{{number}}', 'К1-261016-Э1'),
@@ -163,7 +176,7 @@ describe('supermarket pages (ADR-0063 #8)', () => {
       'href',
       '/finance/journal?entry=31',
     );
-    expect(panel.getByText(`-300 · ${mn.pos.shifts.short}`)).toBeInTheDocument();
+    expect(panel.getByText(`-300₮ · ${mn.pos.shifts.short}`)).toBeInTheDocument();
     await user.click(panel.getByRole('button', { name: mn.pos.actions.handover }));
     const dialog = within(await screen.findByRole('dialog', { name: mn.pos.shifts.handoverTitle }));
     // Counted − float kept, prefilled.
@@ -184,14 +197,34 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     ).toBeInTheDocument();
   });
 
+  it('gives the focus back to the shift number after its panel closes', async () => {
+    const user = userEvent.setup();
+    renderApp('/pos/shifts', signedIn(ACCOUNTANT_ME, routes()));
+    const row = await screen.findByRole('row', { name: /К1-261016-Э1/ });
+    await user.click(within(row).getByRole('link', { name: 'К1-261016-Э1' }));
+    await screen.findByRole('dialog', {
+      name: mn.pos.shifts.panelTitle.replace('{{number}}', 'К1-261016-Э1'),
+    });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // The keyboard goes on from the row it opened.
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('row', { name: /К1-261016-Э1/ })).getByRole('link', {
+          name: 'К1-261016-Э1',
+        }),
+      ).toHaveFocus(),
+    );
+  });
+
   it('lists sales and opens one with its lines, tender and shortfall', async () => {
     const user = userEvent.setup();
     renderApp('/pos/sales', signedIn(undefined, routes()));
     const row = await screen.findByRole('row', { name: /К1-261016-0045/ });
     // The total and the cash tender read the same.
-    expect(within(row).getAllByText('2,600')).toHaveLength(2);
+    expect(within(row).getAllByText('2,600₮')).toHaveLength(2);
     expect(within(row).getByText(mn.pos.ebarimtStatuses.NONE)).toBeInTheDocument();
-    await user.click(within(row).getByText('К1-261016-0045'));
+    await user.click(within(row).getByRole('link', { name: 'К1-261016-0045' }));
     const panel = within(
       await screen.findByRole('dialog', {
         name: `${mn.pos.saleKinds.SALE} К1-261016-0045`,

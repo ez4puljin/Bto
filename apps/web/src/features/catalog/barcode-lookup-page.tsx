@@ -54,7 +54,7 @@ export function BarcodeLookupPage() {
   const [latest, ...older] = scans;
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="max-w-3xl space-y-4">
       <PageHeader title={t('scan.title')} />
       <Card>
         <CardContent className="flex flex-col gap-4">
@@ -68,14 +68,13 @@ export function BarcodeLookupPage() {
             </div>
           </div>
           <ScanBox onScan={scan} />
+          {/* The last result stays in view while the next code is looked up. */}
+          <p role="status" className="text-[13px] text-muted-foreground empty:hidden">
+            {lookup.isPending ? t('common.loading') : null}
+          </p>
         </CardContent>
       </Card>
-      {lookup.isPending ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {t('common.loading')}
-        </p>
-      ) : null}
-      {latest && !lookup.isPending ? <ScanResult entry={latest} /> : null}
+      {latest ? <ScanResult entry={latest} /> : null}
       {older.length > 0 ? (
         <section className="flex flex-col gap-2">
           <h2 className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -171,9 +170,11 @@ function ScanResult({ entry }: { entry: ScanEntry }) {
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-[13px]">{barcode.code}</span>
-              {barcode.isPrimary ? <Badge>{t('catalog.units.primary')}</Badge> : null}
+              {barcode.isPrimary ? (
+                <Badge variant="secondary">{t('catalog.units.primary')}</Badge>
+              ) : null}
               {barcode.isInternal ? (
-                <Badge variant="secondary">{t('catalog.units.internal')}</Badge>
+                <Badge variant="outline">{t('catalog.units.internal')}</Badge>
               ) : null}
             </div>
           </div>

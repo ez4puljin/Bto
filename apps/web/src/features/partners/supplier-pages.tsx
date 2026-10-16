@@ -21,15 +21,9 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { randomUuid } from '@/lib/uuid';
@@ -44,6 +38,7 @@ import {
 import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
 import { ContactsCard } from './contacts-card';
+import { ListColumnCell, ListColumnHead } from './list-column-cell';
 import {
   emptySupplier,
   PARTNER_STATUSES,
@@ -53,6 +48,7 @@ import {
   supplierValues,
 } from './partner-schema';
 import {
+  DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
   LOCKED_SUPPLIER_COLUMNS,
   SUPPLIER_COLUMN_KEYS,
   SUPPLIER_COLUMNS,
@@ -65,11 +61,15 @@ const COLUMNS_LIST = 'partners.suppliers';
 const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
 
-/** Suppliers: every user reads them (goods receipts); admins add and change them (SPEC §5.3). */
+/**
+ * Suppliers: every user reads them (goods receipts); admins add and change them (SPEC §5.3). A user
+ * who never chose sees the columns that fit a 1366px screen (ADR-0066).
+ */
 export function SuppliersPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('partners.suppliers.manage');
   const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const statusParam = params.get('status');
@@ -77,23 +77,22 @@ export function SuppliersPage() {
   const segmentId = segmentParam(params);
   const suppliers = useSuppliers({ q, status, segmentId });
   const rows = suppliers.data?.pages.flatMap((page) => page.data) ?? [];
-  const columnState = useHiddenColumns(COLUMNS_LIST, SUPPLIER_COLUMN_KEYS, LOCKED_SUPPLIER_COLUMNS);
+  const columnState = useHiddenColumns(
+    COLUMNS_LIST,
+    SUPPLIER_COLUMN_KEYS,
+    LOCKED_SUPPLIER_COLUMNS,
+    DEFAULT_HIDDEN_SUPPLIER_COLUMNS,
+  );
   const { hidden } = columnState;
   const columns = useMemo(
     () => SUPPLIER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
+  const filtered = Boolean(q || status || segmentId);
+  const clearFilters = () => {
+    setSearch('');
+    setParams(new URLSearchParams(), { replace: true });
+  };
 
   return (
     <div>
@@ -123,6 +122,7 @@ export function SuppliersPage() {
         }
       >
         <SearchField
+          className="sm:w-60"
           aria-label={t('common.search')}
           placeholder={t('partners.suppliers.searchPlaceholder')}
           value={search}
@@ -151,14 +151,14 @@ export function SuppliersPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(suppliers.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key}>
+                <ListColumnHead key={column.key} numeric={column.numeric}>
                   {t(`partners.suppliers.columns.${column.key}`)}
-                </TableHead>
+                </ListColumnHead>
               ))}
               <ChevronHead />
             </TableRow>
@@ -168,16 +168,18 @@ export function SuppliersPage() {
             {rows.map((supplier) => (
               <LinkRow key={supplier.id} to={`/partners/suppliers/${supplier.id}`}>
                 {columns.map((column) => (
-                  <TableCell key={column.key} className={column.className}>
-                    {column.cell(supplier, t)}
-                  </TableCell>
+                  <ListColumnCell key={column.key} column={column} row={supplier} t={t} />
                 ))}
               </LinkRow>
             ))}
           </TableBody>
         </Table>
         {!suppliers.isPending && rows.length === 0 ? (
-          <EmptyState icon={Factory} title={t('partners.suppliers.empty')} />
+          <EmptyState
+            icon={Factory}
+            title={t('partners.suppliers.empty')}
+            {...(filtered ? { onClearFilters: clearFilters } : {})}
+          />
         ) : null}
         <LoadMore query={suppliers} />
       </ListCard>
@@ -213,22 +215,23 @@ export function SupplierCreatePage() {
       {nextCode.isPending ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
-        <Card>
-          <CardContent>
-            <SupplierForm
-              mode="create"
-              defaultValues={emptySupplier(nextCode.data ?? '')}
-              submitLabel={t('common.save')}
-              onSubmit={create}
-            />
-          </CardContent>
-        </Card>
+        <SupplierForm
+          page
+          mode="create"
+          defaultValues={emptySupplier(nextCode.data ?? '')}
+          submitLabel={t('common.save')}
+          onCancel={() => void navigate('/partners/suppliers')}
+          onSubmit={create}
+        />
       )}
     </div>
   );
 }
 
-/** One supplier: data, contacts and the products ordered from it. */
+/**
+ * One supplier: its data, then from `xl` on a side column with the contacts and the products
+ * ordered from it (ADR-0066).
+ */
 export function SupplierPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
@@ -253,7 +256,7 @@ export function SupplierPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
         title={detail.name}
         meta={
@@ -265,39 +268,52 @@ export function SupplierPage() {
           </>
         }
       />
-      <DetailCard
-        title={t('partners.supplier.info')}
-        canEdit={canManage}
-        view={<SupplierFacts detail={detail} />}
-        edit={(close) => (
-          <SupplierForm
-            mode="edit"
-            defaultValues={supplierValues(detail)}
-            submitLabel={t('common.save')}
-            onCancel={close}
-            onSubmit={(values) => save(values, close)}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
+          <DetailCard
+            title={t('partners.supplier.info')}
+            canEdit={canManage}
+            view={<SupplierFacts detail={detail} />}
+            edit={(close) => (
+              <SupplierForm
+                mode="edit"
+                defaultValues={supplierValues(detail)}
+                submitLabel={t('common.save')}
+                onCancel={close}
+                onSubmit={(values) => save(values, close)}
+              />
+            )}
           />
-        )}
-      />
-      <ContactsCard
-        contacts={detail.contacts}
-        canManage={canManage}
-        onAdd={(body) => mutations.addSupplierContact.mutateAsync({ ownerId: id, body })}
-        onUpdate={(contactId, body) =>
-          mutations.updateSupplierContact.mutateAsync({ id: contactId, body })
-        }
-        onDelete={(contactId) => mutations.deleteSupplierContact.mutateAsync(contactId)}
-      />
-      <SupplierProductsCard supplierId={id} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-4">
+          <ContactsCard
+            contacts={detail.contacts}
+            canManage={canManage}
+            onAdd={(body) => mutations.addSupplierContact.mutateAsync({ ownerId: id, body })}
+            onUpdate={(contactId, body) =>
+              mutations.updateSupplierContact.mutateAsync({ id: contactId, body })
+            }
+            onDelete={(contactId) => mutations.deleteSupplierContact.mutateAsync(contactId)}
+          />
+          <SupplierProductsCard supplierId={id} />
+        </div>
+      </div>
     </div>
   );
 }
 
-/** The products linked to a supplier; the links are made on the product page. */
+/** How many of a supplier's products its card lists; the product list shows them all. */
+const SHOWN_PRODUCTS = 10;
+
+/**
+ * The products linked to a supplier, the first ten, and a link to the product list filtered by it
+ * (`?supplier=`); the links are made on the product page.
+ */
 function SupplierProductsCard({ supplierId }: { supplierId: number }) {
   const { t } = useTranslation();
   const products = useSupplierProducts(supplierId);
-  const rows = products.data?.pages.flatMap((page) => page.data) ?? [];
+  const loaded = products.data?.pages.flatMap((page) => page.data) ?? [];
+  const rows = loaded.slice(0, SHOWN_PRODUCTS);
 
   return (
     <Card>
@@ -309,28 +325,31 @@ function SupplierProductsCard({ supplierId }: { supplierId: number }) {
         {!products.isPending && rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('partners.supplier.productsEmpty')}</p>
         ) : null}
-        <ul className="flex flex-col divide-y">
+        <ul className="flex flex-col divide-y divide-border/80">
           {rows.map(({ linkId, isMain, product }) => (
-            <li key={linkId} className="flex flex-wrap items-center gap-3 py-2">
+            <li key={linkId} className="flex items-center gap-3 py-2">
               {product.thumbUrl ? (
                 <img
                   src={product.thumbUrl}
                   alt=""
                   loading="lazy"
-                  className="size-10 rounded-md object-cover"
+                  className="size-8 shrink-0 rounded-md object-cover"
                 />
               ) : (
-                <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-                  <ImageOff className="size-4 text-muted-foreground" />
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <ImageOff className="size-3.5 text-muted-foreground" />
                 </div>
               )}
-              <span className="font-mono text-sm text-muted-foreground">{product.sku}</span>
-              <Link
-                to={`/catalog/products/${product.id}`}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {product.name}
-              </Link>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <Link
+                  to={`/catalog/products/${product.id}`}
+                  className="truncate font-medium underline-offset-4 hover:underline"
+                  title={product.name}
+                >
+                  {product.name}
+                </Link>
+                <span className="font-mono text-xs text-muted-foreground">{product.sku}</span>
+              </div>
               {isMain ? <Badge variant="secondary">{t('partners.supplier.main')}</Badge> : null}
               {product.status === 'ACTIVE' ? null : (
                 <Badge variant="outline">{t(`partners.status.${product.status}`)}</Badge>
@@ -338,14 +357,12 @@ function SupplierProductsCard({ supplierId }: { supplierId: number }) {
             </li>
           ))}
         </ul>
-        {products.hasNextPage ? (
-          <Button
-            variant="outline"
-            className="self-start"
-            disabled={products.isFetchingNextPage}
-            onClick={() => void products.fetchNextPage()}
-          >
-            {t('common.loadMore')}
+        {/* The rest are in the product list, with its columns and filters. */}
+        {loaded.length > 0 ? (
+          <Button variant="link" size="sm" className="self-start px-0" asChild>
+            <Link to={`/catalog/products?supplier=${supplierId}`}>
+              {t('partners.supplier.productsAll')}
+            </Link>
           </Button>
         ) : null}
       </CardContent>

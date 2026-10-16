@@ -13,6 +13,8 @@ import {
   LoadMore,
   SegmentedControl,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -27,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { plainDecimal } from '@/lib/money';
+import { formatCount, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -40,7 +42,7 @@ import {
   usePricingMutations,
 } from './api';
 import { lastDayOf } from './helpers';
-import { profileValuesOf, useProfileSummary } from './price-views';
+import { profileValuesOf, useProfileSummaryParts } from './price-views';
 import { ProfileExample, ProfileValuesDialog, RenameProfileDialog } from './profile-form';
 
 const FILTERS = ['LIVE', 'ARCHIVED'] as const;
@@ -63,7 +65,7 @@ export function PriceProfilesPage() {
     <div>
       <PageHeader
         title={t('pricing.profiles.title')}
-        meta={<p className="max-w-3xl">{t('pricing.profiles.intro')}</p>}
+        description={t('pricing.profiles.intro')}
         actions={
           canManage ? (
             <Button onClick={() => setCreating(true)}>
@@ -84,7 +86,7 @@ export function PriceProfilesPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(profiles.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -96,11 +98,12 @@ export function PriceProfilesPage() {
               </TableHead>
               <TableHead>{t('pricing.profiles.columns.rounding')}</TableHead>
               <TableHead className="text-right">{t('pricing.profiles.columns.products')}</TableHead>
+              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {profiles.isPending ? <SkeletonRows columns={7} /> : null}
+            {profiles.isPending ? <SkeletonRows columns={8} /> : null}
             {rows.map((profile) => (
               <ProfileRow key={profile.id} profile={profile} />
             ))}
@@ -130,7 +133,7 @@ function ProfileRow({ profile }: { profile: PriceProfile }) {
   const none = <span className="text-muted-foreground">{t('common.none')}</span>;
   return (
     <LinkRow to={`/pricing/profiles/${profile.id}`}>
-      <TableCell className="whitespace-normal">
+      <TableCell>
         <Link
           to={`/pricing/profiles/${profile.id}`}
           className="font-medium underline-offset-4 hover:underline"
@@ -158,7 +161,8 @@ function ProfileRow({ profile }: { profile: PriceProfile }) {
           : none}
       </TableCell>
       <TableCell>{values ? t(`pricing.roundings.${values.rounding}`) : none}</TableCell>
-      <TableCell className="text-right font-mono">{profile.productsToday}</TableCell>
+      <TableCell className="text-right font-mono">{formatCount(profile.productsToday)}</TableCell>
+      <SpacerCell />
     </LinkRow>
   );
 }
@@ -182,7 +186,7 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
   const canManage = useHasPermission('pricing.manage') && !archived;
   const mutations = usePricingMutations();
   const archiving = useAction();
-  const summary = useProfileSummary();
+  const summary = useProfileSummaryParts();
   const [open, setOpen] = useState<'values' | 'rename' | 'archive' | null>(null);
   // Latest first: the planned values, today's, then the earlier ones.
   const versions: { version: PriceProfileVersion; status: VersionStatus }[] = [
@@ -208,7 +212,9 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
         meta={
           <>
             {archived ? <Badge variant="secondary">{t('pricing.profiles.archived')}</Badge> : null}
-            <span>{t('pricing.profiles.productsCount', { count: profile.productsToday })}</span>
+            <span>
+              {t('pricing.profiles.productsCount', { count: formatCount(profile.productsToday) })}
+            </span>
           </>
         }
         actions={
@@ -230,7 +236,8 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
           ) : null
         }
       />
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* The history takes the wider share: dates on one line, one price a line. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <Card role="region" aria-label={t('pricing.profiles.current')}>
           <CardHeader>
             <CardTitle>{t('pricing.profiles.current')}</CardTitle>
@@ -262,7 +269,7 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
               <TableBody>
                 {versions.map(({ version, status }) => (
                   <TableRow key={version.id}>
-                    <TableCell className="font-mono whitespace-normal">
+                    <TableCell className="font-mono">
                       {version.validTo
                         ? t('pricing.profiles.periodClosed', {
                             from: version.validFrom,
@@ -270,7 +277,14 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
                           })
                         : t('pricing.profiles.periodOpen', { from: version.validFrom })}
                     </TableCell>
-                    <TableCell className="whitespace-normal">{summary(version)}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {/* One price a line: a half-width card never splits a list mid-line. */}
+                      <div className="flex flex-col">
+                        {summary(version).map((part) => (
+                          <span key={part}>{part}</span>
+                        ))}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={

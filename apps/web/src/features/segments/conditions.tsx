@@ -566,7 +566,7 @@ function IdsDialog(props: {
   const [ids, setIds] = useState(props.ids);
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+      <DialogContent closeLabel={t('common.close')} size="sm">
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
         </DialogHeader>

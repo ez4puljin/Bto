@@ -50,7 +50,10 @@ const EMPTY_USER: UserFormValues = {
   warehouseIds: [],
 };
 
-/** Staff accounts: search, list, and create with a one-time password code (SPEC §5.1). */
+/**
+ * Staff accounts: search, list, and create with a one-time password code (SPEC §5.1). The create
+ * dialog keeps «Болих» and «Хадгалах» in view while its sections scroll (ADR-0066).
+ */
 export function UsersPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -115,7 +118,7 @@ export function UsersPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(users.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -171,13 +174,17 @@ export function UsersPage() {
           </TableBody>
         </Table>
         {!users.isPending && rows.length === 0 ? (
-          <EmptyState icon={Users} title={t('users.empty')} />
+          <EmptyState
+            icon={Users}
+            title={t('users.empty')}
+            onClearFilters={search ? () => setSearch('') : undefined}
+          />
         ) : null}
         <LoadMore query={users} />
       </ListCard>
 
       <Dialog open={creating} onOpenChange={setCreating}>
-        <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>{t('users.create')}</DialogTitle>
             <DialogDescription>{t('users.form.createHint')}</DialogDescription>
@@ -186,6 +193,7 @@ export function UsersPage() {
             problem={problemFromError(mutations.createUser.error ?? mutations.issueCode.error)}
           />
           <UserForm
+            inDialog
             defaultValues={EMPTY_USER}
             submitLabel={t('common.save')}
             onSubmit={create}

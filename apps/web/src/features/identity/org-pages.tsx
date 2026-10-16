@@ -104,7 +104,7 @@ export function BranchesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(branches.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -197,7 +197,7 @@ function BranchDialog({ branch, onClose }: { branch: Branch | 'new'; onClose: ()
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent size="md">
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>{isNew ? t('org.branches.create') : t('org.branches.edit')}</DialogTitle>
@@ -303,7 +303,7 @@ export function WarehousesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(warehouses.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -414,7 +414,7 @@ function WarehouseDialog({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent>
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>
@@ -458,7 +458,7 @@ function WarehouseDialog({
               error={errors.branchId?.message}
             >
               <NativeSelect id="warehouse-branch" {...form.register('branchId')}>
-                <option value="">{t('common.none')}</option>
+                <option value="">{t('org.warehouses.pickBranch')}</option>
                 {(branches.data ?? []).map((branch) => (
                   <option key={branch.id} value={String(branch.id)}>
                     {branch.name}

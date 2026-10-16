@@ -139,7 +139,7 @@ function LinkSupplierDialog(props: {
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent closeLabel={t('common.close')} size="md">
         <DialogHeader>
           <DialogTitle>{t('partners.productSuppliers.add')}</DialogTitle>
         </DialogHeader>

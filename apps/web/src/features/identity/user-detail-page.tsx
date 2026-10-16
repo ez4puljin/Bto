@@ -7,7 +7,7 @@ import { useAuthState, useHasPermission } from '@/app/auth-context';
 import { CodeDialog } from '@/components/code-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DetailCard, FieldList } from '@/components/detail';
-import { RowAction, RowActions } from '@/components/list';
+import { RowAction, RowActions, TruncateCell } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { RoleName } from '@/components/role-name';
@@ -61,8 +61,21 @@ export function UserDetailPage() {
   const [asking, setAsking] = useState<Asking>(null);
   const isSelf = auth.status === 'authenticated' && auth.me.id === id;
 
-  if (user.isPending) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
-  if (user.isError) return <ProblemAlert problem={problemFromError(user.error)} />;
+  // Loading and refusals keep the page's frame, so the browser tab never shows the last page's name.
+  if (user.isPending || user.isError) {
+    return (
+      <div>
+        <PageHeader title={t('users.detail.title')} />
+        {user.isError ? (
+          <ProblemAlert problem={problemFromError(user.error)} />
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t('common.loading')}
+          </p>
+        )}
+      </div>
+    );
+  }
   const detail = user.data;
   const locked = detail.lockedUntil !== null && Date.parse(detail.lockedUntil) > Date.now();
 
@@ -205,7 +218,8 @@ export function UserDetailPage() {
               </CardAction>
             ) : null}
           </CardHeader>
-          <CardContent>
+          {/* The table runs to the card's edges: its first column lines up with the title. */}
+          <CardContent className={sessions.data?.length ? 'px-0' : undefined}>
             {sessions.data?.length ? (
               <Table>
                 <TableHeader>
@@ -222,10 +236,9 @@ export function UserDetailPage() {
                 <TableBody>
                   {sessions.data.map((session) => (
                     <TableRow key={session.id}>
-                      <TableCell className="max-w-64 truncate" title={session.userAgent ?? ''}>
-                        {session.ip ?? t('common.none')}
-                        {session.userAgent ? ` · ${session.userAgent}` : ''}
-                      </TableCell>
+                      <TruncateCell
+                        text={`${session.ip ?? t('common.none')}${session.userAgent ? ` · ${session.userAgent}` : ''}`}
+                      />
                       <TableCell className="font-mono">{when(session.createdAt)}</TableCell>
                       <TableCell className="font-mono">{when(session.lastUsedAt)}</TableCell>
                       <TableCell className="font-mono">{when(session.expiresAt)}</TableCell>

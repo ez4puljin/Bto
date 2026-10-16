@@ -19,6 +19,7 @@ import {
   FileChartColumn,
   FileSpreadsheet,
   FolderTree,
+  HandCoins,
   History,
   Hourglass,
   KeyRound,
@@ -31,7 +32,6 @@ import {
   PackageMinus,
   PackagePlus,
   ReceiptText,
-  ReceiptText as ReceiptIcon,
   Ruler,
   ScanBarcode,
   ScrollText,
@@ -39,12 +39,15 @@ import {
   Shapes,
   SquareKanban,
   ShieldCheck,
+  ShoppingBasket,
+  ShoppingCart,
   SlidersHorizontal,
   Sparkles,
   Store,
   TabletSmartphone,
   Tag,
   Tags,
+  Timer,
   Truck,
   Users,
   Warehouse,
@@ -72,7 +75,9 @@ export interface NavGroup {
 }
 
 /**
- * Sidebar menu, one group per area (ADR-0042: every entry has an icon). An entry with a permission
+ * Sidebar menu, one group per area (ADR-0042: every entry has an icon), in the order of a wholesale
+ * office's day (ADR-0066): sales, the warehouse, the catalogue, prices, segments, partners, finance,
+ * the supermarket, the assistant, the system. An entry with a permission
  * is shown only to users who hold it (ADR-0027); a group without visible entries is hidden. Catalog
  * pages and suppliers are readable by every user; customers only by the office, accountants and
  * admins. Branches and warehouses are readable by every user too (other pages list them), but only
@@ -86,15 +91,60 @@ export interface NavGroup {
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
+    label: 'nav.groups.sales',
+    items: [
+      {
+        to: '/sales/boards',
+        label: 'nav.salesWarehouse',
+        icon: SquareKanban,
+        permission: 'sales.orders.read',
+        also: ['/sales/orders'],
+      },
+    ],
+  },
+  {
+    label: 'nav.groups.inventory',
+    items: [
+      { to: '/inventory/stock', label: 'nav.stock', icon: Boxes },
+      { to: '/inventory/receipts', label: 'nav.receipts', icon: PackagePlus },
+      {
+        to: '/inventory/transfers',
+        label: 'nav.transfers',
+        icon: ArrowLeftRight,
+        permission: 'inventory.transfers.manage',
+      },
+      {
+        to: '/inventory/stocktakes',
+        label: 'nav.stocktakes',
+        icon: ClipboardCheck,
+        permission: 'inventory.stocktakes.manage',
+      },
+      {
+        to: '/inventory/adjustments',
+        label: 'nav.adjustments',
+        icon: SlidersHorizontal,
+        permission: 'inventory.adjustments.manage',
+      },
+      {
+        to: '/inventory/moves',
+        label: 'nav.binMoves',
+        icon: Move,
+        permission: 'inventory.moves.manage',
+      },
+      { to: '/inventory/low-stock', label: 'nav.lowStock', icon: PackageMinus },
+      { to: '/inventory/movements', label: 'nav.movements', icon: History },
+      {
+        to: '/inventory/bins',
+        label: 'nav.bins',
+        icon: LayoutGrid,
+        permission: 'inventory.setup.manage',
+      },
+    ],
+  },
+  {
     label: 'nav.groups.catalog',
     items: [
       { to: '/catalog/products', label: 'nav.products', icon: Package },
-      {
-        to: '/catalog/pending',
-        label: 'nav.pendingProducts',
-        icon: Hourglass,
-        permission: 'pricing.prices.manage',
-      },
       { to: '/catalog/categories', label: 'nav.categories', icon: FolderTree },
       { to: '/catalog/uoms', label: 'nav.uoms', icon: Ruler },
       { to: '/catalog/scan', label: 'nav.scan', icon: ScanBarcode },
@@ -107,6 +157,24 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
+    label: 'nav.groups.pricing',
+    items: [
+      {
+        to: '/catalog/pending',
+        label: 'nav.pendingProducts',
+        icon: Hourglass,
+        permission: 'pricing.prices.manage',
+      },
+      { to: '/pricing/profiles', label: 'nav.priceProfiles', icon: Tags },
+      { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
+      { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
+    ],
+  },
+  {
+    label: 'nav.groups.segments',
+    items: [{ to: '/segments', label: 'nav.segments', icon: Shapes }],
+  },
+  {
     label: 'nav.groups.partners',
     items: [
       {
@@ -116,18 +184,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'partners.customers.read',
       },
       { to: '/partners/suppliers', label: 'nav.suppliers', icon: Factory },
-    ],
-  },
-  {
-    label: 'nav.groups.sales',
-    items: [
-      {
-        to: '/sales/boards',
-        label: 'nav.salesWarehouse',
-        icon: SquareKanban,
-        permission: 'sales.orders.read',
-        also: ['/sales/orders'],
-      },
     ],
   },
   {
@@ -170,8 +226,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.pos',
     items: [
-      { to: '/pos/shifts', label: 'nav.posShifts', icon: Hourglass, permission: 'pos.read' },
-      { to: '/pos/sales', label: 'nav.posSales', icon: ReceiptIcon, permission: 'pos.read' },
+      { to: '/pos/shifts', label: 'nav.posShifts', icon: Timer, permission: 'pos.read' },
+      { to: '/pos/sales', label: 'nav.posSales', icon: ShoppingBasket, permission: 'pos.read' },
       { to: '/pos/tills', label: 'nav.posTills', icon: Monitor, permission: 'pos.read' },
       { to: '/pos/cashiers', label: 'nav.posCashiers', icon: KeyRound, permission: 'pos.read' },
       {
@@ -190,57 +246,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
-    label: 'nav.groups.inventory',
-    items: [
-      { to: '/inventory/stock', label: 'nav.stock', icon: Boxes },
-      { to: '/inventory/movements', label: 'nav.movements', icon: History },
-      { to: '/inventory/low-stock', label: 'nav.lowStock', icon: PackageMinus },
-      { to: '/inventory/receipts', label: 'nav.receipts', icon: PackagePlus },
-      {
-        to: '/inventory/transfers',
-        label: 'nav.transfers',
-        icon: ArrowLeftRight,
-        permission: 'inventory.transfers.manage',
-      },
-      {
-        to: '/inventory/moves',
-        label: 'nav.binMoves',
-        icon: Move,
-        permission: 'inventory.moves.manage',
-      },
-      {
-        to: '/inventory/adjustments',
-        label: 'nav.adjustments',
-        icon: SlidersHorizontal,
-        permission: 'inventory.adjustments.manage',
-      },
-      {
-        to: '/inventory/stocktakes',
-        label: 'nav.stocktakes',
-        icon: ClipboardCheck,
-        permission: 'inventory.stocktakes.manage',
-      },
-      {
-        to: '/inventory/bins',
-        label: 'nav.bins',
-        icon: LayoutGrid,
-        permission: 'inventory.setup.manage',
-      },
-    ],
-  },
-  {
-    label: 'nav.groups.pricing',
-    items: [
-      { to: '/pricing/profiles', label: 'nav.priceProfiles', icon: Tags },
-      { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
-      { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
-    ],
-  },
-  {
-    label: 'nav.groups.segments',
-    items: [{ to: '/segments', label: 'nav.segments', icon: Shapes }],
-  },
-  {
     label: 'nav.groups.ai',
     items: [
       { to: '/ai', label: 'nav.aiAssistant', icon: Sparkles, permission: 'ai.ask' },
@@ -255,7 +260,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.system',
     items: [
-      { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
       { to: '/users', label: 'nav.users', icon: Users, permission: 'identity.users.read' },
       { to: '/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'identity.users.read' },
       {
@@ -283,6 +287,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: FileSpreadsheet,
         permission: 'imports.manage',
       },
+      { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
     ],
   },
 ];
@@ -326,11 +331,22 @@ export interface QuickAction {
   to: string;
   label: QuickActionKey;
   icon: LucideIcon;
-  permission?: Permission;
+  /** Every right the shortcut needs: to do the thing and to open the page it lands on. */
+  permission?: Permission | readonly Permission[];
 }
 
-/** The home page's shortcuts to the day's work, each behind the right to do it (ADR-0042). */
+/**
+ * The home page's shortcuts to the day's work, each behind the right to do it (ADR-0042), in the
+ * menu's order (ADR-0066): an order, the warehouse's documents, the catalogue, prices, a payment,
+ * the assistant. A name never repeats a menu entry's (docs/ui.md §5).
+ */
 export const QUICK_ACTIONS: readonly QuickAction[] = [
+  {
+    to: '/sales/boards?new=1',
+    label: 'home.actions.newOrder',
+    icon: ShoppingCart,
+    permission: ['sales.orders.read', 'sales.orders.manage'],
+  },
   {
     to: '/inventory/receipts?new=1',
     label: 'home.actions.newReceipt',
@@ -357,13 +373,20 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
   },
   { to: '/catalog/scan', label: 'home.actions.scan', icon: ScanBarcode },
   { to: '/pricing/quote', label: 'home.actions.quote', icon: Calculator },
+  {
+    to: '/finance/payments?new=1',
+    label: 'home.actions.recordPayment',
+    icon: HandCoins,
+    permission: ['finance.read', 'finance.payments.record'],
+  },
   { to: '/ai', label: 'home.actions.askAi', icon: Sparkles, permission: 'ai.ask' },
 ];
 
 export function visibleQuickActions(permissions: readonly Permission[]): QuickAction[] {
-  return QUICK_ACTIONS.filter(
-    (action) => !action.permission || permissions.includes(action.permission),
-  );
+  return QUICK_ACTIONS.filter((action) => {
+    const needed = action.permission === undefined ? [] : [action.permission].flat();
+    return needed.every((permission) => permissions.includes(permission));
+  });
 }
 
 /** A count of the inventory or pricing attention endpoints (ADR-0047 #7). */

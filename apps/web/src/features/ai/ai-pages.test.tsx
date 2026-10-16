@@ -109,7 +109,10 @@ describe('AI assistant pages (ADR-0045)', () => {
       }),
     );
     expect(await screen.findByText(mn.ai.notConfigured.title)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: mn.ai.placeholder })).toBeDisabled();
+    const box = screen.getByRole('textbox', { name: mn.ai.placeholder });
+    expect(box).toBeDisabled();
+    // A disabled box stays in the page's flow, under the examples.
+    expect(box.closest('form')).not.toHaveAttribute('data-floating');
   });
 
   it('asks a question and shows the summary, the table and the folded SQL', async () => {
@@ -131,6 +134,7 @@ describe('AI assistant pages (ADR-0045)', () => {
     await user.click(await screen.findByRole('button', { name: mn.ai.examples.topStockValue }));
     const box = screen.getByRole('textbox', { name: mn.ai.placeholder });
     expect(box).toHaveValue(mn.ai.examples.topStockValue);
+    expect(box.closest('form')).not.toHaveAttribute('data-floating');
     await user.clear(box);
     await user.type(box, 'Аль бараа хамгийн их үнэлгээтэй вэ?{Enter}');
 
@@ -142,9 +146,11 @@ describe('AI assistant pages (ADR-0045)', () => {
     expect(within(table).getByRole('cell', { name: '48,000' })).toBeInTheDocument();
     expect(screen.getByText(mn.ai.answer.howComputed)).toBeInTheDocument();
     expect(screen.getByText(SQL)).toBeInTheDocument();
-    // The new conversation shows its step at once: the empty page never comes back.
+    // The new conversation shows its step at once: the empty page never comes back, and the
+    // question box now floats at the foot of the window over the answers.
     expect(screen.queryByText(mn.ai.examplesTitle)).toBeNull();
     expect(box).toHaveValue('');
+    expect(box.closest('form')).toHaveAttribute('data-floating', 'true');
   });
 
   it('says the first request is still running instead of showing an error', async () => {
@@ -161,6 +167,19 @@ describe('AI assistant pages (ADR-0045)', () => {
     await user.type(box, 'Үлдэгдэл?{Enter}');
     expect(await screen.findByText(mn.ai.stillWorking)).toBeInTheDocument();
     expect(screen.queryByText(mn.errors.IDEMPOTENCY_KEY_IN_PROGRESS)).toBeNull();
+  });
+
+  it('shows an opened conversation loading, never the examples of an empty page', async () => {
+    renderApp(
+      '/ai?c=9',
+      signedIn(ADMIN_ME, {
+        ...AI_ROUTES,
+        'GET /api/v1/ai/conversations/9': () => new Promise<Response>(() => undefined),
+      }),
+    );
+    await screen.findByRole('heading', { level: 1, name: mn.ai.title });
+    expect(screen.getByRole('status')).toHaveTextContent(mn.common.loading);
+    expect(screen.queryByText(mn.ai.examplesTitle)).toBeNull();
   });
 
   it('runs an older answer again for its rows and explains a failed one', async () => {
@@ -250,8 +269,14 @@ describe('saved AI reports', () => {
       screen.getByRole('button', { name: `${mn.ai.report.run}: Бусдынх` }),
     ).toBeInTheDocument();
 
+    // A run opens its rows in a panel named after the report, with the Excel button in its header.
     await user.click(screen.getByRole('button', { name: `${mn.ai.report.run}: Үнэлгээ` }));
-    expect(await screen.findByRole('cell', { name: '1,234,567.50' })).toBeInTheDocument();
+    const panel = within(await screen.findByRole('dialog', { name: 'Үнэлгээ' }));
+    expect(await panel.findByRole('cell', { name: '1,234,567.50' })).toBeInTheDocument();
+    expect(panel.getByText(/Админ Бат ·/)).toBeInTheDocument();
+    expect(panel.getByRole('button', { name: mn.ai.answer.download })).toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: mn.common.close }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
     await user.click(screen.getByRole('button', { name: `${mn.ai.report.delete}: Үнэлгээ` }));
     const dialog = within(await screen.findByRole('dialog'));

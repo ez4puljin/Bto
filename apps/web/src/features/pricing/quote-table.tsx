@@ -7,6 +7,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -69,7 +70,8 @@ export interface PricedRows {
 
 /**
  * The quote's parts per line (ADR-0048 #4): quantity and unit, basis, list and unit price, discount
- * and total, the programs applied, then the totals. `names` follows the lines' order.
+ * and total, the programs applied, then the totals as the table's foot, under their columns.
+ * `names` follows the lines' order.
  */
 export function QuoteResult({
   result,
@@ -161,14 +163,17 @@ export function QuoteResult({
             ));
           })}
         </TableBody>
+        <TableFooter>
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={5}>{t('pricing.quote.footer')}</TableCell>
+            <TableCell className="text-right font-mono">{money(result.subtotal)}</TableCell>
+            <TableCell className="text-right font-mono">{money(result.discountTotal)}</TableCell>
+            <TableCell className="text-right font-mono font-semibold">
+              {money(result.total)}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
       </Table>
-      <p className="border-t border-border/80 px-4 py-3 text-right font-medium">
-        {t('pricing.quote.totals', {
-          subtotal: formatMnt(result.subtotal),
-          discount: formatMnt(result.discountTotal),
-          total: formatMnt(result.total),
-        })}
-      </p>
     </ListCard>
   );
 }

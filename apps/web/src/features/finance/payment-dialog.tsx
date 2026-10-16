@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { useUsers } from '@/features/identity/api';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatTugrik } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
@@ -173,10 +173,10 @@ function PaymentForm({
   };
 
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">
+    <DialogContent closeLabel={t('common.close')} size="lg">
       <DialogHeader>
         <DialogTitle>{t('finance.payments.dialog.title')}</DialogTitle>
-        <DialogDescription>{t('finance.payments.dialog.description')}</DialogDescription>
+        <DialogDescription>{t('finance.payments.dialog.intro')}</DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -205,7 +205,7 @@ function PaymentForm({
             >
               {activeAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name} · {formatMnt(account.balance)}
+                  {account.name} · {formatTugrik(account.balance)}
                 </option>
               ))}
             </NativeSelect>
@@ -215,10 +215,12 @@ function PaymentForm({
           <FormField
             label={t('finance.payments.dialog.customer')}
             htmlFor="payment-customer"
-            error={
-              checked && customer === null
-                ? t('finance.payments.dialog.customerRequired')
-                : undefined
+            hint={
+              checked && customer === null ? (
+                <span role="alert" className="text-destructive">
+                  {t('finance.payments.dialog.customerRequired')}
+                </span>
+              ) : undefined
             }
           >
             <CustomerPicker
@@ -232,10 +234,12 @@ function PaymentForm({
           <FormField
             label={t('finance.payments.dialog.glAccount')}
             htmlFor="payment-gl-account"
-            error={
-              checked && glAccountId === null
-                ? t('finance.payments.dialog.glAccountRequired')
-                : undefined
+            hint={
+              checked && glAccountId === null ? (
+                <span role="alert" className="text-destructive">
+                  {t('finance.payments.dialog.glAccountRequired')}
+                </span>
+              ) : undefined
             }
           >
             <NativeSelect
@@ -258,7 +262,7 @@ function PaymentForm({
             htmlFor="payment-amount"
             error={
               checked && (amountValue === null || !amountValue.gt(0))
-                ? t('validation.required')
+                ? 'validation.required'
                 : undefined
             }
           >
@@ -285,10 +289,10 @@ function PaymentForm({
           <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">{t('finance.payments.dialog.allocations')}</h3>
-              <label className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm">
                 <Switch checked={manual} onCheckedChange={setManual} id="payment-manual" />
-                <Label htmlFor="payment-manual">{t('finance.payments.dialog.allocate')}</Label>
-              </label>
+                <Label htmlFor="payment-manual">{t('finance.payments.dialog.manual')}</Label>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
               {t('finance.payments.dialog.allocationsHint')}
@@ -298,52 +302,55 @@ function PaymentForm({
                 {t('finance.payments.dialog.noOpenInvoices')}
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('finance.fields.number')}</TableHead>
-                    <TableHead>{t('finance.fields.dueDate')}</TableHead>
-                    <TableHead className="text-right">{t('finance.fields.open')}</TableHead>
-                    <TableHead className="text-right">
-                      {t('finance.payments.dialog.allocate')}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {open.map((invoice) => {
-                    const auto = fifo.find((entry) => entry.invoiceId === invoice.id);
-                    return (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-mono">{invoice.number}</TableCell>
-                        <TableCell className="font-mono">{invoice.dueDate}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatMnt(invoice.openAmount)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {manual ? (
-                            <Input
-                              aria-label={`${t('finance.payments.dialog.allocate')}: ${invoice.number}`}
-                              inputMode="decimal"
-                              className="ml-auto w-32 font-mono"
-                              value={chosen[invoice.id] ?? ''}
-                              onChange={(event) =>
-                                setChosen((previous) => ({
-                                  ...previous,
-                                  [invoice.id]: event.target.value.trim(),
-                                }))
-                              }
-                            />
-                          ) : (
-                            <span className="font-mono">
-                              {auto ? formatMnt(auto.amount.toFixed(2)) : '—'}
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              // Many open invoices scroll inside the section; the footer stays in reach.
+              <div className="max-h-60 overflow-y-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('finance.fields.number')}</TableHead>
+                      <TableHead>{t('finance.fields.dueDate')}</TableHead>
+                      <TableHead className="text-right">{t('finance.fields.open')}</TableHead>
+                      <TableHead className="text-right">
+                        {t('finance.payments.dialog.allocate')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {open.map((invoice) => {
+                      const auto = fifo.find((entry) => entry.invoiceId === invoice.id);
+                      return (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-mono">{invoice.number}</TableCell>
+                          <TableCell className="font-mono">{invoice.dueDate}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatTugrik(invoice.openAmount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {manual ? (
+                              <Input
+                                aria-label={`${t('finance.payments.dialog.allocate')}: ${invoice.number}`}
+                                inputMode="decimal"
+                                className="ml-auto w-32 font-mono"
+                                value={chosen[invoice.id] ?? ''}
+                                onChange={(event) =>
+                                  setChosen((previous) => ({
+                                    ...previous,
+                                    [invoice.id]: event.target.value.trim(),
+                                  }))
+                                }
+                              />
+                            ) : (
+                              <span className="font-mono">
+                                {auto ? formatTugrik(auto.amount.toFixed(2)) : '—'}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
             <p className="text-sm">
               {t('finance.payments.dialog.allocated', { amount: formatMnt(allocated.toFixed(2)) })}

@@ -7,10 +7,18 @@ import {
   type PrintKind,
 } from '@tugeel/shared/sales';
 import { ArrowRightLeft, Ellipsis, Plus, Printer } from 'lucide-react';
-import { type DragEvent, useState } from 'react';
+import {
+  type DragEvent,
+  type MouseEvent,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SegmentedControl } from '@/components/list';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,11 +41,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
+import { usePrintFormat } from '@/lib/print-format';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
-import { cn } from '@/lib/utils';
 import { MoveDialogs } from './move-dialogs';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import {
@@ -51,16 +59,19 @@ import {
   useSalesMutations,
   useStageCards,
 } from './pipelines-api';
-import { usePrintFormat } from './print-format';
-import { PrintFormatToggle } from './print-format-toggle';
 import { useMover } from './use-mover';
 
 const DRAG_TYPE = 'application/x-tugeel-order';
+/** Space kept under the board: the page's bottom padding (`pb-10`). */
+const BELOW_BOARD = 40;
+const INTERACTIVE = 'a, button, input, select, textarea, label, [role="menuitem"]';
 
 /**
  * «Самбараар» (ADR-0056 #8, ADR-0057 #7): the pipeline's visible stages as columns in their own
- * sort, the cards dragged (or moved through a menu) from stage to stage; a stage header holds «+»
- * (a new order in a stage without an action) and the stage's «⋯» menu.
+ * sort, the cards dragged (or moved through a menu) from stage to stage; a stage header holds its
+ * count and total, «+» (a new order in a stage without an action) and the stage's «⋯» menu. On a
+ * desktop the board fits the window (ADR-0066): each column scrolls its own cards under its header
+ * and the sideways scrollbar stays in view.
  */
 export function BoardView({
   pipeline,
@@ -68,6 +79,7 @@ export function BoardView({
   canCreate,
   onOpen,
   onNew,
+  onShowStage,
 }: {
   pipeline: SalesPipeline;
   filters: FilterQuery;
@@ -75,6 +87,8 @@ export function BoardView({
   onOpen: (orderId: number) => void;
   /** «+» on a stage: a new order landing there (ADR-0059: the create dialog). */
   onNew: (stageId: number) => void;
+  /** «Дахин N карт жагсаалтад»: the list view narrowed to that stage. */
+  onShowStage: (stageId: number) => void;
 }) {
   const { t } = useTranslation();
   const cards = useStageCards(pipeline.id, filters);
@@ -87,6 +101,8 @@ export function BoardView({
   );
   const mutations = useSalesMutations();
   const action = useAction();
+  const board = useRef<HTMLDivElement>(null);
+  const height = useBoardHeight(board);
 
   const dropOn = (stage: SalesStage) => (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -111,22 +127,29 @@ export function BoardView({
       setArchiving(null);
     });
 
+  const problem = problemFromError(cards.error) ?? (archiving ? null : action.problem);
+
   return (
     <>
-      <ProblemAlert
-        problem={problemFromError(cards.error) ?? (archiving ? null : action.problem)}
-      />
-      <div className="flex gap-3 overflow-x-auto pb-3">
+      {problem ? (
+        <div className="mb-3">
+          <ProblemAlert problem={problem} />
+        </div>
+      ) : null}
+      <div
+        ref={board}
+        style={height === null ? undefined : { height }}
+        className="flex gap-3 overflow-x-auto overscroll-x-contain pb-3"
+      >
         {stages.map((stage) => {
           const column = cards.data?.find((entry) => entry.stageId === stage.id);
+          const more = column ? column.count - column.cards.length : 0;
           return (
             <section
               key={stage.id}
               aria-label={stage.name}
               data-over={over === stage.id ? 'true' : undefined}
-              className={cn(
-                'flex w-72 shrink-0 flex-col rounded-xl bg-black/[0.03] p-2 data-[over=true]:ring-2 data-[over=true]:ring-ring/40',
-              )}
+              className="flex min-h-0 w-72 shrink-0 flex-col rounded-xl bg-fill/60 p-2 data-[over=true]:ring-2 data-[over=true]:ring-ring/40"
               onDragOver={(event) => {
                 if (!stage.canMove) return;
                 event.preventDefault();
@@ -135,19 +158,25 @@ export function BoardView({
               onDragLeave={() => setOver((current) => (current === stage.id ? null : current))}
               onDrop={stage.canMove ? dropOn(stage) : undefined}
             >
-              <header className="flex items-center justify-between gap-1 px-2 py-1">
-                <h2 className="min-w-0 truncate text-sm font-semibold">
+              <header className="flex h-9 shrink-0 items-center justify-between gap-1 pr-0.5 pl-2">
+                <h2 className="min-w-0 truncate text-sm font-semibold" title={stage.name}>
                   {stage.name}
                   <span className="ml-2 font-normal text-muted-foreground">
                     {column?.count ?? 0}
                   </span>
                 </h2>
                 <div className="flex shrink-0 items-center">
+                  {column && new Decimal(column.total).gt(0) ? (
+                    <span className="mr-1 font-mono text-xs text-muted-foreground">
+                      {formatTugrik(column.total)}
+                    </span>
+                  ) : null}
                   {canCreate && stage.action === 'NONE' && stage.canMove ? (
                     <Button
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`${t('sales.work.addHere')}: ${stage.name}`}
+                      title={`${t('sales.work.addHere')}: ${stage.name}`}
                       onClick={() => onNew(stage.id)}
                     >
                       <Plus />
@@ -174,12 +203,7 @@ export function BoardView({
                   />
                 </div>
               </header>
-              {column && new Decimal(column.total).gt(0) ? (
-                <p className="px-2 pb-1 font-mono text-xs text-muted-foreground">
-                  {t('pricing.money', { amount: formatMnt(column.total) })}
-                </p>
-              ) : null}
-              <div className="flex min-h-24 flex-col gap-2">
+              <div className="-mx-1 flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-1 py-0.5 [scrollbar-width:thin]">
                 {(column?.cards ?? []).map((card) => (
                   <Card
                     key={card.id}
@@ -190,10 +214,15 @@ export function BoardView({
                     onMove={(target) => mover.start(card.id, target)}
                   />
                 ))}
-                {column && column.count > column.cards.length ? (
-                  <p className="px-2 text-xs text-muted-foreground">
-                    {t('sales.boards.more', { count: column.count - column.cards.length })}
-                  </p>
+                {more > 0 ? (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-7 shrink-0 self-start px-2"
+                    onClick={() => onShowStage(stage.id)}
+                  >
+                    {t('sales.boards.more', { count: more })}
+                  </Button>
                 ) : null}
               </div>
             </section>
@@ -227,6 +256,43 @@ export function BoardView({
   );
 }
 
+/**
+ * The board's height on a desktop: what the window leaves below its top, so the columns scroll
+ * their own cards and the board's sideways scrollbar stays above the window's edge. Phones and
+ * tablets keep the board's natural height.
+ */
+function useBoardHeight(ref: RefObject<HTMLElement | null>): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element || typeof window.matchMedia !== 'function') return undefined;
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const measure = () => {
+      if (!desktop.matches) {
+        setHeight(null);
+        return;
+      }
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      const next = Math.max(360, Math.floor(window.innerHeight - top - BELOW_BOARD));
+      setHeight((previous) => (previous === next ? previous : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    desktop.addEventListener('change', measure);
+    // Content above the board (an alert, the filter chips wrapping) moves it: the main resizes.
+    const main = element.closest('main');
+    const observer =
+      typeof ResizeObserver === 'undefined' || !main ? null : new ResizeObserver(measure);
+    if (observer && main) observer.observe(main);
+    return () => {
+      window.removeEventListener('resize', measure);
+      desktop.removeEventListener('change', measure);
+      observer?.disconnect();
+    };
+  }, [ref]);
+  return height;
+}
+
 /** A stage's «⋯»: its sort for everyone, printing its cards, archiving finished ones or itself. */
 function StageMenu({
   stage,
@@ -251,6 +317,7 @@ function StageMenu({
           variant="ghost"
           size="icon-sm"
           aria-label={t('sales.work.stageMenu', { name: stage.name })}
+          title={t('sales.work.stageMenu', { name: stage.name })}
         >
           <Ellipsis />
         </Button>
@@ -291,6 +358,19 @@ function StageMenu({
   );
 }
 
+/** A plain left click on the card itself, not on its controls or its menu, with no text selected. */
+function opensCard(event: MouseEvent<HTMLElement>): boolean {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return false;
+  }
+  if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return false;
+  return !window.getSelection()?.toString();
+}
+
+/**
+ * A card: a click anywhere opens the order (its number stays the keyboard's button), the «Зөөх»
+ * menu moves it without dragging.
+ */
 function Card({
   card,
   stage,
@@ -311,7 +391,10 @@ function Card({
     <article
       draggable={targets.length > 0}
       aria-label={title}
-      className="rounded-lg border border-border bg-card p-3 text-sm shadow-card"
+      className="shrink-0 cursor-pointer rounded-lg border border-border bg-card p-3 text-sm shadow-card transition-shadow hover:shadow-popover has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring/30"
+      onClick={(event) => {
+        if (opensCard(event)) onOpen();
+      }}
       onDragStart={(event) => {
         event.dataTransfer.setData(DRAG_TYPE, String(card.id));
         event.dataTransfer.effectAllowed = 'move';
@@ -321,7 +404,7 @@ function Card({
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <button
             type="button"
-            className="text-left font-medium underline-offset-4 hover:underline"
+            className="text-left font-medium underline-offset-4 outline-none hover:underline"
             onClick={onOpen}
           >
             {title}
@@ -334,7 +417,9 @@ function Card({
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="-mt-1 -mr-1 size-7 text-muted-foreground"
                 aria-label={`${t('sales.boards.move')}: ${title}`}
+                title={`${t('sales.boards.move')}: ${title}`}
               >
                 <ArrowRightLeft />
               </Button>
@@ -349,15 +434,18 @@ function Card({
           </DropdownMenu>
         ) : null}
       </div>
-      <div className="mt-1 truncate">{card.customerName}</div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {/* The status beside the customer: the money line never wraps, so cards keep one height. */}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate" title={card.customerName}>
+          {card.customerName}
+        </span>
+        <OrderStatusBadge status={card.status} />
+      </div>
+      <div className="mt-1 flex items-center gap-x-3 text-xs whitespace-nowrap text-muted-foreground">
         {card.total !== null ? (
-          <span className="font-mono text-foreground">
-            {t('pricing.money', { amount: formatMnt(card.total) })}
-          </span>
+          <span className="font-mono text-foreground">{formatTugrik(card.total)}</span>
         ) : null}
         <span className="font-mono">{card.deliveryDate}</span>
-        <OrderStatusBadge status={card.status} />
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
         {card.createdByName ? (
@@ -415,7 +503,7 @@ function StagePrintForm({
   const chosen = cards.filter((card) => ticked.has(card.id) && printable(card));
   const allTicked = cards.filter(printable).every((card) => ticked.has(card.id));
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent closeLabel={t('common.close')} size="md">
       <DialogHeader>
         <DialogTitle>{t('sales.work.printTitle', { name: printing.stage.name })}</DialogTitle>
         <DialogDescription>

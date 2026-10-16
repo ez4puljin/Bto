@@ -13,7 +13,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FieldList } from '@/components/detail';
-import { FormFooter, FormRow, FormSection } from '@/components/form';
+import { FormRow, FormSection } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -23,9 +23,13 @@ import {
   LoadMore,
   SegmentedControl,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
+import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,7 +127,7 @@ export function SegmentsPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(segments.error) ?? problemFromError(counts.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -132,11 +136,12 @@ export function SegmentsPage() {
                 {t('segments.columns.description')}
               </TableHead>
               <TableHead className="text-right">{t('segments.columns.count')}</TableHead>
+              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {segments.isPending ? <SkeletonRows columns={4} /> : null}
+            {segments.isPending ? <SkeletonRows columns={5} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.id} to={`/segments/${row.id}`}>
                 <TableCell>
@@ -152,12 +157,14 @@ export function SegmentsPage() {
                     </Badge>
                   ) : null}
                 </TableCell>
-                <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell">
-                  {row.description ?? t('common.none')}
-                </TableCell>
+                <TruncateCell
+                  text={row.description ?? t('common.none')}
+                  className="hidden text-muted-foreground md:table-cell"
+                />
                 <TableCell className="text-right tabular-nums">
                   {countText(entity, counts.data ? (countOf.get(row.id) ?? null) : undefined)}
                 </TableCell>
+                <SpacerCell />
               </LinkRow>
             ))}
           </TableBody>
@@ -192,7 +199,7 @@ export function SegmentPage() {
   const data = segment.data;
   if (!data) {
     return (
-      <div>
+      <div className="max-w-3xl">
         <PageHeader title={t('segments.title')} />
         <ProblemAlert problem={problemFromError(segment.error)} />
         {segment.isPending ? (
@@ -208,7 +215,7 @@ export function SegmentPage() {
     }
   };
   return (
-    <div>
+    <div className="max-w-3xl">
       <PageHeader
         title={data.name}
         crumbs={[
@@ -233,7 +240,7 @@ export function SegmentPage() {
                   <Archive />
                   {t('segments.archive')}
                 </Button>
-                <Button asChild variant="outline">
+                <Button asChild variant="secondary">
                   <Link to={`/segments/${data.id}/edit`}>
                     <Pencil />
                     {t('common.edit')}
@@ -304,7 +311,7 @@ export function SegmentEditorPage() {
       ? definitionFromProductList(new URLSearchParams(from))
       : newDefinition(entity);
   return (
-    <div>
+    <div className="max-w-3xl">
       <PageHeader
         title={t('segments.create')}
         crumbs={[{ label: t(`segments.entities.${entity}`), to: `/segments?entity=${entity}` }]}
@@ -319,7 +326,7 @@ function EditSegment({ id }: { id: number }) {
   const segment = useSegment(id);
   const data = segment.data;
   return (
-    <div>
+    <div className="max-w-3xl">
       <PageHeader
         title={data ? data.name : t('segments.edit')}
         crumbs={data ? [{ label: data.name, to: `/segments/${data.id}` }] : []}
@@ -367,7 +374,10 @@ function SegmentForm(props: {
     props.definition ?? newDefinition(entity),
   );
   const [submitted, setSubmitted] = useState(false);
+  // A fresh form is not scolded: the rules speak once the conditions were touched or Save pressed.
+  const [touched, setTouched] = useState(false);
   const issue = isList ? null : segmentIssue(entity, definition);
+  const issueShown = submitted || touched ? issue : null;
   const settled = useSettled(definition);
   const preview = useSegmentPreview(
     entity,
@@ -403,69 +413,91 @@ function SegmentForm(props: {
   };
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={(event) => void submit(event)} noValidate>
-      <FormSection title={t('segments.general')}>
-        <FormRow
-          label={t('segments.name')}
-          htmlFor="segment-name"
-          error={nameMissing ? 'validation.required' : undefined}
-        >
-          <Input
-            id="segment-name"
-            maxLength={MAX_SEGMENT_NAME}
-            aria-invalid={nameMissing || undefined}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </FormRow>
-        <FormRow label={t('segments.description')} htmlFor="segment-description">
-          <Textarea
-            id="segment-description"
-            rows={2}
-            maxLength={MAX_SEGMENT_DESCRIPTION}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </FormRow>
-        <FormRow label={t('segments.entity')} align="center">
-          <span className="text-sm">
-            {t(`segments.entities.${entity}`)}
-            {isList ? ` · ${t('segments.kinds.LIST')}` : null}
-          </span>
-        </FormRow>
-      </FormSection>
-      {isList ? (
-        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-          <p>{t('segments.list.hint')}</p>
-          <p>{t('segments.list.howTo')}</p>
-        </div>
-      ) : (
-        <>
-          <FormSection title={t('segments.conditions')} description={t('segments.conditionsHint')}>
-            <div className="p-3">
-              <DefinitionEditor entity={entity} value={definition} onChange={setDefinition} />
-            </div>
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
+      <Card>
+        <CardContent className="flex flex-col gap-5">
+          <FormSection title={t('segments.general')}>
+            <FormRow
+              label={t('segments.name')}
+              htmlFor="segment-name"
+              error={nameMissing ? 'validation.required' : undefined}
+            >
+              <Input
+                id="segment-name"
+                maxLength={MAX_SEGMENT_NAME}
+                aria-invalid={nameMissing || undefined}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </FormRow>
+            <FormRow label={t('segments.description')} htmlFor="segment-description">
+              <Textarea
+                id="segment-description"
+                rows={2}
+                maxLength={MAX_SEGMENT_DESCRIPTION}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </FormRow>
+            <FormRow label={t('segments.entity')} align="center">
+              <span className="text-sm">
+                {t(`segments.entities.${entity}`)}
+                {isList ? ` · ${t('segments.kinds.LIST')}` : null}
+              </span>
+            </FormRow>
           </FormSection>
-          <p role="status" className="text-sm tabular-nums">
-            {issue ? (
-              <span className="text-destructive">{t(`segments.issues.${issue.issue}`)}</span>
-            ) : preview.isFetching ? (
-              <span className="text-muted-foreground">{t('segments.counting')}</span>
-            ) : typeof preview.data === 'number' ? (
-              t('segments.liveCount', { count: formatCount(preview.data) })
-            ) : null}
-          </p>
-        </>
-      )}
+          {isList ? (
+            <div className="flex flex-col gap-1 px-1 text-sm text-muted-foreground">
+              <p>{t('segments.list.hint')}</p>
+              <p>{t('segments.list.howTo')}</p>
+            </div>
+          ) : (
+            <>
+              <FormSection
+                title={t('segments.conditions')}
+                description={t('segments.conditionsHint')}
+                // The live count (or what the rules miss) beside the conditions' title.
+                action={
+                  <p role="status" className="max-w-[55%] text-right text-[13px] tabular-nums">
+                    {issueShown ? (
+                      <span className="text-destructive">
+                        {t(`segments.issues.${issueShown.issue}`)}
+                      </span>
+                    ) : issue ? null : preview.isFetching ? (
+                      <span className="text-muted-foreground">{t('segments.counting')}</span>
+                    ) : typeof preview.data === 'number' ? (
+                      t('segments.liveCount', { count: formatCount(preview.data) })
+                    ) : null}
+                  </p>
+                }
+              >
+                <div className="p-3">
+                  <DefinitionEditor
+                    entity={entity}
+                    value={definition}
+                    onChange={(next) => {
+                      setTouched(true);
+                      setDefinition(next);
+                    }}
+                  />
+                </div>
+              </FormSection>
+            </>
+          )}
+        </CardContent>
+      </Card>
       <ProblemAlert problem={action.problem ?? problemFromError(preview.error)} />
-      <FormFooter>
-        <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>
-          {t('common.cancel')}
+      <StickyActions>
+        {/* Back to the record, or to the list it would join: never a step back out of the app. */}
+        <Button variant="ghost" asChild>
+          <Link to={segment ? `/segments/${segment.id}` : `/segments?entity=${entity}`}>
+            {t('common.cancel')}
+          </Link>
         </Button>
         <Button type="submit" disabled={pending}>
           {t('common.save')}
         </Button>
-      </FormFooter>
+      </StickyActions>
     </form>
   );
 }

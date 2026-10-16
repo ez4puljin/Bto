@@ -1,8 +1,11 @@
 import type { Permission } from '@tugeel/shared/auth';
+import { House } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { useAuthState, useHasPermission } from '@/app/auth-context';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 
 /** Renders its children for a logged-in user; otherwise sends them to /login and back. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -24,7 +27,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** Hides a page from users without the permission; the API refuses them anyway (ADR-0027). */
+/**
+ * Hides a page from users without the permission; the API refuses them anyway (ADR-0027). The
+ * refusal is a page of its own (ADR-0066): «Хандах эрхгүй» names the browser tab, the breadcrumb
+ * still says where it was.
+ */
 export function RequirePermission({
   permission,
   children,
@@ -36,8 +43,14 @@ export function RequirePermission({
   const { t } = useTranslation();
   if (allowed) return children;
   return (
-    <p role="alert" className="text-sm text-destructive">
-      {t('errors.FORBIDDEN')}
-    </p>
+    <div>
+      <PageHeader title={t('errors.forbiddenTitle')} description={t('errors.FORBIDDEN')} />
+      <Button asChild variant="outline">
+        <Link to="/">
+          <House />
+          {t('errors.goHome')}
+        </Link>
+      </Button>
+    </div>
   );
 }

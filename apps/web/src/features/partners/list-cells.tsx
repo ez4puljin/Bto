@@ -9,15 +9,15 @@ export const none = (t: TFunction) => (
 
 export const text = (value: string | null, t: TFunction) => (value ? value : none(t));
 
-/** The first contact: name, then the phone below it. */
+/** The first contact on one line: the name, then the phone. */
 export const contactCell = (contact: ListContact | null, t: TFunction) =>
   contact ? (
-    <div className="flex flex-col">
+    <span className="flex items-center gap-2">
       <span>{contact.name ?? t('common.none')}</span>
       {contact.phone ? (
         <span className="font-mono text-muted-foreground">{localPhone(contact.phone)}</span>
       ) : null}
-    </div>
+    </span>
   ) : (
     none(t)
   );

@@ -21,11 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { printFormatParam, usePrintFormat } from '@/features/sales/print-format';
-import { PrintFormatToggle } from '@/features/sales/print-format-toggle';
+import { printFormatParam, usePrintFormat } from '@/lib/print-format';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { businessDate } from '@tugeel/shared/time';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -33,7 +33,7 @@ import { randomUuid } from '@/lib/uuid';
 import { type InvoiceDetail, useFinanceMutations, useInvoice } from './api';
 import { SettlementBadge } from './badges';
 import { CreditNoteDialog } from './credit-note-dialog';
-import { FactChips, PanelSection, RecordSheet } from './panel';
+import { FactChips, PanelSection, RecordSheet, TotalsGrid } from './panel';
 import { VoidDialog } from './void-dialog';
 
 /** One invoice in the panel (`?invoice=`): facts, totals, lines, settlements, credit notes. */
@@ -98,7 +98,7 @@ function PanelActions({ invoice }: { invoice: InvoiceDetail }) {
   return (
     <>
       <PrintFormatToggle value={format} onChange={choose} />
-      <Button asChild variant="outline" size="sm">
+      <Button asChild variant="outline">
         <Link
           to={`/finance/invoices/${invoice.id}/print?format=${printFormatParam(format)}`}
           target="_blank"
@@ -201,15 +201,17 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
         ]
       : []),
   ];
-  const totals = [
-    [t('finance.fields.subtotal'), invoice.subtotal],
-    [t('finance.fields.discount'), invoice.discountTotal],
-    [t('finance.fields.total'), invoice.total],
-    [t('finance.fields.vat'), invoice.vatTotal],
-    [t('finance.fields.cityTax'), invoice.cityTaxTotal],
-    [t('finance.fields.paid'), subtract(invoice.total, invoice.openAmount)],
-    [t('finance.fields.open'), invoice.openAmount],
-  ] as const;
+  const totals = (
+    [
+      [t('finance.fields.subtotal'), invoice.subtotal],
+      [t('finance.fields.discount'), invoice.discountTotal],
+      [t('finance.fields.total'), invoice.total],
+      [t('finance.fields.vat'), invoice.vatTotal],
+      [t('finance.fields.cityTax'), invoice.cityTaxTotal],
+      [t('finance.fields.paid'), subtract(invoice.total, invoice.openAmount)],
+      [t('finance.fields.open'), invoice.openAmount],
+    ] as const
+  ).map(([label, value]) => [label, formatTugrik(value)] as const);
 
   return (
     <div className="flex flex-col gap-5">
@@ -220,14 +222,7 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
         </p>
       ) : null}
       <FactChips facts={facts} />
-      <div className="grid gap-2 sm:grid-cols-4">
-        {totals.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-border px-3 py-2">
-            <div className="text-[12px] text-muted-foreground">{label}</div>
-            <div className="font-mono text-sm font-semibold">{formatMnt(value)}</div>
-          </div>
-        ))}
-      </div>
+      <TotalsGrid items={totals} />
       <PanelSection title={t('finance.invoices.sections.lines')}>
         <div className="overflow-x-auto rounded-lg border border-border">
           <Table>
@@ -249,18 +244,18 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
                     <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
                     {line.productName}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{line.qty}</TableCell>
+                  <TableCell className="text-right font-mono">{formatQty(line.qty)}</TableCell>
                   <TableCell>{line.uomName}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.unitPrice)}
+                    {formatTugrik(line.unitPrice)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.discountAmount)}
+                    {formatTugrik(line.discountAmount)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.vatAmount)}
+                    {formatTugrik(line.vatAmount)}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatMnt(line.total)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatTugrik(line.total)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -308,7 +303,7 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
                         : t('finance.arKinds.CREDIT_NOTE')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatMnt(allocation.amount)}
+                      {formatTugrik(allocation.amount)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -327,7 +322,7 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
                 <span className="font-mono">
                   {note.number} · {note.noteDate}
                 </span>
-                <span className="font-mono">{formatMnt(note.total)}</span>
+                <span className="font-mono">{formatTugrik(note.total)}</span>
               </li>
             ))}
           </ul>

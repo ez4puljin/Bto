@@ -13,6 +13,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { z } from 'zod';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -24,6 +25,8 @@ import {
   RowActionSpacer,
   RowActions,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -42,8 +45,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
+import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
 import { type Category, type Uom, useCatalogMutations, useCategories, useUoms } from './api';
 import { categoryTree, subtreeIds } from './category-tree';
@@ -65,7 +70,8 @@ function None() {
 
 /**
  * The category tree (SPEC §5.2): any depth, a default БҮНА code per category (ADR-0015 #3). Rows
- * show the tree with folders; a category with subcategories or products cannot be deleted.
+ * show the tree with folders; a category with subcategories or products cannot be deleted. «Шинэ
+ * ангилал» opens its dialog from the address (`?new=1`); a row adds a subcategory or edits.
  */
 export function CategoriesPage() {
   const { t } = useTranslation();
@@ -73,10 +79,12 @@ export function CategoriesPage() {
   const categories = useCategories();
   const mutations = useCatalogMutations();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
-  const [editing, setEditing] = useState<
-    { category: Category } | { parentId: number | null } | null
-  >(null);
+  const [creating, setCreating] = useCreateParam();
+  const [editing, setEditing] = useState<{ category: Category } | { parentId: number } | null>(
+    null,
+  );
   const deletion = useDeleteConfirm<Category>((id) => mutations.deleteCategory.mutateAsync(id));
+  const dialog = editing ?? (creating && canManage ? { parentId: null } : null);
 
   return (
     <div>
@@ -84,7 +92,7 @@ export function CategoriesPage() {
         title={t('catalog.categories.title')}
         actions={
           canManage ? (
-            <Button onClick={() => setEditing({ parentId: null })}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               {t('catalog.categories.create')}
             </Button>
@@ -92,19 +100,20 @@ export function CategoriesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(categories.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('catalog.categories.name')}</TableHead>
               <TableHead>{t('catalog.categories.defaultCode')}</TableHead>
               <TableHead>{t('catalog.categories.skuRange')}</TableHead>
-              <TableHead>{t('catalog.products.title')}</TableHead>
+              <TableHead className="text-right">{t('catalog.products.title')}</TableHead>
+              <SpacerHead />
               {canManage ? <TableHead /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.isPending ? <SkeletonRows columns={canManage ? 5 : 4} /> : null}
+            {categories.isPending ? <SkeletonRows columns={canManage ? 6 : 5} /> : null}
             {tree.map(({ category, depth }) => {
               const Icon = category.childCount > 0 ? FolderOpen : Folder;
               return (
@@ -137,25 +146,39 @@ export function CategoriesPage() {
                   <TableCell>
                     <RangeCell categories={categories.data ?? []} category={category} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground tabular-nums">
-                    {t('catalog.categories.products', { count: category.productCount })}
+                  <TableCell className="text-right">
+                    {category.productCount > 0 ? (
+                      <Link
+                        to={`/catalog/products?category=${category.id}`}
+                        className="text-link underline-offset-4 hover:underline"
+                      >
+                        {t('catalog.categories.products', {
+                          count: formatCount(category.productCount),
+                        })}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {t('catalog.categories.products', { count: formatCount(0) })}
+                      </span>
+                    )}
                   </TableCell>
+                  <SpacerCell />
                   {canManage ? (
                     <RowActions>
                       <RowAction
                         icon={FolderPlus}
-                        label={t('catalog.categories.addChild')}
+                        label={`${t('catalog.categories.addChild')}: ${category.name}`}
                         onClick={() => setEditing({ parentId: category.id })}
                       />
                       <RowAction
                         icon={Pencil}
-                        label={t('common.edit')}
+                        label={t('common.editRecord', { name: category.name })}
                         onClick={() => setEditing({ category })}
                       />
                       {category.childCount === 0 && category.productCount === 0 ? (
                         <RowAction
                           icon={Trash2}
-                          label={t('common.delete')}
+                          label={`${t('common.delete')}: ${category.name}`}
                           destructive
                           onClick={() => deletion.ask(category)}
                         />
@@ -173,11 +196,11 @@ export function CategoriesPage() {
           <EmptyState icon={FolderTree} title={t('catalog.categories.empty')} />
         ) : null}
       </ListCard>
-      {editing ? (
+      {dialog ? (
         <CategoryDialog
           categories={categories.data ?? []}
-          editing={editing}
-          onClose={() => setEditing(null)}
+          editing={dialog}
+          onClose={() => (editing ? setEditing(null) : setCreating(false))}
         />
       ) : null}
       <ConfirmDialog
@@ -194,7 +217,10 @@ export function CategoriesPage() {
   );
 }
 
-/** A category's own code range, or the one it uses from an ancestor, muted (ADR-0044 #1). */
+/**
+ * A category's own code range, or the one it uses from an ancestor, muted with the ancestor's name
+ * after it on the same line (ADR-0044 #1), so every row keeps one line.
+ */
 function RangeCell(props: { categories: readonly Category[]; category: Category }) {
   const { t } = useTranslation();
   const owner = rangeOwner(props.categories, props.category.id);
@@ -203,9 +229,11 @@ function RangeCell(props: { categories: readonly Category[]; category: Category 
   return owner.id === props.category.id ? (
     <span className="font-mono">{text}</span>
   ) : (
-    <span className="flex flex-col text-muted-foreground">
+    <span className="text-muted-foreground">
       <span className="font-mono">{text}</span>
-      <span className="text-xs">{t('catalog.categories.inheritedFrom', { name: owner.name })}</span>
+      <span className="ml-2 text-xs">
+        {t('catalog.categories.inheritedFrom', { name: owner.name })}
+      </span>
     </span>
   );
 }
@@ -359,15 +387,17 @@ function CategoryDialog(props: {
 
 /**
  * Units of measure: the system ones (ш, блок, хайрцаг, кг) and the admin's own. Each may carry the
- * e-Barimt measure unit that product units use by default.
+ * e-Barimt measure unit that product units use by default. «Шинэ нэгж» opens from `?new=1`.
  */
 export function UomsPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('catalog.products.manage');
   const uoms = useUoms();
   const mutations = useCatalogMutations();
-  const [editing, setEditing] = useState<Uom | 'new' | null>(null);
+  const [creating, setCreating] = useCreateParam();
+  const [editing, setEditing] = useState<Uom | null>(null);
   const deletion = useDeleteConfirm<Uom>((id) => mutations.deleteUom.mutateAsync(id));
+  const dialog: Uom | 'new' | null = editing ?? (creating && canManage ? 'new' : null);
 
   return (
     <div>
@@ -375,7 +405,7 @@ export function UomsPage() {
         title={t('catalog.uoms.title')}
         actions={
           canManage ? (
-            <Button onClick={() => setEditing('new')}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               {t('catalog.uoms.create')}
             </Button>
@@ -383,7 +413,7 @@ export function UomsPage() {
         }
       />
       <ProblemAlert problem={problemFromError(uoms.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -391,16 +421,17 @@ export function UomsPage() {
               <TableHead>{t('catalog.uoms.kind')}</TableHead>
               <TableHead>{t('catalog.uoms.fractional')}</TableHead>
               <TableHead>{t('catalog.uoms.measureUnit')}</TableHead>
+              <SpacerHead />
               {canManage ? <TableHead /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {uoms.isPending ? <SkeletonRows columns={canManage ? 5 : 4} /> : null}
+            {uoms.isPending ? <SkeletonRows columns={canManage ? 6 : 5} /> : null}
             {(uoms.data ?? []).map((uom) => (
               <TableRow key={uom.id}>
                 <TableCell className="font-medium">{uom.name}</TableCell>
                 <TableCell>
-                  <Badge variant={uom.code ? 'secondary' : 'default'}>
+                  <Badge variant={uom.code ? 'secondary' : 'outline'}>
                     {uom.code ? t('catalog.uoms.system') : t('catalog.uoms.custom')}
                   </Badge>
                 </TableCell>
@@ -420,11 +451,12 @@ export function UomsPage() {
                   )}
                 </TableCell>
                 <TableCell>{uom.measureUnit ?? <None />}</TableCell>
+                <SpacerCell />
                 {canManage ? (
                   <RowActions>
                     <RowAction
                       icon={Pencil}
-                      label={t('common.edit')}
+                      label={t('common.editRecord', { name: uom.name })}
                       onClick={() => setEditing(uom)}
                     />
                     {uom.code ? (
@@ -432,7 +464,7 @@ export function UomsPage() {
                     ) : (
                       <RowAction
                         icon={Trash2}
-                        label={t('common.delete')}
+                        label={`${t('common.delete')}: ${uom.name}`}
                         destructive
                         onClick={() => deletion.ask(uom)}
                       />
@@ -444,7 +476,9 @@ export function UomsPage() {
           </TableBody>
         </Table>
       </ListCard>
-      {editing ? <UomDialog uom={editing} onClose={() => setEditing(null)} /> : null}
+      {dialog ? (
+        <UomDialog uom={dialog} onClose={() => (editing ? setEditing(null) : setCreating(false))} />
+      ) : null}
       <ConfirmDialog
         open={deletion.target !== null}
         title={t('common.delete')}

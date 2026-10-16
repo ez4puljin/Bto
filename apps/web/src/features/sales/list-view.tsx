@@ -3,7 +3,15 @@ import { ShoppingCart } from 'lucide-react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ColumnChooser } from '@/components/column-chooser';
-import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
+import {
+  ButtonRow,
+  ChevronHead,
+  EmptyState,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+  TruncateCell,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +24,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
-import { useHiddenColumns } from '@/lib/use-hidden-columns';
-import type { OrderStatus } from './api';
+import {
+  ARCHIVED_SCOPES,
+  LIST_COLUMNS,
+  LIST_SCOPES,
+  type ListColumn,
+  type ListColumns,
+  type ListFilters,
+  LOCKED_COLUMNS,
+} from './list-filters';
 import { OrderStatusBadge, PaymentLabel } from './order-badges';
 import {
   type FilterQuery,
@@ -28,56 +43,133 @@ import {
   useOrderList,
 } from './pipelines-api';
 
-const LIST_SCOPES = ['PIPELINE', 'ALL', 'NONE'] as const;
-export type ListScope = (typeof LIST_SCOPES)[number];
-const ARCHIVED_SCOPES = ['exclude', 'include', 'only'] as const;
-export type ArchivedScope = (typeof ARCHIVED_SCOPES)[number];
+/** «Баганууд» of the list view, at the end of the work page's bar. */
+export function ListColumnChooser({ columns }: { columns: ListColumns }) {
+  const { t } = useTranslation();
+  return (
+    <ColumnChooser
+      keys={LIST_COLUMNS}
+      locked={LOCKED_COLUMNS}
+      label={(column) => t(`sales.work.columns.${column}`)}
+      hidden={columns.hidden}
+      toggle={columns.toggle}
+      showAll={columns.showAll}
+    />
+  );
+}
 
-const COLUMNS = [
-  'number',
-  'customer',
-  'stage',
-  'status',
-  'deliveryDate',
-  'total',
-  'payment',
-  'createdBy',
-  'channel',
-  'createdAt',
-] as const;
-type Column = (typeof COLUMNS)[number];
-const LOCKED: readonly Column[] = ['number'];
-
-/** The list's own narrowing beside the shared filters: scope, stage, status, archive. */
-export interface ListFilters {
-  scope: ListScope;
-  stageId?: number;
-  status?: OrderStatus;
-  archived: ArchivedScope;
+/** The list's own pills (scope, stage, status, archive), in the work page's one filter bar. */
+export function ListFilterPills({
+  pipeline,
+  own,
+  onChange,
+}: {
+  pipeline: SalesPipeline | null;
+  own: ListFilters;
+  onChange: (next: ListFilters) => void;
+}) {
+  const { t } = useTranslation();
+  const stages = (pipeline?.stages ?? []).filter((stage) => stage.canView);
+  return (
+    <>
+      <NativeSelect
+        variant="filter"
+        aria-label={t('sales.work.scope')}
+        value={own.scope}
+        active={own.scope !== 'PIPELINE'}
+        onChange={(event) => {
+          const scope = LIST_SCOPES.find((value) => value === event.target.value) ?? 'PIPELINE';
+          onChange({ ...own, scope, stageId: undefined });
+        }}
+      >
+        {LIST_SCOPES.map((scope) => (
+          <option key={scope} value={scope}>
+            {t(`sales.work.scopes.${scope}`)}
+          </option>
+        ))}
+      </NativeSelect>
+      {own.scope === 'PIPELINE' ? (
+        <NativeSelect
+          variant="filter"
+          aria-label={t('sales.boards.stage')}
+          value={own.stageId ?? ''}
+          onChange={(event) =>
+            onChange({ ...own, stageId: Number.parseInt(event.target.value, 10) || undefined })
+          }
+        >
+          <option value="">{t('sales.work.allStages')}</option>
+          {stages.map((stage) => (
+            <option key={stage.id} value={stage.id}>
+              {stage.name}
+            </option>
+          ))}
+        </NativeSelect>
+      ) : null}
+      <NativeSelect
+        variant="filter"
+        aria-label={t('sales.order.status')}
+        value={own.status ?? ''}
+        onChange={(event) =>
+          onChange({ ...own, status: ORDER_STATUSES.find((value) => value === event.target.value) })
+        }
+      >
+        <option value="">{t('sales.orders.allStatuses')}</option>
+        {ORDER_STATUSES.map((value) => (
+          <option key={value} value={value}>
+            {t(`sales.statuses.${value}`)}
+          </option>
+        ))}
+      </NativeSelect>
+      <NativeSelect
+        variant="filter"
+        aria-label={t('sales.work.archivedLabel')}
+        value={own.archived}
+        active={own.archived !== 'exclude'}
+        onChange={(event) =>
+          onChange({
+            ...own,
+            archived: ARCHIVED_SCOPES.find((value) => value === event.target.value) ?? 'exclude',
+          })
+        }
+      >
+        {ARCHIVED_SCOPES.map((value) => (
+          <option key={value} value={value}>
+            {t(`sales.work.archivedScopes.${value}`)}
+          </option>
+        ))}
+      </NativeSelect>
+    </>
+  );
 }
 
 /**
  * «Жагсаалтаар» (ADR-0057 #7): the pipeline's orders (or all of them, or those in no pipeline)
- * newest first with the shared filters plus stage, status and archive; the column chooser keeps
- * each user's columns; a row opens the order beside the list.
+ * newest first with the shared filters plus stage, status and archive (their pills sit in the work
+ * page's bar); the column chooser keeps each user's columns; a click on a row opens the order
+ * beside the list, its number staying the keyboard's button.
  */
 export function ListView({
   pipeline,
   filters,
   own,
-  onOwnChange,
+  columns,
+  openId,
   onOpen,
   onCount,
+  onClearFilters,
 }: {
   pipeline: SalesPipeline | null;
   filters: FilterQuery;
   own: ListFilters;
-  onOwnChange: (next: ListFilters) => void;
+  columns: ListColumns;
+  /** The order open in the panel: its row is tinted. */
+  openId?: number | null;
   onOpen: (orderId: number) => void;
   onCount?: (count: number | null) => void;
+  /** Offered by the empty list while filters narrow it. */
+  onClearFilters?: () => void;
 }) {
   const { t } = useTranslation();
-  const columns = useHiddenColumns('salesOrders', COLUMNS, LOCKED);
   const query: ListQuery = {
     ...filters,
     ...(own.scope === 'PIPELINE' && pipeline ? { pipeline: String(pipeline.id) } : {}),
@@ -92,122 +184,42 @@ export function ListView({
   useEffect(() => {
     onCount?.(total);
   }, [total, onCount]);
-  const shown = (column: Column) => !columns.hidden.has(column);
-  const money = (value: string | null) =>
-    value === null ? '' : t('pricing.money', { amount: formatMnt(value) });
-  const stages = (pipeline?.stages ?? []).filter((stage) => stage.canView);
+  const shown = (column: ListColumn) => !columns.hidden.has(column);
+  const visible = LIST_COLUMNS.filter(shown);
+  const problem = problemFromError(orders.error);
   return (
     <>
-      <FilterBar
-        end={
-          <ColumnChooser
-            keys={COLUMNS}
-            locked={LOCKED}
-            label={(column) => t(`sales.work.columns.${column}`)}
-            hidden={columns.hidden}
-            toggle={columns.toggle}
-            showAll={columns.showAll}
-          />
-        }
-      >
-        <NativeSelect
-          variant="filter"
-          aria-label={t('sales.work.scope')}
-          value={own.scope}
-          active={own.scope !== 'PIPELINE'}
-          onChange={(event) => {
-            const scope = LIST_SCOPES.find((value) => value === event.target.value) ?? 'PIPELINE';
-            onOwnChange({ ...own, scope, stageId: undefined });
-          }}
-        >
-          {LIST_SCOPES.map((scope) => (
-            <option key={scope} value={scope}>
-              {t(`sales.work.scopes.${scope}`)}
-            </option>
-          ))}
-        </NativeSelect>
-        {own.scope === 'PIPELINE' ? (
-          <NativeSelect
-            variant="filter"
-            aria-label={t('sales.boards.stage')}
-            value={own.stageId ?? ''}
-            onChange={(event) =>
-              onOwnChange({
-                ...own,
-                stageId: Number.parseInt(event.target.value, 10) || undefined,
-              })
-            }
-          >
-            <option value="">{t('sales.work.allStages')}</option>
-            {stages.map((stage) => (
-              <option key={stage.id} value={stage.id}>
-                {stage.name}
-              </option>
-            ))}
-          </NativeSelect>
-        ) : null}
-        <NativeSelect
-          variant="filter"
-          aria-label={t('sales.order.status')}
-          value={own.status ?? ''}
-          onChange={(event) =>
-            onOwnChange({
-              ...own,
-              status: ORDER_STATUSES.find((value) => value === event.target.value),
-            })
-          }
-        >
-          <option value="">{t('sales.orders.allStatuses')}</option>
-          {(['DRAFT', 'CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED', 'CANCELLED'] as const).map(
-            (value) => (
-              <option key={value} value={value}>
-                {t(`sales.statuses.${value}`)}
-              </option>
-            ),
-          )}
-        </NativeSelect>
-        <NativeSelect
-          variant="filter"
-          aria-label={t('sales.work.archivedLabel')}
-          value={own.archived}
-          active={own.archived !== 'exclude'}
-          onChange={(event) =>
-            onOwnChange({
-              ...own,
-              archived: ARCHIVED_SCOPES.find((value) => value === event.target.value) ?? 'exclude',
-            })
-          }
-        >
-          {ARCHIVED_SCOPES.map((value) => (
-            <option key={value} value={value}>
-              {t(`sales.work.archivedScopes.${value}`)}
-            </option>
-          ))}
-        </NativeSelect>
-      </FilterBar>
-      <ProblemAlert problem={problemFromError(orders.error)} />
-      <ListCard>
+      {problem ? (
+        <div className="mb-3">
+          <ProblemAlert problem={problem} />
+        </div>
+      ) : null}
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
-              {COLUMNS.filter(shown).map((column) => (
+              {visible.map((column) => (
                 <TableHead key={column} className={column === 'total' ? 'text-right' : undefined}>
                   {t(`sales.work.columns.${column}`)}
                 </TableHead>
               ))}
+              <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders.isPending ? <SkeletonRows columns={COLUMNS.filter(shown).length} /> : null}
+            {orders.isPending ? <SkeletonRows columns={visible.length + 1} /> : null}
             {rows.map((row) => {
               const title = row.number ?? t('sales.order.draftNo', { id: row.id });
+              const stage = [own.scope === 'PIPELINE' ? null : row.pipelineName, row.stageName]
+                .filter(Boolean)
+                .join(' · ');
               return (
-                <TableRow key={row.id}>
+                <ButtonRow key={row.id} selected={row.id === openId} onOpen={() => onOpen(row.id)}>
                   {shown('number') ? (
                     <TableCell className="font-mono">
                       <button
                         type="button"
-                        className="font-medium text-link underline-offset-4 hover:underline"
+                        className="font-medium underline-offset-4 hover:underline"
                         onClick={() => onOpen(row.id)}
                       >
                         {title}
@@ -220,20 +232,18 @@ export function ListView({
                     </TableCell>
                   ) : null}
                   {shown('customer') ? (
-                    <TableCell className="whitespace-normal">
+                    <TruncateCell
+                      text={`${row.customerName} · ${row.customerCode}`}
+                      fill
+                      className="min-w-40"
+                    >
                       {row.customerName}
                       <span className="ml-2 font-mono text-xs text-muted-foreground">
                         {row.customerCode}
                       </span>
-                    </TableCell>
+                    </TruncateCell>
                   ) : null}
-                  {shown('stage') ? (
-                    <TableCell className="whitespace-normal">
-                      {[own.scope === 'PIPELINE' ? null : row.pipelineName, row.stageName]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </TableCell>
-                  ) : null}
+                  {shown('stage') ? <TruncateCell text={stage} /> : null}
                   {shown('status') ? (
                     <TableCell>
                       <OrderStatusBadge status={row.status} />
@@ -243,7 +253,9 @@ export function ListView({
                     <TableCell className="font-mono">{row.deliveryDate}</TableCell>
                   ) : null}
                   {shown('total') ? (
-                    <TableCell className="text-right font-mono">{money(row.total)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {row.total === null ? '' : formatTugrik(row.total)}
+                    </TableCell>
                   ) : null}
                   {shown('payment') ? (
                     <TableCell>
@@ -259,13 +271,17 @@ export function ListView({
                       {formatUbDateTime(Date.parse(row.createdAt))}
                     </TableCell>
                   ) : null}
-                </TableRow>
+                </ButtonRow>
               );
             })}
           </TableBody>
         </Table>
         {!orders.isPending && rows.length === 0 ? (
-          <EmptyState icon={ShoppingCart} title={t('sales.orders.empty')} />
+          <EmptyState
+            icon={ShoppingCart}
+            title={t('sales.orders.empty')}
+            onClearFilters={onClearFilters}
+          />
         ) : null}
         <LoadMore query={orders} />
       </ListCard>

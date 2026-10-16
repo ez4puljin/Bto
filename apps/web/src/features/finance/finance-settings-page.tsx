@@ -32,6 +32,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -41,7 +43,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBranches } from '@/features/identity/api';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -137,7 +139,7 @@ export function FinanceSettingsPage() {
                   <TableCell>{account.branchName ?? ''}</TableCell>
                   <TableCell className="font-mono">{account.glAccountCode}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(account.balance)}
+                    {formatTugrik(account.balance)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu modal={false}>
@@ -250,13 +252,16 @@ function NumberingForm({
             key={kind}
             label={t(`finance.settings.${PATTERN_KEYS[kind]}`)}
             htmlFor={`pattern-${kind}`}
-            error={
-              checked && issues[kind].length
-                ? t(`sales.numbering.issues.${issues[kind][0]?.code ?? 'ENDS_WITH_DIGIT'}`)
-                : undefined
+            hint={
+              // The shared rule's message; FieldError reads only `validation.*` keys.
+              checked && issues[kind].length ? (
+                <span role="alert" className="text-destructive">
+                  {t(`sales.numbering.issues.${issues[kind][0]?.code ?? 'ENDS_WITH_DIGIT'}`)}
+                </span>
+              ) : undefined
             }
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <Input
                 id={`pattern-${kind}`}
                 className="font-mono sm:w-64"
@@ -269,20 +274,24 @@ function NumberingForm({
                   }))
                 }
               />
-              <Input
-                aria-label={`${t('finance.settings.digits')} ${t(`finance.settings.${PATTERN_KEYS[kind]}`)}`}
-                type="number"
-                min={1}
-                max={8}
-                className="w-20 font-mono"
-                value={formats[kind].digits}
-                onChange={(event) =>
-                  setFormats((previous) => ({
-                    ...previous,
-                    [kind]: { ...previous[kind], digits: event.target.value },
-                  }))
-                }
-              />
+              {/* A visible label; the name keeps the row's so the four fields stay apart. */}
+              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                {t('finance.settings.digits')}
+                <Input
+                  aria-label={`${t('finance.settings.digits')}: ${t(`finance.settings.${PATTERN_KEYS[kind]}`)}`}
+                  type="number"
+                  min={1}
+                  max={8}
+                  className="w-20 font-mono"
+                  value={formats[kind].digits}
+                  onChange={(event) =>
+                    setFormats((previous) => ({
+                      ...previous,
+                      [kind]: { ...previous[kind], digits: event.target.value },
+                    }))
+                  }
+                />
+              </label>
             </div>
           </FormRow>
         ))}
@@ -370,7 +379,7 @@ function MoneyAccountDialog({
             <FormField
               label={t('finance.settings.moneyAccountDialog.code')}
               htmlFor="money-code"
-              error={checked && !CODE.test(code.trim()) ? t('validation.required') : undefined}
+              error={checked && !CODE.test(code.trim()) ? 'validation.required' : undefined}
             >
               <Input
                 id="money-code"
@@ -400,7 +409,7 @@ function MoneyAccountDialog({
           <FormField
             label={t('finance.settings.moneyAccountDialog.name')}
             htmlFor="money-name"
-            error={checked && !name.trim() ? t('validation.required') : undefined}
+            error={checked && !name.trim() ? 'validation.required' : undefined}
           >
             <Input
               id="money-name"
@@ -453,7 +462,7 @@ function MoneyAccountDialog({
           <FormField
             label={t('finance.settings.moneyAccountDialog.glAccount')}
             htmlFor="money-gl"
-            error={checked && glAccountId === null ? t('validation.required') : undefined}
+            error={checked && glAccountId === null ? 'validation.required' : undefined}
           >
             <NativeSelect
               id="money-gl"
@@ -469,21 +478,14 @@ function MoneyAccountDialog({
             </NativeSelect>
           </FormField>
           {account ? (
-            <FormField
-              label={t('finance.settings.moneyAccountDialog.status')}
-              htmlFor="money-status"
-            >
-              <NativeSelect
-                id="money-status"
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')
-                }
-              >
-                <option value="ACTIVE">{t('finance.accountStatuses.ACTIVE')}</option>
-                <option value="INACTIVE">{t('finance.accountStatuses.INACTIVE')}</option>
-              </NativeSelect>
-            </FormField>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="money-active">{t('finance.accountStatuses.ACTIVE')}</Label>
+              <Switch
+                id="money-active"
+                checked={status === 'ACTIVE'}
+                onCheckedChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+              />
+            </div>
           ) : null}
           <ProblemAlert problem={action.problem} />
           <DialogFormFooter

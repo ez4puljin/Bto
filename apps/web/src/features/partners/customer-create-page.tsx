@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { Card, CardContent } from '@/components/ui/card';
 import { problemFromError } from '@/lib/problem';
 import { randomUuid } from '@/lib/uuid';
 import { useNextCustomerCode, usePartnersMutations } from './api';
@@ -43,16 +42,14 @@ export function CustomerCreatePage() {
       {nextCode.isPending ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
-        <Card>
-          <CardContent>
-            <CustomerForm
-              mode="create"
-              defaultValues={emptyCustomer(nextCode.data ?? '')}
-              submitLabel={t('common.save')}
-              onSubmit={create}
-            />
-          </CardContent>
-        </Card>
+        <CustomerForm
+          page
+          mode="create"
+          defaultValues={emptyCustomer(nextCode.data ?? '')}
+          submitLabel={t('common.save')}
+          onCancel={() => void navigate('/partners/customers')}
+          onSubmit={create}
+        />
       )}
     </div>
   );

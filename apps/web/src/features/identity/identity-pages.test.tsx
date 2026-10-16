@@ -123,6 +123,9 @@ describe('menu and page access', () => {
     const fetchMock = signedIn(WORKER_ME);
     renderApp('/users', fetchMock);
     expect(await screen.findByText(mn.errors.FORBIDDEN)).toBeInTheDocument();
+    // The refusal is a page of its own: the browser tab says so (ADR-0066).
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(mn.errors.forbiddenTitle);
+    expect(document.title).toBe(`${mn.errors.forbiddenTitle} · ${mn.app.name}`);
     const nav = getSidebar();
     for (const label of ADMIN_MENU) {
       expect(within(nav).queryByRole('link', { name: label })).toBeNull();
@@ -410,13 +413,20 @@ describe('audit', () => {
       'GET /api/v1/audit': (request) =>
         list(new URL(request.url).searchParams.get('entity') === 'roles' ? [] : [entry]),
     });
-    renderApp('/audit', fetchMock);
+    const { router } = renderApp('/audit', fetchMock);
     const user = userEvent.setup();
     expect(await screen.findByText(mn.audit.actions.CREATE)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: mn.audit.details }));
+    const details = screen.getByRole('button', { name: mn.audit.details });
+    await user.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText(/"name": "Дэлгүүр"/)).toBeInTheDocument();
 
+    // The filter lives in the URL; an empty result offers to clear it.
     await user.selectOptions(screen.getByLabelText(mn.audit.entity), 'roles');
     expect(await screen.findByText(mn.audit.empty)).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?entity=roles');
+    await user.click(screen.getByRole('button', { name: mn.common.clearFilters }));
+    expect(await screen.findByText(mn.audit.actions.CREATE)).toBeInTheDocument();
+    expect(router.state.location.search).toBe('');
   });
 });

@@ -21,6 +21,21 @@ export type ProductColumnKey = ProductListColumn;
 /** Columns that name the row; they cannot be hidden. */
 export const LOCKED_PRODUCT_COLUMNS: readonly ProductColumnKey[] = ['sku', 'name'];
 
+/**
+ * What a user who never chose sees hidden (ADR-0066): photo, code, name, category, warehouse
+ * price, supplier and status fit a 1366px screen; every column stays in «Баганууд».
+ */
+export const DEFAULT_HIDDEN_PRODUCT_COLUMNS: readonly ProductColumnKey[] = [
+  'baseUnit',
+  'units',
+  'priceProfile',
+  'baseBarcodes',
+  'unitBarcodes',
+  'weight',
+  'homeWarehouse',
+  'fixedBins',
+];
+
 /** What the cells read besides the row; `suppliers`, `locations`, `prices` are undefined until loaded. */
 export interface ProductCellContext {
   t: TFunction;
@@ -35,6 +50,16 @@ export interface ProductColumn {
   key: ProductColumnKey;
   /** Read from another module per page, only while the column shows. */
   source?: 'suppliers' | 'locations' | 'prices';
+  /** Numbers and money: right-aligned in the head and the cells, tabular figures. */
+  numeric?: boolean;
+  /**
+   * Long text on one line cut with «…», the whole text on hover (`TruncateCell`); `fill` gives the
+   * column the table's spare width. Undefined text (not loaded yet) leaves the cell empty.
+   */
+  truncate?: {
+    text: (row: ProductListItem, ctx: ProductCellContext) => string | undefined;
+    fill?: boolean;
+  };
   className?: string;
   cell: (row: ProductListItem, ctx: ProductCellContext) => ReactNode;
 }
@@ -63,23 +88,57 @@ const otherUnits = (row: ProductListItem) => row.units.filter((unit) => !unit.is
 /** Today's price terms of a product (ADR-0048), or undefined while they load. */
 const termsOf = (row: ProductListItem, ctx: ProductCellContext) => ctx.prices?.get(row.id)?.[0];
 
+/** How `categoryPaths` joins a path («Хүнс / Гурил», `@tugeel/shared/catalog`). */
+const PATH_SEPARATOR = ' / ';
+
+/**
+ * A category's path in a narrow column: the parents give way («Туршилтын ба… / Ахуйн бараа») so
+ * the category itself stays whole; the whole path shows on hover.
+ */
+function categoryCell(path: string | undefined, ctx: ProductCellContext): ReactNode {
+  if (!path) return none(ctx);
+  const parts = path.split(PATH_SEPARATOR);
+  const leaf = parts.pop();
+  if (parts.length === 0 || leaf === undefined) return path;
+  return (
+    <span className="flex min-w-0">
+      <span className="min-w-0 truncate">{parts.join(PATH_SEPARATOR)}</span>
+      {/* The separator stays with the category, after the parents' «…». */}
+      <span className="shrink-0">{`\u00a0/ ${leaf}`}</span>
+    </span>
+  );
+}
+
+/** The main supplier, with «+N» for the others; undefined while the links load. */
+function supplierText(row: ProductListItem, ctx: ProductCellContext): string | undefined {
+  if (!ctx.suppliers) return undefined;
+  const [main, ...others] = ctx.suppliers.get(row.id) ?? [];
+  if (!main) return ctx.t('common.none');
+  return others.length === 0
+    ? main.supplier.name
+    : `${main.supplier.name} ${ctx.t('catalog.products.moreSuppliers', { count: others.length })}`;
+}
+
 export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
     key: 'image',
-    className: 'w-14',
+    // A 32px photo keeps the row at 36px (ADR-0066).
+    className: 'w-12 px-2 py-0.5',
     cell: (row) =>
       row.thumbUrl ? (
-        <img src={row.thumbUrl} alt="" loading="lazy" className="size-10 rounded-md object-cover" />
+        <img src={row.thumbUrl} alt="" loading="lazy" className="size-8 rounded-md object-cover" />
       ) : (
-        <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-          <ImageOff className="size-4 text-muted-foreground" />
+        <div className="flex size-8 items-center justify-center rounded-md bg-muted">
+          <ImageOff className="size-3.5 text-muted-foreground" />
         </div>
       ),
   },
   { key: 'sku', className: 'font-mono', cell: (row) => row.sku },
   {
     key: 'name',
-    className: 'min-w-48 whitespace-normal',
+    // The name takes the spare width, never less than 11rem: with many columns the list scrolls.
+    truncate: { text: (row) => row.name, fill: true },
+    className: 'min-w-44',
     cell: (row) => (
       <Link
         to={`/catalog/products/${row.id}`}
@@ -91,8 +150,9 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   },
   {
     key: 'category',
-    className: 'whitespace-normal text-muted-foreground',
-    cell: (row, ctx) => text(ctx.categoryPath(row.categoryId), ctx),
+    truncate: { text: (row, ctx) => ctx.categoryPath(row.categoryId) },
+    className: 'max-w-40 text-muted-foreground min-[1440px]:max-w-64',
+    cell: (row, ctx) => categoryCell(ctx.categoryPath(row.categoryId), ctx),
   },
   { key: 'baseUnit', cell: (row) => row.baseUnit.uomName },
   {
@@ -112,7 +172,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
     key: 'warehousePrice',
     source: 'prices',
-    className: 'text-right font-mono',
+    numeric: true,
     cell: (row, ctx) => {
       if (!ctx.prices) return null;
       const terms = termsOf(row, ctx);
@@ -143,7 +203,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
         true,
       ),
   },
-  { key: 'weight', className: 'font-mono', cell: (row, ctx) => text(row.weightKg, ctx) },
+  { key: 'weight', numeric: true, cell: (row, ctx) => text(row.weightKg, ctx) },
   {
     key: 'homeWarehouse',
     source: 'locations',
@@ -176,14 +236,12 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
     key: 'supplier',
     source: 'suppliers',
-    className: 'whitespace-normal',
+    truncate: { text: supplierText },
+    className: 'max-w-40 min-[1800px]:max-w-64',
     cell: (row, ctx) => {
-      if (!ctx.suppliers) return null;
-      const [main, ...others] = ctx.suppliers.get(row.id) ?? [];
-      if (!main) return none(ctx);
-      return others.length === 0
-        ? main.supplier.name
-        : `${main.supplier.name} ${ctx.t('catalog.products.moreSuppliers', { count: others.length })}`;
+      const shown = supplierText(row, ctx);
+      if (shown === undefined) return null;
+      return ctx.suppliers?.get(row.id)?.length ? shown : none(ctx);
     },
   },
   {

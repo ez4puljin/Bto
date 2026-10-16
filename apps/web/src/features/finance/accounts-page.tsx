@@ -6,12 +6,14 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
-  DateFilter,
+  ChevronHead,
   EmptyState,
   FilterBar,
+  LinkRow,
   ListCard,
   LoadMore,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -32,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -42,9 +46,11 @@ import {
 } from '@/components/ui/table';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
+import { DateRangeFilter } from './date-range-filter';
 import {
   type GlAccount,
   type GlRole,
@@ -87,7 +93,7 @@ export function AccountsPage() {
         }
       />
       <ProblemAlert problem={problemFromError(accounts.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -98,32 +104,37 @@ export function AccountsPage() {
               <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
               <TableHead className="text-right">{t('finance.fields.balance')}</TableHead>
-              <TableHead className="w-10" />
+              <TableHead className="w-10">
+                <span className="sr-only">{t('common.actions')}</span>
+              </TableHead>
+              <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {accounts.isPending ? <SkeletonRows columns={8} /> : null}
+            {accounts.isPending ? <SkeletonRows columns={9} /> : null}
             {rows.map((account) => (
-              <TableRow
+              // A row opens the account's ledger; its code stays the keyboard's link.
+              <LinkRow
                 key={account.id}
+                to={`/finance/accounts/${account.id}`}
                 className={account.status === 'INACTIVE' ? 'text-muted-foreground' : undefined}
               >
                 <TableCell className="font-mono">
                   <Link
-                    className="text-link underline-offset-2 hover:underline"
+                    className="font-medium underline-offset-4 hover:underline"
                     to={`/finance/accounts/${account.id}`}
                   >
                     {account.code}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TruncateCell text={account.name}>
                   {account.name}
                   {account.status === 'INACTIVE' ? (
                     <Badge variant="secondary" className="ml-2">
                       {t('finance.accountStatuses.INACTIVE')}
                     </Badge>
                   ) : null}
-                </TableCell>
+                </TruncateCell>
                 <TableCell>{t(`finance.accountKinds.${account.kind}`)}</TableCell>
                 <TableCell>{account.role ? t(`finance.roles.${account.role}`) : ''}</TableCell>
                 <TableCell className="text-right font-mono">{formatMnt(account.debit)}</TableCell>
@@ -161,7 +172,7 @@ export function AccountsPage() {
                     </DropdownMenu>
                   ) : null}
                 </TableCell>
-              </TableRow>
+              </LinkRow>
             ))}
           </TableBody>
         </Table>
@@ -231,7 +242,7 @@ function AccountDialog({
           <FormField
             label={t('finance.accounts.dialog.code')}
             htmlFor="account-code"
-            error={checked && !codeOk ? t('validation.required') : undefined}
+            error={checked && !codeOk ? 'validation.required' : undefined}
           >
             <Input
               id="account-code"
@@ -244,7 +255,7 @@ function AccountDialog({
           <FormField
             label={t('finance.accounts.dialog.name')}
             htmlFor="account-name"
-            error={checked && !name.trim() ? t('validation.required') : undefined}
+            error={checked && !name.trim() ? 'validation.required' : undefined}
           >
             <Input
               id="account-name"
@@ -269,18 +280,14 @@ function AccountDialog({
             </NativeSelect>
           </FormField>
           {account ? (
-            <FormField label={t('finance.accounts.dialog.status')} htmlFor="account-status">
-              <NativeSelect
-                id="account-status"
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')
-                }
-              >
-                <option value="ACTIVE">{t('finance.accountStatuses.ACTIVE')}</option>
-                <option value="INACTIVE">{t('finance.accountStatuses.INACTIVE')}</option>
-              </NativeSelect>
-            </FormField>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="account-active">{t('finance.accountStatuses.ACTIVE')}</Label>
+              <Switch
+                id="account-active"
+                checked={status === 'ACTIVE'}
+                onCheckedChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+              />
+            </div>
           ) : null}
           <ProblemAlert problem={action.problem} />
           <DialogFormFooter
@@ -351,24 +358,14 @@ function RoleDialog({
 export function AccountLedgerPage() {
   const { t } = useTranslation();
   const accountId = Number.parseInt(useParams().id ?? '', 10);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const accounts = useGlAccounts();
   const account = accounts.data?.find((entry) => entry.id === accountId);
   const ledger = useAccountLedger(accountId > 0 ? accountId : null, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
-
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -387,15 +384,14 @@ export function AccountLedgerPage() {
         }
       />
       <FilterBar>
-        <DateFilter
-          label={t('finance.fields.from')}
-          value={from}
-          onChange={(value) => setParam('from', value)}
-        />
-        <DateFilter
-          label={t('finance.fields.to')}
-          value={to}
-          onChange={(value) => setParam('to', value)}
+        <DateRangeFilter
+          label={t('finance.fields.date')}
+          fromLabel={t('finance.fields.from')}
+          toLabel={t('finance.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
         />
         {ledger.data?.pages[0] && from ? (
           <span className="text-sm text-muted-foreground">
@@ -405,7 +401,7 @@ export function AccountLedgerPage() {
         ) : null}
       </FilterBar>
       <ProblemAlert problem={problemFromError(ledger.error ?? accounts.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -431,11 +427,12 @@ export function AccountLedgerPage() {
                     {line.entryNumber}
                   </Link>
                 </TableCell>
-                <TableCell>
-                  {[line.entryDescription, line.customerName, line.description]
+                <TruncateCell
+                  text={[line.entryDescription, line.customerName, line.description]
                     .filter(Boolean)
                     .join(' · ')}
-                </TableCell>
+                  fill
+                />
                 <TableCell>
                   <SourceBadge source={line.source} />
                 </TableCell>

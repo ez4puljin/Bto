@@ -19,6 +19,7 @@ import {
   RowActions,
   SearchField,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -37,7 +38,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -49,7 +49,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useBarcodeLookup } from '@/features/catalog/api';
 import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
@@ -76,7 +78,14 @@ import {
 import { useDefaultWarehouse } from './last-warehouse';
 import { ReceiptCostingCard } from './receipt-costing';
 import { useScanQty } from './scan-qty';
-import { DocStatusBadge, ProductSearch, QtyInput, ScanQtyField, WarehouseSelect } from './shared';
+import {
+  DocStatusBadge,
+  ProductSearch,
+  QtyInput,
+  ScanQtyControl,
+  ScanToolbar,
+  WarehouseSelect,
+} from './shared';
 
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['DRAFT', 'POSTED', 'CANCELLED'];
 const WHOLESALE = ['WHOLESALE'] as const;
@@ -99,7 +108,8 @@ export function ReceiptsPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('inventory.receipts.manage');
   const canCost = useHasPermission('inventory.costs.manage');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const statusParam = params.get('status');
@@ -112,17 +122,6 @@ export function ReceiptsPage() {
   const receipts = useReceipts({ q, status, warehouseId, costingPending });
   const rows = receipts.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -181,7 +180,7 @@ export function ReceiptsPage() {
         ) : null}
       </FilterBar>
       <ProblemAlert problem={problemFromError(receipts.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -200,7 +199,10 @@ export function ReceiptsPage() {
             {rows.map((receipt) => (
               <LinkRow key={receipt.id} to={`/inventory/receipts/${receipt.id}`}>
                 <TableCell className="font-mono">
-                  <Link to={`/inventory/receipts/${receipt.id}`} className="font-medium">
+                  <Link
+                    to={`/inventory/receipts/${receipt.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
                     {receipt.number ?? t('inventory.draftNo', { id: receipt.id })}
                   </Link>
                 </TableCell>
@@ -208,7 +210,7 @@ export function ReceiptsPage() {
                   {receipt.effectiveDate ?? t('common.none')}
                 </TableCell>
                 <TableCell>{warehouseName(receipt.warehouseId)}</TableCell>
-                <TableCell className="whitespace-normal">{receipt.supplierName}</TableCell>
+                <TruncateCell text={receipt.supplierName} />
                 <TableCell className="font-mono">
                   {receipt.supplierDocNo ?? t('common.none')}
                 </TableCell>
@@ -217,7 +219,7 @@ export function ReceiptsPage() {
                   <div className="flex gap-1">
                     <DocStatusBadge status={receipt.status} />
                     {receipt.costingStatus ? (
-                      <Badge variant={receipt.costingStatus === 'PENDING' ? 'default' : 'outline'}>
+                      <Badge variant={receipt.costingStatus === 'PENDING' ? 'warning' : 'outline'}>
                         {t(`inventory.costingStatus.${receipt.costingStatus}`)}
                       </Badge>
                     ) : null}
@@ -292,7 +294,7 @@ function ReceiptCreateDialog({ onCancel }: { onCancel: () => void }) {
       });
 
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent closeLabel={t('common.close')} size="md">
       <form
         className="space-y-4"
         onSubmit={(event) => {
@@ -397,19 +399,26 @@ export function ReceiptPage() {
           <>
             <DocStatusBadge status={detail.status} />
             {detail.costingStatus ? (
-              <Badge variant={detail.costingStatus === 'PENDING' ? 'default' : 'outline'}>
+              <Badge variant={detail.costingStatus === 'PENDING' ? 'warning' : 'outline'}>
                 {t(`inventory.costingStatus.${detail.costingStatus}`)}
               </Badge>
             ) : null}
             <span className="text-foreground">{warehouseName(detail.warehouseId)}</span>
             <span>{detail.supplierName}</span>
+            {/* The delivery note in the meta: its card drops below the lines under 1536px. */}
+            {detail.supplierDocNo ? (
+              <span>{t('inventory.receipt.docMeta', { number: detail.supplierDocNo })}</span>
+            ) : null}
+            {detail.supplierDocDate ? (
+              <span>{t('inventory.receipt.docDateMeta', { date: detail.supplierDocDate })}</span>
+            ) : null}
             {detail.effectiveDate ? (
-              <span className="font-mono">{detail.effectiveDate}</span>
+              <span>{t('inventory.postedOn', { date: detail.effectiveDate })}</span>
             ) : null}
           </>
         }
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_16rem] 2xl:items-start">
         <div className="min-w-0 space-y-4">{body}</div>
         <ReceiptHeaderCard detail={detail} />
       </div>
@@ -552,8 +561,8 @@ function ReceiptLinesTable({ lines }: { lines: readonly ReceiptLine[] }) {
               {line.productName}
             </TableCell>
             <TableCell>{line.unitName}</TableCell>
-            <TableCell className="text-right font-mono">{line.enteredQty}</TableCell>
-            <TableCell className="text-right font-mono">{line.qtyBase}</TableCell>
+            <TableCell className="text-right font-mono">{formatQty(line.enteredQty)}</TableCell>
+            <TableCell className="text-right font-mono">{formatQty(line.qtyBase)}</TableCell>
             <TableCell className="font-mono">{line.binCode}</TableCell>
           </TableRow>
         ))}
@@ -707,55 +716,71 @@ function ReceiptEditor({ detail, focusScan }: { detail: ReceiptDetail; focusScan
           <CardTitle>{t('inventory.lines')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <ScanBox
-            letters
-            autoFocus={focusScan}
-            label={t('inventory.scanLabel')}
-            placeholder={t('inventory.scanPlaceholder')}
-            onScan={onScan}
+          <ScanToolbar
+            scanBox={
+              <ScanBox
+                letters
+                autoFocus={focusScan}
+                label={t('inventory.scanLabel')}
+                placeholder={t('inventory.scanPlaceholder')}
+                onScan={onScan}
+              />
+            }
+            qty={<ScanQtyControl id="receipt-scan-qty" qty={qty} onScan={onScan} />}
+            search={
+              <ProductSearch
+                onScan={onScan}
+                onPick={(product) =>
+                  pick(product.baseUnit.id, product.baseUnit.uomName, product.name)
+                }
+              />
+            }
+            status={
+              <>
+                <span className="flex items-center gap-1 font-medium">
+                  {activeBin
+                    ? t('inventory.activeBin', { code: activeBin.code })
+                    : t('inventory.activeBinNone')}
+                  {activeBin ? (
+                    <Button size="xs" variant="ghost" onClick={() => setActiveBin(null)}>
+                      {t('inventory.clearBin')}
+                    </Button>
+                  ) : null}
+                </span>
+                <span aria-live="polite" className="font-medium">
+                  {added
+                    ? added.base
+                      ? t('inventory.scanAddedBase', {
+                          qty: added.qty,
+                          unit: added.unit,
+                          base: added.base.qty,
+                          baseUnit: added.base.unit,
+                          name: added.name,
+                        })
+                      : t('inventory.scanAdded', {
+                          qty: added.qty,
+                          unit: added.unit,
+                          name: added.name,
+                        })
+                    : null}
+                </span>
+                {invalidQty ? (
+                  <span className="text-destructive">{t('inventory.scanQtyInvalid')}</span>
+                ) : null}
+                {missing ? (
+                  <span className="text-destructive">
+                    {t('inventory.scanNotFound', { code: missing })}
+                  </span>
+                ) : null}
+                {qty.value !== '1' ? (
+                  <span className="text-[13px] text-muted-foreground">
+                    {t('inventory.scanQtyHint')}
+                  </span>
+                ) : null}
+              </>
+            }
           />
-          <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor="receipt-scan-qty">{t('inventory.scanQty')}</Label>
-            <ScanQtyField id="receipt-scan-qty" qty={qty} onScan={onScan} />
-            <span className="text-xs text-muted-foreground">{t('inventory.scanQtyHint')}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium">
-              {activeBin
-                ? t('inventory.activeBin', { code: activeBin.code })
-                : t('inventory.activeBinNone')}
-            </span>
-            {activeBin ? (
-              <Button size="xs" variant="ghost" onClick={() => setActiveBin(null)}>
-                {t('inventory.clearBin')}
-              </Button>
-            ) : null}
-          </div>
-          {added ? (
-            <p aria-live="polite" className="text-sm font-medium">
-              {added.base
-                ? t('inventory.scanAddedBase', {
-                    qty: added.qty,
-                    unit: added.unit,
-                    base: added.base.qty,
-                    baseUnit: added.base.unit,
-                    name: added.name,
-                  })
-                : t('inventory.scanAdded', { qty: added.qty, unit: added.unit, name: added.name })}
-            </p>
-          ) : null}
-          {invalidQty ? (
-            <p className="text-sm text-destructive">{t('inventory.scanQtyInvalid')}</p>
-          ) : null}
-          {missing ? (
-            <p className="text-sm text-destructive">
-              {t('inventory.scanNotFound', { code: missing })}
-            </p>
-          ) : null}
           <ProblemAlert problem={confirm ? null : action.problem} />
-          <ProductSearch
-            onPick={(product) => pick(product.baseUnit.id, product.baseUnit.uomName, product.name)}
-          />
           {detail.lines.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('inventory.receipt.linesEmpty')}</p>
           ) : (
@@ -796,7 +821,9 @@ function ReceiptEditor({ detail, focusScan }: { detail: ReceiptDetail; focusScan
                         }
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">{line.qtyBase}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatQty(line.qtyBase)}
+                    </TableCell>
                     <TableCell>
                       <span className="font-mono">{line.binCode}</span>
                       {activeBin && activeBin.id !== line.binId ? (

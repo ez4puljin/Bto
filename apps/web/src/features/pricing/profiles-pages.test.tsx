@@ -212,6 +212,11 @@ describe('price profile page', () => {
       mn.pricing.profiles.status.PAST,
     ]);
     expect(versions.getByText('2099-01-01-с')).toBeInTheDocument();
+    // Each price on its own line, no «·» left at a line's end.
+    const [scheduledRow] = versions.getAllByRole('row').slice(1);
+    expect(
+      within(scheduledRow!).getByText(mn.pricing.profiles.summary.loose.replace('{{pct}}', '17')),
+    ).toBeInTheDocument();
     expect(versions.getByText('2026-09-01 – 2026-09-30')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: mn.pricing.profiles.setValues }));

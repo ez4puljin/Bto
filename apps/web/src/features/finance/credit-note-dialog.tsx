@@ -102,7 +102,7 @@ export function CreditNoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-2xl">
+      <DialogContent closeLabel={t('common.close')} size="lg">
         <DialogHeader>
           <DialogTitle>{t('finance.creditNote.title')}</DialogTitle>
           <DialogDescription>{t('finance.creditNote.description')}</DialogDescription>
@@ -174,7 +174,7 @@ export function CreditNoteDialog({
           <FormField
             label={t('finance.creditNote.reason')}
             htmlFor="credit-note-reason"
-            error={checked && !reason.trim() ? t('validation.required') : undefined}
+            error={checked && !reason.trim() ? 'validation.required' : undefined}
           >
             <Textarea
               id="credit-note-reason"

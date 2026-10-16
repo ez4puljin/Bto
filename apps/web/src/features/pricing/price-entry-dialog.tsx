@@ -1,3 +1,4 @@
+import type { Decimal } from '@tugeel/shared/money';
 import { defaultWholeUomId } from '@tugeel/shared/pricing';
 import { CircleCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -16,14 +17,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatMnt, plainDecimal } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
@@ -51,7 +44,8 @@ type Issue =
  * their prices: the warehouse price of one base unit, the price profile and the pack counted as
  * whole, with every unit's prices previewed by the shared functions. One Idempotency-Key per save.
  * While the product waits for its prices (ADR-0044) the terms start today and «Бүрэн болгох» saves
- * them, then completes the product.
+ * them, then completes the product. The fields sit on the left and the preview on the right
+ * (ADR-0066), so the dialog fits a 633px window with its buttons in view.
  */
 export function PriceEntryDialog(props: {
   productId: number;
@@ -59,6 +53,8 @@ export function PriceEntryDialog(props: {
   productLabel?: string;
   pending: boolean;
   onClose: () => void;
+  /** Called once the product is complete, before the dialog closes. */
+  onCompleted?: () => void;
 }) {
   const { t } = useTranslation();
   const prices = useProductPrices(props.productId);
@@ -66,7 +62,7 @@ export function PriceEntryDialog(props: {
   const loadProblem = problemFromError(prices.error) ?? problemFromError(profiles.error);
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-xl">
+      <DialogContent closeLabel={t('common.close')} size="lg">
         <DialogHeader>
           <DialogTitle>{t('pricing.dialog.title')}</DialogTitle>
           <DialogDescription>
@@ -83,6 +79,7 @@ export function PriceEntryDialog(props: {
             profiles={profiles.data}
             pending={props.pending}
             onClose={props.onClose}
+            {...(props.onCompleted ? { onCompleted: props.onCompleted } : {})}
           />
         ) : loadProblem ? null : (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -97,6 +94,7 @@ function PriceEntryForm(props: {
   profiles: readonly PriceProfile[];
   pending: boolean;
   onClose: () => void;
+  onCompleted?: () => void;
 }) {
   const { t } = useTranslation();
   const { view, profiles, pending, onClose } = props;
@@ -127,7 +125,7 @@ function PriceEntryForm(props: {
   const typedPrice = price.replace(/[\s,]/g, '');
   const whole = packs.length > 0 ? wholeUomId : null;
   const preview = previewTable(view.units, typedPrice, chosen?.current ?? null, whole);
-  const hasBulk = preview?.some((row) => row.retailBulk !== null) ?? false;
+  const money = (amount: Decimal) => t('pricing.money', { amount: formatMnt(amount.toFixed(0)) });
   const busy = mutations.setTerms.isPending || mutations.completeProducts.isPending;
   const termsMissing = action.problem?.code === 'PRICE_MISSING';
 
@@ -191,6 +189,7 @@ function PriceEntryForm(props: {
     });
     if (ok) {
       toast.success(t('pricing.saleReady.completed'));
+      props.onCompleted?.();
       onClose();
     }
   };
@@ -207,150 +206,151 @@ function PriceEntryForm(props: {
       {/* A refused completion says what it needs rather than the generic message. */}
       <ProblemAlert problem={termsMissing ? null : action.problem} />
       {termsMissing ? (
-        <p className="text-sm text-destructive">{t('pricing.dialog.termsRequired')}</p>
-      ) : null}
-      {issue ? <p className="text-sm text-destructive">{t(issue)}</p> : null}
-      <FormField
-        label={t('pricing.dialog.warehousePrice')}
-        htmlFor="price-warehouse"
-        hint={t('pricing.dialog.warehousePriceHint', { unit: base?.uomName ?? '' })}
-      >
-        <Input
-          id="price-warehouse"
-          inputMode="numeric"
-          autoComplete="off"
-          className="font-mono sm:w-44"
-          value={price}
-          onChange={(event) => setPrice(event.target.value)}
-        />
-      </FormField>
-      <FormField
-        label={t('pricing.dialog.profile')}
-        htmlFor="price-profile"
-        hint={
-          chosen
-            ? chosen.current
-              ? summary(chosen.current)
-              : t('pricing.dialog.noValuesToday')
-            : null
-        }
-      >
-        {profiles.length === 0 ? (
-          <p className="text-sm text-warning">{t('pricing.dialog.noProfiles')}</p>
-        ) : (
-          <NativeSelect
-            id="price-profile"
-            value={profileId === undefined ? '' : String(profileId)}
-            onChange={(event) => {
-              const id = Number.parseInt(event.target.value, 10);
-              setProfileId(Number.isSafeInteger(id) ? id : undefined);
-            }}
-          >
-            <option value="">{t('pricing.dialog.pickProfile')}</option>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={String(profile.id)}>
-                {profile.name}
-              </option>
-            ))}
-          </NativeSelect>
-        )}
-      </FormField>
-      {packs.length > 0 ? (
-        <FormField
-          label={t('pricing.dialog.wholeUnit')}
-          htmlFor="price-whole"
-          hint={t('pricing.dialog.wholeUnitHint')}
-        >
-          <NativeSelect
-            id="price-whole"
-            value={wholeUomId === null ? '' : String(wholeUomId)}
-            onChange={(event) => {
-              const id = Number.parseInt(event.target.value, 10);
-              setWholeUomId(Number.isSafeInteger(id) ? id : null);
-            }}
-          >
-            <option value="">{t('pricing.dialog.pickWhole')}</option>
-            {packs.map((unit) => (
-              <option key={unit.uomId} value={String(unit.uomId)}>
-                {unitLabel(unit)}
-              </option>
-            ))}
-          </NativeSelect>
-        </FormField>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t('pricing.dialog.noPacks')}</p>
-      )}
-      {pending ? (
-        <p className="text-sm text-muted-foreground">
-          {t('pricing.dialog.fromToday', { date: view.today })}
+        <p role="alert" className="text-sm text-destructive">
+          {t('pricing.dialog.termsRequired')}
         </p>
-      ) : (
-        <FormField label={t('pricing.dialog.validFrom')} htmlFor="price-valid-from">
-          <Input
-            id="price-valid-from"
-            type="date"
-            min={view.today}
-            value={validFrom}
-            onChange={(event) => setValidFrom(event.target.value)}
-            className="sm:w-44"
-          />
-        </FormField>
-      )}
-      {preview ? (
-        <section aria-label={t('pricing.dialog.preview')} className="flex flex-col gap-1.5">
+      ) : null}
+      {issue ? (
+        <p role="alert" className="text-sm text-destructive">
+          {t(issue)}
+        </p>
+      ) : null}
+      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_16rem] md:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
+          <FormField
+            label={t('pricing.dialog.warehousePrice')}
+            htmlFor="price-warehouse"
+            hint={t('pricing.dialog.warehousePriceHint', { unit: base?.uomName ?? '' })}
+          >
+            <Input
+              id="price-warehouse"
+              inputMode="numeric"
+              autoComplete="off"
+              className="font-mono sm:w-44"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+            />
+          </FormField>
+          <FormField
+            label={t('pricing.dialog.profile')}
+            htmlFor="price-profile"
+            hint={
+              chosen
+                ? chosen.current
+                  ? summary(chosen.current)
+                  : t('pricing.dialog.noValuesToday')
+                : null
+            }
+          >
+            {profiles.length === 0 ? (
+              <p className="text-sm text-warning">{t('pricing.dialog.noProfiles')}</p>
+            ) : (
+              <NativeSelect
+                id="price-profile"
+                value={profileId === undefined ? '' : String(profileId)}
+                onChange={(event) => {
+                  const id = Number.parseInt(event.target.value, 10);
+                  setProfileId(Number.isSafeInteger(id) ? id : undefined);
+                }}
+              >
+                <option value="">{t('pricing.dialog.pickProfile')}</option>
+                {profiles.map((profile) => (
+                  <option key={profile.id} value={String(profile.id)}>
+                    {profile.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </FormField>
+          {packs.length > 0 ? (
+            <FormField
+              label={t('pricing.dialog.wholeUnit')}
+              htmlFor="price-whole"
+              hint={t('pricing.dialog.wholeUnitHint')}
+            >
+              <NativeSelect
+                id="price-whole"
+                value={wholeUomId === null ? '' : String(wholeUomId)}
+                onChange={(event) => {
+                  const id = Number.parseInt(event.target.value, 10);
+                  setWholeUomId(Number.isSafeInteger(id) ? id : null);
+                }}
+              >
+                <option value="">{t('pricing.dialog.pickWhole')}</option>
+                {packs.map((unit) => (
+                  <option key={unit.uomId} value={String(unit.uomId)}>
+                    {unitLabel(unit)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FormField>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('pricing.dialog.noPacks')}</p>
+          )}
+          {pending ? (
+            <p className="text-sm text-muted-foreground">
+              {t('pricing.dialog.fromToday', { date: view.today })}
+            </p>
+          ) : (
+            <FormField label={t('pricing.dialog.validFrom')} htmlFor="price-valid-from">
+              <Input
+                id="price-valid-from"
+                type="date"
+                min={view.today}
+                value={validFrom}
+                onChange={(event) => setValidFrom(event.target.value)}
+                className="sm:w-44"
+              />
+            </FormField>
+          )}
+        </div>
+        <section
+          aria-label={t('pricing.dialog.preview')}
+          className="flex flex-col gap-2 rounded-xl bg-muted/70 p-3"
+        >
           <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             {t('pricing.dialog.preview')}
           </h3>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('pricing.card.columns.unit')}</TableHead>
-                <TableHead className="text-right whitespace-normal">
-                  {t('pricing.card.columns.wholesale')}
-                </TableHead>
-                <TableHead className="text-right whitespace-normal">
-                  {t('pricing.card.columns.retail')}
-                </TableHead>
-                {hasBulk ? (
-                  <TableHead className="text-right whitespace-normal">
-                    {t('pricing.card.columns.retailBulk')}
-                  </TableHead>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {preview ? (
+            <ul className="flex flex-col gap-2">
               {preview.map((row) => {
                 const unit = view.units.find((candidate) => candidate.productUnitId === row.unitId);
                 return (
-                  <TableRow key={row.unitId}>
-                    <TableCell className="whitespace-normal">
-                      {unit ? unitLabel(unit) : null}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-normal">
-                      <span className="font-mono">
-                        {t('pricing.money', { amount: formatMnt(row.wholesale.toFixed(0)) })}
-                      </span>
-                      <Badge variant="outline" className="ml-2">
-                        {t(`pricing.card.bases.${row.wholesaleBasis}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {t('pricing.money', { amount: formatMnt(row.retail.toFixed(0)) })}
-                    </TableCell>
-                    {hasBulk ? (
-                      <TableCell className="text-right font-mono">
-                        {row.retailBulk
-                          ? t('pricing.money', { amount: formatMnt(row.retailBulk.toFixed(0)) })
-                          : null}
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
+                  <li
+                    key={row.unitId}
+                    className="rounded-lg bg-background px-3 py-2 shadow-control ring-1 ring-black/[0.04]"
+                  >
+                    <div className="text-[13px] font-medium">{unit ? unitLabel(unit) : null}</div>
+                    <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-[13px]">
+                      <dt className="text-muted-foreground">
+                        {t('pricing.card.columns.wholesale')}
+                      </dt>
+                      <dd className="flex items-center justify-end gap-1.5">
+                        <Badge variant="outline">
+                          {t(`pricing.card.bases.${row.wholesaleBasis}`)}
+                        </Badge>
+                        <span className="font-mono">{money(row.wholesale)}</span>
+                      </dd>
+                      <dt className="text-muted-foreground">{t('pricing.card.columns.retail')}</dt>
+                      <dd className="text-right font-mono">{money(row.retail)}</dd>
+                      {row.retailBulk ? (
+                        <>
+                          <dt className="text-muted-foreground">
+                            {t('pricing.card.columns.retailBulk')}
+                          </dt>
+                          <dd className="text-right font-mono">{money(row.retailBulk)}</dd>
+                        </>
+                      ) : null}
+                    </dl>
+                  </li>
                 );
               })}
-            </TableBody>
-          </Table>
+            </ul>
+          ) : (
+            <p className="text-[13px] text-muted-foreground">{t('pricing.dialog.previewEmpty')}</p>
+          )}
         </section>
-      ) : null}
+      </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>
           {t('common.cancel')}

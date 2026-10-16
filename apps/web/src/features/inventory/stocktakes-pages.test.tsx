@@ -305,8 +305,12 @@ describe('review', () => {
     });
     renderApp('/inventory/stocktakes/5', fetchMock);
     const user = userEvent.setup();
-    expect(await screen.findByText('Дутагдал: 4,000 ₮')).toBeInTheDocument();
-    expect(screen.getByText('Илүүдэл: 3,000 ₮')).toBeInTheDocument();
+    expect(
+      await screen.findByText(mn.inventory.stocktake.shortageValue.replace('{{value}}', '4,000')),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(mn.inventory.stocktake.surplusValue.replace('{{value}}', '3,000')),
+    ).toBeInTheDocument();
     const differences = calls(fetchMock, 'GET', '/api/v1/stocktakes/5/lines')[0];
     expect(new URL(differences!.url).searchParams.get('differences')).toBe('true');
     expect(await screen.findByText('-4 ш')).toBeInTheDocument();

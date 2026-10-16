@@ -72,10 +72,7 @@ export function PosTestTillPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t('pos.testTill.title')}
-        meta={<span>{t('pos.testTill.description')}</span>}
-      />
+      <PageHeader title={t('pos.testTill.title')} description={t('pos.testTill.description')} />
       <Card>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <FormField label={t('pos.fields.till')} htmlFor="test-till">

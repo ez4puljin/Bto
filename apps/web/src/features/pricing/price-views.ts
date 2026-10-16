@@ -26,10 +26,10 @@ export function useUnitLabel(units: readonly PricedUnit[]) {
         });
 }
 
-/** «Задгай +15% · Супермаркет +30% · Супермаркет бөөний (24+) +20% · Бүхэл төгрөг». */
-export function useProfileSummary() {
+/** A profile's values as parts: «Задгай +15%», «Супермаркет +30%», …, then the rounding. */
+export function useProfileSummaryParts() {
   const { t } = useTranslation();
-  return (values: PriceProfileValues) =>
+  return (values: PriceProfileValues): string[] =>
     [
       t('pricing.profiles.summary.loose', { pct: plainDecimal(values.looseMarkupPct) }),
       t('pricing.profiles.summary.retail', { pct: plainDecimal(values.retailMarkupPct) }),
@@ -40,9 +40,13 @@ export function useProfileSummary() {
           })
         : null,
       t(`pricing.roundings.${values.rounding}`),
-    ]
-      .filter((part) => part !== null)
-      .join(' · ');
+    ].filter((part) => part !== null);
+}
+
+/** «Задгай +15% · Супермаркет +30% · Супермаркет бөөний (24+) +20% · Бүхэл төгрөг». */
+export function useProfileSummary() {
+  const parts = useProfileSummaryParts();
+  return (values: PriceProfileValues) => parts(values).join(' · ');
 }
 
 /** The API's units as the shared pricing functions take them. */

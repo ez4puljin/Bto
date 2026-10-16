@@ -415,10 +415,18 @@ describe('discount programs', () => {
     const { router } = renderApp('/pricing/discounts/new', fetchMock);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: mn.common.save }));
+    // The rule's message sits above the buttons and its field takes the focus.
     expect(screen.getByRole('alert')).toHaveTextContent(mn.pricing.programs.issues.NAME_REQUIRED);
+    expect(screen.getByLabelText(mn.pricing.programs.fields.name)).toHaveFocus();
 
     await user.type(screen.getByLabelText(mn.pricing.programs.fields.name), 'Кока бөөний');
-    await user.type(screen.getByRole('searchbox', { name: mn.inventory.productSearch }), 'кока');
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      mn.pricing.programs.issues.PRODUCT_REQUIRED,
+    );
+    const search = screen.getByRole('searchbox', { name: mn.pricing.programs.fields.product });
+    expect(search).toHaveFocus();
+    await user.type(search, 'кока');
     await user.click(
       await screen.findByRole('button', { name: `${mn.pricing.programs.pickProduct}: Кока кола` }),
     );
@@ -547,8 +555,8 @@ describe('price calculator', () => {
     await user.click(await screen.findByRole('button', { name: `${mn.inventory.add}: Кока кола` }));
     const qty = await screen.findByLabelText(`${mn.pricing.quote.qty}: Кока кола`);
     await user.clear(qty);
-    await user.type(qty, '25');
-    await user.click(screen.getByRole('button', { name: mn.pricing.quote.calculate }));
+    // Enter in a quantity prices the cart, like «Тооцоолох».
+    await user.type(qty, '25{Enter}');
 
     // 25 pieces: one whole box at the warehouse price and one loose piece.
     expect(await screen.findByText('1 хайрцаг')).toBeInTheDocument();
@@ -558,7 +566,14 @@ describe('price calculator', () => {
     expect(screen.getByText('Бөөний: 22,800₮')).toBeInTheDocument();
     expect(screen.getByText('Ундаа: 2% (−456₮)')).toBeInTheDocument();
     expect(screen.getByText('Ундаа: 2% (−23₮)')).toBeInTheDocument();
-    expect(screen.getByText('Нийт: 23,950₮ − 479₮ хямдрал = 23,471₮')).toBeInTheDocument();
+    // The totals are the table's foot, under the amount, discount and total columns.
+    const foot = within(screen.getByText(mn.pricing.quote.footer).closest('tr') ?? document.body);
+    expect(foot.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
+      mn.pricing.quote.footer,
+      '23,950₮',
+      '479₮',
+      '23,471₮',
+    ]);
     const [posted] = calls(fetchMock, 'POST', '/api/v1/pricing/quote');
     expect(await posted?.clone().json()).toEqual({
       list: 'WHOLESALE',

@@ -6,13 +6,13 @@ import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   LinkRow,
   ListCard,
   LoadMore,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -35,10 +35,12 @@ import {
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { randomUuid } from '@/lib/uuid';
+import { DateRangeFilter } from './date-range-filter';
 import {
   type JournalEntryDetail,
   type JournalSource,
@@ -63,6 +65,7 @@ export function JournalPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('finance.journal.manage');
   const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
   const [creating, setCreating] = useCreateParam();
   const sourceParam = params.get('source');
   const accountParam = Number.parseInt(params.get('account') ?? '', 10);
@@ -77,17 +80,6 @@ export function JournalPage() {
     accountId: accountParam > 0 ? accountParam : undefined,
   });
   const rows = journal.data?.pages.flatMap((page) => page.data) ?? [];
-
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -129,19 +121,18 @@ export function JournalPage() {
             </option>
           ))}
         </NativeSelect>
-        <DateFilter
-          label={t('finance.fields.from')}
-          value={from}
-          onChange={(value) => setParam('from', value)}
-        />
-        <DateFilter
-          label={t('finance.fields.to')}
-          value={to}
-          onChange={(value) => setParam('to', value)}
+        <DateRangeFilter
+          label={t('finance.fields.date')}
+          fromLabel={t('finance.fields.from')}
+          toLabel={t('finance.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(journal.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -156,18 +147,26 @@ export function JournalPage() {
           </TableHeader>
           <TableBody>
             {journal.isPending ? <SkeletonRows columns={7} /> : null}
-            {rows.map((entry) => (
-              <LinkRow key={entry.id} to={`?${withParam(params, 'entry', String(entry.id))}`}>
-                <TableCell className="font-mono">{entry.number}</TableCell>
-                <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                <TableCell>{entry.description}</TableCell>
-                <TableCell>
-                  <SourceBadge source={entry.source} />
-                </TableCell>
-                <TableCell className="text-right font-mono">{formatMnt(entry.amount)}</TableCell>
-                <TableCell className="text-right font-mono">{entry.lineCount}</TableCell>
-              </LinkRow>
-            ))}
+            {rows.map((entry) => {
+              // The number is the row's link for the keyboard; a click anywhere opens the panel.
+              const href = hrefWithParam(params, 'entry', String(entry.id));
+              return (
+                <LinkRow key={entry.id} to={href}>
+                  <TableCell className="font-mono">
+                    <Link to={href} className="font-medium underline-offset-4 hover:underline">
+                      {entry.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono">{entry.entryDate}</TableCell>
+                  <TruncateCell text={entry.description} fill />
+                  <TableCell>
+                    <SourceBadge source={entry.source} />
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{formatMnt(entry.amount)}</TableCell>
+                  <TableCell className="text-right font-mono">{entry.lineCount}</TableCell>
+                </LinkRow>
+              );
+            })}
           </TableBody>
         </Table>
         {!journal.isPending && rows.length === 0 ? (
@@ -194,16 +193,10 @@ export function JournalPage() {
       ) : null}
       <JournalEntryPanel
         entryId={openId > 0 ? openId : null}
-        onClose={() => setParam('entry', undefined)}
+        onClose={() => setParam('entry', null)}
       />
     </div>
   );
-}
-
-function withParam(params: URLSearchParams, key: string, value: string): string {
-  const next = new URLSearchParams(params);
-  next.set(key, value);
-  return next.toString();
 }
 
 /** One entry in the panel (`?entry=`): the facts and the lines; a manual one may be reversed. */
@@ -253,7 +246,7 @@ function EntryActions({ entry }: { entry: JournalEntryDetail }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setReversing(true)}>
+          <DropdownMenuItem variant="destructive" onSelect={() => setReversing(true)}>
             {t('finance.actions.reverse')}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -263,6 +256,7 @@ function EntryActions({ entry }: { entry: JournalEntryDetail }) {
           open
           title={t('finance.journal.reverseTitle')}
           description={t('finance.journal.reverseDescription', { number: entry.number })}
+          submitLabel={t('finance.journal.reverseSubmit')}
           pending={mutations.reverseEntry.isPending}
           problem={action.problem}
           onClose={() => {

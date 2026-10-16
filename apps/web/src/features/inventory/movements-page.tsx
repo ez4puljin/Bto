@@ -1,22 +1,23 @@
+import { cleanBarcode } from '@tugeel/shared/gtin';
 import { History } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ColumnChooser } from '@/components/column-chooser';
 import {
-  DateFilter,
   EmptyState,
   FilterBar,
   FilterChip,
   ListCard,
   LoadMore,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
-import { ScanBox } from '@/components/scan-box';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -26,8 +27,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { Input } from '@/components/ui/input';
+import { withScanChar } from '@/lib/barcode-keys';
+import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
+import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import {
   type MovementDocType,
   type StockMovement,
@@ -57,7 +62,37 @@ const positiveId = (value: string | null) => {
 const isDocType = (value: string | null): value is MovementDocType =>
   DOC_TYPES.some((type) => type === value);
 const day = (value: string | null) => (value !== null && DAY.test(value) ? value : undefined);
-const signed = (qty: string) => (qty.startsWith('-') ? qty : `+${qty}`);
+/** A movement's quantity with its sign, thousands grouped («+1,200», «-3»). */
+const signed = (qty: string) => (qty.startsWith('-') ? formatQty(qty) : `+${formatQty(qty)}`);
+
+const COLUMNS = [
+  'postedAt',
+  'document',
+  'movement',
+  'warehouse',
+  'bin',
+  'product',
+  'qty',
+  'warehouseBalance',
+  'binBalance',
+  'unitCost',
+  'value',
+] as const;
+type Column = (typeof COLUMNS)[number];
+const LOCKED: readonly Column[] = ['postedAt', 'document', 'qty'];
+const RIGHT: readonly Column[] = ['qty', 'warehouseBalance', 'binBalance', 'unitCost', 'value'];
+const COSTS: readonly Column[] = ['unitCost', 'value'];
+const NONE: readonly Column[] = [];
+
+/**
+ * The costs of a cost holder start hidden below a wide screen (ADR-0066), so the history fits a
+ * laptop without a sideways scroll; the column chooser brings them back.
+ */
+function defaultHiddenColumns(): readonly Column[] {
+  const wide =
+    typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 1536px)').matches;
+  return wide ? NONE : COSTS;
+}
 
 /**
  * Movement history (SPEC §8.2 #1): every ledger row newest first, by product, warehouse, shelf,
@@ -84,6 +119,17 @@ export function MovementsPage() {
   const [missingBin, setMissingBin] = useState<string | null>(null);
   const rows = movements.data?.pages.flatMap((page) => page.data) ?? [];
   const withBalances = productId !== undefined;
+  const [defaultHidden] = useState(defaultHiddenColumns);
+  const columnChoice = useHiddenColumns('stockMovements', COLUMNS, LOCKED, defaultHidden);
+  // The columns this page can show: balances with a product, costs for cost holders; one product's
+  // history needs no product column.
+  const available = COLUMNS.filter((column) => {
+    if (column === 'product') return !withBalances;
+    if (column === 'warehouseBalance' || column === 'binBalance') return withBalances;
+    if (column === 'unitCost' || column === 'value') return canSeeCosts;
+    return true;
+  });
+  const shown = (column: Column) => available.includes(column) && !columnChoice.hidden.has(column);
 
   const update = (changes: Record<string, string | undefined>) =>
     setParams(
@@ -112,24 +158,27 @@ export function MovementsPage() {
     );
   };
 
-  const columns = 7 + (withBalances ? 2 : 0) + (canSeeCosts ? 2 : 0);
+  const columns = available.filter(shown).length;
 
   return (
     <div>
       <PageHeader
         title={t('inventory.movements.title')}
-        meta={<p className="max-w-3xl">{t('inventory.movements.intro')}</p>}
+        description={t('inventory.movements.intro')}
       />
-      {productId === undefined ? (
-        <div className="mb-3 flex flex-col gap-2">
-          <Label>{t('inventory.movements.product')}</Label>
-          <ProductSearch
-            pickLabel={t('inventory.movements.pick')}
-            onPick={(picked) => update({ product: String(picked.id) })}
+      {/* Every filter in one bar (ADR-0066): the product is a search pill until chosen, then a chip. */}
+      <FilterBar
+        end={
+          <ColumnChooser
+            keys={available}
+            locked={LOCKED}
+            label={(column) => t(`inventory.movements.columns.${column}`)}
+            hidden={columnChoice.hidden}
+            toggle={columnChoice.toggle}
+            showAll={columnChoice.showAll}
           />
-        </div>
-      ) : null}
-      <FilterBar>
+        }
+      >
         {productId !== undefined ? (
           <FilterChip
             clearLabel={t('inventory.movements.clearProduct')}
@@ -138,7 +187,20 @@ export function MovementsPage() {
             <span className="font-mono text-muted-foreground">{product.data?.product.sku}</span>{' '}
             <span>{product.data?.product.name}</span>
           </FilterChip>
-        ) : null}
+        ) : (
+          <>
+            <label htmlFor="movements-product" className="sr-only">
+              {t('inventory.movements.product')}
+            </label>
+            <ProductSearch
+              id="movements-product"
+              variant="filter"
+              className="sm:w-64"
+              pickLabel={t('inventory.movements.pick')}
+              onPick={(picked) => update({ product: String(picked.id) })}
+            />
+          </>
+        )}
         <WarehouseSelect
           variant="filter"
           options={warehouses.options}
@@ -161,15 +223,14 @@ export function MovementsPage() {
             </option>
           ))}
         </NativeSelect>
-        <DateFilter
-          label={t('inventory.movements.from')}
-          value={from}
-          onChange={(value) => update({ from: value })}
-        />
-        <DateFilter
-          label={t('inventory.movements.to')}
-          value={to}
-          onChange={(value) => update({ to: value })}
+        <DateRangeFilter
+          label={t('inventory.date')}
+          fromLabel={t('inventory.movements.from')}
+          toLabel={t('inventory.movements.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => update({ from: value })}
+          onTo={(value) => update({ to: value })}
         />
         {binId !== undefined ? (
           <FilterChip
@@ -179,55 +240,28 @@ export function MovementsPage() {
             <span className="text-muted-foreground">{t('inventory.movements.bin')}</span>{' '}
             <span className="font-mono">{bin.data?.code}</span>
           </FilterChip>
+        ) : warehouseId !== undefined ? (
+          <ShelfFilter onFind={findBin} />
         ) : null}
       </FilterBar>
-      {binId === undefined && warehouseId !== undefined ? (
-        <div className="mb-4 flex flex-col gap-1">
-          <ScanBox
-            letters
-            label={t('inventory.movements.bin')}
-            placeholder={t('inventory.movements.binPlaceholder')}
-            onScan={findBin}
-          />
-          {missingBin ? (
-            <p className="text-sm text-destructive">
-              {t('inventory.movements.binNotFound', { code: missingBin })}
-            </p>
-          ) : null}
-        </div>
+      {missingBin && binId === undefined ? (
+        <p className="mb-3 text-sm text-destructive">
+          {t('inventory.movements.binNotFound', { code: missingBin })}
+        </p>
       ) : null}
       <ProblemAlert problem={problemFromError(movements.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('inventory.movements.columns.postedAt')}</TableHead>
-              <TableHead>{t('inventory.movements.columns.document')}</TableHead>
-              <TableHead>{t('inventory.movements.columns.movement')}</TableHead>
-              <TableHead>{t('inventory.movements.columns.warehouse')}</TableHead>
-              <TableHead>{t('inventory.movements.columns.bin')}</TableHead>
-              <TableHead>{t('inventory.movements.columns.product')}</TableHead>
-              <TableHead className="text-right">{t('inventory.movements.columns.qty')}</TableHead>
-              {withBalances ? (
-                <>
-                  <TableHead className="text-right">
-                    {t('inventory.movements.columns.warehouseBalance')}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.movements.columns.binBalance')}
-                  </TableHead>
-                </>
-              ) : null}
-              {canSeeCosts ? (
-                <>
-                  <TableHead className="text-right">
-                    {t('inventory.movements.columns.unitCost')}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.movements.columns.value')}
-                  </TableHead>
-                </>
-              ) : null}
+              {available.filter(shown).map((column) => (
+                <TableHead
+                  key={column}
+                  className={RIGHT.includes(column) ? 'text-right' : undefined}
+                >
+                  {t(`inventory.movements.columns.${column}`)}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -235,10 +269,14 @@ export function MovementsPage() {
             {rows.map((row) => {
               const docPage = DOC_PAGES[row.docType];
               const number = row.docNumber ?? t('common.none');
+              const [date, time] = formatUbDateTime(Date.parse(row.postedAt)).split(' ');
               return (
                 <TableRow key={row.id}>
                   <TableCell className="font-mono">
-                    {formatUbDateTime(Date.parse(row.postedAt))}
+                    <div className="flex flex-col">
+                      <span>{date}</span>
+                      <span className="text-xs text-muted-foreground">{time}</span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
@@ -257,18 +295,28 @@ export function MovementsPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{t(`inventory.movements.types.${row.movementType}`)}</TableCell>
-                  <TableCell>{warehouseName(row.warehouseId)}</TableCell>
-                  <TableCell className="font-mono">{row.binCode}</TableCell>
-                  <TableCell className="min-w-48 whitespace-normal">
-                    <Link
-                      to={`/inventory/stock/${row.product.id}`}
-                      className="text-link underline-offset-4 hover:underline"
+                  {shown('movement') ? (
+                    <TableCell>{t(`inventory.movements.types.${row.movementType}`)}</TableCell>
+                  ) : null}
+                  {shown('warehouse') ? (
+                    <TableCell>{warehouseName(row.warehouseId)}</TableCell>
+                  ) : null}
+                  {shown('bin') ? <TableCell className="font-mono">{row.binCode}</TableCell> : null}
+                  {shown('product') ? (
+                    <TruncateCell
+                      text={`${row.product.sku} ${row.product.name}`}
+                      fill
+                      className="min-w-44"
                     >
-                      <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
-                      {row.product.name}
-                    </Link>
-                  </TableCell>
+                      <Link
+                        to={`/inventory/stock/${row.product.id}`}
+                        className="text-link underline-offset-4 hover:underline"
+                      >
+                        <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
+                        {row.product.name}
+                      </Link>
+                    </TruncateCell>
+                  ) : null}
                   <TableCell className="text-right font-mono">
                     <div className="flex flex-col items-end">
                       <span
@@ -282,32 +330,32 @@ export function MovementsPage() {
                       {row.unitName !== row.product.baseUnitName ? (
                         <span className="text-xs text-muted-foreground">
                           {t('inventory.movements.entered', {
-                            qty: row.enteredQty,
+                            qty: formatQty(row.enteredQty),
                             unit: row.unitName,
                           })}
                         </span>
                       ) : null}
                     </div>
                   </TableCell>
-                  {withBalances ? (
-                    <>
-                      <TableCell className="text-right font-mono">
-                        {row.warehouseBalance ?? t('common.none')}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {row.binBalance ?? t('common.none')}
-                      </TableCell>
-                    </>
+                  {shown('warehouseBalance') ? (
+                    <TableCell className="text-right font-mono">
+                      {row.warehouseBalance ? formatQty(row.warehouseBalance) : t('common.none')}
+                    </TableCell>
                   ) : null}
-                  {canSeeCosts ? (
-                    <>
-                      <TableCell className="text-right font-mono">
-                        {row.unitCost === undefined ? t('common.none') : formatMnt(row.unitCost)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {row.value === undefined ? t('common.none') : formatMnt(row.value)}
-                      </TableCell>
-                    </>
+                  {shown('binBalance') ? (
+                    <TableCell className="text-right font-mono">
+                      {row.binBalance ? formatQty(row.binBalance) : t('common.none')}
+                    </TableCell>
+                  ) : null}
+                  {shown('unitCost') ? (
+                    <TableCell className="text-right font-mono">
+                      {row.unitCost === undefined ? t('common.none') : formatMnt(row.unitCost)}
+                    </TableCell>
+                  ) : null}
+                  {shown('value') ? (
+                    <TableCell className="text-right font-mono">
+                      {row.value === undefined ? t('common.none') : formatMnt(row.value)}
+                    </TableCell>
                   ) : null}
                 </TableRow>
               );
@@ -319,6 +367,44 @@ export function MovementsPage() {
         ) : null}
         <LoadMore query={movements} />
       </ListCard>
+    </div>
+  );
+}
+
+/**
+ * The bar's shelf filter (ADR-0066): a pill taking a typed or scanned label, read by physical key
+ * so the keyboard layout does not matter; a scanner works without clicking it first.
+ */
+function ShelfFilter({ onFind }: { onFind: (code: string) => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState('');
+  const root = useRef<HTMLDivElement>(null);
+  const submit = (text: string) => {
+    const code = cleanBarcode(text);
+    setDraft('');
+    if (code) onFind(code);
+  };
+  useWedgeScanner(submit, true, { letters: true, root });
+  return (
+    <div ref={root} className="w-full sm:w-64">
+      <Input
+        aria-label={t('inventory.movements.bin')}
+        placeholder={t('inventory.movements.binPlaceholder')}
+        autoComplete="off"
+        spellCheck={false}
+        className="h-8 rounded-full font-mono md:text-[13px]"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submit(draft);
+            return;
+          }
+          const typed = withScanChar(event, draft);
+          if (typed !== null) setDraft(typed);
+        }}
+      />
     </div>
   );
 }

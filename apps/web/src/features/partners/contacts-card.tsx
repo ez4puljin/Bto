@@ -103,6 +103,7 @@ export function ContactsCard(props: {
         title={t('common.delete')}
         description={t('partners.contacts.deleteConfirm')}
         confirmLabel={t('common.delete')}
+        pending={deletion.pending}
         problem={deletion.problem}
         onClose={deletion.close}
         onConfirm={deletion.confirm}

@@ -176,8 +176,13 @@ describe('partners menu and access', () => {
   });
 });
 
+/** The office's stored column choice: every column shown. */
+const showEveryCustomerColumn = () =>
+  localStorage.setItem(`tugeel.partners.customers.hiddenColumns.v1:${OFFICE_ME.id}`, '[]');
+
 describe('customers list', () => {
   it('filters by kind and a missing TIN through the URL', async () => {
+    showEveryCustomerColumn();
     const fetchMock = signedIn(OFFICE_ME, {
       'GET /api/v1/customers': (request) => {
         const query = new URL(request.url).searchParams;
@@ -229,7 +234,7 @@ describe('customers list', () => {
     );
   });
 
-  it('shows every customer field in its own column and opens the customer from its row', async () => {
+  it('shows the columns that fit a laptop, every field on request, and opens a customer', async () => {
     const routes = {
       'GET /api/v1/customers': () =>
         list([
@@ -262,6 +267,27 @@ describe('customers list', () => {
     const first = renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
     const table = within(await screen.findByRole('table'));
     expect(await table.findByText('Өр төлөөгүй')).toBeInTheDocument();
+    // A user who never chose sees the columns that fit a 1366px screen (ADR-0066).
+    const columns = mn.partners.customers.columns;
+    const shown = [
+      columns.code,
+      columns.name,
+      columns.kind,
+      columns.tin,
+      columns.phone,
+      columns.creditHold,
+      columns.status,
+    ];
+    for (const label of Object.values(columns)) {
+      if (shown.includes(label)) {
+        expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
+      } else {
+        expect(screen.queryByRole('columnheader', { name: label })).toBeNull();
+      }
+    }
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
     for (const text of [
       '1234567',
       '11234567',
@@ -270,22 +296,26 @@ describe('customers list', () => {
       'БЗД, 13-р хороо',
       'Бат',
       '8811 2233',
-      '5,000,000',
+      '5,000,000₮',
       '30 хоног',
       mn.partners.credit.held,
       mn.partners.credit.limitUndecided,
       'Өглөө хүргэнэ',
     ]) {
-      expect(table.getAllByText(text).length).toBeGreaterThan(0);
+      expect((await table.findAllByText(text)).length).toBeGreaterThan(0);
     }
     expect(table.getAllByRole('link', { name: mn.partners.addresses.openMap })).toHaveLength(2);
-    for (const label of Object.values(mn.partners.customers.columns)) {
+    for (const label of Object.values(columns)) {
       expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
     }
-    const user = userEvent.setup();
+    // Money reads right-aligned, head and cell alike.
+    expect(screen.getByRole('columnheader', { name: columns.creditLimit })).toHaveClass(
+      'text-right',
+    );
     await user.click(screen.getByRole('link', { name: 'Номин дэлгүүр' }));
     await waitFor(() => expect(first.router.state.location.pathname).toBe('/partners/customers/1'));
 
+    // The choice to show every column is kept for the next visit.
     cleanup();
     const second = renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
     await user.click(await within(await screen.findByRole('table')).findByText('11234567'));
@@ -302,24 +332,25 @@ describe('customers list', () => {
     renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
     const user = userEvent.setup();
     await screen.findByRole('link', { name: 'Номин дэлгүүр' });
+    const { kind, note } = mn.partners.customers.columns;
     await user.click(screen.getByRole('button', { name: mn.common.columns }));
-    await user.click(
-      await screen.findByRole('menuitemcheckbox', { name: mn.partners.customers.columns.note }),
-    );
+    // «Төрөл» shows by default; «Тэмдэглэл» is hidden by default and can be shown.
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: kind }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: note }));
     await user.keyboard('{Escape}');
-    expect(
-      screen.queryByRole('columnheader', { name: mn.partners.customers.columns.note }),
-    ).toBeNull();
-    expect(localStorage.getItem(`tugeel.partners.customers.hiddenColumns.v1:${OFFICE_ME.id}`)).toBe(
-      '["note"]',
+    expect(screen.queryByRole('columnheader', { name: kind })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: note })).toBeInTheDocument();
+    const stored: unknown = JSON.parse(
+      localStorage.getItem(`tugeel.partners.customers.hiddenColumns.v1:${OFFICE_ME.id}`) ?? '[]',
     );
+    expect(stored).toContain('kind');
+    expect(stored).not.toContain('note');
 
     cleanup();
     renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
     await screen.findByRole('link', { name: 'Номин дэлгүүр' });
-    expect(
-      screen.queryByRole('columnheader', { name: mn.partners.customers.columns.note }),
-    ).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: kind })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: note })).toBeInTheDocument();
   });
 });
 
@@ -520,7 +551,7 @@ describe('customer page', () => {
     });
     // The card is read again, with the stored terms.
     const credit = within(screen.getByRole('region', { name: mn.partners.credit.title }));
-    expect(await credit.findByText('5,000,000')).toBeInTheDocument();
+    expect(await credit.findByText('5,000,000₮')).toBeInTheDocument();
     expect(credit.getByText('Хугацаа хэтэрсэн')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: edit })).toBeInTheDocument();
     expect(screen.getAllByText(mn.partners.credit.held).length).toBeGreaterThan(0);
@@ -571,7 +602,7 @@ describe('customer page', () => {
 });
 
 describe('suppliers', () => {
-  it('shows every supplier field in its own column, read-only to a warehouse worker', async () => {
+  it('shows every supplier field on request, read-only to a warehouse worker', async () => {
     const { router } = renderApp(
       '/partners/suppliers',
       signedIn(WORKER_ME, {
@@ -597,6 +628,12 @@ describe('suppliers', () => {
       }),
     );
     const table = within(await screen.findByRole('table'));
+    // By default the bank and the address wait in «Баганууд» (ADR-0066).
+    expect(await table.findByText('12345678901')).toBeInTheDocument();
+    expect(table.queryByText('MN120005005012345678')).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
     for (const text of [
       '7654321',
       '12345678901',
@@ -616,7 +653,7 @@ describe('suppliers', () => {
     for (const label of Object.values(mn.partners.suppliers.columns)) {
       expect(screen.getByRole('columnheader', { name: label })).toBeInTheDocument();
     }
-    await userEvent.setup().click(screen.getByRole('link', { name: 'МСМ ХХК' }));
+    await user.click(screen.getByRole('link', { name: 'МСМ ХХК' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/partners/suppliers/3'));
   });
 
@@ -656,6 +693,11 @@ describe('suppliers', () => {
       '/catalog/products/7',
     );
     expect(screen.getByText(mn.partners.supplier.main)).toBeInTheDocument();
+    // The card shows the first ten; the rest are in the product list, filtered by this supplier.
+    expect(screen.getByRole('link', { name: mn.partners.supplier.productsAll })).toHaveAttribute(
+      'href',
+      '/catalog/products?supplier=3',
+    );
   });
 
   it('shows a taken supplier name on its field', async () => {

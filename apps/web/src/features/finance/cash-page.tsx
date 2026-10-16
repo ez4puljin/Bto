@@ -2,12 +2,12 @@ import { WalletCards } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 import {
-  DateFilter,
   EmptyState,
   FilterBar,
   ListCard,
   LoadMore,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -20,19 +20,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { cn } from '@/lib/utils';
+import { DateRangeFilter } from './date-range-filter';
 import { useCashBook, useMoneyAccounts } from './api';
 import { PaymentKindBadge } from './badges';
 
 /**
- * The cash and bank books (ADR-0060 #5): every money account with its balance; the chosen one's
- * vouchers newest first with the balance after each (`?account=`, dates `?from=&to=`).
+ * The cash and bank books (ADR-0060 #5): every money account as a small card with its balance (as
+ * many to a row as fit); the chosen one's vouchers newest first with the balance after each
+ * (`?account=`, dates `?from=&to=`). Cards carry ₮, the book plain figures (ADR-0066).
  */
 export function CashPage() {
   const { t } = useTranslation();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const accounts = useMoneyAccounts();
   const chosen = Number.parseInt(params.get('account') ?? '', 10);
   const accountId = chosen > 0 ? chosen : (accounts.data?.[0]?.id ?? null);
@@ -41,17 +45,6 @@ export function CashPage() {
   const book = useCashBook(accountId, { from, to });
   const rows = book.data?.pages.flatMap((page) => page.data) ?? [];
   const account = accounts.data?.find((entry) => entry.id === accountId);
-
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div className="space-y-4">
@@ -64,43 +57,44 @@ export function CashPage() {
       ) : null}
       <nav
         aria-label={t('finance.cash.accounts')}
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3"
       >
         {(accounts.data ?? []).map((entry) => (
           <Link
             key={entry.id}
-            to={`?${withParam(params, 'account', String(entry.id))}`}
+            to={hrefWithParam(params, 'account', String(entry.id))}
             aria-current={entry.id === accountId ? 'page' : undefined}
             className={cn(
-              'flex flex-col gap-1 rounded-xl bg-card p-4 shadow-card ring-1 ring-black/[0.06] transition-[box-shadow] hover:shadow-popover',
-              entry.id === accountId ? 'ring-2 ring-ring' : '',
+              'flex min-w-0 flex-col gap-0.5 rounded-xl border bg-card px-3.5 py-3 shadow-card transition-[box-shadow,border-color] hover:shadow-popover',
+              entry.id === accountId ? 'border-ring ring-2 ring-ring/30' : 'border-border',
             )}
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="font-semibold">{entry.name}</span>
+              <span className="truncate font-semibold" title={entry.name}>
+                {entry.name}
+              </span>
               <Badge variant="outline">{t(`finance.moneyKinds.${entry.kind}`)}</Badge>
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="truncate text-xs text-muted-foreground">
               {entry.code}
               {entry.branchName ? ` · ${entry.branchName}` : ''}
               {entry.bankAccountNo ? ` · ${entry.bankAccountNo}` : ''}
             </span>
-            <span className="font-mono text-xl font-semibold">{formatMnt(entry.balance)}</span>
+            <span className="font-mono text-lg font-semibold">{formatTugrik(entry.balance)}</span>
           </Link>
         ))}
       </nav>
       {account ? (
         <section aria-label={t('finance.cash.book')} className="space-y-3">
           <FilterBar>
-            <DateFilter
-              label={t('finance.fields.from')}
-              value={from}
-              onChange={(value) => setParam('from', value)}
-            />
-            <DateFilter
-              label={t('finance.fields.to')}
-              value={to}
-              onChange={(value) => setParam('to', value)}
+            <DateRangeFilter
+              label={t('finance.fields.date')}
+              fromLabel={t('finance.fields.from')}
+              toLabel={t('finance.fields.to')}
+              from={from}
+              to={to}
+              onFrom={(value) => setParam('from', value)}
+              onTo={(value) => setParam('to', value)}
             />
             {book.data?.pages[0] && from ? (
               <span className="text-sm text-muted-foreground">
@@ -110,7 +104,7 @@ export function CashPage() {
             ) : null}
           </FilterBar>
           <ProblemAlert problem={problemFromError(book.error)} />
-          <ListCard>
+          <ListCard scroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -139,9 +133,9 @@ export function CashPage() {
                     <TableCell>
                       <PaymentKindBadge kind={row.kind} />
                     </TableCell>
-                    <TableCell>
-                      {row.customerName ?? row.counterpartyName ?? row.glAccountName ?? ''}
-                    </TableCell>
+                    <TruncateCell
+                      text={row.customerName ?? row.counterpartyName ?? row.glAccountName ?? ''}
+                    />
                     <TableCell className="text-right font-mono">
                       {row.direction === 'IN' ? formatMnt(row.amount) : ''}
                     </TableCell>
@@ -164,10 +158,4 @@ export function CashPage() {
       ) : null}
     </div>
   );
-}
-
-function withParam(params: URLSearchParams, key: string, value: string): string {
-  const next = new URLSearchParams(params);
-  next.set(key, value);
-  return next.toString();
 }

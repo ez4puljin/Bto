@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { saveBlob } from '@/lib/download';
+import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
@@ -38,9 +39,10 @@ const positiveId = (value: string | null) => {
 };
 
 /**
- * «AI туслах» (ADR-0045): the user's conversations on the side, the open one in the middle, the
- * question box under it. The open conversation lives in the URL (`?c=`). Rows of a fresh answer
- * come with it; older steps fetch theirs again on demand, since rows are never stored.
+ * «AI туслах» (ADR-0045): the user's conversations on the side, the open one in the middle (64rem
+ * at most), the question box floating at its foot (ADR-0066). The open conversation lives in the
+ * URL (`?c=`) and shows its outline while it loads. Rows of a fresh answer come with it; older
+ * steps fetch theirs again on demand, since rows are never stored.
  */
 export function AiPage() {
   const { t } = useTranslation();
@@ -62,6 +64,7 @@ export function AiPage() {
   const [saving, setSaving] = useState<{ question: AiQuestion; key: string } | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLFormElement>(null);
 
   const configured = status.data?.configured === true;
   const list = useMemo(
@@ -69,12 +72,32 @@ export function AiPage() {
     [conversations.data],
   );
   const steps = conversationId === undefined ? [] : (conversation.data?.questions ?? []);
+  const loadingConversation = conversationId !== undefined && conversation.isPending;
   const stillWorking = asking.problem?.code === 'IDEMPOTENCY_KEY_IN_PROGRESS';
+  // The question box floats at the foot of the window only over answers it adds to; on an empty
+  // page (examples, datasets) or while the assistant is off it stays in the flow (ADR-0066).
+  const floating = configured && (steps.length > 0 || pending !== null);
 
   // Follows the conversation as it grows; an empty page stays at its top (the notice, examples).
   useEffect(() => {
     if (steps.length > 0 || pending) end.current?.scrollIntoView?.({ block: 'end' });
   }, [steps.length, pending]);
+
+  // Toasts («Тайлан хадгалагдлаа») rise above the floating question box, as above StickyActions.
+  useEffect(() => {
+    const element = composer.current;
+    if (!floating || !element) return;
+    const root = document.documentElement;
+    const measure = () =>
+      root.style.setProperty('--sticky-actions-space', `${element.offsetHeight + 12}px`);
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty('--sticky-actions-space');
+    };
+  }, [floating]);
 
   const startNew = () => {
     setParams({});
@@ -138,7 +161,8 @@ export function AiPage() {
           <AlertDescription>{t('ai.notConfigured.body')}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      {/* The conversation stops at 64rem: answers stay readable on a wide screen (ADR-0066). */}
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,64rem)]">
         <section aria-label={t('ai.conversations')} className="order-2 lg:order-1">
           <ListCard>
             <h2 className="border-b px-4 py-2.5 text-sm font-medium">{t('ai.conversations')}</h2>
@@ -170,9 +194,23 @@ export function AiPage() {
         </section>
 
         <section aria-label={t('ai.title')} className="order-1 min-w-0 space-y-4 lg:order-2">
-          {steps.length === 0 && !pending ? (
+          <ProblemAlert problem={problemFromError(conversation.error)} />
+          {loadingConversation ? (
+            // An opened conversation loads: its outline, never the empty page's examples.
+            <div role="status" className="space-y-4">
+              <span className="sr-only">{t('common.loading')}</span>
+              <div
+                aria-hidden
+                className="ml-auto h-10 w-2/5 animate-pulse rounded-2xl bg-info-soft"
+              />
+              <div
+                aria-hidden
+                className="h-36 animate-pulse rounded-xl bg-card shadow-card ring-1 ring-black/[0.06]"
+              />
+            </div>
+          ) : steps.length === 0 && !pending ? (
             <Card>
-              <CardContent className="space-y-4 pt-5">
+              <CardContent className="space-y-4">
                 <div className="flex items-start gap-3">
                   <Sparkles aria-hidden className="mt-0.5 size-5 text-link" />
                   <div className="space-y-1">
@@ -219,7 +257,10 @@ export function AiPage() {
               </CardContent>
             </Card>
           ) : (
-            <ol aria-label={t('ai.conversations')} className="space-y-6">
+            <ol
+              aria-label={conversation.data?.conversation.title ?? t('ai.title')}
+              className="space-y-6"
+            >
               {steps.map((step) => (
                 <AnswerStep
                   key={step.id}
@@ -249,24 +290,34 @@ export function AiPage() {
             </ol>
           )}
           <ProblemAlert problem={rows.problem} />
-          {stillWorking ? (
-            <Alert>
-              <AlertDescription>{t('ai.stillWorking')}</AlertDescription>
-            </Alert>
-          ) : (
-            <ProblemAlert problem={asking.problem} />
-          )}
+          {/* Over a conversation the question box floats at the foot of the window while the
+              answers scroll under it; its own refusals show inside it, next to the question. */}
           <form
-            className="space-y-2"
+            ref={composer}
+            data-floating={floating ? 'true' : undefined}
+            className={cn(
+              'space-y-2 rounded-2xl p-3 ring-1 ring-black/[0.06] print:hidden',
+              floating
+                ? 'sticky bottom-3 z-20 bg-background/95 shadow-popover backdrop-blur-md'
+                : 'bg-card shadow-card',
+            )}
             onSubmit={(event) => {
               event.preventDefault();
               void submit();
             }}
           >
+            {stillWorking ? (
+              <Alert>
+                <AlertDescription>{t('ai.stillWorking')}</AlertDescription>
+              </Alert>
+            ) : (
+              <ProblemAlert problem={asking.problem} />
+            )}
             <Textarea
               ref={box}
               aria-label={t('ai.placeholder')}
               placeholder={t('ai.placeholder')}
+              className="max-h-48"
               value={draft}
               maxLength={AI_QUESTION_MAX_LENGTH}
               rows={3}
@@ -279,9 +330,13 @@ export function AiPage() {
                 }
               }}
             />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">{t('ai.privacyNote')}</p>
-              <Button type="submit" disabled={!configured || !draft.trim() || pending !== null}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="min-w-0 text-xs text-muted-foreground">{t('ai.privacyNote')}</p>
+              <Button
+                type="submit"
+                className="shrink-0"
+                disabled={!configured || !draft.trim() || pending !== null}
+              >
                 {pending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
                 {pending ? t('ai.thinking') : t('ai.ask')}
               </Button>

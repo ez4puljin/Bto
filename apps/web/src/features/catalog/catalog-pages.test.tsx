@@ -263,14 +263,19 @@ describe('products list', () => {
     expect(screen.getAllByText('Ундаа').length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: mn.common.loadMore }));
     expect(await screen.findByRole('link', { name: 'Фанта' })).toBeInTheDocument();
-    // Each page reads the suppliers and locations of its own products, once.
+    // Each page reads the suppliers and prices of its own products, once; the locations' columns
+    // are hidden until a user shows them (ADR-0066), so no page reads them.
     await waitFor(() =>
       expect(calls(fetchMock, 'GET', '/api/v1/product-suppliers').map(idsOf)).toEqual([
         ['1'],
         ['2'],
       ]),
     );
-    expect(calls(fetchMock, 'GET', '/api/v1/product-locations').map(idsOf)).toEqual([['1'], ['2']]);
+    expect(calls(fetchMock, 'GET', '/api/v1/product-prices/current').map(idsOf)).toEqual([
+      ['1'],
+      ['2'],
+    ]);
+    expect(calls(fetchMock, 'GET', '/api/v1/product-locations')).toHaveLength(0);
 
     await user.type(screen.getByRole('searchbox', { name: mn.common.search }), 'coca');
     await waitFor(() => expect(router.state.location.search).toBe('?q=coca'));
@@ -1026,7 +1031,7 @@ describe('products list', () => {
     ]);
   });
 
-  it('shows every piece of product information in its own column', async () => {
+  it('shows a default set of columns that fits a laptop, and every other one on request', async () => {
     renderApp(
       '/catalog/products',
       signedIn(ADMIN_ME, {
@@ -1062,6 +1067,19 @@ describe('products list', () => {
     const table = await screen.findByRole('table');
     expect(await within(table).findByText('МСМ ХХК +1')).toBeInTheDocument();
     expect(await within(table).findByText('990₮')).toBeInTheDocument();
+    // A user who never chose sees the photo, code, name, category, price, supplier and status.
+    const shown = ['image', 'sku', 'name', 'category', 'warehousePrice', 'supplier', 'status'];
+    for (const key of PRODUCT_LIST_COLUMNS) {
+      if (shown.includes(key)) expect(columnHeader(key)).toBeInTheDocument();
+      else expect(columnHeader(key)).toBeNull();
+    }
+    // The price reads right-aligned, head and cell alike.
+    expect(columnHeader('warehousePrice')).toHaveClass('text-right');
+    expect(within(table).getByText('990₮')).toHaveClass('text-right');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.common.showAllColumns }));
     for (const text of [
       'Ундааны үнэ',
       '1 хайрцаг = 24 ш',
@@ -1071,7 +1089,7 @@ describe('products list', () => {
       'Бөөний агуулах',
       'Бөөний агуулах: A-01-01',
     ]) {
-      expect(within(table).getByText(text)).toBeInTheDocument();
+      expect(await within(table).findByText(text)).toBeInTheDocument();
     }
     for (const key of PRODUCT_LIST_COLUMNS) {
       expect(columnHeader(key)).toBeInTheDocument();
@@ -1096,7 +1114,10 @@ describe('products list', () => {
     );
     await user.keyboard('{Escape}');
     expect(columnHeader('category')).toBeNull();
-    expect(JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]')).toEqual(['category']);
+    // The choice is stored with the columns hidden by default (ADR-0066).
+    const stored: unknown = JSON.parse(localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? '[]');
+    expect(stored).toEqual(expect.arrayContaining(['category', 'weight', 'units']));
+    expect(stored).not.toContain('supplier');
 
     // A new visit keeps the choice until every column is shown again.
     cleanup();
@@ -1192,7 +1213,7 @@ describe('products list', () => {
     cleanup();
     const second = renderApp('/catalog/products', signedIn(ADMIN_ME, routes));
     const table = await screen.findByRole('table');
-    await user.click(await within(table).findByText('1 хайрцаг = 24 ш'));
+    await user.click(await within(table).findByText('Ундаа'));
     await waitFor(() => expect(second.router.state.location.pathname).toBe('/catalog/products/1'));
 
     cleanup();
@@ -1334,6 +1355,31 @@ describe('product page', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(retired).toHaveLength(1);
     expect(retired[0]).toMatch(UUID);
+  });
+
+  it('deletes a barcode only after a question that names it, then says so', async () => {
+    const fetchMock = signedIn(
+      ADMIN_ME,
+      productRoutes({
+        'DELETE /api/v1/product-barcodes/700': () => new Response(null, { status: 204 }),
+      }),
+    );
+    renderApp('/catalog/products/7', fetchMock);
+    const user = userEvent.setup();
+    const piece = within(await screen.findByRole('region', { name: 'ш' }));
+    await user.click(
+      piece.getByRole('button', { name: `${mn.catalog.units.deleteBarcode}: ${COLA_CODE}` }),
+    );
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: mn.catalog.units.deleteBarcodeTitle.replace('{{code}}', COLA_CODE),
+      }),
+    );
+    expect(calls(fetchMock, 'DELETE', '/api/v1/product-barcodes/700')).toHaveLength(0);
+    await user.click(dialog.getByRole('button', { name: mn.common.delete }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls(fetchMock, 'DELETE', '/api/v1/product-barcodes/700')).toHaveLength(1);
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.catalog.units.barcodeDeleted);
   });
 
   it('keeps the product read-only for a worker', async () => {
@@ -1484,7 +1530,10 @@ describe('categories', () => {
     const user = userEvent.setup();
     const food = (await screen.findByText('Хүнс')).closest('tr');
     if (!food) throw new Error('no row');
-    await user.click(within(food).getByRole('button', { name: mn.catalog.categories.addChild }));
+    // Each row's icon buttons carry its name.
+    await user.click(
+      within(food).getByRole('button', { name: `${mn.catalog.categories.addChild}: Хүнс` }),
+    );
     let dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByLabelText(mn.catalog.categories.parent)).toHaveValue('10');
     await user.type(dialog.getByLabelText(mn.catalog.categories.name), 'Будаа');
@@ -1505,13 +1554,47 @@ describe('categories', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
     // Food has products below it: no delete button; editing it hides itself and Flour as parents.
-    expect(within(food).queryByRole('button', { name: mn.common.delete })).toBeNull();
-    await user.click(within(food).getByRole('button', { name: mn.common.edit }));
+    expect(within(food).queryByRole('button', { name: `${mn.common.delete}: Хүнс` })).toBeNull();
+    await user.click(
+      within(food).getByRole('button', { name: mn.common.editRecord.replace('{{name}}', 'Хүнс') }),
+    );
     dialog = within(await screen.findByRole('dialog'));
     const parents = within(dialog.getByLabelText(mn.catalog.categories.parent))
       .getAllByRole('option')
       .map((option) => option.textContent);
     expect(parents).toEqual([mn.catalog.categories.root, 'Ундаа']);
+  });
+});
+
+describe('category delete', () => {
+  it('asks first, and «Болих» gives the focus back to the row’s button', async () => {
+    const empty: Schemas['Category'] = {
+      id: 14,
+      parentId: null,
+      name: 'Хоосон',
+      defaultClassificationCode: null,
+      skuFrom: null,
+      skuTo: null,
+      productCount: 0,
+      childCount: 0,
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTER_ROUTES,
+      'GET /api/v1/categories': () => list([...CATEGORIES, empty]),
+      'DELETE /api/v1/categories/14': () => new Response(null, { status: 204 }),
+    });
+    renderApp('/catalog/categories', fetchMock);
+    const user = userEvent.setup();
+    const remove = await screen.findByRole('button', { name: `${mn.common.delete}: Хоосон` });
+    await user.click(remove);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(
+      dialog.getByText(mn.catalog.categories.deleteConfirm.replace('{{name}}', 'Хоосон')),
+    ).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: mn.common.cancel }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(remove).toHaveFocus();
+    expect(calls(fetchMock, 'DELETE', '/api/v1/categories/14')).toHaveLength(0);
   });
 });
 
@@ -1542,7 +1625,11 @@ describe('category code ranges', () => {
 
     const drinks = screen.getByText('Ундаа').closest('tr');
     if (!drinks) throw new Error('no row');
-    await user.click(within(drinks).getByRole('button', { name: mn.common.edit }));
+    await user.click(
+      within(drinks).getByRole('button', {
+        name: mn.common.editRecord.replace('{{name}}', 'Ундаа'),
+      }),
+    );
     const dialog = within(await screen.findByRole('dialog'));
     await user.type(dialog.getByLabelText(mn.catalog.categories.skuFrom), '10000');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
@@ -1585,16 +1672,31 @@ describe('e-Barimt readiness', () => {
         return json({ classificationCode: 2, taxProductCode: 0, cityTax: 1 });
       },
     });
-    renderApp('/catalog/ebarimt', fetchMock);
+    const { router } = renderApp('/catalog/ebarimt', fetchMock);
     const user = userEvent.setup();
     expect(await screen.findByText(mn.catalog.readiness.gaps.measureUnit)).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Кока кола' })).toBeInTheDocument();
 
-    const card = screen
-      .getByText(mn.catalog.readiness.assign)
-      .closest<HTMLElement>('[data-slot="card"]');
-    if (!card) throw new Error('no assignment card');
-    const form = within(card);
+    // A gap's tile filters the list by it, through the URL; a second click clears it.
+    const tile = screen.getByRole('button', {
+      name: new RegExp(mn.catalog.readiness.gaps.measureUnit),
+    });
+    await user.click(tile);
+    await waitFor(() => expect(router.state.location.search).toBe('?gap=measureUnit'));
+    expect(tile).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() =>
+      expect(
+        calls(fetchMock, 'GET', '/api/v1/catalog/ebarimt-readiness/products').some(
+          (request) => new URL(request.url).searchParams.get('gap') === 'measureUnit',
+        ),
+      ).toBe(true),
+    );
+    await user.click(tile);
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+
+    // The assignment opens from the header, so the list starts under the tiles.
+    await user.click(screen.getByRole('button', { name: mn.catalog.readiness.assign }));
+    const form = within(await screen.findByRole('dialog', { name: mn.catalog.readiness.assign }));
     const apply = form.getByRole('button', { name: mn.catalog.readiness.apply });
     expect(apply).toBeDisabled();
     await user.selectOptions(form.getByLabelText(mn.catalog.readiness.category), '11');

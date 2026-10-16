@@ -1,10 +1,11 @@
-import { CircleCheck } from 'lucide-react';
+import { ChevronRight, CircleCheck, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { FieldList } from '@/components/detail';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -109,16 +110,21 @@ function PriceTermsView({ data }: { data: ProductPriceView }) {
 
   return (
     <>
-      {data.problems.map((problem) => (
-        <p
-          key={problem}
-          className={
-            problem === 'NO_TERMS' ? 'text-sm text-muted-foreground' : 'text-sm text-destructive'
-          }
-        >
-          {t(`pricing.card.problems.${problem}`)}
-        </p>
-      ))}
+      {data.problems.map((problem) =>
+        problem === 'NO_TERMS' ? (
+          <p key={problem} className="text-sm text-muted-foreground">
+            {t(`pricing.card.problems.${problem}`)}
+          </p>
+        ) : (
+          // Prices are worked out another way until the terms are fixed: it needs attention.
+          <Alert key={problem} className="border-transparent bg-warning-soft shadow-none!">
+            <TriangleAlert aria-hidden className="text-warning" />
+            <AlertDescription className="text-warning">
+              {t(`pricing.card.problems.${problem}`)}
+            </AlertDescription>
+          </Alert>
+        ),
+      )}
       {current ? (
         <FieldList
           items={[
@@ -213,18 +219,28 @@ function PriceTermsView({ data }: { data: ProductPriceView }) {
         </p>
       ))}
       {data.history.length > 0 ? (
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer">{t('pricing.card.history')}</summary>
-          {data.history.map((terms) => (
-            <div key={terms.id}>
-              {t('pricing.card.historyTerms', {
-                from: terms.validFrom,
-                to: terms.validTo ? lastDayOf(terms.validTo) : '',
-                amount: formatMnt(terms.warehousePrice),
-                profile: terms.profileName,
-              })}
-            </div>
-          ))}
+        // Folded like the units card's earlier units.
+        <details className="group rounded-xl border border-border/90 text-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[13px] text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden
+              className="size-3.5 transition-transform group-open:rotate-90"
+            />
+            {t('pricing.card.history')}
+            <span className="ml-auto tabular-nums">{data.history.length}</span>
+          </summary>
+          <ul className="divide-y divide-border/80 border-t border-border/80">
+            {data.history.map((terms) => (
+              <li key={terms.id} className="px-3.5 py-2 font-mono text-[13px]">
+                {t('pricing.card.historyTerms', {
+                  from: terms.validFrom,
+                  to: terms.validTo ? lastDayOf(terms.validTo) : '',
+                  amount: formatMnt(terms.warehousePrice),
+                  profile: terms.profileName,
+                })}
+              </li>
+            ))}
+          </ul>
         </details>
       ) : null}
     </>

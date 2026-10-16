@@ -102,7 +102,7 @@ function CreateForm({
   };
 
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent closeLabel={t('common.close')} size="md">
       <DialogHeader>
         <DialogTitle>{t('sales.create.title')}</DialogTitle>
         <DialogDescription>{t('sales.create.description')}</DialogDescription>

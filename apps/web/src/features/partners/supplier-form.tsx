@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FieldList } from '@/components/detail';
-import { FormFooter, FormRow, FormSection } from '@/components/form';
-import { ProblemAlert } from '@/components/problem-alert';
+import { FormRow, FormSection } from '@/components/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { SupplierDetail } from './api';
+import { PartnerFormFrame } from './form-frame';
 import { fieldOfDuplicate, type SupplierFormValues, supplierSchema } from './partner-schema';
 import { localPhone } from './phone';
 
@@ -63,6 +63,8 @@ export function SupplierForm(props: {
   onSubmit: (values: SupplierFormValues) => Promise<ProblemDetails | null>;
   /** Editing in a card: «Болих» returns to reading (ADR-0042). */
   onCancel?: () => void;
+  /** The `/new` page: fields in a card, buttons at the window's foot (`PartnerFormFrame`). */
+  page?: boolean;
 }) {
   const { t } = useTranslation();
   const form = useForm<SupplierFormValues>({
@@ -113,52 +115,59 @@ export function SupplierForm(props: {
     </FormRow>
   );
 
-  return (
-    <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
-      <ProblemAlert problem={problem} />
-      <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
-        <FormSection title={t('partners.supplier.sectionGeneral')}>
-          {GENERAL.map(row)}
-          {props.mode === 'edit' ? (
-            <FormRow label={t('partners.supplier.status')} htmlFor="supplier-status" align="center">
-              <Controller
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <div className="flex items-center gap-2.5">
-                    <Switch
-                      id="supplier-status"
-                      checked={field.value === 'ACTIVE'}
-                      onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
-                    />
-                    <span className="text-sm">{t(`partners.status.${field.value}`)}</span>
-                  </div>
-                )}
-              />
-            </FormRow>
-          ) : null}
-          <FormRow
-            label={t('partners.supplier.note')}
-            htmlFor="supplier-note"
-            error={errors.note?.message}
-          >
-            <Textarea id="supplier-note" rows={2} {...form.register('note')} />
+  const fields = (
+    <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
+      <FormSection title={t('partners.supplier.sectionGeneral')}>
+        {GENERAL.map(row)}
+        {props.mode === 'edit' ? (
+          <FormRow label={t('partners.supplier.status')} htmlFor="supplier-status" align="center">
+            <Controller
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <div className="flex items-center gap-2.5">
+                  <Switch
+                    id="supplier-status"
+                    checked={field.value === 'ACTIVE'}
+                    onCheckedChange={(checked) => field.onChange(checked ? 'ACTIVE' : 'INACTIVE')}
+                  />
+                  <span className="text-sm">{t(`partners.status.${field.value}`)}</span>
+                </div>
+              )}
+            />
           </FormRow>
-        </FormSection>
-        <FormSection title={t('partners.supplier.sectionMoney')}>{MONEY.map(row)}</FormSection>
-      </fieldset>
-      {props.readOnly ? null : (
-        <FormFooter>
-          {props.onCancel ? (
-            <Button type="button" variant="ghost" onClick={props.onCancel}>
-              {t('common.cancel')}
-            </Button>
-          ) : null}
-          <Button type="submit" disabled={isSubmitting}>
-            {props.submitLabel}
-          </Button>
-        </FormFooter>
-      )}
+        ) : null}
+        <FormRow
+          label={t('partners.supplier.note')}
+          htmlFor="supplier-note"
+          error={errors.note?.message}
+        >
+          <Textarea id="supplier-note" rows={2} {...form.register('note')} />
+        </FormRow>
+      </FormSection>
+      <FormSection title={t('partners.supplier.sectionMoney')}>{MONEY.map(row)}</FormSection>
+    </fieldset>
+  );
+  const buttons = props.readOnly ? null : (
+    <>
+      {props.onCancel ? (
+        <Button type="button" variant="ghost" onClick={props.onCancel}>
+          {t('common.cancel')}
+        </Button>
+      ) : null}
+      <Button type="submit" disabled={isSubmitting}>
+        {props.submitLabel}
+      </Button>
+    </>
+  );
+
+  return (
+    <form
+      className={props.page ? 'flex flex-col gap-4' : 'flex flex-col gap-5'}
+      noValidate
+      onSubmit={(event) => void submit(event)}
+    >
+      <PartnerFormFrame page={props.page} problem={problem} fields={fields} buttons={buttons} />
     </form>
   );
 }

@@ -21,11 +21,8 @@ export function PosSettingsPage() {
   const { t } = useTranslation();
   const settings = usePosSettings();
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={t('pos.settings.title')}
-        meta={<span>{t('pos.settings.description')}</span>}
-      />
+    <div className="max-w-3xl space-y-4">
+      <PageHeader title={t('pos.settings.title')} description={t('pos.settings.description')} />
       <ProblemAlert problem={problemFromError(settings.error)} />
       {settings.data ? (
         <DetailCard

@@ -93,7 +93,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="@container flex flex-col gap-3">
         {unsupported ? (
           <Alert variant="destructive">
             <AlertDescription>{t('catalog.images.unsupported')}</AlertDescription>
@@ -106,7 +106,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
             {t('catalog.images.empty')}
           </div>
         ) : (
-          <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-3">
+          <ul className="grid grid-cols-3 gap-2.5 @md:grid-cols-4 @2xl:grid-cols-6">
             {product.images.map((image) => (
               <li
                 key={image.id}
@@ -125,7 +125,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
                   <div className="aspect-square" />
                 )}
                 {image.isPrimary ? (
-                  <Badge className="absolute top-1.5 left-1.5 bg-white/90 text-foreground shadow-sm backdrop-blur-sm">
+                  <Badge className="absolute top-1.5 left-1.5 bg-background/90 text-foreground shadow-sm backdrop-blur-sm">
                     {t('catalog.images.primary')}
                   </Badge>
                 ) : null}
@@ -135,7 +135,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
                       <Button
                         size="icon-xs"
                         variant="secondary"
-                        className="bg-white/90 shadow-sm backdrop-blur-sm"
+                        className="bg-background/90 shadow-sm backdrop-blur-sm"
                         aria-label={t('catalog.images.makePrimary')}
                         title={t('catalog.images.makePrimary')}
                         onClick={() =>
@@ -148,7 +148,7 @@ export function ImagesCard({ product, canManage }: { product: ProductDetail; can
                     <Button
                       size="icon-xs"
                       variant="secondary"
-                      className="bg-white/90 text-destructive shadow-sm backdrop-blur-sm"
+                      className="bg-background/90 text-destructive shadow-sm backdrop-blur-sm"
                       aria-label={t('catalog.images.delete')}
                       title={t('catalog.images.delete')}
                       onClick={() => {

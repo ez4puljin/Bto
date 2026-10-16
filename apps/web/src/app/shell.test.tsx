@@ -2,7 +2,7 @@ import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { navTrail } from '@/app/nav-items';
+import { NAV_GROUPS, navTrail, QUICK_ACTIONS } from '@/app/nav-items';
 import { MAX_RECENT, readRecentPages, rememberRecentPage } from '@/lib/recent-pages';
 import { clearToasts, dismissToast, getToasts, toast } from '@/lib/toast';
 import { ADMIN_ME, findSidebar, json, renderApp, signedIn, WORKER_ME } from '@/test/render-app';
@@ -99,12 +99,14 @@ describe('home page', () => {
     expect(actions.getByRole('link', { name: mn.home.actions.quote })).toBeInTheDocument();
     expect(actions.queryByRole('link', { name: mn.home.actions.newReceipt })).toBeNull();
     expect(actions.queryByRole('link', { name: mn.home.actions.newProduct })).toBeNull();
+    expect(actions.queryByRole('link', { name: mn.home.actions.newOrder })).toBeNull();
+    expect(actions.queryByRole('link', { name: mn.home.actions.recordPayment })).toBeNull();
   });
 
-  it('gives an admin every shortcut, the transfer one opening its dialog', async () => {
+  it('gives an admin every shortcut, the create ones opening their dialogs', async () => {
     renderApp('/', signedIn(ADMIN_ME));
     const actions = within(await screen.findByRole('region', { name: mn.home.quickActions }));
-    expect(actions.getAllByRole('link')).toHaveLength(7);
+    expect(actions.getAllByRole('link')).toHaveLength(9);
     expect(actions.getByRole('link', { name: mn.home.actions.askAi })).toHaveAttribute(
       'href',
       '/ai',
@@ -113,19 +115,34 @@ describe('home page', () => {
       'href',
       '/inventory/transfers?new=1',
     );
+    expect(actions.getByRole('link', { name: mn.home.actions.newOrder })).toHaveAttribute(
+      'href',
+      '/sales/boards?new=1',
+    );
+    expect(actions.getByRole('link', { name: mn.home.actions.recordPayment })).toHaveAttribute(
+      'href',
+      '/finance/payments?new=1',
+    );
+  });
+
+  it('never names a shortcut like a menu entry (docs/ui.md §5)', () => {
+    const text = (key: string) =>
+      key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], mn);
+    const menu = NAV_GROUPS.flatMap((group) => group.items.map((item) => text(item.label)));
+    for (const action of QUICK_ACTIONS) expect(menu).not.toContain(text(action.label));
   });
 });
 
 describe('menu', () => {
-  it('folds a group, remembers it in this browser and unfolds it for a page inside', async () => {
+  it('folds a group, remembers it in this browser for this user and unfolds it for a page inside', async () => {
     const user = userEvent.setup();
     renderApp('/', signedIn(ADMIN_ME));
     let nav = within(await findSidebar());
     await user.click(nav.getByRole('button', { name: mn.nav.groups.pricing }));
     expect(nav.queryByRole('link', { name: mn.nav.discounts })).toBeNull();
-    expect(JSON.parse(localStorage.getItem('tugeel.nav.collapsed.v1') ?? '[]')).toEqual([
-      'nav.groups.pricing',
-    ]);
+    expect(
+      JSON.parse(localStorage.getItem(`tugeel.nav.collapsed.v2:${ADMIN_ME.id}`) ?? '[]'),
+    ).toEqual(['nav.groups.pricing']);
     cleanup();
 
     renderApp('/system/status', signedIn(ADMIN_ME));

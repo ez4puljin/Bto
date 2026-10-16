@@ -52,7 +52,7 @@ export function ProductFilterDialog(props: EditorProps & { field: ProductFilterF
   const { t } = useTranslation();
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.close())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+      <DialogContent closeLabel={t('common.close')} size="sm">
         <DialogHeader>
           <DialogTitle>{t(`catalog.products.filters.fields.${props.field}`)}</DialogTitle>
           <DialogDescription>{t('catalog.products.filters.hint')}</DialogDescription>

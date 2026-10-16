@@ -12,11 +12,14 @@ export function CustomerBalanceCard({ customerId }: { customerId: number }) {
   const balance = useCustomerBalance(customerId, canRead);
   if (!canRead || !balance.data) return null;
   return (
-    <div className="space-y-2">
-      <BalanceCard balance={balance.data} compact />
-      <Button asChild variant="link" size="sm" className="px-0">
-        <Link to={`/finance/customers/${customerId}`}>{t('finance.balances.openLedger')}</Link>
-      </Button>
-    </div>
+    <BalanceCard
+      balance={balance.data}
+      compact
+      action={
+        <Button asChild variant="link" size="sm" className="px-0">
+          <Link to={`/finance/customers/${customerId}`}>{t('finance.balances.openLedger')}</Link>
+        </Button>
+      }
+    />
   );
 }

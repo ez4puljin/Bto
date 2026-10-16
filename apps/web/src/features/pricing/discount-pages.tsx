@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FieldList } from '@/components/detail';
 import {
   ChevronHead,
   EmptyState,
@@ -13,6 +14,9 @@ import {
   LoadMore,
   SegmentedControl,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -28,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import {
   type DiscountProgram,
@@ -64,7 +69,7 @@ export function DiscountProgramsPage() {
     <div>
       <PageHeader
         title={t('pricing.programs.title')}
-        meta={<p className="max-w-3xl">{t('pricing.programs.intro')}</p>}
+        description={t('pricing.programs.intro')}
         actions={
           canManage ? (
             <Button asChild>
@@ -87,37 +92,48 @@ export function DiscountProgramsPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(programs.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('pricing.programs.columns.name')}</TableHead>
               <TableHead>{t('pricing.programs.columns.list')}</TableHead>
               <TableHead>{t('pricing.programs.columns.scope')}</TableHead>
-              <TableHead>{t('pricing.programs.columns.effect')}</TableHead>
+              {/* The steps show the effect too (→ 1%, → 22,800₮, → −500₮): below 1440px it gives
+                  way, so the list fits a laptop without scrolling sideways. */}
+              <TableHead className="hidden min-[1440px]:table-cell">
+                {t('pricing.programs.columns.effect')}
+              </TableHead>
               <TableHead>{t('pricing.programs.columns.steps')}</TableHead>
               <TableHead>{t('pricing.programs.columns.period')}</TableHead>
               <TableHead>{t('pricing.programs.columns.status')}</TableHead>
+              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {programs.isPending ? <SkeletonRows columns={8} /> : null}
+            {programs.isPending ? <SkeletonRows columns={9} /> : null}
             {rows.map((program) => (
               <LinkRow key={program.id} to={`/pricing/discounts/${program.id}`}>
-                <TableCell className="whitespace-normal">
+                <TruncateCell text={program.name} className="max-w-48 min-[1440px]:max-w-56">
                   <Link
                     to={`/pricing/discounts/${program.id}`}
                     className="font-medium underline-offset-4 hover:underline"
                   >
                     {program.name}
                   </Link>
-                </TableCell>
+                </TruncateCell>
                 <TableCell>{t(`pricing.lists.${program.list}`)}</TableCell>
-                <TableCell className="whitespace-normal">{text.target(program)}</TableCell>
-                <TableCell>{t(`pricing.programs.effects.${program.effect}`)}</TableCell>
-                <TableCell className="whitespace-normal">
-                  <div className="flex flex-col">
+                <TruncateCell
+                  text={text.target(program)}
+                  className="max-w-48 min-[1440px]:max-w-56"
+                />
+                <TableCell className="hidden min-[1440px]:table-cell">
+                  {t(`pricing.programs.effects.${program.effect}`)}
+                </TableCell>
+                <TableCell>
+                  {/* One step a line, each line whole. */}
+                  <div className="flex flex-col whitespace-nowrap">
                     {program.steps.map((step) => (
                       <span key={step.threshold}>{text.step(program, step)}</span>
                     ))}
@@ -127,6 +143,7 @@ export function DiscountProgramsPage() {
                 <TableCell>
                   <ProgramStatusBadge status={program.status} />
                 </TableCell>
+                <SpacerCell />
               </LinkRow>
             ))}
           </TableBody>
@@ -162,18 +179,20 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
   const scheduled = program.status === 'SCHEDULED';
 
   const run = async () => {
+    const deleting = confirm === 'delete';
     const ok = await action.run(() =>
-      confirm === 'delete'
+      deleting
         ? mutations.deleteProgram.mutateAsync(program.id)
         : mutations.stopProgram.mutateAsync(program.id),
     );
     if (!ok) return;
     setConfirm(null);
-    if (confirm === 'delete') void navigate('/pricing/discounts');
+    toast.success(t(deleting ? 'pricing.programs.deleted' : 'pricing.programs.stopped'));
+    if (deleting) void navigate('/pricing/discounts');
   };
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-3xl space-y-4">
       <PageHeader
         title={program.name}
         meta={
@@ -183,18 +202,14 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
             <span className="font-mono">{text.period(program)}</span>
           </>
         }
+        // Who may change it is told why a running program has no «Засах».
+        description={
+          canManage && program.status === 'ACTIVE' ? t('pricing.programs.startedHint') : undefined
+        }
         actions={
           // An ended program has nothing left to change.
           canManage && program.status !== 'ENDED' ? (
             <>
-              {scheduled ? (
-                <Button variant="outline" asChild>
-                  <Link to={`/pricing/discounts/${program.id}/edit`}>
-                    <Pencil />
-                    {t('common.edit')}
-                  </Link>
-                </Button>
-              ) : null}
               <Button variant="outline" onClick={() => setConfirm('stop')}>
                 {t('pricing.programs.stop')}
               </Button>
@@ -203,29 +218,53 @@ function ProgramDetail({ program }: { program: DiscountProgram }) {
                   {t('pricing.programs.delete')}
                 </Button>
               ) : null}
+              {scheduled ? (
+                <Button variant="secondary" asChild>
+                  <Link to={`/pricing/discounts/${program.id}/edit`}>
+                    <Pencil />
+                    {t('common.edit')}
+                  </Link>
+                </Button>
+              ) : null}
             </>
           ) : null
         }
       />
-      {canManage && program.status === 'ACTIVE' ? (
-        <p className="text-sm text-muted-foreground">{t('pricing.programs.startedHint')}</p>
-      ) : null}
       <ProblemAlert problem={confirm ? null : action.problem} />
       <Card>
         <CardHeader>
-          <CardTitle>{text.target(program)}</CardTitle>
+          <CardTitle>{t('pricing.programs.sectionWhat')}</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 text-sm">
-          <p>
-            {t('pricing.programs.fields.effect')}: {t(`pricing.programs.effects.${program.effect}`)}
-          </p>
-          <ul className="flex flex-col gap-1">
-            {program.steps.map((step) => (
-              <li key={step.threshold} className="font-mono">
-                {text.step(program, step)}
-              </li>
-            ))}
-          </ul>
+        <CardContent>
+          <FieldList
+            items={[
+              {
+                label: t('pricing.programs.fields.list'),
+                value: t(`pricing.lists.${program.list}`),
+              },
+              { label: t('pricing.programs.columns.scope'), value: text.target(program) },
+              {
+                label: t('pricing.programs.fields.effect'),
+                value: t(`pricing.programs.effects.${program.effect}`),
+              },
+              {
+                label: t('pricing.programs.fields.steps'),
+                value: (
+                  <ul className="flex flex-col gap-0.5">
+                    {program.steps.map((step) => (
+                      <li key={step.threshold} className="font-mono">
+                        {text.step(program, step)}
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              },
+              {
+                label: t('pricing.programs.columns.period'),
+                value: <span className="font-mono">{text.period(program)}</span>,
+              },
+            ]}
+          />
         </CardContent>
       </Card>
       <ConfirmDialog

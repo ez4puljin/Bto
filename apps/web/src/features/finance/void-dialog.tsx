@@ -1,18 +1,24 @@
 import type { ProblemDetails } from '@tugeel/api-client';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DialogFormFooter, FormField } from '@/components/form';
+import { FormField } from '@/components/form';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
-/** «Хүчингүй болгох» with its reason (ADR-0060 #3, #5): the record is reversed, never deleted. */
+/**
+ * «Хүчингүй болгох» with its reason (ADR-0060 #3, #5): the record is reversed, never deleted. The
+ * same dialog writes a journal entry's reversal with its own button (`submitLabel`); both buttons
+ * are destructive unless asked otherwise.
+ */
 export function VoidDialog(props: {
   open: boolean;
   title: string;
@@ -21,6 +27,9 @@ export function VoidDialog(props: {
   problem: ProblemDetails | null;
   onClose: () => void;
   onConfirm: (reason: string) => void;
+  /** The main button; «Хүчингүй болгох» unless named. */
+  submitLabel?: string;
+  variant?: 'destructive' | 'default';
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');
@@ -46,12 +55,18 @@ export function VoidDialog(props: {
             />
           </FormField>
           <ProblemAlert problem={props.problem} />
-          <DialogFormFooter
-            pending={props.pending}
-            disabled={!reason.trim()}
-            onCancel={props.onClose}
-            submitLabel={t('finance.actions.void')}
-          />
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={props.onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              variant={props.variant ?? 'destructive'}
+              disabled={props.pending || !reason.trim()}
+            >
+              {props.submitLabel ?? t('finance.actions.void')}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

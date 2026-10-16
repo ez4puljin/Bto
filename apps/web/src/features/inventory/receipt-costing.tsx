@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -215,7 +215,7 @@ function CostingForm({ costing }: { costing: ReceiptCosting }) {
             <>
               {t('inventory.costing.total')}:{' '}
               <span className="font-mono font-medium text-foreground">
-                {formatMnt(total.toString())}
+                {formatTugrik(total.toString())}
               </span>
             </>
           }
@@ -287,7 +287,7 @@ const CostRow = memo(function CostRow(props: {
         aria-label={`${t(column === 'amount' ? 'inventory.costing.amount' : 'inventory.costing.unitPrice')}: ${name}`}
         inputMode="decimal"
         autoComplete="off"
-        className="ml-auto w-32 text-right font-mono"
+        className="ml-auto w-28 text-right font-mono"
         disabled={entry.free}
         value={own ? entry.value : ''}
         placeholder={!own && shown !== null ? formatMnt(shown.toString()) : undefined}
@@ -307,7 +307,7 @@ const CostRow = memo(function CostRow(props: {
     <TableRow>
       <TableCell className="min-w-40 whitespace-normal">{line.productName}</TableCell>
       <TableCell className="text-right font-mono">
-        {t('inventory.qtyWithUnit', { qty: line.enteredQty, unit: line.unitName })}
+        {t('inventory.qtyWithUnit', { qty: formatQty(line.enteredQty), unit: line.unitName })}
       </TableCell>
       {props.editing ? (
         <>

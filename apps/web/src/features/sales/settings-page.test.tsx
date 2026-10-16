@@ -150,6 +150,43 @@ describe('boards and pipelines settings', () => {
     });
   });
 
+  it('says why a pipeline cannot be added before a board exists', async () => {
+    renderApp(
+      '/sales/boards/settings',
+      signedIn(ADMIN_ME, { ...routes, 'GET /api/v1/sales-boards': () => json([]) }),
+    );
+    expect(await screen.findByText(mn.sales.pipelines.needBoard)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: mn.sales.pipelines.newPipeline })).toBeDisabled();
+  });
+
+  it('asks before a pipeline with unsaved edits closes', async () => {
+    const fetchMock = signedIn(ADMIN_ME, routes);
+    renderApp('/sales/boards/settings', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.sales.pipelines.newPipeline }));
+    const sheet = await screen.findByRole('dialog', { name: mn.sales.pipelines.newPipeline });
+    await user.type(within(sheet).getByLabelText(mn.sales.boards.name), 'Орон нутаг');
+    // Escape (or «Болих») asks first; staying keeps the typed name.
+    await user.keyboard('{Escape}');
+    const question = await screen.findByRole('dialog', { name: mn.sales.panel.leaveTitle });
+    expect(within(question).getByText(mn.sales.pipelines.leaveDescription)).toBeInTheDocument();
+    await user.click(within(question).getByRole('button', { name: mn.common.cancel }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: mn.sales.panel.leaveTitle })).toBeNull(),
+    );
+    expect(within(sheet).getByLabelText(mn.sales.boards.name)).toHaveValue('Орон нутаг');
+    await user.click(within(sheet).getByRole('button', { name: mn.common.cancel }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: mn.sales.panel.leaveTitle })).getByRole(
+        'button',
+        { name: mn.sales.panel.leave },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: mn.sales.pipelines.newPipeline })).toBeNull(),
+    );
+  });
+
   it('copies and archives a pipeline from its row menu', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       ...routes,

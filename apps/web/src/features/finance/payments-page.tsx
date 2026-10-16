@@ -7,7 +7,6 @@ import { Link, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   LinkRow,
@@ -15,6 +14,7 @@ import {
   LoadMore,
   SearchField,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -34,15 +34,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { printFormatParam, usePrintFormat } from '@/features/sales/print-format';
-import { PrintFormatToggle } from '@/features/sales/print-format-toggle';
+import { printFormatParam, usePrintFormat } from '@/lib/print-format';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { randomUuid } from '@/lib/uuid';
+import { DateRangeFilter } from './date-range-filter';
 import {
   type PaymentDetail,
   type PaymentKind,
@@ -70,6 +72,7 @@ export function PaymentsPage() {
   const { t } = useTranslation();
   const canRecord = useHasPermission('finance.payments.record');
   const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
   const [creating, setCreating] = useCreateParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
@@ -91,17 +94,6 @@ export function PaymentsPage() {
   const rows = payments.data?.pages.flatMap((page) => page.data) ?? [];
   const total = payments.data?.pages[0]?.total ?? null;
 
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
-
   return (
     <div>
       <PageHeader
@@ -118,6 +110,8 @@ export function PaymentsPage() {
       />
       <FilterBar>
         <SearchField
+          // Narrower here, so the five filters keep one line at 1366px.
+          className="sm:w-52"
           aria-label={t('common.search')}
           placeholder={t('finance.payments.searchPlaceholder')}
           value={search}
@@ -158,26 +152,25 @@ export function PaymentsPage() {
           value={accountParam > 0 ? String(accountParam) : ''}
           onChange={(event) => setParam('account', event.target.value)}
         >
-          <option value="">{t('finance.fields.moneyAccount')}</option>
+          <option value="">{t('finance.payments.allAccounts')}</option>
           {(accounts.data ?? []).map((account) => (
             <option key={account.id} value={account.id}>
               {account.name}
             </option>
           ))}
         </NativeSelect>
-        <DateFilter
-          label={t('finance.fields.from')}
-          value={from}
-          onChange={(value) => setParam('from', value)}
-        />
-        <DateFilter
-          label={t('finance.fields.to')}
-          value={to}
-          onChange={(value) => setParam('to', value)}
+        <DateRangeFilter
+          label={t('finance.fields.date')}
+          fromLabel={t('finance.fields.from')}
+          toLabel={t('finance.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(payments.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -193,26 +186,39 @@ export function PaymentsPage() {
           </TableHeader>
           <TableBody>
             {payments.isPending ? <SkeletonRows columns={8} /> : null}
-            {rows.map((payment) => (
-              <LinkRow key={payment.id} to={`?${withParam(params, 'payment', String(payment.id))}`}>
-                <TableCell className="font-mono">{payment.number}</TableCell>
-                <TableCell className="font-mono">{payment.paidOn}</TableCell>
-                <TableCell>
-                  <PaymentKindBadge kind={payment.kind} />
-                </TableCell>
-                <TableCell>
-                  {payment.customerName ?? payment.counterpartyName ?? payment.glAccountName ?? ''}
-                </TableCell>
-                <TableCell>{payment.moneyAccountName}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {payment.direction === 'OUT' ? '−' : ''}
-                  {formatMnt(payment.amount)}
-                </TableCell>
-                <TableCell>
-                  <PaymentStatusBadge status={payment.status} />
-                </TableCell>
-              </LinkRow>
-            ))}
+            {rows.map((payment) => {
+              // The number is the row's link for the keyboard; a click anywhere opens the panel.
+              const href = hrefWithParam(params, 'payment', String(payment.id));
+              return (
+                <LinkRow key={payment.id} to={href}>
+                  <TableCell className="font-mono">
+                    <Link to={href} className="font-medium underline-offset-4 hover:underline">
+                      {payment.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono">{payment.paidOn}</TableCell>
+                  <TableCell>
+                    <PaymentKindBadge kind={payment.kind} />
+                  </TableCell>
+                  <TruncateCell
+                    text={
+                      payment.customerName ??
+                      payment.counterpartyName ??
+                      payment.glAccountName ??
+                      ''
+                    }
+                  />
+                  <TableCell>{payment.moneyAccountName}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {payment.direction === 'OUT' ? '−' : ''}
+                    {formatTugrik(payment.amount)}
+                  </TableCell>
+                  <TableCell>
+                    <PaymentStatusBadge status={payment.status} />
+                  </TableCell>
+                </LinkRow>
+              );
+            })}
           </TableBody>
         </Table>
         {!payments.isPending && rows.length === 0 ? (
@@ -237,16 +243,10 @@ export function PaymentsPage() {
       />
       <PaymentPanel
         paymentId={openId > 0 ? openId : null}
-        onClose={() => setParam('payment', undefined)}
+        onClose={() => setParam('payment', null)}
       />
     </div>
   );
-}
-
-function withParam(params: URLSearchParams, key: string, value: string): string {
-  const next = new URLSearchParams(params);
-  next.set(key, value);
-  return next.toString();
 }
 
 /** One voucher in the panel (`?payment=`): facts, its allocations, printing and voiding. */
@@ -310,7 +310,7 @@ function PaymentActions({ payment }: { payment: PaymentDetail }) {
   return (
     <>
       <PrintFormatToggle value={format} onChange={choose} />
-      <Button asChild variant="outline" size="sm">
+      <Button asChild variant="outline">
         <Link
           to={`/finance/payments/${payment.id}/print?format=${printFormatParam(format)}`}
           target="_blank"
@@ -427,7 +427,7 @@ function PaymentBody({ payment }: { payment: PaymentDetail }) {
       <div className="flex items-baseline gap-2">
         <span className="font-mono text-2xl font-semibold">
           {payment.direction === 'OUT' ? '−' : ''}
-          {formatMnt(payment.amount)}
+          {formatTugrik(payment.amount)}
         </span>
         <span className="text-sm text-muted-foreground">
           {t(`finance.directions.${payment.direction}`)}
@@ -467,7 +467,7 @@ function PaymentBody({ payment }: { payment: PaymentDetail }) {
                       </TableCell>
                       <TableCell className="font-mono">{allocation.invoiceDueDate}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatMnt(allocation.amount)}
+                        {formatTugrik(allocation.amount)}
                       </TableCell>
                     </TableRow>
                   ))}

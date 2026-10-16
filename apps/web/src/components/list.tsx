@@ -1,5 +1,12 @@
 import { ChevronRight, Inbox, type LucideIcon, Search, X } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -16,7 +23,7 @@ import { cn } from '@/lib/utils';
 
 export function FilterBar(props: { children: ReactNode; end?: ReactNode; className?: string }) {
   return (
-    <div className={cn('mb-4 flex flex-wrap items-center gap-2', props.className)}>
+    <div className={cn('mb-3 flex flex-wrap items-center gap-2', props.className)}>
       {props.children}
       {props.end ? (
         <div className="ml-auto flex flex-wrap items-center gap-2">{props.end}</div>
@@ -150,19 +157,74 @@ export function SegmentedControl<T extends string>(props: {
   );
 }
 
-/** The white card a list's table sits in; the table runs to its edges. */
-export function ListCard(props: { children: ReactNode; className?: string }) {
+/**
+ * The white card a list's table sits in; the table runs to its edges. `scroll` (the main list of
+ * a menu page, ADR-0066) makes the card its own scroller, as tall as the window leaves it: the
+ * header row stays in view and so does the sideways scrollbar of a wide table. Printing shows
+ * every row.
+ */
+export function ListCard(props: { children: ReactNode; className?: string; scroll?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const maxHeight = useFittedHeight(ref, props.scroll === true);
   return (
     <div
+      ref={ref}
       data-slot="list-card"
+      style={maxHeight === null ? undefined : { maxHeight }}
       className={cn(
         'overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-black/[0.06] print:shadow-none',
+        props.scroll && SCROLLING_CARD,
         props.className,
       )}
     >
       {props.children}
     </div>
   );
+}
+
+/** A scrolling card: its own table box stops scrolling and the header cells stick to its top. */
+const SCROLLING_CARD =
+  'overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] print:max-h-none! print:overflow-visible [&_[data-slot=table-container]]:overflow-visible [&_[data-slot=table-head]]:sticky [&_[data-slot=table-head]]:top-0 [&_[data-slot=table-head]]:z-10 [&_[data-slot=table-head]]:bg-card [&_[data-slot=table-head]]:shadow-[inset_0_-1px_0_var(--color-border)]';
+
+/** Space kept under a scrolling card: the page's bottom padding (`pb-10`). */
+const BELOW_CARD = 40;
+
+/**
+ * Below this much room (a card low on the page, under a form or tiles) the card does not scroll
+ * by itself: the page scrolls as usual, so there is never a scroll inside a scroll.
+ */
+const MIN_FITTED = 288;
+
+/**
+ * The height a scrolling card may take: what the window leaves between its top and what follows it
+ * on the page (later cards, the page's bottom padding), when that is enough.
+ */
+function useFittedHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!enabled || !element) return;
+    const measure = () => {
+      const box = element.getBoundingClientRect();
+      const frame = element.closest('main')?.firstElementChild;
+      const after = frame ? Math.max(0, frame.getBoundingClientRect().bottom - box.bottom) : 0;
+      const room = Math.floor(window.innerHeight - (box.top + window.scrollY) - after - BELOW_CARD);
+      const next = room >= MIN_FITTED ? room : null;
+      setHeight((previous) => (previous === next ? previous : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    // Content above the card (an alert, a second row of filters) moves it: the page's main resizes.
+    const main = element.closest('main');
+    const observer =
+      typeof ResizeObserver === 'undefined' || !main ? null : new ResizeObserver(measure);
+    if (observer && main) observer.observe(main);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer?.disconnect();
+    };
+  }, [enabled, ref]);
+  return enabled ? height : null;
 }
 
 const INTERACTIVE =
@@ -187,18 +249,7 @@ export function LinkRow(props: {
       data-state={props.selected ? 'selected' : undefined}
       className={cn('cursor-pointer has-[a:focus-visible]:bg-accent', props.className)}
       onClick={(event) => {
-        if (
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey
-        ) {
-          return;
-        }
-        if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return;
-        if (window.getSelection()?.toString()) return;
-        void navigate(props.to);
+        if (opensRecord(event)) void navigate(props.to);
       }}
     >
       {props.children}
@@ -207,6 +258,84 @@ export function LinkRow(props: {
       </TableCell>
     </TableRow>
   );
+}
+
+/**
+ * A row that opens its record in a panel of this page (the sales list view, ADR-0066): a click
+ * anywhere on it, with LinkRow's exceptions. The row keeps a real button or link (its number) for
+ * the keyboard; `ChevronHead` heads its chevron column too.
+ */
+export function ButtonRow(props: {
+  onOpen: () => void;
+  children: ReactNode;
+  className?: string;
+  selected?: boolean;
+}) {
+  return (
+    <TableRow
+      data-state={props.selected ? 'selected' : undefined}
+      className={cn(
+        'cursor-pointer has-[a:focus-visible,button:focus-visible]:bg-accent',
+        props.className,
+      )}
+      onClick={(event) => {
+        if (opensRecord(event)) props.onOpen();
+      }}
+    >
+      {props.children}
+      <TableCell aria-hidden className="w-9 pl-0 text-muted-foreground/60">
+        <ChevronRight className="size-4" />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/** A plain left click on the row itself, not on its controls, and no text being selected. */
+function opensRecord(event: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  target: EventTarget | null;
+}): boolean {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return false;
+  }
+  if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return false;
+  return !window.getSelection()?.toString();
+}
+
+/**
+ * Long text in a row (a product or customer name): one line cut with «…», the whole text on hover.
+ * `fill` gives the column the table's spare width (the main column of a short list).
+ */
+export function TruncateCell(props: {
+  text: string;
+  children?: ReactNode;
+  className?: string;
+  fill?: boolean;
+}) {
+  return (
+    <TableCell className={cn(props.fill && 'w-full max-w-0', props.className)}>
+      <span className={cn('block truncate', !props.fill && 'max-w-[24rem]')} title={props.text}>
+        {props.children ?? props.text}
+      </span>
+    </TableCell>
+  );
+}
+
+/**
+ * An empty cell that takes a short table's spare width (ADR-0066), placed before the row's actions
+ * or chevron: the data stays next to the names on a wide screen and the actions keep the right
+ * edge. Pair `SpacerHead` in the header row with `SpacerCell` in every row.
+ */
+export function SpacerHead() {
+  return <TableHead aria-hidden className="w-full p-0" />;
+}
+
+export function SpacerCell() {
+  return <TableCell aria-hidden className="w-full p-0" />;
 }
 
 /** The (empty) header cell above LinkRow's chevrons. */
@@ -220,7 +349,7 @@ export function ChevronHead() {
  */
 export function RowActions({ children }: { children: ReactNode }) {
   return (
-    <TableCell className="w-px py-1 whitespace-nowrap">
+    <TableCell className="w-px py-0.5 whitespace-nowrap">
       <div className="flex justify-end gap-0.5">{children}</div>
     </TableCell>
   );
@@ -236,10 +365,11 @@ export function RowAction(props: {
   const Icon = props.icon;
   return (
     <Button
+      type="button"
       size="icon-sm"
       variant="ghost"
       className={cn(
-        'text-muted-foreground hover:text-foreground',
+        'size-7 text-muted-foreground hover:text-foreground',
         props.destructive && 'hover:bg-danger-soft hover:text-destructive',
       )}
       aria-label={props.label}
@@ -254,19 +384,33 @@ export function RowAction(props: {
 
 /** Keeps a missing action's place, so each action stays in its own column down the list. */
 export function RowActionSpacer() {
-  return <span aria-hidden className="inline-block size-8" />;
+  return <span aria-hidden className="inline-block size-7" />;
 }
 
-/** What an empty list says, with the action that fills it when there is one. */
-export function EmptyState(props: { title: string; icon?: LucideIcon; action?: ReactNode }) {
+/**
+ * What an empty list says, with the action that fills it when there is one; `onClearFilters`
+ * (a list narrowed by filters) offers «Шүүлтүүр арилгах».
+ */
+export function EmptyState(props: {
+  title: string;
+  icon?: LucideIcon;
+  action?: ReactNode;
+  onClearFilters?: () => void;
+}) {
+  const { t } = useTranslation();
   const Icon = props.icon ?? Inbox;
   return (
-    <div className="flex flex-col items-center gap-2.5 px-6 py-12 text-center">
+    <div className="flex flex-col items-center gap-2.5 px-6 py-10 text-center">
       <span className="grid size-11 place-items-center rounded-full bg-fill text-muted-foreground">
         <Icon aria-hidden className="size-5" />
       </span>
       <p className="max-w-sm text-sm text-muted-foreground">{props.title}</p>
       {props.action}
+      {props.onClearFilters ? (
+        <Button variant="ghost" size="sm" className="text-link" onClick={props.onClearFilters}>
+          {t('common.clearFilters')}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -297,7 +441,7 @@ export function SkeletonRows(props: { columns: number; rows?: number }) {
   return Array.from({ length: props.rows ?? 4 }, (_, row) => (
     <tr key={row} aria-hidden className="border-b border-border/80">
       {Array.from({ length: props.columns }, (_, column) => (
-        <td key={column} className="h-11 px-3 first:pl-4 last:pr-4">
+        <td key={column} className="h-9 px-3 first:pl-4 last:pr-4">
           <div className="h-3 w-full max-w-28 animate-pulse rounded bg-fill" />
         </td>
       ))}

@@ -36,9 +36,15 @@ import { PANEL_TABS, type PanelTab } from './order-panel-tabs';
 import { PickForm } from './order-pick';
 import { OrderProducts } from './order-products';
 import { OrderProperties } from './order-properties';
-import { openPrint, orderPrintPath, usePipeline, useSalesMutations } from './pipelines-api';
-import { usePrintFormat } from './print-format';
-import { PrintFormatToggle } from './print-format-toggle';
+import {
+  openPrint,
+  orderPrintPath,
+  placeName,
+  usePipeline,
+  useSalesMutations,
+} from './pipelines-api';
+import { usePrintFormat } from '@/lib/print-format';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { useMover } from './use-mover';
 
 const MANAGE = 'sales.orders.manage';
@@ -83,6 +89,13 @@ export function OrderPanel({
         <SheetContent
           closeLabel={t('common.close')}
           className="gap-0 overflow-hidden p-0 sm:max-w-[min(80rem,94vw)]"
+          // Escape in a search box with text clears the search; the panel stays.
+          onEscapeKeyDown={(event) => {
+            const target = event.target;
+            if (target instanceof HTMLInputElement && target.type === 'search' && target.value) {
+              event.preventDefault();
+            }
+          }}
         >
           {orderId !== null ? (
             <PanelBody
@@ -152,9 +165,7 @@ function PanelBody({
               {detail
                 ? [
                     detail.customerName,
-                    detail.pipelineName
-                      ? `${detail.boardName ?? ''} / ${detail.pipelineName}`
-                      : null,
+                    detail.pipelineName ? placeName(detail.boardName, detail.pipelineName) : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')

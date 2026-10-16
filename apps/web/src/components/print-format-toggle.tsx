@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from '@/components/list';
-import { PRINT_FORMATS, type PrintFormat } from './print-format';
+import { PRINT_FORMATS, type PrintFormat } from '@/lib/print-format';
 
 /** «A4 | 80 мм» beside every print button of the sales screens and on the printable page. */
 export function PrintFormatToggle({

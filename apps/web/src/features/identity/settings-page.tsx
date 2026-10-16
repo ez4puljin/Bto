@@ -49,10 +49,7 @@ export function SettingsPage() {
   const settings = useSettings();
   return (
     <div>
-      <PageHeader
-        title={t('settings.title')}
-        meta={<p className="max-w-3xl">{t('settings.hint')}</p>}
-      />
+      <PageHeader title={t('settings.title')} description={t('settings.hint')} />
       <ProblemAlert problem={problemFromError(settings.error)} />
       <div className="grid gap-4 lg:grid-cols-2">
         {(settings.data ?? []).map((view) => (
@@ -113,7 +110,8 @@ function SettingCard({ view }: { view: SettingView }) {
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent>
+      {/* The history runs to the card's edges, so its first column lines up with the title. */}
+      <CardContent className={view.entries.length ? 'px-0' : undefined}>
         {view.entries.length ? (
           <Table>
             <TableHeader>
@@ -229,7 +227,7 @@ function SettingDialog(props: { settingKey: SettingKey; first: boolean; onClose:
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent>
         <form
           className="space-y-4"
           noValidate

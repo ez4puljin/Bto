@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useMoneyAccounts } from '@/features/finance/api';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatCount, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -41,7 +41,7 @@ export function ShiftPanel({ shiftId, onClose }: { shiftId: number | null; onClo
       open={shiftId !== null}
       onClose={onClose}
       title={detail ? t('pos.shifts.panelTitle', { number: detail.number }) : ''}
-      description={detail ? `${detail.tillName} · ${detail.cashierName ?? ''}` : ''}
+      description={detail ? [detail.tillName, detail.cashierName].filter(Boolean).join(' · ') : ''}
       badges={detail ? <ShiftStatusBadge status={detail.status} /> : null}
       actions={detail ? <PanelActions shift={detail} /> : null}
     >
@@ -69,13 +69,14 @@ function PanelActions({ shift }: { shift: Shift }) {
 
 function ShiftBody({ shift }: { shift: Shift }) {
   const { t } = useTranslation();
-  const stamp = (value: string | null) => (value ? formatUbDateTime(Date.parse(value)) : '');
+  const none = t('pos.fields.none');
+  const stamp = (value: string | null) => (value ? formatUbDateTime(Date.parse(value)) : none);
+  const money = (value: string | null) => (value === null ? none : formatTugrik(value));
   const facts = [
     { label: t('pos.fields.till'), value: `${shift.tillCode} · ${shift.tillName}` },
-    { label: t('pos.fields.cashier'), value: shift.cashierName ?? '' },
+    { label: t('pos.fields.cashier'), value: shift.cashierName ?? none },
     { label: t('pos.fields.openedAt'), value: stamp(shift.openedAt) },
     ...(shift.closedAt ? [{ label: t('pos.fields.closedAt'), value: stamp(shift.closedAt) }] : []),
-    { label: t('pos.fields.openingFloat'), value: formatMnt(shift.openingFloat) },
   ];
   const variance = shift.variance === null ? null : new Decimal(shift.variance);
   const varianceLabel =
@@ -86,6 +87,60 @@ function ShiftBody({ shift }: { shift: Shift }) {
         : variance.gt(0)
           ? t('pos.shifts.over')
           : t('pos.shifts.short');
+  const varianceTone =
+    variance === null || variance.isZero()
+      ? undefined
+      : variance.isNegative()
+        ? 'text-destructive'
+        : 'text-warning';
+  const link = 'font-mono text-link underline-offset-2 hover:underline';
+  const books = [
+    {
+      label: t('pos.fields.journalEntry'),
+      value:
+        shift.journalEntryId && shift.journalNumber ? (
+          <Link className={link} to={`/finance/journal?entry=${shift.journalEntryId}`}>
+            {shift.journalNumber}
+          </Link>
+        ) : shift.status === 'OPEN' ? (
+          none
+        ) : (
+          <span className="text-muted-foreground">{t('pos.shifts.noEntry')}</span>
+        ),
+    },
+    {
+      label: t('pos.fields.handover'),
+      value:
+        shift.handoverPaymentId && shift.handoverNumber ? (
+          <Link className={link} to={`/finance/payments?payment=${shift.handoverPaymentId}`}>
+            {shift.handoverNumber}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">{t('pos.shifts.notHandedOver')}</span>
+        ),
+    },
+    ...(shift.handedOverAt
+      ? [
+          {
+            label: t('pos.fields.handedOverBy'),
+            value: `${shift.handedOverByName ?? none} · ${stamp(shift.handedOverAt)}`,
+          },
+        ]
+      : []),
+    {
+      label: t('pos.sales.title'),
+      value: (
+        <Link
+          className="text-link underline-offset-2 hover:underline"
+          to={`/pos/sales?shiftId=${shift.id}`}
+        >
+          {t('pos.sales.count', {
+            count: formatCount(shift.salesCount + shift.returnsCount),
+          })}
+        </Link>
+      ),
+    },
+  ];
   return (
     <div className="flex flex-col gap-5">
       <FactChips facts={facts} />
@@ -95,105 +150,47 @@ function ShiftBody({ shift }: { shift: Shift }) {
       <PanelSection title={t('pos.shifts.sections.totals')}>
         <TotalsGrid
           items={[
-            [t('pos.fields.salesCount'), String(shift.salesCount)],
-            [t('pos.fields.salesTotal'), formatMnt(shift.salesTotal)],
-            [t('pos.fields.salesVat'), formatMnt(shift.salesVat)],
-            [t('pos.fields.cardSales'), formatMnt(shift.cardSales)],
-            [t('pos.fields.returnsCount'), String(shift.returnsCount)],
-            [t('pos.fields.returnsTotal'), formatMnt(shift.returnsTotal)],
-            [t('pos.fields.returnsVat'), formatMnt(shift.returnsVat)],
-            [t('pos.fields.cardRefunds'), formatMnt(shift.cardRefunds)],
+            [t('pos.fields.salesCount'), formatCount(shift.salesCount)],
+            [t('pos.fields.salesTotal'), formatTugrik(shift.salesTotal)],
+            [t('pos.fields.salesVat'), formatTugrik(shift.salesVat)],
+            [t('pos.fields.cardSales'), formatTugrik(shift.cardSales)],
+            [t('pos.fields.returnsCount'), formatCount(shift.returnsCount)],
+            [t('pos.fields.returnsTotal'), formatTugrik(shift.returnsTotal)],
+            [t('pos.fields.returnsVat'), formatTugrik(shift.returnsVat)],
+            [t('pos.fields.cardRefunds'), formatTugrik(shift.cardRefunds)],
           ]}
         />
       </PanelSection>
       <PanelSection title={t('pos.shifts.sections.cash')}>
         <TotalsGrid
           items={[
-            [t('pos.fields.openingFloat'), formatMnt(shift.openingFloat)],
-            [t('pos.fields.cashSales'), formatMnt(shift.cashSales)],
-            [t('pos.fields.cashRefunds'), formatMnt(shift.cashRefunds)],
-            [
-              t('pos.fields.expectedCash'),
-              shift.expectedCash === null ? t('pos.fields.none') : formatMnt(shift.expectedCash),
-            ],
-            [
-              t('pos.fields.countedCash'),
-              shift.countedCash === null ? t('pos.fields.none') : formatMnt(shift.countedCash),
-            ],
-            [
-              t('pos.fields.floatKept'),
-              shift.floatKept === null ? t('pos.fields.none') : formatMnt(shift.floatKept),
-            ],
+            [t('pos.fields.openingFloat'), formatTugrik(shift.openingFloat)],
+            [t('pos.fields.cashSales'), formatTugrik(shift.cashSales)],
+            [t('pos.fields.cashRefunds'), formatTugrik(shift.cashRefunds)],
+            [t('pos.fields.expectedCash'), money(shift.expectedCash)],
+            [t('pos.fields.countedCash'), money(shift.countedCash)],
+            [t('pos.fields.floatKept'), money(shift.floatKept)],
             [
               t('pos.fields.variance'),
               shift.variance === null ? (
-                t('pos.fields.none')
+                none
               ) : (
-                <span className={variance?.isZero() ? undefined : 'text-destructive'}>
-                  {formatMnt(shift.variance)} · {varianceLabel}
+                <span className={varianceTone}>
+                  {formatTugrik(shift.variance)} · {varianceLabel}
                 </span>
               ),
             ],
-            [t('pos.fields.note'), shift.note ?? t('pos.fields.none')],
           ]}
         />
+        {shift.note ? (
+          <p className="rounded-lg border border-border px-3 py-2 text-sm whitespace-pre-wrap">
+            <span className="mr-2 text-[12px] text-muted-foreground">{t('pos.fields.note')}</span>
+            {shift.note}
+          </p>
+        ) : null}
       </PanelSection>
       <PanelSection title={t('pos.shifts.sections.books')}>
-        <dl className="flex flex-col gap-1.5 text-sm">
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">{t('pos.fields.journalEntry')}</dt>
-            <dd className="font-mono">
-              {shift.journalEntryId && shift.journalNumber ? (
-                <Link
-                  className="text-link underline-offset-2 hover:underline"
-                  to={`/finance/journal?entry=${shift.journalEntryId}`}
-                >
-                  {shift.journalNumber}
-                </Link>
-              ) : shift.status === 'OPEN' ? (
-                t('pos.fields.none')
-              ) : (
-                <span className="font-sans text-muted-foreground">{t('pos.shifts.noEntry')}</span>
-              )}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">{t('pos.fields.handover')}</dt>
-            <dd className="font-mono">
-              {shift.handoverPaymentId && shift.handoverNumber ? (
-                <Link
-                  className="text-link underline-offset-2 hover:underline"
-                  to={`/finance/payments?payment=${shift.handoverPaymentId}`}
-                >
-                  {shift.handoverNumber}
-                </Link>
-              ) : (
-                <span className="font-sans text-muted-foreground">
-                  {t('pos.shifts.notHandedOver')}
-                </span>
-              )}
-            </dd>
-          </div>
-          {shift.handedOverAt ? (
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">{t('pos.fields.handedOverBy')}</dt>
-              <dd>
-                {shift.handedOverByName ?? ''} · {stamp(shift.handedOverAt)}
-              </dd>
-            </div>
-          ) : null}
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">{t('pos.sales.title')}</dt>
-            <dd>
-              <Link
-                className="text-link underline-offset-2 hover:underline"
-                to={`/pos/sales?shiftId=${shift.id}`}
-              >
-                {t('pos.sales.count', { count: shift.salesCount + shift.returnsCount })}
-              </Link>
-            </dd>
-          </div>
-        </dl>
+        <FactChips facts={books} />
       </PanelSection>
     </div>
   );
@@ -276,7 +273,7 @@ function HandoverDialog({
               <option value="">{t('pos.shifts.chooseAccount')}</option>
               {cashBoxes.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name} · {formatMnt(account.balance)}
+                  {account.name} · {formatTugrik(account.balance)}
                 </option>
               ))}
             </NativeSelect>

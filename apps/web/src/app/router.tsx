@@ -147,35 +147,37 @@ export const routes: RouteObject[] = [
         // A page that fails renders its error inside the shell, so the menu stays (ADR-0042).
         errorElement: <RouteErrorBoundary />,
         children: [
-          { index: true, element: <HomePage /> },
+          { index: true, element: <HomePage />, handle: { width: 'wide' } },
           ...financeRoutes(),
           ...posRoutes(),
-          { path: 'system/status', element: <SystemStatusPage /> },
-          { path: 'account', element: <AccountPage /> },
-          { path: 'catalog/products', element: <ProductsPage />, handle: { wide: true } },
+          { path: 'system/status', handle: { width: 'reading' }, element: <SystemStatusPage /> },
+          { path: 'account', handle: { width: 'reading' }, element: <AccountPage /> },
+          { path: 'catalog/products', handle: { width: 'wide' }, element: <ProductsPage /> },
           {
             path: 'catalog/products/new',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="catalog.products.register">
                 <ProductCreatePage />
               </RequirePermission>
             ),
           },
-          { path: 'catalog/products/:id', element: <ProductPage /> },
+          { path: 'catalog/products/:id', handle: { width: 'wide' }, element: <ProductPage /> },
           {
             path: 'catalog/pending',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="pricing.prices.manage">
                 <PendingProductsPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
-          { path: 'catalog/categories', element: <CategoriesPage /> },
-          { path: 'catalog/uoms', element: <UomsPage /> },
-          { path: 'catalog/scan', element: <BarcodeLookupPage /> },
+          { path: 'catalog/categories', handle: { width: 'wide' }, element: <CategoriesPage /> },
+          { path: 'catalog/uoms', handle: { width: 'wide' }, element: <UomsPage /> },
+          { path: 'catalog/scan', handle: { width: 'reading' }, element: <BarcodeLookupPage /> },
           {
             path: 'catalog/ebarimt',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="catalog.ebarimt.manage">
                 <ReadinessPage />
@@ -184,7 +186,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'partners/customers',
-            handle: { wide: true },
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="partners.customers.read">
                 <CustomersPage />
@@ -193,6 +195,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'partners/customers/new',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="partners.customers.manage">
                 <CustomerCreatePage />
@@ -201,108 +204,132 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'partners/customers/:id',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="partners.customers.read">
                 <CustomerPage />
               </RequirePermission>
             ),
           },
-          { path: 'partners/suppliers', element: <SuppliersPage />, handle: { wide: true } },
+          { path: 'partners/suppliers', handle: { width: 'wide' }, element: <SuppliersPage /> },
           {
             path: 'partners/suppliers/new',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="partners.suppliers.manage">
                 <SupplierCreatePage />
               </RequirePermission>
             ),
           },
-          { path: 'partners/suppliers/:id', element: <SupplierPage /> },
-          { path: 'inventory/stock', element: <StockPage /> },
-          { path: 'inventory/stock/:id', element: <StockProductPage /> },
-          { path: 'inventory/movements', element: <MovementsPage />, handle: { wide: true } },
-          { path: 'inventory/low-stock', element: <LowStockPage /> },
-          { path: 'inventory/receipts', element: <ReceiptsPage /> },
+          { path: 'partners/suppliers/:id', handle: { width: 'wide' }, element: <SupplierPage /> },
+          { path: 'inventory/stock', handle: { width: 'wide' }, element: <StockPage /> },
+          { path: 'inventory/stock/:id', handle: { width: 'wide' }, element: <StockProductPage /> },
+          { path: 'inventory/movements', handle: { width: 'wide' }, element: <MovementsPage /> },
+          { path: 'inventory/low-stock', handle: { width: 'wide' }, element: <LowStockPage /> },
+          { path: 'inventory/receipts', handle: { width: 'wide' }, element: <ReceiptsPage /> },
           // Old links: a receipt is created in the list's dialog and costed on its own page.
           {
             path: 'inventory/receipts/new',
+            handle: { width: 'wide' },
             element: <Navigate to="/inventory/receipts?new=1" replace />,
           },
-          { path: 'inventory/receipts/:id', element: <ReceiptPage /> },
+          { path: 'inventory/receipts/:id', handle: { width: 'wide' }, element: <ReceiptPage /> },
           {
             path: 'inventory/receipts/:id/costing',
+            handle: { width: 'wide' },
             element: <Navigate to=".." relative="path" replace />,
           },
-          { path: 'pricing/profiles', element: <PriceProfilesPage />, handle: { wide: true } },
-          { path: 'pricing/profiles/:id', element: <PriceProfilePage /> },
-          { path: 'pricing/discounts', element: <DiscountProgramsPage />, handle: { wide: true } },
+          { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
+          {
+            path: 'pricing/profiles/:id',
+            handle: { width: 'reading' },
+            element: <PriceProfilePage />,
+          },
+          {
+            path: 'pricing/discounts',
+            handle: { width: 'wide' },
+            element: <DiscountProgramsPage />,
+          },
           {
             path: 'pricing/discounts/new',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="pricing.manage">
                 <DiscountProgramCreatePage />
               </RequirePermission>
             ),
           },
-          { path: 'pricing/discounts/:id', element: <DiscountProgramPage /> },
+          {
+            path: 'pricing/discounts/:id',
+            handle: { width: 'reading' },
+            element: <DiscountProgramPage />,
+          },
           {
             path: 'pricing/discounts/:id/edit',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="pricing.manage">
                 <DiscountProgramEditPage />
               </RequirePermission>
             ),
           },
-          { path: 'pricing/quote', element: <PriceQuotePage />, handle: { wide: true } },
+          { path: 'pricing/quote', handle: { width: 'wide' }, element: <PriceQuotePage /> },
           {
             path: 'sales/boards',
+            handle: { width: 'full' },
             element: (
               <RequirePermission permission="sales.orders.read">
                 <SalesWorkPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
           {
             path: 'sales/boards/settings',
+            handle: { width: 'full' },
             element: (
               <RequirePermission permission="sales.boards.manage">
                 <SalesSettingsPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
           // The order list lives in the work page's list view (ADR-0057 #7).
-          { path: 'sales/orders', element: <Navigate to="/sales/boards?view=list" replace /> },
+          {
+            path: 'sales/orders',
+            handle: { width: 'full' },
+            element: <Navigate to="/sales/boards?view=list" replace />,
+          },
           {
             path: 'sales/orders/new',
+            handle: { width: 'full' },
             element: (
               <RequirePermission permission="sales.orders.manage">
                 <SalesOrderNewPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
           {
             path: 'sales/orders/:id',
+            handle: { width: 'full' },
             element: (
               <RequirePermission permission="sales.orders.read">
                 <SalesOrderPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
-          { path: 'segments', element: <SegmentsPage />, handle: { wide: true } },
+          { path: 'segments', handle: { width: 'wide' }, element: <SegmentsPage /> },
           {
             path: 'segments/new',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="segments.manage">
                 <SegmentEditorPage />
               </RequirePermission>
             ),
           },
-          { path: 'segments/:id', element: <SegmentPage /> },
+          { path: 'segments/:id', handle: { width: 'reading' }, element: <SegmentPage /> },
           {
             path: 'segments/:id/edit',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="segments.manage">
                 <SegmentEditorPage />
@@ -311,24 +338,25 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'ai',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="ai.ask">
                 <AiPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
           {
             path: 'ai/reports',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="ai.ask">
                 <AiReportsPage />
               </RequirePermission>
             ),
-            handle: { wide: true },
           },
           {
             path: 'imports',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="imports.manage">
                 <ImportsPage />
@@ -337,21 +365,35 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'imports/:id',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="imports.manage">
                 <ImportPage />
               </RequirePermission>
             ),
           },
-          { path: 'inventory/transfers', element: <TransfersPage /> },
-          { path: 'inventory/transfers/:id', element: <TransferPage /> },
-          { path: 'inventory/moves', element: <BinMovesPage /> },
-          { path: 'inventory/adjustments', element: <AdjustmentsPage /> },
-          { path: 'inventory/adjustments/:id', element: <AdjustmentPage /> },
-          { path: 'inventory/stocktakes', element: <StocktakesPage /> },
-          { path: 'inventory/stocktakes/:id', element: <StocktakePage /> },
+          { path: 'inventory/transfers', handle: { width: 'wide' }, element: <TransfersPage /> },
+          { path: 'inventory/transfers/:id', handle: { width: 'wide' }, element: <TransferPage /> },
+          { path: 'inventory/moves', handle: { width: 'wide' }, element: <BinMovesPage /> },
+          {
+            path: 'inventory/adjustments',
+            handle: { width: 'wide' },
+            element: <AdjustmentsPage />,
+          },
+          {
+            path: 'inventory/adjustments/:id',
+            handle: { width: 'wide' },
+            element: <AdjustmentPage />,
+          },
+          { path: 'inventory/stocktakes', handle: { width: 'wide' }, element: <StocktakesPage /> },
+          {
+            path: 'inventory/stocktakes/:id',
+            handle: { width: 'wide' },
+            element: <StocktakePage />,
+          },
           {
             path: 'inventory/bins',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="inventory.setup.manage">
                 <BinsPage />
@@ -360,6 +402,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'users',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="identity.users.read">
                 <UsersPage />
@@ -368,6 +411,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'users/:id',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="identity.users.read">
                 <UserDetailPage />
@@ -376,16 +420,18 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'roles',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="identity.users.read">
                 <RolesPage />
               </RequirePermission>
             ),
           },
-          { path: 'branches', element: <BranchesPage /> },
-          { path: 'warehouses', element: <WarehousesPage /> },
+          { path: 'branches', handle: { width: 'wide' }, element: <BranchesPage /> },
+          { path: 'warehouses', handle: { width: 'wide' }, element: <WarehousesPage /> },
           {
             path: 'settings',
+            handle: { width: 'reading' },
             element: (
               <RequirePermission permission="identity.settings.read">
                 <SettingsPage />
@@ -394,13 +440,14 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'audit',
+            handle: { width: 'wide' },
             element: (
               <RequirePermission permission="identity.audit.read">
                 <AuditPage />
               </RequirePermission>
             ),
           },
-          { path: '*', element: <NotFoundPage /> },
+          { path: '*', handle: { width: 'reading' }, element: <NotFoundPage /> },
         ],
       },
     ],
@@ -420,13 +467,13 @@ function posRoutes(): RouteObject[] {
     <RequirePermission permission="pos.manage">{element}</RequirePermission>
   );
   return [
-    { path: 'pos/shifts', element: read(<PosShiftsPage />), handle: { wide: true } },
-    { path: 'pos/sales', element: read(<PosSalesPage />), handle: { wide: true } },
-    { path: 'pos/tills', element: read(<PosTillsPage />), handle: { wide: true } },
-    { path: 'pos/cashiers', element: read(<PosCashiersPage />), handle: { wide: true } },
-    { path: 'pos/settings', element: manage(<PosSettingsPage />) },
+    { path: 'pos/shifts', handle: { width: 'wide' }, element: read(<PosShiftsPage />) },
+    { path: 'pos/sales', handle: { width: 'wide' }, element: read(<PosSalesPage />) },
+    { path: 'pos/tills', handle: { width: 'wide' }, element: read(<PosTillsPage />) },
+    { path: 'pos/cashiers', handle: { width: 'wide' }, element: read(<PosCashiersPage />) },
+    { path: 'pos/settings', handle: { width: 'reading' }, element: manage(<PosSettingsPage />) },
     ...(import.meta.env.DEV
-      ? [{ path: 'pos/test-till', element: manage(<PosTestTillPage />), handle: { wide: true } }]
+      ? [{ path: 'pos/test-till', handle: { width: 'wide' }, element: manage(<PosTestTillPage />) }]
       : []),
   ];
 }
@@ -437,16 +484,29 @@ function financeRoutes(): RouteObject[] {
     <RequirePermission permission="finance.read">{element}</RequirePermission>
   );
   return [
-    { path: 'finance/invoices', element: read(<InvoicesPage />), handle: { wide: true } },
-    { path: 'finance/payments', element: read(<PaymentsPage />), handle: { wide: true } },
-    { path: 'finance/cash', element: read(<CashPage />), handle: { wide: true } },
-    { path: 'finance/customers', element: read(<CustomerBalancesPage />), handle: { wide: true } },
-    { path: 'finance/customers/:id', element: read(<CustomerLedgerPage />) },
-    { path: 'finance/journal', element: read(<JournalPage />), handle: { wide: true } },
-    { path: 'finance/accounts', element: read(<AccountsPage />), handle: { wide: true } },
-    { path: 'finance/accounts/:id', element: read(<AccountLedgerPage />), handle: { wide: true } },
+    { path: 'finance/invoices', handle: { width: 'wide' }, element: read(<InvoicesPage />) },
+    { path: 'finance/payments', handle: { width: 'wide' }, element: read(<PaymentsPage />) },
+    { path: 'finance/cash', handle: { width: 'wide' }, element: read(<CashPage />) },
+    {
+      path: 'finance/customers',
+      handle: { width: 'wide' },
+      element: read(<CustomerBalancesPage />),
+    },
+    {
+      path: 'finance/customers/:id',
+      handle: { width: 'wide' },
+      element: read(<CustomerLedgerPage />),
+    },
+    { path: 'finance/journal', handle: { width: 'wide' }, element: read(<JournalPage />) },
+    { path: 'finance/accounts', handle: { width: 'wide' }, element: read(<AccountsPage />) },
+    {
+      path: 'finance/accounts/:id',
+      handle: { width: 'wide' },
+      element: read(<AccountLedgerPage />),
+    },
     {
       path: 'finance/settings',
+      handle: { width: 'reading' },
       element: (
         <RequirePermission permission="finance.settings.manage">
           <FinanceSettingsPage />

@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { CircleCheck, Layers, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { z } from 'zod';
-import { FormFooter, FormRow, FormSection } from '@/components/form';
+import { FormRow, FormSection } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -14,6 +14,9 @@ import {
   ListCard,
   LoadMore,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -21,7 +24,14 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -32,7 +42,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { cn } from '@/lib/utils';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
@@ -54,50 +66,69 @@ const GAPS: readonly ReadinessGap[] = [
   'measureUnit',
   'cityTax',
 ];
-const isGap = (value: string): value is ReadinessGap => GAPS.some((gap) => gap === value);
+const isGap = (value: string | null): value is ReadinessGap => GAPS.some((gap) => gap === value);
+const positiveId = (value: string | null) => {
+  const id = Number.parseInt(value ?? '', 10);
+  return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+};
 
 /**
  * What e-Barimt receipts still miss, product by product, and bulk assignment by category that only
- * fills empty attributes (ADR-0015 #3). Must reach zero before delivery 3 prints receipts.
+ * fills empty attributes (ADR-0015 #3). The tiles count each gap and filter the list by it; the
+ * filters live in the URL (`?gap=`, `?category=`). The assignment opens in a dialog from the header,
+ * so the list starts right under the tiles (ADR-0066).
  */
 export function ReadinessPage() {
   const { t } = useTranslation();
   const report = useReadiness();
   const categories = useCategories();
-  const [gap, setGap] = useState<ReadinessGap | undefined>();
-  const [categoryId, setCategoryId] = useState<number | undefined>();
+  const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
+  const gapParam = params.get('gap');
+  const gap = isGap(gapParam) ? gapParam : undefined;
+  const categoryId = positiveId(params.get('category'));
+  const [assigning, setAssigning] = useState(false);
   const products = useReadinessProducts({ gap, categoryId });
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
   const rows = products.data?.pages.flatMap((page) => page.data) ?? [];
+  const filtered = gap !== undefined || categoryId !== undefined;
 
   return (
-    <div className="space-y-4">
-      <PageHeader title={t('catalog.readiness.title')} meta={t('catalog.readiness.hint')} />
+    <div>
+      <PageHeader
+        title={t('catalog.readiness.title')}
+        description={`${t('catalog.readiness.hint')} ${t('catalog.readiness.uomHint')}`}
+        actions={
+          <Button onClick={() => setAssigning(true)}>
+            <Layers />
+            {t('catalog.readiness.assign')}
+          </Button>
+        }
+      />
       <ProblemAlert problem={problemFromError(report.error ?? products.error)} />
       {report.data ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Kpi label={t('catalog.readiness.active')} value={report.data.activeProducts} />
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <Tile label={t('catalog.readiness.active')} value={report.data.activeProducts} />
           {GAPS.map((item) => (
-            <Kpi
+            <Tile
               key={item}
               label={t(`catalog.readiness.gaps.${item}`)}
               value={report.data.missing[item]}
               tone={report.data.missing[item] === 0 ? 'good' : 'warn'}
+              pressed={gap === item}
+              onClick={() => setParam('gap', gap === item ? null : item)}
             />
           ))}
         </div>
       ) : null}
-      <p className="text-xs text-muted-foreground">{t('catalog.readiness.uomHint')}</p>
 
-      <AssignCard categories={categories.data ?? []} />
-
-      <FilterBar className="mb-0">
+      <FilterBar>
         <NativeSelect
           variant="filter"
           aria-label={t('catalog.readiness.missing')}
           value={gap ?? ''}
-          onChange={(event) => setGap(isGap(event.target.value) ? event.target.value : undefined)}
+          onChange={(event) => setParam('gap', event.target.value)}
         >
           <option value="">{t('catalog.readiness.anyGap')}</option>
           {GAPS.map((item) => (
@@ -110,9 +141,7 @@ export function ReadinessPage() {
           variant="filter"
           aria-label={t('catalog.readiness.category')}
           value={categoryId === undefined ? '' : String(categoryId)}
-          onChange={(event) =>
-            setCategoryId(event.target.value ? Number.parseInt(event.target.value, 10) : undefined)
-          }
+          onChange={(event) => setParam('category', event.target.value)}
         >
           <option value="">{t('catalog.products.allCategories')}</option>
           {tree.map((node) => (
@@ -122,7 +151,7 @@ export function ReadinessPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -130,24 +159,29 @@ export function ReadinessPage() {
               <TableHead>{t('catalog.products.columns.name')}</TableHead>
               <TableHead>{t('catalog.products.columns.category')}</TableHead>
               <TableHead>{t('catalog.readiness.missing')}</TableHead>
+              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.isPending ? <SkeletonRows columns={5} /> : null}
+            {products.isPending ? <SkeletonRows columns={6} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.product.id} to={`/catalog/products/${row.product.id}`}>
                 <TableCell className="font-mono">{row.product.sku}</TableCell>
-                <TableCell className="whitespace-normal">
-                  <Link to={`/catalog/products/${row.product.id}`} className="font-medium">
+                <TruncateCell text={row.product.name} className="max-w-72">
+                  <Link
+                    to={`/catalog/products/${row.product.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
                     {row.product.name}
                   </Link>
-                </TableCell>
-                <TableCell className="whitespace-normal text-muted-foreground">
-                  {paths.get(row.product.categoryId) ?? t('common.none')}
-                </TableCell>
-                <TableCell className="whitespace-normal">
-                  <div className="flex flex-wrap gap-1">
+                </TruncateCell>
+                <TruncateCell
+                  text={paths.get(row.product.categoryId) ?? t('common.none')}
+                  className="max-w-56 text-muted-foreground"
+                />
+                <TableCell>
+                  <div className="flex gap-1">
                     {row.missing.map((item) => (
                       <Badge key={item} variant="warning">
                         {t(`catalog.readiness.gaps.${item}`)}
@@ -155,24 +189,43 @@ export function ReadinessPage() {
                     ))}
                   </div>
                 </TableCell>
+                <SpacerCell />
               </LinkRow>
             ))}
           </TableBody>
         </Table>
         {!products.isPending && rows.length === 0 ? (
-          <EmptyState icon={CircleCheck} title={t('catalog.readiness.empty')} />
+          <EmptyState
+            icon={CircleCheck}
+            title={t('catalog.readiness.empty')}
+            {...(filtered
+              ? { onClearFilters: () => setParams(new URLSearchParams(), { replace: true }) }
+              : {})}
+          />
         ) : null}
         <LoadMore query={products} />
       </ListCard>
+      {assigning ? (
+        <AssignDialog categories={categories.data ?? []} onClose={() => setAssigning(false)} />
+      ) : null}
     </div>
   );
 }
 
-/** A number tile: green with «Бүрэн» at zero, amber while products still miss the attribute. */
-function Kpi(props: { label: string; value: number; tone?: 'good' | 'warn' }) {
+/**
+ * A number tile: green with «Бүрэн» at zero, amber while products still miss the attribute. A gap's
+ * tile is a toggle that filters the list by it (`aria-pressed`).
+ */
+function Tile(props: {
+  label: string;
+  value: number;
+  tone?: 'good' | 'warn';
+  pressed?: boolean;
+  onClick?: () => void;
+}) {
   const { t } = useTranslation();
-  return (
-    <div className="flex flex-col gap-1 rounded-xl bg-card p-4 shadow-card ring-1 ring-black/[0.06]">
+  const body = (
+    <>
       <span className="flex items-start gap-1.5 text-[13px] leading-snug text-muted-foreground">
         {props.tone === 'good' ? (
           <CircleCheck aria-hidden className="mt-px size-3.5 shrink-0 text-success" />
@@ -188,12 +241,28 @@ function Kpi(props: { label: string; value: number; tone?: 'good' | 'warn' }) {
           props.tone === 'warn' && 'text-warning',
         )}
       >
-        {props.value}
+        {formatCount(props.value)}
       </span>
       {props.tone === 'good' ? (
         <span className="text-xs text-success">{t('catalog.readiness.complete')}</span>
       ) : null}
-    </div>
+    </>
+  );
+  const tile = 'flex flex-col gap-1 rounded-xl bg-card p-4 text-left shadow-card ring-1';
+  return props.onClick ? (
+    <button
+      type="button"
+      aria-pressed={props.pressed ?? false}
+      className={cn(
+        tile,
+        'cursor-pointer ring-black/[0.06] transition-[box-shadow,background-color] outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/30 aria-pressed:bg-secondary aria-pressed:ring-2 aria-pressed:ring-primary',
+      )}
+      onClick={props.onClick}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className={cn(tile, 'ring-black/[0.06]')}>{body}</div>
   );
 }
 
@@ -230,11 +299,26 @@ function assignBody(values: AssignValues): AssignRequest {
   };
 }
 
+/** The counts of a dry run or an assignment, grouped for reading. */
+function countsText(counts: {
+  classificationCode: number;
+  taxProductCode: number;
+  cityTax: number;
+}) {
+  return {
+    classificationCode: formatCount(counts.classificationCode),
+    taxProductCode: formatCount(counts.taxProductCode),
+    cityTax: formatCount(counts.cityTax),
+  };
+}
+
 /**
- * Bulk assignment: "count" shows how many products each value would fill, "apply" fills them.
- * A changed form must be counted again before it can be applied.
+ * Bulk assignment, a dialog from the page header: "count" shows how many products each value would
+ * fill, "apply" fills them. A changed form must be counted again before it can be applied; the
+ * dialog stays open after applying, so the next category follows.
  */
-function AssignCard({ categories }: { categories: readonly Category[] }) {
+function AssignDialog(props: { categories: readonly Category[]; onClose: () => void }) {
+  const { categories } = props;
   const { t } = useTranslation();
   const mutations = useCatalogMutations();
   const action = useAction();
@@ -288,12 +372,12 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
   const { errors, isSubmitting } = form.formState;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('catalog.readiness.assign')}</CardTitle>
-        <CardDescription>{t('catalog.readiness.assignHint')}</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} size="lg">
+        <DialogHeader>
+          <DialogTitle>{t('catalog.readiness.assign')}</DialogTitle>
+          <DialogDescription>{t('catalog.readiness.assignHint')}</DialogDescription>
+        </DialogHeader>
         <form
           className="flex flex-col gap-4"
           noValidate
@@ -372,19 +456,23 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
           </FormSection>
           {preview ? (
             <p role="status" className="px-1 text-sm">
-              {t('catalog.readiness.preview', preview.counts)}
+              {t('catalog.readiness.preview', countsText(preview.counts))}
             </p>
           ) : null}
           {applied ? (
-            <Alert>
-              <AlertDescription>
+            <Alert className="border-transparent bg-success-soft">
+              <CircleCheck aria-hidden className="text-success" />
+              <AlertDescription className="text-foreground">
                 {t('catalog.readiness.done')}
                 {': '}
-                {t('catalog.readiness.preview', applied.counts)}
+                {t('catalog.readiness.preview', countsText(applied.counts))}
               </AlertDescription>
             </Alert>
           ) : null}
-          <FormFooter>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={props.onClose}>
+              {t('common.cancel')}
+            </Button>
             <Button type="submit" variant="secondary" disabled={isSubmitting}>
               {t('catalog.readiness.count')}
             </Button>
@@ -395,9 +483,9 @@ function AssignCard({ categories }: { categories: readonly Category[] }) {
             >
               {t('catalog.readiness.apply')}
             </Button>
-          </FormFooter>
+          </DialogFooter>
         </form>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
