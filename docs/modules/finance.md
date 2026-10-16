@@ -65,7 +65,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `CreditControlService.check(tx, { customer, orderId, amount, openOrders })` | the sales hook: HOLD → OVERDUE → LIMIT → ok, with the amounts for the 409 |
 | `InvoicingService.onSold(tx, actor, snapshot)` / `void(ctx, id, reason)` | the sale hook (null when nothing was delivered); the void |
 | `InvoiceQueryService.list(ctx, query)` / `get(id)` / `openOf(customerId)` | reads |
-| `PaymentsService.record(ctx, input)` / `void` / `list(ctx, query)` / `get` / `book(moneyAccountId, query)` | the vouchers and the cash book |
+| `PaymentsService.record(ctx, input)` / `recordInTx(tx, ctx, input)` / `void` / `list(ctx, query)` / `get` / `book(moneyAccountId, query)` | the vouchers and the cash book; `recordInTx` lets another module’s transaction carry a voucher (the POS hand-over, ADR-0064 #3) and answers `{ id, number }` |
 | `CreditNotesService.create(ctx, input)` / `list` / `get` | credit notes |
 | `JournalService.post(tx, actor, input)` / `reverse(tx, actor, id, …)` / `postManual(ctx, …)` / `reverseManual` / `list` / `get` / `accountLedger(accountId, query)` | the journal; `post` throws 422 `JOURNAL_UNBALANCED` |
 | `GlAccountsService.list` / `listWithBalances(asOf)` / `byRole(role)` / `create` / `update` / `setRole` | the chart; `byRole` throws 409 `ACCOUNT_ROLE_MISSING` |
@@ -102,6 +102,7 @@ Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'1
 - **Credit notes (ADR-0060 #6).** Quantities per invoice line, never more than `qty_base − returned_base` (the CHECK guards races too); money at the invoiced unit price, discounts pro rata, taxes with the line's frozen rates; `warehouseId` null means a price correction without stock. The movement is `CN` / `RETURN_IN` into the chosen bin (RETURNS by default) at the warehouse's average cost; `pnpm inventory:reconcile` stays clean.
 - **Dates.** Documents are dated today or earlier (`notFuture`); the number's day is the document's date, so a back-dated voucher takes that day's counter.
 - **The cache.** `customer_balances` is rewritten from the ledger and the open invoices after every entry; `overdue_amount` / `oldest_due_date` are as of the last write, so the nightly `finance.reconcile` (03:15) and `pnpm finance:reconcile` rewrite every row (the calendar moves them) and record a drift of `balance` or `open_invoices` as the evidence of a bug. Lists read the cache; the credit check reads the overdue amount live.
+- **The supermarket POS (ADR-0064).** Till sales get no invoice and no receivable. The pos module posts one `AUTO_POS_SHIFT` entry per closed shift (`source_type` POS_SHIFT) on the roles POS_CASH (100102), CARD_CLEARING (120301), POS_SALES (510102), CASH_VARIANCE (740101) plus SALES_RETURN and VAT_PAYABLE, and records the accountant’s hand-over as an OTHER_IN voucher against POS_CASH through `recordInTx`. `JOURNAL_SOURCE_DOC_TYPES` = the finance document kinds + POS_SHIFT.
 - **Settings.** `credit.payment_term_days` defaults to 30 (ADR-0060 #2); `tax.vat_rate_pct`, `tax.city_tax_rate_pct`, `company.vat_payer`, `company.city_tax_payer` decide the split.
 
 ## 6. Error codes introduced
