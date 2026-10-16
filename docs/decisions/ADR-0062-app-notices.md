@@ -6,6 +6,7 @@
 | Date | 2026-10-16 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0061 (#1: the app gains a notice popup, a notifications screen, a notice's products and a bell on «Профайл»), ADR-0060 (#1: a third sales hook beside the credit checker and the sale sink) |
+| Amended by | ADR-0066 (#3: the popup and the list as the Launch and Notifications boards draw them, a toast after the popup) |
 
 ## Context
 

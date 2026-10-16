@@ -1,19 +1,23 @@
 # App `mobile` — contract
 
-Status: **v1 built** 2026-10-15 (the sales-rep app, ADR-0061), pulled forward from deliveries 4 and 7 at the owner's request. Code: `apps/mobile/` (Expo, the `staff` variant of ADR-0006), the API it uses in `apps/api/src/modules/sales/` (`/sales-rep/*`) and `apps/api/src/modules/identity/` (`/auth/mobile/*`). Decisions: ADR-0006, ADR-0016, ADR-0025, ADR-0027, ADR-0061, ADR-0062 (notices, 2026-10-16).
+Status: **v1 built** 2026-10-15 (the sales-rep app, ADR-0061), pulled forward from deliveries 4 and 7 at the owner's request; **redrawn to the owner's design** 2026-10-16 (ADR-0066, version 0.2.0). Code: `apps/mobile/` (Expo, the `staff` variant of ADR-0006), the API it uses in `apps/api/src/modules/sales/` (`/sales-rep/*`) and `apps/api/src/modules/identity/` (`/auth/mobile/*`). Decisions: ADR-0006, ADR-0016, ADR-0025, ADR-0027, ADR-0061, ADR-0062 (notices, 2026-10-16), ADR-0066 (the design, 2026-10-16). The design: the artifact «Bto Бараа дэлгэц» (15 boards, https://claude.ai/artifact/BAV6mPG85WCGKu6NjUBhNd).
 
 ## 1. Scope (v1, owner 2026-10-15)
 
 The sales rep's app, modelled on the screens of the erxes SR app the owner uses (only its flow: no code, logo or picture of it):
 
 - **Server and login:** the API server's address (checked with `GET /health`), then the staff account; the session lasts one shift (`auth.staff_session_hours`, 12).
-- **«Нүүр»:** the month's orders, total and drafts; where new orders land; shortcuts.
-- **«Дэлгүүр»:** categories, search by name, code or barcode, the camera scanner; each product's units (piece, box…) with the server's wholesale price, the home warehouse's free stock, − n + per unit.
-- **«Сагс»:** the lines priced by the server (`POST /pricing/quote`: whole packs and loose parts, discount programs), the customer (search), the address or pickup, the delivery date (tomorrow by default, from the server's «today»), the payment (Бэлнээр / Дансаар / Зээл), a note, «Илгээх».
-- **«Захиалга»:** the rep's own orders by month (Ulaanbaatar), with status, stage, payment label; an order's page with lines, reserved and short quantities.
-- **«Профайл»** (redesigned 2026-10-16, ADR-0062): the bell with the unread count in the top right corner (also on the Profile tab), the user's initials, name, login and role, the order settings with the chosen stage, the server, logout, «Сервер солих», the version.
-- **Notices (ADR-0062, `docs/modules/notifications.md`):** the admin's unread popup notices one at a time in the middle of the screen when the app starts or returns to the foreground (never over the camera, the customer picker or a pending send; shown = read); «Мэдэгдэл» with the running notices and the rep's sold orders by day; a notice's page with its products and − n +.
-- **Settings «Захиалга бүртгэх тохиргоо»:** the board → pipeline → stage new orders land on, among those the rep may place on.
+- **The look (ADR-0066 #1–#2):** the boards' inset grouped lists, 34 px titles, segmented controls, switches, pill buttons and sheets (`src/ui/*`, tokens in `src/theme/tokens.ts`); a floating tab bar «Нүүр · Бараа · Сагс · Захиалга · Профайл» with the cart's and the bell's counts.
+- **«Нүүр»:** who is signed in and the day, this month's orders (count, confirmed total, drafts), where new orders land, the ways into the shop, the cart, the orders and the scanner.
+- **«Бараа»** (the Main board): the scanner and the filter (with the count of filters on), the search by name, code or barcode, the order and the filters as chips (a chosen one blue with ×), «N бараа · шинэ нь эхэндээ», two cards a row (picture, «Шинэ» for 14 days, «+» by the default unit or the cart's quantity, the base price «29,100₮ / ш», the stock «Үлдэгдэл 73 · хайрцагт 6»).
+- **The filter sheet** (Filter, Supplier): the order (Шинэ эхэндээ / Үнэ өсөхөөр / Үнэ буурахаар), the top categories, the home warehouse (every one, or one of the context's), the main suppliers on a sheet over it (search, counts, ticks), «Зөвхөн үлдэгдэлтэй»; «N бараа харуулах» counts the draft. Kept per server and user; a scoped rep starts in their one wholesale warehouse.
+- **A product** (Product, ProductKeypad): the pictures (a pager), the code and category, the stock and the home warehouse, the unit switch, the unit's price with its pack note, − n + with the keypad on the number, +1 +5 +10, what goes short (backordered), the server's total of the line, «Сагсанд нэмэх / шинэчлэх / хасах». From the scanner it opens in the scanned unit and goes back to the camera.
+- **«Сагс»** (Cart): one row per product (picture, pieces and the price a piece, the server's line total, the unit pill that opens the product), «Засах» with the remove buttons, «Бараа нэмэх», the server's total and discount, «Захиалга илгээх».
+- **«Захиалагчийн мэдээлэл»** (Checkout, CheckoutNote): the customer («Солих»), the contact and phone (the customer's first contact by default), delivery or pickup with the address sheet and the day sheet (a calendar, 60 days ahead), the payment with its colour, a note lifted above the keyboard with «Болсон», where the order lands; «Баталгаажуулж илгээх», then the sent order over the page.
+- **«Миний захиалгууд»** (MyOrders, DateRange): a customer search, today / a week / this month or a range from the calendar sheet (presets, start and end, Monday first, never the future, ≤ 366 days), the count, the confirmed total and the drafts, the orders by day; an order's page in the same look.
+- **«Профайл»** (Profile): the bell with the unread count, the user (to their details), «Хэрэглэгчийн мэдээлэл», «Захиалга илгээх тохиргоо» with the chosen stage, the server, «Гарах» with its question, the version and build. **«Хэрэглэгчийн мэдээлэл»** (ProfileInfo): name, login, role, the branches of the write scope, when the session signed in and ends, the server, «Нууц үг солих» (`POST /auth/password`). The server is changed at sign-in or offline.
+- **Notices (ADR-0062, ADR-0066 #9, `docs/modules/notifications.md`):** the popup as the Launch board draws it (a picture by kind, the kind and days, a price drop's old and new prices, the dots, «… харах», «Дараагийнх / Хаах») when the app starts or returns to the foreground (never over the camera, the customer picker, the checkout, the password or a pending send; shown = read), then a toast «Мэдэгдлүүд Профайл дээрх хонхонд хадгалагдсан» with «Дахин харах»; «Мэдэгдэл» (Notifications) with the running notices and the rep's sold orders by day; a notice's page with its products as cards.
+- **«Захиалга илгээх тохиргоо»** (OrderSettings): the board (with its branch), its pipeline and the stage new orders land on (a number, the stage's rule), among those the rep may place on; «Дараагийн захиалга».
 
 Not in v1: payments and returns (with finance, delivery 3), new customers, biometric login, offline mode (ADR-0020), visit plans, iOS, keyboard-wedge scanners, EAS.
 
@@ -39,16 +43,22 @@ apps/mobile/
   plugins/with-cmake-object-path.cjs   CMAKE_OBJECT_PATH_MAX=250 (Windows' 260-character limit)
   scripts/build-apk.mjs    `pnpm mobile:apk`; apk-env.mjs (pure helpers), expo.mjs (the Expo CLI)
   app/                     Expo Router: _layout (phases), server, login, offline, not-rep,
-                           (staff)/(tabs)/{index,shop,cart,orders,profile}, (staff)/{product/[id],
-                           order/[id],customers,scan,settings,notifications,notice/[id]},
+                           (staff)/(tabs)/{index,shop,cart,orders,profile} (the floating tab bar),
+                           (staff)/{product/[id],checkout,order/[id],customers,scan,settings,
+                           profile-info,password,notifications,notice/[id]},
                            (staff)/notice-popup (a transparentModal route)
   src/api/                 session.ts (tokens), problem.ts, rep.ts, notifications.ts (TanStack hooks)
-  src/notifications/       feed.ts (the list by day, the popup queue), kinds.tsx, popup-gate.tsx
+  src/notifications/       feed.ts (the list by day, the popup queue and replay), kinds.tsx, popup-gate.tsx
   src/cart/                cart.ts (reducer, the order body), send.ts (the pending send), use-send.ts
+  src/shop/                filters.ts (+ use-filters), units.ts, unit-words.ts, filter-sheet,
+                           supplier-sheet, qty-keypad, use-line-quote, use-add
+  src/orders/              date-range-sheet
   src/state/               session.tsx (server + session), shop.tsx (cart, stage, pending send),
-                           placement.ts
+                           placement.ts, role.ts, use-debounced.ts
+  src/ui/                  the boards' kit: layout, grouped, controls, sheet, toast, tab-bar,
+                           calendar, keypad, product-card, status, stat-row, pending-send, kit
   src/device/storage.ts    AsyncStorage JSON, the secure token store
-  src/{dates,format,scan,server,theme,i18n,ui}/
+  src/{dates,format,scan,server,theme,i18n}/
 ```
 
 ## 4. Workspace rules
@@ -57,7 +67,8 @@ apps/mobile/
 - **Metro** watches the workspace, reads `@tugeel/shared` from source (`@tugeel/source`), resolves `react` and `react-native` from `apps/mobile` (`scripts/metro-pin.cjs`) and skips `apps/api`, `apps/web`, `.claude`, `tmp`.
 - **Scripts:** never `build` or `dev` (`pnpm check` and `pnpm dev` run them on every package). `typecheck` and `test` run in `pnpm check`; `apk` and `expo` are by hand.
 - **Strings:** every one in `packages/shared/i18n/mn.json` under `mobile.*` (reusing `sales.*`, `auth.login.*`, `common.*`, `errors.*`); no `count` interpolation (Hermes may lack `Intl.PluralRules`).
-- **Tokens:** `src/theme/tokens.ts`, the web's values (docs/ui.md); Inter faces by file name; touch targets ≥ 44.
+- **Tokens:** `src/theme/tokens.ts`, the web's values (docs/ui.md) and the boards' (ADR-0066); Inter faces by file name; touch targets ≥ 44; shadows as React Native's `boxShadow` (New Architecture); no colour literal in a screen.
+- **Units:** the system units (`PCS`, `BOX`, `BLOCK`, `KG`; stored names are short, «ш») take their word forms from `mobile.units.<code>` (ширхэг, хайрцагт, ширхэгээр); a custom unit shows its own name.
 
 ## 5. Auth (ADR-0061 #4)
 
@@ -65,7 +76,7 @@ apps/mobile/
 
 ## 6. API used
 
-`GET /health`; `/auth/mobile/{login,refresh,logout}`, `GET /auth/me`; `GET /sales-rep/context`, `GET /sales-rep/products`, `GET /sales-rep/products/batch`, `GET /sales-rep/customers`, `GET /sales-rep/customers/:id`, `POST /sales-rep/orders`, `GET /sales-rep/orders?month=`, `GET /sales-rep/orders/:id`; `POST /pricing/quote`, `GET /categories`, `GET /barcodes/:code` (these three need only a signed-in user); `GET /me/notifications/summary` (at start, on foreground, every 60 s), `GET /me/notifications`, `POST /me/notifications/read`; product and notice pictures from `/api/v1/files/public/<key>`. Rights: `sales.orders.rep` (the SALES_REP role); `docs/modules/sales.md` §4.
+`GET /health`; `/auth/mobile/{login,refresh,logout}`, `GET /auth/me` (with `sessionStartedAt`), `POST /auth/password`; `GET /sales-rep/context` (with `warehouses`, `branchNames`, boards' `branchName`), `GET /sales-rep/products?q=&categoryIds=&warehouseId=&supplierIds=&inStock=&sort=` (and `limit=1` for the filter's count), `GET /sales-rep/products/batch?productIds=&priceBefore=`, `GET /sales-rep/suppliers`, `GET /sales-rep/customers`, `GET /sales-rep/customers/:id`, `POST /sales-rep/orders` (with the contact), `GET /sales-rep/orders?from=&to=&q=`, `GET /sales-rep/orders/:id`; `POST /pricing/quote` (the cart, a product's line, the keypad), `GET /categories`, `GET /barcodes/:code` (these three need only a signed-in user); `GET /me/notifications/summary` (at start, on foreground, every 60 s), `GET /me/notifications`, `POST /me/notifications/read`; product and notice pictures from `/api/v1/files/public/<key>`. Rights: `sales.orders.rep` (the SALES_REP role); `docs/modules/sales.md` §4.
 
 ## 7. Data on the phone (ADR-0061 #8)
 
@@ -73,7 +84,8 @@ apps/mobile/
 |---|---|---|
 | expo-secure-store | `bto.session.v1` | `{server, userId, refreshToken}` |
 | AsyncStorage | `bto.server.v1` | the server address |
-| AsyncStorage | `bto.cart.v1:<server>:<userId>` | the cart (lines, customer, delivery, date, payment, note), written 300 ms after a change |
+| AsyncStorage | `bto.cart.v1:<server>:<userId>` | the cart (one line per product, customer, contact, delivery, date, payment, note), written 300 ms after a change |
+| AsyncStorage | `bto.shopFilters.v1:<server>:<userId>` | the shop's order and filters |
 | AsyncStorage | `bto.stage.v1:<server>:<userId>` | the chosen stage |
 | AsyncStorage | `bto.send.v1:<server>:<userId>` | the pending send `{key, body, startedAt}`, stored BEFORE the request leaves |
 
@@ -81,7 +93,7 @@ The send (`src/cart/use-send.ts`): the same body keeps its Idempotency-Key (cano
 
 ## 8. Scanning
 
-`expo-camera` `CameraView` with ean13, ean8, upc_a, upc_e, itf14, code128; `ScanGate` (`src/scan/scan-gate.ts`): a value counts when read twice within 1.5 s and passing `classifyBarcode` (check digit), then 2 s of rest; then `GET /barcodes/:code` (a box barcode gives the box unit) and the product from `/sales-rep/products/batch`. The camera permission is asked in the app; a refused one opens the phone's settings.
+`expo-camera` `CameraView` with ean13, ean8, upc_a, upc_e, itf14, code128; `ScanGate` (`src/scan/scan-gate.ts`): a value counts when read twice within 1.5 s and passing `classifyBarcode` (check digit), then 2 s of rest; then `GET /barcodes/:code` (a box barcode gives the box unit) and the product's page in that unit (`/product/:id?unit=&from=scan`), which comes back to the camera after «Сагсанд нэмэх». The camera permission is asked in the app; a refused one opens the phone's settings.
 
 ## 9. Build and install
 
@@ -101,13 +113,13 @@ Do not run it while `pnpm check` runs: the load makes the integrity suite time o
 
 ## 10. Tests
 
-- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, other server, logout offline), the cart reducer and order body, the pending send, the placement rule, dates without time zones, money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace, the credit refusal's text (`creditMessage`), the notifications feed by day, the popup queue and initials.
-- **API:** `auth-mobile.int-spec.ts`, `sales-rep.int-spec.ts`, `sales-rep-shop.int-spec.ts`, `sales-rep-races.spec.ts` (integrity), `rep-access.spec.ts`, `notifications.int-spec.ts`, `notifications-guards.spec.ts` (integrity).
-- **On the phone:** the owner's walk (server, login, shop, scan, cart, send on a NONE and a CONFIRM stage, own orders by month, a lost connection while sending).
+- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, other server, logout offline), the cart reducer (one line per product, the contact, an old stored cart) and order body, the pending send, the placement rule, dates without time zones, the calendar (Monday first, presets, the range picker, 366 days), the shop filters (the default warehouse, the count, stored filters, top categories, supplier letters), units (the default and pack units, shortages), money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace, the credit refusal's text (`creditMessage`), the notifications feed by day, the popup queue, its replay and pictures, and initials.
+- **API:** `auth-mobile.int-spec.ts`, `sales-rep.int-spec.ts`, `sales-rep-shop.int-spec.ts`, `sales-rep-shop-filters.int-spec.ts`, `sales-rep-races.spec.ts` (integrity), `rep-access.spec.ts`, `notifications.int-spec.ts`, `notifications-guards.spec.ts` (integrity).
+- **On the phone:** the owner's walk, board by board (ADR-0066): the shop's grid, chips, «+» and quantities; the filter and the suppliers; a product's pictures, units, keypad, shortage and total; the cart's edit; the checkout's sheets, the note over the keyboard and the sent order; the orders' presets, calendar and search; the profile, the details and a password change, the order settings, the notifications, the popup and its toast; a lost connection while sending.
 
 ## 11. Open items
 
 - **TODO-VERIFY (owner):** the package id `mn.butenorgil.bto.staff`, permanent once handed out; a release key and how APKs reach the reps; a logo (1024×1024 PNG) instead of the placeholder «B»; the reps' phones (Android ≥ 7, arm64).
 - Payments, returns, receivables on the customer card (with finance, delivery 3); visit plans and rep zones (delivery 5/7; the customer reads by id must then pass `CustomersService.visibleTo`, `docs/modules/sales.md` §10); biometric unlock; keyboard-wedge scanners (delivery 4's warehouse flows).
 - EAS Build and Update, the Play internal track and HTTPS at go-live (row 12); push for notices then (ADR-0062 #7).
-- The new design of the other screens («Бараа» with the filter, the cart's customer step, the keypad, «Миний захиалгууд» with dates; the owner's design artifact of 2026-10-16) comes in a later session.
+- Swiping a sheet down and the boards' blur (iOS-only effects) are left out (ADR-0066); a sheet closes with ×, «Болих» or the dimmed page.
