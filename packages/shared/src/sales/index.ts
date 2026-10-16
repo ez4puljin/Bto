@@ -199,6 +199,22 @@ export function defaultDeliveryDate(today: string = businessDate()): string {
   return addDays(today, 1);
 }
 
+/**
+ * The rep app's shop orders (ADR-0066): NEW, the latest to become sale-ready first; PRICE_ASC and
+ * PRICE_DESC by one base unit's price in whole packs (the warehouse price), unpriced last.
+ */
+export const REP_PRODUCT_SORTS = ['NEW', 'PRICE_ASC', 'PRICE_DESC'] as const;
+export type RepProductSort = (typeof REP_PRODUCT_SORTS)[number];
+
+/**
+ * Products a price sort orders at most. A price sort reads every product the filters keep; above
+ * this it is refused with the count (SELECTION_TOO_LARGE), never cut short.
+ */
+export const REP_PRICE_SORT_MAX = 100_000;
+
+/** Days one request of the rep's orders may span, both ends included. */
+export const REP_ORDER_RANGE_MAX_DAYS = 366;
+
 export interface OrderHeaderInput {
   fulfilment: Fulfilment;
   deliveryDate: string;

@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { addMonths, businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
@@ -35,7 +35,8 @@ const stageBody = (name: string, action: string, roles: StageRoles = NO_STAGE_RO
 /**
  * The sales-rep app's orders (ADR-0061 #5–#6): the stages a rep may place on, an order created on
  * the chosen stage (a draft on NONE, confirmed and reserved on CONFIRM, nothing left behind on a
- * refusal), idempotent sends, and only the rep's own orders by Ulaanbaatar month. Synthetic data.
+ * refusal), idempotent sends, and only the rep's own orders by Ulaanbaatar days and search
+ * (ADR-0066). Synthetic data.
  */
 describe('sales rep orders', () => {
   let app: NestExpressApplication;
@@ -326,7 +327,7 @@ describe('sales rep orders', () => {
       .expect(409);
   });
 
-  it('shows a rep only their own rep orders, by Ulaanbaatar month', async () => {
+  it('shows a rep only their own rep orders, by Ulaanbaatar days and search', async () => {
     const theirs = await repApi(app, repB).order(
       repOrderBody(stage(main, 'ХТ Захиалга'), shop.id, [{ productUnitId: pcs(cola), qty: '1' }]),
     );
@@ -335,8 +336,10 @@ describe('sales rep orders', () => {
         .create(orderBody(shop.id, [{ productUnitId: pcs(cola), qty: '1' }]))
         .expect(201)
     ).body as { id: number };
-    const month = businessDate().slice(0, 7);
-    const mine = await repApi(app, repA).list({ month });
+    const today = businessDate();
+    const first = `${today.slice(0, 7)}-01`;
+    const range = { from: first, to: today };
+    const mine = await repApi(app, repA).list(range);
     expect(mine.data.map((row) => row.id)).not.toContain(theirs.id);
     expect(mine.data.map((row) => row.id)).not.toContain(officeOrder.id);
     expect(mine.data.length).toBeGreaterThanOrEqual(3);
@@ -357,31 +360,48 @@ describe('sales rep orders', () => {
       .get(mine.data[0]?.id ?? 0)
       .expect(404);
 
-    // 2026-09-30 16:30Z is 2026-10-01 00:30 in Ulaanbaatar: the order counts in October.
+    // A customer's name or an order number finds the order; the summary follows the search.
+    const named = await repApi(app, repA).list({ ...range, q: 'Төлөөлөгчийн' });
+    expect(named.data.map((row) => row.id).sort()).toEqual(mine.data.map((row) => row.id).sort());
+    expect(named.summary).toEqual(mine.summary);
+    const numbered = mine.data.find((row) => row.number !== null);
+    const byNumber = await repApi(app, repA).list({ ...range, q: numbered?.number ?? '' });
+    expect(byNumber.data.map((row) => row.id)).toEqual([numbered?.id]);
+    expect(byNumber.summary).toMatchObject({ count: 1 });
+    const none = await repApi(app, repA).list({ ...range, q: 'Ийм харилцагч алга' });
+    expect(none).toMatchObject({ data: [], summary: { count: 0, total: '0', drafts: 0 } });
+
+    // 2026-09-30 16:30Z is 2026-10-01 00:30 in Ulaanbaatar: the order counts on the 1st.
     const moved = mine.data[0]?.id ?? 0;
-    const previous = addMonths(`${month}-01`, -1).slice(0, 7);
+    const dayBefore = addDays(first, -1);
     await sql.query(
       `UPDATE sales_orders SET created_at = ($2::date - interval '7 hours 30 minutes') AT TIME ZONE 'UTC'
         WHERE id = $1`,
-      [moved, `${month}-01`],
+      [moved, first],
     );
-    expect((await repApi(app, repA).list({ month })).data.map((row) => row.id)).toContain(moved);
+    expect((await repApi(app, repA).list(range)).data.map((row) => row.id)).toContain(moved);
     await sql.query(
       `UPDATE sales_orders SET created_at = ($2::date - interval '8 hours 1 minute') AT TIME ZONE 'UTC'
         WHERE id = $1`,
-      [moved, `${month}-01`],
+      [moved, first],
     );
-    expect((await repApi(app, repA).list({ month: previous })).data.map((row) => row.id)).toContain(
-      moved,
-    );
-    expect((await repApi(app, repA).list({ month })).data.map((row) => row.id)).not.toContain(
-      moved,
-    );
-    await http()
-      .get('/api/v1/sales-rep/orders')
-      .query({ month: '2026-13' })
-      .set(bearer(repA))
-      .expect(422);
+    expect(
+      (await repApi(app, repA).list({ from: dayBefore, to: dayBefore })).data.map((row) => row.id),
+    ).toEqual([moved]);
+    expect((await repApi(app, repA).list(range)).data.map((row) => row.id)).not.toContain(moved);
+
+    // 366 days at most, both ends included; the days must exist; the month form is gone.
+    await repApi(app, repA).list({ from: addDays(today, -365), to: today });
+    for (const query of [
+      { from: addDays(today, -366), to: today },
+      { from: today, to: addDays(today, -1) },
+      { from: '2026-02-30', to: '2026-03-01' },
+      { from: '2026-10', to: today },
+      { from: today },
+      { month: today.slice(0, 7) },
+    ]) {
+      await http().get('/api/v1/sales-rep/orders').query(query).set(bearer(repA)).expect(422);
+    }
   });
 
   it('puts the rep order on the office board, where the office moves it on', async () => {

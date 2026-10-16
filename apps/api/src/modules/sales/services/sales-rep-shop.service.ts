@@ -1,9 +1,26 @@
 import { Injectable } from '@nestjs/common';
+import { NEW_PRODUCT_DAYS } from '@tugeel/shared/catalog';
 import { Decimal } from '@tugeel/shared/money';
-import { notFound } from '../../../common/errors/app-error';
-import { type ProductListItem, ProductQueryService } from '../../catalog';
+import { REP_PRICE_SORT_MAX, type RepProductSort } from '@tugeel/shared/sales';
+import type { SegmentCondition, SegmentDefinition } from '@tugeel/shared/segments';
+import { businessDate, isIsoDate } from '@tugeel/shared/time';
+import { AppError, invalid, notFound } from '../../../common/errors/app-error';
+import {
+  DEFAULT_PAGE_LIMIT,
+  decodeCursor,
+  invalidCursor,
+  toPage,
+} from '../../../common/pagination/page';
+import {
+  type ProductImageUrls,
+  type ProductListItem,
+  type ProductListQuery,
+  ProductFiltersService,
+  ProductQueryService,
+} from '../../catalog';
 import type { AuthContext } from '../../identity';
-import { CustomersService } from '../../partners';
+import { StockQueryService } from '../../inventory';
+import { CustomersService, ProductSuppliersService } from '../../partners';
 import { ProductPricesService } from '../../pricing';
 import { SalesOrdersService } from './sales-orders.service';
 
@@ -14,20 +31,53 @@ export interface RepProduct {
   name: string;
   categoryId: number;
   thumbUrl: string | null;
+  /** Ready pictures, the primary first (the product page's pager). */
+  images: ProductImageUrls[];
+  /** Became sale-ready within the last NEW_PRODUCT_DAYS days: «Шинэ» (ADR-0066). */
+  isNew: boolean;
   /** Active, complete and with a home warehouse: an order accepts it. */
   sellable: boolean;
+  homeWarehouseId: number | null;
   /** Base units free in the home warehouse (on hand, sellable, less what is reserved). */
   available: Decimal;
+  /** One base unit in whole packs (the warehouse price), whole MNT; null without terms today. */
+  basePrice: Decimal | null;
+  /** The base price on the day asked for (a price-drop notice); null when not asked or none. */
+  basePriceBefore: Decimal | null;
   units: {
     id: number;
     uomName: string;
+    uomCode: string | null;
     factorToBase: Decimal;
     isBase: boolean;
+    isDefaultSales: boolean;
     barcodes: string[];
     /** One unit at the WHOLESALE list, as a quote splits it; null without terms today. */
     wholesale: Decimal | null;
     basis: 'WAREHOUSE' | 'LOOSE' | 'MIXED' | null;
   }[];
+}
+
+/** The shop's filters and order (ADR-0066). */
+export interface RepProductQuery {
+  q?: string;
+  /** Each with its subcategories. */
+  categoryIds?: readonly number[];
+  /** The products' home warehouse. */
+  warehouseId?: number;
+  /** Main suppliers. */
+  supplierIds?: readonly number[];
+  /** Only products with stock free in their home warehouse. */
+  inStock?: boolean;
+  sort?: RepProductSort;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface RepSupplier {
+  id: number;
+  name: string;
+  productCount: number;
 }
 
 export interface RepCustomer {
@@ -49,35 +99,160 @@ export interface RepCustomerDetail {
   contacts: { name: string | null; phone: string | null }[];
 }
 
+const DAY_MS = 86_400_000;
+
 /**
- * What the rep's shop and customer picker read (ADR-0061 #5, #7): active, sale-ready products with
- * each unit's wholesale price and the home warehouse's stock; active customers with what an order
- * needs, through `CustomersService.visibleTo` (the hook reserved for rep zones). Prices come from
- * pricing: the app never computes one.
+ * The category, home warehouse and main supplier filters as one product-list condition tree
+ * (ADR-0049 #4): the owning modules answer them through the segments resolver. None set: no tree
+ * (an empty one is refused).
+ */
+function shopWhere(query: RepProductQuery): SegmentDefinition | undefined {
+  const conditions: SegmentCondition[] = [];
+  if (query.categoryIds?.length) {
+    conditions.push({ field: 'category', op: 'IN', ids: [...query.categoryIds] });
+  }
+  if (query.warehouseId !== undefined) {
+    conditions.push({ field: 'homeWarehouse', op: 'IN', ids: [query.warehouseId] });
+  }
+  if (query.supplierIds?.length) {
+    conditions.push({ field: 'supplier', op: 'MAIN_IN', ids: [...query.supplierIds] });
+  }
+  return conditions.length === 0
+    ? undefined
+    : { match: 'ALL', groups: [{ match: 'ALL', conditions }] };
+}
+
+/** A price sort's cursor: the sort, the last row's price (none when unpriced) and id, the day. */
+function priceCursorOf(
+  cursor: string | undefined,
+  sort: RepProductSort,
+): { price: string | null; id: number; date: string } | null {
+  const after = decodeCursor(cursor);
+  if (!after) return null;
+  const price = after.p;
+  if (
+    after.s !== sort ||
+    typeof after.id !== 'number' ||
+    typeof after.d !== 'string' ||
+    !isIsoDate(after.d) ||
+    (price !== undefined && (typeof price !== 'string' || !/^\d{1,12}(\.\d{1,2})?$/.test(price)))
+  ) {
+    throw invalidCursor();
+  }
+  return { price: price ?? null, id: after.id, date: after.d };
+}
+
+/**
+ * What the rep's shop and customer picker read (ADR-0061 #5, #7; ADR-0066): active, sale-ready
+ * products with each unit's wholesale price and the home warehouse's stock, filtered and sorted as
+ * the app asks; the suppliers to filter by; active customers with what an order needs, through
+ * `CustomersService.visibleTo` (the hook reserved for rep zones). Prices come from pricing: the app
+ * never computes one.
  */
 @Injectable()
 export class SalesRepShopService {
   constructor(
     private readonly products: ProductQueryService,
+    private readonly productFilters: ProductFiltersService,
     private readonly orders: SalesOrdersService,
     private readonly prices: ProductPricesService,
+    private readonly stock: StockQueryService,
     private readonly customers: CustomersService,
+    private readonly productSuppliers: ProductSuppliersService,
   ) {}
 
-  async productPage(query: {
-    q?: string;
-    categoryId?: number;
-    cursor?: string;
-    limit?: number;
-  }): Promise<{ data: RepProduct[]; nextCursor: string | null }> {
-    const page = await this.products.query({ ...query, status: 'ACTIVE', saleReady: true });
-    return { data: await this.enrich(page.data), nextCursor: page.nextCursor };
+  /**
+   * One page of the shop. NEW pages through catalog's keyset; a price sort orders every product
+   * the filters keep by its base price (refused above REP_PRICE_SORT_MAX, never cut short) and
+   * keeps the first page's day, so a page after midnight continues the same order.
+   */
+  async productPage(
+    query: RepProductQuery,
+  ): Promise<{ data: RepProduct[]; nextCursor: string | null; total: number | null }> {
+    const today = businessDate();
+    const where = shopWhere(query);
+    const onlyIds = query.inStock ? await this.stock.productIdsAvailableAtHome() : undefined;
+    const base: ProductListQuery = {
+      ...(query.q ? { q: query.q } : {}),
+      status: 'ACTIVE',
+      saleReady: true,
+      ...(where ? { where } : {}),
+      ...(onlyIds ? { onlyIds } : {}),
+    };
+    const sort = query.sort ?? 'NEW';
+    if (sort === 'NEW') {
+      const page = await this.products.query({
+        ...base,
+        sort: 'NEW',
+        ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+        ...(query.limit === undefined ? {} : { limit: query.limit }),
+      });
+      return {
+        data: await this.enrich(page.data, today),
+        nextCursor: page.nextCursor,
+        total: page.total,
+      };
+    }
+    const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const after = priceCursorOf(query.cursor, sort);
+    const { ids, total } = await this.products.orderedIds(base, REP_PRICE_SORT_MAX);
+    if (total > REP_PRICE_SORT_MAX) {
+      throw new AppError(
+        'SELECTION_TOO_LARGE',
+        `${total} products match, a price sort orders at most ${REP_PRICE_SORT_MAX}`,
+        { count: total, limit: REP_PRICE_SORT_MAX },
+      );
+    }
+    const date = after?.date ?? today;
+    const rows = await this.prices.orderedByBasePrice(ids, {
+      direction: sort === 'PRICE_ASC' ? 'ASC' : 'DESC',
+      after: after ? { price: after.price, id: after.id } : null,
+      limit: limit + 1,
+      date,
+    });
+    const page = toPage(rows, limit, (row) => ({
+      s: sort,
+      ...(row.price === null ? {} : { p: row.price }),
+      id: row.productId,
+      d: date,
+    }));
+    const items = await this.products.listItemsOf(page.data.map((row) => row.productId));
+    return {
+      data: await this.enrich(items, today),
+      nextCursor: page.nextCursor,
+      total: query.cursor === undefined ? total : null,
+    };
   }
 
-  /** Products by id (a cart refreshed, a scanned barcode), only those the shop would list. */
-  async productsOf(ids: readonly number[]): Promise<RepProduct[]> {
+  /**
+   * Products by id (a cart refreshed, a scanned barcode, a notice), only those the shop would
+   * list; with `priceBefore`, also each base price on that day (a price-drop notice's old price).
+   */
+  async productsOf(ids: readonly number[], priceBefore?: string): Promise<RepProduct[]> {
+    if (priceBefore !== undefined && !isIsoDate(priceBefore)) {
+      throw invalid('priceBefore', 'isDate', 'priceBefore must be a date');
+    }
     const rows = await this.products.listItemsOf(ids);
-    return this.enrich(rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null));
+    return this.enrich(
+      rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null),
+      businessDate(),
+      priceBefore,
+    );
+  }
+
+  /** The main suppliers of the shop's products, with how many each has, the most first. */
+  async suppliers(): Promise<RepSupplier[]> {
+    const shop = await this.productFilters.idsWhere({
+      field: 'stage',
+      op: 'IN',
+      values: ['ACTIVE'],
+    });
+    const counts = await this.productSuppliers.mainSupplierCounts(shop);
+    return counts.map((row) => ({
+      id: row.supplierId,
+      name: row.name,
+      productCount: row.productCount,
+    }));
   }
 
   async customerPage(
@@ -118,32 +293,50 @@ export class SalesRepShopService {
     };
   }
 
-  private async enrich(rows: readonly ProductListItem[]): Promise<RepProduct[]> {
+  private async enrich(
+    rows: readonly ProductListItem[],
+    today: string,
+    priceBefore?: string,
+  ): Promise<RepProduct[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);
     const info = new Map((await this.orders.productInfo(ids)).map((own) => [own.productId, own]));
-    const tables = await this.prices.tablesOf(ids);
+    const prices = await this.prices.shopPricesOf(ids, today);
+    const before =
+      priceBefore === undefined ? null : await this.prices.shopPricesOf(ids, priceBefore);
+    const images = await this.products.imagesOf(ids);
+    const flags = await this.products.unitFlagsOf(ids);
+    const newSince = Date.now() - NEW_PRODUCT_DAYS * DAY_MS;
     return rows.map((row) => {
       const own = info.get(row.id);
-      const table = new Map((tables.get(row.id) ?? []).map((prices) => [prices.unitId, prices]));
+      const priced = prices.get(row.id);
+      const table = new Map((priced?.units ?? []).map((unit) => [unit.unitId, unit]));
       return {
         id: row.id,
         sku: row.sku,
         name: row.name,
         categoryId: row.categoryId,
         thumbUrl: row.thumbUrl,
+        images: images.get(row.id) ?? [],
+        isNew: row.saleReadyAt !== null && row.saleReadyAt.getTime() >= newSince,
         sellable: own?.sellable === true && own.homeWarehouseId !== null,
+        homeWarehouseId: own?.homeWarehouseId ?? null,
         available: own?.available ?? new Decimal(0),
+        basePrice: priced?.basePrice ?? null,
+        basePriceBefore: before?.get(row.id)?.basePrice ?? null,
         units: row.units.map((unit) => {
-          const prices = table.get(unit.id);
+          const unitPrices = table.get(unit.id);
+          const flag = flags.get(unit.id);
           return {
             id: unit.id,
             uomName: unit.uomName,
+            uomCode: flag?.uomCode ?? null,
             factorToBase: unit.factorToBase,
             isBase: unit.isBase,
+            isDefaultSales: flag?.isDefaultSales ?? false,
             barcodes: unit.barcodes,
-            wholesale: prices?.wholesale ?? null,
-            basis: prices?.wholesaleBasis ?? null,
+            wholesale: unitPrices?.wholesale ?? null,
+            basis: unitPrices?.wholesaleBasis ?? null,
           };
         }),
       };

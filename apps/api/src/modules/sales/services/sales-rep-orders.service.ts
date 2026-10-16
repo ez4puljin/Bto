@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Decimal } from '@tugeel/shared/money';
-import type { Fulfilment, OrderStatus, PaymentMethod, StageAction } from '@tugeel/shared/sales';
-import { addDays, addMonths, businessDate } from '@tugeel/shared/time';
+import {
+  type Fulfilment,
+  type OrderStatus,
+  type PaymentMethod,
+  REP_ORDER_RANGE_MAX_DAYS,
+  type StageAction,
+} from '@tugeel/shared/sales';
+import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { onBusinessDays } from '../../../common/db/days';
@@ -9,7 +15,7 @@ import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import type { AuthContext } from '../../identity';
+import { type AuthContext, OrgService } from '../../identity';
 import { CustomersService } from '../../partners';
 import { salesBoards, salesChannelDefaults, salesOrders } from '../schema';
 import { repMayPlace } from './rep-access';
@@ -21,13 +27,15 @@ import { SalesPipelinesService } from './sales-pipelines.service';
 /** A rep's new order: the office order's header and lines, on the stage chosen in the app. */
 export type RepOrderInput = Omit<OrderInput, 'pipelineId' | 'stageId'> & { stageId: number };
 
-/** What the app loads at start (ADR-0061 #5). */
+/** What the app loads at start (ADR-0061 #5, ADR-0066). */
 export interface RepContext {
   /** The server's business date: the phone never computes it (Hermes has no reliable zones). */
   today: string;
   boards: {
     id: number;
     name: string;
+    /** The board's branch, the settings' note under its name. */
+    branchName: string | null;
     pipelines: {
       id: number;
       name: string;
@@ -36,6 +44,10 @@ export interface RepContext {
   }[];
   /** The SALES_REP channel's stage when the rep may place on it. */
   defaultStageId: number | null;
+  /** Active wholesale warehouses, the shop's homes: the location filter's choices. */
+  warehouses: { id: number; name: string; branchId: number; branchName: string }[];
+  /** The branches the rep may write for, by name; empty when the rep is not scoped. */
+  branchNames: string[];
 }
 
 export interface RepOrderSummary {
@@ -58,7 +70,7 @@ export interface RepOrderSummary {
 export interface RepOrderPage {
   data: RepOrderSummary[];
   nextCursor: string | null;
-  /** On the first page: the month's orders, the total of those not cancelled and the drafts. */
+  /** On the first page: the range's orders, the total of those not cancelled and the drafts. */
   summary: { count: number; total: string; drafts: number } | null;
 }
 
@@ -77,19 +89,22 @@ export class SalesRepOrdersService {
     private readonly orders: SalesOrdersService,
     private readonly queries: SalesOrderQueryService,
     private readonly customers: CustomersService,
+    private readonly org: OrgService,
   ) {}
 
   async context(ctx: AuthContext): Promise<RepContext> {
     const access = await this.access.load(ctx);
     const boards = await this.db
-      .select({ id: salesBoards.id, name: salesBoards.name })
+      .select({ id: salesBoards.id, name: salesBoards.name, branchId: salesBoards.branchId })
       .from(salesBoards)
       .where(isNull(salesBoards.archivedAt))
       .orderBy(asc(salesBoards.position), asc(salesBoards.id));
+    const branchNameOf = new Map((await this.org.listBranches()).map((row) => [row.id, row.name]));
     const shaped = boards
       .map((board) => ({
         id: board.id,
         name: board.name,
+        branchName: board.branchId === null ? null : (branchNameOf.get(board.branchId) ?? null),
         pipelines: access.pipelines
           .filter((pipeline) => pipeline.boardId === board.id && pipeline.archivedAt === null)
           .map((pipeline) => ({
@@ -111,10 +126,37 @@ export class SalesRepOrdersService {
       .select({ stageId: salesChannelDefaults.stageId })
       .from(salesChannelDefaults)
       .where(eq(salesChannelDefaults.channel, 'SALES_REP'));
+    const allWarehouses = await this.org.listWarehouses();
+    const warehouses = allWarehouses.flatMap((warehouse) =>
+      warehouse.kind === 'WHOLESALE' && warehouse.status === 'ACTIVE' && warehouse.branchId !== null
+        ? [
+            {
+              id: warehouse.id,
+              name: warehouse.name,
+              branchId: warehouse.branchId,
+              branchName: branchNameOf.get(warehouse.branchId) ?? '',
+            },
+          ]
+        : [],
+    );
+    // The write scope always holds the TRANSIT warehouse, which has no branch.
+    const writable = ctx.writableWarehouseIds;
+    const scopedBranches = new Set(
+      writable === null
+        ? []
+        : allWarehouses.flatMap((warehouse) =>
+            writable.has(warehouse.id) && warehouse.branchId !== null ? [warehouse.branchId] : [],
+          ),
+    );
     return {
       today: businessDate(),
       boards: shaped,
       defaultStageId: channel && placeable.has(channel.stageId) ? channel.stageId : null,
+      warehouses,
+      branchNames: [...scopedBranches]
+        .map((id) => branchNameOf.get(id) ?? '')
+        .filter((name) => name !== '')
+        .sort((a, b) => a.localeCompare(b)),
     };
   }
 
@@ -146,17 +188,29 @@ export class SalesRepOrdersService {
     return this.queries.detail(ctx, id);
   }
 
-  /** The rep's own SALES_REP orders created in an Ulaanbaatar month (YYYY-MM), newest first. */
+  /**
+   * The rep's own SALES_REP orders created on Ulaanbaatar days `from`…`to` (both included, at most
+   * REP_ORDER_RANGE_MAX_DAYS), newest first; `q` finds an order number or a customer as the
+   * office list does. The first page's summary covers every order the range and search keep.
+   */
   async list(
     ctx: AuthContext,
-    query: { month: string; cursor?: string; limit?: number },
+    query: { from: string; to: string; q?: string; cursor?: string; limit?: number },
   ): Promise<RepOrderPage> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
-    const from = `${query.month}-01`;
+    const { from, to } = query;
+    if (!isIsoDate(from)) throw invalid('from', 'isDate', 'from must be a date');
+    if (!isIsoDate(to)) throw invalid('to', 'isDate', 'to must be a date');
+    if (to < from) throw invalid('to', 'range', 'to must not be before from');
+    if (to > addDays(from, REP_ORDER_RANGE_MAX_DAYS - 1)) {
+      throw invalid('to', 'range', `a range spans at most ${REP_ORDER_RANGE_MAX_DAYS} days`);
+    }
+    const search = query.q ? await this.queries.filterSql(ctx, { q: query.q }) : [];
     const mine = and(
       eq(salesOrders.createdBy, ctx.userId),
       eq(salesOrders.channel, 'SALES_REP'),
-      onBusinessDays(salesOrders.createdAt, { from, to: addDays(addMonths(from, 1), -1) }),
+      onBusinessDays(salesOrders.createdAt, { from, to }),
+      ...search,
     );
     const cursor = decodeCursor(query.cursor);
     const after = typeof cursor?.id === 'number' ? cursor.id : null;

@@ -13420,13 +13420,34 @@
             }
           },
           {
-            "name": "month",
+            "name": "from",
             "required": true,
             "in": "query",
-            "description": "The Ulaanbaatar month the orders were made",
+            "description": "The first Ulaanbaatar day the orders were made on",
             "schema": {
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "example": "2026-10",
+              "format": "date",
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "The last day, included; at most 366 days from `from`",
+            "schema": {
+              "format": "date",
+              "example": "2026-10-16",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Order number or customer (name, code, phone)",
+            "schema": {
+              "maxLength": 100,
               "type": "string"
             }
           }
@@ -13543,13 +13564,64 @@
             }
           },
           {
-            "name": "categoryId",
+            "name": "categoryIds",
             "required": false,
             "in": "query",
-            "description": "With its subcategories",
+            "description": "Categories, each with its subcategories (1–200 ids, repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "The products' home warehouse",
             "schema": {
               "minimum": 1,
               "type": "number"
+            }
+          },
+          {
+            "name": "supplierIds",
+            "required": false,
+            "in": "query",
+            "description": "Main suppliers (1–200 ids, repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "Only products with stock free in their home warehouse",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "NEW when left out: the latest to become sale-ready first",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "PRICE_ASC",
+                "PRICE_DESC"
+              ]
             }
           }
         ],
@@ -13599,6 +13671,16 @@
               "example": "12,15",
               "type": "string"
             }
+          },
+          {
+            "name": "priceBefore",
+            "required": false,
+            "in": "query",
+            "description": "Also each base price on this day (a price-drop notice shows the old one)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13610,6 +13692,45 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SalesRepProduct"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/suppliers": {
+      "get": {
+        "operationId": "SalesRep_suppliers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRepSupplier"
                   }
                 }
               }
@@ -17702,6 +17823,11 @@
               "type": "number"
             }
           },
+          "sessionStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this session signed in"
+          },
           "sessionExpiresAt": {
             "type": "string",
             "format": "date-time"
@@ -17714,6 +17840,7 @@
           "permissions",
           "roles",
           "writableWarehouseIds",
+          "sessionStartedAt",
           "sessionExpiresAt"
         ]
       },
@@ -28994,6 +29121,11 @@
           "name": {
             "type": "string"
           },
+          "branchName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The board's branch, if it has one"
+          },
           "pipelines": {
             "type": "array",
             "items": {
@@ -29004,7 +29136,31 @@
         "required": [
           "id",
           "name",
+          "branchName",
           "pipelines"
+        ]
+      },
+      "SalesRepWarehouse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number"
+          },
+          "branchName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "branchId",
+          "branchName"
         ]
       },
       "SalesRepContext": {
@@ -29026,12 +29182,28 @@
             "type": "number",
             "nullable": true,
             "description": "The SALES_REP channel's stage"
+          },
+          "warehouses": {
+            "description": "Active wholesale warehouses: the shop's homes, the location filter",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepWarehouse"
+            }
+          },
+          "branchNames": {
+            "description": "The branches of the rep's write scope; empty when the rep is not scoped",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "today",
           "boards",
-          "defaultStageId"
+          "defaultStageId",
+          "warehouses",
+          "branchNames"
         ]
       },
       "SalesRepOrderRequest": {
@@ -29482,7 +29654,7 @@
           "createdAt"
         ]
       },
-      "SalesRepMonthSummary": {
+      "SalesRepRangeSummary": {
         "type": "object",
         "properties": {
           "count": {
@@ -29490,7 +29662,7 @@
           },
           "total": {
             "type": "string",
-            "description": "MNT: the orders not cancelled"
+            "description": "MNT: the orders not cancelled (a draft has no total yet)"
           },
           "drafts": {
             "type": "number"
@@ -29517,11 +29689,11 @@
           },
           "summary": {
             "nullable": true,
-            "description": "First page only",
+            "description": "First page only: every order of the range and search",
             "type": "object",
             "allOf": [
               {
-                "$ref": "#/components/schemas/SalesRepMonthSummary"
+                "$ref": "#/components/schemas/SalesRepRangeSummary"
               }
             ]
           }
@@ -29530,6 +29702,23 @@
           "data",
           "nextCursor",
           "summary"
+        ]
+      },
+      "SalesRepProductImage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Relative to the server"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "url",
+          "thumbUrl"
         ]
       },
       "SalesRepProductUnit": {
@@ -29542,11 +29731,20 @@
           "uomName": {
             "type": "string"
           },
+          "uomCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "PCS, BOX …; null for a custom one"
+          },
           "factorToBase": {
             "type": "string"
           },
           "isBase": {
             "type": "boolean"
+          },
+          "isDefaultSales": {
+            "type": "boolean",
+            "description": "The unit the shop adds by default"
           },
           "barcodes": {
             "type": "array",
@@ -29572,8 +29770,10 @@
         "required": [
           "id",
           "uomName",
+          "uomCode",
           "factorToBase",
           "isBase",
+          "isDefaultSales",
           "barcodes",
           "wholesale",
           "basis"
@@ -29599,13 +29799,38 @@
             "nullable": true,
             "description": "Relative to the server"
           },
+          "images": {
+            "description": "The primary first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductImage"
+            }
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Became sale-ready within the last 14 days"
+          },
           "sellable": {
             "type": "boolean",
             "description": "An order accepts it (active, complete, with a home warehouse)"
           },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
           "available": {
             "type": "string",
             "description": "Base units free in the home warehouse"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one base unit in whole packs (the warehouse price); null without terms"
+          },
+          "basePriceBefore": {
+            "type": "string",
+            "nullable": true,
+            "description": "The base price on `priceBefore`; null without it"
           },
           "units": {
             "type": "array",
@@ -29620,8 +29845,13 @@
           "name",
           "categoryId",
           "thumbUrl",
+          "images",
+          "isNew",
           "sellable",
+          "homeWarehouseId",
           "available",
+          "basePrice",
+          "basePriceBefore",
           "units"
         ]
       },
@@ -29637,11 +29867,37 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "First page only: how many products the filters keep"
           }
         },
         "required": [
           "data",
-          "nextCursor"
+          "nextCursor",
+          "total"
+        ]
+      },
+      "SalesRepSupplier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Shop products whose main supplier this is"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "productCount"
         ]
       },
       "SalesRepCustomer": {

@@ -15,6 +15,7 @@ import {
   SalesRepProductDto,
   SalesRepProductPageDto,
   SalesRepProductQueryDto,
+  SalesRepSupplierDto,
 } from '../dto/sales-rep.dto';
 import { REP } from '../services/rep-access';
 import type { OrderDetail } from '../services/sales-order-query.service';
@@ -83,13 +84,20 @@ function toRepProduct(product: RepProduct): SalesRepProductDto {
     name: product.name,
     categoryId: product.categoryId,
     thumbUrl: product.thumbUrl,
+    images: product.images,
+    isNew: product.isNew,
     sellable: product.sellable,
+    homeWarehouseId: product.homeWarehouseId,
     available: product.available.toString(),
+    basePrice: money(product.basePrice),
+    basePriceBefore: money(product.basePriceBefore),
     units: product.units.map((unit) => ({
       id: unit.id,
       uomName: unit.uomName,
+      uomCode: unit.uomCode,
       factorToBase: unit.factorToBase.toString(),
       isBase: unit.isBase,
+      isDefaultSales: unit.isDefaultSales,
       barcodes: unit.barcodes,
       wholesale: money(unit.wholesale),
       basis: unit.basis,
@@ -98,9 +106,10 @@ function toRepProduct(product: RepProduct): SalesRepProductDto {
 }
 
 /**
- * The sales-rep app (ADR-0061 #5): the stages a rep may place on, new orders on the chosen stage,
- * the rep's own orders by month, the shop's products with prices and stock, and the customers an
- * order needs. Every route needs `sales.orders.rep` and answers for the caller's own data only.
+ * The sales-rep app (ADR-0061 #5, ADR-0066): the stages a rep may place on, new orders on the
+ * chosen stage, the rep's own orders by days and search, the shop's products with prices and stock
+ * (filtered and sorted), the suppliers to filter by, and the customers an order needs. Every route
+ * needs `sales.orders.rep` and answers for the caller's own data only.
  */
 @ApiTags('sales-rep')
 @Controller('sales-rep')
@@ -150,7 +159,13 @@ export class SalesRepController {
     @CurrentUser() ctx: AuthContext,
     @Query() query: SalesRepOrderListQueryDto,
   ): Promise<SalesRepOrderPageDto> {
-    const page = await this.orders.list(ctx, query);
+    const page = await this.orders.list(ctx, {
+      from: query.from,
+      to: query.to,
+      ...(query.q ? { q: query.q } : {}),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+    });
     return {
       data: page.data.map((row) => ({
         ...row,
@@ -176,8 +191,17 @@ export class SalesRepController {
   @RequirePermission(REP)
   @ApiOkResponse({ type: SalesRepProductPageDto })
   async products(@Query() query: SalesRepProductQueryDto): Promise<SalesRepProductPageDto> {
-    const page = await this.shop.productPage(query);
-    return { data: page.data.map(toRepProduct), nextCursor: page.nextCursor };
+    const page = await this.shop.productPage({
+      ...(query.q ? { q: query.q } : {}),
+      ...(query.categoryIds ? { categoryIds: query.categoryIds } : {}),
+      ...(query.warehouseId === undefined ? {} : { warehouseId: query.warehouseId }),
+      ...(query.supplierIds ? { supplierIds: query.supplierIds } : {}),
+      ...(query.inStock === undefined ? {} : { inStock: query.inStock }),
+      ...(query.sort === undefined ? {} : { sort: query.sort }),
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+    });
+    return { data: page.data.map(toRepProduct), nextCursor: page.nextCursor, total: page.total };
   }
 
   @Get('products/batch')
@@ -185,7 +209,14 @@ export class SalesRepController {
   @ApiOkResponse({ type: [SalesRepProductDto] })
   async productBatch(@Query() query: SalesRepProductBatchQueryDto): Promise<SalesRepProductDto[]> {
     const ids = query.productIds.split(',').map((id) => Number.parseInt(id, 10));
-    return (await this.shop.productsOf(ids)).map(toRepProduct);
+    return (await this.shop.productsOf(ids, query.priceBefore)).map(toRepProduct);
+  }
+
+  @Get('suppliers')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: [SalesRepSupplierDto] })
+  suppliers(): Promise<SalesRepSupplierDto[]> {
+    return this.shop.suppliers();
   }
 
   @Get('customers')

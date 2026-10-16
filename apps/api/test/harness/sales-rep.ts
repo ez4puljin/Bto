@@ -11,6 +11,7 @@ export interface RepContextJson {
   boards: {
     id: number;
     name: string;
+    branchName: string | null;
     pipelines: {
       id: number;
       name: string;
@@ -18,6 +19,8 @@ export interface RepContextJson {
     }[];
   }[];
   defaultStageId: number | null;
+  warehouses: { id: number; name: string; branchId: number; branchName: string }[];
+  branchNames: string[];
 }
 
 export interface RepOrderJson {
@@ -66,14 +69,27 @@ export interface RepProductJson {
   sku: string;
   sellable: boolean;
   available: string;
+  isNew: boolean;
+  homeWarehouseId: number | null;
+  basePrice: string | null;
+  basePriceBefore: string | null;
+  images: { url: string; thumbUrl: string | null }[];
   units: {
     id: number;
     uomName: string;
+    uomCode: string | null;
     factorToBase: string;
     isBase: boolean;
+    isDefaultSales: boolean;
     wholesale: string | null;
     basis: string | null;
   }[];
+}
+
+export interface RepProductPageJson {
+  data: RepProductJson[];
+  nextCursor: string | null;
+  total: number | null;
 }
 
 /** A rep's order: a pickup for tomorrow paid in cash on the stage, unless the fields say otherwise. */
@@ -125,6 +141,28 @@ export function repApi(app: NestExpressApplication, token: string) {
         (await http().get('/api/v1/sales-rep/products').query(query).set(auth).expect(200))
           .body as { data: RepProductJson[] }
       ).data;
+    },
+    /** One page of the shop with its cursor and, on the first page, the total. */
+    async productPage(query: Record<string, unknown> = {}): Promise<RepProductPageJson> {
+      return (await http().get('/api/v1/sales-rep/products').query(query).set(auth).expect(200))
+        .body as RepProductPageJson;
+    },
+    /** Every page of the shop for a query, `limit` rows at a time: the ids in order. */
+    async allIds(query: Record<string, unknown>, limit: number): Promise<number[]> {
+      const ids: number[] = [];
+      let cursor: string | null = null;
+      do {
+        const page: RepProductPageJson = (
+          await http()
+            .get('/api/v1/sales-rep/products')
+            .query({ ...query, limit, ...(cursor ? { cursor } : {}) })
+            .set(auth)
+            .expect(200)
+        ).body as RepProductPageJson;
+        ids.push(...page.data.map((product) => product.id));
+        cursor = page.nextCursor;
+      } while (cursor !== null && ids.length < 1_000);
+      return ids;
     },
   };
 }

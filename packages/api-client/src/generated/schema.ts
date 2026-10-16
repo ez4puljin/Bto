@@ -3269,6 +3269,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_suppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/customers": {
         parameters: {
             query?: never;
@@ -4208,6 +4224,11 @@ export interface components {
             roles: components["schemas"]["RoleRef"][];
             /** @description Warehouses this user may write documents for; null = every warehouse */
             writableWarehouseIds: number[] | null;
+            /**
+             * Format: date-time
+             * @description When this session signed in
+             */
+            sessionStartedAt: string;
             /** Format: date-time */
             sessionExpiresAt: string;
         };
@@ -7493,7 +7514,15 @@ export interface components {
         SalesRepBoard: {
             id: number;
             name: string;
+            /** @description The board's branch, if it has one */
+            branchName: string | null;
             pipelines: components["schemas"]["SalesRepPipeline"][];
+        };
+        SalesRepWarehouse: {
+            id: number;
+            name: string;
+            branchId: number;
+            branchName: string;
         };
         SalesRepContext: {
             /**
@@ -7505,6 +7534,10 @@ export interface components {
             boards: components["schemas"]["SalesRepBoard"][];
             /** @description The SALES_REP channel's stage */
             defaultStageId: number | null;
+            /** @description Active wholesale warehouses: the shop's homes, the location filter */
+            warehouses: components["schemas"]["SalesRepWarehouse"][];
+            /** @description The branches of the rep's write scope; empty when the rep is not scoped */
+            branchNames: string[];
         };
         SalesRepOrderRequest: {
             customerId: number;
@@ -7612,24 +7645,33 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        SalesRepMonthSummary: {
+        SalesRepRangeSummary: {
             count: number;
-            /** @description MNT: the orders not cancelled */
+            /** @description MNT: the orders not cancelled (a draft has no total yet) */
             total: string;
             drafts: number;
         };
         SalesRepOrderPage: {
             data: components["schemas"]["SalesRepOrderSummary"][];
             nextCursor: string | null;
-            /** @description First page only */
-            summary: components["schemas"]["SalesRepMonthSummary"] | null;
+            /** @description First page only: every order of the range and search */
+            summary: components["schemas"]["SalesRepRangeSummary"] | null;
+        };
+        SalesRepProductImage: {
+            /** @description Relative to the server */
+            url: string;
+            thumbUrl: string | null;
         };
         SalesRepProductUnit: {
             /** @description The product unit id an order line takes */
             id: number;
             uomName: string;
+            /** @description PCS, BOX …; null for a custom one */
+            uomCode: string | null;
             factorToBase: string;
             isBase: boolean;
+            /** @description The unit the shop adds by default */
+            isDefaultSales: boolean;
             barcodes: string[];
             /** @description MNT, one unit at the WHOLESALE list */
             wholesale: string | null;
@@ -7643,15 +7685,32 @@ export interface components {
             categoryId: number;
             /** @description Relative to the server */
             thumbUrl: string | null;
+            /** @description The primary first */
+            images: components["schemas"]["SalesRepProductImage"][];
+            /** @description Became sale-ready within the last 14 days */
+            isNew: boolean;
             /** @description An order accepts it (active, complete, with a home warehouse) */
             sellable: boolean;
+            homeWarehouseId: number | null;
             /** @description Base units free in the home warehouse */
             available: string;
+            /** @description MNT, one base unit in whole packs (the warehouse price); null without terms */
+            basePrice: string | null;
+            /** @description The base price on `priceBefore`; null without it */
+            basePriceBefore: string | null;
             units: components["schemas"]["SalesRepProductUnit"][];
         };
         SalesRepProductPage: {
             data: components["schemas"]["SalesRepProduct"][];
             nextCursor: string | null;
+            /** @description First page only: how many products the filters keep */
+            total: number | null;
+        };
+        SalesRepSupplier: {
+            id: number;
+            name: string;
+            /** @description Shop products whose main supplier this is */
+            productCount: number;
         };
         SalesRepCustomer: {
             id: number;
@@ -17455,8 +17514,12 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                /** @description The Ulaanbaatar month the orders were made */
-                month: string;
+                /** @description The first Ulaanbaatar day the orders were made on */
+                from: string;
+                /** @description The last day, included; at most 366 days from `from` */
+                to: string;
+                /** @description Order number or customer (name, code, phone) */
+                q?: string;
             };
             header?: never;
             path?: never;
@@ -17556,8 +17619,16 @@ export interface operations {
                 limit?: number;
                 /** @description Name words, code or barcode */
                 q?: string;
-                /** @description With its subcategories */
-                categoryId?: number;
+                /** @description Categories, each with its subcategories (1–200 ids, repeated) */
+                categoryIds?: number[];
+                /** @description The products' home warehouse */
+                warehouseId?: number;
+                /** @description Main suppliers (1–200 ids, repeated) */
+                supplierIds?: number[];
+                /** @description Only products with stock free in their home warehouse */
+                inStock?: boolean;
+                /** @description NEW when left out: the latest to become sale-ready first */
+                sort?: "NEW" | "PRICE_ASC" | "PRICE_DESC";
             };
             header?: never;
             path?: never;
@@ -17589,6 +17660,8 @@ export interface operations {
             query: {
                 /** @description Product ids, comma separated (at most 200) */
                 productIds: string;
+                /** @description Also each base price on this day (a price-drop notice shows the old one) */
+                priceBefore?: string;
             };
             header?: never;
             path?: never;
@@ -17602,6 +17675,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepProduct"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_suppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepSupplier"][];
                 };
             };
             /** @description RFC 9457 problem details */

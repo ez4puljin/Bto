@@ -6,18 +6,41 @@ import {
   type OrderStatus,
   PAYMENT_METHODS,
   type PaymentMethod,
+  REP_PRODUCT_SORTS,
+  type RepProductSort,
   STAGE_ACTIONS,
   type StageAction,
 } from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
-import { PageQueryDto } from '../../../common/pagination/page';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { SalesOrderRequestDto } from './sales-orders.dto';
 
-// The sales-rep app's API (ADR-0061 #5): only what the phone shows, never another rep's data.
+// The sales-rep app's API (ADR-0061 #5, ADR-0066): only what the phone shows, never another rep's
+// data.
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
+/** "true"/"false" query strings as booleans (other values fail @IsBoolean). */
+const queryBoolean = ({ value }: { value: unknown }) => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
+/** A calendar date's shape; the service checks that the day exists. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 @ApiSchema({ name: 'SalesRepStage' })
 export class SalesRepStageDto {
@@ -38,7 +61,17 @@ export class SalesRepPipelineDto {
 export class SalesRepBoardDto {
   @ApiProperty() id: number;
   @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true, description: "The board's branch, if it has one" })
+  branchName: string | null;
   @ApiProperty({ type: [SalesRepPipelineDto] }) pipelines: SalesRepPipelineDto[];
+}
+
+@ApiSchema({ name: 'SalesRepWarehouse' })
+export class SalesRepWarehouseDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty() branchId: number;
+  @ApiProperty() branchName: string;
 }
 
 @ApiSchema({ name: 'SalesRepContext' })
@@ -49,6 +82,23 @@ export class SalesRepContextDto {
   boards: SalesRepBoardDto[];
   @ApiProperty({ type: Number, nullable: true, description: "The SALES_REP channel's stage" })
   defaultStageId: number | null;
+  @ApiProperty({
+    type: [SalesRepWarehouseDto],
+    description: "Active wholesale warehouses: the shop's homes, the location filter",
+  })
+  warehouses: SalesRepWarehouseDto[];
+  @ApiProperty({
+    type: [String],
+    description: "The branches of the rep's write scope; empty when the rep is not scoped",
+  })
+  branchNames: string[];
+}
+
+@ApiSchema({ name: 'SalesRepSupplier' })
+export class SalesRepSupplierDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'Shop products whose main supplier this is' }) productCount: number;
 }
 
 @ApiSchema({ name: 'SalesRepOrderRequest' })
@@ -64,10 +114,30 @@ export class SalesRepOrderRequestDto extends OmitType(SalesOrderRequestDto, [
 
 @ApiSchema({ name: 'SalesRepOrderListQuery' })
 export class SalesRepOrderListQueryDto extends PageQueryDto {
-  @ApiProperty({ example: '2026-10', description: 'The Ulaanbaatar month the orders were made' })
+  @ApiProperty({
+    format: 'date',
+    example: '2026-10-01',
+    description: 'The first Ulaanbaatar day the orders were made on',
+  })
   @IsString()
-  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
-  month: string;
+  @Matches(ISO_DATE)
+  from: string;
+
+  @ApiProperty({
+    format: 'date',
+    example: '2026-10-16',
+    description: 'The last day, included; at most 366 days from `from`',
+  })
+  @IsString()
+  @Matches(ISO_DATE)
+  to: string;
+
+  @ApiPropertyOptional({ description: 'Order number or customer (name, code, phone)' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(100)
+  q?: string;
 }
 
 @ApiSchema({ name: 'SalesRepOrderSummary' })
@@ -88,10 +158,11 @@ export class SalesRepOrderSummaryDto {
   @ApiProperty({ format: 'date-time' }) createdAt: string;
 }
 
-@ApiSchema({ name: 'SalesRepMonthSummary' })
-export class SalesRepMonthSummaryDto {
+@ApiSchema({ name: 'SalesRepRangeSummary' })
+export class SalesRepRangeSummaryDto {
   @ApiProperty() count: number;
-  @ApiProperty({ description: 'MNT: the orders not cancelled' }) total: string;
+  @ApiProperty({ description: 'MNT: the orders not cancelled (a draft has no total yet)' })
+  total: string;
   @ApiProperty() drafts: number;
 }
 
@@ -99,8 +170,12 @@ export class SalesRepMonthSummaryDto {
 export class SalesRepOrderPageDto {
   @ApiProperty({ type: [SalesRepOrderSummaryDto] }) data: SalesRepOrderSummaryDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
-  @ApiProperty({ type: SalesRepMonthSummaryDto, nullable: true, description: 'First page only' })
-  summary: SalesRepMonthSummaryDto | null;
+  @ApiProperty({
+    type: SalesRepRangeSummaryDto,
+    nullable: true,
+    description: 'First page only: every order of the range and search',
+  })
+  summary: SalesRepRangeSummaryDto | null;
 }
 
 @ApiSchema({ name: 'SalesRepOrderPart' })
@@ -173,12 +248,52 @@ export class SalesRepProductQueryDto extends PageQueryDto {
   @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional({ description: 'With its subcategories' })
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'Categories, each with its subcategories (1–200 ids, repeated)',
+  })
+  @IsOptional()
+  @Transform(queryIds)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_PAGE_LIMIT)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  categoryIds?: number[];
+
+  @ApiPropertyOptional({ description: "The products' home warehouse" })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  categoryId?: number;
+  warehouseId?: number;
+
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'Main suppliers (1–200 ids, repeated)',
+  })
+  @IsOptional()
+  @Transform(queryIds)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_PAGE_LIMIT)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  supplierIds?: number[];
+
+  @ApiPropertyOptional({ description: 'Only products with stock free in their home warehouse' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  inStock?: boolean;
+
+  @ApiPropertyOptional({
+    enum: REP_PRODUCT_SORTS,
+    description: 'NEW when left out: the latest to become sale-ready first',
+  })
+  @IsOptional()
+  @IsIn(REP_PRODUCT_SORTS)
+  sort?: RepProductSort;
 }
 
 @ApiSchema({ name: 'SalesRepProductBatchQuery' })
@@ -187,19 +302,37 @@ export class SalesRepProductBatchQueryDto {
   @IsString()
   @Matches(/^\d+(,\d+){0,199}$/)
   productIds: string;
+
+  @ApiPropertyOptional({
+    format: 'date',
+    description: 'Also each base price on this day (a price-drop notice shows the old one)',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(ISO_DATE)
+  priceBefore?: string;
 }
 
 @ApiSchema({ name: 'SalesRepProductUnit' })
 export class SalesRepProductUnitDto {
   @ApiProperty({ description: 'The product unit id an order line takes' }) id: number;
   @ApiProperty() uomName: string;
+  @ApiProperty({ type: String, nullable: true, description: 'PCS, BOX …; null for a custom one' })
+  uomCode: string | null;
   @ApiProperty() factorToBase: string;
   @ApiProperty() isBase: boolean;
+  @ApiProperty({ description: 'The unit the shop adds by default' }) isDefaultSales: boolean;
   @ApiProperty({ type: [String] }) barcodes: string[];
   @ApiProperty({ type: String, nullable: true, description: 'MNT, one unit at the WHOLESALE list' })
   wholesale: string | null;
   @ApiProperty({ enum: ['WAREHOUSE', 'LOOSE', 'MIXED'], nullable: true })
   basis: 'WAREHOUSE' | 'LOOSE' | 'MIXED' | null;
+}
+
+@ApiSchema({ name: 'SalesRepProductImage' })
+export class SalesRepProductImageDto {
+  @ApiProperty({ description: 'Relative to the server' }) url: string;
+  @ApiProperty({ type: String, nullable: true }) thumbUrl: string | null;
 }
 
 @ApiSchema({ name: 'SalesRepProduct' })
@@ -210,9 +343,25 @@ export class SalesRepProductDto {
   @ApiProperty() categoryId: number;
   @ApiProperty({ type: String, nullable: true, description: 'Relative to the server' })
   thumbUrl: string | null;
+  @ApiProperty({ type: [SalesRepProductImageDto], description: 'The primary first' })
+  images: SalesRepProductImageDto[];
+  @ApiProperty({ description: 'Became sale-ready within the last 14 days' }) isNew: boolean;
   @ApiProperty({ description: 'An order accepts it (active, complete, with a home warehouse)' })
   sellable: boolean;
+  @ApiProperty({ type: Number, nullable: true }) homeWarehouseId: number | null;
   @ApiProperty({ description: 'Base units free in the home warehouse' }) available: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'MNT, one base unit in whole packs (the warehouse price); null without terms',
+  })
+  basePrice: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The base price on `priceBefore`; null without it',
+  })
+  basePriceBefore: string | null;
   @ApiProperty({ type: [SalesRepProductUnitDto] }) units: SalesRepProductUnitDto[];
 }
 
@@ -220,6 +369,12 @@ export class SalesRepProductDto {
 export class SalesRepProductPageDto {
   @ApiProperty({ type: [SalesRepProductDto] }) data: SalesRepProductDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'First page only: how many products the filters keep',
+  })
+  total: number | null;
 }
 
 @ApiSchema({ name: 'SalesRepCustomerQuery' })
