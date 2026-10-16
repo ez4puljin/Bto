@@ -35,7 +35,7 @@ The owner's answers (2026-10-15):
    - **Release APKs built on the owner's PC** with `pnpm mobile:apk`: `expo prebuild` (the `android/` folder is generated, never committed), then Gradle `assembleRelease` with JDK 17, Android SDK 36, NDK 27.1.12297006 and CMake 3.22.1, through a `subst` drive letter because the repository path is long and holds spaces. No EAS Build or EAS Update until go-live: every fix is a new APK with a higher `versionCode`.
    - **Cleartext HTTP** is allowed in builds for the office network (the system is local until go-live, ADR-0026); production builds turn it off.
    - The APK is signed with the template's debug key until the owner chooses a release key (before handing the app to the reps).
-3. **Workspace.** The app lives in the pnpm workspace beside the web: exact pins, every version at least a day old, one TypeScript. Metro resolves `react` and `react-native` from `apps/mobile` (two Reacts coexist under the hoisted layout) and reads `@tugeel/shared` from source through the `@tugeel/source` condition (ADR-0025 #4). The app imports only `@tugeel/api-client` and `@tugeel/shared`; shared modules that need `Intl` time zones, `\p{…}` regexes or `normalize()` (`text`, `taxpayer`, `imports`, `inventory`, `businessDate`) are not imported: the server sends «today».
+3. **Workspace.** The app lives in the pnpm workspace beside the web: exact pins, every version at least a day old, one TypeScript, and **one React: the Expo SDK's** (19.2.3, with `react-dom` 19.2.3 in the app too). The web moves from 19.3.0 to 19.2.3: on a clean install a second React hoisted beside packages both apps use (react-i18next, Radix, vaul) broke the web with «Invalid hook call», and React Native runs only with the React it was built for. A unit test fails on any second copy of `react` or `react-dom`; the web's React follows the SDK at each upgrade. Metro resolves `react` and `react-native` from `apps/mobile` and reads `@tugeel/shared` from source through the `@tugeel/source` condition (ADR-0025 #4). The app imports only `@tugeel/api-client` and `@tugeel/shared`; shared modules that need `Intl` time zones, `\p{…}` regexes or `normalize()` (`text`, `taxpayer`, `imports`, `inventory`, `businessDate`) are not imported: the server sends «today».
 4. **Native token transport** (amends ADR-0027 #8). `POST /auth/mobile/login`, `/auth/mobile/refresh` and `/auth/mobile/logout` carry the refresh token in the JSON body, with the same rotation, 20-second grace and reuse revocation as the cookie. A request carrying an `Origin` header is refused: browsers always send one, so a script on the admin's origin cannot obtain a readable refresh token. The app keeps the token in `expo-secure-store`. A grace answer carries no new token (the stored one stays); a refresh answer lost on the network can therefore end in TOKEN_REUSE and a new login — the security model is kept on purpose.
 5. **Rights and the facade.** A new permission `sales.orders.rep` («Төлөөлөгчийн апп»); the `SALES_REP` role holds only it. Reps get neither `sales.orders.read` / `manage` (other orders) nor `partners.customers.read` (credit data). Everything the app needs passes through `/api/v1/sales-rep/*` in the sales module:
    - `GET /context`: the server's business date, the stages the rep may place on (by board and pipeline) and the SALES_REP channel default when it is one of them.
@@ -60,6 +60,8 @@ The owner's answers (2026-10-15):
 | A draft, then a second request to submit | Not atomic: a failed submit would leave a draft the rep cannot see why. |
 | SDK 58 | Still a beta on the day. |
 | Android Studio's bundled JDK 25 | AGP 8.12 and Kotlin 2.1.20 predate it. |
+| Two Reacts side by side (the web on 19.3.0, the app on 19.2.3) | Under the hoisted layout a clean install put the app's copy beside packages the web shares: the web's tests failed with «Invalid hook call». |
+| The app outside the pnpm workspace | A second lockfile and toolchain; the app would lose the shared lint, typecheck and tests of `pnpm check`. |
 | `jest-expo` now | A second Jest and Babel toolchain in `pnpm check` for no screen tests yet. |
 
 ## Consequences
@@ -72,7 +74,7 @@ The owner's answers (2026-10-15):
 - Every fix is a new APK to install by hand until go-live.
 - Cleartext HTTP on the office Wi-Fi until go-live.
 - A lost refresh answer means a new login; a session lasts one 12-hour shift.
-- Two React versions in one workspace.
+- The web's React version follows the Expo SDK (19.2.3 now, not 19.3.0).
 
 ## Related
 

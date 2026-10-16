@@ -36,12 +36,12 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | jest, ts-jest, supertest | 30.5.2, 29.4.14, 7.3.1 | Jest always via `apps/api/scripts/jest.cjs` (`--experimental-vm-modules`) |
 | eslint, typescript-eslint, eslint-plugin-boundaries | 10.12.0, 8.71.1, 7.2.0 | |
 | vite, @vitejs/plugin-react, vitest | 8.3.4, 6.1.2, 5.0.3 | |
-| react, react-router, @tanstack/react-query | 19.3.0, 7.18.4, 5.104.1 | v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
+| react, react-dom, react-router, @tanstack/react-query | 19.2.3, 19.2.3, 7.18.4, 5.104.1 | ONE React workspace-wide, the Expo SDK's (ADR-0061; a test fails on a second copy); v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
 | i18next, react-i18next, @fontsource-variable/inter | 26.4.2, 17.0.16, 5.3.0 | Inter is the web font (ADR-0042); PDFs embed Noto Sans (ADR-0011) |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |
-| Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
+| Expo SDK | 57 (expo 57.0.28, react-native 0.86.3, expo-router 57.0.26; 2026-10-15, ADR-0061), `docs/modules/mobile.md` | APK built on the owner's PC: JDK 17 and Android SDK 36, NDK 27.1.12297006, CMake 3.22.1 in `C:\Android` (no spaces) |
 | argon2, @nestjs/jwt | 0.45.1 (`allowBuilds: argon2: true`, prebuilt binaries), 12.0.2 | identity (ADR-0027); no passport |
 | react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
 | barcode-detector, zxing-wasm | 3.2.2, 3.1.3 | web camera fallback; `zxing-wasm` = the exact version `barcode-detector` declares, `.wasm` served from our build (ADR-0031) |
