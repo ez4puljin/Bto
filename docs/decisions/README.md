@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0065`. `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`.
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0067`. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`.
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -80,6 +80,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | ADR-0062 | *Reserved: app notifications (the `rep-app` branch)* | — | — |
 | [ADR-0063](ADR-0063-pos-store-edge.md) | The supermarket POS runs on a store edge server; the centre records what the tills did (a `pos` module, client uuids and till numbers, ordered replay, the shortfall rule, cashier PINs, edge tokens) | Accepted | 2026-10-16 |
 | [ADR-0064](ADR-0064-pos-money.md) | POS money: no invoices, one journal entry per closed shift, the cash handed to the accountant as a voucher | Accepted | 2026-10-16 |
+| [ADR-0066](ADR-0066-desktop-density-widths.md) | The web admin on desktop screens: denser lists, one page-width rule, lists that fit the window, sticky dialog footers, the menu in the order of the day's work, `pnpm ui:shots` | Accepted | 2026-10-16 |
 
 ## Template
 
