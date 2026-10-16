@@ -35,7 +35,7 @@ SDK upgrades only in their own session between deliveries (SDK 58 brings an Expo
 apps/mobile/
   app.config.ts            APP_VARIANT=staff, package mn.butenorgil.bto.staff (TODO-VERIFY), plugins
   metro.config.js          the workspace, @tugeel/source, react/react-native pinned to the app
-  plugins/with-cmake-object-path.cjs   CMAKE_OBJECT_PATH_MAX=240 (Windows' 260-character limit)
+  plugins/with-cmake-object-path.cjs   CMAKE_OBJECT_PATH_MAX=250 (Windows' 260-character limit)
   scripts/build-apk.mjs    `pnpm mobile:apk`; apk-env.mjs (pure helpers), expo.mjs (the Expo CLI)
   app/                     Expo Router: _layout (phases), server, login, offline, not-rep,
                            (staff)/(tabs)/{index,shop,cart,orders,profile}, (staff)/{product/[id],
@@ -87,7 +87,7 @@ The send (`src/cart/use-send.ts`): the same body keeps its Idempotency-Key (cano
 **`pnpm mobile:apk`** (`apps/mobile/scripts/build-apk.mjs`):
 1. Finds JDK 17/21 (`BTO_JAVA_HOME`, `JAVA_HOME`, `C:\Android\jdk-17*`) and the SDK packages.
 2. Mirrors the workspace with robocopy to `C:\Android\m` (no node_modules, .git, .claude, android, build, tmp) and runs `pnpm install --frozen-lockfile` there (the shared store): the repository's own path has spaces and is long, and a `subst` drive mixed two roots that React Native's codegen refuses.
-3. `expo prebuild --platform android --clean` (the generated `android/` is never committed), then `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a`. The config plugin `plugins/with-cmake-object-path.cjs` passes `CMAKE_OBJECT_PATH_MAX=240` so ninja's object paths stay under Windows' 260 characters.
+3. `expo prebuild --platform android --clean` (the generated `android/` is never committed), then `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a`. The config plugin `plugins/with-cmake-object-path.cjs` passes `CMAKE_OBJECT_PATH_MAX=250`, so CMake hashes the long object names of the codegen targets and ninja's paths stay under Windows' 260 characters. The limit must leave room for a 32-character hash plus the file name after the object directory (react-native-gesture-handler's: 172 + 33 + 40 on arm64-v8a, two more on armeabi-v7a); 240 was too small. A new native library or a longer mirror path can need it raised (keep it under 255).
 4. Copies the APK to `apps/mobile/build/apk/bto-staff-<version>-<versionCode>.apk` (versionCode = minutes since 2026-01-01, so it only grows).
 
 Do not run it while `pnpm check` runs: the load makes the integrity suite time out.
