@@ -1,8 +1,7 @@
 import type { Request } from 'express';
-import type { AuthContext } from '../auth-context';
 import type { AccessTokenDto, LoginResponseDto, MeDto } from '../dto/auth.dto';
 import { requestIdOf } from '../guards/auth.guard';
-import type { AccessService } from '../services/access.service';
+import type { AccessService, ResolvedAccess } from '../services/access.service';
 import type { ClientInfo, IssuedSession } from '../services/auth.service';
 
 /** What the session rows keep of the caller: address, browser or app, the request id. */
@@ -24,11 +23,8 @@ export function toAccessToken(issued: IssuedSession): AccessTokenDto {
   };
 }
 
-export async function toMe(
-  access: AccessService,
-  ctx: AuthContext,
-  sessionExpiresAt: Date,
-): Promise<MeDto> {
+/** The caller's profile and when their session started and ends (the rep app shows both). */
+export async function toMe(access: AccessService, ctx: ResolvedAccess): Promise<MeDto> {
   return {
     id: ctx.userId,
     username: ctx.username,
@@ -39,7 +35,8 @@ export async function toMe(
       ctx.writableWarehouseIds === null
         ? null
         : [...ctx.writableWarehouseIds].sort((a, b) => a - b),
-    sessionExpiresAt: sessionExpiresAt.toISOString(),
+    sessionStartedAt: ctx.sessionStartedAt.toISOString(),
+    sessionExpiresAt: ctx.sessionExpiresAt.toISOString(),
   };
 }
 
@@ -51,5 +48,5 @@ export async function loginResponseOf(
 ): Promise<LoginResponseDto> {
   const resolved = await access.resolve(issued.userId, issued.sessionId, requestId);
   if (!resolved) throw new Error('a session issued a moment ago is not active');
-  return { ...toAccessToken(issued), me: await toMe(access, resolved, issued.sessionExpiresAt) };
+  return { ...toAccessToken(issued), me: await toMe(access, resolved) };
 }

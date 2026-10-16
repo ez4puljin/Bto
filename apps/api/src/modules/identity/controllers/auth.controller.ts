@@ -126,7 +126,7 @@ export class AuthController {
   async me(@CurrentUser() user: AuthContext, @Req() request: Request): Promise<MeDto> {
     const resolved = await this.access.resolve(user.userId, user.sessionId, requestIdOf(request));
     if (!resolved) throw new AppError('UNAUTHORIZED', 'session is not active');
-    return toMe(this.access, resolved, resolved.sessionExpiresAt);
+    return toMe(this.access, resolved);
   }
 
   @Authenticated()

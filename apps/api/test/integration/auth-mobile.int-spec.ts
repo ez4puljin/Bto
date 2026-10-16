@@ -55,6 +55,18 @@ describe('native-client authentication (ADR-0061)', () => {
     expect((racing.body as TokensJson).refreshToken).toBeNull();
     expect((racing.body as TokensJson).accessToken).toEqual(expect.any(String));
     await refresh(body.refreshToken ?? '').expect(200);
+    // The profile tells when the session signed in (ADR-0066): a rotation never moves it.
+    const signedIn = (first.response.body as { me: { sessionStartedAt: string } }).me
+      .sessionStartedAt;
+    expect(Date.parse(signedIn)).toBeLessThan(Date.parse(body.sessionExpiresAt));
+    const me = (await http().get('/api/v1/auth/me').set(bearer(body.accessToken)).expect(200))
+      .body as { sessionStartedAt: string; sessionExpiresAt: string };
+    expect(me).toEqual(
+      expect.objectContaining({
+        sessionStartedAt: signedIn,
+        sessionExpiresAt: body.sessionExpiresAt,
+      }),
+    );
   });
 
   it('revokes the session when an old token comes back after the grace window', async () => {

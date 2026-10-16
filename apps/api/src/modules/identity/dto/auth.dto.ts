@@ -74,6 +74,8 @@ export class MeDto {
     description: 'Warehouses this user may write documents for; null = every warehouse',
   })
   writableWarehouseIds: number[] | null;
+  @ApiProperty({ format: 'date-time', description: 'When this session signed in' })
+  sessionStartedAt: string;
   @ApiProperty({ format: 'date-time' }) sessionExpiresAt: string;
 }
 
