@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
+import type { Permission } from '@tugeel/shared/auth';
+import { and, eq, inArray } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
-import { users } from '../schema';
+import { rolePermissions, userRoles, users } from '../schema';
 
 export interface UserSummary {
   id: number;
@@ -43,5 +44,17 @@ export class UserNamesService {
       .from(users)
       .where(inArray(users.id, ids));
     return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  /** Of these users, those who hold a permission through one of their roles (the POS supervisors). */
+  async holdersOf(permission: Permission, userIds: readonly number[]): Promise<Set<number>> {
+    const ids = [...new Set(userIds)];
+    if (ids.length === 0) return new Set();
+    const rows = await this.db
+      .selectDistinct({ userId: userRoles.userId })
+      .from(userRoles)
+      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+      .where(and(inArray(userRoles.userId, ids), eq(rolePermissions.permissionCode, permission)));
+    return new Set(rows.map((row) => row.userId));
   }
 }

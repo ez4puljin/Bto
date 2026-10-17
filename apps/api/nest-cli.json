@@ -7,7 +7,16 @@
     "builder": "tsc",
     "tsConfigPath": "tsconfig.build.json",
     "deleteOutDir": true,
-    "assets": [{ "include": "db/migrations/**/*", "watchAssets": false }],
+    "assets": [
+      {
+        "include": "db/migrations/**/*",
+        "watchAssets": false
+      },
+      {
+        "include": "edge/db/migrations/**/*",
+        "watchAssets": false
+      }
+    ],
     "plugins": [
       {
         "name": "@nestjs/swagger",

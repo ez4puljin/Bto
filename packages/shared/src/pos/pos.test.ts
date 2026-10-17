@@ -8,6 +8,7 @@ import {
   lineMoney,
   lineVat,
   normalizeTillCode,
+  tillCodeLookKey,
   parseEdgeToken,
   posSaleNumber,
   posShiftNumber,
@@ -28,6 +29,12 @@ describe('POS numbers (ADR-0063 #3)', () => {
     expect(isTillCode('TILL-8')).toBe(true);
     expect(isTillCode('касс 3')).toBe(false);
     expect(isTillCode('123456789')).toBe(false);
+  });
+
+  it('matches a Latin look-alike till code to the Cyrillic one', () => {
+    expect(tillCodeLookKey('k1')).toBe(tillCodeLookKey('К1'));
+    expect(tillCodeLookKey('TILL-8')).toBe('ТILL-8');
+    expect(tillCodeLookKey('K2')).not.toBe(tillCodeLookKey('К1'));
   });
 
   it('wants a six-digit PIN', () => {

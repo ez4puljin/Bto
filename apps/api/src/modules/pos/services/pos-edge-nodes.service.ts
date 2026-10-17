@@ -182,6 +182,14 @@ export class PosEdgeNodesService {
   }
 
   /** The edge pushed documents just now. */
+  /** The edge pulled its snapshot (ADR-0067). */
+  async touchPull(nodeId: number, version: string): Promise<void> {
+    await this.db
+      .update(posEdgeNodes)
+      .set({ lastPullAt: new Date(), lastSeenAt: new Date(), snapshotVersion: version })
+      .where(eq(posEdgeNodes.id, nodeId));
+  }
+
   async touchPush(nodeId: number, executor: Db | Tx = this.db): Promise<void> {
     await executor
       .update(posEdgeNodes)

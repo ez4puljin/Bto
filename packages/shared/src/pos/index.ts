@@ -93,6 +93,30 @@ export function normalizeTillCode(value: string): string {
   return value.trim().toUpperCase();
 }
 
+/** Latin capitals that look like Cyrillic ones on a till's label, and their Cyrillic letters. */
+const TILL_CODE_LOOKALIKES: Record<string, string> = {
+  A: 'А',
+  B: 'В',
+  C: 'С',
+  E: 'Е',
+  H: 'Н',
+  K: 'К',
+  M: 'М',
+  O: 'О',
+  P: 'Р',
+  T: 'Т',
+  X: 'Х',
+  Y: 'У',
+};
+
+/**
+ * The code a cashier typed, matched by its look: «K1» typed on a Latin keyboard finds till «К1».
+ * An exact match always wins; this key only breaks the tie between look-alike letters.
+ */
+export function tillCodeLookKey(value: string): string {
+  return [...normalizeTillCode(value)].map((char) => TILL_CODE_LOOKALIKES[char] ?? char).join('');
+}
+
 export function isTillCode(value: string): boolean {
   return TILL_CODE_PATTERN.test(value);
 }
@@ -204,3 +228,6 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
   if (!match?.[1] || !match[2]) return null;
   return { nodeId: Number.parseInt(match[1], 10), secret: match[2] };
 }
+
+// The store edge: sync, snapshot and kiosk shapes (ADR-0067).
+export * from './edge';

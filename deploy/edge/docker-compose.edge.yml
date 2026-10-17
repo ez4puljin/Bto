@@ -1,0 +1,77 @@
+# The store edge (ADR-0063, ADR-0067): the tills' server on the store's LAN, offline-capable.
+# On the owner's PC for tests it replays to the dev api (`pnpm dev`, port 3300); in the store it
+# replays to the centre. Start: `pnpm edge:up` (reads deploy/edge/.env, see .env.example).
+# Cashiers open http://<this PC's LAN address>:${KIOSK_PORT} in Chrome.
+name: bto-edge
+services:
+  edge-db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edge
+      POSTGRES_PASSWORD: ${EDGE_DB_PASSWORD:?set EDGE_DB_PASSWORD in deploy/edge/.env}
+      POSTGRES_DB: tugeel_edge
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8'
+    # postgres 18+ images keep PGDATA under /var/lib/postgresql/18/docker; mount the parent.
+    volumes: ['edge-db:/var/lib/postgresql']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U edge -d tugeel_edge']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  edge:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: bto-api:edge-local
+    restart: unless-stopped
+    depends_on:
+      edge-db:
+        condition: service_healthy
+    environment:
+      ROLE: edge
+      NODE_ENV: production
+      LOG_LEVEL: info
+      EDGE_PORT: '3400'
+      EDGE_DATABASE_URL: postgres://edge:${EDGE_DB_PASSWORD}@edge-db:5432/tugeel_edge
+      CENTRAL_API_URL: ${CENTRAL_API_URL:-http://host.docker.internal:3300}
+      EDGE_NODE_TOKEN: ${EDGE_NODE_TOKEN:?set EDGE_NODE_TOKEN in deploy/edge/.env}
+      EDGE_JWT_SECRET: ${EDGE_JWT_SECRET:?set EDGE_JWT_SECRET in deploy/edge/.env}
+      POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/edge/.env}
+      EBARIMT_PROVIDER: fake
+      APP_VERSION: ${APP_VERSION:-local}
+    # Lets the container reach the dev api on the owner's PC.
+    extra_hosts: ['host.docker.internal:host-gateway']
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3400/edge/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  kiosk:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: bto-web:edge-local
+    restart: unless-stopped
+    depends_on:
+      edge:
+        condition: service_healthy
+    volumes: ['./Caddyfile.edge:/etc/caddy/Caddyfile:ro']
+    # Every interface: the tills on the LAN open this port.
+    ports: ['${KIOSK_PORT:-7400}:7400']
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:7400/']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  edge-db:

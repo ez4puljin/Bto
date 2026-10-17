@@ -21,7 +21,7 @@ export {
   CatalogRegistrationService,
   type RegisteredProduct,
 } from './services/catalog-registration.service';
-export { CatalogService } from './services/catalog.service';
+export { CatalogService, type PosCatalogueProduct } from './services/catalog.service';
 export { type Category, CategoriesService } from './services/categories.service';
 export { type BulkChange, ProductBulkService } from './services/product-bulk.service';
 export { type ImageFiles, MAX_PRODUCT_IMAGES } from './services/product-images.service';

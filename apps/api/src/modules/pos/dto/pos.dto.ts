@@ -807,6 +807,11 @@ export class SyncEventDto {
 }
 
 @ApiSchema({ name: 'PosSyncBatch' })
+/** `GET /pos/sync/snapshot?since=`: the version the edge holds (ADR-0067). */
+export class SnapshotQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) since?: string;
+}
+
 export class SyncBatchDto {
   @ApiProperty({ type: [SyncEventDto], description: 'In the order they happened' })
   @IsArray()

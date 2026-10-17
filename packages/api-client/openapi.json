@@ -16394,6 +16394,54 @@
         ]
       }
     },
+    "/api/v1/pos/sync/snapshot": {
+      "get": {
+        "operationId": "PosSync_snapshot",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "What the edge sells from (ADR-0067): the whole snapshot, or only its version when `since`\nalready names it. The shape is `SnapshotResponseWire` of @tugeel/shared/pos.",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
     "/api/v1/pos/sync/events": {
       "post": {
         "operationId": "PosSync_events",
@@ -16403,7 +16451,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PosSyncBatch"
+                "$ref": "#/components/schemas/SyncBatchDto"
               }
             }
           }
@@ -32772,7 +32820,7 @@
           "clientId"
         ]
       },
-      "PosSyncBatch": {
+      "SyncBatchDto": {
         "type": "object",
         "properties": {
           "events": {
@@ -33113,7 +33161,13 @@
           "POS_RETURN_EXCEEDS",
           "POS_RETURN_WINDOW",
           "POS_NUMBER_TAKEN",
-          "POS_DEV_ONLY"
+          "POS_DEV_ONLY",
+          "POS_PAIRING_INVALID",
+          "POS_DEVICE_UNKNOWN",
+          "POS_PIN_INVALID",
+          "POS_CASHIER_LOCKED",
+          "POS_SESSION_EXPIRED",
+          "POS_SNAPSHOT_MISSING"
         ]
       },
       "ProblemFieldError": {
