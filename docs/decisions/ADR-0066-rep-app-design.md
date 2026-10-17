@@ -30,6 +30,53 @@ The owner's answers (2026-10-16):
 9. **The notices** (ADR-0062 #3 unchanged in substance): the popup as the Launch board draws it — a picture by kind (the admin's picture; a price drop's product with how much cheaper it got; a promotion's percentage; a new product's pictures), the kind and days, a price drop's old and new prices (`basePriceBefore`, the base price on the day before the notice starts), the dots, the kind's «… харах» and «Дараагийнх / Хаах». After the last one a toast says the notices are kept under the bell and offers them again. The board's «Өнөөдөр дахин харуулахгүй» tick stays out (ADR-0062 #3: showing counts as reading). The list's note says what the app really notifies: a sold order.
 10. **Who is signed in.** `GET /auth/me` gains `sessionStartedAt`; the user's details show the name, the login, the role, the branches of the rep's write scope (the context's `branchNames`), when the session signed in and when it ends, and the server; «Нууц үг солих» uses `POST /auth/password` (the server checks the rules; the phone has no `normalize()` for the shared check). The profile no longer changes the server; sign-in and offline still do.
 
+### After the owner's first look (2026-10-17)
+
+The owner installed 0.2 and asked for:
+
+- the server and sign-in pages in «маш сайн UI»;
+- the home and the tab bar reviewed again by agents and made «илүү гоёмсог, орчин үеийн»;
+- smaller text: «Text жоохон том»;
+- the products' pictures shown, kept small on the phone, never downloaded again at each start, and swiped on the cards and on the product page;
+- delivery or pickup chosen simply: «Хүргэлтээр бол default нь өнөөдөр».
+
+Two design-review agents read the code against the boards. The owner then chose:
+
+- the home and the tab bar as the «main menu»;
+- swiping on cards and pages;
+- keeping every thumbnail once;
+- today for pickup too.
+
+The pictures had not shown at all in the walk's copy only: its api read another storage folder.
+
+11. **Smaller text, capped scaling** (amends #1). The boards' iPhone sizes are about 12–15% smaller for Inter on Android: rows 15, page titles 28, notes and section headers 12. Android's extra font padding is off and every size is a token. The phone's font size setting enlarges the app's text at most 1.15× (`src/ui/text.tsx`; ESLint forbids react-native's Text and TextInput elsewhere). Rows are 48 px, pill buttons 50 px, segmented controls 40 px.
+12. **The home** (amends #1's «Нүүр»). It has no page title. Top to bottom:
+    - a greeting by given name, with the date and the bell;
+    - a search bar into the shop, with the scanner;
+    - the month on a blue card: the confirmed total large, then the orders and drafts;
+    - the cart's banner while the cart has lines;
+    - where new orders land, with a warning when unset;
+    - «Шинэ бараа» as a strip of tiles with pictures;
+    - the latest three orders.
+
+    The tab bar (amends #2) is 60 px high, with finer icons and the open tab on a light-blue pill in the accent colour.
+13. **Server and sign-in.**
+    - The logo with «Bto» and the company name.
+    - Labelled fields with icons, and an eye to show the password.
+    - A server's errors tell "no answer" apart from "an answer that is not Bto".
+    - The last five servers that answered are kept on the phone (`bto.servers.recent.v1`), to pick again after the PC's address changes.
+14. **«Хүлээн авах»** (amends #7, and ADR-0061's «tomorrow by default» for the app).
+    - Two cards: «Хүргэлтээр», with the address under it (tapping again changes it), and «Өөрөө авна», with the home warehouse.
+    - Four day tiles: today, tomorrow, the day after, and another day from the calendar.
+    - A new order starts on **today** for both delivery and pickup. The office's create dialog keeps tomorrow (`defaultDeliveryDate`).
+15. **Pictures kept on the phone.**
+    - `GET /sales-rep/thumbs` lists the primary thumbnail of every shop product (256 px JPEG, about 3 KB).
+    - After sign-in, and whenever the app comes back to the foreground at least 6 hours after the last run, the app downloads the ones it lacks into expo-image's disk cache.
+    - File URLs never change: a new picture is a new file. So a kept picture is never downloaded again, at a restart or otherwise.
+    - A card swipes through the product's thumbnails; only the first loads until the rep swipes.
+    - The product page opens at once from the list's data, and shows each thumbnail until its full picture arrives.
+16. **Every request gives up after 10 s** (0.2.1). React Native's fetch never gives up by itself, and a stored server gone from the Wi-Fi held the start logo for minutes.
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
@@ -41,13 +88,19 @@ The owner's answers (2026-10-16):
 | The base unit's own wholesale price on the card | With a loose markup it is higher than what a piece costs in boxes, and it would not match the price sort. |
 | Keep `month` beside the range | One phone and one server, built from one commit, before production; two forms of the same filter for nothing. |
 | A «don't show again today» tick | Already rejected by ADR-0062: showing counts as reading. |
+| Keep the boards' 17 px text (2026-10-17) | The owner found it too large on Android: Inter is wider than the boards' font, and the phone's font scaling had no cap. |
+| Prefetch the full pictures too | About 25 KB each and up to ten per product. The thumbnails make the grid instant; a page's full picture is kept once it has been opened. |
+| Keep the list of fetched thumbnails on the phone | expo-image (Glide) finds a kept file without the network, and a picture the phone dropped comes back on its own; the list could only go stale. |
+| Default the office's dialog to today as well | Not asked; the office keeps ADR-0055's tomorrow. |
 
 ## Consequences
 
-- The phone app's screens, kit and tests change; its version is 0.2.0. A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
+- The phone app's screens, kit and tests change; its version is 0.2.0, then 0.3.0 after the owner's first look (0.2.1 only added the request time limit). A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
 - The facade asks catalog, pricing, partners, inventory and identity for small read-only answers (`docs/modules/*.md`): the NEW sort and `onlyIds` in catalog's product list, with batch reads of pictures and unit flags that stay out of `/products`; pricing's shop prices and its order by base price; partners' main-supplier counts; inventory's products free at home; the session's start in identity.
 - A price sort reads up to 100,000 product ids twice per page (catalog, then pricing); about 20,000 today.
-- The design's board files stay the reference for later changes to the app.
+- The design's board files stay the reference for later changes to the app. Text sizes are the documented exception (#11): smaller than the boards.
+- `GET /sales-rep/thumbs` reads every shop product's id, like the suppliers' list, and one file row per primary picture. The phone checks it at most every 6 hours.
+- Capping the font scaling at 1.15 trades some of a large phone setting for layouts that do not break.
 
 ## Related
 
