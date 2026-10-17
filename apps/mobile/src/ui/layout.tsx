@@ -4,11 +4,11 @@ import {
   Pressable,
   type StyleProp,
   StyleSheet,
-  Text,
   type TextStyle,
   View,
   type ViewStyle,
 } from 'react-native';
+import { Text } from './text';
 import { type Edge, SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, type } from '../theme/tokens';
 
@@ -130,7 +130,7 @@ export function LargeTitle({
   );
 }
 
-/** «Бүртгэл», «Төлбөр»: 13 px, semibold, grey, over a group. */
+/** «Бүртгэл», «Төлбөр»: 12 px, semibold, grey, over a group. */
 export function SectionHeader({
   children,
   right,
@@ -146,6 +146,32 @@ export function SectionHeader({
         {children}
       </Text>
       {right}
+    </View>
+  );
+}
+
+/** A section's title in black with an optional link on the right: «Шинэ бараа … Бүгд». */
+export function SectionTitle({
+  children,
+  action,
+  onAction,
+  style,
+}: {
+  children: ReactNode;
+  action?: string;
+  onAction?: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.sectionTitle, style]}>
+      <Text accessibilityRole="header" style={[type.sectionTitle, styles.grow]} numberOfLines={1}>
+        {children}
+      </Text>
+      {action && onAction ? (
+        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={8}>
+          <Text style={[type.bodyStrong, styles.action]}>{action}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -176,6 +202,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginHorizontal: spacing.xs,
   },
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+    marginBottom: 10,
+    marginHorizontal: spacing.xs,
+  },
+  action: { color: colors.primary },
   grow: { flex: 1 },
   footNote: { marginTop: 10, marginHorizontal: spacing.xs },
   center: { textAlign: 'center' },

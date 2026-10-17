@@ -4,7 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Package, X } from 'lucide-react-native';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import { type MyNotice, useMarkRead, useNotificationSummary } from '../../src/api/notifications';
 import { type RepProduct, useProductsOf } from '../../src/api/rep';
 import { formatMnt } from '../../src/format/format';
@@ -17,7 +18,7 @@ import {
 } from '../../src/notifications/feed';
 import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, radii, shadows, spacing } from '../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { useToast } from '../../src/ui/toast';
 
@@ -152,12 +153,14 @@ function NoticeCard({
             source={{ uri: `${server}${notice.imageUrl}` }}
             style={styles.heroImage}
             contentFit="cover"
+            cachePolicy="memory-disk"
           />
         ) : notice.kind === 'PRICE_DROP' && picture(first) ? (
           <Image
             source={{ uri: `${server}${picture(first) ?? ''}` }}
             style={styles.heroProduct}
             contentFit="contain"
+            cachePolicy="memory-disk"
           />
         ) : notice.kind === 'NEW_PRODUCT' && (products.data?.length ?? 0) > 0 ? (
           <View style={styles.tiles}>
@@ -168,6 +171,7 @@ function NoticeCard({
                     source={{ uri: `${server}${product.thumbUrl}` }}
                     style={styles.tileImage}
                     contentFit="cover"
+                    cachePolicy="memory-disk"
                   />
                 ) : (
                   <Package size={36} strokeWidth={1.5} color={colors.input} />
@@ -265,13 +269,8 @@ const styles = StyleSheet.create({
   },
   tileImage: { width: '100%', height: '100%' },
   percent: { alignItems: 'flex-start' },
-  percentText: { fontFamily: fonts.bold, fontSize: 64, lineHeight: 70, letterSpacing: -2 },
-  percentLabel: {
-    fontFamily: fonts.semibold,
-    fontSize: 15,
-    lineHeight: 20,
-    color: colors.warningText,
-  },
+  percentText: type.jumbo,
+  percentLabel: { ...type.rowStrong, color: colors.warningText },
   kindIcon: {
     width: 96,
     height: 96,
@@ -291,12 +290,7 @@ const styles = StyleSheet.create({
   },
   flagRed: { backgroundColor: colors.destructive },
   flagGreen: { backgroundColor: colors.success },
-  flagText: {
-    fontFamily: fonts.bold,
-    fontSize: 14,
-    lineHeight: 18,
-    color: colors.primaryForeground,
-  },
+  flagText: { ...type.bodyStrong, fontFamily: fonts.bold, color: colors.primaryForeground },
   close: {
     position: 'absolute',
     top: spacing.md,
@@ -310,22 +304,9 @@ const styles = StyleSheet.create({
   },
   scroll: { flexGrow: 0 },
   text: { paddingTop: 18, paddingHorizontal: 22, paddingBottom: spacing.lg },
-  eyebrow: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18 },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.3,
-    color: colors.foreground,
-  },
-  body: {
-    marginTop: 6,
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 21,
-    color: colors.label2,
-  },
+  eyebrow: { ...type.chip, fontFamily: fonts.bold },
+  title: { ...type.title3, marginTop: spacing.xs },
+  body: { ...type.row, marginTop: 6, color: colors.label2 },
   prices: {
     marginTop: spacing.md,
     borderRadius: 14,
@@ -341,26 +322,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   priceLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  priceName: {
-    flex: 1,
-    fontFamily: fonts.semibold,
-    fontSize: 15,
-    lineHeight: 20,
-    color: colors.foreground,
-  },
+  priceName: { ...type.rowStrong, flex: 1 },
   priceValues: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   oldPrice: {
+    ...type.chip,
     fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
     color: colors.muted,
     textDecorationLine: 'line-through',
   },
-  newPrice: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 20, color: colors.cancelled },
+  newPrice: { ...type.rowStrong, fontFamily: fonts.bold, color: colors.cancelled },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.lg },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.dotIdle },
   dotOn: { width: 22, backgroundColor: colors.primary },
   cta: { marginTop: spacing.lg },
   secondary: { marginTop: spacing.xs, height: 44, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { fontFamily: fonts.regular, fontSize: 17, lineHeight: 22, color: colors.primary },
+  secondaryText: { ...type.row, color: colors.primary },
 });

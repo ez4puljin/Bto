@@ -3,12 +3,13 @@ import { useRouter } from 'expo-router';
 import { Camera, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AppProblem, NETWORK, problemOf } from '../../src/api/problem';
 import { ScanGate } from '../../src/scan/scan-gate';
 import { useSignedIn } from '../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { colors, radii, spacing, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { Page } from '../../src/ui/layout';
@@ -143,10 +144,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    ...type.heading,
     textAlign: 'center',
-    fontFamily: fonts.semibold,
-    fontSize: 17,
-    lineHeight: 22,
     color: colors.primaryForeground,
   },
   panel: { position: 'absolute', left: spacing.lg, right: spacing.lg },

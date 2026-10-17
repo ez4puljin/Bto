@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,15 +11,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
-import { useCategories, useProductsOf, useRepContext } from '../../../src/api/rep';
+import { cachedProduct, useCategories, useProductsOf, useRepContext } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { formatMnt, formatQty } from '../../../src/format/format';
+import { heroPictures, pageAt } from '../../../src/images/pictures';
 import { QtyKeypad } from '../../../src/shop/qty-keypad';
 import { useUnitOptions } from '../../../src/shop/unit-options';
 import { useUnitWords } from '../../../src/shop/unit-words';
@@ -26,7 +28,7 @@ import { baseQty, baseUnitOf, defaultUnitOf, packOf, shortBy } from '../../../sr
 import { useLineQuote } from '../../../src/shop/use-line-quote';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts, radii, shadows, spacing, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
 import { CircleButton, PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
@@ -52,7 +54,14 @@ export default function ProductScreen() {
   const unitOptions = useUnitOptions();
   const context = useRepContext();
   const categories = useCategories();
-  const query = useProductsOf(Number.isSafeInteger(productId) ? [productId] : []);
+  // Opened from a list, the page shows what the list holds at once; the server's answer follows.
+  const queryClient = useQueryClient();
+  const valid = Number.isSafeInteger(productId);
+  const seed = useMemo(() => {
+    const cached = valid ? cachedProduct(queryClient, productId) : undefined;
+    return cached ? [cached] : undefined;
+  }, [queryClient, productId, valid]);
+  const query = useProductsOf(valid ? [productId] : [], undefined, seed);
   const product = query.data?.[0];
   const line = lineOf(cart, productId);
 
@@ -74,11 +83,7 @@ export default function ProductScreen() {
 
   const unit = product?.units.find((entry) => entry.id === unitId);
   const quote = useLineQuote(product?.units ?? [], unit?.id ?? null, qty);
-  const images = useMemo(() => {
-    if (!product) return [];
-    if (product.images.length > 0) return product.images.map((image) => image.url);
-    return product.thumbUrl ? [product.thumbUrl] : [];
-  }, [product]);
+  const images = useMemo(() => (product ? heroPictures(product) : []), [product]);
   const heroWidth = width - spacing.lg * 2;
 
   const header = (
@@ -183,13 +188,21 @@ export default function ProductScreen() {
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(url) => url}
+              keyExtractor={(item) => item.url}
+              initialNumToRender={1}
+              maxToRenderPerBatch={1}
+              windowSize={3}
               onMomentumScrollEnd={(event) =>
-                setPage(Math.round(event.nativeEvent.contentOffset.x / heroWidth))
+                setPage(pageAt(event.nativeEvent.contentOffset.x, heroWidth, images.length))
               }
-              renderItem={({ item }) => (
+              renderItem={({ item, index }) => (
                 <Image
-                  source={{ uri: `${server}${item}` }}
+                  source={{ uri: `${server}${item.url}` }}
+                  placeholder={item.placeholder ? { uri: `${server}${item.placeholder}` } : null}
+                  placeholderContentFit="contain"
+                  cachePolicy="memory-disk"
+                  priority={index === 0 ? 'high' : 'normal'}
+                  recyclingKey={item.url}
                   style={{ width: heroWidth, height: HERO_HEIGHT }}
                   contentFit="contain"
                   transition={150}
@@ -203,8 +216,8 @@ export default function ProductScreen() {
         </View>
         {images.length > 1 ? (
           <View style={styles.dots}>
-            {images.map((url, index) => (
-              <View key={url} style={[styles.dot, index === page && styles.dotOn]} />
+            {images.map((image, index) => (
+              <View key={image.url} style={[styles.dot, index === page && styles.dotOn]} />
             ))}
           </View>
         ) : null}
@@ -419,7 +432,7 @@ const styles = StyleSheet.create({
   outChip: { backgroundColor: colors.destructiveSoft },
   placeChip: { backgroundColor: colors.canvas },
   stockDot: { width: 7, height: 7, borderRadius: 4 },
-  chipText: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
+  chipText: { ...type.chip, fontFamily: fonts.semibold },
   placeText: { fontFamily: fonts.medium, color: colors.label2 },
   units: { marginTop: 20, marginHorizontal: 20 },
   price: { gap: 2, paddingTop: spacing.lg, paddingHorizontal: 20 },
@@ -458,13 +471,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   qtyBox: { width: 64, height: 44, alignItems: 'center', justifyContent: 'center' },
-  qtyText: {
-    fontFamily: fonts.semibold,
-    fontSize: 22,
-    lineHeight: 28,
-    color: colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
+  qtyText: { ...type.title2, fontFamily: fonts.semibold, ...tabular },
   quick: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -479,8 +486,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
     justifyContent: 'center',
   },
-  quickText: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18, color: colors.foreground },
+  quickText: type.bodyStrong,
   short: {
+    ...type.chip,
     marginTop: 14,
     marginHorizontal: 20,
     paddingVertical: 10,
@@ -488,9 +496,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.field,
     backgroundColor: colors.warningSoft,
     color: colors.warningText,
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
   },
   blocked: { backgroundColor: colors.destructiveSoft, color: colors.destructive },
   bottom: {
@@ -508,13 +513,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   totals: { flex: 1, gap: 1 },
-  total: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.3,
-    color: colors.foreground,
-  },
+  total: { ...type.title3, ...tabular },
   missing: { flex: 1, gap: spacing.lg },
   missingBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
 });

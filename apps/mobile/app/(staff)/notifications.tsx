@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import {
   type MyNotice,
   type MyNotification,
@@ -17,7 +18,7 @@ import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { dayName, type FeedItem, feedOf, unreadIds } from '../../src/notifications/feed';
 import { FeedBadge, useNoticeEyebrow } from '../../src/notifications/kinds';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { colors, radii, spacing, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { BarButton, FootNote, LargeTitle, NavBar, Page } from '../../src/ui/layout';
@@ -202,14 +203,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  rowTitle: {
-    flex: 1,
-    fontFamily: fonts.semibold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: colors.foreground,
-  },
-  body: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.label2 },
+  rowTitle: { ...type.heading, flex: 1 },
+  body: { ...type.body, color: colors.label2 },
   unread: { width: 10, height: 10, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
   loading: { marginTop: spacing.xxl },
 });

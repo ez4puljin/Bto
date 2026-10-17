@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import { ChevronLeft, Package } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RepProduct } from '../api/rep';
 import { formatMnt, formatQty } from '../format/format';
-import { colors, fonts, radii, shadows, spacing, type } from '../theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../theme/tokens';
 import { Segmented } from '../ui/controls';
 import { Keypad } from '../ui/keypad';
 import { useUnitOptions } from './unit-options';
@@ -101,6 +102,8 @@ export function QtyKeypad({
                 source={{ uri: `${server}${product.thumbUrl}` }}
                 style={styles.image}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={product.thumbUrl}
               />
             ) : (
               <Package size={28} strokeWidth={1.5} color={colors.input} />
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   grow: { flex: 1, gap: 2 },
-  name: { fontFamily: fonts.bold, fontSize: 19, lineHeight: 24, color: colors.foreground },
+  name: type.title3,
   units: { marginTop: 22, marginHorizontal: 20 },
   display: {
     marginTop: spacing.lg,
@@ -234,18 +237,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   typed: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  number: {
-    fontFamily: fonts.bold,
-    fontSize: 44,
-    lineHeight: 50,
-    letterSpacing: -1,
-    color: colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
+  number: { ...type.hero, ...tabular },
   caret: { width: 3, height: 40, borderRadius: 2, backgroundColor: colors.primary },
-  unitWord: { fontFamily: fonts.regular, fontSize: 20, lineHeight: 26, color: colors.muted },
-  conversion: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20, color: colors.label2 },
+  unitWord: { ...type.title3, fontFamily: fonts.regular, color: colors.muted },
+  conversion: { ...type.row, color: colors.label2 },
   short: {
+    ...type.chip,
     marginTop: 10,
     marginHorizontal: 20,
     paddingVertical: spacing.sm,
@@ -253,8 +250,5 @@ const styles = StyleSheet.create({
     borderRadius: radii.field,
     backgroundColor: colors.warningSoft,
     color: colors.warningText,
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
   },
 });

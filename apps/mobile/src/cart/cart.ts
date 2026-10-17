@@ -40,7 +40,7 @@ export interface Cart {
   contactPhone: string;
   fulfilment: Fulfilment;
   addressId: number | null;
-  /** YYYY-MM-DD; null until chosen (the screen proposes tomorrow). */
+  /** YYYY-MM-DD; null until chosen (the screen proposes today; a sent order clears it). */
   deliveryDate: string | null;
   paymentMethod: PaymentMethod | null;
   note: string;
@@ -88,8 +88,8 @@ const whole = (qty: number) => (Number.isFinite(qty) ? Math.max(0, Math.floor(qt
  * The cart's rules (ADR-0061 #8, ADR-0066 #5): one line per product, in the unit the rep chose (a
  * product page replaces the product's line; a second «+» raises it), a quantity of 0 removes the
  * line, at most MAX_LINES lines, delivery to the chosen customer's address or pickup when they have
- * none. A sent order empties the lines, the customer and the contact, and keeps the date and the
- * payment for the next shop.
+ * none. A sent order empties the lines, the customer, the contact and the date (the next order
+ * starts on today again), and keeps the payment for the next shop.
  */
 export function cartReducer(cart: Cart, action: CartAction): Cart {
   switch (action.type) {
@@ -175,7 +175,7 @@ export function cartReducer(cart: Cart, action: CartAction): Cart {
     case 'note':
       return { ...cart, note: action.note.slice(0, ORDER_LIMITS.maxNote) };
     case 'sent':
-      return { ...EMPTY_CART, deliveryDate: cart.deliveryDate, paymentMethod: cart.paymentMethod };
+      return { ...EMPTY_CART, paymentMethod: cart.paymentMethod };
     case 'load':
       return action.cart;
   }

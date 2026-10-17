@@ -8,8 +8,9 @@ import { colors } from '../../../src/theme/tokens';
 import { FloatingTabBar } from '../../../src/ui/tab-bar';
 
 /**
- * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0066): the cart's
- * count of lines, and the unread count of the bell on «Профайл» (ADR-0062 #3).
+ * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0066): 22 px
+ * icons, bolder on the open tab; the cart's count of lines, and the unread count of the bell on
+ * «Профайл» (ADR-0062 #3).
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -17,11 +18,11 @@ export default function TabsLayout() {
   const unread = useNotificationSummary().data?.unread ?? 0;
   const icon =
     (Icon: typeof House) =>
-    ({ color, focused }: { color: ColorValue; focused: boolean }) => (
+    ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
       <Icon
-        size={24}
-        color={typeof color === 'string' ? color : colors.foreground}
-        strokeWidth={focused ? 2 : 1.8}
+        size={size}
+        color={typeof color === 'string' ? color : colors.label2}
+        strokeWidth={focused ? 2.1 : 1.75}
       />
     );
   return (

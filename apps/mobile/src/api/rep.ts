@@ -1,5 +1,11 @@
 import type { components } from '@tugeel/api-client';
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  keepPreviousData,
+  type QueryClient,
+  useInfiniteQuery,
+  useQuery,
+} from '@tanstack/react-query';
 import { canonical } from '../cart/send';
 import type { ShopQuery } from '../shop/filters';
 import { useSignedIn } from '../state/session';
@@ -8,6 +14,7 @@ import { unwrap } from './problem';
 export type RepContext = components['schemas']['SalesRepContext'];
 export type RepWarehouse = components['schemas']['SalesRepWarehouse'];
 export type RepProduct = components['schemas']['SalesRepProduct'];
+type RepProductPage = components['schemas']['SalesRepProductPage'];
 export type RepUnit = components['schemas']['SalesRepProductUnit'];
 export type RepSupplier = components['schemas']['SalesRepSupplier'];
 export type RepCustomer = components['schemas']['SalesRepCustomer'];
@@ -101,9 +108,14 @@ export function useProductCount(query: ShopQuery, enabled: boolean) {
 
 /**
  * Products by id, as the shop would list them (a product page, the cart, a notice); with
- * `priceBefore`, each base price on that day too (a price-drop notice's old price).
+ * `priceBefore`, each base price on that day too (a price-drop notice's old price). `seed` shows
+ * what the shop's lists already hold until the server answers.
  */
-export function useProductsOf(ids: readonly number[], priceBefore?: string) {
+export function useProductsOf(
+  ids: readonly number[],
+  priceBefore?: string,
+  seed?: readonly RepProduct[],
+) {
   const { session } = useSignedIn();
   return useQuery({
     queryKey: ['rep', 'products', 'of', [...ids].sort((a, b) => a - b).join(','), priceBefore],
@@ -116,7 +128,28 @@ export function useProductsOf(ids: readonly number[], priceBefore?: string) {
         }),
       ),
     enabled: ids.length > 0,
+    ...(seed && seed.length > 0 ? { placeholderData: [...seed] } : {}),
   });
+}
+
+function isProductPages(data: unknown): data is InfiniteData<RepProductPage> {
+  return (
+    typeof data === 'object' && data !== null && Array.isArray((data as { pages?: unknown }).pages)
+  );
+}
+
+/** A product the shop's lists already hold (a grid page, a batch), so its page opens at once. */
+export function cachedProduct(client: QueryClient, id: number): RepProduct | undefined {
+  for (const [, data] of client.getQueriesData<unknown>({ queryKey: ['rep', 'products'] })) {
+    const rows = Array.isArray(data)
+      ? (data as RepProduct[])
+      : isProductPages(data)
+        ? data.pages.flatMap((page) => page.data)
+        : [];
+    const found = rows.find((product) => product.id === id);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /** The main suppliers of the shop's products, the most products first. */

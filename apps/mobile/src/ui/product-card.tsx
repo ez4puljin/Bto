@@ -1,14 +1,16 @@
 import { Decimal } from '@tugeel/shared/money';
-import { Image } from 'expo-image';
-import { Package, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { CardPictures } from './card-pictures';
+import { Text } from './text';
 import type { RepProduct } from '../api/rep';
 import type { CartLine } from '../cart/cart';
 import { formatMnt, formatQty } from '../format/format';
+import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
 import { baseUnitOf, packOf } from '../shop/units';
-import { colors, fonts, radii, shadows, spacing, type } from '../theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../theme/tokens';
 
 /** «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй». */
 export function useStockLine() {
@@ -46,9 +48,9 @@ export function usePriceParts() {
 }
 
 /**
- * A product of the shop's grid (ADR-0066 #3): the picture with «Шинэ» and the cart's quantity or
- * «+», the name, the code, the base price and the stock. The card opens the product; «+» adds one
- * of its default unit, the quantity opens the product to change it.
+ * A product of the shop's grid (ADR-0066 #3): its pictures (swiped when it has several) with «Шинэ»
+ * and the cart's quantity or «+», the name, the code, the base price and the stock. The card opens
+ * the product; «+» adds one of its default unit, the quantity opens the product to change it.
  */
 export function ProductCard({
   product,
@@ -82,21 +84,7 @@ export function ProductCard({
       style={styles.card}
     >
       <View style={styles.picture}>
-        {product.thumbUrl ? (
-          <Image
-            source={{ uri: `${server}${product.thumbUrl}` }}
-            style={[styles.image, dim && styles.dim]}
-            contentFit="cover"
-            transition={120}
-          />
-        ) : (
-          <Package
-            size={44}
-            strokeWidth={1.4}
-            color={colors.input}
-            style={dim ? styles.dim : null}
-          />
-        )}
+        <CardPictures urls={cardPictures(product)} server={server} dim={dim} onPress={onOpen} />
         {product.isNew ? (
           <View style={styles.newBadge}>
             <Text style={styles.newText}>{t('mobile.shop.new')}</Text>
@@ -158,8 +146,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  image: { width: '100%', height: '100%' },
-  dim: { opacity: 0.55 },
   newBadge: {
     position: 'absolute',
     top: 10,
@@ -170,7 +156,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.floatingFill,
     justifyContent: 'center',
   },
-  newText: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16, color: colors.link },
+  newText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.link },
   add: {
     position: 'absolute',
     right: 10,
@@ -193,15 +179,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
   },
-  qtyText: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.primaryForeground,
-  },
+  qtyText: { ...type.chip, fontFamily: fonts.semibold, color: colors.primaryForeground },
   text: { gap: 1, paddingHorizontal: 2 },
-  name: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 20, color: colors.foreground },
+  name: type.bodyStrong,
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 5 },
-  price: { fontFamily: fonts.bold, fontSize: 17, lineHeight: 22, color: colors.foreground },
+  price: { ...type.heading, fontFamily: fonts.bold, ...tabular },
   out: { color: colors.destructive, fontFamily: fonts.medium },
 });

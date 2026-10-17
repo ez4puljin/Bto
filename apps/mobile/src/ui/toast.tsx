@@ -8,9 +8,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, radii, shadows, spacing } from '../theme/tokens';
+import { colors, radii, shadows, spacing, type } from '../theme/tokens';
 
 export interface ToastInput {
   message: string;
@@ -117,10 +118,8 @@ const styles = StyleSheet.create({
     boxShadow: shadows.toast,
   },
   message: {
+    ...type.body,
     flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 19,
     color: colors.label2,
   },
   action: {
@@ -130,10 +129,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
   },
-  actionText: {
-    fontFamily: fonts.semibold,
-    fontSize: 14,
-    lineHeight: 18,
-    color: colors.primaryForeground,
-  },
+  actionText: { ...type.bodyStrong, color: colors.primaryForeground },
 });

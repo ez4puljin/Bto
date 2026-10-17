@@ -202,6 +202,27 @@ const JSX_TEXT_BAN = [
   },
 ];
 
+// The staff app's import bans: shared modules Hermes cannot run (ADR-0061), and react-native's
+// Text/TextInput, which only apps/mobile/src/ui/text.tsx wraps with the capped font scaling.
+const MOBILE_HERMES_PATHS = [
+  {
+    name: '@tugeel/shared/time',
+    importNames: ['businessDate', 'businessDateTime', 'businessYear', 'businessMonthStart'],
+    message: 'Hermes has no reliable time zones: take «today» from the server (ADR-0061).',
+  },
+];
+const MOBILE_HERMES_PATTERNS = [
+  {
+    regex: '^@tugeel/shared/(text|taxpayer|imports|inventory)$',
+    message: 'Not for the phone: it needs Intl or Unicode regexes Hermes lacks (ADR-0061).',
+  },
+];
+const MOBILE_TEXT_PATH = {
+  name: 'react-native',
+  importNames: ['Text', 'TextInput'],
+  message: 'Import Text/TextInput from src/ui/text: it caps the font scaling (ADR-0066).',
+};
+
 export default defineConfig([
   globalIgnores([
     '**/node_modules/**',
@@ -262,27 +283,20 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            {
-              name: '@tugeel/shared/time',
-              importNames: [
-                'businessDate',
-                'businessDateTime',
-                'businessYear',
-                'businessMonthStart',
-              ],
-              message:
-                'Hermes has no reliable time zones: take «today» from the server (ADR-0061).',
-            },
-          ],
-          patterns: [
-            {
-              regex: '^@tugeel/shared/(text|taxpayer|imports|inventory)$',
-              message:
-                'Not for the phone: it needs Intl or Unicode regexes Hermes lacks (ADR-0061).',
-            },
-          ],
+          paths: [...MOBILE_HERMES_PATHS, MOBILE_TEXT_PATH],
+          patterns: MOBILE_HERMES_PATTERNS,
         },
+      ],
+    },
+  },
+  {
+    // The one file that wraps react-native's Text and TextInput.
+    name: 'mobile-text',
+    files: ['apps/mobile/src/ui/text.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { paths: MOBILE_HERMES_PATHS, patterns: MOBILE_HERMES_PATTERNS },
       ],
     },
   },

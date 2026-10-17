@@ -1,18 +1,22 @@
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { useEffect, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, shadows, spacing, type } from '../theme/tokens';
 
-const BAR_HEIGHT = 64;
+const BAR_HEIGHT = 60;
+const ITEM_HEIGHT = 50;
+/** A tab's icon (`tabBarIcon` draws it at this size). */
+const TAB_ICON_SIZE = 22;
 
 /** How far the bar floats above the bottom edge, past the system's navigation. */
-const barBottom = (inset: number) => Math.max(inset, spacing.sm) + 10;
+const barBottom = (inset: number) => Math.max(inset, spacing.sm) + spacing.sm;
 
 /** Room a tab's content leaves at its end so the floating bar never covers it. */
 export function useTabBarInset(): number {
   const insets = useSafeAreaInsets();
-  return BAR_HEIGHT + barBottom(insets.bottom) + spacing.lg;
+  return BAR_HEIGHT + barBottom(insets.bottom) + spacing.md;
 }
 
 /** True while the software keyboard is open: the bar steps aside instead of riding on it. */
@@ -31,7 +35,8 @@ function useKeyboardShown(): boolean {
 
 /**
  * The design's tab bar (ADR-0066): a white pill floating 16 px from the sides, five tabs, the open
- * one on a grey pill in the accent colour; a tab's `tabBarBadge` is a red count on its icon.
+ * one on a light blue pill in the accent colour; a tab's `tabBarBadge` is a red count on its icon,
+ * cut from the tab by a ring in the colour behind it.
  */
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const keyboard = useKeyboardShown();
@@ -43,7 +48,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
         if (!descriptor) return null;
         const { options } = descriptor;
         const focused = state.index === index;
-        const color = focused ? colors.primary : colors.foreground;
+        const color = focused ? colors.primary : colors.label2;
         const badge = options.tabBarBadge;
         const onPress = () => {
           const event = navigation.emit({
@@ -60,18 +65,23 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
             accessibilityState={{ selected: focused }}
             accessibilityLabel={options.tabBarAccessibilityLabel}
             onPress={onPress}
-            style={[styles.item, focused && styles.itemActive]}
+            style={({ pressed }) => [
+              styles.item,
+              focused ? styles.itemActive : pressed && styles.itemPressed,
+            ]}
           >
-            {options.tabBarIcon?.({ focused, color, size: 24 })}
+            {options.tabBarIcon?.({ focused, color, size: TAB_ICON_SIZE })}
             <Text
               numberOfLines={1}
-              style={[type.tab, { color, fontFamily: focused ? fonts.bold : fonts.semibold }]}
+              style={[type.tab, { color, fontFamily: focused ? fonts.semibold : fonts.medium }]}
             >
               {options.title}
             </Text>
             {badge !== undefined ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{String(badge)}</Text>
+              <View
+                style={[styles.badge, { borderColor: focused ? colors.secondary : colors.card }]}
+              >
+                <Text style={type.badge}>{String(badge)}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -98,30 +108,26 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    height: 54,
-    borderRadius: 27,
+    height: ITEM_HEIGHT,
+    borderRadius: ITEM_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
   },
-  itemActive: { backgroundColor: colors.tabActive },
+  itemActive: { backgroundColor: colors.secondary },
+  itemPressed: { backgroundColor: colors.accent },
   badge: {
     position: 'absolute',
-    top: 4,
+    top: 5,
     left: '50%',
-    marginLeft: 4,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
+    marginLeft: 3,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
     backgroundColor: colors.destructive,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badgeText: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    lineHeight: 13,
-    color: colors.primaryForeground,
   },
 });

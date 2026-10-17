@@ -8,10 +8,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radii, spacing, type } from '../theme/tokens';
 
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   actionLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.hairlineStrong },
   action: { height: 58, alignItems: 'center', justifyContent: 'center' },
-  actionText: { fontFamily: fonts.regular, fontSize: 20, lineHeight: 25 },
+  actionText: { ...type.sectionTitle, fontFamily: fonts.regular, letterSpacing: 0 },
   cancel: {
     height: 58,
     borderRadius: radii.card,

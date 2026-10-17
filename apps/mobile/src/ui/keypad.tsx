@@ -1,7 +1,8 @@
 import { Delete } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, shadows, spacing } from '../theme/tokens';
+import { colors, fonts, shadows, spacing, type } from '../theme/tokens';
 
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 
@@ -82,7 +83,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   barButton: { height: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  barText: { fontFamily: fonts.regular, fontSize: 17, lineHeight: 22, color: colors.primary },
+  barText: { ...type.row, color: colors.primary },
   done: { fontFamily: fonts.semibold },
   tray: {
     backgroundColor: colors.keypadTray,
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   keyPressed: { backgroundColor: colors.fill },
-  digit: { fontFamily: fonts.regular, fontSize: 26, lineHeight: 32, color: colors.foreground },
+  digit: { ...type.title, fontFamily: fonts.regular, letterSpacing: 0 },
   blank: { width: '31.8%', flexGrow: 1, height: 50 },
   delete: {
     width: '31.8%',

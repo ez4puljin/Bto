@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, radii, spacing, type } from '../theme/tokens';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
+import { colors, radii, spacing, tabular, type } from '../theme/tokens';
 
 /** The MyOrders board's three numbers in one white card: «захиалга · батлагдсан дүн · ноорог». */
 export function StatRow({
@@ -44,5 +45,5 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.accent },
   stat: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs },
   divided: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border },
-  value: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 26, color: colors.foreground },
+  value: { ...type.title3, ...tabular },
 });

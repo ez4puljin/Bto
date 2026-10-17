@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import { Bell, ChevronRight, LogOut, Send, Server, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { useRepContext } from '../../../src/api/rep';
 import { initialsOf } from '../../../src/format/format';
@@ -181,15 +182,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: {
-    fontFamily: fonts.semibold,
-    fontSize: 22,
-    lineHeight: 28,
-    color: colors.primaryForeground,
-  },
+  initials: { ...type.title2, fontFamily: fonts.semibold, color: colors.primaryForeground },
   grow: { flex: 1, gap: 2 },
-  name: { fontFamily: fonts.semibold, fontSize: 19, lineHeight: 24, color: colors.foreground },
-  role: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.muted },
+  name: { ...type.title3, fontFamily: fonts.semibold },
+  role: { ...type.body, color: colors.muted },
   group: { marginTop: 22 },
   footer: { marginTop: 20, alignItems: 'center', gap: 3 },
 });

@@ -11,7 +11,8 @@ import {
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { type Quote, type RepProduct, useProductsOf, useQuote } from '../../../src/api/rep';
 import { type CartLine, linesOf } from '../../../src/cart/cart';
 import { formatMnt } from '../../../src/format/format';
@@ -149,7 +150,6 @@ export default function CartScreen() {
           <PillButton
             title={t('mobile.cart.next')}
             trailing={<ArrowRight size={20} strokeWidth={2.2} color={colors.primaryForeground} />}
-            height={56}
             disabled={quote.isLoading || unpriced}
             onPress={() => router.push('/checkout')}
             style={styles.next}
@@ -238,6 +238,8 @@ function CartRow({
             source={{ uri: `${server}${line.thumbUrl}` }}
             style={styles.image}
             contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={line.thumbUrl}
           />
         ) : (
           <Package size={24} strokeWidth={1.5} color={colors.input} />
@@ -302,10 +304,10 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   text: { flex: 1 },
-  name: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  name: { ...type.heading },
   right: { alignItems: 'flex-end', gap: 6 },
-  lineTotal: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
-  red: { color: colors.destructive, fontSize: 13 },
+  lineTotal: { ...type.heading },
+  red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },
   qtyPill: {
     height: 28,
     flexDirection: 'row',
@@ -316,7 +318,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.fieldFill,
   },
-  qtyText: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18, color: colors.foreground },
+  qtyText: { ...type.chip, fontFamily: fonts.semibold },
   addRow: {
     minHeight: 48,
     flexDirection: 'row',
@@ -333,13 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
   },
-  total: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.3,
-    color: colors.foreground,
-  },
+  total: { ...type.title2 },
   discountRow: {
     minHeight: 44,
     flexDirection: 'row',

@@ -5,12 +5,11 @@ import {
   Pressable,
   type StyleProp,
   StyleSheet,
-  Text,
-  TextInput,
   type TextInputProps,
   View,
   type ViewStyle,
 } from 'react-native';
+import { Text, TextInput } from './text';
 import { colors, fonts, radii, shadows, spacing, TOUCH, type } from '../theme/tokens';
 
 /** The grey 40 px search field with its glass. */
@@ -39,7 +38,7 @@ export function Segmented<T extends string>({
   options,
   value,
   onChange,
-  height = 42,
+  height = 40,
   small = false,
   label,
 }: {
@@ -47,7 +46,7 @@ export function Segmented<T extends string>({
   value: T | null;
   onChange: (value: T) => void;
   height?: number;
-  /** 13 px labels (three sorts in a sheet). */
+  /** Smaller labels (three sorts in a sheet). */
   small?: boolean;
   label?: string;
 }) {
@@ -115,7 +114,7 @@ export function Toggle({
 
 type PillVariant = 'primary' | 'soft' | 'white' | 'destructive';
 
-/** The design's 54 px rounded buttons: «Сагсанд нэмэх», «Захиалга илгээх». */
+/** The 50 px rounded buttons: «Сагсанд нэмэх», «Захиалга илгээх». */
 export function PillButton({
   title,
   onPress,
@@ -124,7 +123,8 @@ export function PillButton({
   variant = 'primary',
   disabled = false,
   loading = false,
-  height = 54,
+  loadingTitle,
+  height = 50,
   style,
   accessibilityLabel,
 }: {
@@ -135,6 +135,8 @@ export function PillButton({
   variant?: PillVariant;
   disabled?: boolean;
   loading?: boolean;
+  /** Shown beside the spinner while loading («Шалгаж байна…»); otherwise the spinner alone. */
+  loadingTitle?: string;
   height?: number;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
@@ -159,7 +161,14 @@ export function PillButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={palette.text} />
+        <>
+          <ActivityIndicator color={palette.text} />
+          {loadingTitle ? (
+            <Text numberOfLines={1} style={[styles.pillText, { color: palette.text }]}>
+              {loadingTitle}
+            </Text>
+          ) : null}
+        </>
       ) : (
         <>
           {icon}
@@ -317,7 +326,7 @@ export function ChoiceChip({
   onPress: () => void;
   /** On the grey canvas the idle chip is white; on a white card it is grey. */
   onWhite?: boolean;
-  /** The 34 px chips of a page (the orders' days); 36 px in a sheet. */
+  /** The 32 px chips of a page (the orders' days); 34 px in a sheet. */
   compact?: boolean;
   icon?: ReactNode;
 }) {
@@ -374,8 +383,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   segmentOn: { backgroundColor: colors.card, boxShadow: shadows.segment },
-  segmentText: { fontSize: 15, lineHeight: 20, color: colors.foreground },
-  segmentTextSmall: { fontSize: 13, lineHeight: 18, color: colors.foreground },
+  segmentText: type.body,
+  segmentTextSmall: { ...type.chip },
   dot: { width: 8, height: 8, borderRadius: 4 },
   switch: { width: 51, height: 31, borderRadius: 16 },
   knob: {
@@ -394,7 +403,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: 22,
   },
-  pillText: { fontFamily: fonts.semibold, fontSize: 17, lineHeight: 22 },
+  pillText: type.button,
   disabled: { opacity: 0.45 },
   badge: {
     minWidth: 20,
@@ -405,12 +414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    lineHeight: 13,
-    color: colors.primaryForeground,
-  },
+  badgeText: type.badge,
   circle: {
     width: TOUCH,
     height: TOUCH,
@@ -425,33 +429,28 @@ const styles = StyleSheet.create({
   circlePressed: { backgroundColor: colors.accent },
   circleBadge: { position: 'absolute', top: -3, right: -3 },
   chip: {
-    height: 34,
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: spacing.md,
-    borderRadius: 17,
+    borderRadius: 16,
     backgroundColor: colors.canvas,
   },
   chipChevron: { gap: spacing.xs, paddingRight: 10 },
-  chipText: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 18, color: colors.foreground },
+  chipText: type.chip,
   activeChip: {
-    height: 34,
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingLeft: spacing.md,
     paddingRight: spacing.xs,
-    borderRadius: 17,
+    borderRadius: 16,
     backgroundColor: colors.secondary,
     maxWidth: 240,
   },
-  activeChipText: {
-    fontFamily: fonts.semibold,
-    fontSize: 14,
-    lineHeight: 18,
-    color: colors.link,
-  },
+  activeChipText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
   activeChipX: {
     width: 28,
     height: 28,
@@ -460,14 +459,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   choice: {
-    height: 36,
+    height: 34,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
-    borderRadius: 18,
+    borderRadius: 17,
   },
-  choiceCompact: { height: 34, borderRadius: 17 },
-  choiceText: { fontSize: 15, lineHeight: 20 },
-  choiceTextCompact: { fontSize: 14, lineHeight: 18 },
+  choiceCompact: { height: 32, borderRadius: 16 },
+  choiceText: type.body,
+  choiceTextCompact: type.chip,
 });

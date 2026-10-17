@@ -3,14 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BellOff, Package } from 'lucide-react-native';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { useMarkRead, useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
 import { useProductsOf } from '../../../src/api/rep';
@@ -79,6 +73,7 @@ export default function NoticeScreen() {
               source={{ uri: `${server}${notice.imageUrl}` }}
               style={styles.image}
               contentFit="cover"
+              cachePolicy="memory-disk"
             />
           ) : null}
           <Text style={[styles.eyebrow, { color: KIND_STYLES[notice.kind].strong }]}>
@@ -131,7 +126,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.imageFill,
     marginBottom: spacing.sm,
   },
-  eyebrow: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18 },
-  text: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.label2 },
+  eyebrow: { ...type.chip, fontFamily: fonts.bold },
+  text: { ...type.row, color: colors.label2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: GAP, rowGap: 22 },
 });

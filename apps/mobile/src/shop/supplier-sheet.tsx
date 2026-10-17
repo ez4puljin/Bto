@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/text';
 import { problemFrom } from '../api/problem';
 import { useSuppliers } from '../api/rep';
 import { formatCount } from '../format/format';
@@ -131,12 +132,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initial: {
-    fontFamily: fonts.bold,
-    fontSize: 13,
-    lineHeight: 16,
-    color: colors.primaryForeground,
-  },
+  initial: { ...type.chip, fontFamily: fonts.bold, color: colors.primaryForeground },
   empty: { marginTop: spacing.xl, textAlign: 'center', color: colors.muted },
   loading: { marginTop: spacing.xl },
 });

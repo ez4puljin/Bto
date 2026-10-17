@@ -4,13 +4,12 @@ import {
   Pressable,
   type StyleProp,
   StyleSheet,
-  Text,
-  TextInput,
   type TextInputProps,
   type TextStyle,
   View,
   type ViewStyle,
 } from 'react-native';
+import { Text, TextInput } from './text';
 import { colors, radii, spacing, type } from '../theme/tokens';
 
 /** The white rounded group of the design's lists; rows are separated by inset hairlines. */
@@ -60,7 +59,7 @@ export function InputRow({
     <View style={styles.inputRow}>
       <Text style={[type.row, { width: labelWidth }]}>{label}</Text>
       <TextInput
-        placeholderTextColor={colors.input}
+        placeholderTextColor={colors.placeholder}
         accessibilityLabel={label}
         style={[type.row, styles.input, style]}
         {...props}
@@ -87,7 +86,7 @@ export function Row({
   disabled = false,
   role,
   accessibilityLabel,
-  minHeight = 52,
+  minHeight = 48,
   titleStyle,
 }: {
   icon?: ReactNode;
@@ -181,7 +180,7 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.accent },
   disabled: { opacity: 0.5 },
   inputRow: {
-    minHeight: 52,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,

@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
 import { useOrder, useRepContext } from '../../../src/api/rep';
 import { dayNameOf, monthDay } from '../../../src/dates/calendar';
 import { ubDate, ubTime } from '../../../src/dates/dates';
 import { formatMnt, formatQty } from '../../../src/format/format';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, type } from '../../../src/theme/tokens';
 import { Group, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
@@ -186,9 +187,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   grow: { flex: 1, gap: 2 },
-  lineName: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  lineName: { ...type.heading },
   short: { color: colors.warning },
-  lineTotal: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
+  lineTotal: { ...type.heading },
   totalRow: {
     minHeight: 56,
     flexDirection: 'row',
@@ -197,11 +198,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.card,
   },
-  total: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.3,
-    color: colors.foreground,
-  },
+  total: { ...type.title2 },
 });

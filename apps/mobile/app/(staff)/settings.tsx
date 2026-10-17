@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { ChevronDown, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import { problemFrom } from '../../src/api/problem';
 import { useRepContext } from '../../src/api/rep';
 import { useShop } from '../../src/state/shop';
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   hint: { marginTop: 6, marginHorizontal: spacing.xs, color: colors.muted },
   loading: { marginTop: spacing.xl },
   section: { marginTop: 22 },
-  mark: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 16, color: colors.primaryForeground },
+  mark: { ...type.chip, fontFamily: fonts.bold, color: colors.primaryForeground },
   summary: {
     marginTop: 22,
     paddingVertical: 14,
@@ -180,11 +181,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
   },
   grow: { flex: 1 },
-  summaryLabel: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.link },
-  summaryValue: {
-    fontFamily: fonts.semibold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: colors.foreground,
-  },
+  summaryLabel: { ...type.secondary, color: colors.link },
+  summaryValue: type.heading,
 });

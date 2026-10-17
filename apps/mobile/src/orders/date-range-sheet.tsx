@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../ui/text';
 import {
   type DateRange,
   daysBetween,
@@ -12,7 +13,7 @@ import {
   type RangeEnd,
 } from '../dates/calendar';
 import { monthOf } from '../dates/dates';
-import { colors, fonts, spacing, type } from '../theme/tokens';
+import { colors, fonts, spacing, tabular, type } from '../theme/tokens';
 import { MonthCalendar } from '../ui/calendar';
 import { ChoiceChip, PillButton } from '../ui/controls';
 import { Group } from '../ui/grouped';
@@ -157,12 +158,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   valueOn: { backgroundColor: colors.rangeFill },
-  valueText: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    lineHeight: 20,
-    color: colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
+  valueText: { ...type.row, ...tabular },
   valueTextOn: { fontFamily: fonts.semibold, color: colors.primary },
 });

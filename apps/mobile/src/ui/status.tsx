@@ -1,7 +1,8 @@
 import type { OrderStatus, PaymentMethod } from '@tugeel/shared/sales';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../theme/tokens';
+import { StyleSheet, View } from 'react-native';
+import { Text } from './text';
+import { colors, fonts, type } from '../theme/tokens';
 
 /** Each order status's pill as the MyOrders board colours it; the stages after them alike. */
 const STATUS_COLORS: Record<OrderStatus, { background: string; text: string }> = {
@@ -53,5 +54,5 @@ export function PaymentDot({ method, size = 8 }: { method: PaymentMethod; size?:
 
 const styles = StyleSheet.create({
   pill: { height: 22, paddingHorizontal: 8, borderRadius: 11, justifyContent: 'center' },
-  pillText: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
+  pillText: { ...type.secondary, fontFamily: fonts.semibold },
 });

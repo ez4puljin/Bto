@@ -1,7 +1,9 @@
 import { isErrorCode } from '@tugeel/shared/errors';
+import { CircleAlert } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Text } from './text';
 import { type AppProblem, creditMessage } from '../api/problem';
 import { colors, radii, spacing, type } from '../theme/tokens';
 
@@ -38,11 +40,24 @@ export function useProblemText() {
   };
 }
 
-export function ProblemText({ problem }: { problem: AppProblem | null | undefined }) {
+/** A failed call's message in a red box with its alert sign, 12 px under what is above it. */
+export function ProblemText({
+  problem,
+  style,
+}: {
+  problem: AppProblem | null | undefined;
+  style?: StyleProp<ViewStyle>;
+}) {
   const text = useProblemText();
   if (!problem) return null;
   return (
-    <View accessibilityRole="alert" style={styles.problem}>
+    <View accessibilityRole="alert" style={[styles.problem, style]}>
+      <CircleAlert
+        size={18}
+        strokeWidth={2}
+        color={colors.destructive}
+        style={styles.problemIcon}
+      />
       <Text style={[type.body, styles.problemText]}>{text(problem)}</Text>
     </View>
   );
@@ -58,10 +73,15 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   hint: { textAlign: 'center', color: colors.muted },
   problem: {
-    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     backgroundColor: colors.destructiveSoft,
     borderRadius: radii.field,
-    padding: spacing.md,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 14,
   },
-  problemText: { color: colors.destructive },
+  problemIcon: { marginTop: 0.5 },
+  problemText: { flex: 1, color: colors.destructive },
 });

@@ -1,19 +1,18 @@
 import { addDays } from '@tugeel/shared/time';
-import { defaultDeliveryDate } from '@tugeel/shared/sales';
 import { useRouter } from 'expo-router';
-import { ChartBar, Check, ChevronRight, Store } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
-  Keyboard,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+  CalendarDays,
+  ChartBar,
+  Check,
+  ChevronRight,
+  Store,
+  Truck,
+  Warehouse,
+} from 'lucide-react-native';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '../../src/ui/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppProblem } from '../../src/api/problem';
 import {
@@ -25,13 +24,13 @@ import {
 } from '../../src/api/rep';
 import { type CartIssue, cartIssues, linesOf } from '../../src/cart/cart';
 import { useSendOrder } from '../../src/cart/use-send';
-import { dayNameOf, monthDay } from '../../src/dates/calendar';
+import { monthDay } from '../../src/dates/calendar';
 import { monthOf, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { placeOf } from '../../src/state/placement';
 import { useShop } from '../../src/state/shop';
 import { colors, fonts, radii, shadows, spacing, type } from '../../src/theme/tokens';
-import { ChoiceChip, PillButton, Segmented } from '../../src/ui/controls';
+import { PillButton, Segmented } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { MonthCalendar } from '../../src/ui/calendar';
 import { ProblemText } from '../../src/ui/kit';
@@ -50,9 +49,10 @@ const PAY_DOTS = {
 
 /**
  * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0066 #6): the customer, who
- * takes the order and their phone, delivery or pickup with the address and the day, the payment,
- * a note, where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over
- * the page; a send without an answer keeps the cart locked (ADR-0061 #8).
+ * takes the order and their phone, «Хүлээн авах» (delivery or pickup as two cards, the address,
+ * and the day as four tiles: today, tomorrow, the day after, another day), the payment, a note,
+ * where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the page;
+ * a send without an answer keeps the cart locked (ADR-0061 #8).
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
@@ -78,10 +78,11 @@ export default function CheckoutScreen() {
   const place = context.data ? placeOf(context.data, stageId) : null;
   const locked = pending !== null;
 
-  // The proposed day is tomorrow; a stored day in the past moves to it too.
+  // Every order starts on today, for delivery and pickup alike (the owner, 2026-10-17); a stored
+  // day in the past moves to today too.
   useEffect(() => {
     if (today && (!cart.deliveryDate || cart.deliveryDate < today)) {
-      dispatch({ type: 'deliveryDate', date: defaultDeliveryDate(today) });
+      dispatch({ type: 'deliveryDate', date: today });
     }
   }, [today, cart.deliveryDate, dispatch]);
 
@@ -112,15 +113,46 @@ export default function CheckoutScreen() {
       }),
     ),
   ];
-  const dateText = (date: string | null) => {
-    if (!date || !today) return t('common.none');
-    const name = dayNameOf(date, today);
-    const weekday = weekdayOf(date) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-    const day = `${monthDay(date)} ${t(`mobile.weekdays.${weekday}`)}`;
-    return name === 'date'
-      ? day
-      : t('mobile.checkout.namedDay', { name: t(`mobile.days.${name}`), day });
+  const weekdayName = (date: string) =>
+    t(`mobile.weekdays.${weekdayOf(date) as 0 | 1 | 2 | 3 | 4 | 5 | 6}`);
+  /** «10/17 Бя». */
+  const dateText = (date: string | null) =>
+    date ? `${monthDay(date)} ${weekdayName(date)}` : t('common.none');
+
+  const delivery = cart.fulfilment === 'DELIVERY';
+  // Loaded and empty: nothing to deliver to, so the delivery card is greyed.
+  const noAddress = cart.customer !== null && customer.data !== undefined && addresses.length === 0;
+  const canPickAddress = cart.customer !== null && customer.data !== undefined && !noAddress;
+  const deliveryLine = !cart.customer
+    ? t('mobile.checkout.noCustomerYet')
+    : noAddress
+      ? t('mobile.checkout.noAddressShort')
+      : address
+        ? (address.label ?? address.address ?? t('mobile.checkout.addressNoText'))
+        : t('mobile.checkout.chooseAddress');
+  const pickupLine =
+    homes.length === 0
+      ? t('mobile.checkout.fromWarehouse')
+      : homes.length === 1
+        ? (homes[0] ?? '')
+        : t('mobile.checkout.moreHomes', { name: homes[0], n: homes.length - 1 });
+  const chooseDelivery = () => {
+    if (!delivery) dispatch({ type: 'delivery' });
+    // The chosen card opens the addresses again; choosing it without an address opens them first.
+    if (canPickAddress && (delivery || !address)) setSheet('address');
   };
+
+  const quickDays = today
+    ? [
+        { date: today, name: t('mobile.days.today') },
+        { date: addDays(today, 1), name: t('mobile.days.tomorrow') },
+        { date: addDays(today, 2), name: t('mobile.days.dayAfter') },
+      ]
+    : [];
+  const otherDay =
+    cart.deliveryDate && !quickDays.some((day) => day.date === cart.deliveryDate)
+      ? cart.deliveryDate
+      : null;
   const totalText = quote.data
     ? t('pricing.money', { amount: formatMnt(quote.data.total) })
     : t('common.none');
@@ -221,7 +253,7 @@ export default function CheckoutScreen() {
               value={cart.contactName}
               onChangeText={(name) => dispatch({ type: 'contact', name })}
               placeholder={t('mobile.checkout.contactNameHint')}
-              placeholderTextColor={colors.input}
+              placeholderTextColor={colors.placeholder}
               editable={!locked}
               accessibilityLabel={t('mobile.checkout.contactName')}
               style={[type.row, styles.input]}
@@ -235,7 +267,7 @@ export default function CheckoutScreen() {
                 dispatch({ type: 'contact', phone: phone.replace(/[^0-9 +-]/g, '') })
               }
               placeholder={t('mobile.checkout.contactPhoneHint')}
-              placeholderTextColor={colors.input}
+              placeholderTextColor={colors.placeholder}
               keyboardType="phone-pad"
               editable={!locked}
               accessibilityLabel={t('mobile.checkout.contactPhone')}
@@ -244,55 +276,59 @@ export default function CheckoutScreen() {
           </View>
         </Group>
 
-        <SectionHeader style={styles.section}>{t('mobile.checkout.delivery')}</SectionHeader>
-        <Group>
-          <View style={styles.segmentRow}>
-            <Segmented
-              options={[
-                { value: 'DELIVERY' as const, label: t('sales.fulfilments.DELIVERY') },
-                { value: 'PICKUP' as const, label: t('sales.fulfilments.PICKUP') },
-              ]}
-              value={cart.fulfilment}
-              onChange={(fulfilment) =>
-                !locked && dispatch({ type: fulfilment === 'PICKUP' ? 'pickup' : 'delivery' })
-              }
-              height={38}
-              label={t('mobile.checkout.delivery')}
-            />
-          </View>
-          {cart.fulfilment === 'DELIVERY' ? (
-            <Row
-              title={t('mobile.checkout.address')}
-              value={
-                address
-                  ? (address.label ?? address.address ?? t('mobile.checkout.addressNoText'))
-                  : t('mobile.checkout.chooseAddress')
-              }
-              disabled={locked || !cart.customer}
-              onPress={() => setSheet('address')}
-            />
-          ) : (
-            <Row
-              title={t('mobile.checkout.pickupAt')}
-              value={homes.length > 0 ? homes.join(', ') : t('common.none')}
-            />
-          )}
-          <Row
-            title={
-              cart.fulfilment === 'PICKUP'
-                ? t('mobile.checkout.pickupDay')
-                : t('mobile.checkout.deliveryDay')
-            }
-            right={
-              <View style={styles.dateChip}>
-                <Text style={styles.dateText}>{dateText(cart.deliveryDate)}</Text>
-              </View>
-            }
-            chevron={false}
-            disabled={locked}
-            onPress={() => setSheet('date')}
+        <SectionHeader style={styles.section}>{t('mobile.checkout.receive')}</SectionHeader>
+        <View accessibilityRole="radiogroup" style={styles.options}>
+          <ReceiveCard
+            icon={(color) => <Truck size={18} strokeWidth={2} color={color} />}
+            title={t('sales.fulfilments.DELIVERY')}
+            line={deliveryLine}
+            link={canPickAddress && !address}
+            selected={delivery}
+            disabled={locked || noAddress}
+            dimmed={noAddress}
+            chevron={delivery && canPickAddress}
+            onPress={chooseDelivery}
           />
-        </Group>
+          <ReceiveCard
+            icon={(color) => <Warehouse size={18} strokeWidth={2} color={color} />}
+            title={t('sales.fulfilments.PICKUP')}
+            line={pickupLine}
+            selected={!delivery}
+            disabled={locked}
+            onPress={() => dispatch({ type: 'pickup' })}
+          />
+        </View>
+
+        {today ? (
+          <>
+            <View style={styles.dayHead}>
+              <Text style={[type.sectionHeader, styles.grow]}>
+                {delivery ? t('mobile.checkout.deliveryDay') : t('mobile.checkout.pickupDay')}
+              </Text>
+              <Text style={type.secondary}>{dateText(cart.deliveryDate)}</Text>
+            </View>
+            <View style={styles.days}>
+              {quickDays.map((day) => (
+                <DayTile
+                  key={day.date}
+                  title={day.name}
+                  line={dateText(day.date)}
+                  selected={cart.deliveryDate === day.date}
+                  disabled={locked}
+                  onPress={() => dispatch({ type: 'deliveryDate', date: day.date })}
+                />
+              ))}
+              <DayTile
+                title={otherDay ? monthDay(otherDay) : t('mobile.checkout.otherDay')}
+                line={otherDay ? weekdayName(otherDay) : null}
+                icon={<CalendarDays size={14} strokeWidth={2} color={colors.muted} />}
+                selected={otherDay !== null}
+                disabled={locked}
+                onPress={() => setSheet('date')}
+              />
+            </View>
+          </>
+        ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.payment')}</SectionHeader>
         <Segmented
@@ -318,7 +354,7 @@ export default function CheckoutScreen() {
             value={cart.note}
             onChangeText={(note) => dispatch({ type: 'note', note })}
             placeholder={t('mobile.checkout.noteHint')}
-            placeholderTextColor={colors.input}
+            placeholderTextColor={colors.placeholder}
             multiline
             editable={!locked}
             onFocus={() => setNoteFocused(true)}
@@ -390,10 +426,9 @@ export default function CheckoutScreen() {
       {today ? (
         <DateSheet
           visible={sheet === 'date'}
-          pickup={cart.fulfilment === 'PICKUP'}
+          pickup={!delivery}
           today={today}
           chosen={cart.deliveryDate}
-          dayText={dateText}
           onPick={(date) => {
             dispatch({ type: 'deliveryDate', date });
             setSheet('none');
@@ -502,12 +537,122 @@ function AddressSheet({
   );
 }
 
+/** One of «Хүргэлтээр» / «Өөрөө авна»: an icon tile and a radio mark, the title, one line under it. */
+function ReceiveCard({
+  icon,
+  title,
+  line,
+  link = false,
+  selected,
+  disabled,
+  dimmed = false,
+  chevron = false,
+  onPress,
+}: {
+  icon: (color: string) => ReactNode;
+  title: string;
+  line: string;
+  /** The line asks for something («Хаяг сонгох»): link-coloured. */
+  link?: boolean;
+  selected: boolean;
+  disabled: boolean;
+  /** Nothing to choose here (a customer without addresses): greyed. */
+  dimmed?: boolean;
+  /** The chosen card opens a sheet on another tap. */
+  chevron?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected, disabled }}
+      accessibilityLabel={`${title}, ${line}`}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.option,
+        pressed && styles.optionPressed,
+        selected && styles.optionSelected,
+        dimmed && styles.dimmed,
+      ]}
+    >
+      <View style={styles.optionTop}>
+        <View style={[styles.optionIcon, selected && styles.optionIconSelected]}>
+          {icon(selected ? colors.primaryForeground : colors.label2)}
+        </View>
+        <View style={[styles.radio, selected && styles.radioSelected]}>
+          {selected ? <Check size={13} strokeWidth={3} color={colors.primaryForeground} /> : null}
+        </View>
+      </View>
+      <View style={styles.optionText}>
+        <Text style={type.heading} numberOfLines={1}>
+          {title}
+        </Text>
+        <View style={styles.optionLine}>
+          <Text style={[type.secondary, styles.shrink, link && styles.link]} numberOfLines={1}>
+            {line}
+          </Text>
+          {chevron ? <ChevronRight size={12} strokeWidth={2.6} color={colors.muted} /> : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/** A day tile: its name over its date, or «Өөр өдөр» over a calendar icon. */
+function DayTile({
+  title,
+  line,
+  icon,
+  selected,
+  disabled,
+  onPress,
+}: {
+  title: string;
+  /** The line under the title; null shows the icon instead. */
+  line: string | null;
+  icon?: ReactNode;
+  selected: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.day,
+        pressed && styles.dayPressed,
+        selected && styles.daySelected,
+      ]}
+    >
+      <Text
+        style={[styles.dayTitle, selected && styles.onPrimary]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {title}
+      </Text>
+      {line === null ? (
+        icon
+      ) : (
+        <Text style={[type.caption, selected && styles.onPrimary]} numberOfLines={1}>
+          {line}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+/** The calendar for a day past the tiles: today to DAYS_AHEAD days on. */
 function DateSheet({
   visible,
   pickup,
   today,
   chosen,
-  dayText,
   onPick,
   onClose,
 }: {
@@ -515,7 +660,6 @@ function DateSheet({
   pickup: boolean;
   today: string;
   chosen: string | null;
-  dayText: (date: string) => string;
   onPick: (date: string) => void;
   onClose: () => void;
 }) {
@@ -524,7 +668,6 @@ function DateSheet({
   useEffect(() => {
     if (visible) setMonth(monthOf(chosen ?? today));
   }, [visible, chosen, today]);
-  const quick = [today, addDays(today, 1), addDays(today, 2)];
   return (
     <Sheet
       visible={visible}
@@ -539,16 +682,6 @@ function DateSheet({
       }
     >
       <ScrollView contentContainerStyle={styles.sheetBody}>
-        <View style={styles.quick}>
-          {quick.map((date) => (
-            <ChoiceChip
-              key={date}
-              label={dayText(date)}
-              selected={chosen === date}
-              onPress={() => onPick(date)}
-            />
-          ))}
-        </View>
         <MonthCalendar
           month={month}
           onMonth={setMonth}
@@ -598,16 +731,67 @@ const styles = StyleSheet.create({
   },
   label: { width: 72 },
   input: { flex: 1, height: 44, paddingVertical: 0 },
-  segmentRow: { paddingVertical: spacing.md, paddingHorizontal: 14 },
-  dateChip: {
+  options: { flexDirection: 'row', gap: 10 },
+  option: {
+    flex: 1,
+    minHeight: 96,
+    padding: spacing.md,
+    gap: 10,
+    borderRadius: radii.card,
+    borderWidth: 2,
+    borderColor: colors.card,
+    backgroundColor: colors.card,
+  },
+  optionPressed: { borderColor: colors.accent, backgroundColor: colors.accent },
+  optionSelected: { borderColor: colors.primary },
+  dimmed: { opacity: 0.5 },
+  optionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  optionIcon: {
+    width: 34,
     height: 34,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
+    borderRadius: radii.control,
     backgroundColor: colors.fieldFill,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  dateText: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 20, color: colors.foreground },
-  counter: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.tint.gray },
+  optionIconSelected: { backgroundColor: colors.primary },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.input,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioSelected: { borderWidth: 0, backgroundColor: colors.primary },
+  optionText: { gap: 2 },
+  optionLine: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  shrink: { flexShrink: 1 },
+  link: { color: colors.link },
+  dayHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.xs,
+  },
+  days: { flexDirection: 'row', gap: spacing.sm },
+  day: {
+    flex: 1,
+    height: 56,
+    paddingHorizontal: spacing.xs,
+    gap: 2,
+    borderRadius: radii.field,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPressed: { backgroundColor: colors.accent },
+  daySelected: { backgroundColor: colors.primary },
+  dayTitle: { ...type.chip, fontFamily: fonts.semibold },
+  onPrimary: { color: colors.primaryForeground },
+  counter: { ...type.secondary, color: colors.tint.gray },
   note: {
     minHeight: 92,
     paddingVertical: 14,
@@ -638,13 +822,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  total: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: -0.3,
-    color: colors.foreground,
-  },
+  total: { ...type.title2 },
   sheetBody: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
@@ -652,7 +830,6 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   empty: { marginTop: spacing.xl, textAlign: 'center', color: colors.muted },
-  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   sentBackdrop: {
     flex: 1,
     backgroundColor: colors.dimFill,
@@ -677,7 +854,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sentTitle: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 26, color: colors.foreground },
+  sentTitle: { ...type.title3 },
   sentLine: { color: colors.muted, textAlign: 'center' },
   sentActions: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: spacing.md },
   sentButton: { flex: 1, paddingHorizontal: spacing.sm },

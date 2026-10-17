@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import type { AppProblem } from '../api/problem';
 import type { RepOrder } from '../api/rep';
 import { useSendOrder } from '../cart/use-send';
@@ -91,9 +92,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     backgroundColor: colors.warningSoft,
   },
-  title: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 20, color: colors.warningText },
+  title: { ...type.rowStrong, color: colors.warningText },
   body: { ...type.secondary, color: colors.warningText },
   links: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 2 },
-  link: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 20, color: colors.primary },
+  link: { ...type.row, fontFamily: fonts.medium, color: colors.primary },
   danger: { color: colors.destructive },
 });

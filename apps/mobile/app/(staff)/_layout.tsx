@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { ThumbKeeper } from '../../src/images/thumb-keeper';
 import { NoticePopupGate } from '../../src/notifications/popup-gate';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
@@ -12,6 +13,7 @@ export default function StaffLayout() {
     <ShopProvider server={server} userId={me.id}>
       <ToastProvider>
         <NoticePopupGate />
+        <ThumbKeeper />
         <Stack
           screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}
         >

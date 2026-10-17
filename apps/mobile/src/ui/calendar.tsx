@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './text';
 import { type DateRange, monthGrid } from '../dates/calendar';
 import { monthOf, shiftMonth } from '../dates/dates';
-import { colors, fonts, radii, spacing } from '../theme/tokens';
+import { colors, fonts, radii, spacing, tabular, type } from '../theme/tokens';
 
 /** Monday first, as the design draws the week. */
 const WEEK = [1, 2, 3, 4, 5, 6, 0] as const;
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 6,
   },
-  month: { fontFamily: fonts.semibold, fontSize: 17, lineHeight: 22, color: colors.foreground },
+  month: type.heading,
   arrows: { flexDirection: 'row', gap: spacing.xs },
   arrow: {
     width: 36,
@@ -146,11 +147,8 @@ const styles = StyleSheet.create({
   week: { flexDirection: 'row', paddingTop: spacing.xs, paddingBottom: 2 },
   weekday: {
     flex: 1,
+    ...type.sectionHeader,
     textAlign: 'center',
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.muted,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingTop: spacing.xs, rowGap: spacing.xs },
   cell: { width: `${100 / 7}%`, alignItems: 'center' },
@@ -158,11 +156,8 @@ const styles = StyleSheet.create({
   inside: { backgroundColor: colors.rangeFill },
   edge: { backgroundColor: colors.primary },
   dayText: {
-    fontFamily: fonts.regular,
-    fontSize: 17,
-    lineHeight: 22,
-    color: colors.foreground,
-    fontVariant: ['tabular-nums'],
+    ...type.row,
+    ...tabular,
   },
   offText: { color: colors.input },
   todayText: { color: colors.primary, fontFamily: fonts.bold },

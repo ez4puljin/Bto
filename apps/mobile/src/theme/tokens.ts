@@ -38,8 +38,6 @@ export const colors = {
   switchOff: 'rgba(120,120,128,0.16)',
   /** A sheet's round close button. */
   closeFill: 'rgba(118,118,128,0.14)',
-  /** The open tab of the tab bar. */
-  tabActive: 'rgba(118,118,128,0.13)',
   /** Behind a product picture. */
   imageFill: '#F5F5F7',
   /** A dot of a pager that is not the current page. */
@@ -59,6 +57,17 @@ export const colors = {
   floatingFill: 'rgba(255,255,255,0.92)',
   /** A round button over a picture. */
   glassFill: 'rgba(255,255,255,0.86)',
+  /** Placeholders of text fields. */
+  placeholder: '#8E8E93',
+  /** A text field's box (solid, so its idle border can match it). */
+  field: '#EFEFF0',
+  /** Text and lines on the blue month card. */
+  onPrimaryMuted: 'rgba(255,255,255,0.72)',
+  onPrimaryHairline: 'rgba(255,255,255,0.22)',
+  /** Pager dots over a picture, on a dark capsule. */
+  dotOnImage: '#FFFFFF',
+  dotOnImageIdle: 'rgba(255,255,255,0.55)',
+  pagerCapsule: 'rgba(0,0,0,0.24)',
   hairline: 'rgba(0,0,0,0.08)',
   hairlineSoft: 'rgba(0,0,0,0.06)',
   hairlineStrong: 'rgba(0,0,0,0.15)',
@@ -119,54 +128,74 @@ export const fonts = {
   bold: 'Inter_700Bold',
 } as const;
 
-/** The boards' type scale: 17 for rows, 13 for section headers and notes, 34 for page titles. */
+/**
+ * The type scale (the owner, 2026-10-17: «Text жоохон том»): the boards' iPhone sizes made about
+ * 12–15% smaller for Inter on Android (rows 15, titles 28, notes 12), the phone's font scaling
+ * capped at 1.15 by `src/ui/text.tsx`, and Android's extra font padding off. Every text size in
+ * the app comes from here.
+ */
+const face = (
+  family: string,
+  fontSize: number,
+  lineHeight: number,
+  letterSpacing = 0,
+  color: string = colors.foreground,
+) =>
+  ({
+    fontFamily: family,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    color,
+    includeFontPadding: false,
+  }) as const;
+
 export const type = {
-  largeTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 34,
-    lineHeight: 41,
-    letterSpacing: -0.6,
-    color: colors.foreground,
-  },
-  title: {
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.4,
-    color: colors.foreground,
-  },
-  title2: {
-    fontFamily: fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.4,
-    color: colors.foreground,
-  },
-  title3: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 28, color: colors.foreground },
-  heading: { fontFamily: fonts.semibold, fontSize: 17, lineHeight: 22, color: colors.foreground },
-  row: { fontFamily: fonts.regular, fontSize: 17, lineHeight: 22, color: colors.foreground },
-  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20, color: colors.foreground },
-  bodyStrong: {
-    fontFamily: fonts.semibold,
-    fontSize: 15,
-    lineHeight: 20,
-    color: colors.foreground,
-  },
-  secondary: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.muted },
-  sectionHeader: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.muted,
-  },
-  caption: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.muted },
-  tab: { fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12 },
+  /** A notice's discount, «20%». */
+  jumbo: face(fonts.bold, 56, 62, -1.5),
+  /** The quantity typed on the keypad. */
+  hero: face(fonts.bold, 40, 46, -1),
+  /** The month's total on the home card. */
+  display: face(fonts.bold, 32, 38, -0.8),
+  largeTitle: face(fonts.bold, 28, 34, -0.5),
+  title: face(fonts.bold, 24, 30, -0.4),
+  title2: face(fonts.bold, 22, 28, -0.3),
+  title3: face(fonts.bold, 19, 24, -0.2),
+  /** «Bto» next to the logo. */
+  wordmark: face(fonts.bold, 22, 26, -0.6),
+  /** A section's title with a «Бүгд» link (the home's strips). */
+  sectionTitle: face(fonts.bold, 17, 22, -0.2),
+  heading: face(fonts.semibold, 16, 21, -0.1),
+  row: face(fonts.regular, 15, 20, -0.1),
+  rowStrong: face(fonts.semibold, 15, 20, -0.1),
+  /** Text typed into a field. */
+  field: face(fonts.regular, 16, 20),
+  button: face(fonts.semibold, 16, 20, -0.1),
+  body: face(fonts.regular, 14, 19),
+  bodyStrong: face(fonts.semibold, 14, 19),
+  chip: face(fonts.medium, 13, 18),
+  /** A field's label above its box. */
+  label: face(fonts.semibold, 13, 16, 0, colors.label2),
+  secondary: face(fonts.regular, 12, 16, 0, colors.muted),
+  sectionHeader: face(fonts.semibold, 12, 16, 0.1, colors.muted),
+  caption: face(fonts.regular, 11, 14, 0.1, colors.muted),
+  badge: face(fonts.bold, 10, 12, 0, colors.primaryForeground),
+  tab: { fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12, includeFontPadding: false },
 } as const;
+
+/** Numbers that line up in columns (money, counts). */
+export const tabular = { fontVariant: ['tabular-nums' as const] };
 
 /** The boards' shadows (React Native's boxShadow, the New Architecture). */
 export const shadows = {
   floating: '0 1px 2px rgba(0,0,0,0.05), 0 6px 18px rgba(0,0,0,0.08)',
-  tabBar: '0 10px 34px rgba(0,0,0,0.14)',
+  tabBar: '0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
+  /** The logo tile. */
+  brand: '0 6px 16px rgba(0,113,227,0.28)',
+  /** The blue month card on the home. */
+  accentCard: '0 6px 18px rgba(0,113,227,0.22)',
+  /** A pager capsule over a picture. */
+  capsule: '0 1px 3px rgba(0,0,0,0.18)',
   addButton: '0 2px 10px rgba(0,0,0,0.14)',
   segment: '0 3px 8px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.04)',
   stepper: '0 1px 3px rgba(0,0,0,0.1)',

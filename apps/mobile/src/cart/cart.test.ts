@@ -140,13 +140,24 @@ describe('the cart (ADR-0061 #8)', () => {
       note: 'Өглөө',
       lines: [{ productUnitId: 1, qty: '3' }],
     });
-    const sent = cartReducer(cart, { type: 'sent' });
-    expect(sent).toMatchObject({
-      lines: [],
-      customer: null,
-      contactName: '',
-      paymentMethod: 'CREDIT',
+  });
+
+  it('starts the next order on today once one is sent, keeping only the payment', () => {
+    let cart = cartReducer(EMPTY_CART, { type: 'add', line: unit(1), qty: 3 });
+    cart = cartReducer(cart, {
+      type: 'customer',
+      customer: { id: 9, code: '1009', name: 'Дэлгүүр' },
+      defaultAddressId: 31,
+      contact: { name: 'Бат', phone: '99112233' },
     });
+    cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-18' });
+    cart = cartReducer(cart, { type: 'payment', method: 'CREDIT' });
+    cart = cartReducer(cart, { type: 'note', note: 'Өглөө' });
+    const sent = cartReducer(cart, { type: 'sent' });
+    expect(sent).toEqual({ ...EMPTY_CART, paymentMethod: 'CREDIT' });
+    // The date is the screen's to propose again: today, an issue until it does.
+    expect(sent.deliveryDate).toBeNull();
+    expect(cartIssues(sent, '2026-10-17', 5)).toContain('deliveryDate');
   });
 
   it('reads a stored cart back safely', () => {

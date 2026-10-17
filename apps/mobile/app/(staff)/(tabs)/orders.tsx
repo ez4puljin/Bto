@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { CalendarDays } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SectionList, StyleSheet, View } from 'react-native';
+import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
 import { type RepOrderSummary, useOrders, useRepContext } from '../../../src/api/rep';
 import {
@@ -13,17 +14,17 @@ import {
   presetRange,
   type RangePreset,
 } from '../../../src/dates/calendar';
-import { ubDate, ubTime, weekdayOf } from '../../../src/dates/dates';
+import { ubDate, weekdayOf } from '../../../src/dates/dates';
 import { formatMillions, formatMnt } from '../../../src/format/format';
 import { DateRangeSheet } from '../../../src/orders/date-range-sheet';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, radii, spacing, type } from '../../../src/theme/tokens';
 import { ChoiceChip, SearchField } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { LargeTitle, Page } from '../../../src/ui/layout';
+import { OrderRow } from '../../../src/ui/order-row';
 import { StatRow } from '../../../src/ui/stat-row';
-import { PaymentDot, StatusPill } from '../../../src/ui/status';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
 
 const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
@@ -205,46 +206,6 @@ export default function OrdersScreen() {
   );
 }
 
-function OrderRow({ order, onPress }: { order: RepOrderSummary; onPress: () => void }) {
-  const { t } = useTranslation();
-  const muted = order.total === null || order.status === 'CANCELLED';
-  const meta = [
-    t(`sales.paymentMethods.${order.paymentMethod}`),
-    order.stageName,
-    ubTime(order.createdAt),
-  ]
-    .filter((part) => part)
-    .join(' · ');
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      <View style={styles.rowText}>
-        <Text style={styles.number}>{order.number ?? t('common.none')}</Text>
-        <Text style={styles.customer} numberOfLines={1}>
-          {order.customerName}
-        </Text>
-        <View style={styles.meta}>
-          <PaymentDot method={order.paymentMethod} />
-          <Text style={type.caption} numberOfLines={1}>
-            {meta}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.rowRight}>
-        <Text style={[styles.total, muted && styles.muted]}>
-          {order.total === null
-            ? t('mobile.orders.priceLater')
-            : t('pricing.money', { amount: formatMnt(order.total) })}
-        </Text>
-        <StatusPill status={order.status} />
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
   bar: { height: 44 },
@@ -262,27 +223,6 @@ const styles = StyleSheet.create({
   cell: { backgroundColor: colors.card },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  pressed: { backgroundColor: colors.accent },
-  rowText: { flex: 1, gap: 2 },
-  number: {
-    fontFamily: fonts.semibold,
-    fontSize: 16,
-    lineHeight: 21,
-    color: colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
-  customer: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 19, color: colors.label2 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowRight: { alignItems: 'flex-end', gap: 6 },
-  total: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 21, color: colors.foreground },
   muted: { color: colors.muted },
   loading: { marginTop: spacing.xl },
   empty: { marginTop: 40, alignItems: 'center', gap: 6 },

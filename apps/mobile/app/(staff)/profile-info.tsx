@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '../../src/ui/text';
 import { useRepContext } from '../../src/api/rep';
 import { dayNameOf, monthDay } from '../../src/dates/calendar';
 import { ubDate, ubTime } from '../../src/dates/dates';
@@ -114,12 +115,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: {
-    fontFamily: fonts.semibold,
-    fontSize: 34,
-    lineHeight: 40,
-    color: colors.primaryForeground,
-  },
+  initials: { ...type.display, fontFamily: fonts.semibold, color: colors.primaryForeground },
   center: { textAlign: 'center', marginTop: spacing.xs },
   rolePill: {
     height: 26,
@@ -128,6 +124,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     justifyContent: 'center',
   },
-  roleText: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18, color: colors.link },
+  roleText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
   password: { marginTop: spacing.xl },
 });
