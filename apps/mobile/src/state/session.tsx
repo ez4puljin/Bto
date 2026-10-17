@@ -42,7 +42,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ? new MobileSession({
             server,
             store: secureTokenStore,
-            fetch: (request) => fetch(request),
+            fetch: (request, init) => fetch(request, init),
             randomUUID: Crypto.randomUUID,
           })
         : null,

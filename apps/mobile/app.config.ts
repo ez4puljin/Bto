@@ -18,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Bto',
   slug: 'bto-staff',
   scheme: 'bto-staff',
-  version: '0.2.0',
+  version: '0.2.1',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',

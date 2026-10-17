@@ -173,6 +173,27 @@ describe('the staff app session (ADR-0061 #4)', () => {
     expect(first.store.value).toBeNull();
   });
 
+  it('treats a server that never answers as no connection once the time limit passes', async () => {
+    const first = setup();
+    await first.session.login('rep', 'secret');
+    const signals: AbortSignal[] = [];
+    const silent = new MobileSession({
+      server: SERVER,
+      store: first.store,
+      // Like OkHttp after a dropped packet: no answer and no error, not even on the abort.
+      fetch: (_request, init) => {
+        signals.push(init.signal);
+        return new Promise<Response>(() => undefined);
+      },
+      randomUUID,
+      timeoutMs: 20,
+    });
+    await silent.restore();
+    expect(silent.getSnapshot()).toEqual({ status: 'offline' });
+    expect(signals.map((signal) => signal.aborted)).toEqual([true]);
+    expect(first.store.value).not.toBeNull();
+  });
+
   it('ignores a session stored for another server', async () => {
     const { store, server } = setup();
     store.value = { server: 'http://10.0.0.1:3300', userId: 7, refreshToken: 'rt-1' };

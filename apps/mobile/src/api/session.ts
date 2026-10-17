@@ -35,12 +35,22 @@ const pathOf = (url: string) =>
 /** Refresh this long before the access token ends, so a call never leaves with a dead one. */
 const EARLY_MS = 30_000;
 
+/**
+ * React Native's fetch never gives up by itself (OkHttp without timeouts): a stored server that
+ * had left the Wi-Fi held the start logo for minutes (2026-10-17). Every call is aborted after
+ * this long and then counts as no connection.
+ */
+export const REQUEST_TIMEOUT_MS = 10_000;
+
 export interface SessionOptions {
   server: string;
   store: TokenStore;
-  fetch: (request: Request) => Promise<Response>;
+  /** The platform's fetch; `init.signal` aborts a call that ran out of time. */
+  fetch: (request: Request, init: { signal: AbortSignal }) => Promise<Response>;
   randomUUID: () => string;
   now?: () => number;
+  /** Milliseconds before a call is abandoned; `REQUEST_TIMEOUT_MS` unless a test shortens it. */
+  timeoutMs?: number;
 }
 
 /**
@@ -187,7 +197,7 @@ export class MobileSession {
       if (this.accessToken) request.headers.set('authorization', `Bearer ${this.accessToken}`);
     }
     const retry = own ? null : request.clone();
-    const response = await this.options.fetch(request);
+    const response = await this.send(request);
     if (response.status !== 401 || retry === null || !this.refreshToken) return response;
     const outcome = await this.refresh();
     if (outcome !== 'ok') {
@@ -195,7 +205,30 @@ export class MobileSession {
       return response;
     }
     if (this.accessToken) retry.headers.set('authorization', `Bearer ${this.accessToken}`);
-    return this.options.fetch(retry);
+    return this.send(retry);
+  }
+
+  /**
+   * One call within the time limit: past it the call is aborted and fails like a dropped
+   * connection, even where the platform's fetch ignores the abort.
+   */
+  private async send(request: Request): Promise<Response> {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new TypeError('Network request timed out'));
+      }, this.options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([
+        this.options.fetch(request, { signal: controller.signal }),
+        timedOut,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private takeAccess(token: string, endsAt: string): void {
