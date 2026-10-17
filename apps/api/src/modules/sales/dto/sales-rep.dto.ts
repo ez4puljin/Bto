@@ -101,6 +101,16 @@ export class SalesRepSupplierDto {
   @ApiProperty({ description: 'Shop products whose main supplier this is' }) productCount: number;
 }
 
+@ApiSchema({ name: 'SalesRepThumbs' })
+export class SalesRepThumbsDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      "The primary picture's thumbnail of every product the shop lists (relative URLs that never change)",
+  })
+  urls: string[];
+}
+
 @ApiSchema({ name: 'SalesRepOrderRequest' })
 export class SalesRepOrderRequestDto extends OmitType(SalesOrderRequestDto, [
   'pipelineId',

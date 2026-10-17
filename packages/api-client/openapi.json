@@ -13757,6 +13757,42 @@
         ]
       }
     },
+    "/api/v1/sales-rep/thumbs": {
+      "get": {
+        "operationId": "SalesRep_thumbs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepThumbs"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
     "/api/v1/sales-rep/customers": {
       "get": {
         "operationId": "SalesRep_customers",
@@ -29898,6 +29934,21 @@
           "id",
           "name",
           "productCount"
+        ]
+      },
+      "SalesRepThumbs": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "description": "The primary picture's thumbnail of every product the shop lists (relative URLs that never change)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "urls"
         ]
       },
       "SalesRepCustomer": {

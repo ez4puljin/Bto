@@ -3285,6 +3285,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/thumbs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_thumbs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/customers": {
         parameters: {
             query?: never;
@@ -7711,6 +7727,10 @@ export interface components {
             name: string;
             /** @description Shop products whose main supplier this is */
             productCount: number;
+        };
+        SalesRepThumbs: {
+            /** @description The primary picture's thumbnail of every product the shop lists (relative URLs that never change) */
+            urls: string[];
         };
         SalesRepCustomer: {
             id: number;
@@ -17703,6 +17723,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepSupplier"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_thumbs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepThumbs"];
                 };
             };
             /** @description RFC 9457 problem details */

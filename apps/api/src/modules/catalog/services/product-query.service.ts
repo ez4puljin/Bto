@@ -128,6 +128,14 @@ export class ProductQueryService implements OnModuleInit {
     return this.products.imagesOf(ids, executor);
   }
 
+  /** product id → its primary picture's thumbnail URL, for products that have a ready one. */
+  primaryThumbsOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    return this.products.primaryThumbsOf(ids, executor);
+  }
+
   /** unit id → its unit of measure's code and default-sales flag, for current units. */
   unitFlagsOf(
     ids: readonly number[],

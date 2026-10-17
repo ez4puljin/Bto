@@ -391,6 +391,49 @@ describe('sales rep shop filters', () => {
     expect([...counts].sort((a, b) => b - a)).toEqual(counts);
   });
 
+  it('lists the primary thumbnail of every shop product and nothing off the shop', async () => {
+    const picture = async (productId: number) => {
+      const imageFileId = await upload('catalog.product_image');
+      const thumbFileId = await upload('catalog.product_thumb');
+      await http()
+        .post(`/api/v1/products/${productId}/images`)
+        .set(bearer(admin))
+        .send({ imageFileId, thumbFileId })
+        .expect(201);
+    };
+    const thumbsOf = async (productId: number) =>
+      (
+        (await http().get(`/api/v1/products/${productId}`).set(bearer(admin)).expect(200)).body as {
+          images: { thumbUrl: string; isPrimary: boolean }[];
+        }
+      ).images;
+    const catalog = catalogApi(app, admin);
+    // Waiting for its prices: never in the shop, so never kept on the phone.
+    const waiting = await catalog.product({
+      sku: '7986',
+      name: 'Зүмбэр хүлээгдэж буй',
+      categoryId: parent,
+      baseUomId: await catalog.uomId('PCS'),
+    });
+    await picture(juice.id);
+    await picture(juice.id);
+    await picture(waiting.id);
+    const juices = await thumbsOf(juice.id);
+    const primary = juices.find((image) => image.isPrimary);
+    const other = juices.find((image) => !image.isPrimary);
+    const [waitingThumb] = await thumbsOf(waiting.id);
+
+    const { urls } = (await http().get('/api/v1/sales-rep/thumbs').set(bearer(rep)).expect(200))
+      .body as { urls: string[] };
+    expect(primary).toBeDefined();
+    expect(urls).toContain(primary?.thumbUrl);
+    expect(urls).not.toContain(other?.thumbUrl);
+    expect(urls).not.toContain(waitingThumb?.thumbUrl);
+    expect(new Set(urls).size).toBe(urls.length);
+    const office = (await login(app, await seedUser(app, { roles: ['OFFICE'] }))).accessToken;
+    await http().get('/api/v1/sales-rep/thumbs').set(bearer(office)).expect(403);
+  });
+
   it('gives the context the active wholesale warehouses, the rep branches and board branches', async () => {
     const idle = await inventoryApi(app, admin).warehouse('ZF3');
     await http()

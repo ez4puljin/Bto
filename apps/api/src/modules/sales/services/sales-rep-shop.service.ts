@@ -242,17 +242,20 @@ export class SalesRepShopService {
 
   /** The main suppliers of the shop's products, with how many each has, the most first. */
   async suppliers(): Promise<RepSupplier[]> {
-    const shop = await this.productFilters.idsWhere({
-      field: 'stage',
-      op: 'IN',
-      values: ['ACTIVE'],
-    });
-    const counts = await this.productSuppliers.mainSupplierCounts(shop);
+    const counts = await this.productSuppliers.mainSupplierCounts(await this.shopIds());
     return counts.map((row) => ({
       id: row.supplierId,
       name: row.name,
       productCount: row.productCount,
     }));
+  }
+
+  /**
+   * The primary picture's thumbnail of every product the shop lists: the phone downloads each one
+   * once and keeps it (ADR-0066). The URLs never change; a new picture has a new URL.
+   */
+  async thumbs(): Promise<string[]> {
+    return [...(await this.products.primaryThumbsOf(await this.shopIds())).values()];
   }
 
   async customerPage(
@@ -291,6 +294,11 @@ export class SalesRepShopService {
         })),
       contacts: customer.contacts.map((contact) => ({ name: contact.name, phone: contact.phone })),
     };
+  }
+
+  /** Every product the shop can list: active and sale-ready (the ACTIVE stage). */
+  private shopIds() {
+    return this.productFilters.idsWhere({ field: 'stage', op: 'IN', values: ['ACTIVE'] });
   }
 
   private async enrich(

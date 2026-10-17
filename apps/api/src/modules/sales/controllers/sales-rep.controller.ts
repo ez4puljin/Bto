@@ -16,6 +16,7 @@ import {
   SalesRepProductPageDto,
   SalesRepProductQueryDto,
   SalesRepSupplierDto,
+  SalesRepThumbsDto,
 } from '../dto/sales-rep.dto';
 import { REP } from '../services/rep-access';
 import type { OrderDetail } from '../services/sales-order-query.service';
@@ -217,6 +218,13 @@ export class SalesRepController {
   @ApiOkResponse({ type: [SalesRepSupplierDto] })
   suppliers(): Promise<SalesRepSupplierDto[]> {
     return this.shop.suppliers();
+  }
+
+  @Get('thumbs')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: SalesRepThumbsDto })
+  async thumbs(): Promise<SalesRepThumbsDto> {
+    return { urls: await this.shop.thumbs() };
   }
 
   @Get('customers')

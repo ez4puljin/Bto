@@ -445,6 +445,32 @@ export class ProductsService {
     return result;
   }
 
+  /**
+   * The thumbnail of each product's primary picture, those whose file is ready: the rep app keeps
+   * every shop product's once on the phone (ADR-0066).
+   */
+  async primaryThumbsOf(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ productId: productImages.productId, fileId: productImages.thumbFileId })
+      .from(productImages)
+      .where(and(idIn(productImages.productId, productIds), eq(productImages.isPrimary, true)))
+      .orderBy(asc(productImages.productId));
+    const urls = await this.storage.publicUrls(
+      rows.map((row) => row.fileId),
+      executor,
+    );
+    const result = new Map<number, string>();
+    for (const row of rows) {
+      const url = urls.get(row.fileId);
+      if (url) result.set(row.productId, url);
+    }
+    return result;
+  }
+
   /** The unit of measure's code and the default-sales flag of these products' current units. */
   async unitFlagsOf(
     productIds: readonly number[],
