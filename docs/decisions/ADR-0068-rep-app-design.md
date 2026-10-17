@@ -77,6 +77,17 @@ The pictures had not shown at all in the walk's copy only: its api read another 
     - The product page opens at once from the list's data, and shows each thumbnail until its full picture arrives.
 16. **Every request gives up after 10 s** (0.2.1). React Native's fetch never gives up by itself, and a stored server gone from the Wi-Fi held the start logo for minutes.
 
+### After the owner's second look (2026-10-18)
+
+The owner walked 0.3.0 on the phone and asked: no contact person on «Захиалагчийн мэдээлэл»; a more elegant order settings screen; the orders history filtered by customer, product, payment and more with a date range, through a filter button instead of a search, with each order's amount; no name or code search on the home; the order's products shown neatly; and a «Газрын зураг» menu: the stores without an order in the last 7 days, when the others last ordered, and the rep's own position, from the customers' locations in the main system. Answers: every located store, coloured; only this rep's own orders count; OpenStreetMap-based tiles; a store offers starting an order, its last order and a call.
+
+17. **No contact person** (amends #6 and #7): the checkout and the cart drop the contact name and phone; orders are sent with them null (the API keeps the optional fields for the office).
+18. **No search on the home** (amends #12): the scanner moves next to the bell.
+19. **Order filters** (amends #8): `GET /sales-rep/orders` takes `customerId`, `productId` (orders with a line of it), `paymentMethod`, `fulfilment` and `state` — DRAFT, ACTIVE (submitted, not yet delivered, including a failed delivery), SOLD (delivered, invoiced, closed) and CANCELLED (`REP_ORDER_STATES`) — besides the days; the summary follows the filters. The app asks through a filter sheet with customer and product pickers; there is no search field.
+20. **A draft's estimated amount**: a draft has no price until submit (frozen then, unchanged), so the facade prices each draft's lines with the quote resolver at today's wholesale prices and returns `estimatedTotal` on the row, the order and its lines, and `draftsEstimate` in the summary. Nothing is stored; the app shows it as «≈».
+21. **The store map**: `GET /sales-rep/map` lists every active customer the rep may see that has a GPS point — the default address's, else the oldest active address with one (with its `addressId`) — with the rep's own newest SALES_REP order that is not cancelled (drafts count) and `stale` when there is none within the last 7 Ulaanbaatar days, today included (`REP_MAP_FRESH_DAYS`, `storeIsStale`). The app draws it with MapLibre GL JS inside an Expo DOM component (the already linked `@expo/dom-webview`, so no native map module and no Google key) over OpenFreeMap's tiles; maplibre's worker file comes from jsDelivr pinned to the installed version and checked by SHA-384, because Metro cannot bundle it. The rep's position comes from `expo-location`, foreground only (background location blocked).
+22. **Version 0.4.0.**
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
@@ -92,6 +103,10 @@ The pictures had not shown at all in the walk's copy only: its api read another 
 | Prefetch the full pictures too | About 25 KB each and up to ten per product. The thumbnails make the grid instant; a page's full picture is kept once it has been opened. |
 | Keep the list of fetched thumbnails on the phone | expo-image (Glide) finds a kept file without the network, and a picture the phone dropped comes back on its own; the list could only go stale. |
 | Default the office's dialog to today as well | Not asked; the office keeps ADR-0055's tomorrow. |
+| Google Maps (react-native-maps, expo-maps) (2026-10-18) | Needs an API key on a billed Google Cloud account and Play services; the owner chose OpenStreetMap. |
+| Native MapLibre (@maplibre/maplibre-react-native) | About 15 MB more APK, a version Expo does not pin and another codegen target under Windows' path limit; the DOM component is enough for hundreds of stores. |
+| Store a draft's estimate on the order | Prices move until submit; an estimate computed on reading is never stale and freezing stays at submit. |
+| Count every channel's orders on the map | The owner chose the rep's own orders. |
 
 ## Consequences
 
