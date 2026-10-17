@@ -1,0 +1,49 @@
+# ADR-0067: POS S2: the store edge in Docker, the snapshot it sells from, the kiosk in Chrome with a pairing code and the cashier's PIN, test receipts until ADR-0065
+
+| | |
+|---|---|
+| Status | Accepted |
+| Date | 2026-10-17 |
+| Deciders | Owner, Claude (Claude Code session) |
+| Amends | ADR-0063 (#1: the edge's environment, database and timers are fixed here; #2: the snapshot is one JSON document pulled by version; #6: a browser is bound to a till by a one-time pairing code, the cashier signs in at the till with the PIN checked offline), architecture §3 and §10.2 |
+
+## Context
+
+S1 (ADR-0063, ADR-0064) gave the centre its `pos` module: the till documents, their replay route, shifts, shortfalls and the money. The tills themselves did not exist yet. The owner's words (2026-10-17): run a separate offline POS server in Docker on this PC, let the cashiers open it by typing its IP address and port, test it straight away; the till must work without the internet in the office building, and the company's VAT server (PosAPI) belongs inside it. The supermarket sells today with Erxes POS on a server in the office: a Next.js till screen, a GraphQL POS api and PosAPI 3.2.50 next to it; VAT 10 %, no city tax, one district code and one default product classification code for every receipt, a copy printed. That server stays in use and was only read, never changed.
+
+The owner's answers to the interview (2026-10-17): test receipts for now, nothing sent to the tax office; the tills open the address in Chrome, pair once with a code, then a cashier signs in with the PIN; a screen like Erxes's (search on F6, payment on F12, the cart as a table); the scope is selling plus offline (PIN, shift open and close with the count, scan, cash and card, the receipt on screen, the queue replayed when the centre is back); printing and returns later.
+
+## Decision
+
+1. **The edge process.** `ROLE=edge` of the `bto-api` image runs `dist/edge.js` (`apps/api/src/edge.ts`, `apps/api/src/edge/**`). It imports no `modules/**`: only `common/**` (errors, validation, logging) and `@tugeel/shared`. Its environment (`EdgeEnvSchema`): `EDGE_PORT` (3400), `EDGE_DATABASE_URL`, `EDGE_DB_POOL_MAX` (5), `CENTRAL_API_URL`, `EDGE_NODE_TOKEN` (the node's `tgs_…` token), `EDGE_JWT_SECRET` (the kiosk sessions), `POS_PIN_PEPPER` (the centre's value, or its `AUTH_PEPPER` until that is set), `EBARIMT_PROVIDER` (`fake` only), `EDGE_TIMERS`, `EDGE_PUSH_INTERVAL_MS`. Its own PostgreSQL database with its own Drizzle schema and migrations (`apps/api/src/edge/db`, `pnpm --filter @tugeel/api db:migrate:edge`, run by the entrypoint before the process): `edge_state` (the snapshot and the sync times), `edge_devices`, `edge_sequences`, `edge_shifts`, `edge_sales`, `edge_outbox`, `edge_pin_attempts`. No pg-boss: three in-process loops (pull, push, heartbeat), each waiting for its own last run.
+2. **The snapshot.** `GET /api/v1/pos/sync/snapshot?since=<version>` (the node's token) answers one JSON document or, when `since` is current, only `{ changed: false, version }`. The document holds the node, the store's settings, the company's VAT facts, the node's tills with their pairing-code hashes, the cashiers with their PIN hashes and whether they supervise (`pos.till.supervise`), every ACTIVE product ready for sale with its current units, barcodes (lookup keys), VAT rate and RETAIL price terms, the price profiles in force and the RETAIL discount programs in force with their category subtrees. Its version is the first 20 hex digits of the SHA-256 of its content, every list in a stable order. The centre builds it on every pull (no cache: one edge per store, once a `snapshot_interval_sec`), so a PIN or a pairing code set in the office reaches the edge on its next pull. The edge keeps the latest document in `edge_state` and loads it at boot: a restarted edge sells without the centre.
+3. **Prices on the edge.** The edge prices a cart with the shared pure rules the centre uses (`resolveQuote` with the RETAIL list over `quoteContextOf(snapshot)`, `lineVat`, `saleDocLinesOf`, `saleTotals`) and writes the snapshot version on every sale; the centre checks the arithmetic and the tax (ADR-0063 #4), never re-prices.
+4. **The kiosk's address and the binding of a till.** Chrome on the till opens `http://<store PC's LAN address>:7400`: Caddy serves the kiosk page (`pos.html`) and proxies `/edge/*` to the edge; the admin page is not served there. The admin issues a one-time pairing code for a till in «Супермаркет → Касс» (15 minutes); the till's browser sends the till code and the code to `POST /edge/v1/pair` and keeps the device token it gets (localStorage; header `x-bto-device` on every call); the centre hears of the binding through the outbox (`TILL_BOUND`). The edge checks the code against the hash in its snapshot; a code newer than the snapshot makes the edge pull once more before it refuses.
+5. **The cashier at the till.** The bound till lists the active cashiers with a PIN; the PIN is checked offline against the snapshot's argon2id hash with `POS_PIN_PEPPER` and gives a 12-hour HS256 session for that cashier at that device (`EDGE_JWT_SECRET`); five wrong PINs in a row lock the cashier on this edge for a minute. A session ends when it expires, when the cashier signs out, or when the next snapshot no longer lists the cashier as active.
+6. **Shifts and sales on the edge.** One open shift per till; it opens with the float and closes with the counted cash, the float kept and a note, and shows its Z figures (sales, cash, card, VAT, expected cash, variance) from the edge's own sales. A sale is priced as in #3, numbered per till and day by `posSaleNumber` from `edge_sequences` (shifts by `posShiftNumber`), and written with its document and its outbox entry in one edge transaction; a repeated client id returns the receipt already made. Tenders: cash with the amount handed over and the change, card with the amount entered by hand (the terminal integration comes later); cash and card must make the total.
+7. **The outbox.** The push loop sends the oldest pending documents in batches of 50, one push at a time; a failed call keeps them pending, counts the attempt and backs off from 2 seconds to a minute; a document the centre refuses is parked (`REJECTED` with its code) and the next ones go on; a heartbeat every 30 seconds reports the backlog and the snapshot version. The kiosk shows whether the centre is reachable and how many documents wait.
+8. **Test receipts only.** `EBARIMT_PROVIDER=fake`: the receipt on screen is marked as a test receipt, has no ДДТД and nothing is sent to the tax office. The real PosAPI on the store's own PosAPI box, printing and the receipt facts come with ADR-0065 (S3). A test never sends a receipt to a PosAPI in use (the office's Erxes PosAPI included).
+9. **The kiosk screens.** A second Vite entry of `apps/web` (`pos.html`, `src/pos/**`) with the same tokens, shadcn building blocks and `mn.json` (keys `pos.kiosk.*`), talking only to `/edge/v1` with the shared types: pairing, the cashier list and PIN, shift open, the sale screen modelled on the Erxes till (the cart as a table, search on F6, payment on F12, a barcode scanner as keyboard input), payment with cash and card, the receipt, the recent sales, shift close with the count.
+10. **Where it runs.** `deploy/edge/docker-compose.edge.yml` (project `bto-edge`): `edge-db` (postgres:18), `edge` (the api image, `ROLE=edge`), `kiosk` (the web image with `deploy/edge/Caddyfile.edge` on port `KIOSK_PORT`, 7400), secrets in `deploy/edge/.env` (gitignored, from `.env.example`); `pnpm edge:up`, `pnpm edge:down`, `pnpm edge:logs`. On the owner's PC the edge replays to the dev api (`http://host.docker.internal:3300`); in the store it replays to the centre (S5). Without Docker: `pnpm --filter @tugeel/api edge:dev` with `apps/api/.env.edge`, and Vite proxies `/edge` to port 3400.
+
+## Alternatives considered
+
+| Alternative | Why rejected |
+|---|---|
+| The tills sell straight to the centre's api | No sale while the store's internet is down, which is the owner's first requirement. |
+| The snapshot as a stream of changes since a version | Faster for big catalogues, but needs a change log in every module the snapshot reads; one document of a few MB once a minute is enough for one store, and its version makes an unchanged pull cost one hash. |
+| A desktop till application (Electron) or a PWA with its own offline store | An install per till and a second offline store; with the edge on the LAN the browser needs no offline data of its own. |
+| Sending test receipts to the office's PosAPI | It is the company's live PosAPI used by Erxes: every test receipt would be a real one. |
+| The cashier signs in with the staff password | Too slow at a till and kept by the centre only; a PIN checked against the snapshot works offline. |
+
+## Consequences
+
+**Positive.** The tills keep selling when the centre or the internet is away and the queue drains on its own when it is back; the edge runs from one image and one command on any PC with Docker; prices and VAT are the centre's own rules; a till is bound once and no password is typed at it.
+
+**Negative.** The edge holds PIN hashes, the PIN key and its own sales until they are replayed, so the store PC must be trusted and backed up (S5); the whole catalogue is rebuilt and sent when anything in it changes; the card amount is typed by hand; the receipts are not fiscal until S3.
+
+**Follow-ups.** S3 (ADR-0065): the PosAPI provider on the edge, printing to the receipt printer, the receipt facts. S4: returns, parked baskets, price check, B2B at the till. S5: the store PC, its backups and the pilot till. The owner sets `POS_PIN_PEPPER` on the centre before the cut-over (the edge then gets the same value).
+
+## Related
+
+ADR-0063, ADR-0064, ADR-0065 (reserved), ADR-0042, `docs/modules/pos.md`, `docs/architecture.md` §3, §10.2, `deploy/edge/`.

@@ -186,3 +186,14 @@ Feature pieces other screens reuse (ADR-0044, ADR-0047):
 - A field or button repeated on each line of a document is named «{what}: {product} ({unit})» (`inventory.productUnit`), so the box line and the piece line of one product stay apart.
 - A select under a visible label starts with a plain «Агуулах сонгоно уу», never the label again («Хаанаас: …»); a lone filter pill names itself instead («Бүх агуулах», «Бүх зүйл»).
 - Steps the scans fill but nobody types (the shelves of a move) are a `<dl>` of term and value, not labels without a field.
+
+## 9. The till kiosk (`apps/web/pos.html`, `src/pos/**`, ADR-0067)
+
+- A second page of the same build, without the admin's shell or router: pairing → the cashier list and the PIN pad → shift open → the sale screen → shift close with the Z summary. It talks only to the store edge (`/edge/v1`, `src/pos/edge-client.ts`, the shapes of `@tugeel/shared/pos`); the device token lives in `localStorage` (`bto.kiosk.device.v1`), the cashier's session in `sessionStorage`.
+- The same tokens, shadcn building blocks and `mn.json` (keys `posKiosk.*`, reusing `pos.fields.*`, `pos.tenderKinds.*`, `errors.*`); full-window, fitted to 1366×768 without scrolling on the payment and close screens.
+- The sale screen follows the till the cashiers know (Erxes): the cart as a table, «Бараа хайх» on F6, payment on F12, a scan anywhere on the screen adds the product (the scan box keeps the focus), ↑/↓, + / − and Delete on the cart lines, totals only from the edge's `/quote`; a line without a price shows «Үнэгүй» and blocks the payment. The PIN pad reads the number row on any keyboard layout and the number pad.
+- Payment: cash with quick notes and the change shown live, card typed by hand (terminal id and RRN optional); the cart's client id is drawn once and kept when a payment is retried; a scan into an amount field is dropped.
+- The receipt is on screen; a test receipt carries the «ТУРШИЛТЫН БАРИМТ» banner. The header pill shows whether the edge reaches the centre and how many documents wait.
+- An expired session returns to the same cashier's PIN pad and keeps the cart; an unknown device goes back to pairing.
+- Tests: `src/pos/test/fake-edge.ts` (an in-memory edge) and `render-kiosk.tsx`; `kiosk-sign-in`, `kiosk-sale`, `kiosk-shift-close`, `amounts`.
+- Locally: `http://localhost:5173/pos.html` with `edge:dev` running (Vite proxies `/edge` to 3400); in Docker the kiosk container serves it at `/` on port 7400 (`deploy/edge/Caddyfile.edge`).
