@@ -3,7 +3,7 @@ import { REP_PRODUCT_SORTS, type RepProductSort } from '@tugeel/shared/sales';
 /** At most this many ids in one filter (the API's limit per list). */
 export const MAX_FILTER_IDS = 200;
 
-/** The shop's filters and order as the rep set them (ADR-0066); kept on the phone. */
+/** The shop's filters and order as the rep set them (ADR-0068); kept on the phone. */
 export interface ShopFilters {
   sort: RepProductSort;
   /** Chosen categories, each with its subcategories; none: every category. */

@@ -48,7 +48,7 @@ export function usePriceParts() {
 }
 
 /**
- * A product of the shop's grid (ADR-0066 #3): its pictures (swiped when it has several) with «Шинэ»
+ * A product of the shop's grid (ADR-0068 #3): its pictures (swiped when it has several) with «Шинэ»
  * and the cart's quantity or «+», the name, the code, the base price and the stock. The card opens
  * the product; «+» adds one of its default unit, the quantity opens the product to change it.
  */

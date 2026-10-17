@@ -77,7 +77,7 @@ describe('initials', () => {
   });
 });
 
-describe('the popup pictures and its replay (ADR-0066)', () => {
+describe('the popup pictures and its replay (ADR-0068)', () => {
   it('replays the notices asked for, in that order', () => {
     const notices = [1, 2, 3].map((id) => ({
       id,

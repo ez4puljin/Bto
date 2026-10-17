@@ -151,7 +151,7 @@ export interface ProductQuery {
   saleReady?: boolean;
   /**
    * After the search rank: NAME (the default) by name, then id; NEW the sale-ready products, the
-   * latest to become sale-ready first, then the higher id (the rep app's shop, ADR-0066).
+   * latest to become sale-ready first, then the higher id (the rep app's shop, ADR-0068).
    */
   sort?: ProductSort;
   cursor?: string;
@@ -166,7 +166,7 @@ export interface ProductImageUrls {
   thumbUrl: string | null;
 }
 
-/** What the rep app reads of a current unit beside the list's columns (ADR-0066). */
+/** What the rep app reads of a current unit beside the list's columns (ADR-0068). */
 export interface UnitFlags {
   uomCode: string | null;
   isDefaultSales: boolean;
@@ -413,7 +413,7 @@ export class ProductsService {
 
   /**
    * Each product's pictures, the primary first, then as the product page orders them; only those
-   * whose file is ready (the rep app's product page, ADR-0066).
+   * whose file is ready (the rep app's product page, ADR-0068).
    */
   async imagesOf(
     productIds: readonly number[],
@@ -447,7 +447,7 @@ export class ProductsService {
 
   /**
    * The thumbnail of each product's primary picture, those whose file is ready: the rep app keeps
-   * every shop product's once on the phone (ADR-0066).
+   * every shop product's once on the phone (ADR-0068).
    */
   async primaryThumbsOf(
     productIds: readonly number[],

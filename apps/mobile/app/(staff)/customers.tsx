@@ -18,7 +18,7 @@ import { BarButton, LargeTitle, Page } from '../../src/ui/layout';
 
 /**
  * Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. The pick
- * brings the default address and, for an empty contact, the customer's first contact (ADR-0066).
+ * brings the default address and, for an empty contact, the customer's first contact (ADR-0068).
  */
 export default function CustomersScreen() {
   const { t } = useTranslation();

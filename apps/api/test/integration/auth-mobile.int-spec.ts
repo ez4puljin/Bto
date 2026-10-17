@@ -55,7 +55,7 @@ describe('native-client authentication (ADR-0061)', () => {
     expect((racing.body as TokensJson).refreshToken).toBeNull();
     expect((racing.body as TokensJson).accessToken).toEqual(expect.any(String));
     await refresh(body.refreshToken ?? '').expect(200);
-    // The profile tells when the session signed in (ADR-0066): a rotation never moves it.
+    // The profile tells when the session signed in (ADR-0068): a rotation never moves it.
     const signedIn = (first.response.body as { me: { sessionStartedAt: string } }).me
       .sessionStartedAt;
     expect(Date.parse(signedIn)).toBeLessThan(Date.parse(body.sessionExpiresAt));

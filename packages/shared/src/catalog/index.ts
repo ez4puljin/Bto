@@ -255,7 +255,7 @@ export const MAX_EXPORT_ROWS = 20_000;
  */
 export const MAX_SELECTED_PRODUCTS = 20_000;
 
-/** A product is «Шинэ» in the rep app this many days after it became sale-ready (ADR-0066). */
+/** A product is «Шинэ» in the rep app this many days after it became sale-ready (ADR-0068). */
 export const NEW_PRODUCT_DAYS = 14;
 
 /** A category as the tree helpers need it. */

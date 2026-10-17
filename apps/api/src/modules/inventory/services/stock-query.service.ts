@@ -483,7 +483,7 @@ export class StockQueryService {
   /**
    * The products with stock available in their home warehouse, ascending: sellable on hand, lots
    * summed, less what is reserved, as `balances()` counts it — the rep app's «in stock» filter,
-   * the same quantity its shop shows (ADR-0066).
+   * the same quantity its shop shows (ADR-0068).
    */
   async productIdsAvailableAtHome(executor: Db | Tx = this.db): Promise<number[]> {
     const result = await executor.execute<{ product_id: string }>(sql`

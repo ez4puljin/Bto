@@ -35,7 +35,7 @@ const TILE_GAP = 12;
 const RECENT = 3;
 
 /**
- * «Нүүр» (ADR-0066, the owner 2026-10-17: more modern, larger text): who is signed in and the day
+ * «Нүүр» (ADR-0068, the owner 2026-10-17: more modern, larger text): who is signed in and the day
  * with the bell, a search pill into the shop with the scanner, this month's orders on the blue card,
  * the cart when it has lines, the stage new orders land on, the newest products and the last
  * orders. The tab bar is the way to the other tabs, so the home does not repeat it.

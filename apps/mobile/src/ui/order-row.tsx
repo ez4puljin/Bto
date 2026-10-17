@@ -8,7 +8,7 @@ import { colors, spacing, tabular, type } from '../theme/tokens';
 import { PaymentDot, StatusPill } from './status';
 
 /**
- * An order of the rep's lists (ADR-0066 #7: «Захиалга» and the home's recent ones): the number, the
+ * An order of the rep's lists (ADR-0068 #7: «Захиалга» and the home's recent ones): the number, the
  * customer, the payment, stage and time, then the total and the status. The row opens the order.
  */
 export function OrderRow({ order, onPress }: { order: RepOrderSummary; onPress: () => void }) {

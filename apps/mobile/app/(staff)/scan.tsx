@@ -18,7 +18,7 @@ const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e', 'itf14', 'code128'] as
 
 /**
  * The camera finds a product by its barcode (ADR-0006 #4) and opens its page in the scanned unit
- * (ADR-0066); «Сагсанд нэмэх» there comes back here for the next code.
+ * (ADR-0068); «Сагсанд нэмэх» there comes back here for the next code.
  */
 export default function ScanScreen() {
   const { t } = useTranslation();

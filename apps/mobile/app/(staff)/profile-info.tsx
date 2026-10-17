@@ -15,7 +15,7 @@ import { FootNote, NavBar, Page, SectionHeader } from '../../src/ui/layout';
 const HOUR_MS = 3_600_000;
 
 /**
- * «Хэрэглэгчийн мэдээлэл» (the ProfileInfo board, ADR-0066): the name, the login, the role and the
+ * «Хэрэглэгчийн мэдээлэл» (the ProfileInfo board, ADR-0068): the name, the login, the role and the
  * branches; when the session signed in and when it ends; the server; «Нууц үг солих».
  */
 export default function ProfileInfoScreen() {

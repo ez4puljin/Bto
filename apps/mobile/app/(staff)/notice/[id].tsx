@@ -22,7 +22,7 @@ const GAP = 12;
 
 /**
  * A notice opened from the popup or the list (ADR-0062 #3): its picture and words, then its
- * products in the admin's order, as cards of «Бараа» (ADR-0066).
+ * products in the admin's order, as cards of «Бараа» (ADR-0068).
  */
 export default function NoticeScreen() {
   const { t } = useTranslation();

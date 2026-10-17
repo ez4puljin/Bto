@@ -1,5 +1,5 @@
 // Bto's design tokens for the phone: the web's values from apps/web/src/index.css (ADR-0042,
-// docs/ui.md §1) and the rep app's design boards (ADR-0066), light theme only. Screens use these
+// docs/ui.md §1) and the rep app's design boards (ADR-0068), light theme only. Screens use these
 // names, never colour literals.
 export const colors = {
   canvas: '#F2F2F7',
@@ -89,7 +89,7 @@ export const colors = {
   },
 } as const;
 
-/** Avatar colours in turn (a supplier's initial, ADR-0066). */
+/** Avatar colours in turn (a supplier's initial, ADR-0068). */
 export const AVATAR_TINTS = [
   colors.tint.blue,
   colors.tint.teal,

@@ -220,7 +220,7 @@ const MOBILE_HERMES_PATTERNS = [
 const MOBILE_TEXT_PATH = {
   name: 'react-native',
   importNames: ['Text', 'TextInput'],
-  message: 'Import Text/TextInput from src/ui/text: it caps the font scaling (ADR-0066).',
+  message: 'Import Text/TextInput from src/ui/text: it caps the font scaling (ADR-0068).',
 };
 
 export default defineConfig([

@@ -43,7 +43,7 @@ export interface PriceTerms {
   validTo: string | null;
 }
 
-/** The rep app's prices of a product (ADR-0066): the unit table and one base unit in whole packs. */
+/** The rep app's prices of a product (ADR-0068): the unit table and one base unit in whole packs. */
 export interface ShopPrices {
   /** The warehouse price per base unit, whole MNT, VAT included. */
   basePrice: Decimal;
@@ -279,7 +279,7 @@ export class ProductPricesService {
 
   /**
    * `tablesOf` with each product's warehouse price per base unit (whole MNT): what one base unit
-   * costs in whole packs, the price the rep app's shop shows and sorts by (ADR-0066). The same
+   * costs in whole packs, the price the rep app's shop shows and sorts by (ADR-0068). The same
    * products are left out, so a product never shows a base price without its unit table.
    */
   async shopPricesOf(
@@ -312,7 +312,7 @@ export class ProductPricesService {
 
   /**
    * These products ordered by their warehouse price per base unit on a day, then by id, one keyset
-   * page of them (the rep app's price sorts, ADR-0066). A price counts as `shopPricesOf` counts
+   * page of them (the rep app's price sorts, ADR-0068). A price counts as `shopPricesOf` counts
    * it — terms in force whose profile has values that day; products without one come last in
    * either direction. `after` is the last row of the previous page; the price is NUMERIC text.
    */

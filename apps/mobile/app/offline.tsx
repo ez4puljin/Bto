@@ -11,7 +11,7 @@ import { Page } from '../src/ui/layout';
 import { Text } from '../src/ui/text';
 
 /**
- * A stored session the server could not be asked about (ADR-0061, ADR-0066): try again when the
+ * A stored session the server could not be asked about (ADR-0061, ADR-0068): try again when the
  * Wi-Fi is back, or go to the server screen, which keeps this address on its recent list.
  */
 export default function OfflineScreen() {

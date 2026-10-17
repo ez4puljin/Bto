@@ -26,7 +26,7 @@ import { BarButton, FootNote, LargeTitle, NavBar, Page } from '../../src/ui/layo
 type Item = FeedItem<MyNotice, MyNotification>;
 
 /**
- * «Мэдэгдэл» (the Notifications board; ADR-0062 #3, ADR-0066): the running notices and the rep's
+ * «Мэдэгдэл» (the Notifications board; ADR-0062 #3, ADR-0068): the running notices and the rep's
  * sold orders, by day, newest first, in one white group a day. A notice opens its page, a sold
  * order the order; «Бүгдийг уншсан» marks what is loaded.
  */

@@ -43,7 +43,7 @@ import { useTabBarInset } from '../../../src/ui/tab-bar';
 const GAP = 12;
 
 /**
- * «Бараа» (the Main board, ADR-0066): the scanner and the filter on top, the search, the order and
+ * «Бараа» (the Main board, ADR-0068): the scanner and the filter on top, the search, the order and
  * the filters as chips, the count, and the products two by two; «+» adds one of a product's
  * default unit, a card opens the product.
  */

@@ -28,7 +28,7 @@ import {
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { SalesOrderRequestDto } from './sales-orders.dto';
 
-// The sales-rep app's API (ADR-0061 #5, ADR-0066): only what the phone shows, never another rep's
+// The sales-rep app's API (ADR-0061 #5, ADR-0068): only what the phone shows, never another rep's
 // data.
 
 const trimmed = ({ value }: { value: unknown }) =>

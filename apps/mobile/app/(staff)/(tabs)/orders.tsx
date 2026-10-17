@@ -30,7 +30,7 @@ import { useTabBarInset } from '../../../src/ui/tab-bar';
 const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
 
 /**
- * «Миний захиалгууд» (the MyOrders board, ADR-0066 #7): a customer search, the days (today, a
+ * «Миний захиалгууд» (the MyOrders board, ADR-0068 #7): a customer search, the days (today, a
  * week, this month, or any range from the calendar), the range's count, confirmed total and drafts,
  * and the rep's own orders by day, newest first.
  */

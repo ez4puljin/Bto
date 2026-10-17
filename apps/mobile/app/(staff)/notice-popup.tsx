@@ -26,7 +26,7 @@ import { useToast } from '../../src/ui/toast';
 const LISTED = 3;
 
 /**
- * The notices that pop up when the app opens (the Launch board; ADR-0062 #3, ADR-0066 #8), one at
+ * The notices that pop up when the app opens (the Launch board; ADR-0062 #3, ADR-0068 #8), one at
  * a time in the middle of the screen: a picture by kind, the kind and days, the title, the text,
  * a price drop's old and new prices, the dots, «… харах» and «Дараагийнх / Хаах». A notice counts
  * as read once shown. After the last, a toast says they are kept under the bell and offers them

@@ -107,7 +107,7 @@ function toRepProduct(product: RepProduct): SalesRepProductDto {
 }
 
 /**
- * The sales-rep app (ADR-0061 #5, ADR-0066): the stages a rep may place on, new orders on the
+ * The sales-rep app (ADR-0061 #5, ADR-0068): the stages a rep may place on, new orders on the
  * chosen stage, the rep's own orders by days and search, the shop's products with prices and stock
  * (filtered and sorted), the suppliers to filter by, and the customers an order needs. Every route
  * needs `sales.orders.rep` and answers for the caller's own data only.

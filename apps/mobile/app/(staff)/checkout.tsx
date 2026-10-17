@@ -48,7 +48,7 @@ const PAY_DOTS = {
 } as const;
 
 /**
- * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0066 #6): the customer, who
+ * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0068 #6): the customer, who
  * takes the order and their phone, «Хүлээн авах» (delivery or pickup as two cards, the address,
  * and the day as four tiles: today, tomorrow, the day after, another day), the payment, a note,
  * where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the page;

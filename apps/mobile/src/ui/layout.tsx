@@ -13,7 +13,7 @@ import { type Edge, SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, type } from '../theme/tokens';
 
 /**
- * A page of the design (ADR-0066): the grey canvas, or white for the shop and a product; the safe
+ * A page of the design (ADR-0068): the grey canvas, or white for the shop and a product; the safe
  * area at the top (the floating tab bar keeps the bottom).
  */
 export function Page({

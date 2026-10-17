@@ -46,7 +46,7 @@ const ERRORS = {
 } as const;
 
 /**
- * The API server the app talks to (ADR-0061 #2, ADR-0066): on the office Wi-Fi the PC's address,
+ * The API server the app talks to (ADR-0061 #2, ADR-0068): on the office Wi-Fi the PC's address,
  * later the production address. It is saved, and put on top of «Сүүлд ашигласан», only after
  * GET /health answers as Bto's API.
  */

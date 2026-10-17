@@ -14,7 +14,7 @@ export interface CartLine {
   sku: string;
   name: string;
   uomName: string;
-  /** PCS, BOX …; null for a custom unit (and in a cart stored before ADR-0066). */
+  /** PCS, BOX …; null for a custom unit (and in a cart stored before ADR-0068). */
   uomCode: string | null;
   /** Base units in one of this unit. */
   factorToBase: string;
@@ -85,7 +85,7 @@ export type CartAction =
 const whole = (qty: number) => (Number.isFinite(qty) ? Math.max(0, Math.floor(qty)) : 0);
 
 /**
- * The cart's rules (ADR-0061 #8, ADR-0066 #5): one line per product, in the unit the rep chose (a
+ * The cart's rules (ADR-0061 #8, ADR-0068 #5): one line per product, in the unit the rep chose (a
  * product page replaces the product's line; a second «+» raises it), a quantity of 0 removes the
  * line, at most MAX_LINES lines, delivery to the chosen customer's address or pickup when they have
  * none. A sent order empties the lines, the customer, the contact and the date (the next order

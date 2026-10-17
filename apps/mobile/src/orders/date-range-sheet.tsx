@@ -21,7 +21,7 @@ import { BarButton } from '../ui/layout';
 import { Sheet, SheetHeader } from '../ui/sheet';
 
 /**
- * «Огноо сонгох» (the DateRange board, ADR-0066): the presets, the start and the end (the one being
+ * «Огноо сонгох» (the DateRange board, ADR-0068): the presets, the start and the end (the one being
  * set is tinted), a month to tap days on, and «10/01 – 10/16 · 16 хоногийн захиалга». Future days
  * cannot be chosen; a range spans at most 366 days.
  */

@@ -18,7 +18,7 @@ const jpeg = (size: number) => {
 };
 
 /**
- * The rep app's shop filters and orders (ADR-0066): categories with their subtrees, the home
+ * The rep app's shop filters and orders (ADR-0068): categories with their subtrees, the home
  * warehouse, the main supplier and stock free at home; the latest to become sale-ready first, or by
  * the base price with unpriced products last; «Шинэ» for 14 days; pictures, unit flags, the old price
  * of a notice; the suppliers to filter by; the warehouses and branches of the context. Every query

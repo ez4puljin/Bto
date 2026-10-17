@@ -19,7 +19,7 @@ import { ActionSheet } from '../../../src/ui/sheet';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
 
 /**
- * «Профайл» (the Profile board, ADR-0066; ADR-0062 #3): the bell with the unread count, who is
+ * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3): the bell with the unread count, who is
  * signed in, the user's details and the order settings, the server, «Гарах» with its question, and
  * the app's version.
  */

@@ -36,7 +36,7 @@ const stageBody = (name: string, action: string, roles: StageRoles = NO_STAGE_RO
  * The sales-rep app's orders (ADR-0061 #5–#6): the stages a rep may place on, an order created on
  * the chosen stage (a draft on NONE, confirmed and reserved on CONFIRM, nothing left behind on a
  * refusal), idempotent sends, and only the rep's own orders by Ulaanbaatar days and search
- * (ADR-0066). Synthetic data.
+ * (ADR-0068). Synthetic data.
  */
 describe('sales rep orders', () => {
   let app: NestExpressApplication;

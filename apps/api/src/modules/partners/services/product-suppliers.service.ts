@@ -157,7 +157,7 @@ export class ProductSuppliersService {
 
   /**
    * How many of these products each supplier is the main supplier of, the most first, then by
-   * name: the rep app's supplier filter (ADR-0066). A supplier with none of them is left out.
+   * name: the rep app's supplier filter (ADR-0068). A supplier with none of them is left out.
    */
   async mainSupplierCounts(
     productIds: readonly number[],

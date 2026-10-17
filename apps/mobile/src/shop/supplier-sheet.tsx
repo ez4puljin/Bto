@@ -14,7 +14,7 @@ import { Sheet, SheetHeader } from '../ui/sheet';
 import { supplierInitial, toggleId } from './filters';
 
 /**
- * «Нийлүүлэгч» (the Supplier board, ADR-0066): over the filter, the main suppliers of the shop with
+ * «Нийлүүлэгч» (the Supplier board, ADR-0068): over the filter, the main suppliers of the shop with
  * how many products each has; a search, ticks, «Цэвэрлэх», «Болсон» back to the filter.
  */
 export function SupplierSheet({

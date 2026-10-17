@@ -8,7 +8,7 @@ import { colors } from '../../../src/theme/tokens';
 import { FloatingTabBar } from '../../../src/ui/tab-bar';
 
 /**
- * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0066): 22 px
+ * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0068): 22 px
  * icons, bolder on the open tab; the cart's count of lines, and the unread count of the bell on
  * «Профайл» (ADR-0062 #3).
  */

@@ -33,7 +33,7 @@ export interface RepProduct {
   thumbUrl: string | null;
   /** Ready pictures, the primary first (the product page's pager). */
   images: ProductImageUrls[];
-  /** Became sale-ready within the last NEW_PRODUCT_DAYS days: «Шинэ» (ADR-0066). */
+  /** Became sale-ready within the last NEW_PRODUCT_DAYS days: «Шинэ» (ADR-0068). */
   isNew: boolean;
   /** Active, complete and with a home warehouse: an order accepts it. */
   sellable: boolean;
@@ -58,7 +58,7 @@ export interface RepProduct {
   }[];
 }
 
-/** The shop's filters and order (ADR-0066). */
+/** The shop's filters and order (ADR-0068). */
 export interface RepProductQuery {
   q?: string;
   /** Each with its subcategories. */
@@ -143,7 +143,7 @@ function priceCursorOf(
 }
 
 /**
- * What the rep's shop and customer picker read (ADR-0061 #5, #7; ADR-0066): active, sale-ready
+ * What the rep's shop and customer picker read (ADR-0061 #5, #7; ADR-0068): active, sale-ready
  * products with each unit's wholesale price and the home warehouse's stock, filtered and sorted as
  * the app asks; the suppliers to filter by; active customers with what an order needs, through
  * `CustomersService.visibleTo` (the hook reserved for rep zones). Prices come from pricing: the app
@@ -252,7 +252,7 @@ export class SalesRepShopService {
 
   /**
    * The primary picture's thumbnail of every product the shop lists: the phone downloads each one
-   * once and keeps it (ADR-0066). The URLs never change; a new picture has a new URL.
+   * once and keeps it (ADR-0068). The URLs never change; a new picture has a new URL.
    */
   async thumbs(): Promise<string[]> {
     return [...(await this.products.primaryThumbsOf(await this.shopIds())).values()];

@@ -27,7 +27,7 @@ import { SalesPipelinesService } from './sales-pipelines.service';
 /** A rep's new order: the office order's header and lines, on the stage chosen in the app. */
 export type RepOrderInput = Omit<OrderInput, 'pipelineId' | 'stageId'> & { stageId: number };
 
-/** What the app loads at start (ADR-0061 #5, ADR-0066). */
+/** What the app loads at start (ADR-0061 #5, ADR-0068). */
 export interface RepContext {
   /** The server's business date: the phone never computes it (Hermes has no reliable zones). */
   today: string;

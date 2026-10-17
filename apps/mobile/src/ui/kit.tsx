@@ -8,7 +8,7 @@ import { type AppProblem, creditMessage } from '../api/problem';
 import { colors, radii, spacing, type } from '../theme/tokens';
 
 // What every screen shows when there is nothing yet, or when a call failed; the rest of the kit
-// lives beside it in src/ui (ADR-0066).
+// lives beside it in src/ui (ADR-0068).
 
 export function EmptyState({
   icon,

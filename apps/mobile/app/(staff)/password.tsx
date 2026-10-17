@@ -16,7 +16,7 @@ import { useToast } from '../../src/ui/toast';
 type Which = 'current' | 'next' | 'again';
 
 /**
- * «Нууц үг солих» (ADR-0066): the current password and the new one twice, each with its eye. The
+ * «Нууц үг солих» (ADR-0068): the current password and the new one twice, each with its eye. The
  * server checks the rules (the phone has no `normalize()` for the shared check); this session
  * stays, the others end.
  */

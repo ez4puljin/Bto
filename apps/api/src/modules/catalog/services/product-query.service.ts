@@ -15,7 +15,7 @@ import {
 
 /**
  * The product list's filters: today's (search, category, stage), a segment filter, and a set of
- * products another module chose (the rep app's «in stock», ADR-0066) that the rest narrows.
+ * products another module chose (the rep app's «in stock», ADR-0068) that the rest narrows.
  */
 export interface ProductListQuery extends ProductQuery, ProductSetFilter {
   onlyIds?: readonly number[];

@@ -13,7 +13,7 @@ import { Text, TextInput } from './text';
 import { colors, fonts, radii, TOUCH, type } from '../theme/tokens';
 
 /**
- * A labelled text field of the sign-in boards (ADR-0066): the label above a 52 px grey box with a
+ * A labelled text field of the sign-in boards (ADR-0068): the label above a 52 px grey box with a
  * leading icon; white with a blue border while focused, a red one with the message under it on an
  * error. `trailing` holds a 44 px button (clear, show the password, a spinner).
  */

@@ -2,7 +2,7 @@ import { REP_ORDER_RANGE_MAX_DAYS } from '@tugeel/shared/sales';
 import { addDays } from '@tugeel/shared/time';
 import { weekdayOf } from './dates';
 
-// Calendar arithmetic on `YYYY-MM-DD` strings for the date sheets (ADR-0066), without time zones.
+// Calendar arithmetic on `YYYY-MM-DD` strings for the date sheets (ADR-0068), without time zones.
 
 /** A cell of a month's grid: a blank before the 1st, or a day. */
 export type CalendarCell =

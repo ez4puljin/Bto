@@ -13,7 +13,7 @@ import { Page } from '../src/ui/layout';
 import { Text, type TextInput } from '../src/ui/text';
 
 /**
- * Signs in with the staff account (ADR-0061 #4, ADR-0066); the session stays until its shift ends.
+ * Signs in with the staff account (ADR-0061 #4, ADR-0068); the session stays until its shift ends.
  * «Сервер солих» goes back to the server screen, which keeps this address on its recent list.
  */
 export default function LoginScreen() {

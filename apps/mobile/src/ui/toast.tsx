@@ -28,7 +28,7 @@ interface ToastValue {
 const ToastContext = createContext<ToastValue | null>(null);
 
 /**
- * Confirmations at the bottom of the screen, above the tab bar (ADR-0066): one at a time, a newer
+ * Confirmations at the bottom of the screen, above the tab bar (ADR-0068): one at a time, a newer
  * one replaces the shown one.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {

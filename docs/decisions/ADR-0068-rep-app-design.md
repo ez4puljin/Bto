@@ -1,4 +1,4 @@
-# ADR-0066: The sales-rep app drawn to the owner's design — the boards' look, shop filters and sorts, a checkout page, orders by days
+# ADR-0068: The sales-rep app drawn to the owner's design — the boards' look, shop filters and sorts, a checkout page, orders by days
 
 | | |
 |---|---|

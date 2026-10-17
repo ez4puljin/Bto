@@ -14,7 +14,7 @@ import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
 import { PaymentDot, StatusPill } from '../../../src/ui/status';
 
 /**
- * One of the rep's orders (ADR-0061 #5; the boards' look, ADR-0066): its number and status, the
+ * One of the rep's orders (ADR-0061 #5; the boards' look, ADR-0068): its number and status, the
  * customer, delivery, payment and where it sits, the lines with what was reserved, and the totals.
  */
 export default function OrderScreen() {

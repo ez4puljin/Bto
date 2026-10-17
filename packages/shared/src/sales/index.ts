@@ -200,7 +200,7 @@ export function defaultDeliveryDate(today: string = businessDate()): string {
 }
 
 /**
- * The rep app's shop orders (ADR-0066): NEW, the latest to become sale-ready first; PRICE_ASC and
+ * The rep app's shop orders (ADR-0068): NEW, the latest to become sale-ready first; PRICE_ASC and
  * PRICE_DESC by one base unit's price in whole packs (the warehouse price), unpriced last.
  */
 export const REP_PRODUCT_SORTS = ['NEW', 'PRICE_ASC', 'PRICE_DESC'] as const;

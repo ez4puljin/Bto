@@ -28,7 +28,7 @@ import { PendingSendCard } from '../../../src/ui/pending-send';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
 
 /**
- * «Сагс» (the Cart board, ADR-0066): one row per product with its pieces, the server's line total
+ * «Сагс» (the Cart board, ADR-0068): one row per product with its pieces, the server's line total
  * and the unit pill that opens the product; «Засах» shows the remove buttons; the server's total;
  * «Захиалга илгээх» goes on to the customer's details.
  */

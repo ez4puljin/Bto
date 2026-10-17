@@ -19,7 +19,7 @@ import { useLineQuote } from './use-line-quote';
 const MAX_DIGITS = 4;
 
 /**
- * «Тоо оруулах» (the ProductKeypad board, ADR-0066): the product, the unit switch, the number typed
+ * «Тоо оруулах» (the ProductKeypad board, ADR-0068): the product, the unit switch, the number typed
  * in a large box with what it comes to (pieces and the server's total), the shortage, and the
  * keypad. «Болсон» hands the unit and the number back; «Цуцлах» and the back button drop them.
  */

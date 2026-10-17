@@ -14,7 +14,7 @@ import { FootNote, NavBar, Page, SectionHeader } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
 
 /**
- * «Захиалга илгээх тохиргоо» (the OrderSettings board, ADR-0061 #6, ADR-0066): the board (with its
+ * «Захиалга илгээх тохиргоо» (the OrderSettings board, ADR-0061 #6, ADR-0068): the board (with its
  * branch), its pipeline and the stage new orders land on, among those the rep may place on; a
  * CONFIRM stage reserves at once, a NONE stage leaves a draft. Choosing a board or a pipeline takes
  * its first stage, so the next order always has a place.

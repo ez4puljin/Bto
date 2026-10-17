@@ -5,7 +5,7 @@ import { useSignedIn } from '../state/session';
 import { filtersFrom, initialFilters, type ShopFilters, withKnownWarehouse } from './filters';
 
 /**
- * The shop's filters, kept on the phone per server and user (ADR-0066): read once, written on each
+ * The shop's filters, kept on the phone per server and user (ADR-0068): read once, written on each
  * change. Until a rep chooses, the location is their own warehouse (the context's warehouses and
  * their write scope); null until both are known.
  */

@@ -34,7 +34,7 @@ function useKeyboardShown(): boolean {
 }
 
 /**
- * The design's tab bar (ADR-0066): a white pill floating 16 px from the sides, five tabs, the open
+ * The design's tab bar (ADR-0068): a white pill floating 16 px from the sides, five tabs, the open
  * one on a light blue pill in the accent colour; a tab's `tabBarBadge` is a red count on its icon,
  * cut from the tab by a ring in the colour behind it.
  */

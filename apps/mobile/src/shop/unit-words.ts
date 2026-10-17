@@ -13,7 +13,7 @@ export interface UnitWords {
 }
 
 /**
- * The words of a unit (ADR-0066): the system units' forms from mn.json (their stored names are
+ * The words of a unit (ADR-0068): the system units' forms from mn.json (their stored names are
  * short, «ш»), a custom unit's own name otherwise.
  */
 export function useUnitWords() {

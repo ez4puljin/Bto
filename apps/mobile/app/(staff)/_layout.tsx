@@ -6,7 +6,7 @@ import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
 import { ToastProvider } from '../../src/ui/toast';
 
-/** The sales-rep app (ADR-0061, ADR-0066): the tabs, and the screens opened from them. */
+/** The sales-rep app (ADR-0061, ADR-0068): the tabs, and the screens opened from them. */
 export default function StaffLayout() {
   const { me, server } = useSignedIn();
   return (

@@ -36,7 +36,7 @@ import { Page } from '../../../src/ui/layout';
 const MAX_QTY = 9999;
 
 /**
- * One product (the Product board, ADR-0066): its pictures, name, code and category, the free stock
+ * One product (the Product board, ADR-0068): its pictures, name, code and category, the free stock
  * and the home warehouse, the unit switch, the unit's price, the quantity (− n +, the keypad,
  * +1 +5 +10), what goes short, and the server's total with «Сагсанд нэмэх». The product keeps one
  * line in the cart, in the unit chosen here.

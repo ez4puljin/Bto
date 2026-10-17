@@ -10,7 +10,7 @@ import { colors, fonts, radii, spacing, tabular, type } from '../theme/tokens';
 const WEEK = [1, 2, 3, 4, 5, 6, 0] as const;
 
 /**
- * A month of the date sheets (the DateRange board, ADR-0066): «2026 оны 10-р сар» with the month
+ * A month of the date sheets (the DateRange board, ADR-0068): «2026 оны 10-р сар» with the month
  * arrows, the week's letters and the days. A range shows its ends filled and the days between
  * tinted; a single day is filled. Days outside `min`…`max` are grey and do nothing.
  */

@@ -19,7 +19,7 @@ const WAREHOUSE_TINTS = [
 ];
 
 /**
- * «Шүүлтүүр» (the Filter board, ADR-0066): the order, categories, the home warehouse, the
+ * «Шүүлтүүр» (the Filter board, ADR-0068): the order, categories, the home warehouse, the
  * suppliers and «Зөвхөн үлдэгдэлтэй» on a draft of the filters; «N бараа харуулах» counts the
  * draft and applies it, closing leaves the shop as it was.
  */
