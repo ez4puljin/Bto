@@ -1,26 +1,35 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Decimal } from '@tugeel/shared/money';
+import { Decimal } from '@tugeel/shared/money';
 import {
   type Fulfilment,
   type OrderStatus,
   type PaymentMethod,
+  REP_MAP_FRESH_DAYS,
   REP_ORDER_RANGE_MAX_DAYS,
+  type RepOrderState,
+  repOrderStatusesOf,
   type StageAction,
+  storeIsStale,
 } from '@tugeel/shared/sales';
 import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
-import { onBusinessDays } from '../../../common/db/days';
+import { idIn, onBusinessDays } from '../../../common/db/days';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { invalid, notFound } from '../../../common/errors/app-error';
+import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type AuthContext, OrgService } from '../../identity';
 import { CustomersService } from '../../partners';
-import { salesBoards, salesChannelDefaults, salesOrders } from '../schema';
+import { PriceQuoteService, type Quote } from '../../pricing';
+import { salesBoards, salesChannelDefaults, salesOrderLines, salesOrders } from '../schema';
 import { repMayPlace } from './rep-access';
 import { SalesAccessService } from './sales-access.service';
-import { type OrderDetail, SalesOrderQueryService } from './sales-order-query.service';
+import {
+  type OrderDetail,
+  type OrderLine,
+  SalesOrderQueryService,
+} from './sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from './sales-orders.service';
 import { SalesPipelinesService } from './sales-pipelines.service';
 
@@ -61,6 +70,8 @@ export interface RepOrderSummary {
   deliveryDate: string;
   /** Null for a draft: prices are frozen at the submit. */
   total: Decimal | null;
+  /** A draft's estimate (`DraftEstimate.total`); null for every other order. */
+  estimatedTotal: Decimal | null;
   lineCount: number;
   pipelineName: string | null;
   stageName: string | null;
@@ -70,8 +81,68 @@ export interface RepOrderSummary {
 export interface RepOrderPage {
   data: RepOrderSummary[];
   nextCursor: string | null;
-  /** On the first page: the range's orders, the total of those not cancelled and the drafts. */
-  summary: { count: number; total: string; drafts: number } | null;
+  /**
+   * On the first page: the range's orders, the total of those not cancelled, the drafts and the
+   * sum of the drafts' estimates (a draft without one adds nothing), whole MNT.
+   */
+  summary: { count: number; total: string; drafts: number; draftsEstimate: string } | null;
+}
+
+/**
+ * A draft's prices today (ADR-0068 #20), never stored: its lines quoted as one cart, as
+ * `POST /pricing/quote` and the submit price them. The submit still freezes its own prices.
+ */
+export interface DraftEstimate {
+  /** Null when a line cannot be priced (no terms, a superseded unit, an inexact quantity). */
+  total: Decimal | null;
+  /** By line id; null for a line that cannot be priced. */
+  lines: Map<number, Decimal | null>;
+}
+
+/** A rep's order with a draft's estimate; both kinds of estimate are null for any other order. */
+export interface RepOrderDetail extends Omit<OrderDetail, 'lines'> {
+  estimatedTotal: Decimal | null;
+  lines: (OrderLine & { estimatedTotal: Decimal | null })[];
+}
+
+/** The order history's days, search and filters; every one narrows the page and the summary. */
+export interface RepOrderListQuery {
+  from: string;
+  to: string;
+  q?: string;
+  customerId?: number;
+  /** Orders with a line of this product. */
+  productId?: number;
+  paymentMethod?: PaymentMethod;
+  fulfilment?: Fulfilment;
+  state?: RepOrderState;
+  cursor?: string;
+  limit?: number;
+}
+
+/** A store on the rep's map: its point and the caller's own last order for it. */
+export interface RepMapStore {
+  customerId: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  /** The address whose point is shown (`CustomersService.located`). */
+  addressId: number;
+  address: string | null;
+  lat: Decimal;
+  lng: Decimal;
+  lastOrderId: number | null;
+  lastOrderAt: Date | null;
+  /** The last order's Ulaanbaatar day. */
+  lastOrderDate: string | null;
+  /** No order within REP_MAP_FRESH_DAYS days, today included (`storeIsStale`). */
+  stale: boolean;
+}
+
+export interface RepMap {
+  today: string;
+  freshDays: number;
+  stores: RepMapStore[];
 }
 
 /**
@@ -90,6 +161,7 @@ export class SalesRepOrdersService {
     private readonly queries: SalesOrderQueryService,
     private readonly customers: CustomersService,
     private readonly org: OrgService,
+    private readonly quotes: PriceQuoteService,
   ) {}
 
   async context(ctx: AuthContext): Promise<RepContext> {
@@ -166,7 +238,7 @@ export class SalesRepOrdersService {
    * draft on the SALES_REP channel; on a CONFIRM stage its submit (prices frozen, stock reserved,
    * the rest backordered), the number drawn last. A refusal leaves nothing behind.
    */
-  async create(ctx: AuthContext, input: RepOrderInput): Promise<OrderDetail> {
+  async create(ctx: AuthContext, input: RepOrderInput): Promise<RepOrderDetail> {
     const id = await inTransaction(this.db, async (tx) => {
       const pipelineId = await this.pipelines.lockStage(tx, input.stageId);
       const access = await this.access.load(ctx, tx);
@@ -185,18 +257,18 @@ export class SalesRepOrdersService {
       if (confirm) await this.orders.submitDraftInTx(tx, ctx, orderId);
       return orderId;
     });
-    return this.queries.detail(ctx, id);
+    return this.withEstimate(await this.queries.detail(ctx, id));
   }
 
   /**
    * The rep's own SALES_REP orders created on Ulaanbaatar days `from`…`to` (both included, at most
    * REP_ORDER_RANGE_MAX_DAYS), newest first; `q` finds an order number or a customer as the
-   * office list does. The first page's summary covers every order the range and search keep.
+   * office list does; a customer, a product (an order with a line of it), the payment method, the
+   * fulfilment and the state (`repOrderStatusesOf`) narrow further. The first page's summary
+   * covers every order the range, search and filters keep. A draft carries its estimate
+   * (ADR-0068 #20); the summary sums every kept draft's, so the first page quotes them all.
    */
-  async list(
-    ctx: AuthContext,
-    query: { from: string; to: string; q?: string; cursor?: string; limit?: number },
-  ): Promise<RepOrderPage> {
+  async list(ctx: AuthContext, query: RepOrderListQuery): Promise<RepOrderPage> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const { from, to } = query;
     if (!isIsoDate(from)) throw invalid('from', 'isDate', 'from must be a date');
@@ -205,12 +277,25 @@ export class SalesRepOrdersService {
     if (to > addDays(from, REP_ORDER_RANGE_MAX_DAYS - 1)) {
       throw invalid('to', 'range', `a range spans at most ${REP_ORDER_RANGE_MAX_DAYS} days`);
     }
-    const search = query.q ? await this.queries.filterSql(ctx, { q: query.q }) : [];
+    const filters = await this.queries.filterSql(ctx, {
+      ...(query.q ? { q: query.q } : {}),
+      ...(query.customerId === undefined ? {} : { customerId: query.customerId }),
+      ...(query.paymentMethod === undefined ? {} : { paymentMethod: query.paymentMethod }),
+      ...(query.fulfilment === undefined ? {} : { fulfilment: query.fulfilment }),
+    });
+    if (query.productId !== undefined) {
+      // Spelled out: a single-table select leaves columns unqualified (see lineCount below).
+      filters.push(sql`EXISTS (SELECT 1 FROM sales_order_lines l
+        WHERE l.order_id = sales_orders.id AND l.product_id = ${query.productId})`);
+    }
+    if (query.state !== undefined) {
+      filters.push(inArray(salesOrders.status, [...repOrderStatusesOf(query.state)]));
+    }
     const mine = and(
       eq(salesOrders.createdBy, ctx.userId),
       eq(salesOrders.channel, 'SALES_REP'),
       onBusinessDays(salesOrders.createdAt, { from, to }),
-      ...search,
+      ...filters,
     );
     const cursor = decodeCursor(query.cursor);
     const after = typeof cursor?.id === 'number' ? cursor.id : null;
@@ -244,6 +329,7 @@ export class SalesRepOrdersService {
       ]),
     );
     let summary: RepOrderPage['summary'] = null;
+    let estimates: Map<number, DraftEstimate>;
     if (query.cursor === undefined) {
       const [totals] = await this.db
         .select({
@@ -253,11 +339,26 @@ export class SalesRepOrdersService {
         })
         .from(salesOrders)
         .where(mine);
+      // Every draft the range keeps, the page's among them.
+      const drafts = await this.db
+        .select({ id: salesOrders.id })
+        .from(salesOrders)
+        .where(and(mine, eq(salesOrders.status, 'DRAFT')));
+      estimates = await this.estimates(drafts.map((row) => row.id));
+      const draftsEstimate = [...estimates.values()].reduce(
+        (sum, estimate) => (estimate.total ? sum.plus(estimate.total) : sum),
+        new Decimal(0),
+      );
       summary = {
         count: totals?.count ?? 0,
         total: totals?.total ?? '0',
         drafts: totals?.drafts ?? 0,
+        draftsEstimate: draftsEstimate.toFixed(0),
       };
+    } else {
+      estimates = await this.estimates(
+        page.data.flatMap((row) => (row.status === 'DRAFT' ? [row.id] : [])),
+      );
     }
     return {
       data: page.data.map((row) => ({
@@ -270,6 +371,7 @@ export class SalesRepOrdersService {
         paymentMethod: row.paymentMethod,
         deliveryDate: row.deliveryDate,
         total: row.total,
+        estimatedTotal: row.status === 'DRAFT' ? (estimates.get(row.id)?.total ?? null) : null,
         lineCount: row.lineCount,
         pipelineName:
           row.pipelineId === null ? null : (access.pipeline(row.pipelineId)?.name ?? null),
@@ -281,8 +383,58 @@ export class SalesRepOrdersService {
     };
   }
 
-  /** One of the rep's own SALES_REP orders; 404 for every other order. */
-  async get(ctx: AuthContext, id: number): Promise<OrderDetail> {
+  /**
+   * The rep's map: every active customer the caller may see that has a GPS point
+   * (`CustomersService.located`), each with the caller's own last SALES_REP order for it (drafts
+   * count, cancelled ones do not; another rep's never) and whether it is stale: no such order
+   * within REP_MAP_FRESH_DAYS Ulaanbaatar days, today included.
+   */
+  async map(ctx: AuthContext): Promise<RepMap> {
+    const today = businessDate();
+    const located = await this.customers.located(ctx);
+    // The id rises with created_at: the highest id is the newest order.
+    const last = await this.db
+      .selectDistinctOn([salesOrders.customerId], {
+        customerId: salesOrders.customerId,
+        id: salesOrders.id,
+        createdAt: salesOrders.createdAt,
+      })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.createdBy, ctx.userId),
+          eq(salesOrders.channel, 'SALES_REP'),
+          ne(salesOrders.status, 'CANCELLED'),
+        ),
+      )
+      .orderBy(asc(salesOrders.customerId), desc(salesOrders.id));
+    const lastOf = new Map(last.map((row) => [row.customerId, row]));
+    return {
+      today,
+      freshDays: REP_MAP_FRESH_DAYS,
+      stores: located.map((store) => {
+        const order = lastOf.get(store.id);
+        const lastOrderDate = order ? businessDate(order.createdAt) : null;
+        return {
+          customerId: store.id,
+          code: store.code,
+          name: store.name,
+          phone: store.phone,
+          addressId: store.addressId,
+          address: store.address,
+          lat: store.lat,
+          lng: store.lng,
+          lastOrderId: order?.id ?? null,
+          lastOrderAt: order?.createdAt ?? null,
+          lastOrderDate,
+          stale: storeIsStale(lastOrderDate, today),
+        };
+      }),
+    };
+  }
+
+  /** One of the rep's own SALES_REP orders, a draft with its estimate; 404 for every other order. */
+  async get(ctx: AuthContext, id: number): Promise<RepOrderDetail> {
     const [row] = await this.db
       .select({ createdBy: salesOrders.createdBy, channel: salesOrders.channel })
       .from(salesOrders)
@@ -290,6 +442,84 @@ export class SalesRepOrdersService {
     if (!row || row.createdBy !== ctx.userId || row.channel !== 'SALES_REP') {
       throw notFound('sales order', id);
     }
-    return this.queries.detail(ctx, id);
+    return this.withEstimate(await this.queries.detail(ctx, id));
+  }
+
+  private async withEstimate(order: OrderDetail): Promise<RepOrderDetail> {
+    const estimate =
+      order.status === 'DRAFT' && order.lines.length > 0
+        ? await this.estimate(order.lines, businessDate())
+        : null;
+    return {
+      ...order,
+      estimatedTotal: estimate?.total ?? null,
+      lines: order.lines.map((line) => ({
+        ...line,
+        estimatedTotal: estimate?.lines.get(line.id) ?? null,
+      })),
+    };
+  }
+
+  /**
+   * The drafts' estimates by order id (ADR-0068 #20): their lines load in one query; each draft is
+   * then quoted on its own, because a cart's programs (ORDER and CATEGORY ones, a product's
+   * quantity steps) count over that one cart. A draft without lines has none.
+   */
+  private async estimates(orderIds: readonly number[]): Promise<Map<number, DraftEstimate>> {
+    const estimates = new Map<number, DraftEstimate>();
+    if (orderIds.length === 0) return estimates;
+    // A single-table select: the columns stay unqualified, which is unambiguous here.
+    const lines = await this.db
+      .select({
+        orderId: salesOrderLines.orderId,
+        id: salesOrderLines.id,
+        productUnitId: salesOrderLines.productUnitId,
+        qty: salesOrderLines.qty,
+      })
+      .from(salesOrderLines)
+      .where(idIn(salesOrderLines.orderId, orderIds))
+      .orderBy(asc(salesOrderLines.orderId), asc(salesOrderLines.lineNo));
+    const byOrder = new Map<number, typeof lines>();
+    for (const line of lines) {
+      const own = byOrder.get(line.orderId);
+      if (own) own.push(line);
+      else byOrder.set(line.orderId, [line]);
+    }
+    const today = businessDate();
+    // One at a time: the quote runs a handful of queries, and the pool is small (architecture §10.2).
+    for (const [orderId, own] of byOrder) {
+      estimates.set(orderId, await this.estimate(own, today));
+    }
+    return estimates;
+  }
+
+  /**
+   * One draft's lines quoted as one cart on the WHOLESALE list on `date`, the quote the submit
+   * and `POST /pricing/quote` run. A refusal of the whole quote (a superseded or unknown unit, an
+   * inexact quantity) leaves every line without an estimate; any other error is thrown.
+   */
+  private async estimate(
+    lines: readonly { id: number; productUnitId: number; qty: Decimal }[],
+    date: string,
+  ): Promise<DraftEstimate> {
+    let quote: Quote;
+    try {
+      quote = await this.quotes.quote({
+        list: 'WHOLESALE',
+        date,
+        lines: lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+      });
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      return { total: null, lines: new Map(lines.map((line) => [line.id, null])) };
+    }
+    const totals = new Map(
+      lines.map((line, index): [number, Decimal | null] => {
+        const result = quote.lines[index]?.result;
+        return [line.id, result?.priced ? result.total : null];
+      }),
+    );
+    const complete = [...totals.values()].every((total) => total !== null);
+    return { total: complete ? quote.total : null, lines: totals };
   }
 }

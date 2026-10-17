@@ -21,6 +21,7 @@ export {
   type CustomerPatch,
   type CustomerSummary,
   CustomersService,
+  type LocatedCustomer,
   type LockedCustomer,
   type PartnerStatus,
   type PaymentTerm,

@@ -11,7 +11,7 @@ import {
 import { normalizeName, searchKeys } from '@tugeel/shared/text';
 import { conditionDays, type SegmentCondition } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn, onBusinessDays } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -102,6 +102,19 @@ export interface CustomerSummary {
   tinPending: boolean;
   address: string | null;
   hasGps: boolean;
+}
+
+/** An active customer with a GPS point: a store on the rep app's map. */
+export interface LocatedCustomer {
+  id: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  /** The address whose point this is: the default one, else the oldest active one with a point. */
+  addressId: number;
+  address: string | null;
+  lat: Decimal;
+  lng: Decimal;
 }
 
 /** A contact shown on a list row: the customer's or supplier's first one. */
@@ -419,6 +432,55 @@ export class CustomersService {
       }),
       nextCursor: page.nextCursor,
     };
+  }
+
+  /**
+   * Every ACTIVE customer the caller may read that has an active address with a GPS point, with
+   * that point: the default address's when it has one, otherwise the oldest active address's.
+   * By name, then id.
+   */
+  async located(ctx: AuthContext, executor: Db | Tx = this.db): Promise<LocatedCustomer[]> {
+    const rows = await executor
+      .selectDistinctOn([customers.id], {
+        id: customers.id,
+        code: customers.code,
+        name: customers.name,
+        phone: customers.phone,
+        addressId: customerAddresses.id,
+        address: customerAddresses.address,
+        lat: customerAddresses.lat,
+        lng: customerAddresses.lng,
+      })
+      .from(customers)
+      .innerJoin(customerAddresses, eq(customerAddresses.customerId, customers.id))
+      .where(
+        and(
+          this.visibleTo(ctx),
+          eq(customers.status, 'ACTIVE'),
+          isNull(customerAddresses.archivedAt),
+          isNotNull(customerAddresses.lat),
+          isNotNull(customerAddresses.lng),
+        ),
+      )
+      .orderBy(asc(customers.id), desc(customerAddresses.isDefault), asc(customerAddresses.id));
+    return rows
+      .flatMap((row) =>
+        row.lat && row.lng
+          ? [
+              {
+                id: row.id,
+                code: row.code,
+                name: row.name,
+                phone: row.phone,
+                addressId: row.addressId,
+                address: row.address,
+                lat: row.lat,
+                lng: row.lng,
+              },
+            ]
+          : [],
+      )
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
   }
 
   /** Every customer the caller may read: the universe of a negative condition (ADR-0049 #3). */

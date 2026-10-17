@@ -7,9 +7,53 @@ import {
   ORDER_NUMBER_DEFAULTS,
   orderHeaderIssues,
   orderNumberPatternIssues,
+  ORDER_STATUSES,
   orderNumberPrefix,
+  REP_MAP_FRESH_DAYS,
+  REP_ORDER_STATES,
   renderOrderNumber,
+  repOrderStatusesOf,
+  storeIsStale,
 } from './index';
+
+describe('rep order states', () => {
+  it('puts every order status in exactly one state', () => {
+    const all = REP_ORDER_STATES.flatMap((state) => [...repOrderStatusesOf(state)]);
+    expect([...all].sort()).toEqual([...ORDER_STATUSES].sort());
+    expect(new Set(all).size).toBe(ORDER_STATUSES.length);
+  });
+
+  it('keeps drafts, open orders, sold and cancelled apart', () => {
+    expect(repOrderStatusesOf('DRAFT')).toEqual(['DRAFT']);
+    expect(repOrderStatusesOf('ACTIVE')).toEqual([
+      'SUBMITTED',
+      'APPROVAL_PENDING',
+      'CONFIRMED',
+      'PICKING',
+      'PACKED',
+      'DISPATCHED',
+      'DELIVERY_FAILED',
+    ]);
+    expect(repOrderStatusesOf('SOLD')).toEqual(['DELIVERED', 'INVOICED', 'CLOSED']);
+    expect(repOrderStatusesOf('CANCELLED')).toEqual(['CANCELLED']);
+  });
+});
+
+describe('rep map freshness', () => {
+  it('counts an order within the last seven days, today included, as fresh', () => {
+    expect(REP_MAP_FRESH_DAYS).toBe(7);
+    expect(storeIsStale('2026-10-18', '2026-10-18')).toBe(false);
+    expect(storeIsStale('2026-10-12', '2026-10-18')).toBe(false);
+    expect(storeIsStale('2026-10-11', '2026-10-18')).toBe(true);
+    // Across a month's end.
+    expect(storeIsStale('2026-09-27', '2026-10-03')).toBe(false);
+    expect(storeIsStale('2026-09-26', '2026-10-03')).toBe(true);
+  });
+
+  it('marks a store never ordered for as stale', () => {
+    expect(storeIsStale(null, '2026-10-18')).toBe(true);
+  });
+});
 
 describe('order header', () => {
   const ok = {

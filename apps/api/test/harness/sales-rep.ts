@@ -35,6 +35,8 @@ export interface RepOrderJson {
   paymentMethod: string;
   subtotal: string | null;
   total: string | null;
+  /** A draft's lines at today's WHOLESALE prices (ADR-0068 #20); null for any other order. */
+  estimatedTotal: string | null;
   pipelineName: string | null;
   stageName: string | null;
   lines: {
@@ -45,6 +47,7 @@ export interface RepOrderJson {
     qtyApproved: string;
     qtyBackordered: string;
     total: string | null;
+    estimatedTotal: string | null;
     parts: { uomName: string; basis: string; qty: string; unitPrice: string; total: string }[];
   }[];
   events: { fromStatus: string | null; toStatus: string }[];
@@ -57,11 +60,12 @@ export interface RepOrderPageJson {
     status: string;
     customerName: string;
     total: string | null;
+    estimatedTotal: string | null;
     lineCount: number;
     stageName: string | null;
   }[];
   nextCursor: string | null;
-  summary: { count: number; total: string; drafts: number } | null;
+  summary: { count: number; total: string; drafts: number; draftsEstimate: string } | null;
 }
 
 export interface RepProductJson {

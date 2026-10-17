@@ -7,6 +7,7 @@ import {
   SalesRepCustomerDetailDto,
   SalesRepCustomerPageDto,
   SalesRepCustomerQueryDto,
+  SalesRepMapDto,
   SalesRepOrderDto,
   SalesRepOrderListQueryDto,
   SalesRepOrderPageDto,
@@ -19,13 +20,12 @@ import {
   SalesRepThumbsDto,
 } from '../dto/sales-rep.dto';
 import { REP } from '../services/rep-access';
-import type { OrderDetail } from '../services/sales-order-query.service';
-import { SalesRepOrdersService } from '../services/sales-rep-orders.service';
+import { type RepOrderDetail, SalesRepOrdersService } from '../services/sales-rep-orders.service';
 import { type RepProduct, SalesRepShopService } from '../services/sales-rep-shop.service';
 
 const money = (value: Decimal | null): string | null => (value ? value.toFixed(0) : null);
 
-function toRepOrder(order: OrderDetail): SalesRepOrderDto {
+function toRepOrder(order: RepOrderDetail): SalesRepOrderDto {
   return {
     id: order.id,
     number: order.number,
@@ -43,6 +43,7 @@ function toRepOrder(order: OrderDetail): SalesRepOrderDto {
     subtotal: money(order.subtotal),
     discountTotal: money(order.discountTotal),
     total: money(order.total),
+    estimatedTotal: money(order.estimatedTotal),
     boardName: order.boardName,
     pipelineName: order.pipelineName,
     stageName: order.stageName,
@@ -61,6 +62,7 @@ function toRepOrder(order: OrderDetail): SalesRepOrderDto {
       qtyApproved: line.qtyApproved.toString(),
       qtyBackordered: line.qtyBackordered.toString(),
       total: money(line.total),
+      estimatedTotal: money(line.estimatedTotal),
       parts: line.parts.map((part) => ({
         uomName: part.uomName,
         basis: part.basis,
@@ -108,8 +110,10 @@ function toRepProduct(product: RepProduct): SalesRepProductDto {
 
 /**
  * The sales-rep app (ADR-0061 #5, ADR-0068): the stages a rep may place on, new orders on the
- * chosen stage, the rep's own orders by days and search, the shop's products with prices and stock
- * (filtered and sorted), the suppliers to filter by, and the customers an order needs. Every route
+ * chosen stage, the rep's own orders by days, search and filters (a draft with its estimated
+ * amount, ADR-0068 #20), the map of located stores with the
+ * rep's last order for each, the shop's products with prices and stock (filtered and sorted), the
+ * suppliers to filter by, and the customers an order needs. Every route
  * needs `sales.orders.rep` and answers for the caller's own data only.
  */
 @ApiTags('sales-rep')
@@ -164,6 +168,11 @@ export class SalesRepController {
       from: query.from,
       to: query.to,
       ...(query.q ? { q: query.q } : {}),
+      ...(query.customerId === undefined ? {} : { customerId: query.customerId }),
+      ...(query.productId === undefined ? {} : { productId: query.productId }),
+      ...(query.paymentMethod === undefined ? {} : { paymentMethod: query.paymentMethod }),
+      ...(query.fulfilment === undefined ? {} : { fulfilment: query.fulfilment }),
+      ...(query.state === undefined ? {} : { state: query.state }),
       ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
       ...(query.limit === undefined ? {} : { limit: query.limit }),
     });
@@ -171,10 +180,36 @@ export class SalesRepController {
       data: page.data.map((row) => ({
         ...row,
         total: money(row.total),
+        estimatedTotal: money(row.estimatedTotal),
         createdAt: row.createdAt.toISOString(),
       })),
       nextCursor: page.nextCursor,
       summary: page.summary,
+    };
+  }
+
+  @Get('map')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: SalesRepMapDto })
+  async map(@CurrentUser() ctx: AuthContext): Promise<SalesRepMapDto> {
+    const map = await this.orders.map(ctx);
+    return {
+      today: map.today,
+      freshDays: map.freshDays,
+      data: map.stores.map((store) => ({
+        customerId: store.customerId,
+        code: store.code,
+        name: store.name,
+        phone: store.phone,
+        addressId: store.addressId,
+        address: store.address,
+        lat: store.lat.toFixed(6),
+        lng: store.lng.toFixed(6),
+        lastOrderId: store.lastOrderId,
+        lastOrderAt: store.lastOrderAt?.toISOString() ?? null,
+        lastOrderDate: store.lastOrderDate,
+        stale: store.stale,
+      })),
     };
   }
 

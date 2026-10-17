@@ -6,7 +6,9 @@ import {
   type OrderStatus,
   PAYMENT_METHODS,
   type PaymentMethod,
+  REP_ORDER_STATES,
   REP_PRODUCT_SORTS,
+  type RepOrderState,
   type RepProductSort,
   STAGE_ACTIONS,
   type StageAction,
@@ -148,6 +150,39 @@ export class SalesRepOrderListQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+
+  @ApiPropertyOptional({ description: 'Only the orders of this customer' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  customerId?: number;
+
+  @ApiPropertyOptional({ description: 'Only orders with a line of this product' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  productId?: number;
+
+  @ApiPropertyOptional({ enum: PAYMENT_METHODS })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS)
+  paymentMethod?: PaymentMethod;
+
+  @ApiPropertyOptional({ enum: FULFILMENTS })
+  @IsOptional()
+  @IsIn(FULFILMENTS)
+  fulfilment?: Fulfilment;
+
+  @ApiPropertyOptional({
+    enum: REP_ORDER_STATES,
+    description:
+      'DRAFT; ACTIVE: submitted, not yet delivered; SOLD: delivered, invoiced or closed; CANCELLED',
+  })
+  @IsOptional()
+  @IsIn(REP_ORDER_STATES)
+  state?: RepOrderState;
 }
 
 @ApiSchema({ name: 'SalesRepOrderSummary' })
@@ -162,6 +197,13 @@ export class SalesRepOrderSummaryDto {
   @ApiProperty({ format: 'date' }) deliveryDate: string;
   @ApiProperty({ type: String, nullable: true, description: 'Null for a draft' })
   total: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price",
+  })
+  estimatedTotal: string | null;
   @ApiProperty() lineCount: number;
   @ApiProperty({ type: String, nullable: true }) pipelineName: string | null;
   @ApiProperty({ type: String, nullable: true }) stageName: string | null;
@@ -174,6 +216,10 @@ export class SalesRepRangeSummaryDto {
   @ApiProperty({ description: 'MNT: the orders not cancelled (a draft has no total yet)' })
   total: string;
   @ApiProperty() drafts: number;
+  @ApiProperty({
+    description: "MNT: the sum of the drafts' estimates (a draft without one adds nothing)",
+  })
+  draftsEstimate: string;
 }
 
 @ApiSchema({ name: 'SalesRepOrderPage' })
@@ -183,7 +229,7 @@ export class SalesRepOrderPageDto {
   @ApiProperty({
     type: SalesRepRangeSummaryDto,
     nullable: true,
-    description: 'First page only: every order of the range and search',
+    description: 'First page only: every order the range, search and filters keep',
   })
   summary: SalesRepRangeSummaryDto | null;
 }
@@ -211,6 +257,13 @@ export class SalesRepOrderLineDto {
   @ApiProperty({ description: 'Reserved, base units' }) qtyApproved: string;
   @ApiProperty({ description: 'Short, base units' }) qtyBackordered: string;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "MNT: a draft's line in the quote of its lines at today's WHOLESALE prices; null for any other order or when the line has no price",
+  })
+  estimatedTotal: string | null;
   @ApiProperty({ type: [SalesRepOrderPartDto] }) parts: SalesRepOrderPartDto[];
 }
 
@@ -240,6 +293,13 @@ export class SalesRepOrderDto {
   @ApiProperty({ type: String, nullable: true }) subtotal: string | null;
   @ApiProperty({ type: String, nullable: true }) discountTotal: string | null;
   @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price",
+  })
+  estimatedTotal: string | null;
   @ApiProperty({ type: String, nullable: true }) boardName: string | null;
   @ApiProperty({ type: String, nullable: true }) pipelineName: string | null;
   @ApiProperty({ type: String, nullable: true }) stageName: string | null;
@@ -426,6 +486,49 @@ export class SalesRepCustomerAddressDto {
 export class SalesRepCustomerContactDto {
   @ApiProperty({ type: String, nullable: true }) name: string | null;
   @ApiProperty({ type: String, nullable: true }) phone: string | null;
+}
+
+@ApiSchema({ name: 'SalesRepMapStore' })
+export class SalesRepMapStoreDto {
+  @ApiProperty() customerId: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) phone: string | null;
+  @ApiProperty({ description: 'The customer address whose point this is' }) addressId: number;
+  @ApiProperty({ type: String, nullable: true, description: "The point's address text" })
+  address: string | null;
+  @ApiProperty({ example: '49.639810', description: 'Degrees, 6 decimals' }) lat: string;
+  @ApiProperty({ example: '100.162540', description: 'Degrees, 6 decimals' }) lng: string;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: "The caller's own last rep order for the store (drafts count, cancelled do not)",
+  })
+  lastOrderId: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastOrderAt: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date',
+    nullable: true,
+    description: "The last order's Ulaanbaatar day",
+  })
+  lastOrderDate: string | null;
+  @ApiProperty({ description: 'No such order within `freshDays` days, today included' })
+  stale: boolean;
+}
+
+@ApiSchema({ name: 'SalesRepMap' })
+export class SalesRepMapDto {
+  @ApiProperty({ format: 'date', description: "The server's business date (Ulaanbaatar)" })
+  today: string;
+  @ApiProperty({ description: 'An order within this many days, today included, is fresh' })
+  freshDays: number;
+  @ApiProperty({
+    type: [SalesRepMapStoreDto],
+    description:
+      'Active customers with a GPS point (the default address, else the oldest active one), by name',
+  })
+  data: SalesRepMapStoreDto[];
 }
 
 @ApiSchema({ name: 'SalesRepCustomerDetail' })

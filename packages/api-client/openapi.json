@@ -13450,6 +13450,66 @@
               "maxLength": 100,
               "type": "string"
             }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders of this customer",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Only orders with a line of this product",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "DRAFT; ACTIVE: submitted, not yet delivered; SOLD: delivered, invoiced or closed; CANCELLED",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "ACTIVE",
+                "SOLD",
+                "CANCELLED"
+              ]
+            }
           }
         ],
         "responses": {
@@ -13459,6 +13519,42 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SalesRepOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/map": {
+      "get": {
+        "operationId": "SalesRep_map",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepMap"
                 }
               }
             }
@@ -29382,6 +29478,11 @@
             "type": "string",
             "nullable": true
           },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's line in the quote of its lines at today's WHOLESALE prices; null for any other order or when the line has no price"
+          },
           "parts": {
             "type": "array",
             "items": {
@@ -29402,6 +29503,7 @@
           "qtyApproved",
           "qtyBackordered",
           "total",
+          "estimatedTotal",
           "parts"
         ]
       },
@@ -29542,6 +29644,11 @@
             "type": "string",
             "nullable": true
           },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
           "boardName": {
             "type": "string",
             "nullable": true
@@ -29592,6 +29699,7 @@
           "subtotal",
           "discountTotal",
           "total",
+          "estimatedTotal",
           "boardName",
           "pipelineName",
           "stageName",
@@ -29658,6 +29766,11 @@
             "nullable": true,
             "description": "Null for a draft"
           },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
           "lineCount": {
             "type": "number"
           },
@@ -29684,6 +29797,7 @@
           "paymentMethod",
           "deliveryDate",
           "total",
+          "estimatedTotal",
           "lineCount",
           "pipelineName",
           "stageName",
@@ -29702,12 +29816,17 @@
           },
           "drafts": {
             "type": "number"
+          },
+          "draftsEstimate": {
+            "type": "string",
+            "description": "MNT: the sum of the drafts' estimates (a draft without one adds nothing)"
           }
         },
         "required": [
           "count",
           "total",
-          "drafts"
+          "drafts",
+          "draftsEstimate"
         ]
       },
       "SalesRepOrderPage": {
@@ -29725,7 +29844,7 @@
           },
           "summary": {
             "nullable": true,
-            "description": "First page only: every order of the range and search",
+            "description": "First page only: every order the range, search and filters keep",
             "type": "object",
             "allOf": [
               {
@@ -29738,6 +29857,103 @@
           "data",
           "nextCursor",
           "summary"
+        ]
+      },
+      "SalesRepMapStore": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressId": {
+            "type": "number",
+            "description": "The customer address whose point this is"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "The point's address text"
+          },
+          "lat": {
+            "type": "string",
+            "example": "49.639810",
+            "description": "Degrees, 6 decimals"
+          },
+          "lng": {
+            "type": "string",
+            "example": "100.162540",
+            "description": "Degrees, 6 decimals"
+          },
+          "lastOrderId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The caller's own last rep order for the store (drafts count, cancelled do not)"
+          },
+          "lastOrderAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastOrderDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "The last order's Ulaanbaatar day"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "No such order within `freshDays` days, today included"
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "phone",
+          "addressId",
+          "address",
+          "lat",
+          "lng",
+          "lastOrderId",
+          "lastOrderAt",
+          "lastOrderDate",
+          "stale"
+        ]
+      },
+      "SalesRepMap": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "description": "The server's business date (Ulaanbaatar)"
+          },
+          "freshDays": {
+            "type": "number",
+            "description": "An order within this many days, today included, is fresh"
+          },
+          "data": {
+            "description": "Active customers with a GPS point (the default address, else the oldest active one), by name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepMapStore"
+            }
+          }
+        },
+        "required": [
+          "today",
+          "freshDays",
+          "data"
         ]
       },
       "SalesRepProductImage": {

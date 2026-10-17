@@ -3221,6 +3221,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_map"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/orders/{id}": {
         parameters: {
             query?: never;
@@ -7599,6 +7615,8 @@ export interface components {
             /** @description Short, base units */
             qtyBackordered: string;
             total: string | null;
+            /** @description MNT: a draft's line in the quote of its lines at today's WHOLESALE prices; null for any other order or when the line has no price */
+            estimatedTotal: string | null;
             parts: components["schemas"]["SalesRepOrderPart"][];
         };
         SalesRepOrderEvent: {
@@ -7631,6 +7649,8 @@ export interface components {
             subtotal: string | null;
             discountTotal: string | null;
             total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
             boardName: string | null;
             pipelineName: string | null;
             stageName: string | null;
@@ -7655,6 +7675,8 @@ export interface components {
             deliveryDate: string;
             /** @description Null for a draft */
             total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
             lineCount: number;
             pipelineName: string | null;
             stageName: string | null;
@@ -7666,12 +7688,56 @@ export interface components {
             /** @description MNT: the orders not cancelled (a draft has no total yet) */
             total: string;
             drafts: number;
+            /** @description MNT: the sum of the drafts' estimates (a draft without one adds nothing) */
+            draftsEstimate: string;
         };
         SalesRepOrderPage: {
             data: components["schemas"]["SalesRepOrderSummary"][];
             nextCursor: string | null;
-            /** @description First page only: every order of the range and search */
+            /** @description First page only: every order the range, search and filters keep */
             summary: components["schemas"]["SalesRepRangeSummary"] | null;
+        };
+        SalesRepMapStore: {
+            customerId: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description The customer address whose point this is */
+            addressId: number;
+            /** @description The point's address text */
+            address: string | null;
+            /**
+             * @description Degrees, 6 decimals
+             * @example 49.639810
+             */
+            lat: string;
+            /**
+             * @description Degrees, 6 decimals
+             * @example 100.162540
+             */
+            lng: string;
+            /** @description The caller's own last rep order for the store (drafts count, cancelled do not) */
+            lastOrderId: number | null;
+            /** Format: date-time */
+            lastOrderAt: string | null;
+            /**
+             * Format: date
+             * @description The last order's Ulaanbaatar day
+             */
+            lastOrderDate: string | null;
+            /** @description No such order within `freshDays` days, today included */
+            stale: boolean;
+        };
+        SalesRepMap: {
+            /**
+             * Format: date
+             * @description The server's business date (Ulaanbaatar)
+             */
+            today: string;
+            /** @description An order within this many days, today included, is fresh */
+            freshDays: number;
+            /** @description Active customers with a GPS point (the default address, else the oldest active one), by name */
+            data: components["schemas"]["SalesRepMapStore"][];
         };
         SalesRepProductImage: {
             /** @description Relative to the server */
@@ -17540,6 +17606,14 @@ export interface operations {
                 to: string;
                 /** @description Order number or customer (name, code, phone) */
                 q?: string;
+                /** @description Only the orders of this customer */
+                customerId?: number;
+                /** @description Only orders with a line of this product */
+                productId?: number;
+                paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
+                fulfilment?: "PICKUP" | "DELIVERY";
+                /** @description DRAFT; ACTIVE: submitted, not yet delivered; SOLD: delivered, invoiced or closed; CANCELLED */
+                state?: "DRAFT" | "ACTIVE" | "SOLD" | "CANCELLED";
             };
             header?: never;
             path?: never;
@@ -17588,6 +17662,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepMap"];
                 };
             };
             /** @description RFC 9457 problem details */
