@@ -64,6 +64,8 @@ export function useSendOrder() {
       if (fromCart) dispatch({ type: 'sent' });
       await queryClient.invalidateQueries({ queryKey: ['rep', 'orders'] });
       await queryClient.invalidateQueries({ queryKey: ['rep', 'products'] });
+      // The store map's red and green: the store just ordered from turns green.
+      await queryClient.invalidateQueries({ queryKey: ['rep', 'map'] });
     }
   };
 

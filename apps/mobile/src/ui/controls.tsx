@@ -280,7 +280,10 @@ export function MenuChip({
   );
 }
 
-/** A chosen filter as a blue chip with its ×. */
+/**
+ * A chosen filter as a blue chip with its ×: a long name ellipsizes inside the chip, the × stays
+ * whole and tappable.
+ */
 export function ActiveChip({
   label,
   onPress,
@@ -294,7 +297,7 @@ export function ActiveChip({
 }) {
   return (
     <View style={styles.activeChip}>
-      <Pressable accessibilityRole="button" onPress={onPress}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.activeChipLabel}>
         <Text style={styles.activeChipText} numberOfLines={1}>
           {label}
         </Text>
@@ -450,8 +453,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     maxWidth: 240,
   },
+  activeChipLabel: { flexShrink: 1 },
   activeChipText: { ...type.chip, fontFamily: fonts.semibold, color: colors.link },
   activeChipX: {
+    flexShrink: 0,
     width: 28,
     height: 28,
     borderRadius: 14,

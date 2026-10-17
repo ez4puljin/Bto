@@ -48,11 +48,11 @@ const PAY_DOTS = {
 } as const;
 
 /**
- * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0068 #6): the customer, who
- * takes the order and their phone, «Хүлээн авах» (delivery or pickup as two cards, the address,
- * and the day as four tiles: today, tomorrow, the day after, another day), the payment, a note,
- * where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the page;
- * a send without an answer keeps the cart locked (ADR-0061 #8).
+ * «Захиалагчийн мэдээлэл» (the Checkout and CheckoutNote boards, ADR-0068 #6): the customer (no
+ * contact person, the owner 2026-10-18), «Хүлээн авах» (delivery or pickup as two cards, the
+ * address, and the day as four tiles: today, tomorrow, the day after, another day), the payment, a
+ * note, where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the
+ * page; a send without an answer keeps the cart locked (ADR-0061 #8).
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
@@ -244,37 +244,6 @@ export default function CheckoutScreen() {
             <ChevronRight size={16} strokeWidth={2.6} color={colors.input} />
           )}
         </Pressable>
-
-        <SectionHeader style={styles.section}>{t('mobile.checkout.contact')}</SectionHeader>
-        <Group>
-          <View style={styles.field}>
-            <Text style={[type.row, styles.label]}>{t('mobile.checkout.contactName')}</Text>
-            <TextInput
-              value={cart.contactName}
-              onChangeText={(name) => dispatch({ type: 'contact', name })}
-              placeholder={t('mobile.checkout.contactNameHint')}
-              placeholderTextColor={colors.placeholder}
-              editable={!locked}
-              accessibilityLabel={t('mobile.checkout.contactName')}
-              style={[type.row, styles.input]}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={[type.row, styles.label]}>{t('mobile.checkout.contactPhone')}</Text>
-            <TextInput
-              value={cart.contactPhone}
-              onChangeText={(phone) =>
-                dispatch({ type: 'contact', phone: phone.replace(/[^0-9 +-]/g, '') })
-              }
-              placeholder={t('mobile.checkout.contactPhoneHint')}
-              placeholderTextColor={colors.placeholder}
-              keyboardType="phone-pad"
-              editable={!locked}
-              accessibilityLabel={t('mobile.checkout.contactPhone')}
-              style={[type.row, styles.input]}
-            />
-          </View>
-        </Group>
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.receive')}</SectionHeader>
         <View accessibilityRole="radiogroup" style={styles.options}>
@@ -722,15 +691,6 @@ const styles = StyleSheet.create({
   },
   grow: { flex: 1 },
   accent: { color: colors.primary },
-  field: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  label: { width: 72 },
-  input: { flex: 1, height: 44, paddingVertical: 0 },
   options: { flexDirection: 'row', gap: 10 },
   option: {
     flex: 1,

@@ -1,9 +1,10 @@
+import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
 import {
   Bell,
   ChevronRight,
+  Map as MapIcon,
   ScanBarcode,
-  Search,
   Send,
   ShoppingCart,
   TriangleAlert,
@@ -14,10 +15,12 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import { Text } from '../../../src/ui/text';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
-import { useOrders, useProducts, useRepContext } from '../../../src/api/rep';
+import { useOrders, useProducts, useRepContext, useRepMap } from '../../../src/api/rep';
 import { presetRange } from '../../../src/dates/calendar';
 import { formatMillions, formatMnt, initialsOf } from '../../../src/format/format';
 import { dateLineOf, givenNameOf, newProductsOf } from '../../../src/home/home';
+import { countsOf } from '../../../src/map/stores';
+import { shortMoney } from '../../../src/orders/amounts';
 import { EMPTY_FILTERS } from '../../../src/shop/filters';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
@@ -36,9 +39,10 @@ const RECENT = 3;
 
 /**
  * «Нүүр» (ADR-0068, the owner 2026-10-17: more modern, larger text): who is signed in and the day
- * with the bell, a search pill into the shop with the scanner, this month's orders on the blue card,
- * the cart when it has lines, the stage new orders land on, the newest products and the last
- * orders. The tab bar is the way to the other tabs, so the home does not repeat it.
+ * with the scanner and the bell (no search by name or code here, the owner 2026-10-18: «Бараа»
+ * searches), this month's orders on the blue card, the cart when it has lines, the stage new orders
+ * land on, the newest products and the last orders. The tab bar is the way to the other tabs, so
+ * the home does not repeat it.
  */
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -82,11 +86,34 @@ export default function HomeScreen() {
       ? t('mobile.orders.millions', { amount: millions })
       : t('pricing.money', { amount: formatMnt(summary.total) })
     : t('common.none');
+  // «3 ноорог ≈ 1.2 сая₮»: the drafts at today's prices (a draft without a price adds none).
+  const draftsEstimate =
+    summary && new Decimal(summary.draftsEstimate).gt(0)
+      ? t('mobile.orders.approx', { amount: shortMoney(t, summary.draftsEstimate) })
+      : null;
+
+  // The store map's card: how many located stores have no order of the rep lately.
+  const storeMap = useRepMap();
+  const mapCounts = storeMap.data ? countsOf(storeMap.data.data) : null;
+  const mapLine = !storeMap.data
+    ? storeMap.isLoading
+      ? t('common.loading')
+      : null
+    : storeMap.data.data.length === 0
+      ? t('mobile.map.noStores')
+      : mapCounts && mapCounts.stale > 0
+        ? t('mobile.map.staleCount', { n: mapCounts.stale, days: storeMap.data.freshDays })
+        : t('mobile.map.allFresh', { days: storeMap.data.freshDays });
 
   const refresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([context.refetch(), orders.refetch(), products.refetch()]);
+      await Promise.all([
+        context.refetch(),
+        orders.refetch(),
+        products.refetch(),
+        storeMap.refetch(),
+      ]);
     } finally {
       setRefreshing(false);
     }
@@ -111,6 +138,11 @@ export default function HomeScreen() {
             </Text>
           </View>
           <CircleButton
+            icon={<ScanBarcode size={22} strokeWidth={1.9} color={colors.foreground} />}
+            label={t('mobile.scan.title')}
+            onPress={() => router.push('/scan')}
+          />
+          <CircleButton
             icon={<Bell size={22} strokeWidth={1.9} color={colors.foreground} />}
             label={
               unread > 0
@@ -122,29 +154,6 @@ export default function HomeScreen() {
             onPress={() => router.push('/notifications')}
           />
         </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.shop.searchLabel')}
-          onPress={() =>
-            router.navigate({ pathname: '/shop', params: { search: String(Date.now()) } })
-          }
-          style={({ pressed }) => [styles.search, pressed && styles.searchPressed]}
-        >
-          <Search size={18} strokeWidth={2.2} color={colors.muted} />
-          <Text style={[type.row, styles.mutedText, styles.grow]} numberOfLines={1}>
-            {t('mobile.shop.search')}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.scan.title')}
-            onPress={() => router.push('/scan')}
-            hitSlop={4}
-            style={({ pressed }) => [styles.scan, pressed && styles.scanPressed]}
-          >
-            <ScanBarcode size={19} strokeWidth={2} color={colors.foreground} />
-          </Pressable>
-        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -186,12 +195,17 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[type.secondary, styles.onMuted]}>{t('mobile.orders.count')}</Text>
               </View>
-              <View style={styles.count}>
+              <View style={[styles.count, styles.shrink]}>
                 {summary && summary.drafts > 0 ? <View style={styles.draftDot} /> : null}
                 <Text style={styles.countValue}>
                   {summary ? String(summary.drafts) : t('common.none')}
                 </Text>
                 <Text style={[type.secondary, styles.onMuted]}>{t('mobile.orders.drafts')}</Text>
+                {draftsEstimate ? (
+                  <Text style={[type.secondary, styles.onMuted, styles.shrink]} numberOfLines={1}>
+                    {draftsEstimate}
+                  </Text>
+                ) : null}
               </View>
             </View>
           )}
@@ -260,6 +274,20 @@ export default function HomeScreen() {
             />
           </Group>
         )}
+
+        <Group style={styles.mapCard}>
+          <Row
+            minHeight={56}
+            icon={
+              <IconTile color={colors.tint.teal}>
+                <MapIcon size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.map.title')}
+            subtitle={mapLine}
+            onPress={() => router.push('/map')}
+          />
+        </Group>
 
         {products.isLoading || fresh.length > 0 ? (
           <>
@@ -332,27 +360,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   initials: { ...type.rowStrong, letterSpacing: 0, color: colors.primaryForeground },
-  search: {
-    marginTop: spacing.md,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingLeft: 14,
-    paddingRight: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: colors.card,
-  },
-  searchPressed: { backgroundColor: colors.accent },
-  scan: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanPressed: { backgroundColor: colors.fill },
   month: {
     marginTop: spacing.lg,
     padding: spacing.lg,
@@ -369,6 +376,7 @@ const styles = StyleSheet.create({
   hairline: { height: 1, marginVertical: 14, backgroundColor: colors.onPrimaryHairline },
   counts: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   count: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  shrink: { flexShrink: 1 },
   countValue: { ...type.heading, ...tabular, color: colors.primaryForeground },
   draftDot: {
     width: 8,
@@ -397,6 +405,7 @@ const styles = StyleSheet.create({
   },
   cartButton: { paddingHorizontal: 14 },
   stageWarning: { backgroundColor: colors.warningSoft },
+  mapCard: { marginTop: spacing.md },
   // Edge to edge: the strip scrolls under the page's margins.
   strip: { marginHorizontal: -spacing.lg },
   stripContent: { paddingHorizontal: spacing.lg, gap: TILE_GAP },

@@ -18,7 +18,7 @@ import { BarButton, LargeTitle, Page } from '../../src/ui/layout';
 
 /**
  * Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. The pick
- * brings the default address and, for an empty contact, the customer's first contact (ADR-0068).
+ * brings the default address (ADR-0068); the order takes no contact person (the owner, 2026-10-18).
  */
 export default function CustomersScreen() {
   const { t } = useTranslation();
@@ -49,12 +49,10 @@ export default function CustomersScreen() {
       });
       const preferred =
         detail.addresses.find((address) => address.isDefault) ?? detail.addresses[0];
-      const contact = detail.contacts.find((entry) => entry.name || entry.phone);
       dispatch({
         type: 'customer',
         customer: { id: detail.id, code: detail.code, name: detail.name },
         defaultAddressId: preferred?.id ?? null,
-        contact: contact ?? (detail.phone ? { name: null, phone: detail.phone } : null),
       });
       router.back();
     } catch {

@@ -1,6 +1,6 @@
 {
   "name": "@tugeel/mobile",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Bto staff app (Expo): the sales-rep app v1 (ADR-0061)",
   "main": "expo-router/entry",
@@ -25,6 +25,7 @@
     "expo-font": "57.0.4",
     "expo-image": "57.0.5",
     "expo-linking": "57.0.12",
+    "expo-location": "57.0.21",
     "expo-router": "57.0.26",
     "expo-secure-store": "57.0.4",
     "expo-splash-screen": "57.0.10",
@@ -32,13 +33,15 @@
     "expo-system-ui": "57.0.4",
     "i18next": "26.4.2",
     "lucide-react-native": "1.53.0",
+    "maplibre-gl": "6.14.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-i18next": "17.0.16",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.2",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "react-native-web": "0.21.4"
   },
   "devDependencies": {
     "@types/node": "catalog:",

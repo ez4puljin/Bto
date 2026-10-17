@@ -84,27 +84,6 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cart).toMatchObject({ fulfilment: 'DELIVERY', addressId: 32 });
   });
 
-  it('takes the customer’s first contact unless one was typed, and cuts it to the limits', () => {
-    const customer = { id: 9, code: '1009', name: 'Дэлгүүр' };
-    let cart = cartReducer(EMPTY_CART, {
-      type: 'customer',
-      customer,
-      defaultAddressId: null,
-      contact: { name: 'Бат', phone: '99112233' },
-    });
-    expect(cart).toMatchObject({ contactName: 'Бат', contactPhone: '99112233' });
-    cart = cartReducer(cart, { type: 'contact', name: 'Дорж' });
-    cart = cartReducer(cart, {
-      type: 'customer',
-      customer: { ...customer, id: 10 },
-      defaultAddressId: null,
-      contact: { name: 'Сүх', phone: null },
-    });
-    expect(cart).toMatchObject({ contactName: 'Дорж', contactPhone: '99112233' });
-    cart = cartReducer(cart, { type: 'contact', phone: '9'.repeat(40) });
-    expect(cart.contactPhone).toHaveLength(30);
-  });
-
   it('lists what keeps it from being sent, and builds the order body', () => {
     const today = '2026-10-15';
     expect(cartIssues(EMPTY_CART, today, null)).toEqual([
@@ -126,15 +105,15 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cartIssues(cart, today, 5)).toEqual(['deliveryDate']);
     cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-16' });
     cart = cartReducer(cart, { type: 'note', note: '  Өглөө  ' });
-    cart = cartReducer(cart, { type: 'contact', name: ' Бат ', phone: '' });
     expect(cartIssues(cart, today, 5)).toEqual([]);
+    // No contact person: the order is the customer's (the owner, 2026-10-18).
     expect(orderRequestOf(cart, 5)).toEqual({
       stageId: 5,
       customerId: 9,
       fulfilment: 'PICKUP',
       deliveryDate: '2026-10-16',
       addressId: null,
-      contactName: 'Бат',
+      contactName: null,
       contactPhone: null,
       paymentMethod: 'CREDIT',
       note: 'Өглөө',
@@ -148,7 +127,6 @@ describe('the cart (ADR-0061 #8)', () => {
       type: 'customer',
       customer: { id: 9, code: '1009', name: 'Дэлгүүр' },
       defaultAddressId: 31,
-      contact: { name: 'Бат', phone: '99112233' },
     });
     cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-18' });
     cart = cartReducer(cart, { type: 'payment', method: 'CREDIT' });
@@ -166,8 +144,22 @@ describe('the cart (ADR-0061 #8)', () => {
     expect(cartFrom({ lines: [unit(1)], note: 'n' })).toMatchObject({
       note: 'n',
       fulfilment: 'DELIVERY',
-      contactName: '',
     });
+    // A cart stored with a contact person keeps everything else and drops the contact.
+    const withContact = cartFrom({
+      lines: [unit(1)],
+      customer: { id: 9, code: '1009', name: 'Дэлгүүр' },
+      contactName: 'Бат',
+      contactPhone: '99112233',
+      paymentMethod: 'CASH',
+    });
+    expect(withContact).toEqual({
+      ...EMPTY_CART,
+      lines: [unit(1)],
+      customer: { id: 9, code: '1009', name: 'Дэлгүүр' },
+      paymentMethod: 'CASH',
+    });
+    expect(orderRequestOf(withContact, 5)).toMatchObject({ contactName: null, contactPhone: null });
     // A cart stored before units had codes.
     const { uomCode: _code, ...old } = unit(1);
     expect(cartFrom({ lines: [old] }).lines[0]?.uomCode).toBeNull();

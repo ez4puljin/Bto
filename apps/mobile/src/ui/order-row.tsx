@@ -9,11 +9,15 @@ import { PaymentDot, StatusPill } from './status';
 
 /**
  * An order of the rep's lists (ADR-0068 #7: «Захиалга» and the home's recent ones): the number, the
- * customer, the payment, stage and time, then the total and the status. The row opens the order.
+ * customer, the payment, stage and time, then the amount as the row's strong figure (the owner,
+ * 2026-10-18) and the status; a cancelled one is struck through. A draft has no amount yet: it
+ * shows its estimate at today's prices as «≈ …₮» over its muted «Ноорог» pill, or «үнэ батлахад»
+ * when a line has no price. The row opens the order.
  */
 export function OrderRow({ order, onPress }: { order: RepOrderSummary; onPress: () => void }) {
   const { t } = useTranslation();
-  const muted = order.total === null || order.status === 'CANCELLED';
+  const cancelled = order.status === 'CANCELLED';
+  const estimate = order.total === null ? order.estimatedTotal : null;
   const meta = [
     t(`sales.paymentMethods.${order.paymentMethod}`),
     order.stageName,
@@ -40,11 +44,21 @@ export function OrderRow({ order, onPress }: { order: RepOrderSummary; onPress: 
         </View>
       </View>
       <View style={styles.right}>
-        <Text style={[styles.total, muted && styles.muted]}>
-          {order.total === null
-            ? t('mobile.orders.priceLater')
-            : t('pricing.money', { amount: formatMnt(order.total) })}
-        </Text>
+        {order.total !== null ? (
+          <Text style={[styles.total, cancelled && styles.struck]} numberOfLines={1}>
+            {t('pricing.money', { amount: formatMnt(order.total) })}
+          </Text>
+        ) : estimate !== null ? (
+          <Text style={[styles.total, styles.estimate]} numberOfLines={1}>
+            {t('mobile.orders.approx', {
+              amount: t('pricing.money', { amount: formatMnt(estimate) }),
+            })}
+          </Text>
+        ) : (
+          <Text style={styles.later} numberOfLines={1}>
+            {t('mobile.orders.priceLater')}
+          </Text>
+        )}
         <StatusPill status={order.status} />
       </View>
     </Pressable>
@@ -65,7 +79,10 @@ const styles = StyleSheet.create({
   number: { ...type.heading, ...tabular },
   customer: { ...type.body, color: colors.label2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  right: { alignItems: 'flex-end', gap: 6 },
-  total: { ...type.heading, ...tabular },
-  muted: { color: colors.muted },
+  right: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
+  total: { ...type.sectionTitle, ...tabular, textAlign: 'right' },
+  // Not final yet: a softer figure than a confirmed total.
+  estimate: { color: colors.label2 },
+  later: { ...type.body, color: colors.muted, textAlign: 'right' },
+  struck: { color: colors.muted, textDecorationLine: 'line-through' },
 });

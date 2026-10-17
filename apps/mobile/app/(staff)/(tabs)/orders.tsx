@@ -1,5 +1,6 @@
+import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
-import { CalendarDays } from 'lucide-react-native';
+import { CalendarDays, ClipboardList, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, SectionList, StyleSheet, View } from 'react-native';
@@ -15,13 +16,22 @@ import {
   type RangePreset,
 } from '../../../src/dates/calendar';
 import { ubDate, weekdayOf } from '../../../src/dates/dates';
-import { formatMillions, formatMnt } from '../../../src/format/format';
+import { shortMoney } from '../../../src/orders/amounts';
 import { DateRangeSheet } from '../../../src/orders/date-range-sheet';
-import { useDebounced } from '../../../src/state/use-debounced';
+import { OrderFilterSheet } from '../../../src/orders/order-filter-sheet';
+import {
+  activeOrderFilters,
+  EMPTY_ORDER_FILTERS,
+  type OrderFilterKey,
+  type OrderFilters,
+  orderFilterCount,
+  orderFilterParams,
+  withoutFilter,
+} from '../../../src/orders/order-filters';
 import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { ChoiceChip, SearchField } from '../../../src/ui/controls';
+import { ActiveChip, ChoiceChip, CircleButton, PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
-import { ProblemText } from '../../../src/ui/kit';
+import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { LargeTitle, Page } from '../../../src/ui/layout';
 import { OrderRow } from '../../../src/ui/order-row';
 import { StatRow } from '../../../src/ui/stat-row';
@@ -29,10 +39,13 @@ import { useTabBarInset } from '../../../src/ui/tab-bar';
 
 const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
 
+type Opened = 'none' | 'filters' | 'dates';
+
 /**
- * «Миний захиалгууд» (the MyOrders board, ADR-0068 #7): a customer search, the days (today, a
- * week, this month, or any range from the calendar), the range's count, confirmed total and drafts,
- * and the rep's own orders by day, newest first.
+ * «Миний захиалгууд» (the MyOrders board, ADR-0068 #7; filters instead of a search, the owner
+ * 2026-10-18): the days (today, a week, this month, or any range from the calendar), the filters
+ * that are on as chips, the range's count, confirmed total and drafts, and the rep's own orders
+ * by day, newest first. The filter button opens customer, product, payment, delivery and state.
  */
 export default function OrdersScreen() {
   const { t } = useTranslation();
@@ -41,14 +54,18 @@ export default function OrdersScreen() {
   const context = useRepContext();
   const today = context.data?.today ?? null;
   const [picked, setPicked] = useState<DateRange | null>(null);
-  const [text, setText] = useState('');
-  const [sheet, setSheet] = useState(false);
-  const q = useDebounced(text.trim(), 350);
-  const range = picked ?? (today ? presetRange('month', today) : null);
-  const orders = useOrders(range ? { ...range, q } : null);
+  const [filters, setFilters] = useState<OrderFilters>(EMPTY_ORDER_FILTERS);
+  const [opened, setOpened] = useState<Opened>('none');
+  // Stable while nothing changes, so an open sheet keeps its draft over a refetch.
+  const range = useMemo(
+    () => picked ?? (today ? presetRange('month', today) : null),
+    [picked, today],
+  );
+  const orders = useOrders(range ? { ...range, ...orderFilterParams(filters) } : null);
   const rows = useMemo(() => orders.data?.pages.flatMap((page) => page.data) ?? [], [orders.data]);
   const summary = orders.data?.pages[0]?.summary ?? null;
   const preset = range && today ? presetOf(range, today) : null;
+  const filterCount = orderFilterCount(filters);
 
   const sections = useMemo(() => {
     const groups: { day: string; data: RepOrderSummary[] }[] = [];
@@ -72,26 +89,54 @@ export default function OrdersScreen() {
       ? t('mobile.checkout.namedDay', { name: t(`mobile.days.${name}`), day: date })
       : date;
   };
-  const totalText = summary
-    ? (() => {
-        const millions = formatMillions(summary.total);
-        return millions
-          ? t('mobile.orders.millions', { amount: millions })
-          : t('pricing.money', { amount: formatMnt(summary.total) });
-      })()
-    : t('common.none');
+  const totalText = summary ? shortMoney(t, summary.total) : t('common.none');
+  // The drafts' estimate at today's prices, a line under their count (a draft without a price
+  // adds none; nothing when no draft has one).
+  const draftsEstimate =
+    summary && new Decimal(summary.draftsEstimate).gt(0)
+      ? t('mobile.orders.approx', { amount: shortMoney(t, summary.draftsEstimate) })
+      : null;
+  const draftsLabel = draftsEstimate
+    ? `${t('mobile.orders.drafts')}\n${draftsEstimate}`
+    : t('mobile.orders.drafts');
+  // This month follows today (a new day, a new month); only days the rep chose stay put.
+  const pick = (days: DateRange) => {
+    if (!today) return;
+    const month = presetRange('month', today);
+    setPicked(days.from === month.from && days.to === month.to ? null : days);
+  };
+
+  const chipLabel = (key: OrderFilterKey): string => {
+    switch (key) {
+      case 'customer':
+        return filters.customer?.name ?? '';
+      case 'product':
+        return filters.product?.name ?? '';
+      case 'paymentMethod':
+        return filters.paymentMethod ? t(`sales.paymentMethods.${filters.paymentMethod}`) : '';
+      case 'fulfilment':
+        return filters.fulfilment ? t(`sales.fulfilments.${filters.fulfilment}`) : '';
+      case 'state':
+        return filters.state ? t(`mobile.orderFilter.states.${filters.state}`) : '';
+    }
+  };
+  const active = activeOrderFilters(filters);
+  const customRange = preset === null && range !== null;
 
   const header = (
     <View>
       <View style={styles.bar} />
-      <LargeTitle style={styles.title}>{t('mobile.orders.title')}</LargeTitle>
-      <SearchField
-        value={text}
-        onChangeText={setText}
-        placeholder={t('mobile.orders.search')}
-        accessibilityLabel={t('mobile.orders.search')}
-        style={styles.search}
-      />
+      <View style={styles.head}>
+        <LargeTitle style={styles.title}>{t('mobile.orders.title')}</LargeTitle>
+        <CircleButton
+          icon={<SlidersHorizontal size={22} strokeWidth={1.9} color={colors.foreground} />}
+          label={t('mobile.orders.filterButton', { n: filterCount })}
+          badge={filterCount}
+          badgeTone="accent"
+          badgeRing={colors.canvas}
+          onPress={() => setOpened('filters')}
+        />
+      </View>
       <View style={styles.chips}>
         {today
           ? PAGE_PRESETS.map((entry) => (
@@ -100,28 +145,44 @@ export default function OrdersScreen() {
                 compact
                 label={t(`mobile.dateRange.presets.${entry}`)}
                 selected={preset === entry}
-                onPress={() => setPicked(presetRange(entry, today))}
+                onPress={() => pick(presetRange(entry, today))}
               />
             ))
           : null}
         <ChoiceChip
           compact
           label={
-            preset === null && range
+            customRange && range
               ? t('mobile.orders.range', { from: monthDay(range.from), to: monthDay(range.to) })
               : t('mobile.orders.pickDates')
           }
-          selected={preset === null && range !== null}
+          selected={customRange}
           icon={
             <CalendarDays
               size={15}
               strokeWidth={2}
-              color={preset === null && range ? colors.primaryForeground : colors.foreground}
+              color={customRange ? colors.primaryForeground : colors.foreground}
             />
           }
-          onPress={() => setSheet(true)}
+          onPress={() => setOpened('dates')}
         />
       </View>
+      {active.length > 0 ? (
+        <View style={styles.active}>
+          {active.map((key) => {
+            const label = chipLabel(key);
+            return (
+              <ActiveChip
+                key={key}
+                label={label}
+                onPress={() => setOpened('filters')}
+                onRemove={() => setFilters(withoutFilter(filters, key))}
+                removeLabel={t('mobile.orders.removeFilter', { name: label })}
+              />
+            );
+          })}
+        </View>
+      ) : null}
       <View style={styles.stats}>
         <StatRow
           items={[
@@ -132,7 +193,7 @@ export default function OrdersScreen() {
             { value: totalText, label: t('mobile.orders.confirmed') },
             {
               value: summary ? String(summary.drafts) : t('common.none'),
-              label: t('mobile.orders.drafts'),
+              label: draftsLabel,
             },
           ]}
         />
@@ -149,8 +210,6 @@ export default function OrdersScreen() {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.lg }]}
         ListHeaderComponent={header}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
             {dayTitle(section.day)}
@@ -179,8 +238,19 @@ export default function OrdersScreen() {
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
             <View style={styles.empty}>
-              <Text style={type.heading}>{t('mobile.orders.empty')}</Text>
-              <Text style={[type.body, styles.muted]}>{t('mobile.orders.emptyHint')}</Text>
+              <EmptyState
+                icon={<ClipboardList size={44} strokeWidth={1.5} color={colors.input} />}
+                title={t('mobile.orders.empty')}
+                hint={t('mobile.orders.emptyHint')}
+              />
+              {filterCount > 0 ? (
+                <PillButton
+                  title={t('mobile.orders.clearFilters')}
+                  variant="soft"
+                  height={44}
+                  onPress={() => setFilters(EMPTY_ORDER_FILTERS)}
+                />
+              ) : null}
             </View>
           )
         }
@@ -191,16 +261,30 @@ export default function OrdersScreen() {
         }
       />
       {today && range ? (
-        <DateRangeSheet
-          visible={sheet}
-          today={today}
-          range={range}
-          onApply={(next) => {
-            setPicked(next);
-            setSheet(false);
-          }}
-          onClose={() => setSheet(false)}
-        />
+        <>
+          <DateRangeSheet
+            visible={opened === 'dates'}
+            today={today}
+            range={range}
+            onApply={(next) => {
+              pick(next);
+              setOpened('none');
+            }}
+            onClose={() => setOpened('none')}
+          />
+          <OrderFilterSheet
+            visible={opened === 'filters'}
+            today={today}
+            range={range}
+            filters={filters}
+            onApply={(next, days) => {
+              setFilters(next);
+              pick(days);
+              setOpened('none');
+            }}
+            onClose={() => setOpened('none')}
+          />
+        </>
       ) : null}
     </Page>
   );
@@ -208,9 +292,9 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
-  bar: { height: 44 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  search: { marginTop: spacing.md },
+  bar: { height: 38 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  title: { flex: 1, marginHorizontal: spacing.xs },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -218,12 +302,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 2,
   },
+  active: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingTop: spacing.sm },
   stats: { marginTop: spacing.md },
   day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
   cell: { backgroundColor: colors.card },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
-  muted: { color: colors.muted },
   loading: { marginTop: spacing.xl },
-  empty: { marginTop: 40, alignItems: 'center', gap: 6 },
+  empty: { marginTop: spacing.sm, alignItems: 'center', gap: spacing.sm },
 });

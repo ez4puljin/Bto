@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { ArrowUpDown, PackageSearch, ScanBarcode, SlidersHorizontal } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -10,15 +10,9 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Text, type TextInput } from '../../../src/ui/text';
+import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
-import {
-  type RepProduct,
-  useCategories,
-  useProducts,
-  useRepContext,
-  useSuppliers,
-} from '../../../src/api/rep';
+import { useCategories, useProducts, useRepContext, useSuppliers } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { FilterSheet } from '../../../src/shop/filter-sheet';
 import { activeCount, EMPTY_FILTERS, type ShopFilters } from '../../../src/shop/filters';
@@ -58,17 +52,6 @@ export default function ShopScreen() {
   const categories = useCategories();
   const { filters, setFilters } = useShopFilters();
   const [text, setText] = useState('');
-  const searchRef = useRef<TextInput>(null);
-  const listRef = useRef<FlatList<RepProduct>>(null);
-  // The home's search pill opens the shop with `search` (a fresh value each time): the field takes
-  // the focus and the keyboard opens, once the tab has drawn.
-  const { search } = useLocalSearchParams<{ search?: string }>();
-  useEffect(() => {
-    if (!search) return;
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-    const timer = setTimeout(() => searchRef.current?.focus(), 150);
-    return () => clearTimeout(timer);
-  }, [search]);
   const [sheet, setSheet] = useState<'closed' | 'filters' | 'suppliers'>('closed');
   const q = useDebounced(text.trim(), 350);
   const shown = filters ?? EMPTY_FILTERS;
@@ -122,7 +105,6 @@ export default function ShopScreen() {
       <LargeTitle style={styles.title}>{t('mobile.tabs.shop')}</LargeTitle>
       <View style={styles.search}>
         <SearchField
-          inputRef={searchRef}
           value={text}
           onChangeText={setText}
           placeholder={t('mobile.shop.search')}
@@ -204,7 +186,6 @@ export default function ShopScreen() {
   return (
     <Page white>
       <FlatList
-        ref={listRef}
         data={rows}
         numColumns={2}
         keyExtractor={(product) => String(product.id)}

@@ -4,9 +4,6 @@ import { type Fulfilment, ORDER_LIMITS, type PaymentMethod } from '@tugeel/share
 /** At most this many lines in one order (ORDER_LIMITS.maxLines on the server). */
 export const MAX_LINES = ORDER_LIMITS.maxLines;
 
-/** The contact fields' lengths the server takes. */
-export const CONTACT_LIMITS = { name: ORDER_LIMITS.maxContactName, phone: 30 } as const;
-
 /** A line of the cart: one product in the unit the rep chose, and how many of it. */
 export interface CartLine {
   productId: number;
@@ -35,9 +32,6 @@ export interface CartCustomer {
 export interface Cart {
   lines: CartLine[];
   customer: CartCustomer | null;
-  /** Who takes the order at the customer, and their phone; empty when not given. */
-  contactName: string;
-  contactPhone: string;
   fulfilment: Fulfilment;
   addressId: number | null;
   /** YYYY-MM-DD; null until chosen (the screen proposes today; a sent order clears it). */
@@ -49,8 +43,6 @@ export interface Cart {
 export const EMPTY_CART: Cart = {
   lines: [],
   customer: null,
-  contactName: '',
-  contactPhone: '',
   fulfilment: 'DELIVERY',
   addressId: null,
   deliveryDate: null,
@@ -67,12 +59,9 @@ export type CartAction =
   | {
       type: 'customer';
       customer: CartCustomer;
-      /** The customer's default address: DELIVERY there; none means PICKUP. */
+      /** The address to deliver to (the default one, or the store the map's card was opened from); none means PICKUP. */
       defaultAddressId: number | null;
-      /** The customer's first contact, taken when the cart has none yet. */
-      contact?: { name: string | null; phone: string | null } | null;
     }
-  | { type: 'contact'; name?: string; phone?: string }
   | { type: 'address'; addressId: number }
   | { type: 'pickup' }
   | { type: 'delivery' }
@@ -88,8 +77,9 @@ const whole = (qty: number) => (Number.isFinite(qty) ? Math.max(0, Math.floor(qt
  * The cart's rules (ADR-0061 #8, ADR-0068 #5): one line per product, in the unit the rep chose (a
  * product page replaces the product's line; a second «+» raises it), a quantity of 0 removes the
  * line, at most MAX_LINES lines, delivery to the chosen customer's address or pickup when they have
- * none. A sent order empties the lines, the customer, the contact and the date (the next order
- * starts on today again), and keeps the payment for the next shop.
+ * none. The rep app asks for no contact person (the owner, 2026-10-18): the order is the customer's.
+ * A sent order empties the lines, the customer and the date (the next order starts on today
+ * again), and keeps the payment for the next shop.
  */
 export function cartReducer(cart: Cart, action: CartAction): Cart {
   switch (action.type) {
@@ -137,30 +127,12 @@ export function cartReducer(cart: Cart, action: CartAction): Cart {
         ...cart,
         lines: cart.lines.filter((line) => line.productUnitId !== action.productUnitId),
       };
-    case 'customer': {
-      const keepContact = cart.contactName.trim() !== '' || cart.contactPhone.trim() !== '';
+    case 'customer':
       return {
         ...cart,
         customer: action.customer,
         addressId: action.defaultAddressId,
         fulfilment: action.defaultAddressId === null ? 'PICKUP' : 'DELIVERY',
-        ...(keepContact || !action.contact
-          ? {}
-          : {
-              contactName: (action.contact.name ?? '').slice(0, CONTACT_LIMITS.name),
-              contactPhone: (action.contact.phone ?? '').slice(0, CONTACT_LIMITS.phone),
-            }),
-      };
-    }
-    case 'contact':
-      return {
-        ...cart,
-        ...(action.name === undefined
-          ? {}
-          : { contactName: action.name.slice(0, CONTACT_LIMITS.name) }),
-        ...(action.phone === undefined
-          ? {}
-          : { contactPhone: action.phone.slice(0, CONTACT_LIMITS.phone) }),
       };
     case 'address':
       return { ...cart, addressId: action.addressId, fulfilment: 'DELIVERY' };
@@ -218,6 +190,7 @@ export interface OrderRequest {
   fulfilment: Fulfilment;
   deliveryDate: string;
   addressId: number | null;
+  /** Null: the rep app asks for no contact person (the owner, 2026-10-18). */
   contactName: string | null;
   contactPhone: string | null;
   paymentMethod: PaymentMethod;
@@ -235,25 +208,30 @@ export function orderRequestOf(cart: Cart, stageId: number): OrderRequest {
     fulfilment: cart.fulfilment,
     deliveryDate: cart.deliveryDate ?? '',
     addressId: cart.fulfilment === 'DELIVERY' ? cart.addressId : null,
-    contactName: textOrNull(cart.contactName),
-    contactPhone: textOrNull(cart.contactPhone),
+    contactName: null,
+    contactPhone: null,
     paymentMethod: cart.paymentMethod ?? 'CASH',
     note: textOrNull(cart.note),
     lines: linesOf(cart),
   };
 }
 
-/** A stored cart read back: anything that is not a cart is an empty one. */
+/**
+ * A stored cart read back: anything that is not a cart is an empty one; the contact an older cart
+ * kept is dropped.
+ */
 export function cartFrom(value: unknown): Cart {
   if (typeof value !== 'object' || value === null || !Array.isArray((value as Cart).lines)) {
     return EMPTY_CART;
   }
-  const cart = value as Partial<Cart> & { lines: CartLine[] };
+  const {
+    contactName: _name,
+    contactPhone: _phone,
+    ...cart
+  } = value as Partial<Cart> & { lines: CartLine[]; contactName?: unknown; contactPhone?: unknown };
   return {
     ...EMPTY_CART,
     ...cart,
-    contactName: typeof cart.contactName === 'string' ? cart.contactName : '',
-    contactPhone: typeof cart.contactPhone === 'string' ? cart.contactPhone : '',
     lines: cart.lines
       .slice(0, MAX_LINES)
       .map((line) => ({ ...line, uomCode: line.uomCode ?? null })),

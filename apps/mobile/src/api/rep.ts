@@ -7,6 +7,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { canonical } from '../cart/send';
+import type { OrderFilterParams } from '../orders/order-filters';
 import type { ShopQuery } from '../shop/filters';
 import { useSignedIn } from '../state/session';
 import { unwrap } from './problem';
@@ -26,11 +27,14 @@ export type Quote = components['schemas']['Quote'];
 
 const PAGE = 30;
 
-/** Days and a search of the rep's orders (ADR-0068). */
-export interface OrderRange {
+/**
+ * Days of the rep's orders (ADR-0068) and their filters (the owner, 2026-10-18: customer,
+ * product, payment, delivery, state); `q` searches a number or a customer.
+ */
+export interface OrderRange extends OrderFilterParams {
   from: string;
   to: string;
-  q: string;
+  q?: string;
 }
 
 /** Today, the stages the rep may place on, the warehouses and branches (ADR-0061 #5, ADR-0068). */
@@ -199,21 +203,34 @@ export function useCustomer(id: number | null) {
   });
 }
 
+/** The orders query of a range: the days, then only the search and filters that are on. */
+function orderParams(range: OrderRange) {
+  const q = range.q?.trim() ?? '';
+  return {
+    from: range.from,
+    to: range.to,
+    ...(q ? { q } : {}),
+    ...(range.customerId !== undefined ? { customerId: range.customerId } : {}),
+    ...(range.productId !== undefined ? { productId: range.productId } : {}),
+    ...(range.paymentMethod !== undefined ? { paymentMethod: range.paymentMethod } : {}),
+    ...(range.fulfilment !== undefined ? { fulfilment: range.fulfilment } : {}),
+    ...(range.state !== undefined ? { state: range.state } : {}),
+  };
+}
+
 /** The rep's own orders made on the days of a range, newest first, with the range's summary. */
 export function useOrders(range: OrderRange | null) {
   const { session } = useSignedIn();
-  const q = range?.q.trim() ?? '';
+  const params = range ? orderParams(range) : null;
   return useInfiniteQuery({
-    queryKey: ['rep', 'orders', range?.from, range?.to, q],
+    queryKey: ['rep', 'orders', params],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await session.client.GET('/api/v1/sales-rep/orders', {
           params: {
             query: {
-              from: range?.from ?? '',
-              to: range?.to ?? '',
-              ...(q ? { q } : {}),
+              ...(params ?? { from: '', to: '' }),
               ...(pageParam ? { cursor: pageParam } : {}),
               limit: PAGE,
             },
@@ -221,7 +238,24 @@ export function useOrders(range: OrderRange | null) {
         }),
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    enabled: range !== null,
+    enabled: params !== null,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many orders a filter would show (the order filter's «N захиалга харуулах»). */
+export function useOrderCount(range: OrderRange, enabled: boolean) {
+  const { session } = useSignedIn();
+  const params = orderParams(range);
+  return useQuery({
+    queryKey: ['rep', 'orders', 'count', params],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/orders', {
+          params: { query: { ...params, limit: 1 } },
+        }),
+      ).summary?.count ?? null,
+    enabled,
     placeholderData: keepPreviousData,
   });
 }
@@ -251,5 +285,18 @@ export function useQuote(lines: readonly { productUnitId: number; qty: string }[
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * The active customers with a GPS point and the rep's own last order at each (the store map, the
+ * owner 2026-10-18): `stale` when none within the server's `freshDays`, today included.
+ */
+export function useRepMap() {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'map'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/sales-rep/map')),
+    staleTime: 60_000,
   });
 }

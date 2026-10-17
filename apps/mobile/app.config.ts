@@ -18,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Bto',
   slug: 'bto-staff',
   scheme: 'bto-staff',
-  version: '0.3.0',
+  version: '0.4.0',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',
@@ -29,13 +29,25 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: Number.isSafeInteger(versionCode) && versionCode > 0 ? versionCode : 1,
     allowBackup: false,
     adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#0071E3' },
-    blockedPermissions: ['android.permission.RECORD_AUDIO'],
+    // The store map asks for the position only while it is open (foreground, the owner 2026-10-18).
+    blockedPermissions: [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.ACCESS_BACKGROUND_LOCATION',
+    ],
     softwareKeyboardLayoutMode: 'resize',
   },
   plugins: [
     'expo-router',
     ['expo-camera', { recordAudioAndroid: false }],
     'expo-secure-store',
+    [
+      'expo-location',
+      {
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+        isIosBackgroundLocationEnabled: false,
+      },
+    ],
     [
       'expo-font',
       {

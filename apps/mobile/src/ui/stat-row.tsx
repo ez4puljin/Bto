@@ -18,7 +18,7 @@ export function StatRow({
       <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>
         {item.value}
       </Text>
-      <Text style={type.caption}>{item.label}</Text>
+      <Text style={[type.caption, styles.label]}>{item.label}</Text>
     </View>
   ));
   if (!onPress) return <View style={styles.card}>{content}</View>;
@@ -43,6 +43,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   pressed: { backgroundColor: colors.accent },
+  label: { textAlign: 'center' },
   stat: { flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs },
   divided: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.border },
   value: { ...type.title3, ...tabular },
