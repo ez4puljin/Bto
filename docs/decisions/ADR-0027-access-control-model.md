@@ -6,6 +6,7 @@
 | Date | 2026-10-10 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0005 #1 (libraries, token claims), ADR-0002 #5 (how the actor reaches the audit row), ADR-0004 #5 / `docs/architecture.md` §6 (scope of an idempotency key) |
+| Amended by | ADR-0071 (#1: source systems are SOURCE principals beside STAFF; the staff token is unchanged); ADR-0075 (#2: finance permissions are resolved per company from `identity.user_company_roles`); ADR-0076 (#7: Finance Core reads are scoped by company; Bto's own reads stay unscoped) |
 
 ## Context
 

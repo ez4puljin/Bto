@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0069`. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0078`. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -82,6 +82,15 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0064](ADR-0064-pos-money.md) | POS money: no invoices, one journal entry per closed shift, the cash handed to the accountant as a voucher | Accepted | 2026-10-16 |
 | [ADR-0066](ADR-0066-desktop-density-widths.md) | The web admin on desktop screens: denser lists, one page-width rule, lists that fit the window, sticky dialog footers, the menu in the order of the day's work, `pnpm ui:shots` | Accepted | 2026-10-16 |
 | [ADR-0067](ADR-0067-pos-edge-and-kiosk.md) | POS S2: the store edge in Docker, the snapshot it sells from, the kiosk in Chrome with a pairing code and the cashier's PIN, test receipts until ADR-0065 | Accepted | 2026-10-17 |
+| [ADR-0069](ADR-0069-finance-core-boundary.md) | Finance Core: one shared finance engine that business systems use and never reach into | Accepted | 2026-10-18 |
+| [ADR-0070](ADR-0070-tenant-company-branch-source.md) | The core's organisation model: one tenant for the owner's group, a company per legal entity, branches on every line, registered source systems | Accepted | 2026-10-18 |
+| [ADR-0071](ADR-0071-finance-intake-contract.md) | Source systems post through one versioned intake contract with a durable source key | Accepted | 2026-10-18 |
+| [ADR-0072](ADR-0072-posting-rules-and-open-items.md) | The core books by configuration: posting keys resolved to accounts by rules, and receivables, payables and advances kept as open items | Accepted | 2026-10-18 |
+| [ADR-0073](ADR-0073-billing-owns-commercial-documents.md) | Bto's `billing` module owns the product invoice, the sales return and the credit policy; the core owns the money side | Accepted | 2026-10-18 |
+| [ADR-0074](ADR-0074-mongolian-localisation-layer.md) | Mongolian tax rules, e-Barimt and QPay form a shared localisation layer keyed by source documents, used by every system | Accepted | 2026-10-18 |
+| [ADR-0075](ADR-0075-periods-approvals-rights.md) | Monthly periods per company with a guarded close and an audited reopen, drafts with approval, and separate rights | Accepted | 2026-10-18 |
+| [ADR-0076](ADR-0076-company-isolation.md) | Company data is isolated on the server by scoped keys, scoped services and filtered views; row-level security is prepared, not enabled | Accepted | 2026-10-18 |
+| [ADR-0077](ADR-0077-finance-core-scope-and-roadmap.md) | Bto's books replace Erkhet on the go-live day, so the core's go-live scope is the full set of books, built in phases from now | Accepted | 2026-10-18 |
 
 ## Template
 

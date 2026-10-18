@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0027 (#5: the actor reaches `AuditService.record` as an explicit `AuthContext`, not through an async context), ADR-0045 (#8 in practice: the first integration, `integrations/llm`, is called only from `ai`'s `ask-flow.service.ts`; ESLint now also refuses `fetch` and LLM calls inside transaction callbacks) |
+| Amended by | ADR-0027 (#5: the actor reaches `AuditService.record` as an explicit `AuthContext`, not through an async context); ADR-0045 (#8 in practice: the first integration, `integrations/llm`, is called only from `ai`'s `ask-flow.service.ts`; ESLint now also refuses `fetch` and LLM calls inside transaction callbacks); ADR-0069 (#3: a third element type beside modules and integrations, `apps/api/src/finance-core/`, which imports no module and is reached only through its `index.ts`) |
 
 ## Context
 
