@@ -58,6 +58,7 @@ Permissions (ADR-0027 system mappings, assignable to custom roles): `partners.cu
 | Method and path | Access | Notes |
 |---|---|---|
 | `GET /customers` | `partners.customers.read` | `q` (name in either script, code; digits also match code, phone, TIN and registration number exactly, then code prefixes), `kind`, `status`, `creditHold`, `tinPending` (a company without a TIN), `gpsMissing` (the default address has no point), `segmentId` (a customer segment, ADR-0049; another entity's is 422, an archived one 404), keyset `cursor`/`limit`. Rows are `CustomerListItem`: the summary plus `consumerNo`, payer flags with `taxStatusSource`, `creditLimit`, `paymentTerm` (own, company setting or unset), `creditHoldReason`, `note`, the default address's `gps` point and the first `contact` (ADR-0037) |
+| `GET /customers/lookup?q=` | authenticated | up to 20 active customers (id, code, name) by the list's `q`, for pickers such as a goods issue's recipient (ADR-0081 #6); no credit, phones or addresses |
 | `GET /customers/next-code` | `partners.customers.manage` | the largest code + 1, same width |
 | `GET /customers/:id` | `partners.customers.read` | data, credit terms with `paymentTerm`, active addresses (default first), contacts |
 | `POST /customers` | `partners.customers.manage`, `Idempotency-Key` | code optional (allocated under an advisory lock); the first address becomes the default; a taken code → `DUPLICATE_VALUE` with `params.constraint = 'customers_code_key'` |
