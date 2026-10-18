@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-16 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amends | ADR-0061 (#1: «Дэлгүүр» becomes «Бараа» and the app gains a checkout page, the user's details and a password change; #5: the facade's product filters and sorts, a supplier list, the context's warehouses and branches, orders by days and search instead of by month; #8: one cart line per product, with a contact), ADR-0062 (#3: the popup and the list as the Launch and Notifications boards draw them, with a toast after the popup) |
+| Amends | ADR-0061 (#1: «Дэлгүүр» becomes «Бараа» and the app gains a checkout page, the user's details and a password change; #5: the facade's product filters and sorts, a supplier list, the context's warehouses and branches, orders by days and search instead of by month; #8: one cart line per product, with a contact; #5 again, 2026-10-18, #23: a store's order history shows every order of the store, not only the rep's own), ADR-0062 (#3: the popup and the list as the Launch and Notifications boards draw them, with a toast after the popup) |
 
 ## Context
 
@@ -88,6 +88,16 @@ The owner walked 0.3.0 on the phone and asked: no contact person on «Захиа
 21. **The store map**: `GET /sales-rep/map` lists every active customer the rep may see that has a GPS point — the default address's, else the oldest active address with one (with its `addressId`) — with the rep's own newest SALES_REP order that is not cancelled (drafts count) and `stale` when there is none within the last 7 Ulaanbaatar days, today included (`REP_MAP_FRESH_DAYS`, `storeIsStale`). The app draws it with MapLibre GL JS inside an Expo DOM component (the already linked `@expo/dom-webview`, so no native map module and no Google key) over OpenFreeMap's tiles; maplibre's worker file comes from jsDelivr pinned to the installed version and checked by SHA-384, because Metro cannot bundle it. The rep's position comes from `expo-location`, foreground only (background location blocked).
 22. **Version 0.4.0.**
 
+### A store's order history and direct calls (the owner, 2026-10-18)
+
+The owner asked that a tap on a store's number on the map call at once, and that the store's card show its order history with who took each order and when. Answers: the history shows every order of the store (the office's, other reps', the rep's own), each with who took it, the date and time, the amount and the status; only the rep's own orders open; a tap calls at once, with the permission asked once; the contact persons' phones are listed too. The map's colour stays as #21 (only the rep's own orders count), on OpenStreetMap tiles. On the same walk the owner removed a product's quick steps and asked for satellite pictures, then chose to stay on OpenStreetMap (#25, #26).
+
+23. **A store's order history** (amends ADR-0061 #5, the one read of other people's orders): `GET /sales-rep/customers/:id/orders` returns every order of a customer the rep may see (`CustomersService.isVisible`, else 404), of any channel, author and status, newest first, keyset by id (20 a page, at most 50), each with `takerName` (identity's `UserNamesService`), `createdDate` and `createdTime` in Ulaanbaatar, `total` (frozen) or a draft's `estimatedTotal` (#20), `lineCount`, and `mine` — the caller's own SALES_REP order, exactly the ones `GET /sales-rep/orders/:id` opens. Nothing else of another person's order is shown: no lines, no customer data beyond the card. The store card shows the newest three right below its status, with «Бүгдийг харах» and a footer button to the whole history (`/store-orders/[id]`, by days); the rep's own rows open the order page with a chevron, everyone else's are plain rows. «Сүүлийн захиалга» is gone from the card.
+24. **Direct calls**: a tap on the store's phone, a contact person's phone (every contact with a phone is listed under the store's) or «Залгах» starts Android's `ACTION_CALL` through `expo-intent-launcher` (a new native module, 57.0.1) with `android.permission.CALL_PHONE`, asked on the first tap only; after a «no», off Android, or when Android refuses, the dialer opens with the number filled in. Taps within 2 s of a placed call do nothing more (a double tap would otherwise place a second call or open the dialer over it).
+25. **No quick steps on a product** (amends #4's product page): the owner removed «+1 +5 +10»; − n + and the keypad stay.
+26. **The map stays on OpenStreetMap** (#21 unchanged): the owner asked for satellite pictures; Google's map needs a billed Google Cloud key, and Esri's World Imagery an ArcGIS account and a key built into the APK, so the owner chose to stay on OpenFreeMap's tiles.
+27. **Version 0.5.0.**
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
@@ -107,15 +117,21 @@ The owner walked 0.3.0 on the phone and asked: no contact person on «Захиа
 | Native MapLibre (@maplibre/maplibre-react-native) | About 15 MB more APK, a version Expo does not pin and another codegen target under Windows' path limit; the DOM component is enough for hundreds of stores. |
 | Store a draft's estimate on the order | Prices move until submit; an estimate computed on reading is never stale and freezing stays at submit. |
 | Count every channel's orders on the map | The owner chose the rep's own orders. |
+| Only the rep's own orders in a store's history (2026-10-18) | The owner wants to see who else took orders at a store and when; the rows show no lines and do not open. |
+| Open every order of the history | The owner chose only the rep's own; the order page stays "own orders" (ADR-0061 #5). |
+| The dialer only (`tel:` without the permission) | The owner asked for a call at once; the dialer stays as the fallback. |
+| Satellite pictures (Esri World Imagery, Google) (2026-10-18) | Both need an account and a key, Google's on a billed project, and the key would ship inside every APK; the owner chose to stay on OpenStreetMap. Esri's raster tiles drop into the MapLibre style if this is asked again. |
 
 ## Consequences
 
-- The phone app's screens, kit and tests change; its version is 0.2.0, then 0.3.0 after the owner's first look (0.2.1 only added the request time limit). A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
+- The phone app's screens, kit and tests change; its version is 0.2.0, then 0.3.0 after the owner's first look (0.2.1 only added the request time limit), 0.4.0 after the second and 0.5.0 with a store's history and direct calls. A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
 - The facade asks catalog, pricing, partners, inventory and identity for small read-only answers (`docs/modules/*.md`): the NEW sort and `onlyIds` in catalog's product list, with batch reads of pictures and unit flags that stay out of `/products`; pricing's shop prices and its order by base price; partners' main-supplier counts; inventory's products free at home; the session's start in identity.
 - A price sort reads up to 100,000 product ids twice per page (catalog, then pricing); about 20,000 today.
 - The design's board files stay the reference for later changes to the app. Text sizes are the documented exception (#11): smaller than the boards.
 - `GET /sales-rep/thumbs` reads every shop product's id, like the suppliers' list, and one file row per primary picture. The phone checks it at most every 6 hours.
 - Capping the font scaling at 1.15 trades some of a large phone setting for layouts that do not break.
+- #23 lets a rep see other reps' and the office's orders of a store (number, taker's name, time, amount, status). When reps are limited to zones (delivery 7, `visibleTo`), the history follows the same limit.
+- #24 adds a native module and a dangerous permission: an APK or dev client built before it crashes when the map loads (`ExpoIntentLauncher` is missing), so the phone needs a fresh `pnpm mobile:apk`.
 
 ## Related
 

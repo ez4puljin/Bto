@@ -92,7 +92,7 @@ AI views (ADR-0045):
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
 | `SALE_LISTENER`, `SaleListener`, `SaleNotice` | the hook notifications binds (ADR-0062 #4): `onSale(tx, notice)` with the order id and number, channel, author, customer, frozen total and invoice number, inside the sale's transaction; one statement, never caught |
 
-`SalesRepOrdersService` (`context`, `create`, `list`, `map`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `suppliers`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported. The shop reads catalog's `ProductQueryService` (the list with a condition tree and `onlyIds`, `imagesOf`, `unitFlagsOf`) and `ProductFiltersService`, pricing's `shopPricesOf` and `orderedByBasePrice`, partners' `mainSupplierCounts` and inventory's `productIdsAvailableAtHome` (ADR-0068); the map reads partners' `CustomersService.located`; a draft's estimate (ADR-0068 #20) runs pricing's `PriceQuoteService.quote` outside any transaction.
+`SalesRepOrdersService` (`context`, `create`, `list`, `map`, `storeOrders`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `suppliers`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported. The shop reads catalog's `ProductQueryService` (the list with a condition tree and `onlyIds`, `imagesOf`, `unitFlagsOf`) and `ProductFiltersService`, pricing's `shopPricesOf` and `orderedByBasePrice`, partners' `mainSupplierCounts` and inventory's `productIdsAvailableAtHome` (ADR-0068); the map reads partners' `CustomersService.located`; a store's order history (ADR-0068 #23) checks partners' `CustomersService.isVisible` and names the takers through identity's `UserNamesService.namesOf`; a draft's estimate (ADR-0068 #20) runs pricing's `PriceQuoteService.quote` outside any transaction.
 
 ## 4. REST surface
 
@@ -101,7 +101,7 @@ Permissions:
 - `sales.orders.manage` (OFFICE, ADMIN; assignable) creates, submits and cancels.
 - `sales.orders.pick` (WAREHOUSE, ADMIN) picks.
 - `sales.boards.manage` (ADMIN; assignable) configures.
-- `sales.orders.rep` (SALES_REP, ADMIN; assignable) opens `/sales-rep/*` only (ADR-0061 #5): a rep holds neither `sales.orders.read` nor `manage`, nor `partners.customers.read`.
+- `sales.orders.rep` (SALES_REP, ADMIN; assignable) opens `/sales-rep/*` only (ADR-0061 #5): a rep holds neither `sales.orders.read` nor `manage`, nor `partners.customers.read`. `/sales-rep/*` answers with the caller's own orders, with one exception: a store's order history (`GET /sales-rep/customers/:id/orders`, ADR-0068 #23) lists every order of the store, everyone's, as rows only; only the caller's own open.
 
 Every board, pipeline and stage route carries `sales.orders.read`; the service checks the rest.
 
@@ -143,6 +143,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `GET /sales-rep/suppliers` | The main suppliers of the shop's products (ACTIVE and sale-ready), with how many each has, the most first: the filter's supplier list |
 | `GET /sales-rep/thumbs` | `{ urls }`: the primary picture's thumbnail of every product the shop lists (relative URLs that never change), for the phone to keep once (ADR-0068 #15); catalog's `primaryThumbsOf` over the same shop ids as the suppliers' list |
 | `GET /sales-rep/customers?q&cursor&limit`, `GET /sales-rep/customers/:id` | ACTIVE customers (`CustomersService.list`, so `visibleTo` applies): id, code, name, phone, address. One customer: its live addresses (the default first) and contacts; 404 when not ACTIVE. No credit data |
+| `GET /sales-rep/customers/:id/orders?cursor&limit` | A store's order history (ADR-0068 #23): every order of a customer the caller may see (`CustomersService.isVisible`, else 404 `NOT_FOUND`), any channel, author and status, newest first, keyset by id (`limit` 20 by default, 1–50; `REP_STORE_ORDER_PAGE_LIMIT`). Each `{ id, number, status, channel, createdAt, createdDate, createdTime, takerName, mine, total, estimatedTotal, lineCount }`: `createdDate` / `createdTime` (HH:mm) in Ulaanbaatar; `takerName` the author's full name (null when unknown); `mine` = the caller's own SALES_REP order, exactly what `GET /sales-rep/orders/:id` opens (a rep's own order on another channel is not `mine`); `total` frozen, `estimatedTotal` a DRAFT's quote as in the list (#20). No lines and no other detail of another person's order |
 
 ## 5. Rules worth knowing
 
