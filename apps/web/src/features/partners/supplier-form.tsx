@@ -15,7 +15,7 @@ import { PartnerFormFrame } from './form-frame';
 import { fieldOfDuplicate, type SupplierFormValues, supplierSchema } from './partner-schema';
 import { localPhone } from './phone';
 
-type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note'>;
+type TextField = Exclude<keyof SupplierFormValues, 'status' | 'note' | 'vatPayer'>;
 interface FieldSpec {
   name: TextField;
   inputMode?: 'numeric' | 'tel' | 'email';
@@ -145,7 +145,30 @@ export function SupplierForm(props: {
           <Textarea id="supplier-note" rows={2} {...form.register('note')} />
         </FormRow>
       </FormSection>
-      <FormSection title={t('partners.supplier.sectionMoney')}>{MONEY.map(row)}</FormSection>
+      <FormSection title={t('partners.supplier.sectionMoney')}>
+        {MONEY.map(row)}
+        <FormRow
+          label={t('partners.supplier.vatPayer')}
+          htmlFor="supplier-vatPayer"
+          align="center"
+          hint={t('partners.supplier.vatPayerHint')}
+        >
+          <Controller
+            control={form.control}
+            name="vatPayer"
+            render={({ field }) => (
+              <div className="flex items-center gap-2.5">
+                <Switch
+                  id="supplier-vatPayer"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+                <span className="text-sm">{t(field.value ? 'common.yes' : 'common.no')}</span>
+              </div>
+            )}
+          />
+        </FormRow>
+      </FormSection>
     </fieldset>
   );
   const buttons = props.readOnly ? null : (
@@ -205,7 +228,16 @@ export function SupplierFacts({ detail }: { detail: SupplierDetail }) {
           { label: t('partners.supplier.note'), value: detail.note },
         ]}
       />
-      <FieldList title={t('partners.supplier.sectionMoney')} items={items(MONEY)} />
+      <FieldList
+        title={t('partners.supplier.sectionMoney')}
+        items={[
+          ...items(MONEY),
+          {
+            label: t('partners.supplier.vatPayer'),
+            value: t(detail.vatPayer ? 'common.yes' : 'common.no'),
+          },
+        ]}
+      />
     </div>
   );
 }

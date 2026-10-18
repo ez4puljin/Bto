@@ -6,6 +6,7 @@ import { IdentityModule, WAREHOUSE_CREATED_HOOK } from '../identity';
 import { PartnersModule } from '../partners';
 import { InventoryAttentionController } from './controllers/attention.controller';
 import { BinsController, ProductLocationsController } from './controllers/bins.controller';
+import { IssueLinesController, IssuesController } from './controllers/issues.controller';
 import {
   AdjustmentLinesController,
   AdjustmentsController,
@@ -27,6 +28,8 @@ import { ProductRegistrationService } from './services/product-registration.serv
 import { ReceiptsService } from './services/receipts.service';
 import { ReservationService } from './services/reservation.service';
 import { StockPostingService } from './services/stock-posting.service';
+import { GoodsIssuesService } from './services/goods-issues.service';
+import { IssueExpenseTypesService } from './services/issue-expense-types.service';
 import { StockQueryService } from './services/stock-query.service';
 import { StocktakesService } from './services/stocktakes.service';
 import { SystemBinsService } from './services/system-bins.service';
@@ -34,6 +37,8 @@ import { TransfersService } from './services/transfers.service';
 
 const CORE_SERVICES = [
   AdjustmentsService,
+  GoodsIssuesService,
+  IssueExpenseTypesService,
   InventoryAttentionService,
   BinMovesService,
   BinsService,
@@ -63,13 +68,20 @@ const CORE_SERVICES = [
 })
 export class InventoryModule {}
 
-/** Creates the system bins of warehouses made before inventory existed, before requests arrive. */
+/**
+ * Creates the system bins of warehouses made before inventory existed and the default expense types
+ * of goods issues (ADR-0081), before requests arrive.
+ */
 @Injectable()
 export class InventoryBootstrap implements OnApplicationBootstrap {
-  constructor(private readonly systemBins: SystemBinsService) {}
+  constructor(
+    private readonly systemBins: SystemBinsService,
+    private readonly expenseTypes: IssueExpenseTypesService,
+  ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.systemBins.backfill();
+    await this.expenseTypes.ensureDefaults();
   }
 }
 
@@ -78,6 +90,8 @@ export class InventoryBootstrap implements OnApplicationBootstrap {
   imports: [InventoryModule],
   controllers: [
     BinsController,
+    IssuesController,
+    IssueLinesController,
     ProductLocationsController,
     ProductRegistrationsController,
     ReceiptsController,

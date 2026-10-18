@@ -70,6 +70,8 @@ export const importJobs = pgTable(
     errorRows: integer('error_rows').notNull().default(0),
     warningRows: integer('warning_rows').notNull().default(0),
     heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
+    /** What the import's dialog chose for the whole file (a receipts import: warehouse, payment). */
+    options: jsonb('options'),
     /** Counts by action and code, file-level problems, what the commit did. */
     summary: jsonb('summary'),
     lastError: text('last_error'),

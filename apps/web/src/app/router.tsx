@@ -23,6 +23,7 @@ import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustment
 import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
+import { IssuePage, IssuesPage } from '@/features/inventory/issues-pages';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
@@ -227,18 +228,18 @@ export const routes: RouteObject[] = [
           { path: 'inventory/movements', handle: { width: 'wide' }, element: <MovementsPage /> },
           { path: 'inventory/low-stock', handle: { width: 'wide' }, element: <LowStockPage /> },
           { path: 'inventory/receipts', handle: { width: 'wide' }, element: <ReceiptsPage /> },
-          // Old links: a receipt is created in the list's dialog and costed on its own page.
-          {
-            path: 'inventory/receipts/new',
-            handle: { width: 'wide' },
-            element: <Navigate to="/inventory/receipts?new=1" replace />,
-          },
+          // One page for a new receipt (`new`) and an existing one, so the page that creates a
+          // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects
+          // here. The old costing page is the receipt itself.
           { path: 'inventory/receipts/:id', handle: { width: 'wide' }, element: <ReceiptPage /> },
           {
             path: 'inventory/receipts/:id/costing',
             handle: { width: 'wide' },
             element: <Navigate to=".." relative="path" replace />,
           },
+          // Goods issues (ADR-0081): one page for a new issue (new) and an existing one, like receipts.
+          { path: 'inventory/issues', handle: { width: 'wide' }, element: <IssuesPage /> },
+          { path: 'inventory/issues/:id', handle: { width: 'wide' }, element: <IssuePage /> },
           { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
           {
             path: 'pricing/profiles/:id',

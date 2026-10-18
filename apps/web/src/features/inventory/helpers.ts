@@ -122,9 +122,15 @@ export interface CostEntry {
 /** The amount a receipt line will be costed at, or null while its field is empty or invalid. */
 export function entryAmount(entry: CostEntry, enteredQty: string): Decimal | null {
   if (entry.free) return new Decimal(0);
-  const value = entry.value.trim();
-  if (!MONEY.test(value)) return null;
+  const value = parseMoney(entry.value);
+  if (value === null) return null;
   return entry.source === 'amount' ? new Decimal(value) : lineAmountOf(value, enteredQty);
+}
+
+/** A typed MNT amount as the API takes it ("," read as the decimal mark), or null. */
+export function parseMoney(text: string): string | null {
+  const value = text.trim().replace(',', '.');
+  return MONEY.test(value) ? value : null;
 }
 
 /** A transfer count as typed: in the line's unit, or in base units. */

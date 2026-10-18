@@ -55,7 +55,12 @@ export type Progress = (done: number) => Promise<void>;
  */
 export interface Importer<P = unknown> {
   readonly kind: ImportKind;
-  validate(rows: readonly SourceRow[], executor: Db | Tx): Promise<CheckedRow<P>[]>;
+  /** `job` carries the options its dialog chose (a receipts import, ADR-0078 #7). */
+  validate(
+    rows: readonly SourceRow[],
+    executor: Db | Tx,
+    job?: ImportJobRow,
+  ): Promise<CheckedRow<P>[]>;
   apply(
     tx: Tx,
     actor: Actor,

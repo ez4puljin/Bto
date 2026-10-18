@@ -17,6 +17,9 @@ export type ImportJob = Schemas['ImportJob'];
 export type ImportRow = Schemas['ImportRow'];
 export type ImportStatus = ImportJob['status'];
 export type RowFilter = 'ERRORS' | 'WARNINGS' | 'ALL';
+export type ReceiptImportOptions = Schemas['ReceiptImportOptions'];
+export type IssueImportOptions = Schemas['IssueImportOptions'];
+export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
 
 const KEYS = { imports: ['imports'] as const };
 
@@ -82,7 +85,21 @@ export function useImportMutations() {
   return {
     /** Uploads the sheet (typed as .xlsx whatever the browser says) and creates the job. */
     create: useMutation({
-      mutationFn: async ({ kind, file, key }: { kind: ImportKind; file: File; key: string }) => {
+      mutationFn: async ({
+        kind,
+        file,
+        key,
+        receiptOptions,
+        issueOptions,
+      }: {
+        kind: ImportKind;
+        file: File;
+        key: string;
+        /** A receipts import's warehouse and payment (ADR-0078). */
+        receiptOptions?: ReceiptImportOptions;
+        /** An issues import's warehouse (ADR-0081). */
+        issueOptions?: IssueImportOptions;
+      }) => {
         const fileId = await uploadFile(
           api,
           'imports.source',
@@ -91,7 +108,13 @@ export function useImportMutations() {
         return unwrap(
           await api.POST('/api/v1/imports', {
             params: { header: idempotencyKey(key) },
-            body: { kind, fileId, fileName: file.name },
+            body: {
+              kind,
+              fileId,
+              fileName: file.name,
+              ...(receiptOptions ? { receiptOptions } : {}),
+              ...(issueOptions ? { issueOptions } : {}),
+            },
           }),
         );
       },
@@ -126,4 +149,15 @@ export function useImportMutations() {
         ),
     }),
   };
+}
+
+/** The cash boxes and bank accounts a receipts import may name (ADR-0078). */
+export function useReceiptPaymentAccounts(enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['receipts', 'payment-accounts'] as const,
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/receipts/payment-accounts', { signal })),
+  });
 }

@@ -86,6 +86,8 @@ export function importsApi(app: NestExpressApplication, token: string) {
     async check(
       kind: ImportKind,
       rows: readonly Record<string, unknown>[],
+      /** Extra request fields, e.g. a receipts import's `receiptOptions` (ADR-0078). */
+      extra: Record<string, unknown> = {},
     ): Promise<ImportJobJson> {
       const fileId = await this.upload(await sheetOf(kind, rows));
       const created = (
@@ -93,7 +95,7 @@ export function importsApi(app: NestExpressApplication, token: string) {
           .post('/api/v1/imports')
           .set(auth)
           .set(idempotency())
-          .send({ kind, fileId, fileName: `${kind.toLowerCase()}.xlsx` })
+          .send({ kind, fileId, fileName: `${kind.toLowerCase()}.xlsx`, ...extra })
           .expect(201)
       ).body as ImportJobJson;
       await pipeline.validate(created.id);
