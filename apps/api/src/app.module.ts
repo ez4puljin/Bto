@@ -3,6 +3,7 @@ import { DbModule } from './common/db/db.module';
 import { HttpCoreModule } from './common/errors/http-core.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
+import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
 import { LlmModule } from './integrations/llm';
 import { AiHttpModule } from './modules/ai';
@@ -26,6 +27,7 @@ import { SegmentsHttpModule } from './modules/segments';
     HttpCoreModule,
     HealthModule,
     LlmModule,
+    FinanceCoreModule,
     IdentityHttpModule,
     CatalogHttpModule,
     PartnersHttpModule,

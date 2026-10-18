@@ -1,17 +1,20 @@
 import { HttpException } from '@nestjs/common';
 import type { ErrorCode } from '@tugeel/shared';
 import { DrizzleQueryError } from 'drizzle-orm/errors';
-import { AppError, type FieldError, type ProblemParams } from './app-error';
+import { type FieldError, isCodedError, type ProblemParams } from './coded-error';
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 export const PROBLEM_TYPE_BASE = 'https://tugeel.local/errors/';
 
-/** RFC 9457 problem details with Tugeel's stable `code` (docs/architecture.md §6). */
+/**
+ * RFC 9457 problem details with a stable `code` (docs/architecture.md §6): Bto's catalog, or the
+ * catalog of another owner such as the Finance Core's FIN_* codes (ADR-0069 #7).
+ */
 export interface ProblemDetails {
   type: string;
   title: string;
   status: number;
-  code: ErrorCode;
+  code: ErrorCode | (string & Record<never, never>);
   detail?: string;
   instance?: string;
   requestId?: string;
@@ -40,7 +43,7 @@ const CODE_BY_STATUS: Readonly<Partial<Record<number, ErrorCode>>> = {
 
 /** Maps any thrown value to problem details. Never leaks messages or stacks of unexpected errors. */
 export function toProblem(error: unknown, context: ProblemContext): ProblemDetails {
-  if (error instanceof AppError) {
+  if (isCodedError(error)) {
     return build(error.code, error.status, context, error.detail, error.params, error.errors);
   }
   if (error instanceof HttpException) {
@@ -101,7 +104,7 @@ export function loggableError(error: unknown): { err: unknown; sql?: string } {
 }
 
 function build(
-  code: ErrorCode,
+  code: string,
   status: number,
   context: ProblemContext,
   detail?: string,
