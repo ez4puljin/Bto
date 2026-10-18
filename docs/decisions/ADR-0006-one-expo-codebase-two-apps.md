@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0026 (store listings and the EAS Starter plan come with the go-live phase; development builds reach the API on the LAN) |
+| Amended by | ADR-0026 (store listings and the EAS Starter plan come with the go-live phase; development builds reach the API on the LAN); ADR-0079 (#1: the customer variant «Bto300» is Android first as a locally built APK; iOS, store listings and EAS come with go-live) |
 
 ## Context
 

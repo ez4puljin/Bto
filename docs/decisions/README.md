@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0069`. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0082`. `ADR-0069` … `ADR-0077` are the Finance Core decisions (branches `claude/finance-core-architecture-f4ec20` and `claude/optimistic-wiles-31e053`), `ADR-0078` (the goods-receipt window) and `ADR-0081` (the goods issue) are `main`'s (2026-10-18), and `ADR-0079` (the customer app) and `ADR-0080` (no QPay) are this branch's (`claude/blissful-bose-e90a79`, 2026-10-18); each arrives when its branch merges. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -33,7 +33,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0015](ADR-0015-excel-import-pipeline.md) | Excel import as a validated, previewable, idempotent, revertible job pipeline | Accepted | 2026-10-09 |
 | [ADR-0016](ADR-0016-testing-strategy.md) | Testing strategy: isolated real-Postgres integration tests plus a mandatory integrity suite | Accepted | 2026-10-09 |
 | [ADR-0017](ADR-0017-ebarimt-integration.md) | e-Barimt integration via PosAPI 3.0 on the office box, two-phase issue, certification gate | Deferred | 2026-10-09 |
-| [ADR-0018](ADR-0018-payments-qpay.md) | Payments: QPay Merchant v2 as the single QR rail, callback-then-check, Khan Bank statements | Deferred | 2026-10-09 |
+| [ADR-0018](ADR-0018-payments-qpay.md) | Payments: QPay Merchant v2 as the single QR rail, callback-then-check, Khan Bank statements | Deferred; QPay parts superseded by ADR-0080 | 2026-10-09 |
 | [ADR-0019](ADR-0019-lot-expiry-readiness.md) | Lot/expiry readiness without implementation | Deferred | 2026-10-09 |
 | [ADR-0020](ADR-0020-offline-deferred.md) | Offline mode deferred; idempotent, document-based mutations now | Deferred | 2026-10-09 |
 | [ADR-0021](ADR-0021-scanning-and-printing.md) | Scanning and printing: keyboard-wedge first, raster receipts by default, browser labels first | Accepted | 2026-10-09 |
@@ -82,6 +82,8 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0064](ADR-0064-pos-money.md) | POS money: no invoices, one journal entry per closed shift, the cash handed to the accountant as a voucher | Accepted | 2026-10-16 |
 | [ADR-0066](ADR-0066-desktop-density-widths.md) | The web admin on desktop screens: denser lists, one page-width rule, lists that fit the window, sticky dialog footers, the menu in the order of the day's work, `pnpm ui:shots` | Accepted | 2026-10-16 |
 | [ADR-0067](ADR-0067-pos-edge-and-kiosk.md) | POS S2: the store edge in Docker, the snapshot it sells from, the kiosk in Chrome with a pairing code and the cashier's PIN, test receipts until ADR-0065 | Accepted | 2026-10-17 |
+| [ADR-0079](ADR-0079-customer-app.md) | The customer app «Bto300» v1: linked stores only, phone and password without SMS, orders the office confirms, the store's full account | Accepted | 2026-10-18 |
+| [ADR-0080](ADR-0080-no-qpay.md) | No QPay anywhere: customers pay cash or by bank transfer, recorded by the accountant | Accepted | 2026-10-18 |
 
 ## Template
 
