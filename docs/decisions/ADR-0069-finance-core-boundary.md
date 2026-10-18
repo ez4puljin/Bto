@@ -34,7 +34,7 @@ The owner's interview answers that bear on the boundary (owner, 2026-10-18): the
    | Finance Core | What is equally true for a wholesaler, a hotel and a third business: the financial identity of parties, financial documents, open items and allocations, the journal, accounts and posting rules, money accounts, periods, and the core's own numbering, audit, settings and intake log |
    | Bto | Products, units, packs, warehouses, bins, orders, picking, delivery, tills, the commercial invoice and the sales return (ADR-0073), the credit policy and limits, costing |
    | The PMS (later, its own repository) | Bookings, rooms, guests, folios, housekeeping |
-   | Mongolian localisation (ADR-0074) | VAT and city-tax codes and the tax-inclusive split, e-Barimt, QPay, statutory forms, the Erkhet-style chart template |
+   | Mongolian localisation (ADR-0074) | VAT and city-tax codes and the tax-inclusive split, e-Barimt, statutory forms, the Erkhet-style chart template |
 
    The core never imports Mongolian code: tax codes, rates and the chart reach it as data, through its configuration port.
 2. **The code.** The core lives in `apps/api/src/finance-core/`, a third element type beside `modules/*` and `integrations/*` (ESLint element `api-finance-core`). Its only public API is `finance-core/index.ts`. It may import an exact list of files in `common/**` (after #7), `@tugeel/shared/money`, `@tugeel/shared/time` and `@tugeel/fin-contract`. It never imports `modules/**`, `edge/**`, `db/schema.ts`, `common/config`, `common/segments`, `common/attention.ts` or any other shared subpath. Every other element imports only `finance-core/index.ts`.

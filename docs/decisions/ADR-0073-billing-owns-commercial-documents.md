@@ -23,7 +23,7 @@ Today any overdue amount blocks every order (`credit-control.service.ts:34`), ev
 
 ## Decision
 
-1. **A Bto module `billing`.** In phase H1 (before QPay, delivery 5; ADR-0077) `modules/finance` becomes two Bto modules: `billing` (this ADR) and `fin-bridge` (the legacy finance routes, the call contexts and the party refs; ADR-0069, ADR-0071, ADR-0076). Until H1 the code stays in `modules/finance`; phase P4 only switches its writes to the intake. `MODULE_DEPS.billing = ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt', 'paygate', 'fin-bridge']` plus `finance-core/index.ts`. Sales reaches billing only through its hooks (`CREDIT_CHECKER` and `SALE_SINK`, `apps/api/src/modules/sales/hooks.ts:44`, `:100`) and never imports it.
+1. **A Bto module `billing`.** In phase H1 (before delivery 5; ADR-0077) `modules/finance` becomes two Bto modules: `billing` (this ADR) and `fin-bridge` (the legacy finance routes, the call contexts and the party refs; ADR-0069, ADR-0071, ADR-0076). Until H1 the code stays in `modules/finance`; phase P4 only switches its writes to the intake. `MODULE_DEPS.billing = ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt', 'fin-bridge']` plus `finance-core/index.ts`. Sales reaches billing only through its hooks (`CREDIT_CHECKER` and `SALE_SINK`, `apps/api/src/modules/sales/hooks.ts:44`, `:100`) and never imports it.
 
 2. **What billing owns.** The tables `invoices`, `invoice_lines`, `credit_notes` and `credit_note_lines` stay in schema `public` with every commercial column; in code the credit note becomes the sales return (`billing/sales-returns.service.ts`). Billing keeps:
    - the numbering `Н-…` and `К-…` (`FINANCE_NUMBER_DEFAULTS`, `packages/shared/src/finance/index.ts:25-31`; scopes `INV_NO` and `CN_NO` in identity's `number_sequences`), the patterns in a `billing_settings` row split off `finance_settings`;
@@ -57,7 +57,7 @@ Today any overdue amount blocks every order (`credit-control.service.ts:34`), ev
 | Alternative | Why rejected |
 |---|---|
 | The product invoice and the return in the core, with product lines | The core would carry products, units, warehouses and bins, and a PMS using it would carry Bto's code: the boundary fails the requirements' own test (ADR-0069). |
-| The invoice and the return in `sales` | Sales would import the core, `ebarimt` and `paygate`, ending ADR-0060 #1's rule that sales never imports finance; a return is not an order state. `billing` keeps the order workflow apart from the documents that bill it. |
+| The invoice and the return in `sales` | Sales would import the core and `ebarimt`, ending ADR-0060 #1's rule that sales never imports finance; a return is not an order state. `billing` keeps the order workflow apart from the documents that bill it. |
 | The credit limit and hold on the core's parties now | No second system extends credit (owner default D14); the limit, hold and term are Bto's commercial terms, and #7 is the path when one does. |
 | Commit the sale and post the invoice later, with an «awaiting finance» state | Owner D11: a refusal stops the sale. Without reservations an order would be counted twice or not at all while its post is pending. |
 | Keep today's rule: any overdue amount blocks | With credits applied only by hand, a customer who paid in advance is refused because of an invoice issued after the payment, until the accountant allocates. |
