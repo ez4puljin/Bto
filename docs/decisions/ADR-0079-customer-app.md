@@ -77,6 +77,17 @@ The owner's answers (2026-10-18, six rounds):
 
 12. **Order of work.** The `rep-app` branch lands on `main` first (its ADR-0061, ADR-0062, ADR-0068 and migration renumbering). Until then only the documents and the design boards are made. The build then runs as its own sessions (the plan in `docs/STATUS.md`).
 
+13. **The boards (approved by the owner on 2026-10-18, unchanged).** The artifact «Bto300 дэлгэц» (https://claude.ai/artifact/GFhasAC4DUASUM2WibYuRe, 15 boards on the rep app's kit) is the design CA3 builds:
+    - **Sign-in:** the «Bto300» mark, the phone with «+976» and the password with an eye, «Анх удаа эсвэл нууц үгээ мартсан» to the code screen (phone, the code as `XXXXX-XXXXX`, the new password twice, the 30-minute and 5-attempt note); the server chip only in development builds.
+    - **Tabs:** «Нүүр · Бараа · Сагс · Захиалга · Тооцоо», the cart's count on «Сагс»; «Профайл» opens from the store's initials on «Нүүр», beside the scanner and the bell with its count.
+    - **«Нүүр»:** the date and the store's name; the debt card (the amount, the overdue amount with its oldest due date, the credit bar «үлдсэн боломж / лимит» when a limit is set) opening «Тооцоо»; the unsent cart's banner; the last two orders; the favourites as three tiles.
+    - **«Бараа»:** search, «Бүгд / ★ Дуртай N», categories, sort; two cards a row with a ★ on the picture, the price a base unit, the stock word as a coloured pill (green «Байгаа», orange «Цөөхөн үлдсэн», red «Дууссан» with a faded picture and no «+»), the pack size, the cart's quantity on the card. **A product:** the picture, ★, the code and category, the stock pill, the unit switch, the unit's price, − n +, «Зарим нь хойшилж магадгүй» when the quantity may exceed the stock, the line total, «Сагсанд нэмэх / шинэчлэх». **The scanner:** the camera frame, the torch, the read product with «Хайрцгаар нээх» for a box barcode.
+    - **«Сагс»:** the credit warning card on top (the overdue amount, «илгээж болно, оффис төлбөр орсны дараа батална», a link to «Тооцоо»), one row per product with a low-stock line note, «Бараа нэмэх», the total «өнөөдрийн үнээр», «Үргэлжлүүлэх». **Checkout:** two cards «Хүргэлтээр» (the address) / «Өөрөө авна» (the centre's warehouse), four day tiles, the payment as three segments with their colours and the note that the app takes no payment, the note field, the credit warning and «оффис шалгаж батална», «Захиалга илгээх»; then «Захиалга илгээгдлээ» with the number, «≈» amount and the «Хүлээгдэж буй» pill.
+    - **«Захиалга»:** today / 7 days / this month, the count, the confirmed total and the pending count, the orders by day with the payment colour, who took it («Апп», «Оффис», «Төлөөлөгч <name>»), notes (backordered lines, a cancellation's reason), «≈» on a pending amount and the status in the customer's words: «Хүлээгдэж буй», «Батлагдсан», «Бэлтгэж буй», «Бэлэн», «Хүргэгдсэн», «Цуцлагдсан». **An order:** the progress «Илгээсэн → Батлагдсан → Бэлтгэж буй → Бэлэн → Хүргэгдсэн», the receiving, address, payment and invoice rows, the lines with «N хайрцаг хойшилсон», the total, the advice to call the office for changes, «Дахин захиалах» with a toast to the cart.
+    - **«Тооцоо»:** the debt, the overdue banner, the credit bar, the payment term; «Нэхэмжлэх (n) / Төлбөр (n)» as tabs (open invoices oldest due first with «N хоног хэтэрсэн» or «N хоног үлдсэн»; payments with their method and the invoices they settled); the bank account card with «Хуулах» and the invoice-number advice. **An invoice:** the open amount and the overdue pill, the date, due date and order, the delivered lines, a discount line, the total with «Үүнд НӨАТ», the paid amount, «Нэхэмжлэхийн дугаар хуулах».
+    - **Notifications** by day with a coloured tile per kind (confirmed, cancelled, payment recorded, due soon / overdue, the admin's notice), unread dots and «Бүгдийг уншсан»; **the launch notice** as the rep app's popup (a picture, the kind and days, dots, «Дараагийнх», «Хаах», «Бараа харах»).
+    - **«Профайл»:** the store, its code and centre; the sign-in phone, the default address and the payment term (changed only by the office); «Нууц үг солих», «Мэдэгдэл», the office's phone from a new setting `customer_app.office_phone`; «Гарах» with its question (the cart is kept).
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
@@ -105,7 +116,7 @@ The owner's answers (2026-10-18, six rounds):
 - Android only until go-live.
 
 **Follow-ups.**
-- After the `rep-app` branch lands: the design boards, then the build sessions (`docs/STATUS.md`).
+- The design boards: drawn and approved on 2026-10-18 (#13). After the `rep-app` branch lands: the build sessions (`docs/STATUS.md`).
 - TODO-VERIFY (owner): the package id `mn.butenorgil.bto300`, a 1024×1024 logo, a release key.
 - When Kharkhorin joins: a customer's centre (a new ADR).
 - Go-live (row 12): push, iOS, store listings, EAS.
