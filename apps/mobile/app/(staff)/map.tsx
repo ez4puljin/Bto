@@ -30,10 +30,14 @@ import { useToast } from '../../src/ui/toast';
 
 type Whereabouts = 'asking' | 'on' | 'denied' | 'off';
 
+/** How old the phone's last known position may be to open the map on it. */
+const LAST_KNOWN_MAX_AGE_MS = 5 * 60_000;
+
 /**
- * «Газрын зураг» (the owner, 2026-10-18): every active store with a GPS point, red without an
- * order of this rep in the last 7 days and green with one, the rep's own position, and a store's
- * card on a tap (start an order, its order history, a direct call); stores at one point are listed to pick
+ * «Газрын зураг» (the owner, 2026-10-18): every active store with a GPS point and its name, red
+ * without an order of this rep in the last 7 days, green with one and black when the accountant
+ * closed its orders, the rep's own position (where the map opens), and a store's card on a tap
+ * (start an order, its order history, a direct call); stores at one point are listed to pick
  * from. Tiles are OpenStreetMap's through OpenFreeMap (no key); the map is a DOM component
  * (src/map/store-map.tsx).
  */
@@ -104,6 +108,17 @@ export default function MapScreen() {
         setWhere('denied');
         return 'denied';
       }
+      // The phone's last fix, if recent, opens the map on the rep at once (store-map.tsx); the
+      // watch's first fix can take seconds, replaces it and, as it is live (`meLive`), moves the
+      // map there once more unless the rep has moved it.
+      void Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS }).then(
+        (position) => {
+          if (!alive.current || !position) return;
+          const { latitude: lat, longitude: lng } = position.coords;
+          setMe((current) => current ?? { lat, lng });
+        },
+        () => undefined,
+      );
       const subscription = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.Balanced, distanceInterval: 15, timeInterval: 5_000 },
         (position) => {
@@ -239,6 +254,8 @@ export default function MapScreen() {
           key={attempt}
           pins={pins}
           me={me}
+          meLive={where === 'on'}
+          locating={where === 'asking'}
           selectedId={selectedId}
           locate={locate}
           cardHeight={STORE_SHEET_HEIGHT}
@@ -283,6 +300,14 @@ export default function MapScreen() {
                     {t('mobile.map.legendFresh', { n: counts.fresh })}
                   </Text>
                 </View>
+                {counts.blocked > 0 ? (
+                  <View style={styles.legendItem}>
+                    <View style={[styles.dot, { backgroundColor: colors.blocked }]} />
+                    <Text style={[type.chip, tabular]}>
+                      {t('mobile.map.legendBlocked', { n: counts.blocked })}
+                    </Text>
+                  </View>
+                ) : null}
               </>
             )}
           </View>

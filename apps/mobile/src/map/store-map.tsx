@@ -3,24 +3,30 @@
 import type { DOMProps } from 'expo/dom';
 import {
   AttributionControl,
+  type DataDrivenPropertyValueSpecification,
+  type ExpressionSpecification,
   type FilterSpecification,
   type GeoJSONSource,
   type LngLatLike,
   Map as MapLibreMap,
   type MapMouseEvent,
   setWorkerUrl,
+  type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { colors } from '../theme/tokens';
 import {
-  boundsOf,
+  type CameraPhase,
+  cameraStep,
   centreOf,
   CLUSTER_MAX_ZOOM,
   FIT_MAX_ZOOM,
   type MapPin,
   type MapPoint,
   type MapTap,
+  ME_WAIT_MS,
+  ME_ZOOM,
   MONGOLIA,
   STORE_ZOOM,
   storeIdsOf,
@@ -75,7 +81,7 @@ interface Collection {
   features: {
     type: 'Feature';
     geometry: { type: 'Point'; coordinates: [number, number] };
-    properties: Record<string, number | boolean>;
+    properties: Record<string, number | string>;
   }[];
 }
 
@@ -85,10 +91,23 @@ function storesOf(pins: readonly MapPin[]): Collection {
     features: pins.map((pin) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [pin.lng, pin.lat] },
-      properties: { id: pin.id, stale: pin.stale },
+      properties: { id: pin.id, state: pin.state, label: pin.label },
     })),
   };
 }
+
+/** A pin's colour by its store's state (stateOf in stores.ts): black, red or green. */
+const STATE_COLOR: DataDrivenPropertyValueSpecification<string> = [
+  'match',
+  ['get', 'state'],
+  'blocked',
+  colors.blocked,
+  'stale',
+  colors.tint.red,
+  colors.tint.green,
+];
+
+const UNCLUSTERED: ExpressionSpecification = ['!', ['has', 'point_count']];
 
 function meOf(me: MapPoint | null): Collection {
   return {
@@ -106,18 +125,28 @@ function meOf(me: MapPoint | null): Collection {
 }
 
 function selectedFilter(id: number | null): FilterSpecification {
-  return ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], id ?? -1]];
+  return ['all', UNCLUSTERED, ['==', ['get', 'id'], id ?? -1]];
 }
 
+/** Every pin's name but the selected one's, which its own layer always draws. */
+function labelsFilter(id: number | null): FilterSpecification {
+  return ['all', UNCLUSTERED, ['!=', ['get', 'id'], id ?? -1]];
+}
+
+/** The layers a tap on the map looks at: pins and clusters, then the names above the pins. */
+const TAP_LAYERS = ['pins', 'clusters'];
+const LABEL_LAYERS = ['selected-label', 'labels'];
+
 function addLayers(map: MapLibreMap, pins: readonly MapPin[], me: MapPoint | null) {
+  const counted = (state: string) => ['+', ['case', ['==', ['get', 'state'], state], 1, 0]];
   map.addSource(STORES, {
     type: 'geojson',
     data: storesOf(pins),
     cluster: true,
     clusterRadius: 42,
     clusterMaxZoom: CLUSTER_MAX_ZOOM,
-    // A cluster rings red while it holds a store without an order.
-    clusterProperties: { stale: ['+', ['case', ['get', 'stale'], 1, 0]] },
+    // A cluster rings red while it holds a store without an order, else black with a blocked one.
+    clusterProperties: { stale: counted('stale'), blocked: counted('blocked') },
   });
   map.addSource(ME, { type: 'geojson', data: meOf(me) });
 
@@ -150,7 +179,7 @@ function addLayers(map: MapLibreMap, pins: readonly MapPin[], me: MapPoint | nul
     id: 'pin-shadows',
     type: 'circle',
     source: STORES,
-    filter: ['!', ['has', 'point_count']],
+    filter: UNCLUSTERED,
     paint: {
       ...shadow,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 10, 14, 12, 17, 14],
@@ -169,10 +198,72 @@ function addLayers(map: MapLibreMap, pins: readonly MapPin[], me: MapPoint | nul
         'case',
         ['>', ['get', 'stale'], 0],
         colors.tint.red,
+        ['>', ['get', 'blocked'], 0],
+        colors.blocked,
         colors.tint.green,
       ],
     },
   });
+  map.addLayer({
+    id: 'selected',
+    type: 'circle',
+    source: STORES,
+    filter: selectedFilter(null),
+    paint: {
+      'circle-radius': 20,
+      'circle-color': STATE_COLOR,
+      'circle-opacity': 0.3,
+    },
+  });
+  map.addLayer({
+    id: 'pins',
+    type: 'circle',
+    source: STORES,
+    filter: UNCLUSTERED,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 14, 8, 17, 10],
+      'circle-color': STATE_COLOR,
+      'circle-stroke-width': 3,
+      'circle-stroke-color': colors.card,
+    },
+  });
+  // The store's name above its pin (the owner, 2026-10-18), small, on a white halo, wrapped to
+  // about two lines. Names that would overlap one another are left out (MapLibre's collision, the
+  // default), the selected store's always shows: its own layer, placed first as the upper one.
+  const label: SymbolLayerSpecification['layout'] = {
+    'text-field': ['get', 'label'],
+    'text-font': ['Noto Sans Regular'],
+    'text-size': 11,
+    'text-line-height': 1.15,
+    'text-max-width': 9,
+    'text-anchor': 'bottom',
+    // Ems of the 11 px text: clears the pin (at most 10 px and its 3 px ring) with a gap.
+    'text-offset': [0, -1.3],
+    'text-padding': 2,
+  };
+  const labelPaint = {
+    'text-color': colors.foreground,
+    'text-halo-color': colors.card,
+    'text-halo-width': 1.5,
+  };
+  map.addLayer({
+    id: 'labels',
+    type: 'symbol',
+    source: STORES,
+    filter: labelsFilter(null),
+    layout: label,
+    paint: labelPaint,
+  });
+  map.addLayer({
+    id: 'selected-label',
+    type: 'symbol',
+    source: STORES,
+    filter: selectedFilter(null),
+    layout: { ...label, 'text-allow-overlap': true },
+    paint: labelPaint,
+  });
+  // A cluster's count, over the names: MapLibre places symbols from the upper layer down, so the
+  // counts always show (`text-allow-overlap`) and, in the collision index, hide a name over them.
   map.addLayer({
     id: 'cluster-count',
     type: 'symbol',
@@ -183,32 +274,8 @@ function addLayers(map: MapLibreMap, pins: readonly MapPin[], me: MapPoint | nul
       'text-font': ['Noto Sans Bold'],
       'text-size': 13,
       'text-allow-overlap': true,
-      'text-ignore-placement': true,
     },
     paint: { 'text-color': colors.foreground },
-  });
-  map.addLayer({
-    id: 'selected',
-    type: 'circle',
-    source: STORES,
-    filter: selectedFilter(null),
-    paint: {
-      'circle-radius': 20,
-      'circle-color': ['case', ['get', 'stale'], colors.tint.red, colors.tint.green],
-      'circle-opacity': 0.3,
-    },
-  });
-  map.addLayer({
-    id: 'pins',
-    type: 'circle',
-    source: STORES,
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 14, 8, 17, 10],
-      'circle-color': ['case', ['get', 'stale'], colors.tint.red, colors.tint.green],
-      'circle-stroke-width': 3,
-      'circle-stroke-color': colors.card,
-    },
   });
   map.addLayer({
     id: 'me-dot',
@@ -224,22 +291,24 @@ function addLayers(map: MapLibreMap, pins: readonly MapPin[], me: MapPoint | nul
 }
 
 /**
- * What a tap hit (tapOf in stores.ts): what lies right under the finger first, else what lies
- * within a finger's slop around it. Clusters carry `cluster_id`, pins the store's `id`.
+ * What a tap hit (tapOf in stores.ts): a pin or a cluster right under the finger first, else a
+ * store's name under it, else what lies within a finger's slop around it. Clusters carry
+ * `cluster_id`, pins and names the store's `id`.
  */
 function tapAt(map: MapLibreMap, event: MapMouseEvent): MapTap | null {
   const { x, y } = event.point;
-  const layers = ['pins', 'clusters'];
-  const exact = map.queryRenderedFeatures([x, y], { layers });
+  const exact = map.queryRenderedFeatures([x, y], { layers: TAP_LAYERS });
+  const named =
+    exact.length > 0 ? exact : map.queryRenderedFeatures([x, y], { layers: LABEL_LAYERS });
   const found =
-    exact.length > 0
-      ? exact
+    named.length > 0
+      ? named
       : map.queryRenderedFeatures(
           [
             [x - TAP_SLOP, y - TAP_SLOP],
             [x + TAP_SLOP, y + TAP_SLOP],
           ],
-          { layers },
+          { layers: TAP_LAYERS },
         );
   return tapOf(found.map((feature) => feature.properties as Record<string, unknown>));
 }
@@ -260,10 +329,15 @@ function isSourceError(event: object): boolean {
   return 'sourceId' in event || 'tile' in event;
 }
 
+/**
+ * `onTouch`: the rep moved the map (a drag, a pinch, a double tap) or tapped a store, so it no
+ * longer moves to the rep's position by itself.
+ */
 function createMap(
   element: HTMLDivElement,
   latest: { readonly current: Latest },
   onLoad: (map: MapLibreMap) => void,
+  onTouch: () => void,
 ): MapLibreMap {
   const map = new MapLibreMap({
     container: element,
@@ -319,9 +393,15 @@ function createMap(
     void latest.current.onPinsPress(ids);
   };
 
+  // A move of the rep's own carries the gesture's event; the camera's own moves carry none.
+  map.on('movestart', (event) => {
+    if (event.originalEvent) onTouch();
+  });
+
   map.on('click', (event) => {
     const hit = tapAt(map, event);
     if (!hit) return;
+    onTouch();
     if (hit.kind === 'pin') {
       openPin(hit.id, event.lngLat);
       return;
@@ -360,6 +440,8 @@ const fill: CSSProperties = { position: 'fixed', inset: 0, background: colors.ca
 export default function StoreMap({
   pins,
   me,
+  meLive,
+  locating,
   selectedId,
   locate,
   cardHeight,
@@ -369,9 +451,19 @@ export default function StoreMap({
   onMapError,
   onMapLoad,
 }: {
-  /** null while the stores load: the map stays on Mongolia and fits the pins once they come. */
+  /** null while the stores load: the map draws them once they come. */
   pins: MapPin[] | null;
   me: MapPoint | null;
+  /**
+   * `me` is a live fix of the phone; before it, `me` may be the phone's last known position, which
+   * opens the map only provisionally (cameraStep).
+   */
+  meLive: boolean;
+  /**
+   * The rep's position is asked for and may still come: the map opens on it, waiting on Mongolia
+   * for ME_WAIT_MS at most; without it (refused, off, too slow) the map opens on the pins.
+   */
+  locating: boolean;
   selectedId: number | null;
   /** Bumped by the screen's «my location» button: the map flies to `me`. */
   locate: number;
@@ -401,8 +493,14 @@ export default function StoreMap({
     onMapError,
     onMapLoad,
   });
-  const fitted = useRef(false);
+  /** How far the map's opening has come (cameraStep in stores.ts), and whether the rep moved it. */
+  const camera = useRef<{ phase: CameraPhase; touched: boolean }>({
+    phase: 'waiting',
+    touched: false,
+  });
   const [map, setMap] = useState<MapLibreMap | null>(null);
+  /** The wait for the rep's position is over: the map opens on the pins if it has none. */
+  const [waited, setWaited] = useState(false);
 
   // Every prop arrives again as new JSON on each of the screen's renders: compare by value.
   const pinsKey = pins === null ? null : JSON.stringify(pins);
@@ -421,9 +519,16 @@ export default function StoreMap({
       () => {
         if (gone || !container.current) return;
         try {
-          created = createMap(container.current, latest, (loaded) => {
-            if (!gone) setMap(loaded);
-          });
+          created = createMap(
+            container.current,
+            latest,
+            (loaded) => {
+              if (!gone) setMap(loaded);
+            },
+            () => {
+              camera.current.touched = true;
+            },
+          );
         } catch {
           // MapLibre throws when the web view cannot give it a WebGL context.
           void latest.current.onMapError();
@@ -433,32 +538,54 @@ export default function StoreMap({
         if (!gone) void latest.current.onMapError();
       },
     );
+    // The wait for the rep's position runs from the mount, while the style and the stores load.
+    const timer = setTimeout(() => {
+      if (!gone) setWaited(true);
+    }, ME_WAIT_MS);
     return () => {
       gone = true;
+      clearTimeout(timer);
       created?.remove();
     };
   }, []);
 
-  // New pins (the data, or the «only stale» toggle); the first ones are fitted into view.
+  // New pins (the data, or the «only stale» toggle).
   useEffect(() => {
     const current = latest.current.pins;
     if (!map || pinsKey === null || current === null) return;
     void map.getSource<GeoJSONSource>(STORES)?.setData(storesOf(current));
-    if (fitted.current) return;
-    fitted.current = true;
-    const bounds = boundsOf(current);
-    if (!bounds) return;
-    const [[west, south], [east, north]] = bounds;
-    if (west === east && south === north) {
-      map.jumpTo({ center: [west, south], zoom: STORE_ZOOM });
+  }, [map, pinsKey]);
+
+  // The opening view (cameraStep): the rep's position, else after the wait the pins, and a
+  // position that comes late once, while the rep has not moved the map.
+  const expectMe = locating && !waited;
+  useEffect(() => {
+    if (!map) return;
+    const before = camera.current.phase;
+    const { phase, move } = cameraStep(before, {
+      me: latest.current.me,
+      meLive,
+      pins: latest.current.pins,
+      expectMe,
+      touched: camera.current.touched,
+    });
+    camera.current.phase = phase;
+    if (!move) return;
+    if (move.kind === 'me') {
+      // Straight there on opening; a late position glides in from the pins, a live fix from the
+      // last known position.
+      if (before === 'waiting') map.jumpTo({ center: move.center, zoom: ME_ZOOM });
+      else map.easeTo({ center: move.center, zoom: Math.max(map.getZoom(), ME_ZOOM) });
+    } else if (move.kind === 'point') {
+      map.jumpTo({ center: move.center, zoom: STORE_ZOOM });
     } else {
-      map.fitBounds(bounds, {
+      map.fitBounds(move.bounds, {
         padding: { top: 110, bottom: 80 + insetBottom, left: 40, right: 40 },
         maxZoom: FIT_MAX_ZOOM,
         duration: 0,
       });
     }
-  }, [map, pinsKey, insetBottom]);
+  }, [map, pinsKey, meKey, meLive, expectMe, insetBottom]);
 
   // The credit stays clear of the phone's navigation bar and of the «my location» button.
   useEffect(() => {
@@ -473,12 +600,17 @@ export default function StoreMap({
   }, [map, meKey]);
 
   useEffect(() => {
-    map?.setFilter('selected', selectedFilter(selectedId));
+    if (!map) return;
+    map.setFilter('selected', selectedFilter(selectedId));
+    map.setFilter('selected-label', selectedFilter(selectedId));
+    map.setFilter('labels', labelsFilter(selectedId));
   }, [map, selectedId]);
 
   useEffect(() => {
     const here = latest.current.me;
     if (locate === 0 || !map || !here) return;
+    // The rep asked for it: the map's own opening is over.
+    camera.current.phase = 'settled';
     map.flyTo({ center: [here.lng, here.lat], zoom: Math.max(map.getZoom(), STORE_ZOOM - 1) });
   }, [map, locate]);
 

@@ -19,7 +19,7 @@ import { useOrders, useProducts, useRepContext, useRepMap } from '../../../src/a
 import { presetRange } from '../../../src/dates/calendar';
 import { formatMillions, formatMnt, initialsOf } from '../../../src/format/format';
 import { dateLineOf, givenNameOf, newProductsOf } from '../../../src/home/home';
-import { countsOf } from '../../../src/map/stores';
+import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
 import { EMPTY_FILTERS } from '../../../src/shop/filters';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
@@ -92,18 +92,27 @@ export default function HomeScreen() {
       ? t('mobile.orders.approx', { amount: shortMoney(t, summary.draftsEstimate) })
       : null;
 
-  // The store map's card: how many located stores have no order of the rep lately.
+  // The store map's card: how many located stores have no order of the rep lately, and how many
+  // the accountant closed (as the map's legend counts them: a closed store is not «stale»).
   const storeMap = useRepMap();
   const mapCounts = storeMap.data ? countsOf(storeMap.data.data) : null;
+  const freshDays = storeMap.data?.freshDays ?? 0;
   const mapLine = !storeMap.data
     ? storeMap.isLoading
       ? t('common.loading')
       : null
     : storeMap.data.data.length === 0
       ? t('mobile.map.noStores')
-      : mapCounts && mapCounts.stale > 0
-        ? t('mobile.map.staleCount', { n: mapCounts.stale, days: storeMap.data.freshDays })
-        : t('mobile.map.allFresh', { days: storeMap.data.freshDays });
+      : mapCounts && !allOrdered(mapCounts)
+        ? [
+            mapCounts.stale > 0
+              ? t('mobile.map.staleCount', { n: mapCounts.stale, days: freshDays })
+              : null,
+            mapCounts.blocked > 0 ? t('mobile.map.legendBlocked', { n: mapCounts.blocked }) : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : t('mobile.map.allFresh', { days: freshDays });
 
   const refresh = async () => {
     setRefreshing(true);

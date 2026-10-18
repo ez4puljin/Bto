@@ -32,6 +32,8 @@ export const colors = {
   violet: '#4B3FC9',
   violetSoft: '#EFEDFD',
   cancelled: '#C00012',
+  /** A store whose orders the accountant closed (credit hold): its map pin, dot and card banner. */
+  blocked: '#1C1C1E',
   /** The search field, segmented controls and the stepper's track. */
   fieldFill: 'rgba(118,118,128,0.12)',
   /** The switch's track when off. */

@@ -1,4 +1,4 @@
-import { History, MapPin, Phone, ShoppingCart, Store, UserRound } from 'lucide-react-native';
+import { History, Lock, MapPin, Phone, ShoppingCart, Store, UserRound } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -21,7 +21,8 @@ export const STORE_SHEET_HEIGHT = 510;
 const HISTORY_ROWS = 3;
 
 /**
- * A tapped store (the owner, 2026-10-18): name, code, address, its phone and its contact
+ * A tapped store (the owner, 2026-10-18): name, code, whether the accountant closed its orders
+ * (a dark banner with the reason), address, its phone and its contact
  * persons' (a tap calls at once), when the rep last ordered there, and its latest orders, anyone's,
  * with who took them and when (only the rep's own open; drawn above the address and phones so they
  * show without scrolling). Three ways on: start an order for it (at
@@ -70,6 +71,7 @@ export function StoreSheet({
   );
   const last = store && today ? lastOrderOf(store, today) : null;
   const stale = store?.stale ?? true;
+  const blocked = store?.creditHold ?? false;
   const ago = last
     ? last.days === 0
       ? t('mobile.map.today')
@@ -144,13 +146,21 @@ export function StoreSheet({
             <View
               style={[
                 styles.avatar,
-                { backgroundColor: stale ? colors.destructiveSoft : colors.successSoft },
+                {
+                  backgroundColor: blocked
+                    ? colors.blocked
+                    : stale
+                      ? colors.destructiveSoft
+                      : colors.successSoft,
+                },
               ]}
             >
               <Store
                 size={24}
                 strokeWidth={2}
-                color={stale ? colors.destructive : colors.success}
+                color={
+                  blocked ? colors.primaryForeground : stale ? colors.destructive : colors.success
+                }
               />
             </View>
             <View style={styles.grow}>
@@ -162,6 +172,22 @@ export function StoreSheet({
               </Text>
             </View>
           </View>
+
+          {/* The accountant closed the store's orders (credit hold): said before anything else. A
+              draft can still be started; the office's credit check refuses its confirmation. */}
+          {blocked ? (
+            <View style={styles.blocked} accessibilityRole="alert">
+              <Lock size={20} strokeWidth={2.2} color={colors.primaryForeground} />
+              <View style={styles.grow}>
+                <Text style={[type.bodyStrong, styles.onBlocked]}>{t('mobile.map.blocked')}</Text>
+                <Text style={[type.secondary, styles.onBlockedMuted]}>
+                  {store.creditHoldReason
+                    ? t('mobile.map.blockedReason', { reason: store.creditHoldReason })
+                    : t('mobile.map.blockedNote')}
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <View
             style={[
@@ -289,6 +315,18 @@ const styles = StyleSheet.create({
     borderRadius: radii.field,
   },
   dot: { width: 10, height: 10, borderRadius: 5 },
+  blocked: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 14,
+    borderRadius: radii.field,
+    backgroundColor: colors.blocked,
+  },
+  onBlocked: { color: colors.primaryForeground },
+  onBlockedMuted: { color: colors.onPrimaryMuted },
   group: { marginTop: spacing.lg },
   historyTitle: { marginTop: spacing.lg, marginBottom: spacing.sm },
   loading: { marginTop: spacing.sm },

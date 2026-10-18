@@ -5,7 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme/tokens';
 import { Group, Row } from '../ui/grouped';
 import { Sheet, SheetClose, SheetHeader } from '../ui/sheet';
-import type { MapStore } from './stores';
+import { type MapStore, stateOf, type StoreState } from './stores';
+
+/** A store's dot, the colour of its pin: black when its orders are closed, red or green. */
+const DOT_COLORS: Record<StoreState, string> = {
+  blocked: colors.blocked,
+  stale: colors.tint.red,
+  fresh: colors.tint.green,
+};
 
 /** A row of the list: the store's name over its code. */
 const ROW_HEIGHT = 58;
@@ -62,14 +69,7 @@ export function StorePicker({
           {stores.map((store) => (
             <Row
               key={store.customerId}
-              icon={
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: store.stale ? colors.tint.red : colors.tint.green },
-                  ]}
-                />
-              }
+              icon={<View style={[styles.dot, { backgroundColor: DOT_COLORS[stateOf(store)] }]} />}
               title={store.name}
               subtitle={t('mobile.map.code', { code: store.code })}
               minHeight={ROW_HEIGHT}

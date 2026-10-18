@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allOrdered,
   boundsOf,
+  cameraStep,
   centreOf,
   countsOf,
   daysBetween,
   degreesOf,
+  LABEL_MAX,
+  labelOf,
   lastOrderOf,
   type MapStore,
   pinsOf,
   startAddressOf,
+  stateOf,
   storeIdsOf,
   storesWithIds,
   tapOf,
@@ -19,6 +24,8 @@ const store = (over: Partial<MapStore>): MapStore => ({
   code: '1001',
   name: 'Дэлгүүр',
   phone: null,
+  creditHold: false,
+  creditHoldReason: null,
   addressId: 1,
   address: null,
   lat: '49.639810',
@@ -45,33 +52,175 @@ describe('degreesOf', () => {
   });
 });
 
+describe('stateOf', () => {
+  it('is blocked on a credit hold whatever the orders, else stale or fresh', () => {
+    expect(stateOf({ creditHold: true, stale: true })).toBe('blocked');
+    expect(stateOf({ creditHold: true, stale: false })).toBe('blocked');
+    expect(stateOf({ creditHold: false, stale: true })).toBe('stale');
+    expect(stateOf({ creditHold: false, stale: false })).toBe('fresh');
+  });
+});
+
+describe('labelOf', () => {
+  it('keeps a short name, on one line of spaces', () => {
+    expect(labelOf('  Номин   дэлгүүр ')).toBe('Номин дэлгүүр');
+    expect(labelOf('Оргил\nхүнс')).toBe('Оргил хүнс');
+  });
+
+  it(`cuts a long name to ${LABEL_MAX} characters with «…»`, () => {
+    const long = 'Бүтэн-Оргил бөөний төвийн хүнсний дэлгүүр';
+    const label = labelOf(long);
+    expect(Array.from(label)).toHaveLength(LABEL_MAX);
+    expect(label.endsWith('…')).toBe(true);
+    expect(long.startsWith(label.slice(0, -1))).toBe(true);
+    expect(labelOf('а'.repeat(LABEL_MAX))).toBe('а'.repeat(LABEL_MAX));
+  });
+});
+
 describe('pinsOf', () => {
   const stores = [
-    store({ customerId: 1, stale: true }),
-    store({ customerId: 2, stale: false, lat: '47.200000', lng: '102.800000' }),
+    store({ customerId: 1, stale: true, name: 'Номин' }),
+    store({ customerId: 2, stale: false, lat: '47.200000', lng: '102.800000', name: 'Оргил' }),
     store({ customerId: 3, lat: 'x' }),
     store({ customerId: 4, lat: '0.000000', lng: '0.000000' }),
+    store({ customerId: 5, stale: true, creditHold: true, name: 'Хаалттай' }),
   ];
 
-  it('keeps the stores with a usable point, coloured by staleness', () => {
+  it('keeps the stores with a usable point, with their state and name', () => {
     expect(pinsOf(stores, false)).toEqual([
-      { id: 1, lat: 49.63981, lng: 100.16254, stale: true },
-      { id: 2, lat: 47.2, lng: 102.8, stale: false },
+      { id: 1, lat: 49.63981, lng: 100.16254, state: 'stale', label: 'Номин' },
+      { id: 2, lat: 47.2, lng: 102.8, state: 'fresh', label: 'Оргил' },
+      { id: 5, lat: 49.63981, lng: 100.16254, state: 'blocked', label: 'Хаалттай' },
     ]);
   });
 
-  it('keeps only the stale ones when asked', () => {
+  it('keeps only the stale ones when asked, not the blocked', () => {
     expect(pinsOf(stores, true).map((pin) => pin.id)).toEqual([1]);
   });
 });
 
 describe('countsOf', () => {
-  it('counts stale and fresh stores', () => {
-    expect(countsOf([store({ stale: true }), store({ stale: false }), store({})])).toEqual({
-      stale: 2,
-      fresh: 1,
+  it('counts each store once: blocked, else stale or fresh', () => {
+    expect(
+      countsOf([
+        store({ stale: true }),
+        store({ stale: false }),
+        store({}),
+        store({ creditHold: true, stale: true }),
+        store({ creditHold: true, stale: false }),
+      ]),
+    ).toEqual({ blocked: 2, stale: 2, fresh: 1 });
+    expect(countsOf([])).toEqual({ blocked: 0, stale: 0, fresh: 0 });
+  });
+});
+
+describe('allOrdered', () => {
+  it('is true only when every store is fresh, never with a blocked one', () => {
+    expect(allOrdered(countsOf([store({ stale: false }), store({ stale: false })]))).toBe(true);
+    // Fresh and blocked stores only: the stale count is 0, yet not every store ordered.
+    const freshOrBlocked = countsOf([
+      store({ stale: false }),
+      store({ creditHold: true, stale: true }),
+    ]);
+    expect(freshOrBlocked).toEqual({ blocked: 1, stale: 0, fresh: 1 });
+    expect(allOrdered(freshOrBlocked)).toBe(false);
+    expect(allOrdered(countsOf([store({ creditHold: true, stale: false })]))).toBe(false);
+    expect(allOrdered(countsOf([store({ stale: true })]))).toBe(false);
+  });
+});
+
+describe('cameraStep', () => {
+  const me = { lat: 49.64, lng: 100.16 };
+  const two = [
+    { lat: 48, lng: 100 },
+    { lat: 50, lng: 102 },
+  ];
+  const idle = { me: null, meLive: true, pins: two, expectMe: false, touched: false };
+
+  it('opens on the position as soon as it is known, pins or not', () => {
+    for (const pins of [null, two]) {
+      expect(cameraStep('waiting', { ...idle, me, pins, expectMe: true })).toEqual({
+        phase: 'settled',
+        move: { kind: 'me', center: [100.16, 49.64] },
+      });
+    }
+  });
+
+  it('waits while the position is expected or the stores still load', () => {
+    expect(cameraStep('waiting', { ...idle, expectMe: true })).toEqual({
+      phase: 'waiting',
+      move: null,
     });
-    expect(countsOf([])).toEqual({ stale: 0, fresh: 0 });
+    expect(cameraStep('waiting', { ...idle, pins: null })).toEqual({
+      phase: 'waiting',
+      move: null,
+    });
+  });
+
+  it('opens on the pins without the position: fitted, one up close, none stays', () => {
+    expect(cameraStep('waiting', idle)).toEqual({
+      phase: 'pins',
+      move: {
+        kind: 'fit',
+        bounds: [
+          [100, 48],
+          [102, 50],
+        ],
+      },
+    });
+    expect(cameraStep('waiting', { ...idle, pins: [{ lat: 49.5, lng: 100.2 }] })).toEqual({
+      phase: 'pins',
+      move: { kind: 'point', center: [100.2, 49.5] },
+    });
+    expect(cameraStep('waiting', { ...idle, pins: [] })).toEqual({ phase: 'pins', move: null });
+  });
+
+  it('moves to a late position once, and never fits the pins again', () => {
+    expect(cameraStep('pins', idle)).toEqual({ phase: 'pins', move: null });
+    expect(cameraStep('pins', { ...idle, me })).toEqual({
+      phase: 'settled',
+      move: { kind: 'me', center: [100.16, 49.64] },
+    });
+    expect(cameraStep('settled', { ...idle, me })).toEqual({ phase: 'settled', move: null });
+  });
+
+  it('opens on the last known position provisionally, and the first live fix moves it once', () => {
+    const lastKnown = { ...idle, me, meLive: false };
+    for (const before of ['waiting', 'pins'] as const) {
+      expect(cameraStep(before, lastKnown)).toEqual({
+        phase: 'provisional',
+        move: { kind: 'me', center: [100.16, 49.64] },
+      });
+    }
+    // Still the last known position: no move, and never the pins.
+    expect(cameraStep('provisional', lastKnown)).toEqual({ phase: 'provisional', move: null });
+    expect(cameraStep('provisional', { ...lastKnown, me: null })).toEqual({
+      phase: 'provisional',
+      move: null,
+    });
+    const live = { lat: 49.62, lng: 100.2 };
+    expect(cameraStep('provisional', { ...idle, me: live })).toEqual({
+      phase: 'settled',
+      move: { kind: 'me', center: [100.2, 49.62] },
+    });
+  });
+
+  it('leaves a provisional map the rep has moved', () => {
+    expect(cameraStep('provisional', { ...idle, me, touched: true })).toEqual({
+      phase: 'settled',
+      move: null,
+    });
+  });
+
+  it('never moves a map the rep has moved', () => {
+    expect(cameraStep('pins', { ...idle, me, touched: true })).toEqual({
+      phase: 'settled',
+      move: null,
+    });
+    expect(cameraStep('waiting', { ...idle, me, touched: true })).toEqual({
+      phase: 'settled',
+      move: null,
+    });
   });
 });
 
