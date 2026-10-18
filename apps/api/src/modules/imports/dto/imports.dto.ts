@@ -90,6 +90,11 @@ export class ReceiptImportOptionsDto implements ReceiptImportOptions {
   moneyAccountId: number | null;
 }
 
+@ApiSchema({ name: 'IssueImportOptions' })
+export class IssueImportOptionsDto {
+  @ApiProperty({ description: 'A warehouse or store' }) @IsInt() @Min(1) warehouseId: number;
+}
+
 @ApiSchema({ name: 'ImportJob' })
 export class ImportJobDto {
   @ApiProperty() id: number;
@@ -110,6 +115,8 @@ export class ImportJobDto {
   @ApiProperty({ type: ImportProblemDto, nullable: true }) lastError: ImportProblemDto | null;
   @ApiProperty({ type: ReceiptImportOptionsDto, nullable: true, description: 'RECEIPTS only' })
   receiptOptions: ReceiptImportOptionsDto | null;
+  @ApiProperty({ type: IssueImportOptionsDto, nullable: true, description: 'ISSUES only' })
+  issueOptions: IssueImportOptionsDto | null;
   @ApiProperty({ description: 'The most recent committed import: only it can be reverted' })
   canRevert: boolean;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
@@ -175,6 +182,11 @@ export class CreateImportDto {
   @ValidateNested()
   @Type(() => ReceiptImportOptionsDto)
   receiptOptions?: ReceiptImportOptionsDto;
+  @ApiPropertyOptional({ type: IssueImportOptionsDto, description: 'Required for ISSUES' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => IssueImportOptionsDto)
+  issueOptions?: IssueImportOptionsDto;
 }
 
 export class ImportListQueryDto extends PageQueryDto {

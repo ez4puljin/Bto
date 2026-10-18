@@ -14,7 +14,8 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthContext } from '../auth-context';
-import { CurrentUser, RequirePermission } from '../decorators/access.decorators';
+import { Authenticated, CurrentUser, RequirePermission } from '../decorators/access.decorators';
+import { UserNamesService } from '../services/user-names.service';
 import {
   CreateUserDto,
   PasswordCodeDto,
@@ -23,6 +24,8 @@ import {
   UpdateUserDto,
   UserDetailDto,
   UserListQueryDto,
+  UserLookupDto,
+  UserLookupQueryDto,
   UserPageDto,
   type UserSummaryDto,
 } from '../dto/users.dto';
@@ -74,7 +77,18 @@ function toSessionDto(session: SessionView): SessionDto {
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly names: UserNamesService,
+  ) {}
+
+  /** Active staff by name for pickers (a goods issue's recipient, ADR-0081): id and name only. */
+  @Get('lookup')
+  @Authenticated()
+  @ApiOkResponse({ type: [UserLookupDto] })
+  lookup(@Query() query: UserLookupQueryDto): Promise<UserLookupDto[]> {
+    return this.names.search(query.q ?? '');
+  }
 
   @Get()
   @RequirePermission('identity.users.read')

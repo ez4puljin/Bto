@@ -13,7 +13,13 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
-import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  type AuthContext,
+  Authenticated,
+  CurrentUser,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import { ContactDto, ContactRequestDto, NextCodeDto } from '../dto/common.dto';
 import {
   AddressDto,
@@ -23,6 +29,8 @@ import {
   CreditDto,
   CustomerDetailDto,
   CustomerListQueryDto,
+  CustomerLookupDto,
+  CustomerLookupQueryDto,
   CustomerPageDto,
   UpdateCustomerDto,
 } from '../dto/customers.dto';
@@ -62,6 +70,18 @@ export class CustomersController {
     const within = await this.segments.within(ctx, 'CUSTOMER', query.segmentId);
     const page = await this.customers.listItems(ctx, query, within);
     return { data: page.data.map(toCustomerListItemDto), nextCursor: page.nextCursor };
+  }
+
+  /** Active customers by name or code for pickers anyone signed in may use (ADR-0081 #6). */
+  @Get('lookup')
+  @Authenticated()
+  @ApiOkResponse({ type: [CustomerLookupDto] })
+  async lookup(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: CustomerLookupQueryDto,
+  ): Promise<CustomerLookupDto[]> {
+    const page = await this.customers.list(ctx, { q: query.q, status: 'ACTIVE', limit: 20 });
+    return page.data.map(({ id, code, name }) => ({ id, code, name }));
   }
 
   /** Declared before `:id`, so "next-code" never reaches ParseIntPipe. */

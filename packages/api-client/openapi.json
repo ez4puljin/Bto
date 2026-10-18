@@ -283,6 +283,57 @@
         ]
       }
     },
+    "/api/v1/users/lookup": {
+      "get": {
+        "operationId": "Users_lookup",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name or login",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserLookup"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Active staff by name for pickers (a goods issue's recipient, ADR-0081): id and name only.",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "Users_list",
@@ -3335,6 +3386,57 @@
         ]
       }
     },
+    "/api/v1/customers/lookup": {
+      "get": {
+        "operationId": "Customers_lookup",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name or code",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerLookup"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Active customers by name or code for pickers anyone signed in may use (ADR-0081 #6).",
+        "tags": [
+          "partners"
+        ]
+      }
+    },
     "/api/v1/customers/next-code": {
       "get": {
         "operationId": "Customers_nextCode",
@@ -5157,6 +5259,647 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Bin"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/expense-types": {
+      "get": {
+        "operationId": "Issues_expenseTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IssueExpenseType"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Issues_createExpenseType",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueExpenseTypeCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueExpenseType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/expense-types/{id}": {
+      "patch": {
+        "operationId": "Issues_updateExpenseType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueExpenseTypeUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueExpenseType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues": {
+      "get": {
+        "operationId": "Issues_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "POSTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "expenseTypeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Issue number or recipient",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "Issues_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}": {
+      "get": {
+        "operationId": "Issues_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "Issues_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/lines": {
+      "post": {
+        "operationId": "Issues_addLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/post": {
+      "post": {
+        "operationId": "Issues_post",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → POSTED by the warehouse itself; idempotent so a retried click never posts twice.",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issues/{id}/cancel": {
+      "post": {
+        "operationId": "Issues_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/issue-lines/{id}": {
+      "patch": {
+        "operationId": "IssueLines_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueLineUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "inventory"
+        ]
+      },
+      "delete": {
+        "operationId": "IssueLines_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueDetail"
                 }
               }
             }
@@ -7081,6 +7824,7 @@
               "type": "string",
               "enum": [
                 "GR",
+                "GI",
                 "BM",
                 "TR",
                 "ADJ",
@@ -8831,7 +9575,8 @@
                 "OPENING_STOCK",
                 "LEVELS",
                 "PRICES",
-                "RECEIPTS"
+                "RECEIPTS",
+                "ISSUES"
               ],
               "type": "string"
             }
@@ -8907,7 +9652,8 @@
                 "OPENING_STOCK",
                 "LEVELS",
                 "PRICES",
-                "RECEIPTS"
+                "RECEIPTS",
+                "ISSUES"
               ]
             }
           },
@@ -16856,6 +17602,7 @@
           "inventory.stocktakes.approve",
           "inventory.costs.manage",
           "inventory.transfers.manage",
+          "inventory.issues.manage",
           "imports.manage",
           "pricing.manage",
           "pricing.prices.manage",
@@ -17041,6 +17788,21 @@
           "username",
           "code",
           "newPassword"
+        ]
+      },
+      "UserLookup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
         ]
       },
       "UserSummary": {
@@ -19778,6 +20540,25 @@
           "nextCursor"
         ]
       },
+      "CustomerLookup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
       "NextCode": {
         "type": "object",
         "properties": {
@@ -21070,6 +21851,468 @@
             "nullable": true,
             "minimum": 0,
             "maximum": 1000000
+          }
+        }
+      },
+      "IssueExpenseType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "A seeded type’s stable code"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code",
+          "active",
+          "sortOrder"
+        ]
+      },
+      "IssueExpenseTypeCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "IssueExpenseTypeUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "IssueSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "expenseTypeId": {
+            "type": "number"
+          },
+          "expenseTypeName": {
+            "type": "string"
+          },
+          "recipientKind": {
+            "enum": [
+              "USER",
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "recipientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "issuedOn",
+          "expenseTypeId",
+          "expenseTypeName",
+          "recipientKind",
+          "recipientName",
+          "status",
+          "lineCount",
+          "effectiveDate",
+          "createdAt"
+        ]
+      },
+      "IssuePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "IssueLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "enteredQty": {
+            "type": "string"
+          },
+          "factorSnapshot": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string",
+            "description": "Base units"
+          },
+          "binId": {
+            "type": "number"
+          },
+          "binCode": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "enteredQty",
+          "factorSnapshot",
+          "qtyBase",
+          "binId",
+          "binCode"
+        ]
+      },
+      "IssueDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true,
+            "example": "GI-2026-000001"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "expenseTypeId": {
+            "type": "number"
+          },
+          "expenseTypeName": {
+            "type": "string"
+          },
+          "recipientKind": {
+            "enum": [
+              "USER",
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "recipientUserId": {
+            "type": "number",
+            "nullable": true
+          },
+          "recipientCustomerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "recipientSupplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "recipientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "effectiveDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "postedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueLine"
+            }
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cost holders only"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "warehouseId",
+          "warehouseName",
+          "issuedOn",
+          "expenseTypeId",
+          "expenseTypeName",
+          "recipientKind",
+          "recipientUserId",
+          "recipientCustomerId",
+          "recipientSupplierId",
+          "recipientName",
+          "status",
+          "note",
+          "effectiveDate",
+          "postedAt",
+          "createdAt",
+          "updatedAt",
+          "lines"
+        ]
+      },
+      "IssueRecipientRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "USER",
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "userId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "IssueLineRequest": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "enteredQty": {
+            "type": "string",
+            "example": "2",
+            "description": "In the product unit"
+          },
+          "binId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Omitted: the fixed shelf when it holds the product, else the fullest"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "enteredQty"
+        ]
+      },
+      "IssueCreateRequest": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Default today"
+          },
+          "expenseTypeId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/IssueRecipientRequest"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueLineRequest"
+            }
+          }
+        },
+        "required": [
+          "warehouseId",
+          "expenseTypeId",
+          "recipient"
+        ]
+      },
+      "IssueUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "issuedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "expenseTypeId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/IssueRecipientRequest"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
+      },
+      "IssueLineUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "enteredQty": {
+            "type": "string",
+            "example": "3"
+          },
+          "binId": {
+            "type": "number",
+            "minimum": 1
           }
         }
       },
@@ -22887,6 +24130,7 @@
               "DISPATCH_IN",
               "DELIVERY_ISSUE",
               "POS_SALE",
+              "GOODS_ISSUE",
               "TRANSFER_OUT",
               "TRANSFER_IN",
               "RETURN_IN",
@@ -22906,7 +24150,8 @@
               "TRIP",
               "SO",
               "POS",
-              "CN"
+              "CN",
+              "GI"
             ]
           },
           "docId": {
@@ -24449,6 +25694,19 @@
           "moneyAccountId"
         ]
       },
+      "IssueImportOptions": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A warehouse or store"
+          }
+        },
+        "required": [
+          "warehouseId"
+        ]
+      },
       "ImportJob": {
         "type": "object",
         "properties": {
@@ -24463,7 +25721,8 @@
               "OPENING_STOCK",
               "LEVELS",
               "PRICES",
-              "RECEIPTS"
+              "RECEIPTS",
+              "ISSUES"
             ],
             "type": "string"
           },
@@ -24529,6 +25788,16 @@
               }
             ]
           },
+          "issueOptions": {
+            "nullable": true,
+            "description": "ISSUES only",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IssueImportOptions"
+              }
+            ]
+          },
           "canRevert": {
             "type": "boolean",
             "description": "The most recent committed import: only it can be reverted"
@@ -24570,6 +25839,7 @@
           "summary",
           "lastError",
           "receiptOptions",
+          "issueOptions",
           "canRevert",
           "createdAt",
           "validatedAt",
@@ -24702,7 +25972,8 @@
               "OPENING_STOCK",
               "LEVELS",
               "PRICES",
-              "RECEIPTS"
+              "RECEIPTS",
+              "ISSUES"
             ],
             "type": "string"
           },
@@ -24722,6 +25993,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/ReceiptImportOptions"
+              }
+            ]
+          },
+          "issueOptions": {
+            "description": "Required for ISSUES",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IssueImportOptions"
               }
             ]
           }
@@ -33405,6 +34684,7 @@
           "SELECTION_TOO_LARGE",
           "CUSTOMER_INACTIVE",
           "SUPPLIER_INACTIVE",
+          "EXPENSE_TYPE_INACTIVE",
           "PRODUCT_INACTIVE",
           "SKU_OUT_OF_RANGE",
           "SKU_RESERVED",

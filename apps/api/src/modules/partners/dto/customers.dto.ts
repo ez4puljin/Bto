@@ -363,3 +363,18 @@ export class CustomerListQueryDto extends PageQueryDto {
   @Min(1)
   segmentId?: number;
 }
+
+@ApiSchema({ name: 'CustomerLookup' })
+export class CustomerLookupDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+}
+
+export class CustomerLookupQueryDto {
+  @ApiPropertyOptional({ description: 'Name or code' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+}

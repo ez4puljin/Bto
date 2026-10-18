@@ -53,6 +53,11 @@ function toJobDto(job: ImportJob): ImportJobDto {
     summary: typeof job.summary === 'object' && job.summary !== null ? job.summary : null,
     lastError: job.lastError,
     receiptOptions: receiptOptionsDto(job),
+    issueOptions:
+      job.kind === 'ISSUES' &&
+      typeof (job.options as { warehouseId?: unknown } | null)?.warehouseId === 'number'
+        ? { warehouseId: (job.options as { warehouseId: number }).warehouseId }
+        : null,
     canRevert: job.canRevert,
     createdAt: job.createdAt.toISOString(),
     validatedAt: job.validatedAt?.toISOString() ?? null,
