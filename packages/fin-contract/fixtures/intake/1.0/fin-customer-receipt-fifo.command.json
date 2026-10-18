@@ -1,0 +1,32 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0192f6b2-1d00-7c20-9000-000000000002",
+  "tenant": "BUTEN_ORGIL",
+  "company": "BO",
+  "source": {
+    "system": "FIN",
+    "docType": "RECEIPT",
+    "docId": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f"
+  },
+  "actor": { "kind": "STAFF", "ref": "bto:user:3", "label": "Нягтлан Д." },
+  "body": {
+    "action": "POST",
+    "documentType": "FIN.CUSTOMER_RECEIPT",
+    "documentDate": "2026-10-25",
+    "currency": "MNT",
+    "party": { "ref": "customer:412", "name": "Мөрөн-Од ХХК", "kind": "COMPANY" },
+    "description": "Мөрөн-Од ХХК — бэлэн төлбөр",
+    "controlTotal": "60000.00",
+    "attributes": { "handedInBy": "Жолооч Г." },
+    "lines": [
+      {
+        "lineNo": 1,
+        "key": "CASH",
+        "side": "DEBIT",
+        "amount": "60000.00",
+        "moneyAccount": "MRN-CASH"
+      },
+      { "lineNo": 2, "key": "AR", "side": "CREDIT", "amount": "60000.00", "settles": "FIFO" }
+    ]
+  }
+}

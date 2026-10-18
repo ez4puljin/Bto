@@ -1,0 +1,32 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0192f9c4-2b00-7f40-b000-000000000006",
+  "tenant": "BUTEN_ORGIL",
+  "company": "BO",
+  "source": {
+    "system": "FIN",
+    "docType": "ALLOCATION",
+    "docId": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+  },
+  "actor": { "kind": "STAFF", "ref": "bto:user:3", "label": "Нягтлан Д." },
+  "body": {
+    "action": "POST",
+    "documentType": "FIN.ALLOCATION",
+    "documentDate": "2026-11-03",
+    "currency": "MNT",
+    "party": { "ref": "customer:412", "name": "Мөрөн-Од ХХК", "kind": "COMPANY" },
+    "description": "Илүү төлөлтийг нэхэмжлэхэд тулгав",
+    "controlTotal": "12000.00",
+    "lines": [],
+    "allocate": {
+      "key": "AR",
+      "pairs": [
+        {
+          "debit": { "source": { "system": "BTO", "docType": "SALES_INVOICE", "docId": "905" } },
+          "credit": { "itemId": "5" },
+          "amount": "12000.00"
+        }
+      ]
+    }
+  }
+}

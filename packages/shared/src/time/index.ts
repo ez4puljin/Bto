@@ -10,7 +10,15 @@ export const BUSINESS_TZ = 'Asia/Ulaanbaatar';
 
 /** The Ulaanbaatar calendar date of an instant as `YYYY-MM-DD`; never derive it from a UTC string. */
 export function businessDate(at: Date = new Date()): string {
-  return dayjs(at).tz(BUSINESS_TZ).format('YYYY-MM-DD');
+  return businessDateIn(BUSINESS_TZ, at);
+}
+
+/**
+ * The calendar date of an instant in an IANA time zone as `YYYY-MM-DD`: the Finance Core dates by
+ * each company's own `timezone`, never by BUSINESS_TZ (ADR-0069 #7, ADR-0070).
+ */
+export function businessDateIn(timeZone: string, at: Date = new Date()): string {
+  return dayjs(at).tz(timeZone).format('YYYY-MM-DD');
 }
 
 /** An instant as Ulaanbaatar wall-clock time, `YYYY-MM-DD HH:mm`, for operators (CLI, logs). */

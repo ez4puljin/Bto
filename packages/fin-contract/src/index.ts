@@ -1,0 +1,90 @@
+/**
+ * `@tugeel/fin-contract`: the Finance Core's versioned contract (ADR-0069 #4, ADR-0071) — the types
+ * and zod schemas every source system posts and reads with, the FIN_* error codes, the finance
+ * rights and the contract fixtures (`fixtures/intake/1.0/*.json`). Depends only on zod, so another
+ * repository (the resort PMS) uses it without any Bto code. Package 1.x follows `fin.intake/1.x`.
+ */
+export {
+  FIN_ERROR_CODES,
+  FIN_HELD_CODES,
+  FIN_RETRYABLE_CODES,
+  type FinErrorCode,
+  isFinErrorCode,
+} from './errors';
+export { FIN_PERMISSIONS, type FinPermission, isFinPermission } from './permissions';
+export {
+  ACCOUNT_CONTROLS,
+  ACCOUNT_KINDS,
+  type AccountControl,
+  type AccountKindV1,
+  type AccountV1,
+  AccountV1Schema,
+  CONFIG_STATUSES,
+  type ConfigStatus,
+  type CoverageReportV1,
+  DOCUMENT_CLASSES,
+  type DocumentClass,
+  type DocumentTypeV1,
+  DocumentTypeV1Schema,
+  MONEY_ACCOUNT_KINDS,
+  type MoneyAccountKind,
+  type PostingRuleV1,
+  PostingRuleV1Schema,
+  type TaxCodeV1,
+  TaxCodeV1Schema,
+  type TaxRateV1,
+  TaxRateV1Schema,
+} from './v1/config';
+export {
+  AllocateV1Schema,
+  type AllocateV1,
+  CONTRACT_V1_PATTERN,
+  type ContractV1,
+  type FinActor,
+  FinActorSchema,
+  type FinErrorCodeV1,
+  INTAKE_OUTCOMES,
+  type IntakeCommandV1,
+  IntakeCommandV1Schema,
+  type IntakeErrorV1,
+  type IntakeOutcome,
+  type IntakeResultV1,
+  IntakeResultV1Schema,
+  type ItemRefV1,
+  ItemRefV1Schema,
+  type LineV1,
+  LineV1Schema,
+  PARTY_KINDS,
+  type PartyIn,
+  PartyInSchema,
+  type PartyKind,
+  type PostBody,
+  type ReverseBody,
+  type SettleTarget,
+  type SourceKey,
+  SourceKeySchema,
+} from './v1/intake';
+export {
+  CODE_PATTERN,
+  DEC_PATTERN,
+  type Dec,
+  type IsoDate,
+  type Side,
+  V1_LIMITS,
+} from './v1/primitives';
+export type {
+  DocumentV1,
+  ExposureV1,
+  FreshnessV1,
+  IntakeV1,
+  LedgerLineV1,
+  MoneyAccountV1,
+  OpenItemV1,
+  PageV1,
+  PartyRefV1,
+  SourceKeyStatusV1,
+  StatementLineV1,
+  StatementV1,
+  TaxPositionV1,
+  TbRowV1,
+} from './v1/read';
