@@ -166,3 +166,17 @@ export class SessionListDto {
   @ApiProperty({ type: String, nullable: true, description: 'Always null: live sessions only' })
   nextCursor: null;
 }
+
+@ApiSchema({ name: 'UserLookup' })
+export class UserLookupDto {
+  @ApiProperty() id: number;
+  @ApiProperty() fullName: string;
+}
+
+export class UserLookupQueryDto {
+  @ApiPropertyOptional({ description: 'Name or login' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+}

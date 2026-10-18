@@ -172,6 +172,8 @@ export const MOVEMENT_TYPES = {
   DISPATCH_IN: { sign: 1, legs: [2] },
   DELIVERY_ISSUE: { sign: -1, legs: [1] },
   POS_SALE: { sign: -1, legs: [1] },
+  /** A goods issue (GI, ADR-0081): internal use, write-off, return to a supplier, at the average. */
+  GOODS_ISSUE: { sign: -1, legs: [1] },
   TRANSFER_OUT: { sign: -1, legs: [1, 3, 5] },
   TRANSFER_IN: { sign: 1, legs: [2, 4, 6] },
   RETURN_IN: { sign: 1, legs: [1] },
@@ -192,6 +194,7 @@ export const STOCK_DOC_TYPES = [
   'SO',
   'POS',
   'CN',
+  'GI',
 ] as const;
 export type StockDocType = (typeof STOCK_DOC_TYPES)[number];
 
@@ -422,3 +425,23 @@ export function receiptLineVat(docAmount: DecimalInput, vatRatePct: DecimalInput
 export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInput): Decimal {
   return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Goods issues (ADR-0081)
+
+/** Who received an issue: a staff user, a customer, a supplier, or a name typed by hand. */
+export const ISSUE_RECIPIENT_KINDS = ['USER', 'CUSTOMER', 'SUPPLIER', 'OTHER'] as const;
+export type IssueRecipientKind = (typeof ISSUE_RECIPIENT_KINDS)[number];
+
+/** One issue posts at most this many lines (one document per delivery of goods out). */
+export const MAX_ISSUE_LINES = 500;
+
+/** The expense types a fresh database starts with (the admin renames, adds and retires them). */
+export const DEFAULT_ISSUE_EXPENSE_TYPES = [
+  'INTERNAL_USE',
+  'BONUS',
+  'MARKETING',
+  'WRITE_OFF',
+  'SUPPLIER_RETURN',
+  'TRANSFER_OUT',
+] as const;

@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ImportKind, ReceiptImportOptions, RowIssue } from '@tugeel/shared/imports';
+import type {
+  ImportKind,
+  IssueImportOptions,
+  ReceiptImportOptions,
+  RowIssue,
+} from '@tugeel/shared/imports';
 import { and, asc, desc, eq, gt, inArray, lt, ne, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -95,10 +100,15 @@ export class ImportsService {
       fileId: number;
       fileName: string;
       receiptOptions?: ReceiptImportOptions | null;
+      issueOptions?: IssueImportOptions | null;
     },
   ): Promise<ImportJob> {
     const options =
-      input.kind === 'RECEIPTS' ? await this.receiptOptions(ctx, input.receiptOptions) : null;
+      input.kind === 'RECEIPTS'
+        ? await this.receiptOptions(ctx, input.receiptOptions)
+        : input.kind === 'ISSUES'
+          ? await this.issueOptions(ctx, input.issueOptions)
+          : null;
     await this.storage.verifyUploaded(input.fileId, 'imports.source');
     return inTransaction(this.db, async (tx) => {
       await this.storage.confirm(tx, input.fileId, 'imports.source');
@@ -168,6 +178,28 @@ export class ImportsService {
       moneyAccountId: accountId,
       withPrices: ctx.permissions.has('inventory.costs.manage'),
     };
+  }
+
+  /** An issues import's warehouse (ADR-0081 #7): a warehouse or store the user writes for. */
+  private async issueOptions(
+    ctx: AuthContext,
+    options: IssueImportOptions | null | undefined,
+  ): Promise<IssueImportOptions> {
+    if (!options) {
+      throw invalid('issueOptions', 'required', 'an issues import names its warehouse');
+    }
+    const warehouse = await this.org.getWarehouse(options.warehouseId);
+    if (!['WHOLESALE', 'STORE'].includes(warehouse.kind)) {
+      throw new AppError(
+        'WAREHOUSE_KIND_NOT_ALLOWED',
+        'goods are issued from a warehouse or store',
+        {
+          kind: warehouse.kind,
+        },
+      );
+    }
+    this.scope.assertCanWriteWarehouse(ctx, warehouse.id);
+    return { warehouseId: warehouse.id };
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<ImportJob> {

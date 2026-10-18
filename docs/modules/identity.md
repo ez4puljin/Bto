@@ -52,6 +52,7 @@ Rules for other modules: never read or write identity tables directly (G1 bounda
 | `POST /auth/refresh`, `POST /auth/logout` | public, cookie + same-origin check | refresh rotates the token (20 s grace answers without rotating); a later replay revokes the session (`TOKEN_REUSE`) |
 | `POST /auth/password/setup` | public | `{ username, code, newPassword }`; redeems a one-time code and signs in |
 | `GET /auth/me`, `POST /auth/password`, `POST /auth/logout-all` | authenticated | password change ends the other sessions |
+| `GET /users/lookup?q=` | authenticated | up to 20 active users (id, full name) matching the full name or username, for pickers such as a goods issue's recipient (ADR-0081 #6); no roles, phones or scopes; declared before `:id` |
 | `GET /users`, `GET /users/:id` | `identity.users.read` | `?q=` searches username and full name; keyset pages |
 | `POST /users`, `PATCH /users/:id`, `POST /users/:id/password-code`, `POST /users/:id/unlock`, `GET/DELETE /users/:id/sessions[/:sessionId]` | `identity.users.manage` | the code is shown once and never stored in clear |
 | `GET /permissions`, `GET /roles` | `identity.users.read` | `assignable: false` marks the admin-only codes |

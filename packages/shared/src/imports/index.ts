@@ -16,6 +16,7 @@ export const IMPORT_KINDS = [
   'LEVELS',
   'PRICES',
   'RECEIPTS',
+  'ISSUES',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -129,6 +130,18 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('qty', 'decimal', true),
     column('unitPrice', 'decimal'),
   ],
+  // Goods issues (ADR-0081): rows of one date, expense type and recipient make one draft issue in the
+  // warehouse chosen for the import.
+  ISSUES: [
+    column('date', 'day', true),
+    column('expenseType', 'text', true),
+    column('recipient', 'text', true),
+    column('sku', 'code'),
+    column('barcode', 'code'),
+    column('unit', 'text'),
+    column('qty', 'decimal', true),
+    column('note', 'text'),
+  ],
 };
 
 /** What a receipts import is told in its dialog (ADR-0078): the warehouse and how the notes are paid. */
@@ -139,6 +152,11 @@ export interface ReceiptImportOptions {
 }
 
 export const RECEIPT_IMPORT_PAYMENT_METHODS = RECEIPT_PAYMENT_METHODS;
+
+/** What an issues import is told in its dialog (ADR-0081 #7): the warehouse the goods leave. */
+export interface IssueImportOptions {
+  warehouseId: number;
+}
 
 /** Lines of one delivery note in a receipts import (one draft receipt). */
 export const MAX_RECEIPT_IMPORT_LINES = 500;

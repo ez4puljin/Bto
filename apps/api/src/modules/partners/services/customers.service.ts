@@ -563,6 +563,21 @@ export class CustomersService {
   }
 
   /** Customers by code, for the Excel import (week 4): idempotent re-import keyed on the code. */
+  /** Active customers whose name is one of these, case folded (the issues import, ADR-0081). */
+  async findActiveByNames(names: readonly string[], executor: Db | Tx = this.db) {
+    const lowered = [...new Set(names.map((name) => name.trim().toLowerCase()))].filter(Boolean);
+    if (lowered.length === 0) return [];
+    return executor
+      .select({ id: customers.id, code: customers.code, name: customers.name })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.status, 'ACTIVE'),
+          inArray(sql<string>`lower(${customers.name})`, lowered),
+        ),
+      );
+  }
+
   async findByCodes(codes: readonly string[], executor: Db | Tx = this.db) {
     if (codes.length === 0) return [];
     const rows = await executor

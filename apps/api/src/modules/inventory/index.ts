@@ -34,6 +34,17 @@ export {
   NO_SHELF_CODE,
 } from './services/bins.service';
 export {
+  GoodsIssuesService,
+  type IssueDetail,
+  type IssueInput,
+  type IssueLineInput,
+  type IssueRecipientInput,
+} from './services/goods-issues.service';
+export {
+  type IssueExpenseType,
+  IssueExpenseTypesService,
+} from './services/issue-expense-types.service';
+export {
   type LevelChange,
   type LevelRestore,
   type LevelState,

@@ -23,6 +23,7 @@ import { AdjustmentPage, AdjustmentsPage } from '@/features/inventory/adjustment
 import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
+import { IssuePage, IssuesPage } from '@/features/inventory/issues-pages';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
@@ -236,6 +237,9 @@ export const routes: RouteObject[] = [
             handle: { width: 'wide' },
             element: <Navigate to=".." relative="path" replace />,
           },
+          // Goods issues (ADR-0081): one page for a new issue (new) and an existing one, like receipts.
+          { path: 'inventory/issues', handle: { width: 'wide' }, element: <IssuesPage /> },
+          { path: 'inventory/issues/:id', handle: { width: 'wide' }, element: <IssuePage /> },
           { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
           {
             path: 'pricing/profiles/:id',

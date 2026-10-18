@@ -204,6 +204,13 @@
       "when": 1792324713569,
       "tag": "0028_receipt_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792334115248,
+      "tag": "0029_goods_issues",
+      "breakpoints": true
     }
   ]
 }

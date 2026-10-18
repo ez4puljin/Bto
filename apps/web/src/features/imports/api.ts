@@ -18,6 +18,7 @@ export type ImportRow = Schemas['ImportRow'];
 export type ImportStatus = ImportJob['status'];
 export type RowFilter = 'ERRORS' | 'WARNINGS' | 'ALL';
 export type ReceiptImportOptions = Schemas['ReceiptImportOptions'];
+export type IssueImportOptions = Schemas['IssueImportOptions'];
 export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
 
 const KEYS = { imports: ['imports'] as const };
@@ -89,12 +90,15 @@ export function useImportMutations() {
         file,
         key,
         receiptOptions,
+        issueOptions,
       }: {
         kind: ImportKind;
         file: File;
         key: string;
         /** A receipts import's warehouse and payment (ADR-0078). */
         receiptOptions?: ReceiptImportOptions;
+        /** An issues import's warehouse (ADR-0081). */
+        issueOptions?: IssueImportOptions;
       }) => {
         const fileId = await uploadFile(
           api,
@@ -109,6 +113,7 @@ export function useImportMutations() {
               fileId,
               fileName: file.name,
               ...(receiptOptions ? { receiptOptions } : {}),
+              ...(issueOptions ? { issueOptions } : {}),
             },
           }),
         );

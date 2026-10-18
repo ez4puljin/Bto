@@ -63,6 +63,8 @@ export const KEYS = {
   reconciliation: ['inventory', 'reconciliation'] as const,
   transfers: ['inventory', 'transfers'] as const,
   stocktakes: ['inventory', 'stocktakes'] as const,
+  issues: ['inventory', 'issues'] as const,
+  expenseTypes: ['inventory', 'issue-expense-types'] as const,
 };
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
@@ -962,6 +964,200 @@ export function useStocktakeMutations() {
       mutationFn: async (id: number) =>
         unwrap(await api.POST('/api/v1/stocktakes/{id}/cancel', { params: { path: { id } } })),
       onSuccess: binsChanged,
+    }),
+  };
+}
+
+// -------------------------------------------------------------------------------------------
+// Goods issues (GI-, ADR-0081)
+
+export type IssueSummary = Schemas['IssueSummary'];
+export type IssueDetail = Schemas['IssueDetail'];
+export type IssueLine = Schemas['IssueLine'];
+export type IssueCreate = Schemas['IssueCreateRequest'];
+export type IssueUpdate = Schemas['IssueUpdateRequest'];
+export type IssueLineRequest = Schemas['IssueLineRequest'];
+export type IssueLineUpdate = Schemas['IssueLineUpdateRequest'];
+export type IssueRecipient = Schemas['IssueRecipientRequest'];
+export type IssueRecipientKind = IssueDetail['recipientKind'];
+export type IssueStatus = IssueDetail['status'];
+export type IssueExpenseType = Schemas['IssueExpenseType'];
+export type UserLookup = Schemas['UserLookup'];
+export type CustomerLookup = Schemas['CustomerLookup'];
+
+export interface IssueFilter {
+  warehouseId?: number;
+  status?: IssueStatus;
+  expenseTypeId?: number;
+  q?: string;
+}
+
+export function useIssues(filter: IssueFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.issues, 'list', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/issues', {
+          params: {
+            query: {
+              warehouseId: filter.warehouseId,
+              status: filter.status,
+              expenseTypeId: filter.expenseTypeId,
+              q: filter.q || undefined,
+              cursor: pageParam,
+              limit: 50,
+            },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** One issue; `enabled: false` while the page is a new issue that does not exist yet. */
+export function useIssue(id: number, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.issues, id],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/issues/{id}', { params: { path: { id } }, signal })),
+  });
+}
+
+/** The latest copy of an issue in the cache, read when a queued scan runs (like receipts). */
+export function useIssueSnapshot(): (id: number) => IssueDetail | undefined {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (id: number) => queryClient.getQueryData<IssueDetail>([...KEYS.issues, id]),
+    [queryClient],
+  );
+}
+
+/** Every expense type, retired ones too (an old issue still names its type). */
+export function useIssueExpenseTypes() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.expenseTypes,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/issues/expense-types', { signal })),
+  });
+}
+
+/** Active staff by name, for an issue's recipient (ADR-0081). */
+export function useUserLookup(q: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['identity', 'users', 'lookup', q],
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/users/lookup', {
+          params: { query: { q: q || undefined } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** Active customers by name or code, for anyone signed in (ADR-0081 #6). */
+export function useCustomerLookup(q: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['partners', 'customers', 'lookup', q],
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customers/lookup', {
+          params: { query: { q: q || undefined } },
+          signal,
+        }),
+      ),
+  });
+}
+
+export function useIssueMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const invalidate = (...keys: (readonly unknown[])[]) =>
+    Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  const issuesChanged = () => invalidate(KEYS.issues, KEYS.stock);
+  /** A draft's new copy goes into the cache at once; the list refreshes behind it. */
+  const issueChanged = async (issue: IssueDetail) => {
+    const key = [...KEYS.issues, issue.id];
+    await queryClient.cancelQueries({ queryKey: key, exact: true });
+    queryClient.setQueryData(key, issue);
+    void invalidate([...KEYS.issues, 'list']);
+  };
+  const typesChanged = () => invalidate(KEYS.expenseTypes);
+
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<IssueCreate>) =>
+        unwrap(await api.POST('/api/v1/issues', { params: { header: idempotencyKey(key) }, body })),
+      onSuccess: issueChanged,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: IssueUpdate }) =>
+        unwrap(await api.PATCH('/api/v1/issues/{id}', { params: { path: { id } }, body })),
+      onSuccess: issueChanged,
+    }),
+    addLine: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: IssueLineRequest }) =>
+        unwrap(await api.POST('/api/v1/issues/{id}/lines', { params: { path: { id } }, body })),
+      onSuccess: issueChanged,
+    }),
+    updateLine: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: IssueLineUpdate }) =>
+        unwrap(await api.PATCH('/api/v1/issue-lines/{id}', { params: { path: { id } }, body })),
+      onSuccess: issueChanged,
+    }),
+    removeLine: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.DELETE('/api/v1/issue-lines/{id}', { params: { path: { id } } })),
+      onSuccess: issueChanged,
+    }),
+    post: useMutation({
+      mutationFn: async ({ id, key }: { id: number; key: string }) =>
+        unwrap(
+          await api.POST('/api/v1/issues/{id}/post', {
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: async (issue) => {
+        queryClient.setQueryData([...KEYS.issues, issue.id], issue);
+        await issuesChanged();
+      },
+    }),
+    cancel: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.POST('/api/v1/issues/{id}/cancel', { params: { path: { id } } })),
+      onSuccess: issuesChanged,
+    }),
+    createType: useMutation({
+      mutationFn: async (name: string) =>
+        unwrap(await api.POST('/api/v1/issues/expense-types', { body: { name } })),
+      onSuccess: typesChanged,
+    }),
+    updateType: useMutation({
+      mutationFn: async ({
+        id,
+        body,
+      }: {
+        id: number;
+        body: Schemas['IssueExpenseTypeUpdateRequest'];
+      }) =>
+        unwrap(
+          await api.PATCH('/api/v1/issues/expense-types/{id}', { params: { path: { id } }, body }),
+        ),
+      onSuccess: typesChanged,
     }),
   };
 }

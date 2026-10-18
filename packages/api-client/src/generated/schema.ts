@@ -132,6 +132,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active staff by name for pickers (a goods issue's recipient, ADR-0081): id and name only. */
+        get: operations["Users_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -871,6 +888,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active customers by name or code for pickers anyone signed in may use (ADR-0081 #6). */
+        get: operations["Customers_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/next-code": {
         parameters: {
             query?: never;
@@ -1261,6 +1295,135 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/expense-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Issues_expenseTypes"];
+        put?: never;
+        post: operations["Issues_createExpenseType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/expense-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Issues_updateExpenseType"];
+        trace?: never;
+    };
+    "/api/v1/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Issues_list"];
+        put?: never;
+        post: operations["Issues_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Issues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Issues_update"];
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Issues_addLine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** DRAFT → POSTED by the warehouse itself; idempotent so a retried click never posts twice. */
+        post: operations["Issues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issues/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Issues_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/issue-lines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["IssueLines_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["IssueLines_update"];
         trace?: never;
     };
     "/api/v1/product-locations": {
@@ -3988,7 +4151,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4036,6 +4199,10 @@ export interface components {
             code: string;
             /** Format: password */
             newPassword: string;
+        };
+        UserLookup: {
+            id: number;
+            fullName: string;
         };
         UserSummary: {
             id: number;
@@ -4822,6 +4989,11 @@ export interface components {
             data: components["schemas"]["CustomerListItem"][];
             nextCursor: string | null;
         };
+        CustomerLookup: {
+            id: number;
+            code: string;
+            name: string;
+        };
         NextCode: {
             /** @example 1024 */
             code: string;
@@ -5173,6 +5345,137 @@ export interface components {
         BinUpdateRequest: {
             name?: string | null;
             pickSequence?: number | null;
+        };
+        IssueExpenseType: {
+            id: number;
+            name: string;
+            /** @description A seeded type’s stable code */
+            code: string | null;
+            active: boolean;
+            sortOrder: number;
+        };
+        IssueExpenseTypeCreateRequest: {
+            name: string;
+            sortOrder?: number;
+        };
+        IssueExpenseTypeUpdateRequest: {
+            name?: string;
+            active?: boolean;
+            sortOrder?: number;
+        };
+        IssueSummary: {
+            id: number;
+            number: string | null;
+            warehouseId: number;
+            /** Format: date */
+            issuedOn: string;
+            expenseTypeId: number;
+            expenseTypeName: string;
+            /** @enum {string} */
+            recipientKind: "USER" | "CUSTOMER" | "SUPPLIER" | "OTHER";
+            recipientName: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED";
+            lineCount: number;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        IssuePage: {
+            data: components["schemas"]["IssueSummary"][];
+            nextCursor: string | null;
+        };
+        IssueLine: {
+            id: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            unitName: string;
+            enteredQty: string;
+            factorSnapshot: string;
+            /** @description Base units */
+            qtyBase: string;
+            binId: number;
+            binCode: string;
+            /** @description Cost holders only */
+            unitCost?: string | null;
+            /** @description Cost holders only */
+            amount?: string | null;
+        };
+        IssueDetail: {
+            id: number;
+            /** @example GI-2026-000001 */
+            number: string | null;
+            warehouseId: number;
+            warehouseName: string;
+            /** Format: date */
+            issuedOn: string;
+            expenseTypeId: number;
+            expenseTypeName: string;
+            /** @enum {string} */
+            recipientKind: "USER" | "CUSTOMER" | "SUPPLIER" | "OTHER";
+            recipientUserId: number | null;
+            recipientCustomerId: number | null;
+            recipientSupplierId: number | null;
+            recipientName: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "POSTED" | "CANCELLED";
+            note: string | null;
+            /** Format: date */
+            effectiveDate: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lines: components["schemas"]["IssueLine"][];
+            /** @description Cost holders only */
+            total?: string | null;
+        };
+        IssueRecipientRequest: {
+            /** @enum {string} */
+            kind: "USER" | "CUSTOMER" | "SUPPLIER" | "OTHER";
+            userId?: number | null;
+            customerId?: number | null;
+            supplierId?: number | null;
+            name?: string | null;
+        };
+        IssueLineRequest: {
+            productUnitId: number;
+            /**
+             * @description In the product unit
+             * @example 2
+             */
+            enteredQty: string;
+            /** @description Omitted: the fixed shelf when it holds the product, else the fullest */
+            binId?: number | null;
+        };
+        IssueCreateRequest: {
+            warehouseId: number;
+            /**
+             * Format: date
+             * @description Default today
+             */
+            issuedOn?: string;
+            expenseTypeId: number;
+            recipient: components["schemas"]["IssueRecipientRequest"];
+            note?: string | null;
+            lines?: components["schemas"]["IssueLineRequest"][];
+        };
+        IssueUpdateRequest: {
+            /** Format: date */
+            issuedOn?: string;
+            expenseTypeId?: number;
+            recipient?: components["schemas"]["IssueRecipientRequest"];
+            note?: string | null;
+        };
+        IssueLineUpdateRequest: {
+            /** @example 3 */
+            enteredQty?: string;
+            binId?: number;
         };
         ProductLocation: {
             id: number;
@@ -5724,9 +6027,9 @@ export interface components {
             product: components["schemas"]["StockProduct"];
             lotId: number | null;
             /** @enum {string} */
-            movementType: "RECEIPT" | "PUTAWAY_OUT" | "PUTAWAY_IN" | "BIN_MOVE_OUT" | "BIN_MOVE_IN" | "PICK_OUT" | "PICK_IN" | "DISPATCH_OUT" | "DISPATCH_IN" | "DELIVERY_ISSUE" | "POS_SALE" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_IN" | "ADJUSTMENT" | "COUNT_CORRECTION";
+            movementType: "RECEIPT" | "PUTAWAY_OUT" | "PUTAWAY_IN" | "BIN_MOVE_OUT" | "BIN_MOVE_IN" | "PICK_OUT" | "PICK_IN" | "DISPATCH_OUT" | "DISPATCH_IN" | "DELIVERY_ISSUE" | "POS_SALE" | "GOODS_ISSUE" | "TRANSFER_OUT" | "TRANSFER_IN" | "RETURN_IN" | "ADJUSTMENT" | "COUNT_CORRECTION";
             /** @enum {string} */
-            docType: "GR" | "BM" | "TR" | "ADJ" | "ST" | "PK" | "TRIP" | "SO" | "POS" | "CN";
+            docType: "GR" | "BM" | "TR" | "ADJ" | "ST" | "PK" | "TRIP" | "SO" | "POS" | "CN" | "GI";
             docId: number;
             /** @example GR-2026-000001 */
             docNumber: string | null;
@@ -6257,10 +6560,14 @@ export interface components {
             /** @description Cash box or bank account */
             moneyAccountId: number | null;
         };
+        IssueImportOptions: {
+            /** @description A warehouse or store */
+            warehouseId: number;
+        };
         ImportJob: {
             id: number;
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
             fileName: string;
             /** @enum {string} */
             status: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
@@ -6274,6 +6581,8 @@ export interface components {
             lastError: components["schemas"]["ImportProblem"] | null;
             /** @description RECEIPTS only */
             receiptOptions: components["schemas"]["ReceiptImportOptions"] | null;
+            /** @description ISSUES only */
+            issueOptions: components["schemas"]["IssueImportOptions"] | null;
             /** @description The most recent committed import: only it can be reverted */
             canRevert: boolean;
             /** Format: date-time */
@@ -6320,13 +6629,15 @@ export interface components {
         };
         ImportCreateRequest: {
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
             /** @description An uploaded file of kind imports.source */
             fileId: number;
             /** @example Бараа.xlsx */
             fileName: string;
             /** @description Required for RECEIPTS */
             receiptOptions?: components["schemas"]["ReceiptImportOptions"];
+            /** @description Required for ISSUES */
+            issueOptions?: components["schemas"]["IssueImportOptions"];
         };
         PricedUnit: {
             productUnitId: number;
@@ -8826,7 +9137,7 @@ export interface components {
             note?: string | null;
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -9087,6 +9398,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Users_lookup: {
+        parameters: {
+            query?: {
+                /** @description Name or login */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserLookup"][];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -11015,6 +11357,37 @@ export interface operations {
             };
         };
     };
+    Customers_lookup: {
+        parameters: {
+            query?: {
+                /** @description Name or code */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLookup"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Customers_nextCode: {
         parameters: {
             query?: never;
@@ -12162,6 +12535,397 @@ export interface operations {
             };
         };
     };
+    Issues_expenseTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueExpenseType"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_createExpenseType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueExpenseTypeCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueExpenseType"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_updateExpenseType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueExpenseTypeUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueExpenseType"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                warehouseId?: number;
+                status?: "DRAFT" | "POSTED" | "CANCELLED";
+                expenseTypeId?: number;
+                /** @description Issue number or recipient */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_addLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueLineRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Issues_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueLines_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueLines_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueLineUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ProductLocations_list: {
         parameters: {
             query?: {
@@ -13258,7 +14022,7 @@ export interface operations {
                 productId?: number;
                 warehouseId?: number;
                 binId?: number;
-                docType?: "GR" | "BM" | "TR" | "ADJ" | "ST" | "SO" | "CN" | "POS";
+                docType?: "GR" | "GI" | "BM" | "TR" | "ADJ" | "ST" | "SO" | "CN" | "POS";
                 from?: string;
                 to?: string;
             };
@@ -14275,7 +15039,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
+                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
             };
             cookie?: never;
         };
@@ -14306,7 +15070,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
+                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
                 status?: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
             };
             header?: never;

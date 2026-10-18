@@ -92,6 +92,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0076](ADR-0076-company-isolation.md) | Company data is isolated on the server by scoped keys, scoped services and filtered views; row-level security is prepared, not enabled | Accepted | 2026-10-18 |
 | [ADR-0077](ADR-0077-finance-core-scope-and-roadmap.md) | Bto's books replace Erkhet on the go-live day, so the core's go-live scope is the full set of books, built in phases from now | Accepted | 2026-10-18 |
 | [ADR-0078](ADR-0078-receipt-window-prices-payment.md) | The goods receipt as one delivery-note window: prices typed on the draft, VAT taken out for VAT-paying suppliers, costed at posting when priced in full, the payment method kept for the books, delivery notes imported from a sheet | Accepted | 2026-10-18 |
+| [ADR-0081](ADR-0081-goods-issue.md) | The goods issue «Зарлага»: one document for internal use, write-offs, supplier returns and transfers to other organizations, posted by the warehouse at the average cost, with a recipient, an expense type and a sheet import | Accepted | 2026-10-18 |
 
 ## Template
 

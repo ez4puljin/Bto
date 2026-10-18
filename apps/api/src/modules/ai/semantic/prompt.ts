@@ -26,6 +26,8 @@ export const GLOSSARY = {
   adjustment:
     "stock_movements with doc_type = 'ADJ' and adjustment_reason DAMAGED, EXPIRED, SHORTAGE or SURPLUS",
   stocktake: "stock_documents with doc_type = 'ST'; stock_movements COUNT_CORRECTION",
+  issue:
+    "goods issues (зарлага): stock_documents with doc_type = 'GI' (adjustment_reason holds the expense type, supplier_name the supplier of a return); stock_movements GOODS_ISSUE",
   lowStock: 'low_stock',
   category: 'categories; products.category_path and products.top_category_name',
   unit: 'product_units (uom_code PCS piece, BOX box, BLOCK block, KG kilogram)',

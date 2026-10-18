@@ -163,7 +163,13 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
             options.paymentMethod === 'CREDIT' ? null : (options.moneyAccountId ?? null),
         }
       : undefined;
-  const ready = kind !== 'RECEIPTS' || receiptOptions !== undefined;
+  // An issues import names its warehouse before the file (ADR-0081).
+  const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
+  const issueOptions =
+    kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
+  const ready =
+    (kind !== 'RECEIPTS' || receiptOptions !== undefined) &&
+    (kind !== 'ISSUES' || issueOptions !== undefined);
 
   const download = () =>
     void action.run(async () => {
@@ -184,7 +190,13 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
       }
       setWrongType(false);
       if (!ready) return;
-      const job = await mutations.create.mutateAsync({ kind, file, key, receiptOptions });
+      const job = await mutations.create.mutateAsync({
+        kind,
+        file,
+        key,
+        receiptOptions,
+        issueOptions,
+      });
       setKey(randomUuid());
       await navigate(`/imports/${job.id}`);
     });
@@ -198,6 +210,9 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
       <CardContent className="flex flex-1 flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
         {kind === 'RECEIPTS' ? <ReceiptImportFields value={options} onChange={setOptions} /> : null}
+        {kind === 'ISSUES' ? (
+          <IssueImportFields value={issueWarehouse} onChange={setIssueWarehouse} />
+        ) : null}
         {wrongType ? (
           <p role="alert" className="text-[13px] text-destructive">
             {t('imports.xlsxOnly')}
@@ -300,6 +315,28 @@ function ReceiptImportFields(props: {
         </NativeSelect>
       )}
     </div>
+  );
+}
+
+/** The warehouse or store the goods issues of an import leave (ADR-0081). */
+function IssueImportFields(props: {
+  value: number | undefined;
+  onChange: (warehouseId: number | undefined) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouses = (useWarehouses().data ?? []).filter(
+    (warehouse) =>
+      (warehouse.kind === 'WHOLESALE' || warehouse.kind === 'STORE') &&
+      warehouse.status === 'ACTIVE',
+  );
+  return (
+    <WarehouseSelect
+      label={t('imports.issueOptions.warehouse')}
+      options={warehouses}
+      value={props.value}
+      emptyLabel={t('imports.issueOptions.pickWarehouse')}
+      onChange={props.onChange}
+    />
   );
 }
 
