@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0069`. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0079`. `ADR-0069` … `ADR-0077` are taken by the Finance Core branch (`finance-core-architecture`, PR #1). `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -82,6 +82,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0064](ADR-0064-pos-money.md) | POS money: no invoices, one journal entry per closed shift, the cash handed to the accountant as a voucher | Accepted | 2026-10-16 |
 | [ADR-0066](ADR-0066-desktop-density-widths.md) | The web admin on desktop screens: denser lists, one page-width rule, lists that fit the window, sticky dialog footers, the menu in the order of the day's work, `pnpm ui:shots` | Accepted | 2026-10-16 |
 | [ADR-0067](ADR-0067-pos-edge-and-kiosk.md) | POS S2: the store edge in Docker, the snapshot it sells from, the kiosk in Chrome with a pairing code and the cashier's PIN, test receipts until ADR-0065 | Accepted | 2026-10-17 |
+| [ADR-0078](ADR-0078-receipt-window-prices-payment.md) | The goods receipt as one delivery-note window: prices typed on the draft, VAT taken out for VAT-paying suppliers, costed at posting when priced in full, the payment method kept for the books, delivery notes imported from a sheet | Accepted | 2026-10-18 |
 
 ## Template
 
