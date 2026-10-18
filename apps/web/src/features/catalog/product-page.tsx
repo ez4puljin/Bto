@@ -26,7 +26,7 @@ import { UnitsCard } from './units-card';
  * One product: its data (read first, «Засах» to change them, ADR-0042), units with barcodes,
  * prices (and «Бүрэн болгох» while it waits for them, ADR-0044), its e-Barimt data for the
  * accountant, photos (SPEC §5.2), the suppliers it is ordered from (SPEC §5.3, ADR-0032) and where
- * it is kept. On a wide screen the side column holds the photos and suppliers.
+ * it is kept. From `xl` on a side column holds the photos and suppliers (ADR-0066).
  */
 export function ProductPage() {
   const { t } = useTranslation();
@@ -93,7 +93,7 @@ export function ProductPage() {
           </>
         }
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <DetailCard
             title={t('catalog.product.info')}

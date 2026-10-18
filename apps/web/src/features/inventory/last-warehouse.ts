@@ -5,7 +5,7 @@ import type { Warehouse } from '@/features/identity/api';
 const STORAGE_KEY = 'tugeel.inventory.lastWarehouse.v1';
 
 export type WarehouseDoc =
-  'receipt' | 'adjustment' | 'stocktake' | 'transferRequest' | 'transferPush';
+  'receipt' | 'adjustment' | 'stocktake' | 'transferRequest' | 'transferPush' | 'issue';
 
 type Remembered = Record<string, Partial<Record<WarehouseDoc, number>>>;
 

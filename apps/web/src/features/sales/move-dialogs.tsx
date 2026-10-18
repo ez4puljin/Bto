@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { openPrint, orderPrintPath } from './pipelines-api';
-import { usePrintFormat } from './print-format';
-import { PrintFormatToggle } from './print-format-toggle';
+import { usePrintFormat } from '@/lib/print-format';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import type { Mover } from './use-mover';
 
 /** A move's question (the reason of a CANCEL stage) and, after it, the stage's documents. */

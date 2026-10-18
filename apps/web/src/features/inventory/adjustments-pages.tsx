@@ -25,7 +25,7 @@ import { ScanBox } from '@/components/scan-box';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
@@ -62,12 +64,21 @@ import {
 import {
   isInbound,
   looksLikeLabel,
+  parseScanQty,
   useWarehouseName,
   useWarehouseOptions,
   wantsScanFocus,
 } from './helpers';
 import { useDefaultWarehouse } from './last-warehouse';
-import { DocStatusBadge, ProductSearch, QtyInput, WarehouseSelect } from './shared';
+import { useScanQty } from './scan-qty';
+import {
+  DocStatusBadge,
+  ProductSearch,
+  QtyInput,
+  ScanQtyControl,
+  ScanToolbar,
+  WarehouseSelect,
+} from './shared';
 
 const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
 const STATUSES: readonly AdjustmentStatus[] = ['DRAFT', 'SUBMITTED', 'POSTED', 'CANCELLED'];
@@ -81,7 +92,8 @@ const isStatus = (value: string | null): value is AdjustmentStatus =>
 export function AdjustmentsPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('inventory.adjustments.manage');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
   const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
@@ -91,17 +103,6 @@ export function AdjustmentsPage() {
   const adjustments = useAdjustments({ warehouseId, status });
   const rows = adjustments.data?.pages.flatMap((page) => page.data) ?? [];
   const [creating, setCreating] = useCreateParam();
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -144,7 +145,7 @@ export function AdjustmentsPage() {
         </NativeSelect>
       </FilterBar>
       <ProblemAlert problem={problemFromError(adjustments.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -162,7 +163,10 @@ export function AdjustmentsPage() {
             {rows.map((row) => (
               <LinkRow key={row.id} to={`/inventory/adjustments/${row.id}`}>
                 <TableCell className="font-mono">
-                  <Link to={`/inventory/adjustments/${row.id}`} className="font-medium">
+                  <Link
+                    to={`/inventory/adjustments/${row.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
                     {row.number ?? t('inventory.draftNo', { id: row.id })}
                   </Link>
                 </TableCell>
@@ -318,12 +322,11 @@ export function AdjustmentPage() {
             </span>
             <span className="text-foreground">{warehouseName(detail.warehouseId)}</span>
             {detail.effectiveDate ? (
-              <span className="font-mono">{detail.effectiveDate}</span>
+              <span>{t('inventory.postedOn', { date: detail.effectiveDate })}</span>
             ) : null}
           </>
         }
       />
-      {detail.note ? <p className="text-sm">{detail.note}</p> : null}
       {detail.status === 'DRAFT' && canManage ? (
         <AdjustmentEditor
           key={detail.id}
@@ -347,11 +350,14 @@ function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; foc
   const [activeBin, setActiveBin] = useState<Bin | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  // «Тоо», the quantity the next scan or pick adds (ADR-0047 #2); back to 1 after each product.
+  const qty = useScanQty();
 
-  const addUnit = async (productUnitId: number) => {
+  /** Adds `amount` of the unit on the active shelf; false without one. */
+  const addUnit = async (productUnitId: number, amount: string) => {
     if (activeBin === null) {
       setMessage(t('inventory.needBin'));
-      return;
+      return false;
     }
     const same = detail.lines.find(
       (line) => line.productUnitId === productUnitId && line.binId === activeBin.id,
@@ -359,17 +365,25 @@ function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; foc
     if (same) {
       await mutations.updateAdjustmentLine.mutateAsync({
         id: same.id,
-        body: { enteredQty: new Decimal(same.enteredQty).plus(1).toString() },
+        body: { enteredQty: new Decimal(same.enteredQty).plus(amount).toString() },
       });
     } else {
       await mutations.addAdjustmentLine.mutateAsync({
         id: detail.id,
-        body: { productUnitId, enteredQty: '1', binId: activeBin.id },
+        body: { productUnitId, enteredQty: amount, binId: activeBin.id },
       });
     }
+    return true;
   };
 
-  const onScan = (code: string) =>
+  const onScan = (code: string) => {
+    // «Тоо» belongs to this scan; it goes back to 1 at once, and returns if no product took it.
+    const typed = qty.read();
+    const amount = parseScanQty(typed);
+    qty.reset();
+    const giveBack = () => {
+      if (qty.read() === '1') qty.set(typed);
+    };
     void action.run(async () => {
       setMessage(null);
       const find = async <T,>(promise: Promise<T>) => {
@@ -386,11 +400,17 @@ function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; foc
         : null;
       if (bin) {
         setActiveBin(bin);
+        giveBack();
         return;
       }
       const resolved = await find(lookupBarcode.mutateAsync(code));
       if (resolved) {
-        await addUnit(resolved.unit.id);
+        if (amount === null) {
+          setMessage(t('inventory.scanQtyInvalid'));
+          giveBack();
+        } else if (!(await addUnit(resolved.unit.id, amount))) {
+          giveBack();
+        }
         return;
       }
       const late = label
@@ -398,7 +418,26 @@ function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; foc
         : await find(lookupBin.mutateAsync({ warehouseId: detail.warehouseId, code }));
       if (late) setActiveBin(late);
       else setMessage(t('inventory.scanNotFound', { code }));
+      giveBack();
     });
+  };
+
+  const pick = (productUnitId: number) => {
+    const typed = qty.read();
+    const amount = parseScanQty(typed);
+    if (amount === null) {
+      setMessage(t('inventory.scanQtyInvalid'));
+      return;
+    }
+    qty.reset();
+    void action.run(async () => {
+      setMessage(null);
+      if (!(await addUnit(productUnitId, amount))) qty.set(typed);
+    });
+  };
+  const shelfText = activeBin
+    ? t('inventory.activeBin', { code: activeBin.code })
+    : t('inventory.needBin');
 
   const submit = () =>
     void action.run(async () => {
@@ -417,25 +456,38 @@ function AdjustmentEditor({ detail, focusScan }: { detail: AdjustmentDetail; foc
       <Card>
         <CardHeader>
           <CardTitle>{t('inventory.lines')}</CardTitle>
+          {detail.note ? <CardDescription>{detail.note}</CardDescription> : null}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <ScanBox
-            letters
-            autoFocus={focusScan}
-            label={t('inventory.scanLabel')}
-            placeholder={t('inventory.scanPlaceholder')}
-            onScan={onScan}
+          <ScanToolbar
+            scanBox={
+              <ScanBox
+                letters
+                autoFocus={focusScan}
+                label={t('inventory.scanLabel')}
+                placeholder={t('inventory.scanPlaceholder')}
+                onScan={onScan}
+              />
+            }
+            qty={<ScanQtyControl id="adjustment-scan-qty" qty={qty} onScan={onScan} />}
+            search={
+              <ProductSearch onScan={onScan} onPick={(product) => pick(product.baseUnit.id)} />
+            }
+            status={
+              <>
+                <span className="font-medium">{shelfText}</span>
+                {message && message !== shelfText ? (
+                  <span className="text-destructive">{message}</span>
+                ) : null}
+                {qty.value !== '1' ? (
+                  <span className="text-[13px] text-muted-foreground">
+                    {t('inventory.scanQtyHint')}
+                  </span>
+                ) : null}
+              </>
+            }
           />
-          <span className="text-sm font-medium">
-            {activeBin
-              ? t('inventory.activeBin', { code: activeBin.code })
-              : t('inventory.needBin')}
-          </span>
-          {message ? <p className="text-sm text-destructive">{message}</p> : null}
           <ProblemAlert problem={confirm ? null : action.problem} />
-          <ProductSearch
-            onPick={(product) => void action.run(() => addUnit(product.baseUnit.id))}
-          />
           {detail.lines.length > 0 ? (
             <Table>
               <TableHeader>
@@ -570,6 +622,11 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
   return (
     <>
       <Card>
+        {detail.note ? (
+          <CardHeader>
+            <CardDescription>{detail.note}</CardDescription>
+          </CardHeader>
+        ) : null}
         <CardContent className="flex flex-col gap-4">
           <ProblemAlert problem={confirm ? null : action.problem} />
           <Table>
@@ -591,8 +648,10 @@ function AdjustmentReview({ detail }: { detail: AdjustmentDetail }) {
                     {line.productName}
                   </TableCell>
                   <TableCell>{line.unitName}</TableCell>
-                  <TableCell className="text-right font-mono">{line.enteredQty}</TableCell>
-                  <TableCell className="text-right font-mono">{line.qtyBase}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatQty(line.enteredQty)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">{formatQty(line.qtyBase)}</TableCell>
                   <TableCell className="font-mono">{line.binCode}</TableCell>
                   {withCosts ? (
                     <TableCell>

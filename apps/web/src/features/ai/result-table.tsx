@@ -12,20 +12,36 @@ import type { AiResult } from './api';
 import { cellText } from './result-format';
 
 /**
+ * The frame is the table's only scroller, both ways (as in a scrolling ListCard): the table's own
+ * sideways box stops scrolling, so the header cells stick to the frame's top.
+ */
+const FRAME =
+  'overflow-auto rounded-lg border [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&_[data-slot=table-container]]:overflow-visible [&_[data-slot=table-head]]:sticky [&_[data-slot=table-head]]:top-0 [&_[data-slot=table-head]]:z-10 [&_[data-slot=table-head]]:bg-card [&_[data-slot=table-head]]:shadow-[inset_0_-1px_0_var(--color-border)]';
+
+/**
  * The rows of an answer or a report: the column names as the query labelled them, numbers to the
  * right with grouped thousands, a note when only the first rows are shown. Scrolls inside its own
- * frame, header kept in view.
+ * frame, header kept in view; `tall` (a report's side panel) lets the frame take the window's
+ * height.
  */
-export function ResultTable({ result, label }: { result: AiResult; label: string }) {
+export function ResultTable({
+  result,
+  label,
+  tall,
+}: {
+  result: AiResult;
+  label: string;
+  tall?: boolean;
+}) {
   const { t } = useTranslation();
   if (result.rows.length === 0) {
     return <p className="text-sm text-muted-foreground">{t('ai.answer.noRows')}</p>;
   }
   return (
     <div className="space-y-2">
-      <div className="max-h-[28rem] overflow-auto rounded-lg border">
+      <div className={cn(FRAME, tall ? 'max-h-[max(20rem,calc(100svh-15rem))]' : 'max-h-[28rem]')}>
         <Table aria-label={label}>
-          <TableHeader className="sticky top-0 z-10 bg-card">
+          <TableHeader>
             <TableRow>
               {result.columns.map((column, index) => (
                 <TableHead

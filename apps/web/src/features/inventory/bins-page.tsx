@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
+import { useSetParam } from '@/lib/search-params';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
@@ -63,12 +64,14 @@ type Mode = (typeof MODES)[number];
  */
 export function BinsPage() {
   const { t } = useTranslation();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
   const warehouseId = Number.isNaN(warehouseParam) ? undefined : warehouseParam;
-  const [search, setSearch] = useState('');
+  // The filters live in the URL (ADR-0066): a reload or a shared link keeps them.
+  const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
-  const [archived, setArchived] = useState(false);
+  const archived = params.get('archived') === '1';
   const warehouses = useWarehouseOptions(SHELF_KINDS, true);
   const bins = useBins({ warehouseId, q, archived });
   const rows = bins.data?.pages.flatMap((page) => page.data) ?? [];
@@ -78,15 +81,7 @@ export function BinsPage() {
   const deletion = useDeleteConfirm<Bin>((id) => mutations.deleteBin.mutateAsync(id));
 
   const setWarehouse = (id: number | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (id === undefined) next.delete('warehouseId');
-        else next.set('warehouseId', String(id));
-        return next;
-      },
-      { replace: true },
-    );
+    setParam('warehouseId', id === undefined ? null : String(id));
 
   return (
     <div>
@@ -123,12 +118,15 @@ export function BinsPage() {
               placeholder={t('inventory.bins.searchPlaceholder')}
               className="font-mono"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setParam('q', event.target.value.trim());
+              }}
             />
             <FilterToggle
               label={t('inventory.bins.showArchived')}
               checked={archived}
-              onCheckedChange={setArchived}
+              onCheckedChange={(checked) => setParam('archived', checked ? '1' : null)}
             />
           </>
         )}
@@ -136,7 +134,7 @@ export function BinsPage() {
       {warehouseId === undefined ? null : (
         <>
           <ProblemAlert problem={action.problem ?? problemFromError(bins.error)} />
-          <ListCard>
+          <ListCard scroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -158,9 +156,10 @@ export function BinsPage() {
                     <TableCell>{bin.name ?? t('common.none')}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Badge variant={bin.status === 'ACTIVE' ? 'success' : 'secondary'}>
-                          {t(`inventory.binStatus.${bin.status}`)}
-                        </Badge>
+                        {/* Only the exception is marked: a shelf being counted, blue as a document in progress. */}
+                        {bin.status === 'ACTIVE' ? null : (
+                          <Badge variant="default">{t(`inventory.binStatus.${bin.status}`)}</Badge>
+                        )}
                         {bin.isSystem ? (
                           <Badge variant="outline">{t('inventory.bins.system')}</Badge>
                         ) : null}
@@ -264,7 +263,7 @@ function BinCreateDialog({ warehouseId, onClose }: { warehouseId: number; onClos
   return (
     <DialogContent
       closeLabel={t('common.close')}
-      className="sm:max-w-lg"
+      size="md"
       onOpenAutoFocus={(event) => {
         event.preventDefault();
         document.getElementById('bin-code')?.focus();

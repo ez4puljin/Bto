@@ -34,6 +34,8 @@ export interface SupplierInput {
   bankName?: string | null;
   bankAccount?: string | null;
   paymentTermDays?: number | null;
+  /** A VAT payer: its delivery-note prices hold VAT (ADR-0078). Omitted on create: no. */
+  vatPayer?: boolean;
   note?: string | null;
 }
 
@@ -50,6 +52,7 @@ export interface SupplierSummary {
   name: string;
   tin: string | null;
   phone: string | null;
+  vatPayer: boolean;
   status: PartnerStatus;
 }
 
@@ -166,6 +169,7 @@ export class SuppliersService {
       bankAccount: patch.bankAccount === undefined ? before.bankAccount : patch.bankAccount,
       paymentTermDays:
         patch.paymentTermDays === undefined ? before.paymentTermDays : patch.paymentTermDays,
+      vatPayer: patch.vatPayer ?? before.vatPayer,
       note: patch.note === undefined ? before.note : patch.note,
     });
     const code = patch.code ?? before.code;
@@ -370,6 +374,7 @@ const SUMMARY = {
   name: suppliers.name,
   tin: suppliers.tin,
   phone: suppliers.phone,
+  vatPayer: suppliers.vatPayer,
   status: suppliers.status,
 };
 
@@ -380,6 +385,7 @@ function toSummary(row: SupplierSummary): SupplierSummary {
     name: row.name,
     tin: row.tin,
     phone: row.phone,
+    vatPayer: row.vatPayer,
     status: row.status,
   };
 }
@@ -409,6 +415,7 @@ function validated(input: SupplierInput) {
     bankName: optionalText(input.bankName) ?? null,
     bankAccount: bankAccount ?? null,
     paymentTermDays: input.paymentTermDays ?? null,
+    vatPayer: input.vatPayer ?? false,
     note: optionalText(input.note) ?? null,
   };
 }

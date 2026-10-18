@@ -1,11 +1,20 @@
 import { useCallback, useState } from 'react';
 
-/** Sidebar groups the user folded, remembered in this browser (ADR-0042); all open by default. */
-const STORAGE_KEY = 'tugeel.nav.collapsed.v1';
+/**
+ * Sidebar groups this user folded, remembered in this browser per user (ADR-0042, ADR-0066:
+ * `tugeel.nav.collapsed.v2:<userId>`, read from the old shared key until the user folds anew);
+ * all open by default.
+ */
+const LEGACY_KEY = 'tugeel.nav.collapsed.v1';
 
-function read(): Set<string> {
+function keyOf(userId: number | null): string {
+  return `tugeel.nav.collapsed.v2:${userId ?? 0}`;
+}
+
+function read(userId: number | null): Set<string> {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+    const text = localStorage.getItem(keyOf(userId)) ?? localStorage.getItem(LEGACY_KEY) ?? '[]';
+    const parsed: unknown = JSON.parse(text);
     return new Set(
       Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [],
     );
@@ -14,21 +23,24 @@ function read(): Set<string> {
   }
 }
 
-export function useCollapsedGroups() {
-  const [collapsed, setCollapsed] = useState(read);
+export function useCollapsedGroups(userId: number | null) {
+  const [state, setState] = useState(() => ({ userId, collapsed: read(userId) }));
+  // Another user signed in on this browser: their own folds.
+  const current = state.userId === userId ? state.collapsed : read(userId);
+  if (state.userId !== userId) setState({ userId, collapsed: current });
   const setOpen = useCallback((group: string, open: boolean) => {
-    setCollapsed((previous) => {
-      if (open !== previous.has(group)) return previous;
-      const next = new Set(previous);
+    setState((previous) => {
+      if (open !== previous.collapsed.has(group)) return previous;
+      const next = new Set(previous.collapsed);
       if (open) next.delete(group);
       else next.add(group);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+        localStorage.setItem(keyOf(previous.userId), JSON.stringify([...next]));
       } catch {
         // Storage blocked or full: the choice lasts until the page reloads.
       }
-      return next;
+      return { userId: previous.userId, collapsed: next };
     });
   }, []);
-  return { collapsed, setOpen };
+  return { collapsed: current, setOpen };
 }

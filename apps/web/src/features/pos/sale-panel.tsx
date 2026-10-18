@@ -12,10 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { printFormatParam, usePrintFormat } from '@/features/sales/print-format';
-import { PrintFormatToggle } from '@/features/sales/print-format-toggle';
+import { printFormatParam, usePrintFormat } from '@/lib/print-format';
+import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { type SaleDetail, useSale } from './api';
 import { EbarimtBadge, SaleKindBadge } from './badges';
@@ -39,7 +39,9 @@ export function SalePanel({ saleId, onClose }: { saleId: number | null; onClose:
       }
       description={
         detail
-          ? `${formatUbDateTime(Date.parse(detail.soldAt))} · ${detail.tillCode} · ${detail.cashierName ?? ''}`
+          ? [formatUbDateTime(Date.parse(detail.soldAt)), detail.tillCode, detail.cashierName]
+              .filter(Boolean)
+              .join(' · ')
           : ''
       }
       badges={
@@ -122,10 +124,10 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
       <FactChips facts={facts} />
       <TotalsGrid
         items={[
-          [t('pos.fields.subtotal'), formatMnt(sale.subtotal)],
-          [t('pos.fields.discount'), formatMnt(sale.discountTotal)],
-          [t('pos.fields.total'), formatMnt(sale.total)],
-          [t('pos.fields.vat'), formatMnt(sale.vatTotal)],
+          [t('pos.fields.subtotal'), formatTugrik(sale.subtotal)],
+          [t('pos.fields.discount'), formatTugrik(sale.discountTotal)],
+          [t('pos.fields.total'), formatTugrik(sale.total)],
+          [t('pos.fields.vat'), formatTugrik(sale.vatTotal)],
         ]}
       />
       <PanelSection title={t('pos.sales.sections.lines')}>
@@ -133,7 +135,7 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t('pos.fields.product')}</TableHead>
+                <TableHead className="w-full">{t('pos.fields.product')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.qty')}</TableHead>
                 <TableHead>{t('pos.fields.unit')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.unitPrice')}</TableHead>
@@ -150,24 +152,26 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
             <TableBody>
               {sale.lines.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell>
+                  <TableCell className="min-w-48 whitespace-normal">
                     <span className="font-mono text-muted-foreground">{line.productSku}</span>{' '}
                     {line.productName}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{line.qty}</TableCell>
+                  <TableCell className="text-right font-mono">{formatQty(line.qty)}</TableCell>
                   <TableCell>{line.uomName}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.unitPrice)}
+                    {formatTugrik(line.unitPrice)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.discountAmount)}
+                    {formatTugrik(line.discountAmount)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatMnt(line.vatAmount)}
+                    {formatTugrik(line.vatAmount)}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatMnt(line.total)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatTugrik(line.total)}</TableCell>
                   {sale.kind === 'SALE' ? (
-                    <TableCell className="text-right font-mono">{line.returnedBase}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatQty(line.returnedBase)}
+                    </TableCell>
                   ) : (
                     <TableCell>{line.damaged ? t('common.yes') : t('common.no')}</TableCell>
                   )}
@@ -177,13 +181,12 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
           </Table>
         </div>
       </PanelSection>
-      <PanelSection title={t('pos.sales.sections.tenders')}>
-        {sale.tenders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('pos.sales.noTenders')}</p>
-        ) : (
-          <ul className="flex flex-col gap-1 text-sm">
+      {/* Sections with nothing to show are left out rather than saying so (ADR-0066). */}
+      {sale.tenders.length > 0 ? (
+        <PanelSection title={t('pos.sales.sections.tenders')}>
+          <ul className="flex max-w-2xl flex-col divide-y divide-border/80 rounded-lg border border-border text-sm">
             {sale.tenders.map((tender) => (
-              <li key={tender.id} className="flex flex-wrap justify-between gap-3">
+              <li key={tender.id} className="flex flex-wrap justify-between gap-3 px-3 py-2">
                 <span>
                   {t(`pos.tenderKinds.${tender.kind}`)}
                   {tender.terminalId ? ` · ${tender.terminalId}` : ''}
@@ -191,26 +194,24 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
                   {tender.maskedPan ? ` · ${tender.maskedPan}` : ''}
                 </span>
                 <span className="font-mono">
-                  {formatMnt(tender.amount)}
+                  {formatTugrik(tender.amount)}
                   {tender.tendered
-                    ? ` (${t('pos.fields.tendered')} ${formatMnt(tender.tendered)})`
+                    ? ` (${t('pos.fields.tendered')} ${formatTugrik(tender.tendered)})`
                     : ''}
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </PanelSection>
-      <PanelSection title={t('pos.sales.sections.shortfalls')}>
-        {sale.shortfalls.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('pos.sales.noShortfalls')}</p>
-        ) : (
-          <ul className="flex flex-col gap-1 text-sm">
+        </PanelSection>
+      ) : null}
+      {sale.shortfalls.length > 0 ? (
+        <PanelSection title={t('pos.sales.sections.shortfalls')}>
+          <ul className="flex flex-col divide-y divide-border/80 rounded-lg border border-border text-sm">
             {sale.shortfalls.map((shortfall) => (
-              <li key={shortfall.id} className="flex flex-wrap justify-between gap-3">
+              <li key={shortfall.id} className="flex flex-wrap justify-between gap-3 px-3 py-2">
                 <span>
                   <span className="font-mono text-muted-foreground">{shortfall.productSku}</span>{' '}
-                  {shortfall.productName} · {shortfall.qtyBase}
+                  {shortfall.productName} · {formatQty(shortfall.qtyBase)}
                 </span>
                 <span className="text-muted-foreground">
                   {t('pos.sales.shortfallHint', { number: shortfall.adjustmentNumber })}
@@ -219,27 +220,23 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
               </li>
             ))}
           </ul>
-        )}
-      </PanelSection>
-      {sale.kind === 'SALE' ? (
+        </PanelSection>
+      ) : null}
+      {sale.kind === 'SALE' && sale.returns.length > 0 ? (
         <PanelSection title={t('pos.sales.sections.returns')}>
-          {sale.returns.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('pos.sales.noReturns')}</p>
-          ) : (
-            <ul className="flex flex-col gap-1 text-sm">
-              {sale.returns.map((entry) => (
-                <li key={entry.id} className="flex justify-between gap-3">
-                  <Link
-                    className="font-mono text-link underline-offset-2 hover:underline"
-                    to={`/pos/sales?sale=${entry.id}`}
-                  >
-                    {entry.number}
-                  </Link>
-                  <span className="font-mono">{formatMnt(entry.total)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ul className="flex max-w-2xl flex-col divide-y divide-border/80 rounded-lg border border-border text-sm">
+            {sale.returns.map((entry) => (
+              <li key={entry.id} className="flex justify-between gap-3 px-3 py-2">
+                <Link
+                  className="font-mono text-link underline-offset-2 hover:underline"
+                  to={`/pos/sales?sale=${entry.id}`}
+                >
+                  {entry.number}
+                </Link>
+                <span className="font-mono">{formatTugrik(entry.total)}</span>
+              </li>
+            ))}
+          </ul>
         </PanelSection>
       ) : null}
       {sale.note ? (

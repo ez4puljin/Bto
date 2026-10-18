@@ -14,6 +14,7 @@ import {
   SegmentedControl,
   SkeletonRows,
 } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -28,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useWarehouses } from '@/features/identity/api';
+import { WarehouseSelect } from '@/features/inventory/shared';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, problemOf } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
@@ -36,12 +39,14 @@ import {
   type ImportJob,
   type ImportRow,
   type ImportStatus,
+  type ReceiptImportOptions,
   RUNNING,
   type RowFilter,
   useImport,
   useImportMutations,
   useImportRows,
   useImports,
+  useReceiptPaymentAccounts,
 } from './api';
 import { columnName, fieldNames, issueText } from './helpers';
 
@@ -49,21 +54,28 @@ const FILTERS: readonly RowFilter[] = ['ERRORS', 'WARNINGS', 'ALL'];
 /** Filled cells shown for each row before the ones with a problem. */
 const SHOWN_CELLS = 3;
 
+/**
+ * An import's state (docs/ui.md §1): green once in, blue while it runs or waits for «Системд
+ * оруулах» (a checked file is not done yet), red when refused or unreadable, an outline when
+ * reverted.
+ */
 function StatusBadge({ status }: { status: ImportStatus }) {
   const { t } = useTranslation();
   const variant =
-    status === 'COMMITTED' || status === 'VALIDATED'
+    status === 'COMMITTED'
       ? 'success'
       : status === 'INVALID' || status === 'FAILED'
         ? 'destructive'
-        : RUNNING.includes(status)
+        : status === 'VALIDATED' || RUNNING.includes(status)
           ? 'default'
           : 'outline';
   return <Badge variant={variant}>{t(`imports.statuses.${status}`)}</Badge>;
 }
 
-/** The rows filter as a segmented control (ADR-0042); still tabs for keyboards and tests. */
-/** Imports (ADR-0036): a card per kind for the template and the upload, then the history. */
+/**
+ * Imports (ADR-0036): a compact card per kind for the template and the upload, three in a row on
+ * wide screens so the history stays near the first screen (ADR-0066), then the history.
+ */
 export function ImportsPage() {
   const { t } = useTranslation();
   const imports = useImports();
@@ -71,20 +83,17 @@ export function ImportsPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('imports.title')}
-        meta={<p className="max-w-3xl">{t('imports.intro')}</p>}
-      />
-      <div className="grid gap-4 md:grid-cols-2">
+      <PageHeader title={t('imports.title')} description={t('imports.intro')} />
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {IMPORT_KINDS.map((kind) => (
           <ImportKindCard key={kind} kind={kind} />
         ))}
       </div>
-      <h2 className="mt-8 mb-3 text-[17px] leading-tight font-semibold tracking-tight">
+      <h2 className="mt-6 mb-2.5 text-[15px] leading-tight font-semibold tracking-tight">
         {t('imports.history')}
       </h2>
       <ProblemAlert problem={problemFromError(imports.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -137,6 +146,30 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const input = useRef<HTMLInputElement>(null);
   const [key, setKey] = useState(randomUuid);
   const [wrongType, setWrongType] = useState(false);
+  // A receipts import names its warehouse and payment before the file (ADR-0078 #7).
+  const [options, setOptions] = useState<Partial<ReceiptImportOptions>>({
+    paymentMethod: 'CREDIT',
+    moneyAccountId: null,
+  });
+  const receiptOptions =
+    kind === 'RECEIPTS' &&
+    options.warehouseId !== undefined &&
+    options.paymentMethod !== undefined &&
+    (options.paymentMethod === 'CREDIT' || options.moneyAccountId)
+      ? {
+          warehouseId: options.warehouseId,
+          paymentMethod: options.paymentMethod,
+          moneyAccountId:
+            options.paymentMethod === 'CREDIT' ? null : (options.moneyAccountId ?? null),
+        }
+      : undefined;
+  // An issues import names its warehouse before the file (ADR-0081).
+  const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
+  const issueOptions =
+    kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
+  const ready =
+    (kind !== 'RECEIPTS' || receiptOptions !== undefined) &&
+    (kind !== 'ISSUES' || issueOptions !== undefined);
 
   const download = () =>
     void action.run(async () => {
@@ -156,28 +189,55 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         return;
       }
       setWrongType(false);
-      const job = await mutations.create.mutateAsync({ kind, file, key });
+      if (!ready) return;
+      const job = await mutations.create.mutateAsync({
+        kind,
+        file,
+        key,
+        receiptOptions,
+        issueOptions,
+      });
       setKey(randomUuid());
       await navigate(`/imports/${job.id}`);
     });
 
+  // The page has no single main action: uploads are tinted, templates quiet (docs/ui.md §5).
   return (
-    <Card>
+    <Card className="gap-2">
       <CardHeader>
         <CardTitle>{t(`imports.kinds.${kind}`)}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
-        {wrongType ? <p className="text-sm text-destructive">{t('imports.xlsxOnly')}</p> : null}
+      <CardContent className="flex flex-1 flex-col gap-3">
+        <p className="text-[13px] text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
+        {kind === 'RECEIPTS' ? <ReceiptImportFields value={options} onChange={setOptions} /> : null}
+        {kind === 'ISSUES' ? (
+          <IssueImportFields value={issueWarehouse} onChange={setIssueWarehouse} />
+        ) : null}
+        {wrongType ? (
+          <p role="alert" className="text-[13px] text-destructive">
+            {t('imports.xlsxOnly')}
+          </p>
+        ) : null}
         <ProblemAlert problem={action.problem} />
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={mutations.template.isPending} onClick={download}>
-            <Download />
-            {t('imports.downloadTemplate')}
-          </Button>
-          <Button disabled={mutations.create.isPending} onClick={() => input.current?.click()}>
+        {/* The card's own action first, so its tint lines up with the text; the template after. */}
+        <div className="mt-auto flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={mutations.create.isPending || !ready}
+            onClick={() => input.current?.click()}
+          >
             <Upload />
             {t('imports.upload')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={mutations.template.isPending}
+            onClick={download}
+          >
+            <Download />
+            {t('imports.downloadTemplate')}
           </Button>
           <input
             ref={input}
@@ -197,6 +257,89 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   );
 }
 
+/** The warehouse and the payment of the delivery notes a receipts import brings (ADR-0078 #7). */
+function ReceiptImportFields(props: {
+  value: Partial<ReceiptImportOptions>;
+  onChange: (value: Partial<ReceiptImportOptions>) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouses = (useWarehouses().data ?? []).filter(
+    (warehouse) => warehouse.kind === 'WHOLESALE' && warehouse.status === 'ACTIVE',
+  );
+  const method = props.value.paymentMethod ?? 'CREDIT';
+  const accounts = useReceiptPaymentAccounts(method !== 'CREDIT');
+  const choices = (accounts.data ?? []).filter((account) => account.kind === method);
+  return (
+    <div className="grid gap-2">
+      <WarehouseSelect
+        label={t('imports.receiptOptions.warehouse')}
+        options={warehouses}
+        value={props.value.warehouseId}
+        emptyLabel={t('imports.receiptOptions.pickWarehouse')}
+        onChange={(warehouseId) => props.onChange({ ...props.value, warehouseId })}
+      />
+      <NativeSelect
+        aria-label={t('imports.receiptOptions.payment')}
+        value={method}
+        onChange={(event) =>
+          props.onChange({
+            ...props.value,
+            paymentMethod: event.target.value as ReceiptImportOptions['paymentMethod'],
+            moneyAccountId: null,
+          })
+        }
+      >
+        {(['CREDIT', 'CASH', 'BANK'] as const).map((value) => (
+          <option key={value} value={value}>
+            {t(`imports.receiptOptions.methods.${value}`)}
+          </option>
+        ))}
+      </NativeSelect>
+      {method === 'CREDIT' ? null : (
+        <NativeSelect
+          aria-label={t('imports.receiptOptions.account')}
+          value={props.value.moneyAccountId ?? ''}
+          onChange={(event) =>
+            props.onChange({
+              ...props.value,
+              moneyAccountId: event.target.value ? Number.parseInt(event.target.value, 10) : null,
+            })
+          }
+        >
+          <option value="">{t('imports.receiptOptions.pickAccount')}</option>
+          {choices.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
+    </div>
+  );
+}
+
+/** The warehouse or store the goods issues of an import leave (ADR-0081). */
+function IssueImportFields(props: {
+  value: number | undefined;
+  onChange: (warehouseId: number | undefined) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouses = (useWarehouses().data ?? []).filter(
+    (warehouse) =>
+      (warehouse.kind === 'WHOLESALE' || warehouse.kind === 'STORE') &&
+      warehouse.status === 'ACTIVE',
+  );
+  return (
+    <WarehouseSelect
+      label={t('imports.issueOptions.warehouse')}
+      options={warehouses}
+      value={props.value}
+      emptyLabel={t('imports.issueOptions.pickWarehouse')}
+      onChange={props.onChange}
+    />
+  );
+}
+
 /** One import: progress while the worker runs, the counts, the rows with their problems. */
 export function ImportPage() {
   const { t } = useTranslation();
@@ -205,8 +348,21 @@ export function ImportPage() {
   const [filter, setFilter] = useState<RowFilter | null>(null);
 
   const loadProblem = problemFromError(job.error);
-  if (loadProblem) return <ProblemAlert problem={loadProblem} />;
-  if (!job.data) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
+  // Loading and refusals keep the page's frame, so the browser tab never shows the last page's name.
+  if (loadProblem || !job.data) {
+    return (
+      <div>
+        <PageHeader title={t('imports.fileTitle')} />
+        {loadProblem ? (
+          <ProblemAlert problem={loadProblem} />
+        ) : (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t('common.loading')}
+          </p>
+        )}
+      </div>
+    );
+  }
   const detail = job.data;
   const running = RUNNING.includes(detail.status);
   const shown = filter ?? (detail.errorRows > 0 ? 'ERRORS' : 'ALL');

@@ -11,7 +11,7 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { ScanBox } from '@/components/scan-box';
 import { StickyActions } from '@/components/sticky-actions';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBarcodeLookup } from '@/features/catalog/api';
@@ -30,7 +30,7 @@ import {
 } from './api';
 import { looksLikeLabel, parseCount, parseScanQty } from './helpers';
 import { useScanQty } from './scan-qty';
-import { ProductSearch, ScanQtyField } from './shared';
+import { ProductSearch, ScanQtyField, ScanToolbar } from './shared';
 
 /** Shelves shown at once; the rest are reached by scanning their label. */
 const SHELVES_SHOWN = 300;
@@ -298,20 +298,32 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <Card>
+        {/* The note is the card's description, as on every document (ADR-0066). */}
+        {detail.note ? (
+          <CardHeader>
+            <CardDescription>{detail.note}</CardDescription>
+          </CardHeader>
+        ) : null}
         <CardContent className="flex flex-col gap-3">
-          <ScanBox
-            letters
-            label={t('inventory.stocktake.scanLabel')}
-            placeholder={t('inventory.stocktake.scanPlaceholder')}
-            onScan={onScan}
+          <ScanToolbar
+            scanBox={
+              <ScanBox
+                letters
+                label={t('inventory.stocktake.scanLabel')}
+                placeholder={t('inventory.stocktake.scanPlaceholder')}
+                onScan={onScan}
+              />
+            }
+            qty={
+              <div className="flex flex-wrap items-center gap-2 lg:h-9 lg:flex-nowrap">
+                <Label htmlFor="stocktake-qty">{t('inventory.stocktake.multiplier')}</Label>
+                <ScanQtyField id="stocktake-qty" qty={multiplier} onScan={onScan} />
+                <span className="text-xs text-muted-foreground lg:max-w-56">
+                  {t('inventory.stocktake.multiplierHint')}
+                </span>
+              </div>
+            }
           />
-          <div className="flex items-center gap-2">
-            <Label htmlFor="stocktake-qty">{t('inventory.stocktake.multiplier')}</Label>
-            <ScanQtyField id="stocktake-qty" qty={multiplier} onScan={onScan} />
-            <span className="text-xs text-muted-foreground">
-              {t('inventory.stocktake.multiplierHint')}
-            </span>
-          </div>
           <p className="text-lg font-semibold">
             {activeBin
               ? t('inventory.stocktake.activeBin', { code: activeBin.code })
@@ -377,6 +389,7 @@ export function StocktakeCounter({ detail }: { detail: StocktakeDetail }) {
             </div>
             {/* A finished shelf still takes scans; finishing it again would change nothing. */}
             <Button
+              variant="secondary"
               className="self-start"
               disabled={activeBin.finishedAt !== null || mutations.finishBin.isPending}
               onClick={() => ask('finish')}
@@ -568,7 +581,7 @@ function ShelfGrid(props: {
           {shown.slice(0, SHELVES_SHOWN).map((bin) => (
             <Button
               key={bin.id}
-              variant={bin.id === props.activeId ? 'default' : 'outline'}
+              variant={bin.id === props.activeId ? 'secondary' : 'outline'}
               aria-pressed={bin.id === props.activeId}
               className="h-auto flex-col gap-0 py-2"
               onClick={() => props.onPick(bin)}

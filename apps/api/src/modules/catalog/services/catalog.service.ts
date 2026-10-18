@@ -1,14 +1,36 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import type { Decimal } from '@tugeel/shared/money';
+import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
-import { products } from '../schema';
+import { productBarcodes, products, productUnits, uoms, type VatType } from '../schema';
 import {
   type ProductDetail,
   type ProductQuery,
   ProductsService,
   type ProductSummary,
 } from './products.service';
+
+/** A product the store edge may sell (ADR-0067): its current units and their barcode lookup keys. */
+export interface PosCatalogueProduct {
+  id: number;
+  sku: string;
+  name: string;
+  categoryId: number;
+  vatType: VatType;
+  cityTax: boolean | null;
+  units: {
+    unitId: number;
+    uomId: number;
+    uomName: string;
+    factor: Decimal;
+    isBase: boolean;
+    barcodes: string[];
+  }[];
+}
+
+/** Rows per `IN (…)` list, well under PostgreSQL's 65,535 bind parameters. */
+const IN_CHUNK = 10_000;
 
 /** Read access to products for other modules (docs/architecture.md §4 catalog row). */
 @Injectable()
@@ -29,6 +51,83 @@ export class CatalogService {
       .from(products)
       .where(inArray(products.id, [...ids]));
     return this.products.summaries(rows, executor);
+  }
+
+  /**
+   * Every active product that is ready for sale, with its current units, their unit-of-measure names
+   * and barcode lookup keys: the store edge's catalogue (ADR-0067). A few queries whatever the count.
+   */
+  async posCatalogue(executor: Db | Tx = this.db): Promise<PosCatalogueProduct[]> {
+    const rows = await executor
+      .select({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        categoryId: products.categoryId,
+        vatType: products.vatType,
+        cityTax: products.cityTax,
+      })
+      .from(products)
+      .where(and(eq(products.status, 'ACTIVE'), isNotNull(products.saleReadyAt)))
+      .orderBy(asc(products.id));
+    const byProduct = new Map<number, PosCatalogueProduct>(
+      rows.map((row) => [row.id, { ...row, units: [] }]),
+    );
+    const ids = rows.map((row) => row.id);
+    const unitRows: {
+      unitId: number;
+      productId: number;
+      uomId: number;
+      uomName: string;
+      factor: Decimal;
+      isBase: boolean;
+    }[] = [];
+    for (let at = 0; at < ids.length; at += IN_CHUNK) {
+      unitRows.push(
+        ...(await executor
+          .select({
+            unitId: productUnits.id,
+            productId: productUnits.productId,
+            uomId: productUnits.uomId,
+            uomName: uoms.name,
+            factor: productUnits.factorToBase,
+            isBase: productUnits.isBase,
+          })
+          .from(productUnits)
+          .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
+          .where(
+            and(
+              inArray(productUnits.productId, ids.slice(at, at + IN_CHUNK)),
+              isNull(productUnits.supersededAt),
+            ),
+          )
+          .orderBy(asc(productUnits.productId), asc(productUnits.id))),
+      );
+    }
+    const codes = new Map<number, string[]>();
+    const unitIds = unitRows.map((unit) => unit.unitId);
+    for (let at = 0; at < unitIds.length; at += IN_CHUNK) {
+      const barcodeRows = await executor
+        .select({ unitId: productBarcodes.productUnitId, lookupKey: productBarcodes.lookupKey })
+        .from(productBarcodes)
+        .where(inArray(productBarcodes.productUnitId, unitIds.slice(at, at + IN_CHUNK)));
+      for (const row of barcodeRows) {
+        const list = codes.get(row.unitId) ?? [];
+        list.push(row.lookupKey);
+        codes.set(row.unitId, list);
+      }
+    }
+    for (const unit of unitRows) {
+      byProduct.get(unit.productId)?.units.push({
+        unitId: unit.unitId,
+        uomId: unit.uomId,
+        uomName: unit.uomName,
+        factor: unit.factor,
+        isBase: unit.isBase,
+        barcodes: codes.get(unit.unitId) ?? [],
+      });
+    }
+    return [...byProduct.values()];
   }
 
   search(query: ProductQuery) {

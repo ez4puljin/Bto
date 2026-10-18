@@ -212,7 +212,7 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-xl">
+      <DialogContent closeLabel={t('common.close')} size="xl">
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>
@@ -225,110 +225,131 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
             </DialogDescription>
           </DialogHeader>
           <ProblemAlert problem={problemFromError(mutation.error)} />
-          {creating ? (
-            <FormField
-              label={t('pricing.profiles.fields.name')}
-              htmlFor="profile-name"
-              error={errors.name?.message}
-            >
-              <Input id="profile-name" autoComplete="off" {...form.register('name')} />
-            </FormField>
-          ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FormField
-              label={t('pricing.profiles.fields.loose')}
-              htmlFor="profile-loose"
-              hint={t('pricing.profiles.fields.looseHint')}
-              error={errors.looseMarkupPct?.message}
-            >
-              <Input
-                id="profile-loose"
-                inputMode="decimal"
-                autoComplete="off"
-                className="font-mono"
-                {...form.register('looseMarkupPct')}
-              />
-            </FormField>
-            <FormField
-              label={t('pricing.profiles.fields.retail')}
-              htmlFor="profile-retail"
-              hint={t('pricing.profiles.fields.retailHint')}
-              error={errors.retailMarkupPct?.message}
-            >
-              <Input
-                id="profile-retail"
-                inputMode="decimal"
-                autoComplete="off"
-                className="font-mono"
-                {...form.register('retailMarkupPct')}
-              />
-            </FormField>
-          </div>
-          <Controller
-            control={form.control}
-            name="bulk"
-            render={({ field }) => (
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="profile-bulk">{t('pricing.profiles.fields.bulk')}</Label>
-                <Switch id="profile-bulk" checked={field.value} onCheckedChange={field.onChange} />
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem] md:items-start">
+            <div className="flex min-w-0 flex-col gap-4">
+              {creating ? (
+                <FormField
+                  label={t('pricing.profiles.fields.name')}
+                  htmlFor="profile-name"
+                  error={errors.name?.message}
+                >
+                  <Input id="profile-name" autoComplete="off" {...form.register('name')} />
+                </FormField>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  label={t('pricing.profiles.fields.loose')}
+                  htmlFor="profile-loose"
+                  hint={t('pricing.profiles.fields.looseHint')}
+                  error={errors.looseMarkupPct?.message}
+                >
+                  <Input
+                    id="profile-loose"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    className="font-mono"
+                    {...form.register('looseMarkupPct')}
+                  />
+                </FormField>
+                <FormField
+                  label={t('pricing.profiles.fields.retail')}
+                  htmlFor="profile-retail"
+                  hint={t('pricing.profiles.fields.retailHint')}
+                  error={errors.retailMarkupPct?.message}
+                >
+                  <Input
+                    id="profile-retail"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    className="font-mono"
+                    {...form.register('retailMarkupPct')}
+                  />
+                </FormField>
               </div>
-            )}
-          />
-          {bulk ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField
-                label={t('pricing.profiles.fields.bulkQty')}
-                htmlFor="profile-bulk-qty"
-                hint={t('pricing.profiles.fields.bulkQtyHint')}
-                error={errors.retailBulkMinQty?.message}
-              >
-                <Input
-                  id="profile-bulk-qty"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="font-mono"
-                  {...form.register('retailBulkMinQty')}
-                />
-              </FormField>
-              <FormField
-                label={t('pricing.profiles.fields.bulkPct')}
-                htmlFor="profile-bulk-pct"
-                error={errors.retailBulkMarkupPct?.message}
-              >
-                <Input
-                  id="profile-bulk-pct"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="font-mono"
-                  {...form.register('retailBulkMarkupPct')}
-                />
-              </FormField>
-            </div>
-          ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FormField label={t('pricing.profiles.fields.rounding')} htmlFor="profile-rounding">
-              <NativeSelect id="profile-rounding" {...form.register('rounding')}>
-                {PRICE_ROUNDINGS.map((rounding) => (
-                  <option key={rounding} value={rounding}>
-                    {t(`pricing.roundings.${rounding}`)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </FormField>
-            <FormField
-              label={t('pricing.profiles.fields.validFrom')}
-              htmlFor="profile-valid-from"
-              error={errors.validFrom?.message}
-            >
-              <Input
-                id="profile-valid-from"
-                type="date"
-                min={today}
-                {...form.register('validFrom')}
+              <Controller
+                control={form.control}
+                name="bulk"
+                render={({ field }) => (
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="profile-bulk">{t('pricing.profiles.fields.bulk')}</Label>
+                    <Switch
+                      id="profile-bulk"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </div>
+                )}
               />
-            </FormField>
+              {bulk ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    label={t('pricing.profiles.fields.bulkQty')}
+                    htmlFor="profile-bulk-qty"
+                    hint={t('pricing.profiles.fields.bulkQtyHint')}
+                    error={errors.retailBulkMinQty?.message}
+                  >
+                    <Input
+                      id="profile-bulk-qty"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      className="font-mono"
+                      {...form.register('retailBulkMinQty')}
+                    />
+                  </FormField>
+                  <FormField
+                    label={t('pricing.profiles.fields.bulkPct')}
+                    htmlFor="profile-bulk-pct"
+                    error={errors.retailBulkMarkupPct?.message}
+                  >
+                    <Input
+                      id="profile-bulk-pct"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      className="font-mono"
+                      {...form.register('retailBulkMarkupPct')}
+                    />
+                  </FormField>
+                </div>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label={t('pricing.profiles.fields.rounding')} htmlFor="profile-rounding">
+                  <NativeSelect id="profile-rounding" {...form.register('rounding')}>
+                    {PRICE_ROUNDINGS.map((rounding) => (
+                      <option key={rounding} value={rounding}>
+                        {t(`pricing.roundings.${rounding}`)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </FormField>
+                <FormField
+                  label={t('pricing.profiles.fields.validFrom')}
+                  htmlFor="profile-valid-from"
+                  error={errors.validFrom?.message}
+                >
+                  <Input
+                    id="profile-valid-from"
+                    type="date"
+                    min={today}
+                    {...form.register('validFrom')}
+                  />
+                </FormField>
+              </div>
+            </div>
+            <div className="rounded-xl bg-muted/70 p-3">
+              {example ? (
+                <ProfileExample values={example} layout="list" />
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    {t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) })}
+                  </h3>
+                  <p className="text-[13px] text-muted-foreground">
+                    {t('pricing.profiles.exampleEmpty')}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-          {example ? <ProfileExample values={example} /> : null}
           <DialogFormFooter pending={isSubmitting} onCancel={props.onClose} />
         </form>
       </DialogContent>
@@ -391,8 +412,15 @@ const EXAMPLE_PRICE = new Decimal(1000);
 /**
  * What a product with a warehouse price of 1,000₮ costs on each basis under a profile's values,
  * worked out by the shared `perBasePrices` as orders will be (the profile page and its dialogs).
+ * `list` is the narrow form of a dialog's side column: one line per basis.
  */
-export function ProfileExample({ values }: { values: ProfileValues }) {
+export function ProfileExample({
+  values,
+  layout = 'table',
+}: {
+  values: ProfileValues;
+  layout?: 'table' | 'list';
+}) {
   const { t } = useTranslation();
   const prices = perBasePrices(EXAMPLE_PRICE, values);
   const money = (amount: Decimal) => t('pricing.money', { amount: formatMnt(amount.toFixed(0)) });
@@ -431,6 +459,37 @@ export function ProfileExample({ values }: { values: ProfileValues }) {
       : []),
   ];
   const title = t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) });
+  const roundingNote = (
+    <p className="text-xs text-muted-foreground">
+      {t('pricing.profiles.roundingNote', {
+        rounding: t(`pricing.roundings.${values.rounding}`),
+      })}
+    </p>
+  );
+
+  if (layout === 'list') {
+    return (
+      <section aria-label={title} className="flex flex-col gap-2">
+        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          {title}
+        </h3>
+        <ul className="divide-y divide-border/80 rounded-lg bg-background shadow-control ring-1 ring-black/[0.04]">
+          {rows.map((row) => (
+            <li key={row.key} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+              <span className="min-w-0 text-[13px]">
+                <span>{row.basis}</span>
+                {row.markup ? (
+                  <span className="ml-1.5 font-mono text-muted-foreground">{row.markup}</span>
+                ) : null}
+              </span>
+              <span className="font-mono text-[13px] font-medium">{money(row.price)}</span>
+            </li>
+          ))}
+        </ul>
+        {roundingNote}
+      </section>
+    );
+  }
 
   return (
     <section aria-label={title} className="flex flex-col gap-1.5">
@@ -461,11 +520,7 @@ export function ProfileExample({ values }: { values: ProfileValues }) {
           ))}
         </TableBody>
       </Table>
-      <p className="text-xs text-muted-foreground">
-        {t('pricing.profiles.roundingNote', {
-          rounding: t(`pricing.roundings.${values.rounding}`),
-        })}
-      </p>
+      {roundingNote}
     </section>
   );
 }

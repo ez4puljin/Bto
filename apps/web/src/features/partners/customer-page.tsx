@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -30,7 +30,10 @@ import {
   customerValues,
 } from './partner-schema';
 
-/** One customer: data, credit terms, delivery addresses and contacts (SPEC §5.3). */
+/**
+ * One customer: data and delivery addresses, then from `xl` on a side column with the credit
+ * terms, the balance («Тооцоо», finance) and the contacts (SPEC §5.3, ADR-0066).
+ */
 export function CustomerPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
@@ -56,7 +59,7 @@ export function CustomerPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
         title={detail.name}
         meta={
@@ -75,33 +78,39 @@ export function CustomerPage() {
           </>
         }
       />
-      <DetailCard
-        title={t('partners.customer.info')}
-        canEdit={canManage}
-        view={<CustomerFacts customer={detail} />}
-        edit={(close) => (
-          <CustomerForm
-            mode="edit"
-            customer={detail}
-            defaultValues={customerValues(detail)}
-            submitLabel={t('common.save')}
-            onCancel={close}
-            onSubmit={(values) => save(values, close)}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
+          <DetailCard
+            title={t('partners.customer.info')}
+            canEdit={canManage}
+            view={<CustomerFacts customer={detail} />}
+            edit={(close) => (
+              <CustomerForm
+                mode="edit"
+                customer={detail}
+                defaultValues={customerValues(detail)}
+                submitLabel={t('common.save')}
+                onCancel={close}
+                onSubmit={(values) => save(values, close)}
+              />
+            )}
           />
-        )}
-      />
-      <CreditCard customer={detail} canEdit={canCredit} />
-      <CustomerBalanceCard customerId={id} />
-      <AddressesCard customer={detail} canManage={canManage} />
-      <ContactsCard
-        contacts={detail.contacts}
-        canManage={canManage}
-        onAdd={(body) => mutations.addCustomerContact.mutateAsync({ ownerId: id, body })}
-        onUpdate={(contactId, body) =>
-          mutations.updateCustomerContact.mutateAsync({ id: contactId, body })
-        }
-        onDelete={(contactId) => mutations.deleteCustomerContact.mutateAsync(contactId)}
-      />
+          <AddressesCard customer={detail} canManage={canManage} />
+        </div>
+        <div className="flex min-w-0 flex-col gap-4">
+          <CreditCard customer={detail} canEdit={canCredit} />
+          <CustomerBalanceCard customerId={id} />
+          <ContactsCard
+            contacts={detail.contacts}
+            canManage={canManage}
+            onAdd={(body) => mutations.addCustomerContact.mutateAsync({ ownerId: id, body })}
+            onUpdate={(contactId, body) =>
+              mutations.updateCustomerContact.mutateAsync({ id: contactId, body })
+            }
+            onDelete={(contactId) => mutations.deleteCustomerContact.mutateAsync(contactId)}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -135,13 +144,19 @@ function CreditCard(props: { customer: CustomerDetail; canEdit: boolean }) {
           <FieldList
             items={[
               {
-                label: t('partners.credit.limit'),
+                // The value carries «₮» and «хоног»: the read view drops the form's units.
+                label: t('partners.customers.columns.creditLimit'),
                 value:
-                  customer.creditLimit === null
-                    ? t('partners.credit.limitUndecided')
-                    : formatMnt(customer.creditLimit),
+                  customer.creditLimit === null ? (
+                    t('partners.credit.limitUndecided')
+                  ) : (
+                    <span className="font-mono">{formatTugrik(customer.creditLimit)}</span>
+                  ),
               },
-              { label: t('partners.credit.term'), value: termText(customer.paymentTerm) },
+              {
+                label: t('partners.customers.columns.paymentTerm'),
+                value: termText(customer.paymentTerm),
+              },
               {
                 label: t('partners.credit.status'),
                 value: customer.creditHold ? (

@@ -7,14 +7,26 @@ import { useAuthState } from '@/app/auth-context';
  * shared key (ADR-0037), which is never written again. Only hidden keys are stored, so columns
  * added later show up by default; showing every column stores an empty list, so the old shared
  * choice cannot come back. Storage can be missing or refuse writes (private windows, blocked site
- * data): the choice then lasts until the page is closed.
+ * data): the choice then lasts until the page is closed. `defaultHidden` (ADR-0066) is what a
+ * user who never chose sees hidden, so a wide list fits a 1366px screen; every column stays in the
+ * chooser.
  */
-export function useHiddenColumns(list: string, keys: readonly string[], locked: readonly string[]) {
+export function useHiddenColumns(
+  list: string,
+  keys: readonly string[],
+  locked: readonly string[],
+  defaultHidden: readonly string[] = NONE,
+) {
   const auth = useAuthState();
   const userId = auth.status === 'authenticated' ? auth.me.id : 0;
   const shared = `tugeel.${list}.hiddenColumns.v1`;
   const own = `${shared}:${userId}`;
-  const stored = useMemo(() => readHidden(own, shared, keys, locked), [own, shared, keys, locked]);
+  const stored = useMemo(
+    () =>
+      readHidden(own, shared, keys, locked) ??
+      new Set(defaultHidden.filter((key) => keys.includes(key) && !locked.includes(key))),
+    [own, shared, keys, locked, defaultHidden],
+  );
   // The choice made on this page; signing in as someone else reads that user's own.
   const [chosen, setChosen] = useState<{ key: string; hidden: ReadonlySet<string> } | null>(null);
   const hidden = chosen?.key === own ? chosen.hidden : stored;
@@ -33,15 +45,18 @@ export function useHiddenColumns(list: string, keys: readonly string[], locked: 
   return { hidden, toggle, showAll };
 }
 
+const NONE: readonly string[] = [];
+
+/** The stored choice, or null when this user never chose (the list's default then applies). */
 function readHidden(
   own: string,
   shared: string,
   keys: readonly string[],
   locked: readonly string[],
-): ReadonlySet<string> {
+): ReadonlySet<string> | null {
   try {
     const text = window.localStorage.getItem(own) ?? window.localStorage.getItem(shared);
-    if (text === null) return new Set();
+    if (text === null) return null;
     const value: unknown = JSON.parse(text);
     if (!Array.isArray(value)) return new Set();
     return new Set(

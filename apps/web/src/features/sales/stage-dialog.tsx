@@ -36,7 +36,7 @@ export function StageDialog({
   const [form, setForm] = useState<StageInput>(stage ?? EMPTY_STAGE);
   const patch = (fields: Partial<StageInput>) => setForm((current) => ({ ...current, ...fields }));
   return (
-    <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+    <DialogContent closeLabel={t('common.close')} size="md">
       <DialogHeader>
         <DialogTitle>
           {stage ? t('sales.boards.editStage') : t('sales.boards.newStage')}

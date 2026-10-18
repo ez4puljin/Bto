@@ -64,7 +64,7 @@ export function AnswerStep(props: {
         {question.question}
       </p>
       <Card>
-        <CardContent className="space-y-3 pt-4">
+        <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Sparkles aria-hidden className="size-3.5" />
             <span>{t('ai.answer.assistant')}</span>

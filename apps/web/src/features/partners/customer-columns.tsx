@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import type { CustomerListItem } from './api';
 import { MapLink } from './gps-field';
 import { contactCell, none, text } from './list-cells';
@@ -33,8 +33,29 @@ export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
 /** Columns that name the row; they cannot be hidden. */
 export const LOCKED_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = ['code', 'name'];
 
+/**
+ * What a user who never chose sees hidden (ADR-0066): code, name, kind, phone, TIN, credit status
+ * and status fit a 1366px screen; every column stays in «Баганууд».
+ */
+export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
+  'regNo',
+  'consumerNo',
+  'vatPayer',
+  'cityPayer',
+  'address',
+  'gps',
+  'contact',
+  'creditLimit',
+  'paymentTerm',
+  'note',
+];
+
 export interface CustomerColumn {
   key: CustomerColumnKey;
+  /** Money and counts: right-aligned in the head and the cells. */
+  numeric?: boolean;
+  /** Long text on one line with «…» and the whole text on hover; `fill` takes the spare width. */
+  truncate?: { text: (row: CustomerListItem, t: TFunction) => string; fill?: boolean };
   className?: string;
   cell: (row: CustomerListItem, t: TFunction) => ReactNode;
 }
@@ -53,7 +74,9 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   { key: 'code', className: 'font-mono', cell: (row) => row.code },
   {
     key: 'name',
-    className: 'min-w-48 whitespace-normal',
+    // The name takes the spare width, never less than 14rem: with many columns the list scrolls.
+    truncate: { text: (row) => row.name, fill: true },
+    className: 'min-w-56',
     cell: (row) => (
       <Link
         to={`/partners/customers/${row.id}`}
@@ -71,7 +94,7 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
       row.tin ? (
         <span className="font-mono">{row.tin}</span>
       ) : row.tinPending ? (
-        <Badge variant="outline">{t('partners.customer.tinPending')}</Badge>
+        <Badge variant="warning">{t('partners.customer.tinPending')}</Badge>
       ) : (
         none(t)
       ),
@@ -86,7 +109,7 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   { key: 'cityPayer', cell: (row, t) => payer(row, row.cityPayer, t) },
   {
     key: 'address',
-    className: 'min-w-48 whitespace-normal',
+    truncate: { text: (row, t) => row.address ?? t('common.none') },
     cell: (row, t) => text(row.address, t),
   },
   {
@@ -95,18 +118,20 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
       row.gps ? (
         <MapLink lat={row.gps.lat} lng={row.gps.lng} />
       ) : (
-        <Badge variant="outline">{t('partners.addresses.noGps')}</Badge>
+        <Badge variant="warning">{t('partners.addresses.noGps')}</Badge>
       ),
   },
-  { key: 'contact', className: 'whitespace-normal', cell: (row, t) => contactCell(row.contact, t) },
+  { key: 'contact', cell: (row, t) => contactCell(row.contact, t) },
   {
     key: 'creditLimit',
-    className: 'text-right font-mono',
+    numeric: true,
     cell: (row, t) =>
       row.creditLimit === null ? (
-        <span className="text-muted-foreground">{t('partners.credit.limitUndecided')}</span>
+        <span className="font-sans text-muted-foreground">
+          {t('partners.credit.limitUndecided')}
+        </span>
       ) : (
-        formatMnt(row.creditLimit)
+        formatTugrik(row.creditLimit)
       ),
   },
   {
@@ -122,24 +147,29 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
   },
   {
     key: 'creditHold',
-    className: 'whitespace-normal',
     cell: (row, t) =>
       row.creditHold ? (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex items-center gap-2">
           <Badge variant="destructive">{t('partners.credit.held')}</Badge>
           {row.creditHoldReason ? (
-            <span className="text-muted-foreground">{row.creditHoldReason}</span>
+            <span className="max-w-48 truncate text-muted-foreground" title={row.creditHoldReason}>
+              {row.creditHoldReason}
+            </span>
           ) : null}
         </div>
       ) : (
         t('partners.credit.open')
       ),
   },
-  { key: 'note', className: 'min-w-48 whitespace-normal', cell: (row, t) => text(row.note, t) },
+  {
+    key: 'note',
+    truncate: { text: (row, t) => row.note ?? t('common.none') },
+    cell: (row, t) => text(row.note, t),
+  },
   {
     key: 'status',
     cell: (row, t) => (
-      <Badge variant={row.status === 'ACTIVE' ? 'secondary' : 'outline'}>
+      <Badge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
         {t(`partners.status.${row.status}`)}
       </Badge>
     ),

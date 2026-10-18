@@ -228,6 +228,7 @@ export default defineConfig([
     '**/node_modules/**',
     '**/dist/**',
     '**/dist-worker/**',
+    '**/dist-edge/**',
     '**/build/**',
     '**/coverage/**',
     '**/.expo/**',

@@ -41,7 +41,10 @@ function passwordSchema(username: string) {
 }
 type PasswordValues = z.infer<ReturnType<typeof passwordSchema>>;
 
-/** The signed-in user's own page: profile, password change, sign-out everywhere. */
+/**
+ * The signed-in user's own page: profile (the name as a row, not as a section label), password
+ * change, sign-out everywhere.
+ */
 export function AccountPage() {
   const { t } = useTranslation();
   const session = useAuthSession();
@@ -83,8 +86,9 @@ export function AccountPage() {
       <PageHeader title={t('auth.account.title')} />
       <div className="flex max-w-3xl flex-col gap-5">
         <FieldList
-          title={me.fullName}
+          title={t('auth.account.profile')}
           items={[
+            { label: t('auth.account.fullName'), value: me.fullName },
             {
               label: t('auth.account.username'),
               value: <span className="font-mono">{me.username}</span>,

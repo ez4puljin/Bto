@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronsUpDown, House, LogOut, Search, UserRound, X } from 'lucide-react';
 import { Collapsible } from 'radix-ui';
-import { type Ref, useEffect } from 'react';
+import { type Ref, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import { useAuthSession, useAuthState } from '@/app/auth-context';
@@ -22,7 +22,7 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'group/item flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+    'group/item flex items-center gap-2.5 rounded-lg px-2.5 py-1 text-sm transition-colors',
     isActive
       ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
       : 'text-foreground/85 hover:bg-black/[0.04] hover:text-foreground',
@@ -30,8 +30,10 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
 
 /**
  * The menu (ADR-0042): the brand, the search button (Ctrl/⌘+K), «Нүүр», the permitted groups with
- * an icon per page (each group folds, remembered in this browser) and the account menu. On a
- * phone the same element slides in as a drawer; there is only ever one menu landmark.
+ * an icon per page (each group folds, remembered in this browser per user) and the account menu.
+ * Exactly one entry is lit: the page's own, or the list a deeper page belongs to (`navTrail`), and
+ * it is scrolled into view (ADR-0066). On a phone the same element slides in as a drawer; there is
+ * only ever one menu landmark.
  */
 export function Sidebar(props: {
   open: boolean;
@@ -42,14 +44,34 @@ export function Sidebar(props: {
   const { t } = useTranslation();
   const state = useAuthState();
   const { pathname } = useLocation();
-  const { collapsed, setOpen } = useCollapsedGroups();
+  const { collapsed, setOpen } = useCollapsedGroups(
+    state.status === 'authenticated' ? state.me.id : null,
+  );
   const groups = visibleNav(state.status === 'authenticated' ? state.me.permissions : []);
-  const current = navTrail(pathname)?.group.label;
+  const trail = navTrail(pathname);
+  const current = trail?.group.label;
+  const activeTo = trail?.item.to;
+  const navRef = useRef<HTMLElement>(null);
 
   // Opening a page of a folded group (by a link or the search) unfolds it.
   useEffect(() => {
     if (current) setOpen(current, true);
   }, [current, setOpen]);
+
+  // The lit entry stays in view in a long menu (a short window, a group low down): centred when it
+  // was out of view, also after its group unfolds (its links exist only then).
+  const currentOpen = current ? !collapsed.has(current) : false;
+  useEffect(() => {
+    const nav = navRef.current;
+    const link = nav?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!nav || !link || typeof nav.scrollTo !== 'function') return;
+    const box = nav.getBoundingClientRect();
+    const own = link.getBoundingClientRect();
+    // Scrolls the menu alone: scrollIntoView would also move the page under it.
+    if (own.top < box.top || own.bottom > box.bottom) {
+      nav.scrollTo({ top: nav.scrollTop + own.top - box.top - (box.height - own.height) / 2 });
+    }
+  }, [activeTo, currentOpen]);
 
   return (
     <aside
@@ -100,6 +122,7 @@ export function Sidebar(props: {
         </button>
       </div>
       <nav
+        ref={navRef}
         id="app-nav"
         aria-label={t('nav.menu')}
         className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
@@ -113,7 +136,7 @@ export function Sidebar(props: {
             key={group.label}
             open={!collapsed.has(group.label)}
             onOpenChange={(open) => setOpen(group.label, open)}
-            className="mt-4"
+            className="mt-3"
           >
             <Collapsible.Trigger className="group/trigger flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none">
               {t(group.label)}
@@ -126,10 +149,15 @@ export function Sidebar(props: {
               <ul className="mt-1 flex flex-col gap-0.5">
                 {group.items.map((item) => (
                   <li key={item.to}>
-                    <NavLink to={item.to} className={itemClass}>
+                    <Link
+                      to={item.to}
+                      data-active={item.to === activeTo ? 'true' : undefined}
+                      aria-current={item.to === activeTo && trail?.exact ? 'page' : undefined}
+                      className={itemClass({ isActive: item.to === activeTo })}
+                    >
                       <item.icon aria-hidden className="size-4 shrink-0 text-primary" />
                       {t(item.label)}
-                    </NavLink>
+                    </Link>
                   </li>
                 ))}
               </ul>

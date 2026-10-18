@@ -18,10 +18,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { problemFromError } from '@/lib/problem';
 import { BoardView } from './board-view';
-import { type ListFilters, ListView } from './list-view';
-import { OrderFilterMenu } from './order-filter-menu';
-import { orderFilterQuery, readOrderFilters, writeOrderFilters } from './order-filters';
+import {
+  DEFAULT_LIST_FILTERS,
+  type ListFilters,
+  listFiltersActive,
+  readListFilters,
+  useListColumns,
+  writeListFilters,
+} from './list-filters';
+import { ListColumnChooser, ListFilterPills, ListView } from './list-view';
 import { OrderCreateDialog } from './order-create-dialog';
+import { OrderFilterMenu } from './order-filter-menu';
+import {
+  activeOrderFilters,
+  orderFilterQuery,
+  readOrderFilters,
+  writeOrderFilters,
+} from './order-filters';
 import { OrderPanel } from './order-panel';
 import { type PanelTab, parsePanelTab } from './order-panel-tabs';
 import { useBoardTree, usePipeline, useStageCards } from './pipelines-api';
@@ -31,10 +44,11 @@ import { WorkPanel } from './work-panel';
 
 /**
  * «Борлуулалт» → «Агуулахын борлуулалт» (ADR-0057 #7, after erxes Deals): the boards and their
- * pipelines on the left, the chosen pipeline as a board of stages or as a list, the search, the
- * filters and the count above. The URL keeps the pipeline (`?pipeline=`), the view (`?view=`) and
- * the filters; the last pipeline, view and panel are remembered per user in this browser. An open
- * order (`?order=&tab=`) and the create dialog (`?new=1&stage=`) live in the URL too (ADR-0059).
+ * pipelines on the left, the chosen pipeline as a board of stages or as a list, one bar above with
+ * the search, the filters (the list's own pills too), the count and the view. The URL keeps the
+ * pipeline (`?pipeline=`), the view (`?view=`) and every filter; the last pipeline, view and panel
+ * are remembered per user in this browser. An open order (`?order=&tab=`) and the create dialog
+ * (`?new=1&stage=`) live in the URL too (ADR-0059).
  */
 export function SalesWorkPage() {
   const { t } = useTranslation();
@@ -43,6 +57,7 @@ export function SalesWorkPage() {
   const [params, setParams] = useSearchParams();
   const canCreate = useHasPermission('sales.orders.manage');
   const isManager = useHasPermission('sales.boards.manage');
+  const columns = useListColumns();
   const boards = useMemo(
     () =>
       (tree.data ?? [])
@@ -62,44 +77,72 @@ export function SalesWorkPage() {
   const view: WorkView =
     viewParam === 'list' ? 'LIST' : viewParam === 'board' ? 'BOARD' : prefs.view;
   const filters = readOrderFilters(params);
+  const listFilters = readListFilters(params);
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const query = orderFilterQuery(filters, q);
   const cards = useStageCards(view === 'BOARD' ? (current?.id ?? null) : null, query);
   const [listCount, setListCount] = useState<number | null>(null);
-  const [listFilters, setListFilters] = useState<ListFilters>({
-    scope: 'PIPELINE',
-    archived: 'exclude',
-  });
   const openId = Number.parseInt(params.get('order') ?? '', 10) || null;
   const tab = parsePanelTab(params.get('tab'));
   const creating = canCreate && params.get('new') === '1';
   const newStage = Number.parseInt(params.get('stage') ?? '', 10) || null;
   const [configuring, setConfiguring] = useState(false);
 
-  const setMany = (patch: Record<string, string | null>) =>
+  /** Rewrites the URL in place (filters, the open order, the dialog): no new history entry. */
+  const edit = (change: (next: URLSearchParams) => URLSearchParams | void) =>
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
-        for (const [key, value] of Object.entries(patch)) {
-          if (value === null) next.delete(key);
-          else next.set(key, value);
-        }
-        return next;
+        return change(next) ?? next;
       },
       { replace: true },
     );
-  const setParam = (key: string, value: string | null) => setMany({ [key]: value });
+  const setMany = (patch: Record<string, string | null>) =>
+    edit((next) => {
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null) next.delete(key);
+        else next.set(key, value);
+      }
+    });
   const openOrder = (id: number, section: PanelTab | null = null) =>
     setMany({ order: String(id), tab: section, new: null, stage: null });
   const choose = (id: number) => {
-    setParam('pipeline', String(id));
+    edit((next) => {
+      const narrowed = writeListFilters(next, { ...readListFilters(next), stageId: undefined });
+      narrowed.set('pipeline', String(id));
+      return narrowed;
+    });
     update({ pipelineId: id });
-    setListFilters((currentFilters) => ({ ...currentFilters, stageId: undefined }));
   };
   const showView = (next: WorkView) => {
-    setParam('view', next === 'LIST' ? 'list' : 'board');
+    setMany({ view: next === 'LIST' ? 'list' : 'board' });
     update({ view: next });
+  };
+  const setListFilters = (next: ListFilters) =>
+    edit((previous) => writeListFilters(previous, next));
+  /** «Дахин N карт жагсаалтад»: the stage's orders as a list. */
+  const showStage = (stageId: number) => {
+    edit((next) => {
+      const narrowed = writeListFilters(next, {
+        ...readListFilters(next),
+        scope: 'PIPELINE',
+        stageId,
+      });
+      narrowed.set('view', 'list');
+      return narrowed;
+    });
+    update({ view: 'LIST' });
+  };
+  const narrowed =
+    q !== '' || activeOrderFilters(filters).length > 0 || listFiltersActive(listFilters);
+  const clearFilters = () => {
+    setSearch('');
+    edit((next) => {
+      const cleared = writeListFilters(writeOrderFilters(next, {}), DEFAULT_LIST_FILTERS);
+      cleared.delete('q');
+      return cleared;
+    });
   };
   const count =
     view === 'BOARD' ? (cards.data ?? []).reduce((sum, stage) => sum + stage.count, 0) : listCount;
@@ -111,9 +154,13 @@ export function SalesWorkPage() {
         meta={
           pipelines.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
-              {board ? <span>{board.name}</span> : null}
+              {/* The group, unless it reads as the pipeline already. */}
+              {board && board.name !== current?.name ? <span>{board.name}</span> : null}
+              {/* Phones, and a desktop whose panel is folded away, switch pipelines here. */}
               <NativeSelect
-                className="lg:hidden"
+                variant="filter"
+                active={false}
+                className={prefs.panelOpen ? 'lg:hidden' : undefined}
                 aria-label={t('sales.work.choosePipeline')}
                 value={current?.id ?? ''}
                 onChange={(event) => choose(Number.parseInt(event.target.value, 10))}
@@ -181,18 +228,19 @@ export function SalesWorkPage() {
               onHide={() => update({ panelOpen: false })}
             />
           ) : null}
-          <div className="min-w-0 flex-1 space-y-3">
+          <div className="min-w-0 flex-1">
             <FilterBar
               end={
-                <div className="flex items-center gap-3">
+                <>
                   {count !== null ? (
                     <span className="text-[13px] whitespace-nowrap text-muted-foreground">
                       {t('sales.work.count', { count })}
                     </span>
                   ) : null}
+                  {view === 'LIST' ? <ListColumnChooser columns={columns} /> : null}
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
+                      <Button variant="outline" size="sm">
                         {view === 'BOARD' ? <Kanban /> : <List />}
                         {t('sales.work.display')}
                       </Button>
@@ -214,15 +262,16 @@ export function SalesWorkPage() {
                       </DropdownMenuRadioGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
+                </>
               }
             >
               {!prefs.panelOpen ? (
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   className="hidden lg:inline-flex"
                   aria-label={t('sales.work.showPanel')}
+                  title={t('sales.work.showPanel')}
                   onClick={() => update({ panelOpen: true })}
                 >
                   <PanelLeftOpen />
@@ -234,13 +283,20 @@ export function SalesWorkPage() {
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
-                  setParam('q', event.target.value.trim() || null);
+                  setMany({ q: event.target.value.trim() || null });
                 }}
               />
               <OrderFilterMenu
                 filters={filters}
-                onChange={(next) => setParams(writeOrderFilters(params, next), { replace: true })}
+                onChange={(next) => edit((previous) => writeOrderFilters(previous, next))}
               />
+              {view === 'LIST' ? (
+                <ListFilterPills
+                  pipeline={pipeline.data ?? null}
+                  own={listFilters}
+                  onChange={setListFilters}
+                />
+              ) : null}
             </FilterBar>
             {view === 'BOARD' && pipeline.data ? (
               <BoardView
@@ -249,6 +305,7 @@ export function SalesWorkPage() {
                 canCreate={canCreate}
                 onOpen={(id) => openOrder(id)}
                 onNew={(stageId) => setMany({ new: '1', stage: String(stageId) })}
+                onShowStage={showStage}
               />
             ) : null}
             {view === 'LIST' ? (
@@ -256,9 +313,11 @@ export function SalesWorkPage() {
                 pipeline={pipeline.data ?? null}
                 filters={query}
                 own={listFilters}
-                onOwnChange={setListFilters}
+                columns={columns}
+                openId={openId}
                 onOpen={(id) => openOrder(id)}
                 onCount={setListCount}
+                onClearFilters={narrowed ? clearFilters : undefined}
               />
             ) : null}
           </div>
@@ -267,7 +326,7 @@ export function SalesWorkPage() {
       <OrderPanel
         orderId={openId}
         tab={tab}
-        onTab={(next) => setParam('tab', next === 'overview' ? null : next)}
+        onTab={(next) => setMany({ tab: next === 'overview' ? null : next })}
         onClose={() => setMany({ order: null, tab: null })}
       />
       <OrderCreateDialog

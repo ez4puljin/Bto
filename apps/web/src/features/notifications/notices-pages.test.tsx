@@ -170,7 +170,8 @@ describe('app notices list', () => {
     ).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText(mn.notifications.form.products), 'кола');
-    await user.click(await within(dialog).findByRole('button', { name: /Кола 1л/ }));
+    // The matches open in a popover outside the dialog (ProductSearch, ADR-0066).
+    await user.click(await screen.findByRole('button', { name: /Кола 1л/ }));
     expect(preview.getByText('Бараа харах (1)')).toBeInTheDocument();
 
     await user.type(within(dialog).getByLabelText(mn.notifications.form.lastDay), lastDay);

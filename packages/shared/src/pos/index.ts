@@ -6,7 +6,7 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
  * the kiosk share. Messages live in mn.json under `pos`.
  */
 
-/** How a sale is paid at the till; QPay and others come later (SPEC §6.6 #4). */
+/** How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). */
 export const TENDER_KINDS = ['CASH', 'CARD'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
 
@@ -91,6 +91,30 @@ export const CONSUMER_NO_PATTERN = /^([0-9]{8}|11\*{6})$/;
 
 export function normalizeTillCode(value: string): string {
   return value.trim().toUpperCase();
+}
+
+/** Latin capitals that look like Cyrillic ones on a till's label, and their Cyrillic letters. */
+const TILL_CODE_LOOKALIKES: Record<string, string> = {
+  A: 'А',
+  B: 'В',
+  C: 'С',
+  E: 'Е',
+  H: 'Н',
+  K: 'К',
+  M: 'М',
+  O: 'О',
+  P: 'Р',
+  T: 'Т',
+  X: 'Х',
+  Y: 'У',
+};
+
+/**
+ * The code a cashier typed, matched by its look: «K1» typed on a Latin keyboard finds till «К1».
+ * An exact match always wins; this key only breaks the tie between look-alike letters.
+ */
+export function tillCodeLookKey(value: string): string {
+  return [...normalizeTillCode(value)].map((char) => TILL_CODE_LOOKALIKES[char] ?? char).join('');
 }
 
 export function isTillCode(value: string): boolean {
@@ -204,3 +228,6 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
   if (!match?.[1] || !match[2]) return null;
   return { nodeId: Number.parseInt(match[1], 10), secret: match[2] };
 }
+
+// The store edge: sync, snapshot and kiosk shapes (ADR-0067).
+export * from './edge';

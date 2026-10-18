@@ -1,7 +1,8 @@
+import { Decimal } from '@tugeel/shared/money';
 import { SHIFT_STATUSES } from '@tugeel/shared/pos';
 import { Hourglass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
   ChevronHead,
   DateFilter,
@@ -11,6 +12,9 @@ import {
   ListCard,
   LoadMore,
   SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -24,8 +28,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { type ShiftStatus, useShifts, useTills } from './api';
 import { ShiftStatusBadge } from './badges';
 import { ShiftPanel } from './shift-panel';
@@ -35,11 +40,13 @@ const isStatus = (value: string | null): value is ShiftStatus =>
 
 /**
  * «Ээлж» (ADR-0064): the tills' shifts as the edge replayed them; closed ones wait for the
- * accountant's hand-over («Хүлээн авах ээлж» on the home page). One opens in the panel (`?shift=`).
+ * accountant's hand-over («Хүлээн авах ээлж» on the home page). One opens in the panel (`?shift=`);
+ * its number is the row's link for the keyboard.
  */
 export function PosShiftsPage() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
   const tillId = Number.parseInt(params.get('tillId') ?? '', 10) || undefined;
@@ -49,17 +56,8 @@ export function PosShiftsPage() {
   const tills = useTills();
   const shifts = useShifts({ status, tillId, from, to });
   const rows = shifts.data?.pages.flatMap((page) => page.data) ?? [];
-
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
+  const filtered = Boolean(status || tillId || from || to);
+  const none = <span className="text-muted-foreground">{t('pos.fields.none')}</span>;
 
   return (
     <div>
@@ -103,7 +101,7 @@ export function PosShiftsPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(shifts.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -114,47 +112,60 @@ export function PosShiftsPage() {
               <TableHead>{t('pos.fields.status')}</TableHead>
               <TableHead className="text-right">{t('pos.fields.salesTotal')}</TableHead>
               <TableHead className="text-right">{t('pos.fields.variance')}</TableHead>
+              <SpacerHead />
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shifts.isPending ? <SkeletonRows columns={8} /> : null}
-            {rows.map((shift) => (
-              <LinkRow key={shift.id} to={`?${withParam(params, 'shift', String(shift.id))}`}>
-                <TableCell className="font-mono">{shift.number}</TableCell>
-                <TableCell>{shift.tillName}</TableCell>
-                <TableCell>{shift.cashierName ?? ''}</TableCell>
-                <TableCell className="font-mono">
-                  {formatUbDateTime(Date.parse(shift.openedAt))}
-                </TableCell>
-                <TableCell>
-                  <ShiftStatusBadge status={shift.status} />
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatMnt(shift.salesTotal)}
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {shift.variance === null ? '' : formatMnt(shift.variance)}
-                </TableCell>
-              </LinkRow>
-            ))}
+            {shifts.isPending ? <SkeletonRows columns={9} /> : null}
+            {rows.map((shift) => {
+              const href = hrefWithParam(params, 'shift', String(shift.id));
+              const short = shift.variance !== null && new Decimal(shift.variance).isNegative();
+              return (
+                <LinkRow key={shift.id} to={href}>
+                  <TableCell className="font-mono">
+                    <Link to={href} className="font-medium underline-offset-4 hover:underline">
+                      {shift.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{shift.tillName}</TableCell>
+                  <TruncateCell text={shift.cashierName ?? t('pos.fields.none')}>
+                    {shift.cashierName ?? none}
+                  </TruncateCell>
+                  <TableCell className="font-mono">
+                    {formatUbDateTime(Date.parse(shift.openedAt))}
+                  </TableCell>
+                  <TableCell>
+                    <ShiftStatusBadge status={shift.status} />
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatTugrik(shift.salesTotal)}
+                  </TableCell>
+                  <TableCell
+                    className={
+                      short ? 'text-right font-mono text-destructive' : 'text-right font-mono'
+                    }
+                  >
+                    {shift.variance === null ? none : formatTugrik(shift.variance)}
+                  </TableCell>
+                  <SpacerCell />
+                </LinkRow>
+              );
+            })}
           </TableBody>
         </Table>
         {!shifts.isPending && rows.length === 0 ? (
-          <EmptyState icon={Hourglass} title={t('pos.shifts.empty')} />
+          <EmptyState
+            icon={Hourglass}
+            title={t('pos.shifts.empty')}
+            {...(filtered
+              ? { onClearFilters: () => setParams(new URLSearchParams(), { replace: true }) }
+              : {})}
+          />
         ) : null}
         <LoadMore query={shifts} />
       </ListCard>
-      <ShiftPanel
-        shiftId={openId > 0 ? openId : null}
-        onClose={() => setParam('shift', undefined)}
-      />
+      <ShiftPanel shiftId={openId > 0 ? openId : null} onClose={() => setParam('shift', null)} />
     </div>
   );
-}
-
-function withParam(params: URLSearchParams, key: string, value: string): string {
-  const next = new URLSearchParams(params);
-  next.set(key, value);
-  return next.toString();
 }

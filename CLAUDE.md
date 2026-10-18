@@ -1,9 +1,9 @@
 # Tugeel (Түгээл) — agent contract
 
 Tugeel is an in-house ERP for the wholesale distribution of Бүтэн-Оргил ХХК (the owner named the main branch «Оргил Бөөний төв» in Mörön, Khövsgöl, and the branch «Боломж бөөний төв» in Kharkhorin, Övörkhangai, on 2026-10-13; older documents assume one centre in Ulaanbaatar — STATUS pending #23): product catalog with multi-unit barcodes,
-multi-warehouse stock with bins on an append-only ledger, customer orders (web, customer app, sales reps), picking,
-zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay
-payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
+multi-warehouse stock with bins on an append-only ledger, customer orders (web, the customer app «Bto300» — ADR-0079, sales reps), picking,
+zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, cash and
+bank-transfer payments (no QPay, ADR-0080), mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
 reporting, an AI assistant answering questions from the company's own data (ADR-0045), HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
 Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Бүтэн-Оргил ХХК's internal system, owner 2026-10-13, ADR-0042 #11); code names stay `tugeel`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
@@ -66,8 +66,11 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm catalog:reindex-search [--all]` / `pnpm partners:reindex-search [--all]` | recompute product / customer and supplier search keys after `SEARCH_KEYS_VERSION` changes (`--all`: every row; ADR-0028) |
 | `pnpm inventory:reconcile` / `pnpm inventory:rebuild-balances` | compare `bin_stock` / `warehouse_stock` with the ledger and record a run (exit 2 on drift) / recompute the cache quantities from the ledger, keeping averages, then reconcile (find the cause of a drift first; `docs/modules/inventory.md` §7) |
 | `pnpm finance:reconcile` | compare `customer_balances` with the receivables ledger and the open invoices, rewrite every row and record a run (exit 2 on drift; `docs/modules/finance.md` §7) |
+| `pnpm edge:up` / `pnpm edge:down` / `pnpm edge:logs` | the store edge in Docker (ADR-0067; `deploy/edge/.env` from `.env.example`): its PostgreSQL, the edge replaying to the dev api, the till kiosk on `http://<LAN address>:7400`; never touches the tugeel PostgreSQL container |
+| `pnpm --filter @tugeel/api db:migrate:edge` / `edge:dev` | the edge without Docker (`apps/api/.env.edge`): migrate its database / watch it on port 3400; the kiosk is then `http://localhost:5173/pos.html` (not started by `pnpm dev`) |
 | `pnpm check` | ts:single-version → prettier → build packages → eslint → lint-guard self-test → typecheck → gen:api freshness → drizzle-kit check → unit (Jest + Vitest) → integration → integrity (`--runInBand`) → build |
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
+| `pnpm ui:shots -- --out tmp/ui-shots/<name> [--only <regex>]` | with `pnpm dev` running: pictures of every route at 1366×633, 1536×730 and 1920×969 in a headless Chrome or Edge, with layout measurements and a gallery (ADR-0066); signs in with a dev login from a gitignored file (`--logins`), never printed |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
 | `pnpm mobile:apk` | the staff app's release APK, built on this PC (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 
@@ -87,7 +90,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 - ESLint guards (`eslint.config.mjs` G1–G6, proved by `tools/lint-guards/guards.test.mjs`) must never be removed or weakened: G1 `boundaries/dependencies` (module `index.ts` only, §4 direction, `src/integrations/**` only from `jobs/*.job.ts` / `*-flow.service.ts`, web imports only `@tugeel/api-client` / `@tugeel/shared`); G2 `stockLedger` import ban outside `stock-posting.service.ts`; G3 `Number(` / `parseFloat(` ban in `apps/api/src/modules/**`; G4 Cyrillic literal ban in `**/*.tsx`; G5 literal JSX text ban; G6 `noInlineConfig` (`eslint-disable` comments do nothing: exceptions go in the config); TX_GUARD (ADR-0045): no `fetch` / `axios` / LLM client call inside an `inTransaction(...)` or `.transaction(...)` callback.
 - The AI assistant (ADR-0045, `docs/modules/ai.md`) reads only schema `ai`, as role `ai_reader`; model-written SQL runs only through `AiReaderService` after `sqlGuard`. A migration that changes a column an `ai.*` view uses recreates the view; a module opens its data to the assistant with its own views and `AI_DATASETS` entries.
 - Workspace packages are CommonJS with a `@tugeel/source` export condition (ADR-0025): the api uses their built `dist`, Vite/Vitest/Jest read the source; `pnpm check` builds them first.
-- Web screens follow `docs/ui.md` (ADR-0042): `PageHeader` with the menu breadcrumb (no «Буцах» buttons), the list kit (filter bar, list card, rows that open their record), read-first `DetailCard`s, create dialogs on `?new=1`, toasts for confirmations, tokens instead of colour literals. `components/ui` keeps shadcn formatting: run prettier from the repo root only.
+- Web screens follow `docs/ui.md` (ADR-0042, ADR-0066): `PageHeader` with the menu breadcrumb (no «Буцах» buttons), every page route with `handle: { width }`, the list kit (filter bar, `ListCard scroll`, rows that open their record), read-first `DetailCard`s, create dialogs on `?new=1` with `DialogContent size`, toasts for confirmations, tokens instead of colour literals. `components/ui` keeps shadcn formatting: run prettier from the repo root only.
 
 ## ALWAYS
 
@@ -105,9 +108,10 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 - Build a business date with `new Date().toISOString().slice(0, 10)` or any UTC date; use dayjs in Asia/Ulaanbaatar.
 - Write literal Cyrillic in `.tsx` (i18n keys only); hard-code VAT or city-tax rates.
 - Write `stock_ledger` outside `StockPostingService`, or write another module's tables.
-- Make an HTTP call (PosAPI, QPay, SMS, push) while a DB transaction is open; blind-retry a timed-out PosAPI call.
+- Make an HTTP call (PosAPI, push, an LLM) while a DB transaction is open; blind-retry a timed-out PosAPI call.
 - Persist or log e-Barimt `lottery` / `qrData` anywhere (DB, logs, Sentry, `ebarimt_submission_log`, fixtures) — the single exception is the rendered receipt bitmap in `print_jobs.payload`, nulled on ack and expired after 10 min (ADR-0022).
-- Mark a payment paid from a callback body; only `payment/check`, a cash session or a statement match records a payment.
+- Mark a payment paid from a customer's word or any callback; only the accountant's voucher, a cash session, a till tender or a statement match records a payment (no QPay, ADR-0080).
+- Take a customer id from the client on a customer-app route; a customer token reads only its own store (ADR-0079).
 - Install `typescript@7` or a second TypeScript version; upgrade a major dependency inside a delivery session.
 - Skip, weaken or retry the integrity suite; add `jest.retryTimes` or any retry to CI.
 - Commit secrets or `.env*` files (only `.env.example`); paste credentials into docs or code.
@@ -124,6 +128,6 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `docs/decisions/README.md` + `ADR-*.md` | why a decision stands; before starting a module and before proposing any stack change |
 | `docs/modules/<module>.md` | the module's contract (owned tables, public services, invariants, status); created with the module |
 | `docs/ui.md` | before building or changing a screen: tokens, building blocks, page patterns, do/don't, test notes (ADR-0042) |
-| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt / QPay outages (written from delivery 1 on) |
+| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt outages (written from delivery 1 on) |
 
 `CLAUDE.local.md` is gitignored and holds personal settings (local paths, tailnet addresses, preferences); it never overrides the rules in this file.

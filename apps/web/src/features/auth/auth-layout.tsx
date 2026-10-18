@@ -1,6 +1,13 @@
 import { type ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MAP_HEIGHT, MAP_WIDTH } from './mongolia';
 import { MongoliaMap } from './mongolia-map';
+
+/**
+ * The map's width: 52rem at most, and never so wide that its height (width ÷ the map's aspect)
+ * passes what the window leaves beside the mark, the title and the legend (about 20rem).
+ */
+const MAP_MAX_WIDTH = `min(52rem, calc((100svh - 20rem) * ${(MAP_WIDTH / MAP_HEIGHT).toFixed(3)}))`;
 
 /** The «B» mark of Bto: a blue rounded square, white letter. */
 function BrandMark({ size = 'md' }: { size?: 'md' | 'lg' }) {
@@ -41,20 +48,25 @@ export function AuthLayout(props: { title: string; description?: string; childre
           aria-hidden
           className="absolute inset-0 [background-image:linear-gradient(rgb(255_255_255/0.035)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.035)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(75%_65%_at_50%_45%,black,transparent)]"
         />
-        <header className="relative flex items-center gap-3 px-12 pt-11">
+        {/* A laptop's short screen (1366×633) keeps the whole panel without a scroll: tighter
+            spacing below 760px of height, and the map never taller than the height leaves it. */}
+        <header className="relative flex items-center gap-3 px-12 pt-11 [@media(max-height:760px)]:pt-7">
           <BrandMark size="lg" />
           <div>
             <p className="text-[26px] leading-none font-semibold tracking-tight">{t('app.name')}</p>
             <p className="mt-1.5 text-sm text-white/65">{t('brand.tagline')}</p>
           </div>
         </header>
-        <div className="relative flex flex-1 flex-col justify-center px-10 py-8 xl:px-14">
+        <div className="relative flex flex-1 flex-col justify-center px-10 py-8 xl:px-14 [@media(max-height:760px)]:py-3">
+          {/* Its full margin stays: the main branch's label reaches above the map. */}
           <p className="mb-6 text-[13px] font-medium tracking-wide text-[#64d2ff] uppercase">
             {t('brand.mapTitle')}
           </p>
-          <MongoliaMap className="max-w-[52rem] xl:scale-[1.04]" />
+          <div style={{ maxWidth: MAP_MAX_WIDTH }}>
+            <MongoliaMap className="xl:scale-[1.04]" />
+          </div>
         </div>
-        <footer className="relative flex flex-wrap items-end justify-between gap-6 px-12 pb-11">
+        <footer className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-12 pb-11 [@media(max-height:760px)]:pb-7">
           <ul className="flex flex-col gap-2.5 text-sm">
             <li className="flex items-center gap-2.5">
               <span
@@ -89,7 +101,7 @@ export function AuthLayout(props: { title: string; description?: string; childre
         </footer>
       </aside>
       <main className="flex min-h-svh flex-col">
-        <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-10">
+        <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-10 [@media(max-height:760px)]:py-8">
           <div className="w-full max-w-sm">
             <div className="mb-10 flex items-center gap-2.5 lg:hidden">
               <BrandMark />

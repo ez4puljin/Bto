@@ -27,7 +27,7 @@ export function PhotoPicker(props: {
   const errorId = `${props.id}-error`;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="@container flex flex-col gap-2">
       <input
         ref={input}
         id={props.id}
@@ -42,7 +42,7 @@ export function PhotoPicker(props: {
           void add(files);
         }}
       />
-      <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-5">
+      <ul className="grid grid-cols-3 gap-2.5 @md:grid-cols-5">
         {photos.map((photo, index) => (
           <li
             key={photo.key}
@@ -54,12 +54,12 @@ export function PhotoPicker(props: {
               className="aspect-square w-full object-cover"
             />
             {index === 0 && photo.status !== 'failed' ? (
-              <Badge className="absolute top-1.5 left-1.5 bg-white/90 text-foreground shadow-sm backdrop-blur-sm">
+              <Badge className="absolute top-1.5 left-1.5 bg-background/90 text-foreground shadow-sm backdrop-blur-sm">
                 {t('catalog.images.primary')}
               </Badge>
             ) : null}
             {photo.status === 'uploading' ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/60 text-xs text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs text-muted-foreground">
                 <LoaderCircle aria-hidden className="size-4 animate-spin" />
                 <span className="sr-only">{t('catalog.registration.photoUploading')}</span>
               </div>
@@ -73,7 +73,7 @@ export function PhotoPicker(props: {
               type="button"
               size="icon-xs"
               variant="secondary"
-              className="absolute right-1.5 bottom-1.5 bg-white/90 shadow-sm backdrop-blur-sm"
+              className="absolute right-1.5 bottom-1.5 bg-background/90 shadow-sm backdrop-blur-sm"
               aria-label={t('catalog.registration.removePhoto', { number: index + 1 })}
               title={t('catalog.registration.removePhoto', { number: index + 1 })}
               onClick={() => remove(photo.key)}

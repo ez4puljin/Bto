@@ -175,7 +175,7 @@ function LocationDialog(props: {
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+      <DialogContent closeLabel={t('common.close')} size="sm">
         <form
           className="space-y-4"
           noValidate

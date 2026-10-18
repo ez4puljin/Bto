@@ -217,7 +217,13 @@ export function SalesSettingsPage() {
           <h2 className="text-sm font-semibold">
             {t('sales.pipelines.pipelinesTitle', { count: board?.pipelines.length ?? 0 })}
           </h2>
-          <ListCard>
+          {/* Why «Дамжлага нэмэх» waits (ADR-0066): a disabled button never says it itself. */}
+          {!tree.isPending && (!board || board.archivedAt !== null) ? (
+            <p className="text-[13px] text-muted-foreground">
+              {board ? t('sales.pipelines.boardArchived') : t('sales.pipelines.needBoard')}
+            </p>
+          ) : null}
+          <ListCard scroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -236,7 +242,7 @@ export function SalesSettingsPage() {
                     <TableCell className="font-medium whitespace-normal">
                       <button
                         type="button"
-                        className="text-left text-link underline-offset-4 hover:underline"
+                        className="text-left font-medium underline-offset-4 hover:underline"
                         onClick={() => setSheet({ pipelineId: pipeline.id })}
                       >
                         {pipeline.name}
@@ -247,11 +253,10 @@ export function SalesSettingsPage() {
                     </TableCell>
                     <TableCell>{pipeline.createdByName ?? ''}</TableCell>
                     <TableCell>
+                      {/* Only the exception is marked: an archived pipeline. */}
                       {pipeline.archivedAt ? (
                         <Badge variant="outline">{t('sales.pipelines.statuses.archived')}</Badge>
-                      ) : (
-                        <Badge variant="success">{t('sales.pipelines.statuses.active')}</Badge>
-                      )}
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu modal={false}>

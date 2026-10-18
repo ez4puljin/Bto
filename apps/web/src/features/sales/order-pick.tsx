@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { plainDecimal } from '@/lib/money';
+import { formatQty, plainDecimal } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
@@ -54,10 +54,12 @@ export function PickForm({ order }: { order: SalesOrder }) {
       });
       toast.success(t('sales.pick.done'));
     });
-  const complete = order.lines.every((line) => lines[line.id]?.binId);
+  // «Батлах» waits for a shelf on every line; the line under the table says how many lack one.
+  const missing = order.lines.filter((line) => !lines[line.id]?.binId).length;
   return (
     <section className="rounded-xl border border-border p-3">
-      <h3 className="mb-2 text-sm font-semibold">{t('sales.pick.title')}</h3>
+      <h3 className="text-sm font-semibold">{t('sales.pick.title')}</h3>
+      <p className="mt-0.5 mb-2 text-[13px] text-muted-foreground">{t('sales.pick.hint')}</p>
       <Table>
         <TableHeader>
           <TableRow>
@@ -75,7 +77,7 @@ export function PickForm({ order }: { order: SalesOrder }) {
                 <TableCell className="whitespace-normal">{line.productName}</TableCell>
                 <TableCell className="text-right font-mono">
                   {t('sales.order.qtyIn', {
-                    qty: plainDecimal(line.qtyApproved),
+                    qty: formatQty(line.qtyApproved),
                     unit: line.baseUnitName,
                   })}
                 </TableCell>
@@ -112,7 +114,7 @@ export function PickForm({ order }: { order: SalesOrder }) {
                       <option key={bin.id} value={bin.id}>
                         {t('sales.pick.binOption', {
                           code: bin.code,
-                          onHand: plainDecimal(bin.onHand),
+                          onHand: formatQty(bin.onHand),
                         })}
                       </option>
                     ))}
@@ -124,9 +126,13 @@ export function PickForm({ order }: { order: SalesOrder }) {
         </TableBody>
       </Table>
       <ProblemAlert problem={action.problem} />
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{t('sales.pick.hint')}</p>
-        <Button disabled={!complete || mutations.pick.isPending} onClick={confirm}>
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
+        {info.data && missing > 0 ? (
+          <p className="mr-auto text-[13px] text-warning">
+            {t('sales.pick.missingBins', { count: missing })}
+          </p>
+        ) : null}
+        <Button disabled={missing > 0 || mutations.pick.isPending} onClick={confirm}>
           {t('sales.pick.confirm')}
         </Button>
       </div>

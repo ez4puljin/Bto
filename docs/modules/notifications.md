@@ -26,7 +26,7 @@ Nobody imports `notifications`. Sales finds the listener through `ModuleRef` (`s
 | Content | the admin writes each notice by hand | ADR-0062 #1 |
 | Order notifications | only when the rep's order is sold («Зөвхөн борлуулалт болсон захиалгын мэдэгдэл авна») | ADR-0062 #4 |
 
-## 2. Owned tables (migration `0028_notifications`)
+## 2. Owned tables (migration `0030_notifications`, numbered 0028 until the merge with main on 2026-10-19)
 
 - `app_notices` — `kind` (PROMOTION, PRICE_DROP, NEW_PRODUCT, NEWS), `title` (1–80 characters after trimming), `body` (1–1,000), `image_file_id` → `files` (unique: a picture belongs to one notice), `popup`, `valid_from` (date), `valid_to` (exclusive, null = until withdrawn, `> valid_from`), `created_by` / `created_at`, `withdrawn_at` / `withdrawn_by` (both or neither). Index on `(valid_from, id)` where not withdrawn.
 - `app_notice_products` — `(notice_id, product_id)` primary key, `position` 1–20, unique per notice: the order the app shows.

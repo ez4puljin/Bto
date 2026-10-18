@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
-import { PrintFrame } from '@/features/finance/print-pages';
+import { PrintFrame } from '@/components/print-frame';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { cn } from '@/lib/utils';

@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-16 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0080 (QPay is dropped, not deferred); ADR-0079 (#7: the customer app reads the store's balance, invoices and payments; `money_accounts` gains «Харилцагчид харуулах») |
 | Amends | ADR-0055 (the credit check: no tolerance, no approval state, every order, open orders summed by sales at check time), ADR-0056 (#3: the SALE stage also invoices the order, which ends INVOICED), ADR-0057 (#7: `CREDIT_BLOCKED` carries its reasons; the order panel shows the invoice), ADR-0017 and ADR-0018 (unchanged in principle; e-Barimt and QPay stay deferred, the invoice is their source), ADR-0010 (the tax split is applied on invoices, not on orders), architecture §4 (finance's dependencies and seams), §5.5 (`customer_balances` keeps no `open_orders`; the tolerance setting is dropped), §5.6 (INVOICED), §5.8 (no cash sessions in delivery 3; the cash book) |
 | Amended by | ADR-0062 (#1: a third sales hook, `SALE_LISTENER`, told of every sale after the invoice) |
 

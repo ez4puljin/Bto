@@ -1,5 +1,11 @@
 // Public API of the inventory module (docs/modules/inventory.md). Other modules import only this
 // file; named exports only (ESLint G2 rejects `export *`).
+export {
+  RECEIPT_MONEY_ACCOUNTS,
+  type ReceiptMoneyAccount,
+  type ReceiptMoneyAccountKind,
+  type ReceiptMoneyAccounts,
+} from './hooks';
 export { InventoryHttpModule, InventoryModule, InventoryWorkerModule } from './inventory.module';
 export {
   type AdjustmentDetail,
@@ -27,6 +33,17 @@ export {
   BinsService,
   NO_SHELF_CODE,
 } from './services/bins.service';
+export {
+  GoodsIssuesService,
+  type IssueDetail,
+  type IssueInput,
+  type IssueLineInput,
+  type IssueRecipientInput,
+} from './services/goods-issues.service';
+export {
+  type IssueExpenseType,
+  IssueExpenseTypesService,
+} from './services/issue-expense-types.service';
 export {
   type LevelChange,
   type LevelRestore,

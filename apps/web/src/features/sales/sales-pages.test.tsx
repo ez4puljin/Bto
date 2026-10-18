@@ -324,14 +324,18 @@ describe('new order (ADR-0059)', () => {
       'aria-selected',
       'true',
     );
-    await user.type(
-      await within(panel).findByRole('searchbox', { name: mn.inventory.productSearch }),
-      'кока',
-    );
-    await user.click(
-      await within(panel).findByRole('button', { name: `${mn.inventory.add}: Кока кола` }),
-    );
+    const search = await within(panel).findByRole('searchbox', {
+      name: mn.inventory.productSearch,
+    });
+    expect(search).toHaveFocus();
+    await user.type(search, 'кока');
+    // The matches open over the panel; Enter adds the first one (ADR-0066).
+    expect(
+      await screen.findByRole('button', { name: `${mn.inventory.add}: Кока кола` }),
+    ).toBeInTheDocument();
+    await user.keyboard('{Enter}');
     const qty = await within(panel).findByLabelText(`${mn.sales.order.qty}: Кока кола`);
+    expect(search).toHaveValue('');
     await user.clear(qty);
     await user.type(qty, '30');
     // The rules' price, marked as an estimate until the order is confirmed.

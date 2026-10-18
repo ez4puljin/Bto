@@ -13,6 +13,7 @@ import {
   LoadMore,
   SearchField,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -28,8 +29,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useProductStock, useReconciliation, useStock } from './api';
 import { useWarehouseName, useWarehouseOptions } from './helpers';
 import { WarehouseSelect } from './shared';
@@ -45,7 +47,8 @@ export function StockPage() {
   const { t } = useTranslation();
   const canSeeCosts = useHasPermission('inventory.costs.manage');
   const isAdmin = useHasPermission('inventory.setup.manage');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
@@ -54,17 +57,6 @@ export function StockPage() {
   const warehouses = useWarehouseOptions(STOCK_KINDS);
   const stock = useStock({ q, warehouseId, inStock });
   const rows = stock.data?.pages.flatMap((page) => page.data) ?? [];
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -94,7 +86,7 @@ export function StockPage() {
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(stock.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -113,18 +105,24 @@ export function StockPage() {
             {rows.map((row) => (
               <LinkRow key={row.product.id} to={`/inventory/stock/${row.product.id}`}>
                 <TableCell className="font-mono">{row.product.sku}</TableCell>
-                <TableCell className="whitespace-normal">
-                  <Link to={`/inventory/stock/${row.product.id}`} className="font-medium">
+                <TruncateCell text={row.product.name} fill>
+                  <Link
+                    to={`/inventory/stock/${row.product.id}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
                     {row.product.name}
                   </Link>
-                </TableCell>
+                </TruncateCell>
                 <TableCell className="text-right font-mono">
-                  {t('inventory.qtyWithUnit', { qty: row.onHand, unit: row.product.baseUnitName })}
+                  {t('inventory.qtyWithUnit', {
+                    qty: formatQty(row.onHand),
+                    unit: row.product.baseUnitName,
+                  })}
                 </TableCell>
-                <TableCell className="text-right font-mono">{row.available}</TableCell>
+                <TableCell className="text-right font-mono">{formatQty(row.available)}</TableCell>
                 {canSeeCosts ? (
                   <TableCell className="text-right font-mono">
-                    {row.value === undefined ? t('common.none') : formatMnt(row.value)}
+                    {row.value === undefined ? t('common.none') : formatTugrik(row.value)}
                   </TableCell>
                 ) : null}
               </LinkRow>
@@ -221,18 +219,24 @@ export function StockProductPage() {
                   <TableRow key={row.warehouseId}>
                     <TableCell>{warehouseName(row.warehouseId)}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {t('inventory.qtyWithUnit', { qty: row.onHand, unit })}
+                      {t('inventory.qtyWithUnit', { qty: formatQty(row.onHand), unit })}
                     </TableCell>
-                    <TableCell className="text-right font-mono">{row.sellableOnHand}</TableCell>
-                    <TableCell className="text-right font-mono">{row.reserved}</TableCell>
-                    <TableCell className="text-right font-mono">{row.available}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatQty(row.sellableOnHand)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatQty(row.reserved)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatQty(row.available)}
+                    </TableCell>
                     {canSeeCosts ? (
                       <>
                         <TableCell className="text-right font-mono">
-                          {row.avgCost === undefined ? t('common.none') : formatMnt(row.avgCost)}
+                          {row.avgCost === undefined ? t('common.none') : formatTugrik(row.avgCost)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {row.value === undefined ? t('common.none') : formatMnt(row.value)}
+                          {row.value === undefined ? t('common.none') : formatTugrik(row.value)}
                         </TableCell>
                       </>
                     ) : null}
@@ -270,7 +274,7 @@ export function StockProductPage() {
                     <TableCell className="font-mono">{row.binCode}</TableCell>
                     <TableCell>{t(`inventory.binTypes.${row.binType}`)}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {t('inventory.qtyWithUnit', { qty: row.onHand, unit })}
+                      {t('inventory.qtyWithUnit', { qty: formatQty(row.onHand), unit })}
                     </TableCell>
                     <TableCell>
                       <Link

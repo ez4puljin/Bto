@@ -87,3 +87,9 @@ jobs:
           docker run --rm --env-file deploy/.env.example \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2.11-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          # The store edge (ADR-0067): its compose file with placeholder secrets, and its Caddyfile.
+          cp deploy/edge/.env.example deploy/edge/.env
+          sed -i -E 's/^(EDGE_NODE_TOKEN|EDGE_JWT_SECRET|POS_PIN_PEPPER)=$/\1=ci-placeholder/' deploy/edge/.env
+          docker compose -f deploy/edge/docker-compose.edge.yml --env-file deploy/edge/.env config --quiet
+          docker run --rm -v "$PWD/deploy/edge/Caddyfile.edge:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

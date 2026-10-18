@@ -20,15 +20,9 @@ import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableHeader, TableRow } from '@/components/ui/table';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
@@ -36,8 +30,10 @@ import { type CustomerKind, type PartnerStatus, useCustomers } from './api';
 import {
   CUSTOMER_COLUMN_KEYS,
   CUSTOMER_COLUMNS,
+  DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
   LOCKED_CUSTOMER_COLUMNS,
 } from './customer-columns';
+import { ListColumnCell, ListColumnHead } from './list-column-cell';
 import { PARTNER_STATUSES } from './partner-schema';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
@@ -53,12 +49,14 @@ const isStatus = (value: string | null): value is PartnerStatus =>
 /**
  * Customers: search by name in either script, code, phone, TIN or registration number; filter by
  * kind and status, and find the rows that still miss a TIN or a GPS point, or are on credit hold
- * (SPEC §5.3). Filters live in the URL so "back" keeps them.
+ * (SPEC §5.3). Filters live in the URL so "back" keeps them. A user who never chose sees the
+ * columns that fit a 1366px screen (ADR-0066).
  */
 export function CustomersPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('partners.customers.manage');
   const [params, setParams] = useSearchParams();
+  const setParam = useSetParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const kindParam = params.get('kind');
@@ -77,23 +75,24 @@ export function CustomersPage() {
     creditHold: flag('creditHold'),
   });
   const rows = customers.data?.pages.flatMap((page) => page.data) ?? [];
-  const columnState = useHiddenColumns(COLUMNS_LIST, CUSTOMER_COLUMN_KEYS, LOCKED_CUSTOMER_COLUMNS);
+  const columnState = useHiddenColumns(
+    COLUMNS_LIST,
+    CUSTOMER_COLUMN_KEYS,
+    LOCKED_CUSTOMER_COLUMNS,
+    DEFAULT_HIDDEN_CUSTOMER_COLUMNS,
+  );
   const { hidden } = columnState;
   const columns = useMemo(
     () => CUSTOMER_COLUMNS.filter((column) => !hidden.has(column.key)),
     [hidden],
   );
-
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
+  const filtered = Boolean(
+    q || kind || status || segmentId || FLAGS.some((name) => flag(name) === true),
+  );
+  const clearFilters = () => {
+    setSearch('');
+    setParams(new URLSearchParams(), { replace: true });
+  };
 
   return (
     <div>
@@ -123,6 +122,7 @@ export function CustomersPage() {
         }
       >
         <SearchField
+          className="sm:w-60"
           aria-label={t('common.search')}
           placeholder={t('partners.customers.searchPlaceholder')}
           value={search}
@@ -172,14 +172,14 @@ export function CustomersPage() {
         ))}
       </FilterBar>
       <ProblemAlert problem={problemFromError(customers.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key}>
+                <ListColumnHead key={column.key} numeric={column.numeric}>
                   {t(`partners.customers.columns.${column.key}`)}
-                </TableHead>
+                </ListColumnHead>
               ))}
               <ChevronHead />
             </TableRow>
@@ -189,16 +189,18 @@ export function CustomersPage() {
             {rows.map((customer) => (
               <LinkRow key={customer.id} to={`/partners/customers/${customer.id}`}>
                 {columns.map((column) => (
-                  <TableCell key={column.key} className={column.className}>
-                    {column.cell(customer, t)}
-                  </TableCell>
+                  <ListColumnCell key={column.key} column={column} row={customer} t={t} />
                 ))}
               </LinkRow>
             ))}
           </TableBody>
         </Table>
         {!customers.isPending && rows.length === 0 ? (
-          <EmptyState icon={Store} title={t('partners.customers.empty')} />
+          <EmptyState
+            icon={Store}
+            title={t('partners.customers.empty')}
+            {...(filtered ? { onClearFilters: clearFilters } : {})}
+          />
         ) : null}
         <LoadMore query={customers} />
       </ListCard>

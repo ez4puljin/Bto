@@ -1,13 +1,13 @@
 # Tugeel (Түгээл)
 
-In-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog with multi-unit barcodes, multi-warehouse stock on an append-only ledger, customer ordering (web admin, customer app, sales reps), picking and zone-based delivery, receivables with credit control, QPay payments, mandatory e-Barimt receipts, a supermarket POS, procurement, reporting and HR/payroll. Built and maintained by one owner-developer with Claude Code, one module per session. The UI is Mongolian only; code, schema and all documents except `docs/SPEC.md` are English.
+In-house ERP for a wholesale distribution center in Ulaanbaatar: product catalog with multi-unit barcodes, multi-warehouse stock on an append-only ledger, customer ordering (web admin, customer app, sales reps), picking and zone-based delivery, receivables with credit control (cash and bank transfers, no QPay), mandatory e-Barimt receipts, a supermarket POS, procurement, reporting and HR/payroll. Built and maintained by one owner-developer with Claude Code, one module per session. The UI is Mongolian only; code, schema and all documents except `docs/SPEC.md` are English.
 
 ## Documentation
 
 | Document | Content |
 |---|---|
 | `docs/SPEC.md` (Mongolian) | scope, roles, glossary, user stories and acceptance criteria per module, business rules, first-deliverable cut line, roadmap, open questions |
-| `docs/architecture.md` | stack and version pins, repo layout, module boundaries, domain model, integrations (e-Barimt, QPay, scanners, printers), deploy, conventions for the agent |
+| `docs/architecture.md` | stack and version pins, repo layout, module boundaries, domain model, integrations (e-Barimt, scanners, printers), deploy, conventions for the agent |
 | `docs/decisions/` | ADR-0001 … ADR-0027; index, rules and template in `docs/decisions/README.md` |
 | `docs/STATUS.md` | progress per delivery, Week 0 checklist for the owner, pending decisions, the next-session prompt |
 | `CLAUDE.md` | the contract every Claude Code session reads first: pins, commands, ALWAYS / NEVER, docs map |

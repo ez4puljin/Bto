@@ -20,10 +20,16 @@ export function SupplierPicker(props: {
   onChange: (supplier: PickedSupplier | null) => void;
   invalid?: boolean;
   describedBy?: string;
+  /**
+   * The matches float under the box while it has the focus (a header among other fields, e.g. the
+   * receipt window, ADR-0078); otherwise they stay listed below it.
+   */
+  floating?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [changing, setChanging] = useState(false);
+  const [focused, setFocused] = useState(false);
   const searchBox = useRef<HTMLInputElement>(null);
   const q = useDeferredValue(search.trim());
   const suppliers = useSuppliers({ q, status: 'ACTIVE' }, { enabled: props.value === null });
@@ -60,8 +66,15 @@ export function SupplierPicker(props: {
       </div>
     );
   }
+  const open = !props.floating || focused;
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className={props.floating ? 'relative' : 'flex flex-col gap-2'}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
       <Input
         ref={searchBox}
         id={props.id}
@@ -74,8 +87,14 @@ export function SupplierPicker(props: {
         onChange={(event) => setSearch(event.target.value)}
       />
       <ProblemAlert problem={problemFromError(suppliers.error)} />
-      {rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
+      {!open ? null : rows.length > 0 ? (
+        <ul
+          className={
+            props.floating
+              ? 'absolute inset-x-0 top-full z-30 mt-1 flex max-h-72 flex-col divide-y divide-border overflow-y-auto rounded-lg border border-border bg-popover shadow-lg'
+              : 'flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border'
+          }
+        >
           {rows.map((supplier) => (
             <li key={supplier.id}>
               <button
@@ -92,7 +111,15 @@ export function SupplierPicker(props: {
           ))}
         </ul>
       ) : suppliers.isPending ? null : (
-        <p className="text-sm text-muted-foreground">{t('partners.supplierPicker.none')}</p>
+        <p
+          className={
+            props.floating
+              ? 'absolute inset-x-0 top-full z-30 mt-1 rounded-lg border border-border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-lg'
+              : 'text-sm text-muted-foreground'
+          }
+        >
+          {t('partners.supplierPicker.none')}
+        </p>
       )}
     </div>
   );

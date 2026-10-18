@@ -8,14 +8,16 @@ import {
   bodyOf,
   calls,
   COLA,
+  COLA_BOX,
   list,
   SHELF,
   STAMP,
   UUID,
   WAREHOUSE_ME,
   warehouses,
+  WH1,
 } from '@/test/inventory-fixtures';
-import { ADMIN_ME, findSidebar, json, renderApp, signedIn } from '@/test/render-app';
+import { ADMIN_ME, findSidebar, json, problem, renderApp, signedIn } from '@/test/render-app';
 
 type Schemas = components['schemas'];
 
@@ -87,7 +89,8 @@ describe('stock page', () => {
           }),
       }),
     );
-    expect(await screen.findByText('48,000')).toBeInTheDocument();
+    // A list shows money with ₮ (ADR-0066).
+    expect(await screen.findByText('48,000₮')).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: mn.inventory.stock.value }),
     ).toBeInTheDocument();
@@ -246,6 +249,21 @@ describe('movement history', () => {
           (request) => new URL(request.url).searchParams.get('docType') === 'BM',
         ),
       ).toBe(true),
+    );
+    // «Баганууд» hides the costs, remembered for this user (a laptop starts without them).
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(
+      await screen.findByRole('menuitemcheckbox', { name: mn.inventory.movements.columns.value }),
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('columnheader', { name: mn.inventory.movements.columns.value }),
+      ).toBeNull(),
+    );
+    expect(screen.queryByText('10,000')).toBeNull();
+    expect(localStorage.getItem(`tugeel.stockMovements.hiddenColumns.v1:${ACCOUNTANT_ME.id}`)).toBe(
+      JSON.stringify(['value']),
     );
   });
 
@@ -452,5 +470,51 @@ describe('shelf setup', () => {
     expect(await screen.findByText('29 тавиур нэмэгдлээ')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(calls(fetchMock, 'POST', '/api/v1/bins/bulk')).toHaveLength(2);
+  });
+});
+
+describe('bin moves', () => {
+  it('asks before a warehouse change drops the lines not moved yet', async () => {
+    const SECOND: Schemas['Warehouse'] = { ...WH1, id: 2, code: 'WH2', name: 'Хоёр' };
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': () => list([WH1, SECOND]),
+      'GET /api/v1/bin-moves': () => list([]),
+      'GET /api/v1/bins/lookup': (request) => {
+        const code = new URL(request.url).searchParams.get('code');
+        if (code === 'A-01-03') return json(SHELF);
+        if (code === 'A-01-04') return json({ ...SHELF, id: 32, code: 'A-01-04' });
+        return problem('NOT_FOUND', 404);
+      },
+      'GET /api/v1/barcodes/4006381333931': () => json(COLA_BOX),
+    });
+    const { router } = renderApp('/inventory/moves?warehouseId=1', fetchMock);
+    const user = userEvent.setup();
+    const scan = await screen.findByRole('textbox', { name: mn.inventory.scanLabel });
+    await user.type(scan, 'A-01-03{Enter}');
+    expect(await screen.findByText('A-01-03')).toBeInTheDocument();
+    await user.type(scan, '4006381333931{Enter}');
+    expect(await screen.findByText(`${COLA.name} (хайрцаг)`)).toBeInTheDocument();
+    await user.type(scan, 'A-01-04{Enter}');
+    const add = screen.getByRole('button', { name: mn.inventory.moves.addLine });
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+    expect(await screen.findByRole('button', { name: mn.inventory.moves.submit })).toBeEnabled();
+
+    // The line is not moved yet: another warehouse asks first, and «Болих» keeps it.
+    const warehouse = screen.getByRole('combobox', { name: mn.inventory.warehouse });
+    await user.selectOptions(warehouse, '2');
+    const question = await screen.findByRole('dialog', { name: mn.inventory.moves.leaveTitle });
+    await user.click(within(question).getByRole('button', { name: mn.common.cancel }));
+    expect(router.state.location.search).toBe('?warehouseId=1');
+    expect(screen.getByRole('button', { name: mn.inventory.moves.submit })).toBeInTheDocument();
+    await user.selectOptions(warehouse, '2');
+    await user.click(
+      within(await screen.findByRole('dialog', { name: mn.inventory.moves.leaveTitle })).getByRole(
+        'button',
+        { name: mn.inventory.moves.leave },
+      ),
+    );
+    await waitFor(() => expect(router.state.location.search).toBe('?warehouseId=2'));
+    expect(screen.queryByRole('button', { name: mn.inventory.moves.submit })).toBeNull();
   });
 });

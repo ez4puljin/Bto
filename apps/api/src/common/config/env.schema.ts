@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-export const PROCESS_ROLES = ['api', 'worker'] as const;
+export const PROCESS_ROLES = ['api', 'worker', 'edge'] as const;
 export type ProcessRole = (typeof PROCESS_ROLES)[number];
 
 export const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
@@ -106,6 +106,10 @@ export function parseEnv(raw: Record<string, unknown>, role: ProcessRole): Env {
       if (data.NODE_ENV === 'production' && value.startsWith('dev-')) {
         throw new Error(`Invalid environment (api): ${key} is a development placeholder`);
       }
+    }
+    // The tills' PIN key (ADR-0063 #6) is optional, but never a placeholder in production.
+    if (data.NODE_ENV === 'production' && data.POS_PIN_PEPPER?.startsWith('dev-')) {
+      throw new Error('Invalid environment (api): POS_PIN_PEPPER is a development placeholder');
     }
   }
   if (data.STORAGE_DRIVER === 'spaces') {

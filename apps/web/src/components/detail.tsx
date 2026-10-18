@@ -111,11 +111,11 @@ export function FieldList(props: {
           ) : null}
         </div>
       ) : null}
-      <dl className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
+      <dl className="@container divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
         {props.items.map((item) => (
           <div
             key={item.label}
-            className="grid gap-1 px-3.5 py-2.5 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4"
+            className="grid gap-1 px-3.5 py-2.5 @md:grid-cols-[11rem_minmax(0,1fr)] @md:gap-4"
           >
             <dt className="text-[13px] leading-snug text-muted-foreground">{item.label}</dt>
             <div className="min-w-0">

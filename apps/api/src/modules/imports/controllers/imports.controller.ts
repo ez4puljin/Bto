@@ -28,6 +28,17 @@ import { type ImportJob, ImportsService } from '../services/imports.service';
 
 const IMPORTS = 'imports.manage';
 
+/** The options a receipts job stored, without the internal price flag. */
+function receiptOptionsDto(job: ImportJob): ImportJobDto['receiptOptions'] {
+  const options = job.options as Partial<ImportJobDto['receiptOptions'] & object> | null;
+  if (job.kind !== 'RECEIPTS' || !options || typeof options.warehouseId !== 'number') return null;
+  return {
+    warehouseId: options.warehouseId,
+    paymentMethod: options.paymentMethod ?? 'CREDIT',
+    moneyAccountId: options.moneyAccountId ?? null,
+  };
+}
+
 function toJobDto(job: ImportJob): ImportJobDto {
   return {
     id: job.id,
@@ -41,6 +52,12 @@ function toJobDto(job: ImportJob): ImportJobDto {
     warningRows: job.warningRows,
     summary: typeof job.summary === 'object' && job.summary !== null ? job.summary : null,
     lastError: job.lastError,
+    receiptOptions: receiptOptionsDto(job),
+    issueOptions:
+      job.kind === 'ISSUES' &&
+      typeof (job.options as { warehouseId?: unknown } | null)?.warehouseId === 'number'
+        ? { warehouseId: (job.options as { warehouseId: number }).warehouseId }
+        : null,
     canRevert: job.canRevert,
     createdAt: job.createdAt.toISOString(),
     validatedAt: job.validatedAt?.toISOString() ?? null,

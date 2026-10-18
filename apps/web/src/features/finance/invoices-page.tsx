@@ -2,10 +2,9 @@ import { SETTLEMENTS } from '@tugeel/shared/finance';
 import { FileText } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import {
   ChevronHead,
-  DateFilter,
   EmptyState,
   FilterBar,
   FilterToggle,
@@ -14,6 +13,7 @@ import {
   LoadMore,
   SearchField,
   SkeletonRows,
+  TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
@@ -26,8 +26,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { hrefWithParam, useSetParam } from '@/lib/search-params';
+import { DateRangeFilter } from './date-range-filter';
 import { type Settlement, useInvoices } from './api';
 import { SettlementBadge } from './badges';
 import { InvoicePanel } from './invoice-panel';
@@ -41,7 +43,8 @@ const isSettlement = (value: string | null): value is Settlement =>
  */
 export function InvoicesPage() {
   const { t } = useTranslation();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
   const settlementParam = params.get('settlement');
@@ -54,17 +57,6 @@ export function InvoicesPage() {
   const invoices = useInvoices({ q, settlement, status, overdue, from, to });
   const rows = invoices.data?.pages.flatMap((page) => page.data) ?? [];
   const total = invoices.data?.pages[0]?.total ?? null;
-
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
 
   return (
     <div>
@@ -101,19 +93,18 @@ export function InvoicesPage() {
           checked={overdue === true}
           onCheckedChange={(checked) => setParam('overdue', checked ? '1' : undefined)}
         />
-        <DateFilter
-          label={t('finance.fields.from')}
-          value={from}
-          onChange={(value) => setParam('from', value)}
-        />
-        <DateFilter
-          label={t('finance.fields.to')}
-          value={to}
-          onChange={(value) => setParam('to', value)}
+        <DateRangeFilter
+          label={t('finance.fields.date')}
+          fromLabel={t('finance.fields.from')}
+          toLabel={t('finance.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value)}
+          onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
       <ProblemAlert problem={problemFromError(invoices.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -129,27 +120,37 @@ export function InvoicesPage() {
           </TableHeader>
           <TableBody>
             {invoices.isPending ? <SkeletonRows columns={8} /> : null}
-            {rows.map((invoice) => (
-              <LinkRow key={invoice.id} to={`?${withParam(params, 'invoice', String(invoice.id))}`}>
-                <TableCell className="font-mono">{invoice.number}</TableCell>
-                <TableCell className="font-mono">{invoice.invoiceDate}</TableCell>
-                <TableCell className="font-mono">{invoice.dueDate}</TableCell>
-                <TableCell>{invoice.customerName}</TableCell>
-                <TableCell className="text-right font-mono">{formatMnt(invoice.total)}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatMnt(invoice.openAmount)}
-                </TableCell>
-                <TableCell>
-                  <span className="flex flex-wrap gap-1">
-                    <SettlementBadge
-                      settlement={invoice.settlement}
-                      status={invoice.status}
-                      overdue={invoice.overdue}
-                    />
-                  </span>
-                </TableCell>
-              </LinkRow>
-            ))}
+            {rows.map((invoice) => {
+              // The number is the row's link for the keyboard; a click anywhere opens the panel.
+              const href = hrefWithParam(params, 'invoice', String(invoice.id));
+              return (
+                <LinkRow key={invoice.id} to={href}>
+                  <TableCell className="font-mono">
+                    <Link to={href} className="font-medium underline-offset-4 hover:underline">
+                      {invoice.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono">{invoice.invoiceDate}</TableCell>
+                  <TableCell className="font-mono">{invoice.dueDate}</TableCell>
+                  <TruncateCell text={invoice.customerName} />
+                  <TableCell className="text-right font-mono">
+                    {formatTugrik(invoice.total)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatTugrik(invoice.openAmount)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="flex flex-wrap gap-1">
+                      <SettlementBadge
+                        settlement={invoice.settlement}
+                        status={invoice.status}
+                        overdue={invoice.overdue}
+                      />
+                    </span>
+                  </TableCell>
+                </LinkRow>
+              );
+            })}
           </TableBody>
         </Table>
         {!invoices.isPending && rows.length === 0 ? (
@@ -159,15 +160,8 @@ export function InvoicesPage() {
       </ListCard>
       <InvoicePanel
         invoiceId={openId > 0 ? openId : null}
-        onClose={() => setParam('invoice', undefined)}
+        onClose={() => setParam('invoice', null)}
       />
     </div>
   );
-}
-
-/** The current query with one parameter changed, for a row's link. */
-function withParam(params: URLSearchParams, key: string, value: string): string {
-  const next = new URLSearchParams(params);
-  next.set(key, value);
-  return next.toString();
 }

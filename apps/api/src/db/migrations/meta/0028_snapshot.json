@@ -1,5 +1,5 @@
 {
-  "id": "95be3e72-623c-48cf-998e-3dac9ebd71b9",
+  "id": "ddf0a648-987f-4982-9278-24a162387db3",
   "prevId": "88dc036e-417b-4fd2-b4af-ece7d87481bf",
   "version": "7",
   "dialect": "postgresql",
@@ -1047,350 +1047,6 @@
         "allocations_amount": {
           "name": "allocations_amount",
           "value": "\"allocations\".\"amount\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.app_notice_products": {
-      "name": "app_notice_products",
-      "schema": "",
-      "columns": {
-        "notice_id": {
-          "name": "notice_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "app_notice_products_notice_id_app_notices_id_fk": {
-          "name": "app_notice_products_notice_id_app_notices_id_fk",
-          "tableFrom": "app_notice_products",
-          "tableTo": "app_notices",
-          "columnsFrom": [
-            "notice_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "app_notice_products_product_id_products_id_fk": {
-          "name": "app_notice_products_product_id_products_id_fk",
-          "tableFrom": "app_notice_products",
-          "tableTo": "products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "app_notice_products_notice_id_product_id_pk": {
-          "name": "app_notice_products_notice_id_product_id_pk",
-          "columns": [
-            "notice_id",
-            "product_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {
-        "app_notice_products_position": {
-          "name": "app_notice_products_position",
-          "nullsNotDistinct": false,
-          "columns": [
-            "notice_id",
-            "position"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "app_notice_products_position_range": {
-          "name": "app_notice_products_position_range",
-          "value": "\"app_notice_products\".\"position\" BETWEEN 1 AND 20"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.app_notice_reads": {
-      "name": "app_notice_reads",
-      "schema": "",
-      "columns": {
-        "notice_id": {
-          "name": "notice_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "app_notice_reads_notice_id_app_notices_id_fk": {
-          "name": "app_notice_reads_notice_id_app_notices_id_fk",
-          "tableFrom": "app_notice_reads",
-          "tableTo": "app_notices",
-          "columnsFrom": [
-            "notice_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "app_notice_reads_user_id_users_id_fk": {
-          "name": "app_notice_reads_user_id_users_id_fk",
-          "tableFrom": "app_notice_reads",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "app_notice_reads_notice_id_user_id_pk": {
-          "name": "app_notice_reads_notice_id_user_id_pk",
-          "columns": [
-            "notice_id",
-            "user_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.app_notices": {
-      "name": "app_notices",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "app_notices_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "image_file_id": {
-          "name": "image_file_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "popup": {
-          "name": "popup",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "valid_from": {
-          "name": "valid_from",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "valid_to": {
-          "name": "valid_to",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "withdrawn_at": {
-          "name": "withdrawn_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "withdrawn_by": {
-          "name": "withdrawn_by",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "app_notices_image": {
-          "name": "app_notices_image",
-          "columns": [
-            {
-              "expression": "image_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "app_notices_live_idx": {
-          "name": "app_notices_live_idx",
-          "columns": [
-            {
-              "expression": "valid_from",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"app_notices\".\"withdrawn_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "app_notices_image_file_id_files_id_fk": {
-          "name": "app_notices_image_file_id_files_id_fk",
-          "tableFrom": "app_notices",
-          "tableTo": "files",
-          "columnsFrom": [
-            "image_file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "app_notices_created_by_users_id_fk": {
-          "name": "app_notices_created_by_users_id_fk",
-          "tableFrom": "app_notices",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "app_notices_withdrawn_by_users_id_fk": {
-          "name": "app_notices_withdrawn_by_users_id_fk",
-          "tableFrom": "app_notices",
-          "tableTo": "users",
-          "columnsFrom": [
-            "withdrawn_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "app_notices_kind": {
-          "name": "app_notices_kind",
-          "value": "\"app_notices\".\"kind\" IN ('PROMOTION', 'PRICE_DROP', 'NEW_PRODUCT', 'NEWS')"
-        },
-        "app_notices_title": {
-          "name": "app_notices_title",
-          "value": "length(btrim(\"app_notices\".\"title\")) BETWEEN 1 AND 80"
-        },
-        "app_notices_body": {
-          "name": "app_notices_body",
-          "value": "length(btrim(\"app_notices\".\"body\")) BETWEEN 1 AND 1000"
-        },
-        "app_notices_dates": {
-          "name": "app_notices_dates",
-          "value": "\"app_notices\".\"valid_to\" IS NULL OR \"app_notices\".\"valid_to\" > \"app_notices\".\"valid_from\""
-        },
-        "app_notices_withdrawn": {
-          "name": "app_notices_withdrawn",
-          "value": "(\"app_notices\".\"withdrawn_at\" IS NULL) = (\"app_notices\".\"withdrawn_by\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -4956,6 +4612,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "doc_unit_price": {
+          "name": "doc_unit_price",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doc_amount": {
+          "name": "doc_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "free_goods": {
+          "name": "free_goods",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -5068,6 +4743,10 @@
         "goods_receipt_lines_qty": {
           "name": "goods_receipt_lines_qty",
           "value": "\"goods_receipt_lines\".\"entered_qty\" > 0 AND \"goods_receipt_lines\".\"qty_base\" > 0"
+        },
+        "goods_receipt_lines_price": {
+          "name": "goods_receipt_lines_price",
+          "value": "(\"goods_receipt_lines\".\"doc_amount\" IS NULL OR \"goods_receipt_lines\".\"doc_amount\" >= 0)\n        AND (\"goods_receipt_lines\".\"doc_unit_price\" IS NULL OR (\"goods_receipt_lines\".\"doc_unit_price\" >= 0 AND \"goods_receipt_lines\".\"doc_amount\" IS NOT NULL))\n        AND NOT (\"goods_receipt_lines\".\"free_goods\" AND \"goods_receipt_lines\".\"doc_amount\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false
@@ -5154,6 +4833,26 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "payment_method": {
+          "name": "payment_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CREDIT'"
+        },
+        "money_account_id": {
+          "name": "money_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vat_rate_pct": {
+          "name": "vat_rate_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
         },
         "number": {
           "name": "number",
@@ -5356,6 +5055,18 @@
         "goods_receipts_costing": {
           "name": "goods_receipts_costing",
           "value": "(\"goods_receipts\".\"costing_status\" IS NULL OR \"goods_receipts\".\"costing_status\" IN ('PENDING', 'COSTED'))\n        AND \"goods_receipts\".\"costing_version\" >= 0\n        AND (\"goods_receipts\".\"costing_version\" = 0) = (\"goods_receipts\".\"costed_at\" IS NULL)\n        AND (\"goods_receipts\".\"costing_status\" = 'COSTED') = (\"goods_receipts\".\"costing_version\" > 0)"
+        },
+        "goods_receipts_payment_method": {
+          "name": "goods_receipts_payment_method",
+          "value": "\"goods_receipts\".\"payment_method\" IN ('CREDIT', 'CASH', 'BANK')"
+        },
+        "goods_receipts_money_account": {
+          "name": "goods_receipts_money_account",
+          "value": "\"goods_receipts\".\"payment_method\" <> 'CREDIT' OR \"goods_receipts\".\"money_account_id\" IS NULL"
+        },
+        "goods_receipts_vat_rate": {
+          "name": "goods_receipts_vat_rate",
+          "value": "\"goods_receipts\".\"vat_rate_pct\" >= 0 AND \"goods_receipts\".\"vat_rate_pct\" < 100"
         },
         "goods_receipts_texts": {
           "name": "goods_receipts_texts",
@@ -5742,6 +5453,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "options": {
+          "name": "options",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "summary": {
           "name": "summary",
           "type": "jsonb",
@@ -5888,7 +5605,7 @@
       "checkConstraints": {
         "import_jobs_kind": {
           "name": "import_jobs_kind",
-          "value": "\"import_jobs\".\"kind\" IN ('PRODUCTS', 'CUSTOMERS', 'SUPPLIERS', 'OPENING_STOCK', 'LEVELS', 'PRICES')"
+          "value": "\"import_jobs\".\"kind\" IN ('PRODUCTS', 'CUSTOMERS', 'SUPPLIERS', 'OPENING_STOCK', 'LEVELS', 'PRICES', 'RECEIPTS')"
         },
         "import_jobs_status": {
           "name": "import_jobs_status",
@@ -15390,6 +15107,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "vat_payer": {
+          "name": "vat_payer",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "note": {
           "name": "note",
           "type": "text",
@@ -16227,156 +15951,6 @@
         "uoms_measure_unit": {
           "name": "uoms_measure_unit",
           "value": "\"uoms\".\"measure_unit\" IS NULL OR length(\"uoms\".\"measure_unit\") BETWEEN 1 AND 50"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.user_notifications": {
-      "name": "user_notifications",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "user_notifications_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "order_id": {
-          "name": "order_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "user_notifications_user_idx": {
-          "name": "user_notifications_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "user_notifications_unread_idx": {
-          "name": "user_notifications_unread_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"user_notifications\".\"read_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "user_notifications_user_id_users_id_fk": {
-          "name": "user_notifications_user_id_users_id_fk",
-          "tableFrom": "user_notifications",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "user_notifications_order_id_sales_orders_id_fk": {
-          "name": "user_notifications_order_id_sales_orders_id_fk",
-          "tableFrom": "user_notifications",
-          "tableTo": "sales_orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "user_notifications_order": {
-          "name": "user_notifications_order",
-          "nullsNotDistinct": false,
-          "columns": [
-            "kind",
-            "order_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "user_notifications_kind": {
-          "name": "user_notifications_kind",
-          "value": "\"user_notifications\".\"kind\" IN ('ORDER_SOLD')"
-        },
-        "user_notifications_order_required": {
-          "name": "user_notifications_order_required",
-          "value": "\"user_notifications\".\"kind\" <> 'ORDER_SOLD' OR \"user_notifications\".\"order_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false

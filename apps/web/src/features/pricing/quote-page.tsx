@@ -1,13 +1,13 @@
 import { businessDate } from '@tugeel/shared/time';
-import { Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Calculator, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RowAction, RowActions } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -36,7 +36,9 @@ interface CartLine {
 /**
  * «Үнэ» → «Үнэ тооцоолох» (ADR-0041 #3, ADR-0048 #4): a test cart priced as an order would be —
  * whole packs and loose pieces apart, or the supermarket's prices — with every discount that
- * applies and why. Nothing is stored; orders use the same quote at SUBMIT.
+ * applies and why. Nothing is stored; orders use the same quote at SUBMIT. The price list, the day
+ * and the product search share one row, «Тооцоолох» sits in the cart's header and Enter in a
+ * quantity calculates too; the result scrolls into view (ADR-0066).
  */
 export function PriceQuotePage() {
   const { t } = useTranslation();
@@ -46,12 +48,18 @@ export function PriceQuotePage() {
   const [date, setDate] = useState(businessDate());
   const [lines, setLines] = useState<CartLine[]>([]);
   const [result, setResult] = useState<Quote | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [result]);
 
   const change = (next: CartLine[]) => {
     setLines(next);
     setResult(null);
   };
-  const calculate = () =>
+  const calculate = () => {
+    if (lines.length === 0 || quote.isPending) return;
     void action.run(async () => {
       setResult(
         await quote.mutateAsync({
@@ -61,21 +69,27 @@ export function PriceQuotePage() {
         }),
       );
     });
+  };
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t('pricing.quote.title')}
-        meta={<p className="max-w-3xl">{t('pricing.quote.hint')}</p>}
-      />
+      <PageHeader title={t('pricing.quote.title')} description={t('pricing.quote.hint')} />
       <Card>
+        <CardHeader>
+          <CardTitle>{t('pricing.quote.cart')}</CardTitle>
+          <CardAction>
+            <Button disabled={lines.length === 0 || quote.isPending} onClick={calculate}>
+              <Calculator />
+              {t('pricing.quote.calculate')}
+            </Button>
+          </CardAction>
+        </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-2">
+          <div className="grid gap-3 md:grid-cols-[12rem_11rem_minmax(0,1fr)] md:items-start">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="quote-list">{t('pricing.quote.list')}</Label>
               <NativeSelect
                 id="quote-list"
-                className="w-48"
                 value={list}
                 onChange={(event) => {
                   setList(event.target.value === 'RETAIL' ? 'RETAIL' : 'WHOLESALE');
@@ -86,12 +100,11 @@ export function PriceQuotePage() {
                 <option value="RETAIL">{t('pricing.lists.RETAIL')}</option>
               </NativeSelect>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="quote-date">{t('pricing.quote.date')}</Label>
               <Input
                 id="quote-date"
                 type="date"
-                className="w-48"
                 value={date}
                 onChange={(event) => {
                   setDate(event.target.value);
@@ -99,94 +112,105 @@ export function PriceQuotePage() {
                 }}
               />
             </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="quote-search">{t('inventory.productSearch')}</Label>
+              <ProductSearch
+                id="quote-search"
+                onPick={(product) =>
+                  change([
+                    ...lines,
+                    {
+                      key: randomUuid(),
+                      productId: product.id,
+                      sku: product.sku,
+                      name: product.name,
+                      unitId: product.baseUnit.id,
+                      qty: '1',
+                    },
+                  ])
+                }
+              />
+            </div>
           </div>
-          <ProductSearch
-            onPick={(product) =>
-              change([
-                ...lines,
-                {
-                  key: randomUuid(),
-                  productId: product.id,
-                  sku: product.sku,
-                  name: product.name,
-                  unitId: product.baseUnit.id,
-                  qty: '1',
-                },
-              ])
-            }
-          />
           {lines.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('pricing.quote.empty')}</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('pricing.quote.columns.product')}</TableHead>
-                  <TableHead>{t('pricing.quote.unit')}</TableHead>
-                  <TableHead>{t('pricing.quote.qty')}</TableHead>
-                  <TableHead>
-                    <span className="sr-only">{t('pricing.quote.remove')}</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line) => (
-                  <TableRow key={line.key}>
-                    <TableCell className="whitespace-normal">
-                      <span className="mr-2 font-mono text-muted-foreground">{line.sku}</span>
-                      {line.name}
-                    </TableCell>
-                    <TableCell>
-                      <UnitSelect
-                        productId={line.productId}
-                        unitId={line.unitId}
-                        name={line.name}
-                        onChange={(unitId) =>
-                          change(
-                            lines.map((row) => (row.key === line.key ? { ...row, unitId } : row)),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        aria-label={`${t('pricing.quote.qty')}: ${line.name}`}
-                        inputMode="decimal"
-                        className="w-28 text-right font-mono"
-                        value={line.qty}
-                        onChange={(event) =>
-                          change(
-                            lines.map((row) =>
-                              row.key === line.key
-                                ? { ...row, qty: event.target.value.trim() }
-                                : row,
-                            ),
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <RowActions>
-                      <RowAction
-                        label={`${t('pricing.quote.remove')}: ${line.name}`}
-                        icon={Trash2}
-                        destructive
-                        onClick={() => change(lines.filter((row) => row.key !== line.key))}
-                      />
-                    </RowActions>
+            <div className="overflow-hidden rounded-xl border border-border/90">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-full">{t('pricing.quote.columns.product')}</TableHead>
+                    <TableHead>{t('pricing.quote.unit')}</TableHead>
+                    <TableHead className="text-right">{t('pricing.quote.qty')}</TableHead>
+                    <TableHead>
+                      <span className="sr-only">{t('pricing.quote.remove')}</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((line) => (
+                    <TableRow key={line.key}>
+                      <TableCell className="whitespace-normal">
+                        <span className="mr-2 font-mono text-muted-foreground">{line.sku}</span>
+                        {line.name}
+                      </TableCell>
+                      <TableCell>
+                        <UnitSelect
+                          productId={line.productId}
+                          unitId={line.unitId}
+                          name={line.name}
+                          onChange={(unitId) =>
+                            change(
+                              lines.map((row) => (row.key === line.key ? { ...row, unitId } : row)),
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`${t('pricing.quote.qty')}: ${line.name}`}
+                          inputMode="decimal"
+                          className="ml-auto w-28 text-right font-mono"
+                          value={line.qty}
+                          onChange={(event) =>
+                            change(
+                              lines.map((row) =>
+                                row.key === line.key
+                                  ? { ...row, qty: event.target.value.trim() }
+                                  : row,
+                              ),
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            // Enter in a quantity prices the cart, like the header's button.
+                            if (event.key !== 'Enter') return;
+                            event.preventDefault();
+                            calculate();
+                          }}
+                        />
+                      </TableCell>
+                      <RowActions>
+                        <RowAction
+                          label={`${t('pricing.quote.remove')}: ${line.name}`}
+                          icon={Trash2}
+                          destructive
+                          onClick={() => change(lines.filter((row) => row.key !== line.key))}
+                        />
+                      </RowActions>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
-          <div className="flex justify-end">
-            <Button disabled={lines.length === 0 || quote.isPending} onClick={calculate}>
-              {t('pricing.quote.calculate')}
-            </Button>
-          </div>
         </CardContent>
       </Card>
       <ProblemAlert problem={action.problem} />
-      {result ? <QuoteResult result={result} names={lines} /> : null}
+      {result ? (
+        <div ref={resultRef} className="scroll-mt-4">
+          <QuoteResult result={result} names={lines} />
+        </div>
+      ) : null}
     </div>
   );
 }

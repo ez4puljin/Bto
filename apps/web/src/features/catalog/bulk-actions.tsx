@@ -48,13 +48,13 @@ function useReport() {
   return (result: { changed: number[]; unchanged: number[]; skipped?: unknown[] }) => {
     const parts: string[] = [];
     if (result.changed.length > 0 || (result.unchanged.length === 0 && !result.skipped?.length)) {
-      parts.push(t('catalog.products.bulk.done', { count: result.changed.length }));
+      parts.push(t('catalog.products.bulk.done', { count: formatCount(result.changed.length) }));
     }
     if (result.unchanged.length > 0) {
-      parts.push(t('catalog.products.bulk.same', { count: result.unchanged.length }));
+      parts.push(t('catalog.products.bulk.same', { count: formatCount(result.unchanged.length) }));
     }
     if (result.skipped?.length) {
-      parts.push(t('catalog.products.bulk.noTerms', { count: result.skipped.length }));
+      parts.push(t('catalog.products.bulk.noTerms', { count: formatCount(result.skipped.length) }));
     }
     toast.success(parts.join('. '));
   };
@@ -157,7 +157,7 @@ function LimitDialog(props: {
   const { t } = useTranslation();
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+      <DialogContent closeLabel={t('common.close')} size="sm">
         <DialogHeader>
           <DialogTitle>{t(`catalog.products.bulk.actions.${props.action}`)}</DialogTitle>
           <DialogDescription>
@@ -202,12 +202,12 @@ function BulkDialog(props: {
   };
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-md">
+      <DialogContent closeLabel={t('common.close')} size="sm">
         <DialogHeader>
           <DialogTitle>{t(`catalog.products.bulk.actions.${props.action}`)}</DialogTitle>
           <DialogDescription>
             <span className="block font-medium text-foreground">
-              {t('catalog.products.bulk.count', { count: props.count })}
+              {t('catalog.products.bulk.count', { count: formatCount(props.count) })}
             </span>
             {t(`catalog.products.bulk.hints.${props.action}`)}
           </DialogDescription>
@@ -490,13 +490,15 @@ function HomeDialog(props: {
       </FormField>
       {stocked ? (
         <div role="alert" className="flex flex-col gap-1.5 rounded-lg bg-warning-soft p-3 text-sm">
-          <p>{t('catalog.products.bulk.withStock', { count: stocked.length })}</p>
+          <p>{t('catalog.products.bulk.withStock', { count: formatCount(stocked.length) })}</p>
           <ul className="list-inside list-disc text-muted-foreground">
             {shown.map((id) => (
               <li key={id}>{nameOf(id)}</li>
             ))}
             {stocked.length > NAMED ? (
-              <li>{t('catalog.products.bulk.more', { count: stocked.length - NAMED })}</li>
+              <li>
+                {t('catalog.products.bulk.more', { count: formatCount(stocked.length - NAMED) })}
+              </li>
             ) : null}
           </ul>
         </div>
@@ -534,7 +536,9 @@ function StatusDialog(props: {
   return (
     <ConfirmDialog
       open
-      title={t(`catalog.products.bulk.${props.action}Title`, { count: props.ids.length })}
+      title={t(`catalog.products.bulk.${props.action}Title`, {
+        count: formatCount(props.ids.length),
+      })}
       description={t('catalog.products.bulk.statusHint')}
       confirmLabel={t(`catalog.products.bulk.actions.${props.action}`)}
       variant={props.action === 'deactivate' ? 'destructive' : 'default'}

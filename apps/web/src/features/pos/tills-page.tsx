@@ -1,15 +1,23 @@
 import { KeyRound, Monitor, Pencil, Plus, QrCode } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
-import { EmptyState, ListCard, RowAction, RowActions, SkeletonRows } from '@/components/list';
+import {
+  EmptyState,
+  ListCard,
+  RowAction,
+  RowActions,
+  SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +38,7 @@ import {
 } from '@/components/ui/table';
 import { useWarehouses } from '@/features/identity/api';
 import { formatUbDateTime } from '@/lib/dayjs';
+import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -39,8 +48,9 @@ import { ActiveBadge } from './badges';
 import { OneTimeCodeDialog } from './one-time-code-dialog';
 
 /**
- * «Касс» (ADR-0063 #8): the store's edge servers with their tokens, and the tills with their
- * printers. A token or a pairing code is shown once.
+ * «Касс» (ADR-0063 #8): the tills with their printers first (the page's main object), then the
+ * store's edge servers with their tokens. A token or a pairing code is shown once; a new token stops
+ * the old one at once, so it is asked as a destructive step (ADR-0066).
  */
 export function PosTillsPage() {
   const { t } = useTranslation();
@@ -58,6 +68,7 @@ export function PosTillsPage() {
   const mutations = usePosMutations();
   const action = useAction();
   const nodeName = (id: number) => nodes.data?.find((node) => node.id === id)?.code ?? '';
+  const none = <span className="text-muted-foreground">{t('pos.fields.none')}</span>;
 
   const issueToken = (node: EdgeNode) => {
     void action
@@ -88,31 +99,102 @@ export function PosTillsPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
         title={t('pos.tills.title')}
         actions={
           canManage ? (
-            <>
-              <Button variant="outline" onClick={() => setNewNode(true)}>
-                <Plus />
-                {t('pos.actions.newNode')}
-              </Button>
-              <Button onClick={() => setNewTill(true)}>
-                <Plus />
-                {t('pos.actions.newTill')}
-              </Button>
-            </>
+            <Button onClick={() => setNewTill(true)}>
+              <Plus />
+              {t('pos.actions.newTill')}
+            </Button>
           ) : null
         }
       />
       <ProblemAlert problem={problemFromError(nodes.error ?? tills.error) ?? action.problem} />
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('pos.nodes.title')}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">{t('pos.nodes.description')}</p>
-        </CardHeader>
-        <CardContent>
+      <section aria-labelledby="pos-tills-heading" className="mb-6">
+        <SectionHeading
+          id="pos-tills-heading"
+          title={t('pos.tills.listTitle')}
+          description={t('pos.tills.description')}
+        />
+        <ListCard scroll>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('pos.fields.code')}</TableHead>
+                <TableHead>{t('pos.fields.name')}</TableHead>
+                <TableHead>{t('pos.fields.node')}</TableHead>
+                <TableHead>{t('pos.fields.printer')}</TableHead>
+                <TableHead>{t('pos.tills.lastSale')}</TableHead>
+                <TableHead>{t('pos.fields.status')}</TableHead>
+                <SpacerHead />
+                <TableHead className="w-px" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tills.isPending ? <SkeletonRows columns={8} rows={2} /> : null}
+              {(tills.data ?? []).map((till) => (
+                <TableRow key={till.id}>
+                  <TableCell className="font-mono font-medium">{till.code}</TableCell>
+                  <TruncateCell text={till.name} />
+                  <TableCell className="font-mono">{nodeName(till.edgeNodeId)}</TableCell>
+                  <TableCell className="font-mono">
+                    {till.printerHost ? (
+                      `${till.printerHost}:${till.printerPort}`
+                    ) : (
+                      <span className="font-sans text-muted-foreground">
+                        {t('pos.tills.noPrinter')}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono">
+                    {till.lastSaleAt ? formatUbDateTime(Date.parse(till.lastSaleAt)) : none}
+                  </TableCell>
+                  <TableCell>
+                    <ActiveBadge status={till.status} />
+                  </TableCell>
+                  <SpacerCell />
+                  <RowActions>
+                    {canManage ? (
+                      <>
+                        <RowAction
+                          label={`${t('pos.actions.pairingCode')}: ${till.code}`}
+                          icon={QrCode}
+                          onClick={() => pairingCode(till)}
+                        />
+                        <RowAction
+                          label={`${t('pos.actions.edit')}: ${till.code}`}
+                          icon={Pencil}
+                          onClick={() => setEditingTill(till)}
+                        />
+                      </>
+                    ) : null}
+                  </RowActions>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!tills.isPending && (tills.data ?? []).length === 0 ? (
+            <EmptyState icon={Monitor} title={t('pos.tills.empty')} />
+          ) : null}
+        </ListCard>
+      </section>
+      <section aria-labelledby="pos-nodes-heading">
+        <SectionHeading
+          id="pos-nodes-heading"
+          title={t('pos.nodes.title')}
+          description={t('pos.nodes.description')}
+          action={
+            canManage ? (
+              <Button variant="outline" size="sm" onClick={() => setNewNode(true)}>
+                <Plus />
+                {t('pos.actions.newNode')}
+              </Button>
+            ) : null
+          }
+        />
+        <ListCard>
           <Table>
             <TableHeader>
               <TableRow>
@@ -123,34 +205,43 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.fields.lastSeen')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.backlog')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
+                <SpacerHead />
                 <TableHead className="w-px" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nodes.isPending ? <SkeletonRows columns={8} rows={2} /> : null}
+              {nodes.isPending ? <SkeletonRows columns={9} rows={2} /> : null}
               {(nodes.data ?? []).map((node) => (
                 <TableRow key={node.id}>
                   <TableCell className="font-mono font-medium">{node.code}</TableCell>
-                  <TableCell>{node.name}</TableCell>
-                  <TableCell>{node.warehouseName ?? ''}</TableCell>
+                  <TruncateCell text={node.name} />
+                  <TableCell>{node.warehouseName ?? none}</TableCell>
                   <TableCell className="font-mono text-muted-foreground">
                     {node.tokenPrefix ? `${node.tokenPrefix}…` : t('pos.fields.none')}
                   </TableCell>
                   <TableCell className="font-mono">
-                    {node.lastSeenAt
-                      ? formatUbDateTime(Date.parse(node.lastSeenAt))
-                      : t('pos.nodes.neverSeen')}
+                    {node.lastSeenAt ? (
+                      formatUbDateTime(Date.parse(node.lastSeenAt))
+                    ) : (
+                      <span className="font-sans text-muted-foreground">
+                        {t('pos.nodes.neverSeen')}
+                      </span>
+                    )}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{node.backlog}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatCount(node.backlog)}
+                  </TableCell>
                   <TableCell>
                     <ActiveBadge status={node.status} />
                   </TableCell>
+                  <SpacerCell />
                   <RowActions>
                     {canManage ? (
                       <>
                         <RowAction
                           label={`${t('pos.actions.newToken')}: ${node.code}`}
                           icon={KeyRound}
+                          destructive
                           onClick={() => setTokenFor(node)}
                         />
                         <RowAction
@@ -168,63 +259,8 @@ export function PosTillsPage() {
           {!nodes.isPending && (nodes.data ?? []).length === 0 ? (
             <EmptyState icon={Monitor} title={t('pos.nodes.empty')} />
           ) : null}
-        </CardContent>
-      </Card>
-      <ListCard>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('pos.fields.code')}</TableHead>
-              <TableHead>{t('pos.fields.name')}</TableHead>
-              <TableHead>{t('pos.fields.node')}</TableHead>
-              <TableHead>{t('pos.fields.printer')}</TableHead>
-              <TableHead>{t('pos.tills.lastSale')}</TableHead>
-              <TableHead>{t('pos.fields.status')}</TableHead>
-              <TableHead className="w-px" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tills.isPending ? <SkeletonRows columns={7} /> : null}
-            {(tills.data ?? []).map((till) => (
-              <TableRow key={till.id}>
-                <TableCell className="font-mono font-medium">{till.code}</TableCell>
-                <TableCell>{till.name}</TableCell>
-                <TableCell className="font-mono">{nodeName(till.edgeNodeId)}</TableCell>
-                <TableCell className="font-mono">
-                  {till.printerHost
-                    ? `${till.printerHost}:${till.printerPort}`
-                    : t('pos.tills.noPrinter')}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {till.lastSaleAt ? formatUbDateTime(Date.parse(till.lastSaleAt)) : ''}
-                </TableCell>
-                <TableCell>
-                  <ActiveBadge status={till.status} />
-                </TableCell>
-                <RowActions>
-                  {canManage ? (
-                    <>
-                      <RowAction
-                        label={`${t('pos.actions.pairingCode')}: ${till.code}`}
-                        icon={QrCode}
-                        onClick={() => pairingCode(till)}
-                      />
-                      <RowAction
-                        label={`${t('pos.actions.edit')}: ${till.code}`}
-                        icon={Pencil}
-                        onClick={() => setEditingTill(till)}
-                      />
-                    </>
-                  ) : null}
-                </RowActions>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {!tills.isPending && (tills.data ?? []).length === 0 ? (
-          <EmptyState icon={Monitor} title={t('pos.tills.empty')} />
-        ) : null}
-      </ListCard>
+        </ListCard>
+      </section>
       <NodeDialog
         open={newNode || editingNode !== null}
         node={editingNode}
@@ -247,7 +283,7 @@ export function PosTillsPage() {
         title={t('pos.nodes.tokenTitle')}
         description={t('pos.nodes.tokenConfirm')}
         confirmLabel={t('pos.actions.newToken')}
-        variant="default"
+        variant="destructive"
         pending={mutations.issueToken.isPending}
         problem={action.problem}
         onConfirm={() => {
@@ -262,6 +298,49 @@ export function PosTillsPage() {
         code={shown?.code ?? ''}
         onClose={() => setShown(null)}
       />
+    </div>
+  );
+}
+
+/** A list's title and what it holds, above its card; `action` adds to it. */
+function SectionHeading(props: {
+  id: string;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap items-end justify-between gap-2 px-1">
+      <div className="min-w-0">
+        <h2 id={props.id} className="text-[15px] font-semibold tracking-tight">
+          {props.title}
+        </h2>
+        <p className="text-[13px] text-muted-foreground">{props.description}</p>
+      </div>
+      {props.action}
+    </div>
+  );
+}
+
+/** An on/off value of a dialog's form, with its state in words beside the switch. */
+function SwitchRow(props: {
+  id: string;
+  label: string;
+  checked: boolean;
+  state?: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+      <Label htmlFor={props.id} className="font-normal">
+        {props.label}
+      </Label>
+      <div className="flex items-center gap-2.5">
+        {props.state ? (
+          <span className="text-[13px] text-muted-foreground">{props.state}</span>
+        ) : null}
+        <Switch id={props.id} checked={props.checked} onCheckedChange={props.onChange} />
+      </div>
     </div>
   );
 }
@@ -383,18 +462,15 @@ function NodeForm({ node, onClose }: { node: EdgeNode | null; onClose: () => voi
           </NativeSelect>
         </FormField>
         {node ? (
-          <FormField label={t('pos.fields.status')} htmlFor="node-status">
-            <NativeSelect
+          <div className="overflow-hidden rounded-xl border border-border/90">
+            <SwitchRow
               id="node-status"
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')
-              }
-            >
-              <option value="ACTIVE">{t('pos.statuses.ACTIVE')}</option>
-              <option value="INACTIVE">{t('pos.statuses.INACTIVE')}</option>
-            </NativeSelect>
-          </FormField>
+              label={t('pos.fields.status')}
+              checked={status === 'ACTIVE'}
+              state={t(`pos.statuses.${status}`)}
+              onChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+            />
+          </div>
         ) : null}
         <ProblemAlert problem={action.problem} />
         <DialogFormFooter pending={pending} onCancel={onClose} />
@@ -490,7 +566,7 @@ function TillForm({
   const pending = mutations.createTill.isPending || mutations.updateTill.isPending;
 
   return (
-    <DialogContent closeLabel={t('common.close')}>
+    <DialogContent closeLabel={t('common.close')} size="md">
       <DialogHeader>
         <DialogTitle>
           {till ? t('pos.tills.editTitle', { code: till.code }) : t('pos.tills.dialogTitle')}
@@ -509,7 +585,7 @@ function TillForm({
               value={edgeNodeId ?? ''}
               onChange={(event) => setEdgeNodeId(Number.parseInt(event.target.value, 10) || null)}
             >
-              <option value="">{t('pos.settings.chooseWarehouse')}</option>
+              <option value="">{t('pos.tills.chooseNode')}</option>
               {nodes.map((node) => (
                 <option key={node.id} value={node.id}>
                   {node.code} · {node.name}
@@ -518,7 +594,7 @@ function TillForm({
             </NativeSelect>
           </FormField>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
           <FormField
             label={t('pos.fields.code')}
             htmlFor="till-code"
@@ -546,7 +622,7 @@ function TillForm({
             />
           </FormField>
         </div>
-        <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
           <FormField label={t('pos.fields.printerHost')} htmlFor="till-printer">
             <Input
               id="till-printer"
@@ -570,24 +646,23 @@ function TillForm({
             />
           </FormField>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={drawerKick} onCheckedChange={setDrawerKick} id="till-drawer" />
-          <Label htmlFor="till-drawer">{t('pos.fields.drawerKick')}</Label>
-        </label>
-        {till ? (
-          <FormField label={t('pos.fields.status')} htmlFor="till-status">
-            <NativeSelect
+        <div className="divide-y divide-border/80 overflow-hidden rounded-xl border border-border/90">
+          <SwitchRow
+            id="till-drawer"
+            label={t('pos.fields.drawerKick')}
+            checked={drawerKick}
+            onChange={setDrawerKick}
+          />
+          {till ? (
+            <SwitchRow
               id="till-status"
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE')
-              }
-            >
-              <option value="ACTIVE">{t('pos.statuses.ACTIVE')}</option>
-              <option value="INACTIVE">{t('pos.statuses.INACTIVE')}</option>
-            </NativeSelect>
-          </FormField>
-        ) : null}
+              label={t('pos.fields.status')}
+              checked={status === 'ACTIVE'}
+              state={t(`pos.statuses.${status}`)}
+              onChange={(on) => setStatus(on ? 'ACTIVE' : 'INACTIVE')}
+            />
+          ) : null}
+        </div>
         <ProblemAlert problem={action.problem} />
         <DialogFormFooter pending={pending} onCancel={onClose} />
       </form>

@@ -4,18 +4,19 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { NativeSelect } from '@/components/native-select';
+import { FactChips } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
 import { useOrderInvoice } from '@/features/finance/api';
 import { SettlementBadge } from '@/features/finance/badges';
 import { useBranches } from '@/features/identity/api';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import type { SalesOrder } from './api';
 import { OrderActivity } from './order-activity';
 import { PaymentLabel } from './order-badges';
 import type { PanelTab } from './order-panel-tabs';
-import { type SalesPipeline, type SalesStage, useBoardTree } from './pipelines-api';
+import { placeName, type SalesPipeline, type SalesStage, useBoardTree } from './pipelines-api';
 import type { Mover } from './use-mover';
 
 /**
@@ -56,7 +57,7 @@ export function OrderOverview({
       ? [
           {
             label: t('sales.order.place'),
-            value: `${order.boardName ?? ''} / ${order.pipelineName}`,
+            value: placeName(order.boardName, order.pipelineName),
           },
         ]
       : []),
@@ -93,10 +94,7 @@ export function OrderOverview({
       : []),
     {
       label: t('sales.order.total'),
-      value:
-        order.total === null
-          ? t('sales.panel.totalLater')
-          : t('pricing.money', { amount: formatMnt(order.total) }),
+      value: order.total === null ? t('sales.panel.totalLater') : formatTugrik(order.total),
     },
   ];
   const editable = order.canEdit && isEditable(order.status);
@@ -106,19 +104,7 @@ export function OrderOverview({
       {pipeline && order.stageId !== null ? (
         <StageProgress order={order} pipeline={pipeline} mover={mover} blocked={blocked} />
       ) : null}
-      <dl className="flex flex-wrap gap-2">
-        {facts.map((fact) => (
-          <div
-            key={fact.label}
-            className="flex items-stretch overflow-hidden rounded-lg border border-border text-[13px]"
-          >
-            <dt className="flex items-center bg-fill px-2.5 py-1.5 text-muted-foreground">
-              {fact.label}
-            </dt>
-            <dd className="flex items-center px-2.5 py-1.5">{fact.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <FactChips facts={facts} />
       <section className="rounded-xl border border-border p-4">
         <div className="mb-1 flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">{t('sales.order.note')}</h3>

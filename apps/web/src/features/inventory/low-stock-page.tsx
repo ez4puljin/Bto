@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
+import {
+  EmptyState,
+  FilterBar,
+  ListCard,
+  LoadMore,
+  SkeletonRows,
+  TruncateCell,
+} from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +26,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useProductSuppliersOf } from '@/features/partners/api';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import { type LowStockRow, useLowStock, useTransferMutations } from './api';
@@ -53,7 +62,8 @@ function commonHome(rows: readonly LowStockRow[]): number | undefined {
  */
 export function LowStockPage() {
   const { t } = useTranslation();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const warehouses = useWarehouseOptions(SHELF_KINDS);
   const mine = useWarehouseOptions(SHELF_KINDS, true);
   const warehouseName = useWarehouseName();
@@ -82,15 +92,7 @@ export function LowStockPage() {
 
   const pickWarehouse = (id: number | undefined) => {
     setSelected(new Set());
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (id === undefined) next.delete('warehouseId');
-        else next.set('warehouseId', String(id));
-        return next;
-      },
-      { replace: true },
-    );
+    setParam('warehouseId', id === undefined ? null : String(id));
   };
   const toggle = (productId: number, on: boolean) =>
     setSelected((previous) => {
@@ -107,10 +109,9 @@ export function LowStockPage() {
     <div>
       <PageHeader
         title={t('inventory.lowStock.title')}
-        meta={<p className="max-w-3xl">{t('inventory.lowStock.intro')}</p>}
-      />
-      <FilterBar
-        end={
+        description={t('inventory.lowStock.intro')}
+        actions={
+          // The bulk action is the page's main button, counting the ticked rows (docs/ui.md).
           requestable && warehouseId !== undefined ? (
             <RequestTransfer
               storeId={warehouseId}
@@ -119,7 +120,8 @@ export function LowStockPage() {
             />
           ) : null
         }
-      >
+      />
+      <FilterBar>
         <WarehouseSelect
           variant="filter"
           options={warehouses.options}
@@ -135,7 +137,7 @@ export function LowStockPage() {
       ) : (
         <>
           <ProblemAlert problem={problemFromError(low.error)} />
-          <ListCard>
+          <ListCard scroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -188,7 +190,7 @@ export function LowStockPage() {
                         />
                       </TableCell>
                     ) : null}
-                    <TableCell className="min-w-48 whitespace-normal">
+                    <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
                       <Link
                         to={`/inventory/stock/${row.product.id}`}
                         className="text-link underline-offset-4 hover:underline"
@@ -196,7 +198,7 @@ export function LowStockPage() {
                         <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
                         {row.product.name}
                       </Link>
-                    </TableCell>
+                    </TruncateCell>
                     <TableCell>
                       <Badge variant={row.status === 'OUT' ? 'destructive' : 'warning'}>
                         {t(`inventory.lowStock.statuses.${row.status}`)}
@@ -204,18 +206,18 @@ export function LowStockPage() {
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {t('inventory.qtyWithUnit', {
-                        qty: row.onHand,
+                        qty: formatQty(row.onHand),
                         unit: row.product.baseUnitName,
                       })}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {row.minQty ?? t('common.none')}
+                      {row.minQty ? formatQty(row.minQty) : t('common.none')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {row.maxQty ?? t('common.none')}
+                      {row.maxQty ? formatQty(row.maxQty) : t('common.none')}
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {row.suggestedQty ?? t('common.none')}
+                      {row.suggestedQty ? formatQty(row.suggestedQty) : t('common.none')}
                     </TableCell>
                     {isStore ? (
                       <TableCell>

@@ -1,8 +1,10 @@
 import { Move, Trash2 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { LeaveGuard } from '@/components/leave-guard';
 import {
   EmptyState,
   FilterBar,
@@ -28,7 +30,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBarcodeLookup } from '@/features/catalog/api';
+import { formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -36,7 +40,7 @@ import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
 import { type Bin, useBinLookup, useBinMoves, useInventoryMutations } from './api';
 import { isQty, looksLikeLabel, useWarehouseName, useWarehouseOptions } from './helpers';
-import { ProductSearch, WarehouseSelect } from './shared';
+import { ProductSearch, ScanToolbar, WarehouseSelect } from './shared';
 
 const SHELF_KINDS = ['WHOLESALE', 'STORE'] as const;
 
@@ -51,11 +55,17 @@ interface PendingLine extends Item {
   to: Bin;
 }
 
-/** Bin moves (BM-): put-away from the receiving area and shelf-to-shelf moves, posted at once. */
+/**
+ * Bin moves (BM-): put-away from the receiving area and shelf-to-shelf moves, posted at once. The
+ * form comes first and the moves made follow it under their own title (docs/ui.md: never a create
+ * form above its list); lines not moved yet are asked about before the page or the warehouse
+ * changes.
+ */
 export function BinMovesPage() {
   const { t } = useTranslation();
   const canMove = useHasPermission('inventory.moves.manage');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
   const warehouseId = Number.isNaN(warehouseParam) ? undefined : warehouseParam;
   const warehouses = useWarehouseOptions(SHELF_KINDS, canMove);
@@ -63,16 +73,16 @@ export function BinMovesPage() {
   const moves = useBinMoves({ warehouseId });
   const rows = moves.data?.pages.flatMap((page) => page.data) ?? [];
 
+  // Lines added in the form and not moved yet: a warehouse change asks first.
+  const [pending, setPending] = useState(0);
+  const [switching, setSwitching] = useState<{ id: number | undefined } | null>(null);
+
   const setWarehouse = (id: number | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (id === undefined) next.delete('warehouseId');
-        else next.set('warehouseId', String(id));
-        return next;
-      },
-      { replace: true },
-    );
+    setParam('warehouseId', id === undefined ? null : String(id));
+  const chooseWarehouse = (id: number | undefined) => {
+    if (pending > 0) setSwitching({ id });
+    else setWarehouse(id);
+  };
 
   return (
     <div>
@@ -83,14 +93,17 @@ export function BinMovesPage() {
           options={warehouses.options}
           value={warehouseId}
           emptyLabel={canMove ? t('inventory.pickWarehouse') : t('inventory.allWarehouses')}
-          onChange={setWarehouse}
+          onChange={chooseWarehouse}
         />
       </FilterBar>
       {canMove && warehouseId !== undefined ? (
-        <div className="mb-4">
-          <MoveForm key={warehouseId} warehouseId={warehouseId} />
+        <div className="mb-6">
+          <MoveForm key={warehouseId} warehouseId={warehouseId} onPending={setPending} />
         </div>
       ) : null}
+      <h2 className="mb-2 text-[15px] font-semibold tracking-tight">
+        {t('inventory.moves.history')}
+      </h2>
       <ProblemAlert problem={problemFromError(moves.error)} />
       <ListCard>
         <Table>
@@ -121,6 +134,23 @@ export function BinMovesPage() {
         ) : null}
         <LoadMore query={moves} />
       </ListCard>
+      <LeaveGuard
+        when={pending > 0}
+        title={t('inventory.moves.leaveTitle')}
+        description={t('inventory.moves.leaveDescription')}
+        leaveLabel={t('inventory.moves.leave')}
+      />
+      <ConfirmDialog
+        open={switching !== null}
+        title={t('inventory.moves.leaveTitle')}
+        description={t('inventory.moves.leaveDescription')}
+        confirmLabel={t('inventory.moves.leave')}
+        onConfirm={() => {
+          if (switching) setWarehouse(switching.id);
+          setSwitching(null);
+        }}
+        onClose={() => setSwitching(null)}
+      />
     </div>
   );
 }
@@ -129,7 +159,14 @@ export function BinMovesPage() {
  * Scan the shelf goods leave, the product and its quantity, then the shelf they go to; repeat,
  * then move them all in one document. A label scan fills "from" first, then "to".
  */
-function MoveForm({ warehouseId }: { warehouseId: number }) {
+function MoveForm({
+  warehouseId,
+  onPending,
+}: {
+  warehouseId: number;
+  /** How many lines wait to be moved (the page asks before dropping them). */
+  onPending: (count: number) => void;
+}) {
   const { t } = useTranslation();
   const mutations = useInventoryMutations();
   const lookupBin = useBinLookup();
@@ -143,6 +180,8 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
   const [lines, setLines] = useState<PendingLine[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
   const guard = useScanGuard((code) => onScan(code), { letters: true });
+  useEffect(() => onPending(lines.length), [lines.length, onPending]);
+  useEffect(() => () => onPending(0), [onPending]);
 
   const reset = () => {
     setFrom(null);
@@ -223,18 +262,36 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
         <CardTitle>{t('inventory.moves.create')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <p className="text-sm text-muted-foreground">{t('inventory.moves.hint')}</p>
-        <ScanBox
-          letters
-          label={t('inventory.scanLabel')}
-          placeholder={t('inventory.scanPlaceholder')}
-          onScan={onScan}
+        <p className="text-[13px] text-muted-foreground">{t('inventory.moves.hint')}</p>
+        <ScanToolbar
+          scanBox={
+            <ScanBox
+              letters
+              label={t('inventory.scanLabel')}
+              placeholder={t('inventory.scanPlaceholder')}
+              onScan={onScan}
+            />
+          }
+          search={
+            <ProductSearch
+              onScan={onScan}
+              onPick={(product) =>
+                setItem({
+                  productUnitId: product.baseUnit.id,
+                  productName: product.name,
+                  unitName: product.baseUnit.uomName,
+                })
+              }
+            />
+          }
+          status={
+            missing ? (
+              <span className="text-destructive">
+                {t('inventory.scanNotFound', { code: missing })}
+              </span>
+            ) : null
+          }
         />
-        {missing ? (
-          <p className="text-sm text-destructive">
-            {t('inventory.scanNotFound', { code: missing })}
-          </p>
-        ) : null}
         <ProblemAlert problem={action.problem} />
         <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Picked term={t('inventory.moves.from')} mono>
@@ -265,15 +322,6 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
             {to?.code ?? t('inventory.moves.pickTo')}
           </Picked>
         </dl>
-        <ProductSearch
-          onPick={(product) =>
-            setItem({
-              productUnitId: product.baseUnit.id,
-              productName: product.name,
-              unitName: product.baseUnit.uomName,
-            })
-          }
-        />
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" disabled={!canAdd} onClick={addLine}>
             {t('inventory.moves.addLine')}
@@ -302,7 +350,10 @@ function MoveForm({ warehouseId }: { warehouseId: number }) {
                   <TableRow key={`${line.productUnitId}:${line.from.id}:${line.to.id}:${index}`}>
                     <TableCell className="whitespace-normal">{line.productName}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {t('inventory.qtyWithUnit', { qty: line.enteredQty, unit: line.unitName })}
+                      {t('inventory.qtyWithUnit', {
+                        qty: formatQty(line.enteredQty),
+                        unit: line.unitName,
+                      })}
                     </TableCell>
                     <TableCell className="font-mono">{line.from.code}</TableCell>
                     <TableCell className="font-mono">{line.to.code}</TableCell>

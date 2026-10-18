@@ -9,7 +9,7 @@ Status (Finance I, delivery 3, built 2026-10-16, ADR-0060):
 - **The general journal**: a small chart of accounts with roles, automatic entries from every document, manual and opening entries, reversals.
 - **Number formats** for the four documents, in the owner's style (`Н-20261016-0001`).
 
-Still to come: e-Barimt on the invoices (ADR-0017, next session), QPay (delivery 5), bank statement import and reports (delivery 10), the opening-receivables importer (before go-live), cost of goods sold postings, the screens of delivery 3 slice 5 (`docs/ui.md`).
+Still to come: e-Barimt on the invoices (ADR-0017, next session), bank statement import and reports (delivery 10), the opening-receivables importer (before go-live), cost of goods sold postings, the screens of delivery 3 slice 5 (`docs/ui.md`).
 - **Code:** `apps/api/src/modules/finance/`; shared rules in `packages/shared/src/finance`; screens in `apps/web/src/features/finance/`.
 - **Decisions:** ADR-0060 (everything here), ADR-0010 (the tax split), ADR-0055 … ADR-0057 (the sale that invoices), ADR-0017 / ADR-0018 (what waits).
 - **Architecture:** §4 (the row), §5.5 (credit), §5.6 (INVOICED), §5.8 (payments), §5.13 (the journal).
@@ -29,7 +29,7 @@ Nobody imports `finance`. Sales finds the two hooks through `ModuleRef` (`strict
 |---|---|---|
 | Scope | sales finance plus the general journal; the balance sheet, P&L, payroll and fixed assets stay in Erkhet for now | ADR-0060 context |
 | Invoice | created automatically at the «Борлуулалт» stage, for the delivered quantities; e-Barimt postponed to the next session | #3 |
-| Money | customers and drivers hand cash to the accountant, who records it and closes receivables; bank transfers typed by hand; QPay in delivery 5; no warehouse cashier, no shifts | #5 |
+| Money | customers and drivers hand cash to the accountant, who records it and closes receivables; bank transfers typed by hand; no QPay (ADR-0080); no warehouse cashier, no shifts | #5 |
 | Accounts | a small built-in chart; automatic postings for sales, receivables, payments and VAT; manual entries allowed; COGS later | #7 |
 | Credit | 30-day term; **no tolerance**: over the limit or any overdue invoice blocks every order, cash too; NULL limit = no limit; no approval state; only the owner raises limits | #2 |
 | Cash book | one per branch cash box and bank account, income and expense vouchers, the driver named on what he hands in | #5 |
@@ -145,7 +145,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 ## 11. Open items
 
 - e-Barimt receipts on invoices (ADR-0017): the next session; the invoice carries everything the receipt needs (lines with `vat_type`, rates and amounts, the customer's TIN through partners).
-- QPay payment intents (delivery 5) record payments through `PaymentsService.record` with a `BANK` money account.
+- No QPay (ADR-0080): customers pay cash or by bank transfer; the customer app (ADR-0079 #7) reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах».
 - Opening balances: an importer of customer balances (OPENING ledger entries + an OPENING journal entry) before go-live; manual journal entries meanwhile.
 - A shorter due date for cash sales if the owner wants it (today every invoice takes the customer's term).
 - Cost of goods sold postings (stock value out of inventory at the sale); CLOSED orders when their invoice is paid; customer statements; reminders; bank statement import and VAT reports (delivery 10); supplier bills (delivery 8).

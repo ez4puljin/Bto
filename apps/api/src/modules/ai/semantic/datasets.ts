@@ -164,9 +164,13 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col(
         'movement_type',
         'text',
-        'RECEIPT (from a supplier), BIN_MOVE_OUT / BIN_MOVE_IN (between shelves), TRANSFER_OUT / TRANSFER_IN (between warehouses), ADJUSTMENT (damage, expiry, shortage, surplus, opening stock), COUNT_CORRECTION (stocktake difference)',
+        'RECEIPT (from a supplier), BIN_MOVE_OUT / BIN_MOVE_IN (between shelves), TRANSFER_OUT / TRANSFER_IN (between warehouses), ADJUSTMENT (damage, expiry, shortage, surplus, opening stock), COUNT_CORRECTION (stocktake difference), GOODS_ISSUE (a goods issue: internal use, bonus, write-off, return to a supplier)',
       ),
-      col('doc_type', 'text', 'GR receipt, BM bin move, ADJ adjustment, ST stocktake, TR transfer'),
+      col(
+        'doc_type',
+        'text',
+        'GR receipt, BM bin move, ADJ adjustment, ST stocktake, TR transfer, GI goods issue',
+      ),
       col('doc_id', 'bigint'),
       col('doc_number', 'text', 'e.g. GR-2026-000012'),
       col(
@@ -182,7 +186,7 @@ export const AI_DATASETS: readonly AiDataset[] = [
   {
     name: 'stock_documents',
     description:
-      'Stock document headers: GR goods receipt, BM bin move, ADJ adjustment, ST stocktake, TR transfer between warehouses.',
+      'Stock document headers: GR goods receipt, BM bin move, ADJ adjustment, ST stocktake, TR transfer between warehouses, GI goods issue (зарлага; adjustment_reason holds its expense type, supplier_id/name the supplier of a return).',
     columns: [
       col('doc_type', 'text'),
       col('id', 'bigint'),
@@ -190,7 +194,7 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col(
         'status',
         'text',
-        'GR DRAFT/POSTED/CANCELLED; BM DRAFT/POSTED; ADJ DRAFT/SUBMITTED/POSTED/CANCELLED; ST DRAFT/COUNTING/REVIEW/APPROVED/CANCELLED; TR DRAFT/REQUESTED/SHIPPED/RECEIVED/CANCELLED',
+        'GR DRAFT/POSTED/CANCELLED; BM DRAFT/POSTED; ADJ DRAFT/SUBMITTED/POSTED/CANCELLED; ST DRAFT/COUNTING/REVIEW/APPROVED/CANCELLED; TR DRAFT/REQUESTED/SHIPPED/RECEIVED/CANCELLED; GI DRAFT/POSTED/CANCELLED',
       ),
       col('warehouse_id', 'bigint', 'TR: the sending warehouse'),
       col('warehouse_name', 'text'),

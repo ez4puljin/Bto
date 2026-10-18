@@ -1,23 +1,15 @@
 import { AGING_BUCKETS } from '@tugeel/shared/finance';
 import { Plus } from 'lucide-react';
-import { useId } from 'react';
+import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
-import { FieldList } from '@/components/detail';
-import {
-  DateFilter,
-  EmptyState,
-  FilterBar,
-  ListCard,
-  LoadMore,
-  SkeletonRows,
-} from '@/components/list';
+import { EmptyState, FilterBar, ListCard, LoadMore, SkeletonRows } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -26,9 +18,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatMnt } from '@/lib/money';
+import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useCreateParam } from '@/lib/use-create-param';
+import { cn } from '@/lib/utils';
+import { DateRangeFilter } from './date-range-filter';
 import {
   type CustomerBalance,
   type LedgerEntry,
@@ -46,7 +41,8 @@ export function CustomerLedgerPage() {
   const { t } = useTranslation();
   const customerId = Number.parseInt(useParams().id ?? '', 10);
   const canRecord = useHasPermission('finance.payments.record');
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const setParam = useSetParam();
   const [creating, setCreating] = useCreateParam();
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
@@ -55,26 +51,27 @@ export function CustomerLedgerPage() {
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
   const summary = balance.data;
 
-  const setParam = (key: string, value: string | undefined) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
-
+  const crumbs = [{ label: t('finance.balances.title'), to: '/finance/customers' }];
+  // Loading or refused, the page keeps its header and breadcrumb.
   const loadProblem = problemFromError(balance.error);
-  if (loadProblem) return <ProblemAlert problem={loadProblem} />;
-  if (!summary) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
+  if (loadProblem || !summary) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title={t('finance.balances.ledgerTitle')} crumbs={crumbs} />
+        {loadProblem ? (
+          <ProblemAlert problem={loadProblem} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader
         title={summary.name}
-        crumbs={[{ label: t('finance.balances.title'), to: '/finance/customers' }]}
+        crumbs={crumbs}
         meta={
           <>
             <span className="font-mono">{summary.code}</span>
@@ -101,15 +98,14 @@ export function CustomerLedgerPage() {
       <BalanceCard balance={summary} />
       <section aria-label={t('finance.balances.ledgerTitle')} className="space-y-3">
         <FilterBar>
-          <DateFilter
-            label={t('finance.fields.from')}
-            value={from}
-            onChange={(value) => setParam('from', value)}
-          />
-          <DateFilter
-            label={t('finance.fields.to')}
-            value={to}
-            onChange={(value) => setParam('to', value)}
+          <DateRangeFilter
+            label={t('finance.fields.date')}
+            fromLabel={t('finance.fields.from')}
+            toLabel={t('finance.fields.to')}
+            from={from}
+            to={to}
+            onFrom={(value) => setParam('from', value)}
+            onTo={(value) => setParam('to', value)}
           />
           {ledger.data?.pages[0] && from ? (
             <span className="text-sm text-muted-foreground">
@@ -119,7 +115,7 @@ export function CustomerLedgerPage() {
           ) : null}
         </FilterBar>
         <ProblemAlert problem={problemFromError(ledger.error)} />
-        <ListCard>
+        <ListCard scroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -169,50 +165,48 @@ export function CustomerLedgerPage() {
   );
 }
 
-/** The balance, the overdue amount, the aging and the credit terms of a customer. */
-export function BalanceCard({ balance, compact }: { balance: CustomerBalance; compact?: boolean }) {
+/**
+ * «Тооцоо» (ADR-0060 #4): the balance, the open invoices, the overdue amount and the credit limit
+ * as tiles, the aging as a row of smaller ones (ADR-0066: the ledger starts near the top). Tiles
+ * wrap by the card's own width, so a side column of the customer page keeps them readable;
+ * `compact` (the customer page, whose Credit card shows the limit) leaves the limit and the aging out.
+ */
+export function BalanceCard({
+  balance,
+  compact,
+  action,
+}: {
+  balance: CustomerBalance;
+  compact?: boolean;
+  /** A link in the card's header (the customer page's «Дэвтэр харах»). */
+  action?: ReactNode;
+}) {
   const { t } = useTranslation();
   const titleId = useId();
-  const items = [
+  const tiles: { label: string; value: string; hint?: string; danger?: boolean }[] = [
     {
       label: t('finance.fields.balance'),
-      value: <span className="font-mono">{formatMnt(balance.balance)}</span>,
-      hint: balance.balance.startsWith('-') ? t('finance.balances.advance') : undefined,
+      value: formatTugrik(balance.balance),
+      ...(balance.balance.startsWith('-') ? { hint: t('finance.balances.advance') } : {}),
     },
     { label: t('finance.balances.openInvoices'), value: String(balance.openInvoices) },
     {
       label: t('finance.fields.overdue'),
-      value: (
-        <span className={balance.overdueAmount === '0.00' ? '' : 'font-mono text-destructive'}>
-          {formatMnt(balance.overdueAmount)}
-        </span>
-      ),
-      hint: balance.oldestDueDate
-        ? `${t('finance.balances.oldestDue')}: ${balance.oldestDueDate}`
-        : undefined,
-    },
-    {
-      label: t('finance.balances.creditLimit'),
-      value:
-        balance.creditLimit === null
-          ? t('finance.balances.noLimit')
-          : formatMnt(balance.creditLimit),
+      value: formatTugrik(balance.overdueAmount),
+      danger: balance.overdueAmount !== '0.00',
+      ...(balance.oldestDueDate
+        ? { hint: `${t('finance.balances.oldestDue')}: ${balance.oldestDueDate}` }
+        : {}),
     },
     ...(compact
       ? []
       : [
           {
-            label: t('finance.balances.aging'),
-            value: (
-              <span className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-sm">
-                {AGING_BUCKETS.map((bucket) => (
-                  <span key={bucket}>
-                    <span className="text-muted-foreground">{t(`finance.aging.${bucket}`)}: </span>
-                    {formatMnt(balance.aging[bucket])}
-                  </span>
-                ))}
-              </span>
-            ),
+            label: t('finance.balances.creditLimit'),
+            value:
+              balance.creditLimit === null
+                ? t('finance.balances.noLimit')
+                : formatTugrik(balance.creditLimit),
           },
         ]),
   ];
@@ -220,9 +214,47 @@ export function BalanceCard({ balance, compact }: { balance: CustomerBalance; co
     <Card role="region" aria-labelledby={titleId}>
       <CardHeader>
         <CardTitle id={titleId}>{t('finance.balances.card')}</CardTitle>
+        {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      <CardContent>
-        <FieldList items={items} />
+      <CardContent className="@container flex flex-col gap-3">
+        <dl
+          className={cn('grid grid-cols-2 gap-2', compact ? '@sm:grid-cols-3' : '@2xl:grid-cols-4')}
+        >
+          {tiles.map((tile) => (
+            <div key={tile.label} className="min-w-0 rounded-lg border border-border px-3 py-2">
+              <dt className="text-xs text-muted-foreground">{tile.label}</dt>
+              <dd
+                className={cn(
+                  'truncate font-mono text-[15px] font-semibold',
+                  tile.danger && 'text-destructive',
+                )}
+              >
+                {tile.value}
+              </dd>
+              {tile.hint ? <dd className="text-xs text-muted-foreground">{tile.hint}</dd> : null}
+            </div>
+          ))}
+        </dl>
+        {compact ? null : (
+          <div role="group" className="flex flex-col gap-1.5" aria-labelledby={`${titleId}-aging`}>
+            <h3
+              id={`${titleId}-aging`}
+              className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+            >
+              {t('finance.balances.aging')}
+            </h3>
+            <dl className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @3xl:grid-cols-5">
+              {AGING_BUCKETS.map((bucket) => (
+                <div key={bucket} className="min-w-0 rounded-lg bg-fill/60 px-3 py-1.5">
+                  <dt className="text-xs text-muted-foreground">{t(`finance.aging.${bucket}`)}</dt>
+                  <dd className="truncate font-mono text-sm">
+                    {formatTugrik(balance.aging[bucket])}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

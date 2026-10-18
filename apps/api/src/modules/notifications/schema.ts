@@ -21,8 +21,9 @@ import { files, users } from '../identity/schema';
 import { salesOrders } from '../sales/schema';
 
 // The tables owned by the notifications module (docs/modules/notifications.md, ADR-0062).
-// Migration 0028_notifications adds by hand: the REVOKEs and column grants that leave a sent
-// notice, its products and its reads unchangeable except for the withdrawal and `read_at`.
+// Migration 0030_notifications (0028 before the merge with main) adds by hand: the REVOKEs and
+// column grants that leave a sent notice, its products and its reads unchangeable except for the
+// withdrawal and `read_at`.
 
 const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
 const ref = (name: string) => bigint(name, { mode: 'number' });

@@ -3,7 +3,15 @@ import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHasPermission } from '@/app/auth-context';
 import { DialogFormFooter, FormField } from '@/components/form';
-import { EmptyState, ListCard, RowAction, RowActions, SkeletonRows } from '@/components/list';
+import {
+  EmptyState,
+  ListCard,
+  RowAction,
+  RowActions,
+  SkeletonRows,
+  SpacerCell,
+  SpacerHead,
+} from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -65,7 +73,7 @@ export function PosCashiersPage() {
     <div>
       <PageHeader
         title={t('pos.cashiers.title')}
-        meta={<span>{t('pos.cashiers.description')}</span>}
+        description={t('pos.cashiers.description')}
         actions={
           canManage ? (
             <Button onClick={() => setAdding(true)}>
@@ -76,7 +84,7 @@ export function PosCashiersPage() {
         }
       />
       <ProblemAlert problem={problemFromError(cashiers.error) ?? action.problem} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -85,11 +93,12 @@ export function PosCashiersPage() {
               <TableHead>{t('pos.fields.status')}</TableHead>
               <TableHead>{t('pos.fields.pinSetAt')}</TableHead>
               <TableHead>{t('pos.fields.pinSetBy')}</TableHead>
+              <SpacerHead />
               <TableHead className="w-px" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cashiers.isPending ? <SkeletonRows columns={6} /> : null}
+            {cashiers.isPending ? <SkeletonRows columns={7} /> : null}
             {(cashiers.data ?? []).map((cashier) => {
               const locked = cashier.lockedUntil !== null && Date.parse(cashier.lockedUntil) > now;
               return (
@@ -116,7 +125,12 @@ export function PosCashiersPage() {
                   <TableCell className="font-mono">
                     {formatUbDateTime(Date.parse(cashier.pinSetAt))}
                   </TableCell>
-                  <TableCell>{cashier.pinSetByName ?? ''}</TableCell>
+                  <TableCell>
+                    {cashier.pinSetByName ?? (
+                      <span className="text-muted-foreground">{t('pos.fields.none')}</span>
+                    )}
+                  </TableCell>
+                  <SpacerCell />
                   <RowActions>
                     {canManage ? (
                       <>

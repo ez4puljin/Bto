@@ -11,9 +11,24 @@ export interface WorkPrefs {
   panelOpen: boolean;
 }
 
-const DEFAULTS: WorkPrefs = { pipelineId: null, view: 'BOARD', panelOpen: true };
+/** What the browser keeps: the panel stays `null` until the user opens or closes it. */
+interface Stored extends Omit<WorkPrefs, 'panelOpen'> {
+  panelOpen: boolean | null;
+}
 
-function read(key: string): WorkPrefs {
+const DEFAULTS: Stored = { pipelineId: null, view: 'BOARD', panelOpen: null };
+
+/**
+ * The folding panel of a user who never chose (ADR-0066): open from 1536px; a laptop gives its
+ * width to the board's columns. Open where the width cannot be asked (tests).
+ */
+function widePanel(): boolean {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia('(min-width: 1536px)').matches
+    : true;
+}
+
+function read(key: string): Stored {
   try {
     const text = window.localStorage.getItem(key);
     if (text === null) return DEFAULTS;
@@ -21,7 +36,7 @@ function read(key: string): WorkPrefs {
     return {
       pipelineId: typeof value.pipelineId === 'number' ? value.pipelineId : null,
       view: WORK_VIEWS.find((view) => view === value.view) ?? 'BOARD',
-      panelOpen: value.panelOpen !== false,
+      panelOpen: typeof value.panelOpen === 'boolean' ? value.panelOpen : null,
     };
   } catch {
     // Storage blocked or not JSON: the defaults.
@@ -29,7 +44,7 @@ function read(key: string): WorkPrefs {
   }
 }
 
-function write(key: string, prefs: WorkPrefs): void {
+function write(key: string, prefs: Stored): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(prefs));
   } catch {
@@ -43,12 +58,14 @@ export function useWorkPrefs() {
   const userId = auth.status === 'authenticated' ? auth.me.id : 0;
   const key = `tugeel.salesWork.v1:${userId}`;
   const stored = useMemo(() => read(key), [key]);
-  const [chosen, setChosen] = useState<{ key: string; prefs: WorkPrefs } | null>(null);
-  const prefs = chosen?.key === key ? chosen.prefs : stored;
+  const [wide] = useState(widePanel);
+  const [chosen, setChosen] = useState<{ key: string; prefs: Stored } | null>(null);
+  const current = chosen?.key === key ? chosen.prefs : stored;
+  const prefs: WorkPrefs = { ...current, panelOpen: current.panelOpen ?? wide };
   const update = useCallback(
     (patch: Partial<WorkPrefs>) => {
-      setChosen((current) => {
-        const base = current?.key === key ? current.prefs : read(key);
+      setChosen((previous) => {
+        const base = previous?.key === key ? previous.prefs : read(key);
         const next = { ...base, ...patch };
         write(key, next);
         return { key, prefs: next };

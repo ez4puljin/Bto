@@ -3,8 +3,10 @@
 import * as React from "react"
 import { cn } from "cn"
 import { Dialog as SheetPrimitive } from "radix-ui"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
+import { useReturnFocus } from "@/components/ui/dialog"
 import { useScanEnterGuard } from "@/lib/scan/use-wedge-scanner"
 import { XIcon } from "lucide-react"
 
@@ -52,14 +54,18 @@ function SheetContent({
   side = "right",
   closeLabel,
   onKeyDownCapture,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
-  /** Screen-reader label of the close button, from i18n (no literal JSX text: ESLint G5). */
+  /** Screen-reader label of the close button; «Хаах» unless named. */
   closeLabel?: string
 }) {
+  const { t } = useTranslation()
   // A barcode scan's Enter never presses the focused button (ADR-0047 #4).
   const scanGuard = useScanEnterGuard()
+  const focus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus)
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -67,7 +73,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 overflow-y-auto bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 outline-none *:shrink-0 data-open:animate-in data-closed:animate-out",
+          "fixed z-50 flex flex-col gap-4 overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] bg-popover p-5 text-sm text-popover-foreground shadow-dialog ring-1 ring-black/[0.06] duration-200 outline-none *:shrink-0 data-open:animate-in data-closed:animate-out",
           side === "right" &&
             "inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-open:slide-in-from-right data-closed:slide-out-to-right",
           side === "left" &&
@@ -82,15 +88,18 @@ function SheetContent({
           scanGuard(event)
           onKeyDownCapture?.(event)
         }}
+        onOpenAutoFocus={focus.onOpenAutoFocus}
+        onCloseAutoFocus={focus.onCloseAutoFocus}
         {...props}
       >
         {children}
         <SheetPrimitive.Close data-slot="sheet-close" asChild>
           <Button
             variant="ghost"
-            className="absolute top-3 right-3 rounded-full text-muted-foreground"
+            className="absolute top-3 right-3 z-20 rounded-full text-muted-foreground"
             size="icon-sm"
-            aria-label={closeLabel}
+            aria-label={closeLabel ?? t("common.close")}
+            title={closeLabel ?? t("common.close")}
           >
             <XIcon />
           </Button>
@@ -114,7 +123,11 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        // Sticks to the foot of a sheet that scrolls, so its buttons stay in reach (ADR-0066).
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-col-reverse gap-2 border-t border-border/80 bg-popover px-5 py-3 sm:flex-row sm:justify-end",
+        className
+      )}
       {...props}
     />
   )

@@ -26,7 +26,7 @@ export function ColumnChooser<K extends string>(props: {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">
+        <Button variant="outline" size="sm">
           <Columns3 />
           {t('common.columns')}
         </Button>

@@ -10,7 +10,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-/** A secret shown once (an edge token, a pairing code): copy it now, it is never read back. */
+/**
+ * A secret shown once (an edge token, a pairing code): copy it now, it is never read back. A click
+ * beside the dialog does not close it (the code would be lost): «Хаах», ✕ or Escape do.
+ */
 export function OneTimeCodeDialog(props: {
   open: boolean;
   title: string;
@@ -38,7 +41,10 @@ export function OneTimeCodeDialog(props: {
         props.onClose();
       }}
     >
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent
+        closeLabel={t('common.close')}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
           <DialogDescription>{props.description}</DialogDescription>

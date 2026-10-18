@@ -1,12 +1,20 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../common/auth/public.decorator';
 import { systemActor } from '../../identity';
-import { HeartbeatDto, HeartbeatResponseDto, SyncBatchDto, SyncResponseDto } from '../dto/pos.dto';
+import type { SnapshotResponseWire } from '@tugeel/shared/pos';
+import {
+  HeartbeatDto,
+  HeartbeatResponseDto,
+  SnapshotQueryDto,
+  SyncBatchDto,
+  SyncResponseDto,
+} from '../dto/pos.dto';
 import { CurrentEdge, EdgeTokenGuard } from '../guards/edge-token.guard';
 import { PosAcceptService } from '../services/pos-accept.service';
 import { type EdgeNode, PosEdgeNodesService } from '../services/pos-edge-nodes.service';
 import { PosSettingsService } from '../services/pos-settings.service';
+import { PosSnapshotService } from '../services/pos-snapshot.service';
 import { outcomeDto, settingsDto } from './mappers';
 import { toSyncEvent } from './to-docs';
 
@@ -26,7 +34,25 @@ export class PosSyncController {
     private readonly accept: PosAcceptService,
     private readonly nodes: PosEdgeNodesService,
     private readonly settings: PosSettingsService,
+    private readonly snapshots: PosSnapshotService,
   ) {}
+
+  /**
+   * What the edge sells from (ADR-0067): the whole snapshot, or only its version when `since`
+   * already names it. The shape is `SnapshotResponseWire` of @tugeel/shared/pos.
+   */
+  @Get('snapshot')
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  async snapshot(
+    @CurrentEdge() node: EdgeNode,
+    @Query() query: SnapshotQueryDto,
+  ): Promise<SnapshotResponseWire> {
+    const snapshot = await this.snapshots.forNode(node);
+    await this.nodes.touchPull(node.id, snapshot.version);
+    return query.since === snapshot.version
+      ? { changed: false, version: snapshot.version }
+      : { changed: true, snapshot };
+  }
 
   @Post('events')
   @HttpCode(200)

@@ -87,7 +87,8 @@ describe('finance pages (ADR-0060 #11)', () => {
     renderApp('/finance/invoices', fetchMock);
     const row = await screen.findByRole('row', { name: /Н-20261016-0001/ });
     expect(within(row).getByText('Номин дэлгүүр')).toBeInTheDocument();
-    expect(within(row).getByText('150,000')).toBeInTheDocument();
+    // Lists show money with ₮ (ADR-0066).
+    expect(within(row).getByText('150,000₮')).toBeInTheDocument();
     expect(within(row).getByText(mn.finance.settlements.PARTIAL)).toBeInTheDocument();
     await user.click(within(row).getByText('Н-20261016-0001'));
     const panel = within(
@@ -137,9 +138,9 @@ describe('finance pages (ADR-0060 #11)', () => {
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.customer), 'Номин');
     await user.click(await dialog.findByRole('button', { name: /Номин дэлгүүр/ }));
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.amount), '50000');
-    // The open invoice is settled first; the preview shows the whole 50,000 on it.
+    // The open invoice is settled first; the preview shows the whole 50,000₮ on it.
     const invoiceRow = await dialog.findByRole('row', { name: /Н-20261016-0001/ });
-    expect(within(invoiceRow).getAllByText('50,000').length).toBeGreaterThan(0);
+    expect(within(invoiceRow).getAllByText('50,000₮').length).toBeGreaterThan(0);
     expect(
       dialog.getByText(mn.finance.payments.dialog.allocated.replace('{{amount}}', '50,000')),
     ).toBeInTheDocument();
@@ -195,13 +196,17 @@ describe('finance pages (ADR-0060 #11)', () => {
     const user = userEvent.setup();
     renderApp('/finance/customers', signedIn(ACCOUNTANT_ME, routes()));
     const row = await screen.findByRole('row', { name: /Номин дэлгүүр/ });
-    // The balance and its not-due aging bucket read the same.
-    expect(within(row).getAllByText('100,000')).toHaveLength(2);
+    // The balance (₮) and its not-due aging bucket (plain, under «Насжилт (₮)») read the same.
+    expect(within(row).getByText('100,000₮')).toBeInTheDocument();
+    expect(within(row).getByText('100,000')).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: mn.finance.balances.agingGroup }),
+    ).toBeInTheDocument();
     await user.click(within(row).getByText('Номин дэлгүүр'));
     expect(await screen.findByRole('heading', { name: 'Номин дэлгүүр' })).toBeInTheDocument();
     const card = within(await screen.findByRole('region', { name: mn.finance.balances.card }));
-    expect(card.getAllByText('100,000').length).toBeGreaterThan(0);
-    expect(card.getByText('5,000,000')).toBeInTheDocument();
+    expect(card.getAllByText('100,000₮').length).toBeGreaterThan(0);
+    expect(card.getByText('5,000,000₮')).toBeInTheDocument();
     const ledger = await screen.findByRole('row', { name: /Н-20261016-0001/ });
     // The debit and the balance after it read the same on the first entry.
     expect(within(ledger).getAllByText('150,000')).toHaveLength(2);

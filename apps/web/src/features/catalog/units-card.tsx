@@ -10,7 +10,7 @@ import {
   Plus,
   ScanBarcode,
   Star,
-  X,
+  Trash2,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -54,6 +54,13 @@ import { FACTOR } from './product-schema';
 /** A barcode's small tags («Үндсэн», «Дотоод»), so a code and its tags share one line. */
 const TAG = 'h-5 px-1.5 text-[11px]';
 
+/** A barcode asked about before it is deleted, with the unit whose scan button gets the focus. */
+interface BarcodeTarget {
+  id: number;
+  code: string;
+  unitId: number;
+}
+
 const factorField = (fractional: boolean) =>
   z
     .string()
@@ -69,13 +76,16 @@ const factorField = (fractional: boolean) =>
  * The units of a product with their barcodes (ADR-0008), one row per unit: the unit and its factor,
  * its barcodes (the primary and the internal one tagged), its default tags and, for managers, a
  * «Баркод нэмэх» button and a «⋯» menu (edit, change the factor, retire). Each row is a region
- * named by its unit. Superseded and retired units fold away below.
+ * named by its unit. Superseded and retired units fold away below. A barcode is deleted only after
+ * a question that names it (ADR-0066); the e-Barimt measure units live on the e-Barimt card.
  */
 export function UnitsCard({ product, canManage }: { product: ProductDetail; canManage: boolean }) {
   const { t } = useTranslation();
   const mutations = useCatalogMutations();
   const action = useAction();
   const retireAction = useAction();
+  const deleteAction = useAction();
+  const [deleting, setDeleting] = useState<BarcodeTarget | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ProductUnit | null>(null);
   const [superseding, setSuperseding] = useState<ProductUnit | null>(null);
@@ -146,11 +156,6 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                   {unit.isBase ? null : (
                     <span className="text-[13px] text-muted-foreground">{factorOf(unit)}</span>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    {t('catalog.units.measureUnit')}
-                    {': '}
-                    {unit.effectiveMeasureUnit ?? t('common.none')}
-                  </span>
                   {unit.isDefaultSales || unit.isDefaultPurchase ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {unit.isDefaultSales ? (
@@ -167,29 +172,33 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                   {unit.barcodes.length > 0 ? (
                     <ul className="flex flex-col gap-1">
                       {unit.barcodes.map((barcode) => (
-                        <li key={barcode.id} className="flex items-start gap-2">
+                        <li key={barcode.id} className="flex items-center gap-2">
                           <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-1.5">
                             <span className="font-mono text-[13px] tabular-nums">
                               {barcode.code}
                             </span>
                             {barcode.isPrimary ? (
-                              <Badge className={TAG}>{t('catalog.units.primary')}</Badge>
+                              <Badge variant="secondary" className={TAG}>
+                                {t('catalog.units.primary')}
+                              </Badge>
                             ) : null}
                             {barcode.isInternal ? (
-                              <Badge variant="secondary" className={TAG}>
+                              <Badge variant="outline" className={TAG}>
                                 {t('catalog.units.internal')}
                               </Badge>
                             ) : null}
                           </div>
                           {canManage ? (
-                            <span className="flex shrink-0 items-center">
-                              {barcode.isPrimary ? null : (
+                            <span className="-my-1 flex shrink-0 items-center gap-0.5">
+                              {barcode.isPrimary ? (
+                                <span aria-hidden className="inline-block size-8" />
+                              ) : (
                                 <Button
-                                  size="icon-xs"
+                                  size="icon-sm"
                                   variant="ghost"
-                                  className="text-muted-foreground"
-                                  aria-label={t('catalog.units.makePrimary')}
-                                  title={t('catalog.units.makePrimary')}
+                                  className="text-muted-foreground hover:text-foreground"
+                                  aria-label={`${t('catalog.units.makePrimary')}: ${barcode.code}`}
+                                  title={`${t('catalog.units.makePrimary')}: ${barcode.code}`}
                                   onClick={() =>
                                     void action.run(() =>
                                       mutations.primaryBarcode.mutateAsync(barcode.id),
@@ -200,18 +209,21 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
                                 </Button>
                               )}
                               <Button
-                                size="icon-xs"
+                                size="icon-sm"
                                 variant="ghost"
-                                className="text-muted-foreground hover:text-destructive"
-                                aria-label={t('catalog.units.deleteBarcode')}
-                                title={t('catalog.units.deleteBarcode')}
-                                onClick={() =>
-                                  void action.run(() =>
-                                    mutations.deleteBarcode.mutateAsync(barcode.id),
-                                  )
-                                }
+                                className="text-muted-foreground hover:bg-danger-soft hover:text-destructive"
+                                aria-label={`${t('catalog.units.deleteBarcode')}: ${barcode.code}`}
+                                title={`${t('catalog.units.deleteBarcode')}: ${barcode.code}`}
+                                onClick={() => {
+                                  deleteAction.clear();
+                                  setDeleting({
+                                    id: barcode.id,
+                                    code: barcode.code,
+                                    unitId: unit.id,
+                                  });
+                                }}
                               >
-                                <X />
+                                <Trash2 />
                               </Button>
                             </span>
                           ) : null}
@@ -343,6 +355,33 @@ export function UnitsCard({ product, canManage }: { product: ProductDetail; canM
           }}
         />
       ) : null}
+      <ConfirmDialog
+        open={deleting !== null}
+        title={t('catalog.units.deleteBarcodeTitle', { code: deleting?.code ?? '' })}
+        description={t('catalog.units.deleteBarcodeHint')}
+        confirmLabel={t('common.delete')}
+        pending={mutations.deleteBarcode.isPending}
+        problem={deleteAction.problem}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          const target = deleting;
+          void deleteAction
+            .run(() => mutations.deleteBarcode.mutateAsync(target.id))
+            .then((ok) => {
+              if (!ok) return;
+              setDeleting(null);
+              toast.success(t('catalog.units.barcodeDeleted'));
+              // The deleted code's buttons are gone once the dialog has faded out: the unit's
+              // «Баркод нэмэх» takes the focus the page would otherwise lose.
+              window.setTimeout(() => {
+                if (document.activeElement === document.body) {
+                  triggers.current.get(`scan-${target.unitId}`)?.focus();
+                }
+              }, 250);
+            });
+        }}
+      />
       {retiring ? (
         <ConfirmDialog
           open
@@ -490,7 +529,7 @@ function AddUnitDialog(props: { product: ProductDetail; base: ProductUnit; onClo
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent closeLabel={t('common.close')} size="md">
         <DialogHeader>
           <DialogTitle>{t('catalog.product.addUnit')}</DialogTitle>
           <DialogDescription>{props.product.name}</DialogDescription>
@@ -504,7 +543,7 @@ function AddUnitDialog(props: { product: ProductDetail; base: ProductUnit; onClo
               error={errors.uomId?.message}
             >
               <NativeSelect id="unit-uom" {...form.register('uomId')}>
-                <option value="" />
+                <option value="">{t('catalog.product.chooseUnit')}</option>
                 {(uoms.data ?? [])
                   .filter((uom) => !used.has(uom.id))
                   .map((uom) => (

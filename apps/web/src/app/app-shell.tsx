@@ -5,18 +5,14 @@ import { Outlet, useLocation, useMatches } from 'react-router';
 import { useAuthState } from '@/app/auth-context';
 import { CommandPalette } from '@/app/command-palette';
 import { navTrail } from '@/app/nav-items';
+import { PAGE_WIDTHS, type PageWidth, widthOf } from '@/app/page-width';
 import { Sidebar } from '@/app/sidebar';
 import { Button } from '@/components/ui/button';
 import { rememberRecentPage } from '@/lib/recent-pages';
-import { cn } from '@/lib/utils';
-
-/** A route's `handle` asks for the full width with `{ wide: true }`. */
-const isWide = (handle: unknown): boolean =>
-  typeof handle === 'object' && handle !== null && 'wide' in handle && handle.wide === true;
 
 /**
  * The frame of every signed-in page (ADR-0042): the sidebar menu on the grey canvas, the page in
- * the reading width (or the whole width for wide lists), the Ctrl/⌘+K search and, on phones, a
+ * its route's width (ADR-0066), the Ctrl/⌘+K search and, on phones, a
  * slim top bar whose menu button slides the sidebar in. The shell itself makes no API calls.
  */
 export function AppShell() {
@@ -26,7 +22,11 @@ export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const firstLink = useRef<HTMLAnchorElement>(null);
-  const wide = useMatches().some((match) => isWide(match.handle));
+  const width =
+    useMatches()
+      .map((match) => widthOf(match.handle))
+      .filter((value): value is PageWidth => value !== null)
+      .at(-1) ?? 'reading';
   const auth = useAuthState();
   const userId = auth.status === 'authenticated' ? auth.me.id : null;
 
@@ -106,9 +106,9 @@ export function AppShell() {
       />
       <main
         inert={menuOpen ? true : undefined}
-        className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 md:pt-7 print:p-0"
+        className="min-w-0 flex-1 px-4 pt-5 pb-10 md:px-8 print:p-0"
       >
-        <div className={cn('mx-auto', wide ? 'max-w-none' : 'max-w-6xl')}>
+        <div data-width={width} className={PAGE_WIDTHS[width]}>
           <Outlet />
         </div>
       </main>

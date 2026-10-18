@@ -12,10 +12,13 @@ import {
  * A record in a wide panel from the right (docs/ui.md «Record panel»): the number, a description
  * line, badges and the record's actions in the header; the sections below scroll. Finance and the
  * supermarket pages open theirs from a URL parameter (`?invoice=`, `?shift=`, `?sale=`).
+ * `size` (ADR-0066): `record` (64rem, part of the list stays in view at 1366) or `panel` (80rem,
+ * a record people work in, like the sales order).
  */
 export function RecordSheet(props: {
   open: boolean;
   onClose: () => void;
+  size?: 'record' | 'panel';
   title: string;
   description?: string;
   badges?: ReactNode;
@@ -28,7 +31,11 @@ export function RecordSheet(props: {
       <SheetContent
         side="right"
         closeLabel={t('common.close')}
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-[min(64rem,94vw)]"
+        className={
+          props.size === 'panel'
+            ? 'flex w-full flex-col gap-0 p-0 sm:max-w-[min(80rem,94vw)]'
+            : 'flex w-full flex-col gap-0 p-0 sm:max-w-[min(64rem,94vw)]'
+        }
       >
         <div className="flex h-full min-h-0 flex-col">
           <SheetHeader className="gap-2 border-b border-border px-5 py-3 pr-14">
@@ -45,7 +52,9 @@ export function RecordSheet(props: {
               ) : null}
             </div>
           </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto p-5">{props.children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]">
+            {props.children}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

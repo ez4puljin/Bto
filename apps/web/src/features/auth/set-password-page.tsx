@@ -63,6 +63,7 @@ export function SetPasswordPage() {
           <Label htmlFor="username">{t('auth.login.username')}</Label>
           <Input
             id="username"
+            className="h-10"
             autoComplete="username"
             autoCapitalize="none"
             {...form.register('username')}
@@ -73,6 +74,7 @@ export function SetPasswordPage() {
           <Label htmlFor="code">{t('auth.setPassword.code')}</Label>
           <Input
             id="code"
+            className="h-10"
             autoComplete="one-time-code"
             autoCapitalize="characters"
             {...form.register('code')}
@@ -83,6 +85,7 @@ export function SetPasswordPage() {
           <Label htmlFor="newPassword">{t('auth.setPassword.newPassword')}</Label>
           <Input
             id="newPassword"
+            className="h-10"
             type="password"
             autoComplete="new-password"
             {...form.register('newPassword')}
@@ -93,6 +96,7 @@ export function SetPasswordPage() {
           <Label htmlFor="confirmPassword">{t('auth.setPassword.confirmPassword')}</Label>
           <Input
             id="confirmPassword"
+            className="h-10"
             type="password"
             autoComplete="new-password"
             {...form.register('confirmPassword')}

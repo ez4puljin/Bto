@@ -61,7 +61,7 @@ export function OrderFilterMenu(props: {
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button ref={trigger} variant="outline">
+          <Button ref={trigger} variant="outline" size="sm">
             <ListFilter />
             {t('sales.filters.menu')}
           </Button>

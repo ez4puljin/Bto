@@ -8,7 +8,7 @@ import { partnersApi } from '../harness/partners';
 import { repApi, repOrderBody } from '../harness/sales-rep';
 
 /**
- * The database guards of notifications (ADR-0062, migration 0028): app may withdraw a notice and
+ * The database guards of notifications (ADR-0062, migration 0030): app may withdraw a notice and
  * mark a notification read, nothing else; a notice, its products, its reads and the notifications
  * are never deleted; parallel reads of one notice leave one row.
  */

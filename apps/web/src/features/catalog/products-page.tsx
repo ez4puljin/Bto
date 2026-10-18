@@ -21,6 +21,7 @@ import { SegmentActions } from '@/features/segments/segment-actions';
 import { saveBlob } from '@/lib/download';
 import { formatCount } from '@/lib/money';
 import { ApiProblem, problemFromError } from '@/lib/problem';
+import { useSetParam } from '@/lib/search-params';
 import { useAction } from '@/lib/use-action';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import {
@@ -34,7 +35,11 @@ import {
 } from './api';
 import { categoryPaths, categoryTree } from './category-tree';
 import { BulkActions } from './bulk-actions';
-import { LOCKED_PRODUCT_COLUMNS, PRODUCT_COLUMNS } from './product-columns';
+import {
+  DEFAULT_HIDDEN_PRODUCT_COLUMNS,
+  LOCKED_PRODUCT_COLUMNS,
+  PRODUCT_COLUMNS,
+} from './product-columns';
 import { ProductFilterMenu } from './product-filter-menu';
 import {
   activeFilterFields,
@@ -133,7 +138,12 @@ export function ProductsPage() {
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
   const warehouseName = useWarehouseName();
-  const columnState = useHiddenColumns(COLUMNS_LIST, PRODUCT_LIST_COLUMNS, LOCKED_PRODUCT_COLUMNS);
+  const columnState = useHiddenColumns(
+    COLUMNS_LIST,
+    PRODUCT_LIST_COLUMNS,
+    LOCKED_PRODUCT_COLUMNS,
+    DEFAULT_HIDDEN_PRODUCT_COLUMNS,
+  );
   const { hidden } = columnState;
   const columns = useMemo(
     () => PRODUCT_COLUMNS.filter((column) => !hidden.has(column.key)),
@@ -225,17 +235,13 @@ export function ProductsPage() {
     </Button>
   );
   const empty = !products.isPending && pages.every((page) => page.data.length === 0);
+  const filtered = Boolean(q || categoryId || stage || activeFilterFields(filters).length > 0);
 
-  const setParam = (key: string, value: string) =>
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        return next;
-      },
-      { replace: true },
-    );
+  const setParam = useSetParam();
+  const clearFilters = () => {
+    setSearch('');
+    setParams(new URLSearchParams(), { replace: true });
+  };
   const applyFilters = (next: ProductFilters) =>
     setParams(
       (previous) => {
@@ -288,6 +294,8 @@ export function ProductsPage() {
         }
       >
         <SearchField
+          // One search width across the lists (15rem): the filters keep one row at 1366px.
+          className="sm:w-60"
           aria-label={t('common.search')}
           placeholder={t('catalog.products.searchPlaceholder')}
           value={search}
@@ -339,14 +347,20 @@ export function ProductsPage() {
       <ProblemAlert
         problem={exporting.problem ?? selecting.problem ?? problemFromError(products.error)}
       />
-      <ListCard>
+      <ListCard scroll>
         <ProductTable
           pages={pages}
           columns={columns}
           context={context}
           {...(canSelect ? { selection } : {})}
         />
-        {empty ? <EmptyState icon={Package} title={t('catalog.products.empty')} /> : null}
+        {empty ? (
+          <EmptyState
+            icon={Package}
+            title={t('catalog.products.empty')}
+            {...(filtered ? { onClearFilters: clearFilters } : {})}
+          />
+        ) : null}
         <LoadMore query={products} />
       </ListCard>
       <SelectionBar count={selected.size} onClear={ticks.clear}>

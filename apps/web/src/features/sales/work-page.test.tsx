@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import { SYSTEM_ROLE_PERMISSIONS } from '@tugeel/shared/auth';
+import { ORDER_STATUSES } from '@tugeel/shared/sales';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it, vi } from 'vitest';
 import { bodyOf, calls, list, UUID, warehouses } from '@/test/inventory-fixtures';
@@ -493,6 +494,68 @@ describe('warehouse sales page', () => {
     renderApp('/sales/orders', signedIn(OFFICE_ME, routes()));
     expect(await screen.findByRole('button', { name: '20261015_0005' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: mn.sales.work.scope })).toHaveValue('PIPELINE');
+  });
+
+  it('keeps the list’s filters in the URL, offers every status and opens a row on a click', async () => {
+    const fetchMock = signedIn(
+      OFFICE_ME,
+      routes({
+        'GET /api/v1/sales-orders/5': () =>
+          json({ ...ORDER, id: 5, number: '20261015_0005', status: 'DRAFT' }),
+      }),
+    );
+    const { router } = renderApp('/sales/boards?view=list', fetchMock);
+    const user = userEvent.setup();
+    expect(await screen.findByRole('button', { name: '20261015_0005' })).toBeInTheDocument();
+    // Every status an order can have, invoiced ones too (ADR-0066).
+    const status = screen.getByRole('combobox', { name: mn.sales.order.status });
+    expect(within(status).getAllByRole('option')).toHaveLength(ORDER_STATUSES.length + 1);
+    await user.selectOptions(status, 'INVOICED');
+    await waitFor(() => expect(router.state.location.search).toContain('status=INVOICED'));
+    await waitFor(() =>
+      expect(queryOf(calls(fetchMock, 'GET', '/api/v1/sales-orders').at(-1))).toMatchObject({
+        status: 'INVOICED',
+      }),
+    );
+    // A click beside the number opens the order too.
+    await user.click(screen.getByRole('cell', { name: mn.sales.paymentMethods.CREDIT }));
+    expect(await screen.findByRole('dialog', { name: '20261015_0005' })).toBeInTheDocument();
+    expect(router.state.location.search).toContain('order=5');
+  });
+
+  it('opens a stage’s other cards as the list narrowed to that stage', async () => {
+    const fetchMock = signedIn(
+      OFFICE_ME,
+      routes({
+        'GET /api/v1/sales-pipelines/10/cards': () =>
+          json([{ ...CARDS[0]!, count: 3 }, ...CARDS.slice(1)]),
+      }),
+    );
+    const { router } = renderApp('/sales/boards', fetchMock);
+    const user = userEvent.setup();
+    const first = await screen.findByRole('region', { name: 'ХТ Захиалга' });
+    await user.click(
+      await within(first).findByRole('button', {
+        name: mn.sales.boards.more.replace('{{count}}', '2'),
+      }),
+    );
+    await waitFor(() => expect(router.state.location.search).toContain('view=list'));
+    expect(router.state.location.search).toContain('lstage=1');
+    expect(await screen.findByRole('combobox', { name: mn.sales.boards.stage })).toHaveValue('1');
+    await waitFor(() =>
+      expect(queryOf(calls(fetchMock, 'GET', '/api/v1/sales-orders').at(-1))).toMatchObject({
+        pipeline: '10',
+        stageId: '1',
+      }),
+    );
+  });
+
+  it('opens a card on a click anywhere on it', async () => {
+    renderApp('/sales/boards', signedIn(OFFICE_ME, routes()));
+    const user = userEvent.setup();
+    const cancelled = await screen.findByRole('region', { name: 'Цуцалсан' });
+    await user.click(await within(cancelled).findByText('Номин дэлгүүр'));
+    expect(await screen.findByRole('dialog', { name: '20261015_0007' })).toBeInTheDocument();
   });
 
   it('shows a reader the empty state when no pipeline is open to them', async () => {

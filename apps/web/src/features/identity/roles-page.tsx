@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { isSystemRole, PERMISSIONS, type Permission } from '@tugeel/shared/auth';
-import { Eye, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Eye, Lock, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +87,7 @@ export function RolesPage() {
         }
       />
       <ProblemAlert problem={problemFromError(roles.error)} />
-      <ListCard>
+      <ListCard scroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -108,7 +108,9 @@ export function RolesPage() {
                   <RoleName role={role} />
                 </TableCell>
                 <TableCell>
-                  <Badge variant={role.isSystem ? 'secondary' : 'outline'}>
+                  {/* A kind, not a state: neutral outlines; the lock marks what cannot change. */}
+                  <Badge variant="outline">
+                    {role.isSystem ? <Lock aria-hidden /> : null}
                     {role.isSystem ? t('roles.systemBadge') : t('roles.customBadge')}
                   </Badge>
                 </TableCell>
@@ -172,12 +174,15 @@ export function RolesPage() {
   );
 }
 
-/** What a system role (or a role read by someone who cannot change it) may do. */
+/**
+ * What a system role (or a role read by someone who cannot change it) may do: the permissions in
+ * two columns; the dialog scrolls as a whole and keeps «Хаах» in view (ADR-0066).
+ */
 function RolePermissionsDialog({ role, onClose }: { role: Role; onClose: () => void }) {
   const { t } = useTranslation();
   return (
     <Dialog open onOpenChange={(value) => (value ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>
             <RoleName role={role} />
@@ -187,7 +192,7 @@ function RolePermissionsDialog({ role, onClose }: { role: Role; onClose: () => v
           </DialogDescription>
         </DialogHeader>
         {role.permissions.length ? (
-          <ul className="flex max-h-96 list-inside list-disc flex-col gap-1 overflow-y-auto text-sm">
+          <ul className="list-inside list-disc gap-x-6 text-sm sm:columns-2 [&>li]:mb-1 [&>li]:break-inside-avoid">
             {role.permissions.map((code) => (
               <li key={code}>
                 <PermissionLabel code={code} />
@@ -227,7 +232,7 @@ function RoleDialog({ role, onClose }: { role: Role | 'new'; onClose: () => void
 
   return (
     <Dialog open onOpenChange={(value) => (value ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')} className="sm:max-w-lg">
+      <DialogContent size="lg">
         <form className="space-y-4" noValidate onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>{isNew ? t('roles.create') : t('roles.edit')}</DialogTitle>
@@ -239,25 +244,24 @@ function RoleDialog({ role, onClose }: { role: Role | 'new'; onClose: () => void
           <FormField label={t('roles.form.name')} htmlFor="role-name" error={errors.name?.message}>
             <Input id="role-name" {...form.register('name')} />
           </FormField>
+          {/* One scroller: the dialog itself, with «Болих» and «Хадгалах» kept in view (ADR-0066). */}
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">{t('roles.form.permissions')}</legend>
-            <div className="max-h-80 overflow-y-auto pr-1">
-              <Controller
-                control={form.control}
-                name="permissions"
-                render={({ field }) => (
-                  <CheckboxGroup
-                    name="permission"
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={assignable.map((permission) => ({
-                      value: permission.code,
-                      label: <PermissionLabel code={permission.code} />,
-                    }))}
-                  />
-                )}
-              />
-            </div>
+            <Controller
+              control={form.control}
+              name="permissions"
+              render={({ field }) => (
+                <CheckboxGroup
+                  name="permission"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={assignable.map((permission) => ({
+                    value: permission.code,
+                    label: <PermissionLabel code={permission.code} />,
+                  }))}
+                />
+              )}
+            />
           </fieldset>
           <DialogFormFooter pending={isSubmitting} onCancel={onClose} />
         </form>

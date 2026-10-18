@@ -29,6 +29,7 @@ import { PosQueryService } from './services/pos-query.service';
 import { PosReplayService } from './services/pos-replay.service';
 import { PosSettingsService } from './services/pos-settings.service';
 import { PosShiftsService } from './services/pos-shifts.service';
+import { PosSnapshotService } from './services/pos-snapshot.service';
 import { PosTillsService } from './services/pos-tills.service';
 
 const SERVICES = [
@@ -42,6 +43,7 @@ const SERVICES = [
   PosReplayService,
   PosQueryService,
   PosDevService,
+  PosSnapshotService,
 ];
 
 /**

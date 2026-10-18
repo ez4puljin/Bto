@@ -8,8 +8,8 @@ import { useInventoryAttention, usePricingAttention } from './api';
 
 /**
  * «Анхаарах» (ADR-0047 #7): the work waiting for this person, one tile per count above zero, each
- * opening its list already filtered. Nothing shows while the counts load, after an error, or when
- * nothing waits.
+ * opening its list already filtered; as many tiles in a row as the column holds (ADR-0066). Nothing
+ * shows while the counts load, after an error, or when nothing waits.
  */
 export function AttentionTiles({ permissions }: { permissions: readonly Permission[] }) {
   const { t } = useTranslation();
@@ -39,7 +39,7 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
       <h2 id="home-attention" className="mb-2.5 text-[15px] font-semibold tracking-tight">
         {t('home.attention.title')}
       </h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
         {shown.map(({ tile, count, cap, to }) => {
           const text = count >= cap ? t('home.attention.more', { count: cap - 1 }) : String(count);
           const label = t(tile.label);
@@ -48,7 +48,7 @@ export function AttentionTiles({ permissions }: { permissions: readonly Permissi
               key={tile.count}
               to={to}
               aria-label={`${label}: ${text}`}
-              className="flex items-center gap-3 rounded-xl bg-card p-4 shadow-card ring-1 ring-black/[0.06] transition-[box-shadow,transform] hover:shadow-popover active:scale-[0.98]"
+              className="flex items-center gap-3 rounded-xl bg-card px-3.5 py-3 shadow-card ring-1 ring-black/[0.06] transition-[box-shadow,transform] hover:shadow-popover active:scale-[0.98]"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-warning-soft text-warning">
                 <tile.icon aria-hidden className="size-5" />

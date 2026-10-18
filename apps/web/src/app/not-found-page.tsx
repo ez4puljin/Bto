@@ -1,14 +1,24 @@
-import { SearchX } from 'lucide-react';
+import { House } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 
+/**
+ * An address the app does not know: a page of its own (ADR-0066), so the browser tab says so
+ * instead of keeping the last page's name; the menu stays beside it.
+ */
 export function NotFoundPage() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-3 p-4 text-center">
-      <span className="grid size-11 place-items-center rounded-full bg-fill text-muted-foreground">
-        <SearchX aria-hidden className="size-5" />
-      </span>
-      <p className="text-[15px] font-medium">{t('errors.notFound')}</p>
+    <div>
+      <PageHeader title={t('errors.notFound')} description={t('errors.notFoundHint')} />
+      <Button asChild variant="outline">
+        <Link to="/">
+          <House />
+          {t('errors.goHome')}
+        </Link>
+      </Button>
     </div>
   );
 }

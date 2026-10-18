@@ -341,6 +341,10 @@ describe('shipping', () => {
     // Water has no fixed shelf in the warehouse: it waits for a scanned one.
     expect(ship).toBeDisabled();
     expect(screen.getByText(mn.inventory.transfer.scanShelf)).toBeInTheDocument();
+    // The bar says why the button waits (ADR-0066).
+    expect(
+      screen.getByText(mn.inventory.transfer.blockedBins.replace('{{count}}', '1')),
+    ).toBeInTheDocument();
 
     const scan = screen.getByRole('textbox', { name: mn.inventory.scanLabel });
     await user.type(scan, 'A-01-04{Enter}');

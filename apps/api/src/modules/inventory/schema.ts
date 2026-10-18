@@ -1,11 +1,13 @@
 import {
   ADJUSTMENT_REASON_CODES,
+  RECEIPT_PAYMENT_METHODS,
   BIN_TYPES,
   SELLABLE_BIN_TYPES,
   STOCK_DOC_TYPES,
   TRANSFER_ORIGINS,
   TRANSFER_STATUSES,
   USER_BIN_TYPES,
+  ISSUE_RECIPIENT_KINDS,
 } from '@tugeel/shared/inventory';
 import { sql } from 'drizzle-orm';
 import {
@@ -23,10 +25,10 @@ import {
   unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { cost, factor, jsonValue, qty } from '../../common/db/types';
+import { cost, factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products } from '../catalog/schema';
 import { users, warehouses } from '../identity/schema';
-import { suppliers } from '../partners/schema';
+import { customers, suppliers } from '../partners/schema';
 
 // Tables owned by the inventory module (docs/architecture.md §4, §5.1, §5.3; docs/modules/inventory.md;
 // ADR-0007, ADR-0019, ADR-0033, ADR-0034). The ledger, the valuation history and the partitioned
@@ -50,6 +52,7 @@ export const RECEIPT_STATUSES = ['DRAFT', 'POSTED', 'CANCELLED'] as const;
 export const COSTING_STATUSES = ['PENDING', 'COSTED'] as const;
 export const BIN_MOVE_STATUSES = ['DRAFT', 'POSTED'] as const;
 export const ADJUSTMENT_STATUSES = ['DRAFT', 'SUBMITTED', 'POSTED', 'CANCELLED'] as const;
+export const ISSUE_STATUSES = ['DRAFT', 'POSTED', 'CANCELLED'] as const;
 export const STOCKTAKE_STATUSES = ['DRAFT', 'COUNTING', 'REVIEW', 'APPROVED', 'CANCELLED'] as const;
 export const RESERVATION_STATUSES = ['ACTIVE', 'CONSUMED', 'RELEASED'] as const;
 export const RECONCILIATION_STATUSES = ['OK', 'DRIFT'] as const;
@@ -292,8 +295,10 @@ const lineQtyColumns = () => ({
 });
 
 /**
- * Goods receipts (GR-, ADR-0033): counted by the warehouse and posted at once into each line's bin;
- * the accountant costs them afterwards. Costs live in stock_valuation_adjustments, never here.
+ * Goods receipts (GR-, ADR-0033, ADR-0078): counted by the warehouse and posted at once into each
+ * line's bin. The delivery note's prices may be typed on the draft lines; a receipt priced in full is
+ * costed at posting, else the accountant costs it afterwards. The cost history lives in
+ * stock_valuation_adjustments; the payment method and account are facts for the books.
  */
 export const goodsReceipts = pgTable(
   'goods_receipts',
@@ -314,6 +319,15 @@ export const goodsReceipts = pgTable(
     costedAt: timestamp('costed_at', { withTimezone: true }),
     costedBy: userRef('costed_by'),
     note: text('note'),
+    /** How the delivery is paid (ADR-0078); the payable or the voucher is the books' business. */
+    paymentMethod: text('payment_method', { enum: RECEIPT_PAYMENT_METHODS })
+      .notNull()
+      .default('CREDIT'),
+    /** The finance module's cash box or bank account for CASH / BANK (no FK: inventory cannot
+     * depend on finance; checked through the RECEIPT_MONEY_ACCOUNTS hook). */
+    moneyAccountId: integer('money_account_id'),
+    /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
+    vatRatePct: percent('vat_rate_pct').notNull().default(zero),
     ...postingColumns(),
   },
   (t) => [
@@ -336,6 +350,12 @@ export const goodsReceipts = pgTable(
         AND (${t.costingVersion} = 0) = (${t.costedAt} IS NULL)
         AND (${t.costingStatus} = 'COSTED') = (${t.costingVersion} > 0)`,
     ),
+    check('goods_receipts_payment_method', inList(t.paymentMethod, RECEIPT_PAYMENT_METHODS)),
+    check(
+      'goods_receipts_money_account',
+      sql`${t.paymentMethod} <> 'CREDIT' OR ${t.moneyAccountId} IS NULL`,
+    ),
+    check('goods_receipts_vat_rate', sql`${t.vatRatePct} >= 0 AND ${t.vatRatePct} < 100`),
     check(
       'goods_receipts_texts',
       sql`(${t.supplierDocNo} IS NULL OR length(${t.supplierDocNo}) BETWEEN 1 AND 50)
@@ -356,12 +376,24 @@ export const goodsReceiptLines = pgTable(
     binId: ref('bin_id')
       .notNull()
       .references(() => bins.id),
+    /** The delivery note's price per entered unit, when that is what was typed (ADR-0078). */
+    docUnitPrice: money('doc_unit_price'),
+    /** The delivery note's line amount, VAT included as printed; NULL until a price is typed. */
+    docAmount: money('doc_amount'),
+    /** Free goods (бонус): costed at zero. */
+    freeGoods: boolean('free_goods').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index('goods_receipt_lines_receipt_idx').on(t.receiptId, t.id),
     check('goods_receipt_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
+    check(
+      'goods_receipt_lines_price',
+      sql`(${t.docAmount} IS NULL OR ${t.docAmount} >= 0)
+        AND (${t.docUnitPrice} IS NULL OR (${t.docUnitPrice} >= 0 AND ${t.docAmount} IS NOT NULL))
+        AND NOT (${t.freeGoods} AND ${t.docAmount} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -472,6 +504,106 @@ export const adjustmentLines = pgTable(
     check('adjustment_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
     check('adjustment_lines_cost', sql`${t.unitCost} IS NULL OR ${t.unitCost} >= 0`),
     check('adjustment_lines_note', sql`${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 300`),
+  ],
+);
+
+/**
+ * Expense types of goods issues (ADR-0081): what an issue was for (internal use, a bonus, a
+ * write-off, a return to a supplier…), kept by the admin; the books map them to accounts later.
+ */
+export const issueExpenseTypes = pgTable(
+  'issue_expense_types',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    /** A seeded type's stable code (DEFAULT_ISSUE_EXPENSE_TYPES); NULL for one the admin added. */
+    code: text('code'),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('issue_expense_types_name_key').on(t.nameKey),
+    unique('issue_expense_types_code_key').on(t.code),
+    check('issue_expense_types_name', sql`length(${t.name}) BETWEEN 1 AND 100`),
+  ],
+);
+
+/**
+ * Goods issues (GI-, ADR-0081): goods leave a warehouse at its average cost for an expense type and
+ * a recipient (a user, a customer, a supplier or a typed name). Warehouse staff post them at once.
+ */
+export const goodsIssues = pgTable(
+  'goods_issues',
+  {
+    id: id(),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    /** The document's date as written on it; the ledger takes the posting day. */
+    issuedOn: date('issued_on', { mode: 'string' }).notNull(),
+    expenseTypeId: ref('expense_type_id')
+      .notNull()
+      .references(() => issueExpenseTypes.id),
+    recipientKind: text('recipient_kind', { enum: ISSUE_RECIPIENT_KINDS }).notNull(),
+    recipientUserId: userRef('recipient_user_id'),
+    recipientCustomerId: ref('recipient_customer_id').references(() => customers.id),
+    recipientSupplierId: ref('recipient_supplier_id').references(() => suppliers.id),
+    /** The typed name of an OTHER recipient; a snapshot of the chosen one's name otherwise. */
+    recipientName: text('recipient_name'),
+    status: text('status', { enum: ISSUE_STATUSES }).notNull().default('DRAFT'),
+    note: text('note'),
+    ...postingColumns(),
+  },
+  (t) => [
+    unique('goods_issues_number_key').on(t.number),
+    index('goods_issues_warehouse_idx').on(t.warehouseId, t.status, t.id),
+    index('goods_issues_expense_type_idx').on(t.expenseTypeId, t.id),
+    check('goods_issues_status', inList(t.status, ISSUE_STATUSES)),
+    check('goods_issues_recipient_kind', inList(t.recipientKind, ISSUE_RECIPIENT_KINDS)),
+    check(
+      'goods_issues_recipient',
+      sql`(${t.recipientUserId} IS NOT NULL) = (${t.recipientKind} = 'USER')
+        AND (${t.recipientCustomerId} IS NOT NULL) = (${t.recipientKind} = 'CUSTOMER')
+        AND (${t.recipientSupplierId} IS NOT NULL) = (${t.recipientKind} = 'SUPPLIER')
+        AND (${t.recipientKind} <> 'OTHER' OR ${t.recipientName} IS NOT NULL)`,
+    ),
+    check(
+      'goods_issues_posted',
+      sql`(${t.status} = 'POSTED') = (${t.number} IS NOT NULL AND ${t.postedAt} IS NOT NULL
+        AND ${t.effectiveDate} IS NOT NULL)`,
+    ),
+    check(
+      'goods_issues_texts',
+      sql`(${t.recipientName} IS NULL OR length(${t.recipientName}) BETWEEN 1 AND 200)
+        AND (${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500)`,
+    ),
+  ],
+);
+
+export const goodsIssueLines = pgTable(
+  'goods_issue_lines',
+  {
+    id: id(),
+    issueId: ref('issue_id')
+      .notNull()
+      .references(() => goodsIssues.id),
+    ...lineQtyColumns(),
+    /** The shelf the goods leave from (the fixed shelf, the fullest, or a scanned label). */
+    binId: ref('bin_id')
+      .notNull()
+      .references(() => bins.id),
+    /** The average cost per base unit the line left at, written by the posting; cost data. */
+    unitCost: cost('unit_cost'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('goods_issue_lines_issue_idx').on(t.issueId, t.id),
+    check('goods_issue_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
+    check('goods_issue_lines_cost', sql`${t.unitCost} IS NULL OR ${t.unitCost} >= 0`),
   ],
 );
 
