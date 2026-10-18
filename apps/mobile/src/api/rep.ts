@@ -22,6 +22,7 @@ export type RepCustomer = components['schemas']['SalesRepCustomer'];
 export type RepCustomerDetail = components['schemas']['SalesRepCustomerDetail'];
 export type RepOrder = components['schemas']['SalesRepOrder'];
 export type RepOrderSummary = components['schemas']['SalesRepOrderSummary'];
+export type RepStoreOrder = components['schemas']['SalesRepStoreOrder'];
 export type Category = components['schemas']['Category'];
 export type Quote = components['schemas']['Quote'];
 
@@ -268,6 +269,30 @@ export function useOrder(id: number) {
       unwrap(
         await session.client.GET('/api/v1/sales-rep/orders/{id}', { params: { path: { id } } }),
       ),
+  });
+}
+
+/**
+ * Every order of a store, anyone's, newest first (the store card's history, the owner 2026-10-18):
+ * who took it and when; only the rep's own (`mine`) open. The card shows the first rows of the
+ * page its full list loads, so the list opens at once.
+ */
+export function useStoreOrders(customerId: number | null) {
+  const { session } = useSignedIn();
+  return useInfiniteQuery({
+    queryKey: ['rep', 'store-orders', customerId],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/customers/{id}/orders', {
+          params: {
+            path: { id: customerId ?? 0 },
+            query: { ...(pageParam ? { cursor: pageParam } : {}), limit: PAGE },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: customerId !== null,
   });
 }
 

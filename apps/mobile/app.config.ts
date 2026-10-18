@@ -18,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Bto',
   slug: 'bto-staff',
   scheme: 'bto-staff',
-  version: '0.4.0',
+  version: '0.5.0',
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   icon: './assets/icon.png',
@@ -29,6 +29,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     versionCode: Number.isSafeInteger(versionCode) && versionCode > 0 ? versionCode : 1,
     allowBackup: false,
     adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#0071E3' },
+    // A store's number calls at once (the owner, 2026-10-18): src/phone/call.ts, asked on first tap.
+    permissions: ['android.permission.CALL_PHONE'],
     // The store map asks for the position only while it is open (foreground, the owner 2026-10-18).
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',

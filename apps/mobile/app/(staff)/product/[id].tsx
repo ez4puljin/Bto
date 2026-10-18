@@ -320,18 +320,6 @@ export default function ProductScreen() {
             </Pressable>
           </View>
         </View>
-        <View style={styles.quick}>
-          {[1, 5, 10].map((step) => (
-            <Pressable
-              key={step}
-              accessibilityRole="button"
-              onPress={() => set(qty + step)}
-              style={styles.quickChip}
-            >
-              <Text style={styles.quickText}>{t('mobile.product.plus', { n: step })}</Text>
-            </Pressable>
-          ))}
-        </View>
         {short.gt(0) ? (
           <Text accessibilityRole="alert" style={styles.short}>
             {t('mobile.product.short', {
@@ -472,21 +460,6 @@ const styles = StyleSheet.create({
   },
   qtyBox: { width: 64, height: 44, alignItems: 'center', justifyContent: 'center' },
   qtyText: { ...type.title2, fontFamily: fonts.semibold, ...tabular },
-  quick: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    paddingHorizontal: 20,
-  },
-  quickChip: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 17,
-    backgroundColor: colors.canvas,
-    justifyContent: 'center',
-  },
-  quickText: type.bodyStrong,
   short: {
     ...type.chip,
     marginTop: 14,

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { REP_MAP_FRESH_DAYS } from '@tugeel/shared/sales';
 import { problemFrom } from '../../src/api/problem';
 import { useRepMap } from '../../src/api/rep';
+import { callNow } from '../../src/phone/call';
 import StoreMap from '../../src/map/store-map';
 import { StorePicker } from '../../src/map/store-picker';
 import { STORE_SHEET_HEIGHT, StoreSheet } from '../../src/map/store-sheet';
@@ -32,7 +33,7 @@ type Whereabouts = 'asking' | 'on' | 'denied' | 'off';
 /**
  * «Газрын зураг» (the owner, 2026-10-18): every active store with a GPS point, red without an
  * order of this rep in the last 7 days and green with one, the rep's own position, and a store's
- * card on a tap (start an order, open the last one, call); stores at one point are listed to pick
+ * card on a tap (start an order, its order history, a direct call); stores at one point are listed to pick
  * from. Tiles are OpenStreetMap's through OpenFreeMap (no key); the map is a DOM component
  * (src/map/store-map.tsx).
  */
@@ -73,6 +74,8 @@ export default function MapScreen() {
   const starting = useRef(false);
   const alive = useRef(true);
   const asked = useRef(false);
+  /** The store whose card a page opened from it left; it opens again on the way back. */
+  const reopen = useRef<number | null>(null);
 
   useEffect(() => {
     alive.current = true;
@@ -133,8 +136,23 @@ export default function MapScreen() {
       const ask = !asked.current;
       asked.current = true;
       void startLocation(ask);
+      // Back from a store's history or order: its card again.
+      if (reopen.current !== null) {
+        setSelectedId(reopen.current);
+        reopen.current = null;
+      }
     }, [startLocation]),
   );
+
+  /**
+   * Opens a page from the store card: the card (a modal over everything) closes first and comes
+   * back when the rep returns to the map.
+   */
+  const leaveCard = (go: () => void) => {
+    reopen.current = selectedId;
+    setSelectedId(null);
+    go();
+  };
 
   // Back from the phone's settings: the permission or the location may be on now.
   useEffect(() => {
@@ -339,11 +357,16 @@ export default function MapScreen() {
           router.dismissTo('/shop');
           toast.show({ message: t('mobile.map.customerSet', { name: customer.name }) });
         }}
-        onLastOrder={(orderId) => {
-          setSelectedId(null);
-          router.push(`/order/${orderId}`);
-        }}
-        onCall={(phone) => void Linking.openURL(`tel:${phone}`)}
+        onHistory={(store) =>
+          leaveCard(() =>
+            router.push({
+              pathname: '/store-orders/[id]',
+              params: { id: String(store.customerId), name: store.name },
+            }),
+          )
+        }
+        onOpenOrder={(orderId) => leaveCard(() => router.push(`/order/${orderId}`))}
+        onCall={(phone) => void callNow(phone)}
       />
     </Page>
   );

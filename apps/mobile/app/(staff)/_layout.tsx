@@ -30,6 +30,7 @@ export default function StaffLayout() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notice/[id]" />
           <Stack.Screen name="map" />
+          <Stack.Screen name="store-orders/[id]" />
           <Stack.Screen name="customers" options={{ presentation: 'modal' }} />
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
           {/* The notice popup over whatever is open (ADR-0062 #3); the back button closes it. */}
