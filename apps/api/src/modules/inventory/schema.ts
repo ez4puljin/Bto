@@ -1,5 +1,6 @@
 import {
   ADJUSTMENT_REASON_CODES,
+  RECEIPT_PAYMENT_METHODS,
   BIN_TYPES,
   SELLABLE_BIN_TYPES,
   STOCK_DOC_TYPES,
@@ -23,7 +24,7 @@ import {
   unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { cost, factor, jsonValue, qty } from '../../common/db/types';
+import { cost, factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products } from '../catalog/schema';
 import { users, warehouses } from '../identity/schema';
 import { suppliers } from '../partners/schema';
@@ -292,8 +293,10 @@ const lineQtyColumns = () => ({
 });
 
 /**
- * Goods receipts (GR-, ADR-0033): counted by the warehouse and posted at once into each line's bin;
- * the accountant costs them afterwards. Costs live in stock_valuation_adjustments, never here.
+ * Goods receipts (GR-, ADR-0033, ADR-0078): counted by the warehouse and posted at once into each
+ * line's bin. The delivery note's prices may be typed on the draft lines; a receipt priced in full is
+ * costed at posting, else the accountant costs it afterwards. The cost history lives in
+ * stock_valuation_adjustments; the payment method and account are facts for the books.
  */
 export const goodsReceipts = pgTable(
   'goods_receipts',
@@ -314,6 +317,15 @@ export const goodsReceipts = pgTable(
     costedAt: timestamp('costed_at', { withTimezone: true }),
     costedBy: userRef('costed_by'),
     note: text('note'),
+    /** How the delivery is paid (ADR-0078); the payable or the voucher is the books' business. */
+    paymentMethod: text('payment_method', { enum: RECEIPT_PAYMENT_METHODS })
+      .notNull()
+      .default('CREDIT'),
+    /** The finance module's cash box or bank account for CASH / BANK (no FK: inventory cannot
+     * depend on finance; checked through the RECEIPT_MONEY_ACCOUNTS hook). */
+    moneyAccountId: integer('money_account_id'),
+    /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
+    vatRatePct: percent('vat_rate_pct').notNull().default(zero),
     ...postingColumns(),
   },
   (t) => [
@@ -336,6 +348,12 @@ export const goodsReceipts = pgTable(
         AND (${t.costingVersion} = 0) = (${t.costedAt} IS NULL)
         AND (${t.costingStatus} = 'COSTED') = (${t.costingVersion} > 0)`,
     ),
+    check('goods_receipts_payment_method', inList(t.paymentMethod, RECEIPT_PAYMENT_METHODS)),
+    check(
+      'goods_receipts_money_account',
+      sql`${t.paymentMethod} <> 'CREDIT' OR ${t.moneyAccountId} IS NULL`,
+    ),
+    check('goods_receipts_vat_rate', sql`${t.vatRatePct} >= 0 AND ${t.vatRatePct} < 100`),
     check(
       'goods_receipts_texts',
       sql`(${t.supplierDocNo} IS NULL OR length(${t.supplierDocNo}) BETWEEN 1 AND 50)
@@ -356,12 +374,24 @@ export const goodsReceiptLines = pgTable(
     binId: ref('bin_id')
       .notNull()
       .references(() => bins.id),
+    /** The delivery note's price per entered unit, when that is what was typed (ADR-0078). */
+    docUnitPrice: money('doc_unit_price'),
+    /** The delivery note's line amount, VAT included as printed; NULL until a price is typed. */
+    docAmount: money('doc_amount'),
+    /** Free goods (бонус): costed at zero. */
+    freeGoods: boolean('free_goods').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index('goods_receipt_lines_receipt_idx').on(t.receiptId, t.id),
     check('goods_receipt_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
+    check(
+      'goods_receipt_lines_price',
+      sql`(${t.docAmount} IS NULL OR ${t.docAmount} >= 0)
+        AND (${t.docUnitPrice} IS NULL OR (${t.docUnitPrice} >= 0 AND ${t.docAmount} IS NOT NULL))
+        AND NOT (${t.freeGoods} AND ${t.docAmount} IS NOT NULL)`,
+    ),
   ],
 );
 

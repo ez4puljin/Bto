@@ -397,3 +397,28 @@ export function costingDeadline(postedOn: string): string {
 export function canRecost(postedOn: string, today: string): boolean {
   return today <= costingDeadline(postedOn);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Receipt prices and payment (ADR-0078)
+
+/** How a delivery is paid: on credit (a payable), from a cash box or from a bank account. */
+export const RECEIPT_PAYMENT_METHODS = ['CREDIT', 'CASH', 'BANK'] as const;
+export type ReceiptPaymentMethod = (typeof RECEIPT_PAYMENT_METHODS)[number];
+
+/**
+ * The VAT inside a delivery-note amount at the receipt's rate (0 when the company or the supplier
+ * is not a VAT payer), two decimals half up, the way invoices split their lines (ADR-0010 #4).
+ */
+export function receiptLineVat(docAmount: DecimalInput, vatRatePct: DecimalInput): Decimal {
+  const rate = new Decimal(vatRatePct);
+  if (rate.isZero()) return new Decimal(0);
+  return new Decimal(docAmount)
+    .times(rate)
+    .dividedBy(new Decimal(100).plus(rate))
+    .toDecimalPlaces(MONEY_SCALE);
+}
+
+/** A line's cost: its delivery-note amount without the VAT the company takes back. */
+export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInput): Decimal {
+  return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
+}

@@ -20,6 +20,7 @@ import type {
 import { LevelsImporter } from '../importers/levels.importer';
 import { OpeningStockImporter } from '../importers/opening-stock.importer';
 import { PricesImporter } from '../importers/prices.importer';
+import { ReceiptsImporter } from '../importers/receipts.importer';
 import { ProductsImporter } from '../importers/products.importer';
 import { SuppliersImporter } from '../importers/suppliers.importer';
 import { type ImportAction, importJobs, importRows } from '../schema';
@@ -56,6 +57,7 @@ export class ImportPipelineService {
     opening: OpeningStockImporter,
     levels: LevelsImporter,
     prices: PricesImporter,
+    receipts: ReceiptsImporter,
   ) {
     this.importers = new Map<ImportKind, Importer>([
       ['PRODUCTS', products],
@@ -64,6 +66,7 @@ export class ImportPipelineService {
       ['OPENING_STOCK', opening],
       ['LEVELS', levels],
       ['PRICES', prices],
+      ['RECEIPTS', receipts],
     ]);
   }
 
@@ -120,7 +123,7 @@ export class ImportPipelineService {
       }
     });
     await this.update(jobId, { phase: 'CHECKING', totalRows: sources.length });
-    const checked = await this.importerOf(job.kind).validate(sources, this.db);
+    const checked = await this.importerOf(job.kind).validate(sources, this.db, job);
     await this.storeChecks(this.db, jobId, checked);
     const summary = summarize(checked);
     await this.update(jobId, {
@@ -161,7 +164,7 @@ export class ImportPipelineService {
       await inTransaction(this.db, async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(${IMPORT_LOCK})`);
         await this.progress(jobId, 'CHECKING', 0);
-        const checked = await importer.validate(sources, tx);
+        const checked = await importer.validate(sources, tx, job);
         if (checked.some((row) => row.errors.length > 0 || row.action !== preview.get(row.rowNo))) {
           throw new PreviewChanged(checked);
         }

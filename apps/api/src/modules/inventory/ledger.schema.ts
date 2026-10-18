@@ -57,6 +57,8 @@ export const stockValuationAdjustments = pgTable('stock_valuation_adjustments', 
   qtyBase: qty('qty_base').notNull(),
   freeGoods: boolean('free_goods').notNull(),
   amount: money('amount').notNull(),
+  /** What was typed, VAT included as on the delivery note (ADR-0078); NULL before 0028. */
+  docAmount: money('doc_amount'),
   valueBefore: money('value_before').notNull(),
   valueDelta: money('value_delta').notNull(),
   onHandAt: qty('on_hand_at').notNull(),

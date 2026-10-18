@@ -13,6 +13,8 @@ import {
   lineAmountOf,
   MOVEMENT_TYPES,
   normalizeBinCode,
+  receiptLineCost,
+  receiptLineVat,
   reaverage,
   revalue,
   systemBinTypes,
@@ -203,5 +205,20 @@ describe('cost arithmetic', () => {
     expect(costingDeadline('2028-01-31')).toBe('2028-02-29');
     expect(canRecost('2026-10-15', '2026-11-30')).toBe(true);
     expect(canRecost('2026-10-15', '2026-12-01')).toBe(false);
+  });
+});
+
+describe('receipt prices (ADR-0078)', () => {
+  it('takes the VAT out of a delivery-note amount at the receipt rate', () => {
+    expect(text(receiptLineVat('1100', '10'))).toBe('100');
+    expect(text(receiptLineCost('1100', '10'))).toBe('1000');
+    // 2,500 × 10 / 110 = 227.2727… → 227.27; the cost keeps the rest.
+    expect(text(receiptLineVat('2500', '10'))).toBe('227.27');
+    expect(text(receiptLineCost('2500', '10'))).toBe('2272.73');
+  });
+
+  it('keeps the whole amount as cost when no VAT applies', () => {
+    expect(text(receiptLineVat('2500', '0'))).toBe('0');
+    expect(text(receiptLineCost('2500', '0'))).toBe('2500');
   });
 });

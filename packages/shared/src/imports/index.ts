@@ -1,3 +1,4 @@
+import { RECEIPT_PAYMENT_METHODS, type ReceiptPaymentMethod } from '../inventory';
 import { Decimal } from '../money';
 import { type CustomerKind, cleanTaxNumber, normalizeRegNo, regNoShape } from '../taxpayer';
 
@@ -14,6 +15,7 @@ export const IMPORT_KINDS = [
   'OPENING_STOCK',
   'LEVELS',
   'PRICES',
+  'RECEIPTS',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -82,6 +84,7 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('bankName', 'text'),
     column('bankAccount', 'text'),
     column('paymentTermDays', 'decimal'),
+    column('vatPayer', 'text'),
     column('contactName', 'text'),
     column('contactPhone', 'code'),
     column('note', 'text'),
@@ -114,7 +117,31 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('wholePack', 'text'),
     column('validFrom', 'day'),
   ],
+  // Delivery notes (ADR-0078): rows of one date, supplier and note number make one draft receipt in
+  // the warehouse chosen for the import; a product by code or barcode; the price as printed.
+  RECEIPTS: [
+    column('date', 'day', true),
+    column('supplier', 'text', true),
+    column('docNo', 'text'),
+    column('sku', 'code'),
+    column('barcode', 'code'),
+    column('unit', 'text'),
+    column('qty', 'decimal', true),
+    column('unitPrice', 'decimal'),
+  ],
 };
+
+/** What a receipts import is told in its dialog (ADR-0078): the warehouse and how the notes are paid. */
+export interface ReceiptImportOptions {
+  warehouseId: number;
+  paymentMethod: ReceiptPaymentMethod;
+  moneyAccountId: number | null;
+}
+
+export const RECEIPT_IMPORT_PAYMENT_METHODS = RECEIPT_PAYMENT_METHODS;
+
+/** Lines of one delivery note in a receipts import (one draft receipt). */
+export const MAX_RECEIPT_IMPORT_LINES = 500;
 
 /** The most data rows a file of a kind may hold. */
 export function maxRowsOf(kind: ImportKind): number {
@@ -156,6 +183,7 @@ export const ROW_ERROR_CODES = [
   'ARCHIVED',
   'NO_PROFILE_VALUES',
   'NO_PACKS',
+  'TOO_MANY_LINES',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 
@@ -167,6 +195,7 @@ export const ROW_WARNING_CODES = [
   'NO_SHELF',
   'NOT_SELLABLE',
   'REACTIVATED',
+  'PRICE_IGNORED',
 ] as const;
 export type RowWarningCode = (typeof ROW_WARNING_CODES)[number];
 
