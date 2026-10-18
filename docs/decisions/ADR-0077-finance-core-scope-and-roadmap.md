@@ -48,7 +48,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
 
    | Addition | Content | Sessions | Order |
    |---|---|---|---|
-   | Payables | Supplier bills and credits (`AP_BILL`, `AP_CREDIT`, ADR-0072) and supplier payments as open items, with the accountant's screens; procurement later only sends `AP_BILL` commands | 2 | after P3, before delivery 8 |
+   | Payables | Supplier bills and credits (`AP_BILL`, `AP_CREDIT`, ADR-0072) and supplier payments as open items, with the accountant's screens; the source facts are Bto's goods receipts (their payment method, money account, frozen VAT rate and VAT-inclusive line prices, the main session's ADR-0078), which post no payables themselves; procurement later only sends `AP_BILL` commands | 2 | after P3, before delivery 8 |
    | Bank import | The daily statement import, Khan Bank Excel first: lines normalised, duplicates dropped, matched to open items in the order of SPEC §5.8, the rest by hand | 1–2 | after P4 |
    | Fixed assets | A core sub-ledger reusable by the PMS: the asset register, classes with their accounts and rates, depreciation runs posting through the intake, disposals | 2 | after P3 |
    | Cost of goods and inventory | Bto posts the daily cost of goods sold and the inventory postings (receipts, adjustments, stocktakes, transfers, returns) as JOURNAL documents | 1–2 | after P5, once D8 is answered |
