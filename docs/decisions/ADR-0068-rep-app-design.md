@@ -98,6 +98,15 @@ The owner asked that a tap on a store's number on the map call at once, and that
 26. **The map stays on OpenStreetMap** (#21 unchanged): the owner asked for satellite pictures; Google's map needs a billed Google Cloud key, and Esri's World Imagery an ArcGIS account and a key built into the APK, so the owner chose to stay on OpenFreeMap's tiles.
 27. **Version 0.5.0.**
 
+### The map's opening view, names and holds (the owner, 2026-10-18)
+
+The owner opened the map in 0.5.0 and asked: start on the phone's position (it opened on the one located store); show each store's name over its point, in small text; and mark black a customer the accountant put on hold («захиалгын хаалт», the customer's «Зээл хаалттай»), meaning blocked.
+
+28. **Black for a credit hold**: `GET /sales-rep/map` adds each customer's manual `creditHold` and `creditHoldReason` (partners' `located`). A held store is black on the map, in a cluster's ring (red still wins: a store to visit), on the card (a dark «Захиалга хаалттай» banner with the accountant's reason) and in the stack list; the legend adds «N хаалттай» and the home's map card says it too. Each store has one state: blocked, else stale, else fresh, so «Зөвхөн захиалгагүй» leaves held stores out. Only the manual hold is black: finance's automatic refusals (an overdue invoice, the limit) stay out, since sales never reads finance. «Захиалга эхлүүлэх» stays: a draft is allowed and the credit check refuses a confirmation anyway.
+29. **Names over the pins**: unclustered pins carry the store's name above them (11 px Noto Sans Regular from OpenFreeMap's glyphs, a white halo, at most two lines, cut at 28 characters); names that would overlap hide, the selected store's name always shows, the cluster counts are never covered, and a tap on a name opens its store.
+30. **Opening on the phone's position**: the map opens at street level (zoom 15) on the rep's position: the phone's last known one (at most 5 minutes old) at once, the first live fix moving it once more. While the position is expected the map waits up to 3.5 s, then fits the pins as before (also when the location is refused or off), and a later first fix still moves it once. Once the rep pans or zooms, the map never moves by itself; «my location» works as before (`cameraStep` in `src/map/stores.ts`).
+31. **Version 0.6.0.**
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
@@ -120,11 +129,13 @@ The owner asked that a tap on a store's number on the map call at once, and that
 | Only the rep's own orders in a store's history (2026-10-18) | The owner wants to see who else took orders at a store and when; the rows show no lines and do not open. |
 | Open every order of the history | The owner chose only the rep's own; the order page stays "own orders" (ADR-0061 #5). |
 | The dialer only (`tel:` without the permission) | The owner asked for a call at once; the dialer stays as the fallback. |
+| Black also for finance's automatic refusals (overdue, over the limit) | The owner named the accountant's hold; sales would have to read finance through a new hook. Possible later. |
+| Fit the pins first, as before | The owner asked for the phone's position; the pins stay the fallback. |
 | Satellite pictures (Esri World Imagery, Google) (2026-10-18) | Both need an account and a key, Google's on a billed project, and the key would ship inside every APK; the owner chose to stay on OpenStreetMap. Esri's raster tiles drop into the MapLibre style if this is asked again. |
 
 ## Consequences
 
-- The phone app's screens, kit and tests change; its version is 0.2.0, then 0.3.0 after the owner's first look (0.2.1 only added the request time limit), 0.4.0 after the second and 0.5.0 with a store's history and direct calls. A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
+- The phone app's screens, kit and tests change; its version is 0.2.0, then 0.3.0 after the owner's first look (0.2.1 only added the request time limit), 0.4.0 after the second, 0.5.0 with a store's history and direct calls, and 0.6.0 with the map's opening view, names and holds. A phone with the 0.1.0 APK gets 422 on «Захиалга» against the new server until the new APK is installed (before production only).
 - The facade asks catalog, pricing, partners, inventory and identity for small read-only answers (`docs/modules/*.md`): the NEW sort and `onlyIds` in catalog's product list, with batch reads of pictures and unit flags that stay out of `/products`; pricing's shop prices and its order by base price; partners' main-supplier counts; inventory's products free at home; the session's start in identity.
 - A price sort reads up to 100,000 product ids twice per page (catalog, then pricing); about 20,000 today.
 - The design's board files stay the reference for later changes to the app. Text sizes are the documented exception (#11): smaller than the boards.
