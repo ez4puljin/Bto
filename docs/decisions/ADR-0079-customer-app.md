@@ -88,6 +88,11 @@ The owner's answers (2026-10-18, six rounds):
     - **Notifications** by day with a coloured tile per kind (confirmed, cancelled, payment recorded, due soon / overdue, the admin's notice), unread dots and «Бүгдийг уншсан»; **the launch notice** as the rep app's popup (a picture, the kind and days, dots, «Дараагийнх», «Хаах», «Бараа харах»).
     - **«Профайл»:** the store, its code and centre; the sign-in phone, the default address and the payment term (changed only by the office); «Нууц үг солих», «Мэдэгдэл», the office's phone from a new setting `customer_app.office_phone`; «Гарах» with its question (the cart is kept).
 
+14. **«Холбоо барих» on «Нүүр» (owner 2026-10-19).** Below the favourites, «Нүүр» lists the company's contact people, each as a row with a role («Захиалга, оффис», «Борлуулалтын менежер», «Нягтлан бодогч, тооцоо», «Агуулах, хүргэлт» on the board), a name, a phone and a green call button; a tap anywhere on the row calls the number at once.
+    - **The list** is the company's, the same for every store: admins keep it on a «Харилцагчийн апп» settings page (role, name, phone in E.164 through `@tugeel/shared/phone`, order, shown or hidden; `identity.settings.manage`), and the app reads the shown rows through a customer route. It replaces #13's single `customer_app.office_phone` setting; the «Профайл» row «Холбоо барих» leads to the list.
+    - **The call** is the rep app's direct call (ADR-0068 #24, `src/phone/`): Android's `ACTION_CALL` through `expo-intent-launcher` once `CALL_PHONE` is granted (asked on the first tap); after a «no», or when Android refuses, the dialer opens with the number filled in; taps within 2 s of a placed call do nothing. The customer variant therefore declares `android.permission.CALL_PHONE` (#10).
+    - **The board:** «Нүүр» grows to 1430 px with the list and a «Залгаж байна…» toast (artifact version of 2026-10-19).
+
 ## Alternatives considered
 
 | Alternative | Why rejected |
