@@ -4,22 +4,22 @@
   "tenant": "BUTEN_ORGIL",
   "company": "RES",
   "source": { "system": "PMS", "docType": "DEPOSIT", "docId": "R-1001-1" },
-  "actor": { "kind": "SYSTEM", "ref": "pms:qpay", "label": "QPay" },
+  "actor": { "kind": "STAFF", "ref": "pms:user:12", "label": "Ресепшн С." },
   "body": {
     "action": "POST",
     "documentType": "PMS.DEPOSIT_RECEIVED",
     "documentDate": "2026-11-30",
     "currency": "MNT",
     "party": { "ref": "company:7", "name": "Монгол Шуудан ХК", "kind": "COMPANY" },
-    "description": "R-1001 урьдчилгаа",
+    "description": "R-1001 урьдчилгаа, банкны шилжүүлэг",
     "controlTotal": "132000.00",
     "lines": [
       {
         "lineNo": 1,
-        "key": "QPAY",
+        "key": "BANK",
         "side": "DEBIT",
         "amount": "132000.00",
-        "moneyAccount": "RES-QPAY"
+        "moneyAccount": "RES-BANK"
       },
       {
         "lineNo": 2,

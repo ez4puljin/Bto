@@ -17,11 +17,9 @@ export const EBARIMT_STATUSES = [
 ] as const;
 export type EbarimtStatus = (typeof EBARIMT_STATUSES)[number];
 
-/** PosAPI payment codes (SPEC §6.11 #6); Σ payments = the receipt's total. */
-export const EBARIMT_PAYMENT_CODES = [
-  'CASH',
-  'PAYMENT_CARD',
-  'BANK_TRANSFER',
-  'BANK_TRANSFER_QPAY',
-] as const;
+/**
+ * The PosAPI payment codes the systems use (SPEC §6.11 #6); Σ payments = the receipt's total.
+ * PosAPI's `BANK_TRANSFER_QPAY` is not used: the owner dropped QPay (2026-10-18, ADR-0080).
+ */
+export const EBARIMT_PAYMENT_CODES = ['CASH', 'PAYMENT_CARD', 'BANK_TRANSFER'] as const;
 export type EbarimtPaymentCode = (typeof EBARIMT_PAYMENT_CODES)[number];
