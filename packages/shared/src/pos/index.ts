@@ -6,7 +6,7 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
  * the kiosk share. Messages live in mn.json under `pos`.
  */
 
-/** How a sale is paid at the till; QPay and others come later (SPEC §6.6 #4). */
+/** How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). */
 export const TENDER_KINDS = ['CASH', 'CARD'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
 

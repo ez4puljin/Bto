@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0027 (#1: a custom guard on `@nestjs/jwt` instead of passport; the access token carries no permissions or scopes) |
+| Amended by | ADR-0027 (#1: a custom guard on `@nestjs/jwt` instead of passport; the access token carries no permissions or scopes); ADR-0079 (#2: one app account per store; #4–#6: customers sign in with phone + password only, the office issues the codes, no SMS OTP and no rep reset) |
 
 ## Context
 

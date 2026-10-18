@@ -31,7 +31,7 @@ finance depends on these modules, always through their `index.ts`:
 |---|---|---|
 | Scope | sales finance plus the general journal; the balance sheet, P&L, payroll and fixed assets stay in Erkhet for now (superseded 2026-10-18: Erkhet stops on the go-live day, so the Finance Core carries the full books, ADR-0077) | ADR-0060 context |
 | Invoice | created automatically at the «Борлуулалт» stage, for the delivered quantities; e-Barimt postponed to the next session | #3 |
-| Money | customers and drivers hand cash to the accountant, who records it and closes receivables; bank transfers typed by hand; QPay in delivery 5; no warehouse cashier, no shifts | #5 |
+| Money | customers and drivers hand cash to the accountant, who records it and closes receivables; bank transfers typed by hand; no QPay (ADR-0080); no warehouse cashier, no shifts | #5 |
 | Accounts | a small built-in chart; automatic postings for sales, receivables, payments and VAT; manual entries allowed; COGS later (2026-10-18: the books use Erkhet's account codes, imported, ADR-0072) | #7 |
 | Credit | 30-day term; **no tolerance**: over the limit or any overdue invoice blocks every order, cash too; NULL limit = no limit; no approval state; only the owner raises limits | #2 |
 | Cash book | one per branch cash box and bank account, income and expense vouchers, the driver named on what he hands in | #5 |
@@ -152,7 +152,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 ## 11. Open items
 
 - e-Barimt receipts on invoices (ADR-0017): after P0a; the invoice carries everything the receipt needs (lines with `vat_type`, rates and amounts, the customer's TIN through partners); `ebarimt_receipts` is keyed by the source document from its first migration, never by `invoice_id` (ADR-0074).
-- QPay payment intents (delivery 5) record payments through `PaymentsService.record` with a `BANK` money account.
+- No QPay (ADR-0080): customers pay cash or by bank transfer; the customer app (ADR-0079 #7) reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах».
 - Opening balances: the full trial balance at the cut-over, AR and AP per party as open items, imported into the Finance Core and signed off against Erkhet's closing trial balance (ADR-0077); manual journal entries meanwhile.
 - The Finance Core carve itself: phases P0b … P5, H1, H2, A1, A2 and the go-live additions (`docs/modules/finance-core.md` §16).
 - A shorter due date for cash sales if the owner wants it (today every invoice takes the customer's term).

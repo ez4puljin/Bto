@@ -17,7 +17,7 @@ Mongolian law and infrastructure sit today inside Bto's finance and POS code:
 
 ADR-0017 is Deferred and nothing of it is built: `apps/api/src/modules` has no `ebarimt` module, and `apps/api/src/integrations` holds only `llm`. Its design binds receipts to finance: `ebarimt_receipts.invoice_id` (ADR-0017 "Module"). The lint graph agrees: `MODULE_DEPS.ebarimt = ['identity', 'catalog']`, and `sales` and `finance` both list `ebarimt` (`eslint.config.mjs:44`, `:46`, `:47`).
 
-QPay, the QR payment rail of ADR-0018, is dropped system-wide (owner, 2026-10-18: not in the customer app, nor for the drivers, nor at the till; ADR-0080 on the customer-app branch). So nothing of ADR-0018's provider interface or `payment_intents` is built, and no payment module belongs in this layer.
+QPay, the QR payment rail of ADR-0018, is dropped system-wide (owner, 2026-10-18: not in the customer app, nor for the drivers, nor at the till; ADR-0080). So nothing of ADR-0018's provider interface or `payment_intents` is built, and no payment module belongs in this layer.
 
 ADR-0069 forbids the Finance Core to import Bto code, and ADR-0073 moves the product invoice into Bto's `billing`. The PMS needs the same Mongolian rules: VAT, city tax for a hotel and e-Barimt receipts. The owner (2026-10-18): the PMS is a separate repository (D22), starts after Bto's go-live (D4), and runs on its own small server at the resort because the internet there is weak (D3). So the PMS consumes published rules and never Bto's modules. ADR-0017 already runs a PosAPI instance per site.
 
@@ -80,4 +80,4 @@ The next e-Barimt session puts receipts on Finance I's invoices (SPEC §11 #2, a
 
 ## Related
 
-ADR-0010, ADR-0017, ADR-0018, ADR-0025, ADR-0063, ADR-0065 (reserved), ADR-0067, ADR-0069, ADR-0070, ADR-0071, ADR-0072, ADR-0073, ADR-0077, ADR-0080 (on the customer-app branch); `docs/architecture.md` §4, §5.9, §9.1; `docs/SPEC.md` §6.10, §6.11, §11 #2; `docs/modules/finance-core.md`.
+ADR-0010, ADR-0017, ADR-0018, ADR-0025, ADR-0063, ADR-0065 (reserved), ADR-0067, ADR-0069, ADR-0070, ADR-0071, ADR-0072, ADR-0073, ADR-0077, ADR-0080; `docs/architecture.md` §4, §5.9, §9.1; `docs/SPEC.md` §6.10, §6.11, §11 #2; `docs/modules/finance-core.md`.
