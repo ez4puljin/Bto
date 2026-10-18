@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type Fulfilment,
+  type OrderChannel,
   type OrderStatus,
   type PaymentMethod,
   REP_MAP_FRESH_DAYS,
@@ -11,7 +12,7 @@ import {
   type StageAction,
   storeIsStale,
 } from '@tugeel/shared/sales';
-import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
+import { addDays, businessDate, businessDateTime, isIsoDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn, onBusinessDays } from '../../../common/db/days';
@@ -19,7 +20,7 @@ import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { type AuthContext, OrgService } from '../../identity';
+import { type AuthContext, OrgService, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
 import { PriceQuoteService, type Quote } from '../../pricing';
 import { salesBoards, salesChannelDefaults, salesOrderLines, salesOrders } from '../schema';
@@ -32,6 +33,9 @@ import {
 } from './sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from './sales-orders.service';
 import { SalesPipelinesService } from './sales-pipelines.service';
+
+/** A store history page's rows when the app asks for no other number. */
+export const REP_STORE_ORDER_PAGE_LIMIT = 20;
 
 /** A rep's new order: the office order's header and lines, on the stage chosen in the app. */
 export type RepOrderInput = Omit<OrderInput, 'pipelineId' | 'stageId'> & { stageId: number };
@@ -139,6 +143,36 @@ export interface RepMapStore {
   stale: boolean;
 }
 
+/**
+ * One order in a store's history (ADR-0068): every channel and every creator, with who took it
+ * and when (Ulaanbaatar day and time); only `mine` ones open in the app (`get`).
+ */
+export interface RepStoreOrder {
+  id: number;
+  number: string | null;
+  status: OrderStatus;
+  channel: OrderChannel;
+  createdAt: Date;
+  /** The Ulaanbaatar day, `YYYY-MM-DD`. */
+  createdDate: string;
+  /** The Ulaanbaatar wall-clock time, `HH:mm`. */
+  createdTime: string;
+  /** The creator's full name; null when the order has no creator or the user is unknown. */
+  takerName: string | null;
+  /** The caller's own SALES_REP order: exactly the orders `get` opens. */
+  mine: boolean;
+  /** Null for a draft: prices are frozen at the submit. */
+  total: Decimal | null;
+  /** A draft's estimate (`DraftEstimate.total`); null for every other order. */
+  estimatedTotal: Decimal | null;
+  lineCount: number;
+}
+
+export interface RepStoreOrderPage {
+  data: RepStoreOrder[];
+  nextCursor: string | null;
+}
+
 export interface RepMap {
   today: string;
   freshDays: number;
@@ -162,6 +196,7 @@ export class SalesRepOrdersService {
     private readonly customers: CustomersService,
     private readonly org: OrgService,
     private readonly quotes: PriceQuoteService,
+    private readonly names: UserNamesService,
   ) {}
 
   async context(ctx: AuthContext): Promise<RepContext> {
@@ -430,6 +465,71 @@ export class SalesRepOrdersService {
           stale: storeIsStale(lastOrderDate, today),
         };
       }),
+    };
+  }
+
+  /**
+   * A store's order history on its map card (ADR-0068): every order of a customer the caller may
+   * see (`CustomersService.isVisible`, else 404), every channel, creator and status, drafts and
+   * cancelled ones included, newest first. A rep otherwise sees only their own orders; here the
+   * others' are rows only (who took it, when, the amount, the status), and `mine` marks the ones
+   * `get` opens. A draft carries its estimate (ADR-0068 #20).
+   */
+  async storeOrders(
+    ctx: AuthContext,
+    customerId: number,
+    query: { cursor?: string; limit?: number } = {},
+  ): Promise<RepStoreOrderPage> {
+    if (!(await this.customers.isVisible(ctx, customerId))) throw notFound('customer', customerId);
+    const limit = query.limit ?? REP_STORE_ORDER_PAGE_LIMIT;
+    const cursor = decodeCursor(query.cursor);
+    const after = typeof cursor?.id === 'number' ? cursor.id : null;
+    const rows = await this.db
+      .select({
+        id: salesOrders.id,
+        number: salesOrders.number,
+        status: salesOrders.status,
+        channel: salesOrders.channel,
+        createdBy: salesOrders.createdBy,
+        total: salesOrders.total,
+        createdAt: salesOrders.createdAt,
+        // Spelled out: a single-table select leaves columns unqualified (see `list`).
+        lineCount: sql<number>`(SELECT count(*)::int FROM sales_order_lines l WHERE l.order_id = sales_orders.id)`,
+      })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.customerId, customerId),
+          after === null ? undefined : lt(salesOrders.id, after),
+        ),
+      )
+      .orderBy(desc(salesOrders.id))
+      .limit(limit + 1);
+    const page = toPage(rows, limit, (row) => ({ id: row.id }));
+    const names = await this.names.namesOf(
+      page.data.flatMap((row) => (row.createdBy === null ? [] : [row.createdBy])),
+    );
+    const estimates = await this.estimates(
+      page.data.flatMap((row) => (row.status === 'DRAFT' ? [row.id] : [])),
+    );
+    return {
+      data: page.data.map((row) => ({
+        id: row.id,
+        number: row.number,
+        status: row.status,
+        channel: row.channel,
+        createdAt: row.createdAt,
+        createdDate: businessDate(row.createdAt),
+        // `YYYY-MM-DD HH:mm` in Ulaanbaatar: the time follows the day.
+        createdTime: businessDateTime(row.createdAt).slice(11),
+        takerName: row.createdBy === null ? null : (names.get(row.createdBy) ?? null),
+        // The condition `get` opens an order on.
+        mine: row.createdBy === ctx.userId && row.channel === 'SALES_REP',
+        total: row.total,
+        estimatedTotal: row.status === 'DRAFT' ? (estimates.get(row.id)?.total ?? null) : null,
+        lineCount: row.lineCount,
+      })),
+      nextCursor: page.nextCursor,
     };
   }
 

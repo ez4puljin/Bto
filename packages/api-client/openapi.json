@@ -13956,6 +13956,72 @@
         ]
       }
     },
+    "/api/v1/sales-rep/customers/{id}/orders": {
+      "get": {
+        "operationId": "SalesRep_storeOrders",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepStoreOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
     "/api/v1/sales-rep/customers/{id}": {
       "get": {
         "operationId": "SalesRep_customer",
@@ -30204,6 +30270,115 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SalesRepCustomer"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepStoreOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string",
+            "description": "ADMIN: an office order"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date",
+            "description": "The Ulaanbaatar day the order was taken"
+          },
+          "createdTime": {
+            "type": "string",
+            "example": "14:05",
+            "description": "The Ulaanbaatar time it was taken, HH:mm"
+          },
+          "takerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The creator's full name; null when unknown"
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "The caller's own rep order: only these open (GET /sales-rep/orders/{id}), the rest are rows only"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a draft"
+          },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
+          "lineCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "channel",
+          "createdAt",
+          "createdDate",
+          "createdTime",
+          "takerName",
+          "mine",
+          "total",
+          "estimatedTotal",
+          "lineCount"
+        ]
+      },
+      "SalesRepStoreOrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Every order of the store, anyone's, any status, newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepStoreOrder"
             }
           },
           "nextCursor": {

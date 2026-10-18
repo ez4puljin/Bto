@@ -2,7 +2,9 @@ import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/s
 import {
   FULFILMENTS,
   type Fulfilment,
+  ORDER_CHANNELS,
   ORDER_STATUSES,
+  type OrderChannel,
   type OrderStatus,
   PAYMENT_METHODS,
   type PaymentMethod,
@@ -24,6 +26,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -529,6 +532,69 @@ export class SalesRepMapDto {
       'Active customers with a GPS point (the default address, else the oldest active one), by name',
   })
   data: SalesRepMapStoreDto[];
+}
+
+@ApiSchema({ name: 'SalesRepStoreOrderQuery' })
+/** PageQueryDto's keyset paging with the store history's smaller pages (20, at most 50). */
+export class SalesRepStoreOrderQueryDto {
+  @ApiPropertyOptional({ description: 'nextCursor of the previous page' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+@ApiSchema({ name: 'SalesRepStoreOrder' })
+export class SalesRepStoreOrderDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ type: String, nullable: true }) number: string | null;
+  @ApiProperty({ enum: ORDER_STATUSES }) status: OrderStatus;
+  @ApiProperty({ enum: ORDER_CHANNELS, description: 'ADMIN: an office order' })
+  channel: OrderChannel;
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+  @ApiProperty({ format: 'date', description: 'The Ulaanbaatar day the order was taken' })
+  createdDate: string;
+  @ApiProperty({ example: '14:05', description: 'The Ulaanbaatar time it was taken, HH:mm' })
+  createdTime: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: "The creator's full name; null when unknown",
+  })
+  takerName: string | null;
+  @ApiProperty({
+    description:
+      "The caller's own rep order: only these open (GET /sales-rep/orders/{id}), the rest are rows only",
+  })
+  mine: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Null for a draft' })
+  total: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price",
+  })
+  estimatedTotal: string | null;
+  @ApiProperty() lineCount: number;
+}
+
+@ApiSchema({ name: 'SalesRepStoreOrderPage' })
+export class SalesRepStoreOrderPageDto {
+  @ApiProperty({
+    type: [SalesRepStoreOrderDto],
+    description: "Every order of the store, anyone's, any status, newest first",
+  })
+  data: SalesRepStoreOrderDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
 @ApiSchema({ name: 'SalesRepCustomerDetail' })

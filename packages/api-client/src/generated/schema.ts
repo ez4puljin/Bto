@@ -3333,6 +3333,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/customers/{id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_storeOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales-rep/customers/{id}": {
         parameters: {
             query?: never;
@@ -7808,6 +7824,43 @@ export interface components {
         };
         SalesRepCustomerPage: {
             data: components["schemas"]["SalesRepCustomer"][];
+            nextCursor: string | null;
+        };
+        SalesRepStoreOrder: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            /**
+             * @description ADMIN: an office order
+             * @enum {string}
+             */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date
+             * @description The Ulaanbaatar day the order was taken
+             */
+            createdDate: string;
+            /**
+             * @description The Ulaanbaatar time it was taken, HH:mm
+             * @example 14:05
+             */
+            createdTime: string;
+            /** @description The creator's full name; null when unknown */
+            takerName: string | null;
+            /** @description The caller's own rep order: only these open (GET /sales-rep/orders/{id}), the rest are rows only */
+            mine: boolean;
+            /** @description Null for a draft */
+            total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
+            lineCount: number;
+        };
+        SalesRepStoreOrderPage: {
+            /** @description Every order of the store, anyone's, any status, newest first */
+            data: components["schemas"]["SalesRepStoreOrder"][];
             nextCursor: string | null;
         };
         SalesRepCustomerAddress: {
@@ -17887,6 +17940,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepCustomerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_storeOrders: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepStoreOrderPage"];
                 };
             };
             /** @description RFC 9457 problem details */

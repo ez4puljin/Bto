@@ -483,6 +483,15 @@ export class CustomersService {
       .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
   }
 
+  /** True when the customer exists and the caller may read it (`visibleTo`). */
+  async isVisible(ctx: AuthContext, id: number, executor: Db | Tx = this.db): Promise<boolean> {
+    const [row] = await executor
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(this.visibleTo(ctx), eq(customers.id, id)));
+    return row !== undefined;
+  }
+
   /** Every customer the caller may read: the universe of a negative condition (ADR-0049 #3). */
   allIds(ctx: AuthContext, executor: Db | Tx = this.db): Promise<number[]> {
     return this.idsOf(ctx, sql`true`, executor);

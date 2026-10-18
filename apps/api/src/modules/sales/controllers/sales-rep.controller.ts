@@ -16,6 +16,8 @@ import {
   SalesRepProductDto,
   SalesRepProductPageDto,
   SalesRepProductQueryDto,
+  SalesRepStoreOrderPageDto,
+  SalesRepStoreOrderQueryDto,
   SalesRepSupplierDto,
   SalesRepThumbsDto,
 } from '../dto/sales-rep.dto';
@@ -114,7 +116,8 @@ function toRepProduct(product: RepProduct): SalesRepProductDto {
  * amount, ADR-0068 #20), the map of located stores with the
  * rep's last order for each, the shop's products with prices and stock (filtered and sorted), the
  * suppliers to filter by, and the customers an order needs. Every route
- * needs `sales.orders.rep` and answers for the caller's own data only.
+ * needs `sales.orders.rep` and answers for the caller's own data only, except a store's order
+ * history: every order of the store, the others' as rows that never open.
  */
 @ApiTags('sales-rep')
 @Controller('sales-rep')
@@ -270,6 +273,29 @@ export class SalesRepController {
     @Query() query: SalesRepCustomerQueryDto,
   ): Promise<SalesRepCustomerPageDto> {
     return this.shop.customerPage(ctx, query);
+  }
+
+  @Get('customers/:id/orders')
+  @RequirePermission(REP)
+  @ApiOkResponse({ type: SalesRepStoreOrderPageDto })
+  async storeOrders(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: SalesRepStoreOrderQueryDto,
+  ): Promise<SalesRepStoreOrderPageDto> {
+    const page = await this.orders.storeOrders(ctx, id, {
+      ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
+      ...(query.limit === undefined ? {} : { limit: query.limit }),
+    });
+    return {
+      data: page.data.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+        total: money(row.total),
+        estimatedTotal: money(row.estimatedTotal),
+      })),
+      nextCursor: page.nextCursor,
+    };
   }
 
   @Get('customers/:id')
