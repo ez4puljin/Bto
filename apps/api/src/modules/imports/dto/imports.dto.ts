@@ -1,7 +1,21 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { IMPORT_KINDS, type ImportKind } from '@tugeel/shared/imports';
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IMPORT_KINDS,
+  type ImportKind,
+  RECEIPT_IMPORT_PAYMENT_METHODS,
+  type ReceiptImportOptions,
+} from '@tugeel/shared/imports';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { IMPORT_ACTIONS, IMPORT_STATUSES, type ImportAction, type ImportStatus } from '../schema';
 
@@ -63,6 +77,19 @@ export class ImportSummaryDto {
   sheetDeleted?: boolean;
 }
 
+@ApiSchema({ name: 'ReceiptImportOptions' })
+export class ReceiptImportOptionsDto implements ReceiptImportOptions {
+  @ApiProperty({ description: 'A wholesale warehouse' }) @IsInt() @Min(1) warehouseId: number;
+  @ApiProperty({ enum: RECEIPT_IMPORT_PAYMENT_METHODS })
+  @IsIn(RECEIPT_IMPORT_PAYMENT_METHODS)
+  paymentMethod: ReceiptImportOptions['paymentMethod'];
+  @ApiProperty({ type: Number, nullable: true, description: 'Cash box or bank account' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  moneyAccountId: number | null;
+}
+
 @ApiSchema({ name: 'ImportJob' })
 export class ImportJobDto {
   @ApiProperty() id: number;
@@ -81,6 +108,8 @@ export class ImportJobDto {
   @ApiProperty() warningRows: number;
   @ApiProperty({ type: ImportSummaryDto, nullable: true }) summary: ImportSummaryDto | null;
   @ApiProperty({ type: ImportProblemDto, nullable: true }) lastError: ImportProblemDto | null;
+  @ApiProperty({ type: ReceiptImportOptionsDto, nullable: true, description: 'RECEIPTS only' })
+  receiptOptions: ReceiptImportOptionsDto | null;
   @ApiProperty({ description: 'The most recent committed import: only it can be reverted' })
   canRevert: boolean;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
@@ -141,6 +170,11 @@ export class CreateImportDto {
   @MinLength(1)
   @MaxLength(255)
   fileName: string;
+  @ApiPropertyOptional({ type: ReceiptImportOptionsDto, description: 'Required for RECEIPTS' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ReceiptImportOptionsDto)
+  receiptOptions?: ReceiptImportOptionsDto;
 }
 
 export class ImportListQueryDto extends PageQueryDto {

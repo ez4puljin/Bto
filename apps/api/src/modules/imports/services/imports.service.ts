@@ -1,15 +1,23 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ImportKind, RowIssue } from '@tugeel/shared/imports';
+import type { ImportKind, ReceiptImportOptions, RowIssue } from '@tugeel/shared/imports';
 import { and, asc, desc, eq, gt, inArray, lt, ne, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { AppError, notFound } from '../../../common/errors/app-error';
+import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { JobsService } from '../../../common/jobs/jobs.service';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { type AuthContext, AuditService, StorageService } from '../../identity';
+import {
+  type AuthContext,
+  AuditService,
+  OrgService,
+  ScopeService,
+  StorageService,
+} from '../../identity';
+import { ReceiptsService } from '../../inventory';
 import { type ImportAction, type ImportStatus, importJobs, importRows } from '../schema';
 import { PricesImporter } from '../importers/prices.importer';
+import type { StoredReceiptOptions } from '../importers/receipts.importer';
 import { buildTemplate } from './import-template';
 
 type JobRow = typeof importJobs.$inferSelect;
@@ -33,6 +41,8 @@ export interface ImportJob {
   errorRows: number;
   warningRows: number;
   summary: unknown;
+  /** What the dialog chose for the whole file (a receipts import: warehouse and payment). */
+  options: unknown;
   lastError: ImportProblem | null;
   /** The most recent committed import: the only one that can be reverted (ADR-0036 #7). */
   canRevert: boolean;
@@ -67,6 +77,9 @@ export class ImportsService {
     private readonly jobs: JobsService,
     private readonly storage: StorageService,
     private readonly prices: PricesImporter,
+    private readonly org: OrgService,
+    private readonly scope: ScopeService,
+    private readonly receipts: ReceiptsService,
   ) {}
 
   /** The template of a kind; the price sheet starts from every active product (ADR-0054 #2). */
@@ -77,8 +90,15 @@ export class ImportsService {
   /** Attaches an uploaded sheet and queues its check (POST /imports). */
   async create(
     ctx: AuthContext,
-    input: { kind: ImportKind; fileId: number; fileName: string },
+    input: {
+      kind: ImportKind;
+      fileId: number;
+      fileName: string;
+      receiptOptions?: ReceiptImportOptions | null;
+    },
   ): Promise<ImportJob> {
+    const options =
+      input.kind === 'RECEIPTS' ? await this.receiptOptions(ctx, input.receiptOptions) : null;
     await this.storage.verifyUploaded(input.fileId, 'imports.source');
     return inTransaction(this.db, async (tx) => {
       await this.storage.confirm(tx, input.fileId, 'imports.source');
@@ -88,6 +108,7 @@ export class ImportsService {
           kind: input.kind,
           fileId: input.fileId,
           fileName: input.fileName.trim().slice(0, 255) || 'import.xlsx',
+          options,
           createdBy: ctx.userId,
         })
         .returning();
@@ -97,10 +118,56 @@ export class ImportsService {
         action: 'CREATE',
         entity: 'import_jobs',
         entityId: job.id,
-        after: { kind: job.kind, fileName: job.fileName, fileId: job.fileId },
+        after: { kind: job.kind, fileName: job.fileName, fileId: job.fileId, options },
       });
       return this.view(job, tx);
     });
+  }
+
+  /**
+   * A receipts import's options (ADR-0078 #7): a wholesale warehouse the user writes for, how the
+   * notes are paid, and whether the sheet's prices are taken (cost holders only).
+   */
+  private async receiptOptions(
+    ctx: AuthContext,
+    options: ReceiptImportOptions | null | undefined,
+  ): Promise<StoredReceiptOptions> {
+    if (!options) {
+      throw invalid('receiptOptions', 'required', 'a receipts import names its warehouse');
+    }
+    const warehouse = await this.org.getWarehouse(options.warehouseId);
+    if (warehouse.kind !== 'WHOLESALE') {
+      throw new AppError(
+        'WAREHOUSE_KIND_NOT_ALLOWED',
+        'goods are received into wholesale warehouses',
+        { kind: warehouse.kind },
+      );
+    }
+    this.scope.assertCanWriteWarehouse(ctx, warehouse.id);
+    if (options.paymentMethod === 'CREDIT' && options.moneyAccountId) {
+      throw invalid(
+        'receiptOptions.moneyAccountId',
+        'credit',
+        'a receipt on credit names no account',
+      );
+    }
+    const accountId = options.paymentMethod === 'CREDIT' ? null : options.moneyAccountId;
+    if (options.paymentMethod !== 'CREDIT') {
+      const account = (await this.receipts.paymentAccounts()).find((row) => row.id === accountId);
+      if (!account || account.kind !== options.paymentMethod) {
+        throw invalid(
+          'receiptOptions.moneyAccountId',
+          'kind',
+          'an active account of the payment kind',
+        );
+      }
+    }
+    return {
+      warehouseId: warehouse.id,
+      paymentMethod: options.paymentMethod,
+      moneyAccountId: accountId,
+      withPrices: ctx.permissions.has('inventory.costs.manage'),
+    };
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<ImportJob> {
@@ -277,6 +344,7 @@ function toView(job: JobRow, latestCommitted: number | null): ImportJob {
     errorRows: job.errorRows,
     warningRows: job.warningRows,
     summary: job.summary,
+    options: job.options,
     lastError: parseProblem(job.lastError),
     canRevert: job.status === 'COMMITTED' && latestCommitted === job.id,
     createdAt: job.createdAt,

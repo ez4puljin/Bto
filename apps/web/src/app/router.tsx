@@ -227,12 +227,9 @@ export const routes: RouteObject[] = [
           { path: 'inventory/movements', handle: { width: 'wide' }, element: <MovementsPage /> },
           { path: 'inventory/low-stock', handle: { width: 'wide' }, element: <LowStockPage /> },
           { path: 'inventory/receipts', handle: { width: 'wide' }, element: <ReceiptsPage /> },
-          // Old links: a receipt is created in the list's dialog and costed on its own page.
-          {
-            path: 'inventory/receipts/new',
-            handle: { width: 'wide' },
-            element: <Navigate to="/inventory/receipts?new=1" replace />,
-          },
+          // One page for a new receipt (`new`) and an existing one, so the page that creates a
+          // draft stays mounted when it takes the draft's address; `?new=1` on the list redirects
+          // here. The old costing page is the receipt itself.
           { path: 'inventory/receipts/:id', handle: { width: 'wide' }, element: <ReceiptPage /> },
           {
             path: 'inventory/receipts/:id/costing',

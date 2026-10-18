@@ -83,7 +83,7 @@ export function toLocationDto(location: ProductLocation): ProductLocationDto {
   };
 }
 
-export function toReceiptLineDto(line: ReceiptLine): ReceiptLineDto {
+export function toReceiptLineDto(line: ReceiptLine, withCosts = false): ReceiptLineDto {
   return {
     id: line.id,
     productId: line.productId,
@@ -97,11 +97,20 @@ export function toReceiptLineDto(line: ReceiptLine): ReceiptLineDto {
     binId: line.binId,
     binCode: line.binCode,
     lotId: line.lotId,
+    ...(withCosts
+      ? {
+          docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
+          docAmount: line.docAmount?.toFixed(2) ?? null,
+          freeGoods: line.freeGoods,
+          vatAmount: line.vatAmount?.toFixed(2) ?? null,
+          costAmount: line.costAmount?.toFixed(2) ?? null,
+        }
+      : {}),
   };
 }
 
-/** No cost, amount or average ever reaches this DTO (ADR-0033 #8). */
-export function toReceiptDetailDto(receipt: ReceiptDetail): ReceiptDetailDto {
+/** Prices, amounts and totals only with `withCosts` (ADR-0033 #8, ADR-0078 #2). */
+export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): ReceiptDetailDto {
   return {
     id: receipt.id,
     number: receipt.number,
@@ -114,12 +123,29 @@ export function toReceiptDetailDto(receipt: ReceiptDetail): ReceiptDetailDto {
     supplierDocDate: receipt.supplierDocDate,
     status: receipt.status,
     costingStatus: receipt.costingStatus,
+    costingVersion: receipt.costingVersion,
+    recostUntil: receipt.recostUntil,
     note: receipt.note,
+    paymentMethod: receipt.paymentMethod,
+    moneyAccountId: receipt.moneyAccountId,
+    moneyAccountName: receipt.moneyAccountName,
+    supplierVatPayer: receipt.supplierVatPayer,
+    vatRatePct: receipt.vatRatePct.toFixed(),
     effectiveDate: receipt.effectiveDate,
     postedAt: receipt.postedAt?.toISOString() ?? null,
     createdAt: receipt.createdAt.toISOString(),
     updatedAt: receipt.updatedAt.toISOString(),
-    lines: receipt.lines.map(toReceiptLineDto),
+    lines: receipt.lines.map((line) => toReceiptLineDto(line, withCosts)),
+    ...(withCosts
+      ? {
+          totals: {
+            docTotal: receipt.totals.docTotal.toFixed(2),
+            vatTotal: receipt.totals.vatTotal.toFixed(2),
+            costTotal: receipt.totals.costTotal.toFixed(2),
+            pricedLines: receipt.totals.pricedLines,
+          },
+        }
+      : {}),
   };
 }
 
@@ -148,7 +174,9 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
     costingVersion: costing.costingVersion,
     recostUntil: costing.recostUntil,
     costedAt: costing.costedAt?.toISOString() ?? null,
+    vatRatePct: costing.vatRatePct.toFixed(),
     total: costing.total?.toFixed(2) ?? null,
+    docTotal: costing.docTotal?.toFixed(2) ?? null,
     lines: costing.lines.map((line) => ({
       lineId: line.lineId,
       productId: line.productId,
@@ -158,6 +186,7 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
       qtyBase: line.qtyBase.toFixed(),
       provisionalUnitCost: line.provisionalUnitCost.toFixed(),
       amount: line.amount?.toFixed(2) ?? null,
+      docAmount: line.docAmount?.toFixed(2) ?? null,
       unitCost: line.unitCost?.toFixed() ?? null,
       freeGoods: line.freeGoods,
     })),

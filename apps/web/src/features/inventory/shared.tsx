@@ -306,8 +306,9 @@ export function ScanToolbar(props: {
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
-        <div className="min-w-0 lg:flex-1">{props.scanBox}</div>
+      {/* The scan box keeps room for its label and buttons; the search wraps below when tight. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
+        <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
         {props.qty}
         {props.search ? (
           <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>

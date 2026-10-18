@@ -11,6 +11,7 @@ import { CustomersImporter } from './importers/customers.importer';
 import { LevelsImporter } from './importers/levels.importer';
 import { OpeningStockImporter } from './importers/opening-stock.importer';
 import { PricesImporter } from './importers/prices.importer';
+import { ReceiptsImporter } from './importers/receipts.importer';
 import { ProductsImporter } from './importers/products.importer';
 import { SuppliersImporter } from './importers/suppliers.importer';
 import { CommitImportJob } from './jobs/commit-import.job';
@@ -29,6 +30,7 @@ const CORE_SERVICES = [
   OpeningStockImporter,
   PricesImporter,
   ProductsImporter,
+  ReceiptsImporter,
   SuppliersImporter,
 ];
 

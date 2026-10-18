@@ -28,6 +28,7 @@ import {
   ReceiptLineRequestDto,
   ReceiptListQueryDto,
   ReceiptPageDto,
+  ReceiptPaymentAccountDto,
   UpdateReceiptDto,
   UpdateReceiptLineDto,
 } from '../dto/receipts.dto';
@@ -37,11 +38,21 @@ import { toReceiptCostingDto, toReceiptDetailDto, toReceiptSummaryDto } from './
 const MANAGE = 'inventory.receipts.manage';
 const COSTS = 'inventory.costs.manage';
 
+const money = (value: string | null | undefined) =>
+  value === undefined ? undefined : value === null ? null : new Decimal(value);
+
 const lineInput = (line: ReceiptLineRequestDto) => ({
   productUnitId: line.productUnitId,
   enteredQty: new Decimal(line.enteredQty),
   ...(line.binId === undefined ? {} : { binId: line.binId }),
+  ...(line.docUnitPrice === undefined ? {} : { docUnitPrice: money(line.docUnitPrice) }),
+  ...(line.docAmount === undefined ? {} : { docAmount: money(line.docAmount) }),
+  ...(line.freeGoods === undefined ? {} : { freeGoods: line.freeGoods }),
 });
+
+/** Prices and totals only for cost holders (ADR-0033 #8, ADR-0078 #2). */
+const detail = (ctx: AuthContext) => (receipt: Parameters<typeof toReceiptDetailDto>[0]) =>
+  toReceiptDetailDto(receipt, ctx.permissions.has(COSTS));
 
 /**
  * Goods receipts (ADR-0033): warehouse staff count and post them; every user reads them without
@@ -60,11 +71,22 @@ export class ReceiptsController {
     return { data: page.data.map(toReceiptSummaryDto), nextCursor: page.nextCursor };
   }
 
+  /** The cash boxes and bank accounts a receipt may name (ADR-0078 #5). */
+  @Get('payment-accounts')
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: [ReceiptPaymentAccountDto] })
+  async paymentAccounts(): Promise<ReceiptPaymentAccountDto[]> {
+    return this.receipts.paymentAccounts();
+  }
+
   @Get(':id')
   @Authenticated()
   @ApiOkResponse({ type: ReceiptDetailDto })
-  async get(@Param('id', ParseIntPipe) id: number): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.get(id));
+  async get(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ReceiptDetailDto> {
+    return detail(ctx)(await this.receipts.get(id));
   }
 
   @Post()
@@ -75,13 +97,15 @@ export class ReceiptsController {
     @CurrentUser() ctx: AuthContext,
     @Body() body: CreateReceiptDto,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(
+    return detail(ctx)(
       await this.receipts.create(ctx, {
         warehouseId: body.warehouseId,
         supplierId: body.supplierId,
         ...(body.supplierDocNo === undefined ? {} : { supplierDocNo: body.supplierDocNo }),
         ...(body.supplierDocDate === undefined ? {} : { supplierDocDate: body.supplierDocDate }),
         ...(body.note === undefined ? {} : { note: body.note }),
+        ...(body.paymentMethod === undefined ? {} : { paymentMethod: body.paymentMethod }),
+        ...(body.moneyAccountId === undefined ? {} : { moneyAccountId: body.moneyAccountId }),
         lines: (body.lines ?? []).map(lineInput),
       }),
     );
@@ -95,7 +119,7 @@ export class ReceiptsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateReceiptDto,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.update(ctx, id, body));
+    return detail(ctx)(await this.receipts.update(ctx, id, body));
   }
 
   @Post(':id/lines')
@@ -106,7 +130,7 @@ export class ReceiptsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ReceiptLineRequestDto,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.addLine(ctx, id, lineInput(body)));
+    return detail(ctx)(await this.receipts.addLine(ctx, id, lineInput(body)));
   }
 
   /** DRAFT → POSTED; idempotent so a retried click never posts twice. */
@@ -119,7 +143,7 @@ export class ReceiptsController {
     @CurrentUser() ctx: AuthContext,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.post(ctx, id));
+    return detail(ctx)(await this.receipts.post(ctx, id));
   }
 
   @Post(':id/cancel')
@@ -130,7 +154,7 @@ export class ReceiptsController {
     @CurrentUser() ctx: AuthContext,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.cancel(ctx, id));
+    return detail(ctx)(await this.receipts.cancel(ctx, id));
   }
 
   @Get(':id/costing')
@@ -176,10 +200,13 @@ export class ReceiptLinesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateReceiptLineDto,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(
+    return detail(ctx)(
       await this.receipts.updateLine(ctx, id, {
         ...(body.enteredQty === undefined ? {} : { enteredQty: new Decimal(body.enteredQty) }),
         ...(body.binId === undefined ? {} : { binId: body.binId }),
+        ...(body.docUnitPrice === undefined ? {} : { docUnitPrice: money(body.docUnitPrice) }),
+        ...(body.docAmount === undefined ? {} : { docAmount: money(body.docAmount) }),
+        ...(body.freeGoods === undefined ? {} : { freeGoods: body.freeGoods }),
       }),
     );
   }
@@ -191,6 +218,6 @@ export class ReceiptLinesController {
     @CurrentUser() ctx: AuthContext,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ReceiptDetailDto> {
-    return toReceiptDetailDto(await this.receipts.removeLine(ctx, id));
+    return detail(ctx)(await this.receipts.removeLine(ctx, id));
   }
 }

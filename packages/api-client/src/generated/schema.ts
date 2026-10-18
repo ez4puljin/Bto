@@ -1361,6 +1361,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/receipts/payment-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cash boxes and bank accounts a receipt may name (ADR-0078 #5). */
+        get: operations["Receipts_paymentAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/receipts/{id}": {
         parameters: {
             query?: never;
@@ -4966,6 +4983,8 @@ export interface components {
             name: string;
             tin: string | null;
             phone: string | null;
+            /** @description A VAT payer: delivery-note prices hold VAT (ADR-0078) */
+            vatPayer: boolean;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             regNo: string | null;
@@ -4990,6 +5009,8 @@ export interface components {
             name: string;
             tin: string | null;
             phone: string | null;
+            /** @description A VAT payer: delivery-note prices hold VAT (ADR-0078) */
+            vatPayer: boolean;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             regNo: string | null;
@@ -5019,6 +5040,8 @@ export interface components {
             bankAccount?: string | null;
             /** @description Days we have to pay them */
             paymentTermDays?: number | null;
+            /** @description A VAT payer (ADR-0078); omitted on create: no */
+            vatPayer?: boolean;
             note?: string | null;
             /** @description Omitted: the next free number */
             code?: string;
@@ -5038,6 +5061,8 @@ export interface components {
             bankAccount?: string | null;
             /** @description Days we have to pay them */
             paymentTermDays?: number | null;
+            /** @description A VAT payer (ADR-0078); omitted on create: no */
+            vatPayer?: boolean;
             note?: string | null;
             code?: string;
             name?: string;
@@ -5268,6 +5293,13 @@ export interface components {
             data: components["schemas"]["ReceiptSummary"][];
             nextCursor: string | null;
         };
+        ReceiptPaymentAccount: {
+            id: number;
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "CASH" | "BANK";
+        };
         ReceiptLine: {
             id: number;
             productId: number;
@@ -5289,6 +5321,22 @@ export interface components {
             /** @example A-01-03 */
             binCode: string;
             lotId: number | null;
+            /** @description Delivery-note price per unit */
+            docUnitPrice?: string | null;
+            /** @description Delivery-note amount, VAT in */
+            docAmount?: string | null;
+            freeGoods?: boolean;
+            vatAmount?: string | null;
+            /** @description Amount less VAT */
+            costAmount?: string | null;
+        };
+        ReceiptTotals: {
+            /** @description Σ delivery-note amounts, VAT in */
+            docTotal: string;
+            vatTotal: string;
+            costTotal: string;
+            /** @description Lines priced or free */
+            pricedLines: number;
         };
         ReceiptDetail: {
             id: number;
@@ -5307,7 +5355,20 @@ export interface components {
             status: "DRAFT" | "POSTED" | "CANCELLED";
             /** @enum {string|null} */
             costingStatus: "PENDING" | "COSTED" | null;
+            costingVersion: number;
+            /** Format: date */
+            recostUntil: string | null;
             note: string | null;
+            /** @enum {string} */
+            paymentMethod: "CREDIT" | "CASH" | "BANK";
+            moneyAccountId: number | null;
+            moneyAccountName: string | null;
+            supplierVatPayer: boolean;
+            /**
+             * @description VAT inside the delivery-note prices
+             * @example 10
+             */
+            vatRatePct: string;
             /** Format: date */
             effectiveDate: string | null;
             /** Format: date-time */
@@ -5317,6 +5378,8 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             lines: components["schemas"]["ReceiptLine"][];
+            /** @description Cost holders only */
+            totals?: components["schemas"]["ReceiptTotals"];
         };
         ReceiptLineRequest: {
             productUnitId: number;
@@ -5327,12 +5390,25 @@ export interface components {
             enteredQty: string;
             /** @description Omitted: the fixed shelf of the product, else the receiving area */
             binId?: number | null;
+            /** @description Delivery-note price per unit */
+            docUnitPrice?: string | null;
+            /** @description Or the line amount, VAT in */
+            docAmount?: string | null;
+            /** @description Free goods (бонус) */
+            freeGoods?: boolean;
         };
         ReceiptCreateRequest: {
             supplierDocNo?: string | null;
             /** Format: date */
             supplierDocDate?: string | null;
             note?: string | null;
+            /**
+             * @description Default CREDIT
+             * @enum {string}
+             */
+            paymentMethod?: "CREDIT" | "CASH" | "BANK";
+            /** @description Cash box or bank account */
+            moneyAccountId?: number | null;
             warehouseId: number;
             supplierId: number;
             lines?: components["schemas"]["ReceiptLineRequest"][];
@@ -5342,6 +5418,13 @@ export interface components {
             /** Format: date */
             supplierDocDate?: string | null;
             note?: string | null;
+            /**
+             * @description Default CREDIT
+             * @enum {string}
+             */
+            paymentMethod?: "CREDIT" | "CASH" | "BANK";
+            /** @description Cash box or bank account */
+            moneyAccountId?: number | null;
             supplierId?: number;
         };
         ReceiptCostingLine: {
@@ -5353,7 +5436,10 @@ export interface components {
             qtyBase: string;
             /** @description Cost per base unit the goods went in at */
             provisionalUnitCost: string;
+            /** @description Cost: the amount less VAT */
             amount: string | null;
+            /** @description As typed, VAT in */
+            docAmount: string | null;
             /** @description Per base unit */
             unitCost: string | null;
             freeGoods: boolean;
@@ -5370,18 +5456,23 @@ export interface components {
             recostUntil: string | null;
             /** Format: date-time */
             costedAt: string | null;
+            /** @example 10 */
+            vatRatePct: string;
+            /** @description Σ cost */
             total: string | null;
+            /** @description Σ as typed */
+            docTotal: string | null;
             lines: components["schemas"]["ReceiptCostingLine"][];
         };
         ReceiptCostLineRequest: {
             lineId: number;
             /**
-             * @description Line amount, MNT ex-VAT
+             * @description Line amount as on the delivery note (VAT in)
              * @example 48000
              */
             amount?: string;
             /**
-             * @description Price per entered unit, MNT ex-VAT
+             * @description Price per entered unit as on the delivery note
              * @example 24000
              */
             unitPrice?: string;
@@ -5397,6 +5488,11 @@ export interface components {
             /** @example 3 */
             enteredQty?: string;
             binId?: number;
+            /** @description null clears the price */
+            docUnitPrice?: string | null;
+            /** @description null clears the price */
+            docAmount?: string | null;
+            freeGoods?: boolean;
         };
         BinMoveSummary: {
             id: number;
@@ -6153,10 +6249,18 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        ReceiptImportOptions: {
+            /** @description A wholesale warehouse */
+            warehouseId: number;
+            /** @enum {string} */
+            paymentMethod: "CREDIT" | "CASH" | "BANK";
+            /** @description Cash box or bank account */
+            moneyAccountId: number | null;
+        };
         ImportJob: {
             id: number;
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
             fileName: string;
             /** @enum {string} */
             status: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
@@ -6168,6 +6272,8 @@ export interface components {
             warningRows: number;
             summary: components["schemas"]["ImportSummary"] | null;
             lastError: components["schemas"]["ImportProblem"] | null;
+            /** @description RECEIPTS only */
+            receiptOptions: components["schemas"]["ReceiptImportOptions"] | null;
             /** @description The most recent committed import: only it can be reverted */
             canRevert: boolean;
             /** Format: date-time */
@@ -6214,11 +6320,13 @@ export interface components {
         };
         ImportCreateRequest: {
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
             /** @description An uploaded file of kind imports.source */
             fileId: number;
             /** @example Бараа.xlsx */
             fileName: string;
+            /** @description Required for RECEIPTS */
+            receiptOptions?: components["schemas"]["ReceiptImportOptions"];
         };
         PricedUnit: {
             productUnitId: number;
@@ -12326,6 +12434,34 @@ export interface operations {
             };
         };
     };
+    Receipts_paymentAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptPaymentAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Receipts_get: {
         parameters: {
             query?: never;
@@ -14139,7 +14275,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
+                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
             };
             cookie?: never;
         };
@@ -14170,7 +14306,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES";
+                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS";
                 status?: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
             };
             header?: never;

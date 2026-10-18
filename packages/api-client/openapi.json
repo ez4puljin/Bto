@@ -5675,6 +5675,46 @@
         ]
       }
     },
+    "/api/v1/receipts/payment-accounts": {
+      "get": {
+        "operationId": "Receipts_paymentAccounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReceiptPaymentAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The cash boxes and bank accounts a receipt may name (ADR-0078 #5).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/receipts/{id}": {
       "get": {
         "operationId": "Receipts_get",
@@ -8790,7 +8830,8 @@
                 "SUPPLIERS",
                 "OPENING_STOCK",
                 "LEVELS",
-                "PRICES"
+                "PRICES",
+                "RECEIPTS"
               ],
               "type": "string"
             }
@@ -8865,7 +8906,8 @@
                 "SUPPLIERS",
                 "OPENING_STOCK",
                 "LEVELS",
-                "PRICES"
+                "PRICES",
+                "RECEIPTS"
               ]
             }
           },
@@ -20283,6 +20325,10 @@
             "type": "string",
             "nullable": true
           },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "A VAT payer: delivery-note prices hold VAT (ADR-0078)"
+          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -20339,6 +20385,7 @@
           "name",
           "tin",
           "phone",
+          "vatPayer",
           "status",
           "regNo",
           "email",
@@ -20389,6 +20436,10 @@
           "phone": {
             "type": "string",
             "nullable": true
+          },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "A VAT payer: delivery-note prices hold VAT (ADR-0078)"
           },
           "status": {
             "enum": [
@@ -20446,6 +20497,7 @@
           "name",
           "tin",
           "phone",
+          "vatPayer",
           "status",
           "regNo",
           "email",
@@ -20507,6 +20559,10 @@
             "minimum": 0,
             "maximum": 365,
             "description": "Days we have to pay them"
+          },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "A VAT payer (ADR-0078); omitted on create: no"
           },
           "note": {
             "type": "string",
@@ -20575,6 +20631,10 @@
             "minimum": 0,
             "maximum": 365,
             "description": "Days we have to pay them"
+          },
+          "vatPayer": {
+            "type": "boolean",
+            "description": "A VAT payer (ADR-0078); omitted on create: no"
           },
           "note": {
             "type": "string",
@@ -21447,6 +21507,33 @@
           "nextCursor"
         ]
       },
+      "ReceiptPaymentAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "kind"
+        ]
+      },
       "ReceiptLine": {
         "type": "object",
         "properties": {
@@ -21492,6 +21579,28 @@
           "lotId": {
             "type": "number",
             "nullable": true
+          },
+          "docUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Delivery-note price per unit"
+          },
+          "docAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Delivery-note amount, VAT in"
+          },
+          "freeGoods": {
+            "type": "boolean"
+          },
+          "vatAmount": {
+            "type": "string",
+            "nullable": true
+          },
+          "costAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Amount less VAT"
           }
         },
         "required": [
@@ -21507,6 +21616,31 @@
           "binId",
           "binCode",
           "lotId"
+        ]
+      },
+      "ReceiptTotals": {
+        "type": "object",
+        "properties": {
+          "docTotal": {
+            "type": "string",
+            "description": "Σ delivery-note amounts, VAT in"
+          },
+          "vatTotal": {
+            "type": "string"
+          },
+          "costTotal": {
+            "type": "string"
+          },
+          "pricedLines": {
+            "type": "number",
+            "description": "Lines priced or free"
+          }
+        },
+        "required": [
+          "docTotal",
+          "vatTotal",
+          "costTotal",
+          "pricedLines"
         ]
       },
       "ReceiptDetail": {
@@ -21561,9 +21695,41 @@
             ],
             "type": "string"
           },
+          "costingVersion": {
+            "type": "number"
+          },
+          "recostUntil": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "paymentMethod": {
+            "enum": [
+              "CREDIT",
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "moneyAccountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "supplierVatPayer": {
+            "type": "boolean"
+          },
+          "vatRatePct": {
+            "type": "string",
+            "example": "10",
+            "description": "VAT inside the delivery-note prices"
           },
           "effectiveDate": {
             "type": "string",
@@ -21588,6 +21754,14 @@
             "items": {
               "$ref": "#/components/schemas/ReceiptLine"
             }
+          },
+          "totals": {
+            "description": "Cost holders only",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptTotals"
+              }
+            ]
           }
         },
         "required": [
@@ -21602,7 +21776,14 @@
           "supplierDocDate",
           "status",
           "costingStatus",
+          "costingVersion",
+          "recostUntil",
           "note",
+          "paymentMethod",
+          "moneyAccountId",
+          "moneyAccountName",
+          "supplierVatPayer",
+          "vatRatePct",
           "effectiveDate",
           "postedAt",
           "createdAt",
@@ -21627,6 +21808,20 @@
             "nullable": true,
             "minimum": 1,
             "description": "Omitted: the fixed shelf of the product, else the receiving area"
+          },
+          "docUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Delivery-note price per unit"
+          },
+          "docAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Or the line amount, VAT in"
+          },
+          "freeGoods": {
+            "type": "boolean",
+            "description": "Free goods (бонус)"
           }
         },
         "required": [
@@ -21651,6 +21846,21 @@
             "type": "string",
             "nullable": true,
             "maxLength": 500
+          },
+          "paymentMethod": {
+            "enum": [
+              "CREDIT",
+              "CASH",
+              "BANK"
+            ],
+            "type": "string",
+            "description": "Default CREDIT"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Cash box or bank account"
           },
           "warehouseId": {
             "type": "number",
@@ -21691,6 +21901,21 @@
             "nullable": true,
             "maxLength": 500
           },
+          "paymentMethod": {
+            "enum": [
+              "CREDIT",
+              "CASH",
+              "BANK"
+            ],
+            "type": "string",
+            "description": "Default CREDIT"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Cash box or bank account"
+          },
           "supplierId": {
             "type": "number",
             "minimum": 1
@@ -21724,7 +21949,13 @@
           },
           "amount": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Cost: the amount less VAT"
+          },
+          "docAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "As typed, VAT in"
           },
           "unitCost": {
             "type": "string",
@@ -21744,6 +21975,7 @@
           "qtyBase",
           "provisionalUnitCost",
           "amount",
+          "docAmount",
           "unitCost",
           "freeGoods"
         ]
@@ -21787,9 +22019,19 @@
             "nullable": true,
             "format": "date-time"
           },
+          "vatRatePct": {
+            "type": "string",
+            "example": "10"
+          },
           "total": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Σ cost"
+          },
+          "docTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Σ as typed"
           },
           "lines": {
             "type": "array",
@@ -21806,7 +22048,9 @@
           "costingVersion",
           "recostUntil",
           "costedAt",
+          "vatRatePct",
           "total",
+          "docTotal",
           "lines"
         ]
       },
@@ -21820,12 +22064,12 @@
           "amount": {
             "type": "string",
             "example": "48000",
-            "description": "Line amount, MNT ex-VAT"
+            "description": "Line amount as on the delivery note (VAT in)"
           },
           "unitPrice": {
             "type": "string",
             "example": "24000",
-            "description": "Price per entered unit, MNT ex-VAT"
+            "description": "Price per entered unit as on the delivery note"
           },
           "freeGoods": {
             "type": "boolean",
@@ -21867,6 +22111,19 @@
           "binId": {
             "type": "number",
             "minimum": 1
+          },
+          "docUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "null clears the price"
+          },
+          "docAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "null clears the price"
+          },
+          "freeGoods": {
+            "type": "boolean"
           }
         }
       },
@@ -24163,6 +24420,35 @@
           "code"
         ]
       },
+      "ReceiptImportOptions": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "A wholesale warehouse"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CREDIT",
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          },
+          "moneyAccountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Cash box or bank account"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "paymentMethod",
+          "moneyAccountId"
+        ]
+      },
       "ImportJob": {
         "type": "object",
         "properties": {
@@ -24176,7 +24462,8 @@
               "SUPPLIERS",
               "OPENING_STOCK",
               "LEVELS",
-              "PRICES"
+              "PRICES",
+              "RECEIPTS"
             ],
             "type": "string"
           },
@@ -24232,6 +24519,16 @@
               }
             ]
           },
+          "receiptOptions": {
+            "nullable": true,
+            "description": "RECEIPTS only",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptImportOptions"
+              }
+            ]
+          },
           "canRevert": {
             "type": "boolean",
             "description": "The most recent committed import: only it can be reverted"
@@ -24272,6 +24569,7 @@
           "warningRows",
           "summary",
           "lastError",
+          "receiptOptions",
           "canRevert",
           "createdAt",
           "validatedAt",
@@ -24403,7 +24701,8 @@
               "SUPPLIERS",
               "OPENING_STOCK",
               "LEVELS",
-              "PRICES"
+              "PRICES",
+              "RECEIPTS"
             ],
             "type": "string"
           },
@@ -24417,6 +24716,14 @@
             "minLength": 1,
             "maxLength": 255,
             "example": "Бараа.xlsx"
+          },
+          "receiptOptions": {
+            "description": "Required for RECEIPTS",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReceiptImportOptions"
+              }
+            ]
           }
         },
         "required": [

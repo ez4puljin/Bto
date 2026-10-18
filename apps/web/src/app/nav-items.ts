@@ -348,7 +348,7 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
     permission: ['sales.orders.read', 'sales.orders.manage'],
   },
   {
-    to: '/inventory/receipts?new=1',
+    to: '/inventory/receipts/new',
     label: 'home.actions.newReceipt',
     icon: PackagePlus,
     permission: 'inventory.receipts.manage',

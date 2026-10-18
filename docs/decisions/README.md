@@ -6,7 +6,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 
 1. **ADRs are immutable.** Once an ADR is `Accepted`, its text is never edited except to fix typos or add a "Superseded by" line. To change a decision, write a new ADR that supersedes the old one and set the old ADR's status to `Superseded by ADR-00NN`.
 2. **One decision per ADR.** If a session needs two unrelated decisions, write two files.
-3. **Numbering is sequential and never reused.** The next free number is `ADR-0079`. `ADR-0078` is taken by the main session for the goods-receipt window (the receipt keeps its payment method, money account and a frozen VAT rate; 2026-10-18). `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
+3. **Numbering is sequential and never reused.** The next free number is `ADR-0079`. `ADR-0069` … `ADR-0077` are the Finance Core decisions (P0a, 2026-10-18) and `ADR-0078` is the goods-receipt window. `ADR-0065` is reserved for the supermarket's e-Barimt and printing on the store edge (POS S3, ADR-0063). `ADR-0061` (the sales-rep app) and `ADR-0062` (app notifications) are reserved for the `rep-app` worktree branch, which renumbers its files to them when it rebases onto `main`. `ADR-0068` is reserved for the same branch's rep-app design ADR (its local "ADR-0066", agreed 2026-10-18).
 4. **Status values:** `Proposed` (written, not yet acted on), `Accepted` (in force), `Deferred` (principles decided now, implementation scheduled for a later delivery), `Superseded by ADR-00NN`, `Rejected`.
 5. **Read before building.** A session that starts a delivery reads the ADRs listed under that delivery in `docs/STATUS.md` ("ADRs to read first") and the "Related" section of each. A session must not re-argue an `Accepted` ADR; it writes a superseding ADR if it disagrees.
 6. **External facts** (e-Barimt rules, QPay behaviour, package versions, prices) are quoted from `docs/architecture.md` §9 and §13. Business unknowns are tagged `TODO-VERIFY`; tooling choices are never left open.
@@ -91,6 +91,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0075](ADR-0075-periods-approvals-rights.md) | Monthly periods per company with a guarded close and an audited reopen, drafts with approval, and separate rights | Accepted | 2026-10-18 |
 | [ADR-0076](ADR-0076-company-isolation.md) | Company data is isolated on the server by scoped keys, scoped services and filtered views; row-level security is prepared, not enabled | Accepted | 2026-10-18 |
 | [ADR-0077](ADR-0077-finance-core-scope-and-roadmap.md) | Bto's books replace Erkhet on the go-live day, so the core's go-live scope is the full set of books, built in phases from now | Accepted | 2026-10-18 |
+| [ADR-0078](ADR-0078-receipt-window-prices-payment.md) | The goods receipt as one delivery-note window: prices typed on the draft, VAT taken out for VAT-paying suppliers, costed at posting when priced in full, the payment method kept for the books, delivery notes imported from a sheet | Accepted | 2026-10-18 |
 
 ## Template
 

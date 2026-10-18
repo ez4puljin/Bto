@@ -216,6 +216,8 @@ export const suppliers = pgTable(
     /** Account number or IBAN, spaces removed and upper case. */
     bankAccount: text('bank_account'),
     paymentTermDays: integer('payment_term_days'),
+    /** A VAT payer: its delivery-note prices hold VAT the company takes back (ADR-0078). */
+    vatPayer: boolean('vat_payer').notNull().default(false),
     note: text('note'),
     status: text('status', { enum: PARTNER_STATUSES }).notNull().default('ACTIVE'),
     createdAt: createdAt(),

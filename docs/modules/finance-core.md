@@ -190,6 +190,7 @@ Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the c
 | settings `company.*_payer`, `tax.*_rate_pct` | `fin.company_tax_registrations`, `fin.tax_rates`; `credit.payment_term_days` stays a Bto setting |
 | `number_sequences` | `INV_NO` and `CN_NO` stay in identity; `JE_NO` is copied in P2 and `PAY_NO` in P4, each in the migration that moves its writer |
 | POS `handover_money_account_id`, `journal_entry_id`, `handover_payment_id` (`P/schema.ts:62,263,265`) | stay in Bto as plain ids plus the stored numbers; the FKs at `:62,263` are dropped in P2, the one at `:265` (→ `payments`) in P4, when payments are frozen |
+| `goods_receipts.money_account_id` (ADR-0078, migration `0028_receipt_prices`) | a plain id with no FK already, chosen through inventory's `RECEIPT_MONEY_ACCOUNTS` hook that finance binds (`finance/services/receipt-money-accounts.service.ts`); P2 keeps the money-account ids when it copies the table, and `fin-bridge` binds the hook over `FinReader.moneyAccounts` from H1 |
 
 ## 5. Document classes and account determination (ADR-0072)
 

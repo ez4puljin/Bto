@@ -155,6 +155,8 @@ export interface CostedLine {
   lotId?: number | null;
   qtyBase: Decimal;
   amount: Decimal;
+  /** What was typed, VAT included (ADR-0078); null for a costing that typed only the cost. */
+  docAmount?: Decimal | null;
   freeGoods: boolean;
 }
 
@@ -162,6 +164,7 @@ export interface Valuation {
   docLineId: number;
   version: number;
   amount: Decimal;
+  docAmount: Decimal | null;
   freeGoods: boolean;
   valueBefore: Decimal;
   valueDelta: Decimal;
@@ -575,6 +578,7 @@ export class StockPostingService {
           docLineId: line.docLineId,
           version: input.version,
           amount: line.amount,
+          docAmount: line.docAmount ?? null,
           freeGoods: line.freeGoods,
           valueBefore: before.get(line.docLineId) ?? ZERO,
           valueDelta: lineDelta,
@@ -611,6 +615,7 @@ export class StockPostingService {
           qtyBase: line.qtyBase,
           freeGoods: line.freeGoods,
           amount: result.amount,
+          docAmount: result.docAmount,
           valueBefore: result.valueBefore,
           valueDelta: result.valueDelta,
           onHandAt: balance?.onHand ?? ZERO,
@@ -644,6 +649,7 @@ export class StockPostingService {
         docLineId: row.docLineId,
         version: row.version,
         amount: row.amount,
+        docAmount: row.docAmount,
         freeGoods: row.freeGoods,
         valueBefore: row.valueBefore,
         valueDelta: row.valueDelta,

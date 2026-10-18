@@ -64,6 +64,7 @@ const supplierRow = (
 ): Schemas['SupplierListItem'] => ({
   tin: null,
   phone: null,
+  vatPayer: false,
   status: 'ACTIVE',
   regNo: null,
   email: null,
@@ -136,6 +137,7 @@ const MSM: Schemas['SupplierDetail'] = {
   name: 'МСМ ХХК',
   tin: '12345678901',
   phone: '+97670112233',
+  vatPayer: false,
   status: 'ACTIVE',
   regNo: '7654321',
   email: 'sales@msm.mn',
@@ -735,6 +737,7 @@ describe('suppliers', () => {
       bankName: null,
       bankAccount: 'mn12 0005',
       paymentTermDays: 30,
+      vatPayer: false,
       note: null,
     });
   });

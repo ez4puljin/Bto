@@ -6,7 +6,7 @@ import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
 import { IdentityModule } from '../identity';
-import { InventoryModule } from '../inventory';
+import { InventoryModule, RECEIPT_MONEY_ACCOUNTS } from '../inventory';
 import { PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
 import {
@@ -36,6 +36,7 @@ import { InvoicingService } from './services/invoicing.service';
 import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
+import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 
 const SERVICES = [
   FinanceSettingsService,
@@ -48,6 +49,7 @@ const SERVICES = [
   MoneyAccountsService,
   PaymentsService,
   CreditNotesService,
+  ReceiptMoneyAccountsService,
 ];
 
 /**
@@ -62,8 +64,9 @@ const SERVICES = [
     ...SERVICES,
     { provide: CREDIT_CHECKER, useExisting: CreditControlService },
     { provide: SALE_SINK, useExisting: InvoicingService },
+    { provide: RECEIPT_MONEY_ACCOUNTS, useExisting: ReceiptMoneyAccountsService },
   ],
-  exports: [...SERVICES, CREDIT_CHECKER, SALE_SINK],
+  exports: [...SERVICES, CREDIT_CHECKER, SALE_SINK, RECEIPT_MONEY_ACCOUNTS],
 })
 export class FinanceModule {}
 
