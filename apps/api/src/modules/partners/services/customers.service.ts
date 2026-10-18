@@ -110,6 +110,9 @@ export interface LocatedCustomer {
   code: string;
   name: string;
   phone: string | null;
+  /** The manual credit hold (no new orders) and its reason, set only while on hold. */
+  creditHold: boolean;
+  creditHoldReason: string | null;
   /** The address whose point this is: the default one, else the oldest active one with a point. */
   addressId: number;
   address: string | null;
@@ -446,6 +449,8 @@ export class CustomersService {
         code: customers.code,
         name: customers.name,
         phone: customers.phone,
+        creditHold: customers.creditHold,
+        creditHoldReason: customers.creditHoldReason,
         addressId: customerAddresses.id,
         address: customerAddresses.address,
         lat: customerAddresses.lat,
@@ -472,6 +477,8 @@ export class CustomersService {
                 code: row.code,
                 name: row.name,
                 phone: row.phone,
+                creditHold: row.creditHold,
+                creditHoldReason: row.creditHoldReason,
                 addressId: row.addressId,
                 address: row.address,
                 lat: row.lat,

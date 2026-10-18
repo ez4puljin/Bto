@@ -29941,6 +29941,15 @@
             "type": "string",
             "nullable": true
           },
+          "creditHold": {
+            "type": "boolean",
+            "description": "The customer's manual credit hold: no new orders (partners)"
+          },
+          "creditHoldReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set only while on hold"
+          },
           "addressId": {
             "type": "number",
             "description": "The customer address whose point this is"
@@ -29986,6 +29995,8 @@
           "code",
           "name",
           "phone",
+          "creditHold",
+          "creditHoldReason",
           "addressId",
           "address",
           "lat",

@@ -204,6 +204,8 @@ export class SalesRepController {
         code: store.code,
         name: store.name,
         phone: store.phone,
+        creditHold: store.creditHold,
+        creditHoldReason: store.creditHoldReason,
         addressId: store.addressId,
         address: store.address,
         lat: store.lat.toFixed(6),

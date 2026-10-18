@@ -497,6 +497,10 @@ export class SalesRepMapStoreDto {
   @ApiProperty() code: string;
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) phone: string | null;
+  @ApiProperty({ description: "The customer's manual credit hold: no new orders (partners)" })
+  creditHold: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Set only while on hold' })
+  creditHoldReason: string | null;
   @ApiProperty({ description: 'The customer address whose point this is' }) addressId: number;
   @ApiProperty({ type: String, nullable: true, description: "The point's address text" })
   address: string | null;

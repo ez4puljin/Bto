@@ -7718,6 +7718,10 @@ export interface components {
             code: string;
             name: string;
             phone: string | null;
+            /** @description The customer's manual credit hold: no new orders (partners) */
+            creditHold: boolean;
+            /** @description Set only while on hold */
+            creditHoldReason: string | null;
             /** @description The customer address whose point this is */
             addressId: number;
             /** @description The point's address text */

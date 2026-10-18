@@ -130,6 +130,9 @@ export interface RepMapStore {
   code: string;
   name: string;
   phone: string | null;
+  /** The customer's manual credit hold (partners) and its reason; drawn black on the map. */
+  creditHold: boolean;
+  creditHoldReason: string | null;
   /** The address whose point is shown (`CustomersService.located`). */
   addressId: number;
   address: string | null;
@@ -420,9 +423,9 @@ export class SalesRepOrdersService {
 
   /**
    * The rep's map: every active customer the caller may see that has a GPS point
-   * (`CustomersService.located`), each with the caller's own last SALES_REP order for it (drafts
-   * count, cancelled ones do not; another rep's never) and whether it is stale: no such order
-   * within REP_MAP_FRESH_DAYS Ulaanbaatar days, today included.
+   * (`CustomersService.located`, with its manual credit hold), each with the caller's own last
+   * SALES_REP order for it (drafts count, cancelled ones do not; another rep's never) and whether
+   * it is stale: no such order within REP_MAP_FRESH_DAYS Ulaanbaatar days, today included.
    */
   async map(ctx: AuthContext): Promise<RepMap> {
     const today = businessDate();
@@ -455,6 +458,8 @@ export class SalesRepOrdersService {
           code: store.code,
           name: store.name,
           phone: store.phone,
+          creditHold: store.creditHold,
+          creditHoldReason: store.creditHoldReason,
           addressId: store.addressId,
           address: store.address,
           lat: store.lat,

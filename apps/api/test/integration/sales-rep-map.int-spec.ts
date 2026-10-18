@@ -21,6 +21,8 @@ interface MapStoreJson {
   code: string;
   name: string;
   phone: string | null;
+  creditHold: boolean;
+  creditHoldReason: string | null;
   addressId: number;
   address: string | null;
   lat: string;
@@ -54,8 +56,8 @@ const stageBody = (name: string, action: string) => ({
  * The rep app's order-history filters and map: a customer, a product, the payment method, the
  * fulfilment and the state narrow both the page and the summary; the map lists the active
  * customers with a GPS point (the default address's, else the oldest active one's) with the
- * caller's own last order and whether it is stale (no order within 7 Ulaanbaatar days, today
- * included). Synthetic data.
+ * caller's own last order, whether it is stale (no order within 7 Ulaanbaatar days, today
+ * included) and the customer's manual credit hold with its reason. Synthetic data.
  */
 describe('sales rep order filters and map', () => {
   let app: NestExpressApplication;
@@ -456,6 +458,44 @@ describe('sales rep order filters and map', () => {
     });
     await http().get('/api/v1/sales-rep/map').set(bearer(office)).expect(403);
     await http().get('/api/v1/sales-rep/map').expect(401);
+  });
+
+  it("carries the customer's manual credit hold and its reason", async () => {
+    const credit = (customerId: number, hold: boolean, reason: string | null) =>
+      http()
+        .put(`/api/v1/customers/${customerId}/credit`)
+        .set(bearer(admin))
+        .send({
+          creditLimit: null,
+          paymentTermDays: null,
+          creditHold: hold,
+          creditHoldReason: reason,
+        })
+        .expect(200);
+    const byId = async () =>
+      new Map((await map(repA)).data.map((store) => [store.customerId, store]));
+
+    // West is put on hold with a reason; the others stay open.
+    await credit(west.id, true, 'Төлбөр хоцорсон');
+    const held = await byId();
+    expect(held.get(west.id)).toMatchObject({
+      creditHold: true,
+      creditHoldReason: 'Төлбөр хоцорсон',
+    });
+    for (const open of [north, south, east]) {
+      expect(held.get(open.id)).toMatchObject({ creditHold: false, creditHoldReason: null });
+    }
+    // Every rep sees the hold; the store stays on the map.
+    expect((await map(repB)).data.find((store) => store.customerId === west.id)).toMatchObject({
+      creditHold: true,
+    });
+
+    // Lifted: no hold, no reason.
+    await credit(west.id, false, null);
+    expect((await byId()).get(west.id)).toMatchObject({
+      creditHold: false,
+      creditHoldReason: null,
+    });
   });
 
   it("shows the caller's own last order and marks stores without one in the last 7 days", async () => {
