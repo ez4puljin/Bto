@@ -36,6 +36,7 @@ const JOB: Schemas['ImportJob'] = {
     warnings: {},
   },
   lastError: null,
+  receiptOptions: null,
   canRevert: false,
   createdAt: STAMP,
   validatedAt: STAMP,
@@ -247,5 +248,80 @@ describe('price sheet (ADR-0054)', () => {
     await user.click(screen.getByRole('button', { name: mn.imports.revert }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(mn.imports.revertPricesDescription)).toBeInTheDocument();
+  });
+});
+
+describe('receipts import (ADR-0078)', () => {
+  it('names the warehouse and the payment before the sheet and sends them with it', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
+      'GET /api/v1/warehouses': () =>
+        json({
+          data: [
+            {
+              id: 1,
+              code: 'WH1',
+              name: 'Төв агуулах',
+              kind: 'WHOLESALE',
+              branchId: 1,
+              status: 'ACTIVE',
+              createdAt: STAMP,
+              updatedAt: STAMP,
+            },
+          ],
+        }),
+      'GET /api/v1/receipts/payment-accounts': () =>
+        json([
+          { id: 7, code: 'CASH-1', name: 'Касс', kind: 'CASH' },
+          { id: 8, code: 'KHAN', name: 'Хаан банк', kind: 'BANK' },
+        ]),
+      'POST /api/v1/files/presign': () =>
+        json(
+          {
+            fileId: 42,
+            uploadUrl: '/api/v1/files/local/r.xlsx?exp=1&sig=s',
+            method: 'PUT',
+            headers: { 'Content-Type': XLSX },
+            expiresAt: STAMP,
+          },
+          201,
+        ),
+      'PUT /api/v1/files/local/r.xlsx': () => new Response(null, { status: 204 }),
+      'POST /api/v1/imports': () => json({ ...JOB, kind: 'RECEIPTS', status: 'UPLOADED' }, 201),
+      'GET /api/v1/imports/5': () => json({ ...JOB, kind: 'RECEIPTS', status: 'UPLOADED' }),
+    });
+    const put = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input, init) => fetchMock(new Request(input, init)));
+    renderApp('/imports', fetchMock);
+    const user = userEvent.setup();
+    const warehouse = await screen.findByRole('combobox', {
+      name: mn.imports.receiptOptions.warehouse,
+    });
+    const upload = screen.getAllByRole('button', { name: mn.imports.upload });
+    expect(upload.some((button) => button.hasAttribute('disabled'))).toBe(true);
+    await screen.findByRole('option', { name: 'Төв агуулах' });
+    await user.selectOptions(warehouse, 'Төв агуулах');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: mn.imports.receiptOptions.payment }),
+      mn.imports.receiptOptions.methods.CASH,
+    );
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: mn.imports.receiptOptions.account }),
+      'Касс',
+    );
+    expect(screen.queryByRole('option', { name: 'Хаан банк' })).not.toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.RECEIPTS}`),
+      new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Падаан.xlsx'),
+    );
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/imports')).toHaveLength(1));
+    expect(await calls(fetchMock, 'POST', '/api/v1/imports')[0]?.clone().json()).toEqual({
+      kind: 'RECEIPTS',
+      fileId: 42,
+      fileName: 'Падаан.xlsx',
+      receiptOptions: { warehouseId: 1, paymentMethod: 'CASH', moneyAccountId: 7 },
+    });
+    put.mockRestore();
   });
 });

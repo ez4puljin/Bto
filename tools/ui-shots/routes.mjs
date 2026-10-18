@@ -47,7 +47,7 @@ export const ROUTES = [
   { area: 'inventory', name: 'stock', path: '/inventory/stock' },
   { area: 'inventory', name: 'stock-record', path: '/inventory/stock/{stockProduct}' },
   { area: 'inventory', name: 'receipts', path: '/inventory/receipts' },
-  { area: 'inventory', name: 'receipts-new', path: '/inventory/receipts?new=1', dialog: true },
+  { area: 'inventory', name: 'receipts-new', path: '/inventory/receipts/new' },
   { area: 'inventory', name: 'receipt', path: '/inventory/receipts/{receipt}' },
   { area: 'inventory', name: 'transfers', path: '/inventory/transfers' },
   { area: 'inventory', name: 'transfers-new', path: '/inventory/transfers?new=1', dialog: true },

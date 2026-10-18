@@ -33,9 +33,11 @@ export type ReceiptLine = Schemas['ReceiptLine'];
 export type ReceiptCreate = Schemas['ReceiptCreateRequest'];
 export type ReceiptUpdate = Schemas['ReceiptUpdateRequest'];
 export type ReceiptLineRequest = Schemas['ReceiptLineRequest'];
-export type ReceiptCosting = Schemas['ReceiptCosting'];
+export type ReceiptLineUpdate = Schemas['ReceiptLineUpdateRequest'];
 export type ReceiptCostRequest = Schemas['ReceiptCostRequest'];
 export type ReceiptStatus = ReceiptDetail['status'];
+export type ReceiptPaymentMethod = ReceiptDetail['paymentMethod'];
+export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
 export type BinMoveSummary = Schemas['BinMoveSummary'];
 export type BinMoveDetail = Schemas['BinMoveDetail'];
 export type BinMoveCreate = Schemas['BinMoveCreateRequest'];
@@ -287,10 +289,12 @@ export function useReceipts(filter: ReceiptFilter) {
   });
 }
 
-export function useReceipt(id: number) {
+/** One receipt; `enabled: false` while the page is a new receipt that does not exist yet. */
+export function useReceipt(id: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.receipts, id],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/receipts/{id}', { params: { path: { id } }, signal })),
   });
@@ -298,21 +302,23 @@ export function useReceipt(id: number) {
 
 /**
  * The latest copy of a receipt in the cache, read when a queued scan runs (ADR-0047 #2): line
- * changes write the returned draft there before the next scan looks for its line.
+ * changes write the returned draft there before the next scan looks for its line. Takes the id
+ * at the call, since a new receipt gets its id from its first scan.
  */
-export function useReceiptSnapshot(id: number): () => ReceiptDetail | undefined {
+export function useReceiptSnapshot(): (id: number) => ReceiptDetail | undefined {
   const queryClient = useQueryClient();
   return useCallback(
-    () => queryClient.getQueryData<ReceiptDetail>([...KEYS.receipts, id]),
-    [queryClient, id],
+    (id: number) => queryClient.getQueryData<ReceiptDetail>([...KEYS.receipts, id]),
+    [queryClient],
   );
 }
 
 /** Posted receipts waiting for their costs, newest first: the accountant's queue (ADR-0047 #1). */
-export function usePendingReceipts() {
+export function usePendingReceipts(enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.receipts, 'pending'],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/receipts', {
@@ -323,13 +329,15 @@ export function usePendingReceipts() {
   });
 }
 
-/** The costs of a receipt: only for holders of inventory.costs.manage. */
-export function useReceiptCosting(id: number) {
+/** The cash boxes and bank accounts a receipt paid at once may name (inventory.receipts.manage). */
+export function useReceiptPaymentAccounts(enabled = true) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.receipts, id, 'costing'],
+    queryKey: [...KEYS.receipts, 'payment-accounts'],
+    enabled,
+    staleTime: 5 * 60_000,
     queryFn: async ({ signal }) =>
-      unwrap(await api.GET('/api/v1/receipts/{id}/costing', { params: { path: { id } }, signal })),
+      unwrap(await api.GET('/api/v1/receipts/payment-accounts', { signal })),
   });
 }
 
@@ -453,13 +461,7 @@ export function useInventoryMutations() {
       onSuccess: receiptLinesChanged,
     }),
     updateReceiptLine: useMutation({
-      mutationFn: async ({
-        id,
-        body,
-      }: {
-        id: number;
-        body: { enteredQty?: string; binId?: number };
-      }) =>
+      mutationFn: async ({ id, body }: { id: number; body: ReceiptLineUpdate }) =>
         unwrap(await api.PATCH('/api/v1/receipt-lines/{id}', { params: { path: { id } }, body })),
       onSuccess: receiptLinesChanged,
     }),
