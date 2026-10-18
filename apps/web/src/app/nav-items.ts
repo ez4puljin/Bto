@@ -30,6 +30,7 @@ import {
   Package,
   PackageCheck,
   PackageMinus,
+  PackageOpen,
   PackagePlus,
   ReceiptText,
   Ruler,
@@ -82,8 +83,8 @@ export interface NavGroup {
  * pages and suppliers are readable by every user; customers only by the office, accountants and
  * admins. Branches and warehouses are readable by every user too (other pages list them), but only
  * people who manage them need the menu entry. Stock, its history, the low-stock list and receipts
- * are read by every user (without costs); transfers, moves, adjustments, stocktakes and shelves only
- * by the people who make them (every user may still open a transfer or a stocktake by its link).
+ * are read by every user (without costs); transfers, goods issues, moves, adjustments, stocktakes
+ * and shelves only by the people who make them (every user may still open a transfer or a stocktake by its link).
  * Price profiles, discount programs and the price calculator are read by every user;
  * pricing.manage changes the profiles and the programs (ADR-0041, ADR-0048). The products waiting
  * for their prices are the price clerk's list (pricing.prices.manage, ADR-0044). The AI assistant and its saved reports need ai.ask
@@ -107,6 +108,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/inventory/stock', label: 'nav.stock', icon: Boxes },
       { to: '/inventory/receipts', label: 'nav.receipts', icon: PackagePlus },
+      {
+        to: '/inventory/issues',
+        label: 'nav.issues',
+        icon: PackageOpen,
+        permission: 'inventory.issues.manage',
+      },
       {
         to: '/inventory/transfers',
         label: 'nav.transfers',

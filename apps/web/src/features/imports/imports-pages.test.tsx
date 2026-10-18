@@ -37,6 +37,7 @@ const JOB: Schemas['ImportJob'] = {
   },
   lastError: null,
   receiptOptions: null,
+  issueOptions: null,
   canRevert: false,
   createdAt: STAMP,
   validatedAt: STAMP,
@@ -300,7 +301,7 @@ describe('receipts import (ADR-0078)', () => {
     });
     const upload = screen.getAllByRole('button', { name: mn.imports.upload });
     expect(upload.some((button) => button.hasAttribute('disabled'))).toBe(true);
-    await screen.findByRole('option', { name: 'Төв агуулах' });
+    await within(warehouse).findByRole('option', { name: 'Төв агуулах' });
     await user.selectOptions(warehouse, 'Төв агуулах');
     await user.selectOptions(
       screen.getByRole('combobox', { name: mn.imports.receiptOptions.payment }),
@@ -321,6 +322,70 @@ describe('receipts import (ADR-0078)', () => {
       fileId: 42,
       fileName: 'Падаан.xlsx',
       receiptOptions: { warehouseId: 1, paymentMethod: 'CASH', moneyAccountId: 7 },
+    });
+    put.mockRestore();
+  });
+});
+
+describe('issues import (ADR-0081)', () => {
+  it('names the warehouse before the sheet and sends it with it', async () => {
+    const warehouse = (id: number, name: string, kind: Schemas['WarehouseKind']) => ({
+      id,
+      code: `WH${id}`,
+      name,
+      kind,
+      branchId: 1,
+      status: 'ACTIVE',
+      createdAt: STAMP,
+      updatedAt: STAMP,
+    });
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
+      'GET /api/v1/warehouses': () =>
+        json({
+          data: [
+            warehouse(1, 'Төв агуулах', 'WHOLESALE'),
+            warehouse(2, 'Супермаркет', 'STORE'),
+            warehouse(3, 'Машин 1', 'VEHICLE'),
+          ],
+          nextCursor: null,
+        }),
+      'POST /api/v1/files/presign': () =>
+        json(
+          {
+            fileId: 43,
+            uploadUrl: '/api/v1/files/local/i.xlsx?exp=1&sig=s',
+            method: 'PUT',
+            headers: { 'Content-Type': XLSX },
+            expiresAt: STAMP,
+          },
+          201,
+        ),
+      'PUT /api/v1/files/local/i.xlsx': () => new Response(null, { status: 204 }),
+      'POST /api/v1/imports': () => json({ ...JOB, kind: 'ISSUES', status: 'UPLOADED' }, 201),
+      'GET /api/v1/imports/5': () => json({ ...JOB, kind: 'ISSUES', status: 'UPLOADED' }),
+    });
+    const put = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input, init) => fetchMock(new Request(input, init)));
+    renderApp('/imports', fetchMock);
+    const user = userEvent.setup();
+    const select = await screen.findByRole('combobox', { name: mn.imports.issueOptions.warehouse });
+    const input = screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.ISSUES}`);
+    const upload = input.parentElement!.querySelector('button')!;
+    expect(upload).toBeDisabled();
+    // Goods leave a warehouse or the store, never a van.
+    expect(await within(select).findByRole('option', { name: 'Супермаркет' })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Машин 1' })).toBeNull();
+    await user.selectOptions(select, 'Супермаркет');
+    expect(upload).toBeEnabled();
+    await user.upload(input, new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Зарлага.xlsx'));
+    await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/imports')).toHaveLength(1));
+    expect(await calls(fetchMock, 'POST', '/api/v1/imports')[0]?.clone().json()).toEqual({
+      kind: 'ISSUES',
+      fileId: 43,
+      fileName: 'Зарлага.xlsx',
+      issueOptions: { warehouseId: 2 },
     });
     put.mockRestore();
   });
