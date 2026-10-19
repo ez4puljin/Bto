@@ -9,6 +9,8 @@ Status (Finance I, delivery 3, built 2026-10-16, ADR-0060):
 - **The general journal**: a small chart of accounts with roles, automatic entries from every document, manual and opening entries, reversals.
 - **Number formats** for the four documents, in the owner's style (`Н-20261016-0001`).
 
+- **The customer app's reads** (ADR-0079 #7, ADR-0082, 2026-10-19): «Харилцагчид харуулах» on bank accounts, the store's own invoice and payment reads, and `PAYMENT_LISTENER` telling notifications of a customer payment.
+
 Still to come: e-Barimt on the invoices (ADR-0017, next session), bank statement import and reports (delivery 10), the opening-receivables importer (before go-live), cost of goods sold postings, the screens of delivery 3 slice 5 (`docs/ui.md`).
 - **Code:** `apps/api/src/modules/finance/`; shared rules in `packages/shared/src/finance`; screens in `apps/web/src/features/finance/`.
 - **Decisions:** ADR-0060 (everything here), ADR-0010 (the tax split), ADR-0055 … ADR-0057 (the sale that invoices), ADR-0017 / ADR-0018 (what waits).
@@ -42,7 +44,7 @@ Nobody imports `finance`. Sales finds the two hooks through `ModuleRef` (`strict
 | Table | Holds | Guards |
 |---|---|---|
 | `gl_accounts` | the chart of accounts: `code` (Erkhet's style), `name`, `kind` ASSET / LIABILITY / EQUITY / INCOME / EXPENSE, `role` (one account per role: AR, SALES, SALES_DISCOUNT, SALES_RETURN, VAT_PAYABLE, CITY_TAX_PAYABLE, CUSTOMER_ADVANCE, CASH, BANK, OTHER_INCOME, OTHER_EXPENSE), `status` | code and role unique; `REVOKE DELETE, TRUNCATE`; seeded with the eleven `DEFAULT_GL_ACCOUNTS` |
-| `money_accounts` | cash boxes and bank accounts: code, name, kind CASH / BANK, branch, bank name and number, the `gl_account_id` their vouchers hit, status | code unique; `REVOKE DELETE, TRUNCATE`; one «Касс (branch)» per branch existing at migration time |
+| `money_accounts` | cash boxes and bank accounts: code, name, kind CASH / BANK, branch, bank name and number, the `gl_account_id` their vouchers hit, `show_to_customers` («Харилцагчид харуулах», BANK only: CHECK `money_accounts_show_to_customers`, migration 0031), status | code unique; `REVOKE DELETE, TRUNCATE`; one «Касс (branch)» per branch existing at migration time |
 | `finance_settings` | the four number formats (pattern + digits), one row (`id = 1`); absent until saved → the shared `FINANCE_NUMBER_DEFAULTS` | pattern 1–24 chars not ending in a digit or `}`; digits 1–8; `REVOKE DELETE, TRUNCATE` |
 | `journal_entries` | number, `entry_date`, description, `source` AUTO_INVOICE / AUTO_PAYMENT / AUTO_CREDIT_NOTE / AUTO_VOID / MANUAL / OPENING, the source document (`source_type`, `source_id`), `reverses_id`, `posted_by` | append-only (`REVOKE UPDATE, DELETE, TRUNCATE` + `forbid_update_delete` triggers); number unique |
 | `journal_lines` | `line_no`, account, `debit` xor `credit` (> 0), optional customer and money account, description | append-only like the entries; deferred constraint trigger `journal_entry_balanced`: ≥ 2 lines and Σ debit = Σ credit at commit |
@@ -65,6 +67,10 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `CreditControlService.check(tx, { customer, orderId, amount, openOrders })` | the sales hook: HOLD → OVERDUE → LIMIT → ok, with the amounts for the 409 |
 | `InvoicingService.onSold(tx, actor, snapshot)` / `void(ctx, id, reason)` | the sale hook (null when nothing was delivered); the void |
 | `InvoiceQueryService.list(ctx, query)` / `get(id)` / `openOf(customerId)` | reads |
+| `InvoiceQueryService.ofCustomer(customerId, id)` / `ofOrder(orderId)` / `openDueBetween(from, to)` | the customer app (ADR-0079 #7): one invoice of the store (404 for another's), a sold order's invoice, the open invoices the morning reminders look at |
+| `PaymentsService.ofCustomer(customerId, { cursor, limit })` | the store's posted payments and refunds with the method (CASH / BANK) and the invoices each settled; nothing internal (accounts, journal, who collected it) |
+| `MoneyAccountsService.shownToCustomers()` | the ACTIVE bank accounts marked «Харилцагчид харуулах» |
+| `PAYMENT_LISTENER`, `PaymentListener`, `PaymentRecordedNotice` (`hooks.ts`) | the hook notifications binds (ADR-0082 #5): `recordInTx` tells it of every CUSTOMER_PAYMENT with a customer, after the ledger and the audit row, with the invoices `allocate` settled; never caught; finance resolves it through ModuleRef and does without it |
 | `PaymentsService.record(ctx, input)` / `recordInTx(tx, ctx, input)` / `void` / `list(ctx, query)` / `get` / `book(moneyAccountId, query)` | the vouchers and the cash book; `recordInTx` lets another module’s transaction carry a voucher (the POS hand-over, ADR-0064 #3) and answers `{ id, number }` |
 | `CreditNotesService.create(ctx, input)` / `list` / `get` | credit notes |
 | `JournalService.post(tx, actor, input)` / `reverse(tx, actor, id, …)` / `postManual(ctx, …)` / `reverseManual` / `list` / `get` / `accountLedger(accountId, query)` | the journal; `post` throws 422 `JOURNAL_UNBALANCED` |
@@ -81,7 +87,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `POST /invoices/:id/void` [`finance.invoices.manage`, idempotent] | voids an issued invoice nothing is allocated to or credited against |
 | `GET /credit-notes`, `GET /credit-notes/:id`, `POST /credit-notes` [read / `finance.invoices.manage`, idempotent] | credit notes; `warehouseId` null = no goods back, `binId` null = the RETURNS bin; the warehouse scope applies |
 | `GET /payments`, `GET /payments/:id`, `POST /payments`, `POST /payments/:id/void` [read / `finance.payments.record`, idempotent] | vouchers; `allocations` omitted = oldest due first |
-| `GET /money-accounts` [read], `POST`, `PUT /:id` [`finance.settings.manage`], `GET /money-accounts/:id/book` [read] | cash boxes and bank accounts with balances; the book newest first with `balanceAfter` and the `opening` before `from` |
+| `GET /money-accounts` [read], `POST`, `PUT /:id` [`finance.settings.manage`], `GET /money-accounts/:id/book` [read] | cash boxes and bank accounts with balances and `showToCustomers` (a CASH box with it → 422 `showToCustomers` `bankOnly`); the book newest first with `balanceAfter` and the `opening` before `from` |
 | `GET /gl-accounts` [read], `POST`, `PUT /:id` [`finance.journal.manage`], `PUT /:id/role` [`finance.settings.manage`], `GET /:id/ledger` [read] | the chart with turnover and balances; the account ledger |
 | `GET /journal-entries`, `GET /:id` [read], `POST` (manual), `POST /:id/reverse` [`finance.journal.manage`, idempotent] | the journal; only MANUAL / OPENING entries are reversed by hand |
 | `GET /customer-balances`, `GET /customer-balances/:customerId`, `GET /customer-balances/:customerId/ledger` [read] | balances largest first (`q`, `overdue`) with aging; one customer; the ledger with `balanceAfter` and `opening` |
@@ -145,7 +151,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 ## 11. Open items
 
 - e-Barimt receipts on invoices (ADR-0017): the next session; the invoice carries everything the receipt needs (lines with `vat_type`, rates and amounts, the customer's TIN through partners).
-- No QPay (ADR-0080): customers pay cash or by bank transfer; the customer app (ADR-0079 #7) reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах».
+- Done 2026-10-19 (ADR-0082): no QPay (ADR-0080); the customer app reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах» (`docs/modules/customer.md`).
 - Opening balances: an importer of customer balances (OPENING ledger entries + an OPENING journal entry) before go-live; manual journal entries meanwhile.
 - A shorter due date for cash sales if the owner wants it (today every invoice takes the customer's term).
 - Cost of goods sold postings (stock value out of inventory at the sale); CLOSED orders when their invoice is paid; customer statements; reminders; bank statement import and VAT reports (delivery 10); supplier bills (delivery 8).

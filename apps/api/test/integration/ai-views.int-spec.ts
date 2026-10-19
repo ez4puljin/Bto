@@ -24,6 +24,8 @@ const PG_TYPES: Record<AiColumnType, string> = {
 const FORBIDDEN_TABLES = [
   'auth_sessions',
   'password_resets',
+  'customer_users',
+  'customer_password_codes',
   'idempotency_keys',
   'files',
   'audit_log',

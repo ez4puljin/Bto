@@ -7,7 +7,7 @@ import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
 import { SalesModule } from '../sales';
 import {
-  CustomerAppAccountController,
+  CustomerAppMoneyController,
   CustomerAppNotificationsController,
   CustomerAppOrdersController,
   CustomerAppShopController,
@@ -38,7 +38,7 @@ import { CustomerShopService } from './services/customer-shop.service';
     CustomerAppStoreController,
     CustomerAppShopController,
     CustomerAppOrdersController,
-    CustomerAppAccountController,
+    CustomerAppMoneyController,
     CustomerAppNotificationsController,
     CustomerSettingsController,
   ],

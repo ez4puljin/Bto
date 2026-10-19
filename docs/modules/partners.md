@@ -1,6 +1,6 @@
 # Module `partners` — contract
 
-Status: **built** (minimal) in delivery 1 (week 2), session of 2026-10-11; accepted locally together with the rest of delivery 1. Code: `apps/api/src/modules/partners/`, shared rules in `packages/shared/src/{taxpayer,geo}`, screens in `apps/web/src/features/partners/`. Decisions: ADR-0027 (access control), ADR-0028 (search keys), ADR-0032 (product ↔ supplier link), architecture §4 (partners row) and §5.5.
+Status: **built** (minimal) in delivery 1 (week 2), session of 2026-10-11; accepted locally together with the rest of delivery 1. The customer app's «Апп» card, the list's app column and filter, and the account gate added 2026-10-19 (ADR-0079 #11, ADR-0082). Code: `apps/api/src/modules/partners/`, shared rules in `packages/shared/src/{taxpayer,geo}`, screens in `apps/web/src/features/partners/`. Decisions: ADR-0027 (access control), ADR-0028 (search keys), ADR-0032 (product ↔ supplier link), architecture §4 (partners row) and §5.5.
 
 partners depends on `identity` (audit, settings, access decorators) and, for `product_suppliers` only, on `catalog` (ADR-0032: `CatalogModule`, read through `CatalogService.getMany`). inventory, imports, pricing, sales, finance, delivery, procurement and notifications import its `index.ts`.
 
@@ -44,6 +44,8 @@ partners depends on `identity` (audit, settings, access decorators) and, for `pr
 | `SuppliersService.get / getMany / list / nextCode`, `assertActive(tx, id)` | `SUPPLIER_INACTIVE` (409) for goods receipts (week 3) and product registration (ADR-0044) |
 | `SuppliersService.createInTx / updateInTx`, `findByCodes(codes)`, `findByNames(names)`, `findByIds(ids)` | the supplier and product imports (week 4): a product sheet's supplier column is matched by code, then by name (`name_key`) |
 | `SupplierContactsService.addInTx(tx, actor, supplierId, input)` | the supplier import adds a contact person the supplier does not have yet |
+| `CUSTOMER_ACCOUNT_GATE` (identity's token, bound here to `CustomerAccountGateService`) | identity asks whether a customer is ACTIVE before a customer app sign-in, a code redemption or a refresh (ADR-0082 #1). `CustomersService.updateInTx` ends the account's sessions (`CUSTOMER_INACTIVE`) when a customer stops being ACTIVE — the import's updates too |
+| `CustomerAppAccountsService` (not exported) | the «Апп» card: `get`, `link`, `issueCode`, `setStatus`; each change locks the customer row (FOR NO KEY UPDATE), checks it is ACTIVE (except closing) and hands identity's `CustomerAccountsService` the transaction |
 | `PARTNER_SET_RESOLVER` / `PartnerSetResolver`, `PartnerSegmentsService.within(ctx, entity, segmentId?)` (2026-10-14, ADR-0049 #4) | the hook segments binds; the customer and supplier lists narrow to a saved segment's ids (503 `SERVICE_UNAVAILABLE` while unbound) |
 | `CustomersService.allIds(ctx)`, `idsWhere(ctx, condition)`; `SuppliersService.allIds()`, `idsWhere(condition)`; `ProductSuppliersService.productIdsWhere(condition)` | partners' answers to segment conditions (ascending ids): customers by search, kind, status, credit hold, a missing TIN or GPS point, the day registered (under `visibleTo(ctx)`); suppliers by search, status, whether they deliver any product, the day registered; products linked to suppliers (`IN`), with one as the main (`MAIN_IN`) or to any (`ANY`) |
 | `ProductSuppliersService.setMainMany(actor, productIds, supplierId)` (ADR-0051) | the bulk main-supplier change below |
@@ -59,7 +61,9 @@ Permissions (ADR-0027 system mappings, assignable to custom roles): `partners.cu
 
 | Method and path | Access | Notes |
 |---|---|---|
-| `GET /customers` | `partners.customers.read` | `q` (name in either script, code; digits also match code, phone, TIN and registration number exactly, then code prefixes), `kind`, `status`, `creditHold`, `tinPending` (a company without a TIN), `gpsMissing` (the default address has no point), `segmentId` (a customer segment, ADR-0049; another entity's is 422, an archived one 404), keyset `cursor`/`limit`. Rows are `CustomerListItem`: the summary plus `consumerNo`, payer flags with `taxStatusSource`, `creditLimit`, `paymentTerm` (own, company setting or unset), `creditHoldReason`, `note`, the default address's `gps` point and the first `contact` (ADR-0037) |
+| `GET /customers` | `partners.customers.read` | `q` (name in either script, code; digits also match code, phone, TIN and registration number exactly, then code prefixes), `kind`, `status`, `creditHold`, `tinPending` (a company without a TIN), `gpsMissing` (the default address has no point), `app` (ACTIVE / DISABLED / NONE: the customer app account, through identity's ids, never a join), `segmentId` (a customer segment, ADR-0049; another entity's is 422, an archived one 404), keyset `cursor`/`limit`. Rows are `CustomerListItem`: the summary plus `consumerNo`, payer flags with `taxStatusSource`, `creditLimit`, `paymentTerm` (own, company setting or unset), `creditHoldReason`, `note`, the default address's `gps` point and the first `contact` (ADR-0037) |
+| `GET /customers/:id/app-account` | `partners.customers.read` | the customer app account (ADR-0079 #11): `{ account: null }` or `{ id, phone, status, passwordSet, lastSignInAt, lockedUntil, codeExpiresAt, createdAt, updatedAt }` |
+| `PUT /customers/:id/app-account` `{ phone }`, `POST /customers/:id/app-account/code`, `/disable`, `/enable` (200) | `partners.customer_app.manage` (ADMIN, OFFICE; assignable) | link the phone (local form accepted) or change it — the password is cleared and every session ends; a phone of another store → `DUPLICATE_VALUE` `customer_users_phone_key`; the code `{ code, expiresAt }` is shown once (`Cache-Control: no-store`, never `@Idempotent`, so it is never stored); closing ends every session and the live code; an inactive customer → `CUSTOMER_INACTIVE` (closing still works); a closed account's code → `ACCOUNT_DISABLED` |
 | `GET /customers/lookup?q=` | authenticated | up to 20 active customers (id, code, name) by the list's `q`, for pickers such as a goods issue's recipient (ADR-0081 #6); no credit, phones or addresses |
 | `GET /customers/next-code` | `partners.customers.manage` | the largest code + 1, same width |
 | `GET /customers/:id` | `partners.customers.read` | data, credit terms with `paymentTerm`, active addresses (default first), contacts |
@@ -98,7 +102,7 @@ Menu group «Харилцагч»: `/partners/customers` (`partners.customers.re
 
 ## 9. Tests
 
-Shared (Vitest): `taxpayer`, `geo`. Integration (`apps/api/test/integration/`): `partners-schema` (CHECKs, uniques, REVOKEs), `customers` (codes, kind/TIN rules, permission matrix, search, addresses, contacts, credit terms with the setting), `suppliers` (normalisation, unique names, read/write rights, main supplier, inactive supplier). Integrity (`apps/api/test/integrity/`): `partners-guards` (`has_table_privilege`), `partners-races` (parallel code allocation, one default address, the credit lock serialises credit checks but not address inserts, one main supplier under link/main races). Web: `features/partners/partners-pages.test.tsx`, `features/partners/partners-logic.test.ts`, the settings range message in `features/identity/identity-pages.test.tsx`.
+Shared (Vitest): `taxpayer`, `geo`. Integration (`apps/api/test/integration/`): `partners-schema` (CHECKs, uniques, REVOKEs), `customers` (codes, kind/TIN rules, permission matrix, search, addresses, contacts, credit terms with the setting), `suppliers` (normalisation, unique names, read/write rights, main supplier, inactive supplier). Integrity (`apps/api/test/integrity/`): `partners-guards` (`has_table_privilege`), `partners-races` (parallel code allocation, one default address, the credit lock serialises credit checks but not address inserts, one main supplier under link/main races). Customer app: `customer-auth.int-spec.ts` (the card, the list filter, the gate). Web: `features/partners/partners-pages.test.tsx`, `features/partners/partners-logic.test.ts`, the settings range message in `features/identity/identity-pages.test.tsx`.
 
 ## 10. Open items
 
@@ -107,6 +111,6 @@ Shared (Vitest): `taxpayer`, `geo`. Integration (`apps/api/test/integration/`): 
 - Zone definition and the `zone_id` foreign key: before delivery 5 (SPEC §11); the FK is added by hand in delivery's migration.
 - PosAPI TIN and taxpayer lookup (`tin_source` / `tax_status_source` = LOOKUP): delivery 3, together with deciding whether partners calls ebarimt or the reverse.
 - Customer and supplier Excel import, product ↔ supplier column: `imports`, week 4.
-- `customer_users` (one shop owner, several customer accounts; many-to-many): delivery 6.
+- Done 2026-10-19: `customer_users` live in identity (ADR-0082 #1; one phone — one store, ADR-0079 #2); partners holds the card's routes, the list column and filter, and the gate.
 - Price tiers and contract prices: delivery 2 (pricing).
 - Sales reps limited to their zones through `visibleTo`: delivery 7.

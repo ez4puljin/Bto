@@ -443,8 +443,8 @@ export class CustomerAppReorderDto {
 
 // ---------------------------------------------------------------------------------- the account
 
-@ApiSchema({ name: 'CustomerAppAccount' })
-export class CustomerAppAccountDto {
+@ApiSchema({ name: 'CustomerAppBalance' })
+export class CustomerAppBalanceDto {
   @ApiProperty({ example: '125000.00', description: 'Negative = an advance' }) balance: string;
   @ApiProperty() overdueAmount: string;
   @ApiProperty({ type: String, nullable: true, format: 'date' }) oldestOverdueDate: string | null;

@@ -19,7 +19,7 @@ import { CustomerInboxService } from '../../notifications';
 import { toQuoteDto } from '../../pricing';
 import {
   CompanyContactDto,
-  CustomerAppAccountDto,
+  CustomerAppBalanceDto,
   CustomerAppBankAccountDto,
   CustomerAppBarcodeDto,
   CustomerAppCategoryDto,
@@ -302,13 +302,13 @@ export class CustomerAppOrdersController {
 /** «Тооцоо» (ADR-0079 #7): read-only, from finance's own records. */
 @ApiTags('customer-app')
 @Controller('customer-app')
-export class CustomerAppAccountController {
+export class CustomerAppMoneyController {
   constructor(private readonly account: CustomerAccountService) {}
 
   @Get('account')
   @CustomerRoute()
-  @ApiOkResponse({ type: CustomerAppAccountDto })
-  async get(@CurrentCustomer() ctx: CustomerContext): Promise<CustomerAppAccountDto> {
+  @ApiOkResponse({ type: CustomerAppBalanceDto })
+  async get(@CurrentCustomer() ctx: CustomerContext): Promise<CustomerAppBalanceDto> {
     return accountDto(await this.account.account(ctx));
   }
 
