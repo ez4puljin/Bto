@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0083 (2026-10-20: #12 the pending and failed list waits until after go-live; the intake stays synchronous and in-process until A1) |
 | Amends | ADR-0027 (#1: a SOURCE principal beside STAFF; the staff token itself is unchanged); ADR-0060 (#1: `SALE_SINK.onSold` posts an `AR_INVOICE` through `FinIntakeInTx.submitInTx` inside the sale's transaction); ADR-0063 (the rejected alternative "service accounts … until a second kind of machine caller appears": source systems are that second kind, authorised per company; #4: the replay outcomes are the model for the intake's); ADR-0064 (#2 to #4, mechanism only: the shift entry and the hand-over post through the intake in phase H2; the postings are unchanged) |
 
 ## Context
