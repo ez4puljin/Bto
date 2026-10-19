@@ -6,6 +6,7 @@
 | Date | 2026-10-13 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0002 #8 (the first integration and flow service), architecture §3.1 rule 4 (`ai` reads like `reporting`), §10.2 (a third database role and pool) |
+| Amended by | ADR-0076 (#2: finance views filter by company and are `security_barrier`; #5 and #9: the AI reader sets, on every query, the companies where the user holds `finance.read`) |
 
 ## Context
 

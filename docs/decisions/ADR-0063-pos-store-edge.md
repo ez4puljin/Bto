@@ -7,6 +7,7 @@
 | Deciders | Owner, Claude (Claude Code session) |
 | Supersedes | ADR-0020 #1, #5 and #6 for the supermarket POS (the tills work through the store's own server when the internet is down; POS documents carry client-generated uuids and till-allocated numbers; the replay queue lives on that server, not in a browser) |
 | Amends | ADR-0026 (a second production footprint, the store's Ubuntu PC, exists from the POS cut-over; local development runs the edge beside the api), ADR-0027 (an edge node is a caller that is not a staff member: its own token on `@Public()` routes), ADR-0034 (the `POS` document is posted by inventory for the pos module, after an automatic `POS_SHORTFALL` adjustment), ADR-0041 and ADR-0048 (RETAIL prices are resolved on the edge from a snapshot; the centre checks, never re-prices), architecture §4 (a `pos` module of its own; the sales module no longer owns POS tables) |
+| Amended by | ADR-0069 (#2: from phase H1 `MODULE_DEPS.pos` lists `fin-bridge` instead of `finance`); ADR-0071 (the rejected alternative of identity service accounts: source systems are the second kind of machine caller, principals with per-company grants; #4: the replay outcomes are the model for the intake's) |
 
 ## Context
 
