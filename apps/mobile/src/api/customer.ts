@@ -234,7 +234,11 @@ export function useToggleFavourite() {
         : await session.client.DELETE('/api/v1/customer-app/favourites/{productId}', params);
       if (!result.response.ok) unwrap(result);
     },
-    onMutate: ({ productId, favourite }) => markFavourite(queryClient, productId, favourite),
+    onMutate: async ({ productId, favourite }) => {
+      // A refetch still running from an earlier ★ would land after this one and undo it.
+      await queryClient.cancelQueries({ queryKey: [...STORE_KEY, 'products'] });
+      markFavourite(queryClient, productId, favourite);
+    },
     onError: (_error, { productId, favourite }) =>
       markFavourite(queryClient, productId, !favourite),
     onSettled: async () => {

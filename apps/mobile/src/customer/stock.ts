@@ -24,14 +24,18 @@ export function canOrder(
   return product.stock !== 'OUT' && unit !== undefined && unit.wholesale !== null;
 }
 
-/** A cart line's warning from the quote: «Цөөхөн үлдсэн», «Зарим нь хойшилж магадгүй», or none. */
-export type LineStockNote = 'low' | 'mayBackorder' | 'lowMayBackorder' | null;
+/**
+ * A cart line's warning from the quote: «Дууссан» (it would wait for stock), «Цөөхөн үлдсэн»,
+ * «Зарим нь хойшилж магадгүй», or none.
+ */
+export type LineStockNote = 'out' | 'low' | 'mayBackorder' | 'lowMayBackorder' | null;
 
 export function lineStockNote(
   stock: { stock: StockWord; mayBackorder: boolean } | undefined,
 ): LineStockNote {
   if (!stock) return null;
-  const low = stock.stock !== 'IN';
+  if (stock.stock === 'OUT') return 'out';
+  const low = stock.stock === 'LOW';
   if (low && stock.mayBackorder) return 'lowMayBackorder';
   if (stock.mayBackorder) return 'mayBackorder';
   return low ? 'low' : null;

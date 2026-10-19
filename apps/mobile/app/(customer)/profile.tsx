@@ -108,7 +108,7 @@ export default function CustomerProfileScreen() {
             }
             title={t('mobile.customer.contacts.title')}
             value={t('mobile.customer.profile.contactsOnHome')}
-            onPress={() => router.navigate('/')}
+            onPress={() => router.navigate({ pathname: '/', params: { contacts: '1' } })}
           />
         </Group>
 

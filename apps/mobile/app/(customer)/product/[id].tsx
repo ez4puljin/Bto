@@ -118,7 +118,7 @@ export default function StoreProductScreen() {
           {query.isSuccess && !product ? (
             <EmptyState
               icon={<Package size={44} strokeWidth={1.5} color={colors.input} />}
-              title={t('mobile.shop.gone')}
+              title={t('mobile.customer.product.gone')}
             />
           ) : null}
         </View>
@@ -331,7 +331,7 @@ export default function StoreProductScreen() {
                 {quote.total
                   ? t('pricing.money', { amount: formatMnt(quote.total) })
                   : quote.unpriced
-                    ? t('mobile.cart.noPrice')
+                    ? t('mobile.shop.noPrice')
                     : quote.loading
                       ? t('mobile.product.pricing')
                       : t('common.none')}

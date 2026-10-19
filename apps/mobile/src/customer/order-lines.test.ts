@@ -57,9 +57,24 @@ describe('«Bto300»: an order line’s unit price', () => {
 
 describe('«Bto300»: «Дахин захиалах» into a cart with a line limit', () => {
   it('adds to lines already in the cart and new lines only while there is room', () => {
-    const { fits, full } = fitReorder([entry(1), entry(2), entry(3)], [{ productUnitId: 2 }], 2);
+    const { fits, full } = fitReorder(
+      [entry(1), entry(2), entry(3)],
+      [{ productId: 20, productUnitId: 2 }],
+      2,
+    );
     expect(fits.map((line) => line.line.productUnitId)).toEqual([1, 2]);
     expect(full.map((line) => line.line.productUnitId)).toEqual([3]);
+  });
+
+  it('keeps one line per product: another unit of a product in the cart or the plan stays out', () => {
+    const box = entry(1);
+    const piece = { ...entry(9), line: { ...entry(9).line, productId: box.line.productId } };
+    const inCart = fitReorder([piece, entry(2)], [{ productId: 10, productUnitId: 1 }], 150);
+    expect(inCart.fits.map((line) => line.line.productUnitId)).toEqual([2]);
+    expect(inCart.otherUnit.map((line) => line.line.productUnitId)).toEqual([9]);
+    const inPlan = fitReorder([box, piece], [], 150);
+    expect(inPlan.fits.map((line) => line.line.productUnitId)).toEqual([1]);
+    expect(inPlan.otherUnit.map((line) => line.line.productUnitId)).toEqual([9]);
   });
 
   it('fits everything into a cart with room', () => {

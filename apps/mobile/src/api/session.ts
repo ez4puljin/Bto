@@ -56,6 +56,9 @@ interface RefreshTokens {
 /** Who a session belongs to, or why the server would not say. */
 type Who<P> = { me: P } | { problem: AppProblem };
 
+/** A server that failed (5xx) or never answered says nothing about the session: keep it. */
+const serverFailed = (problem: AppProblem) => problem.status === 0 || problem.status >= 500;
+
 /** The path of a URL without the URL class (Hermes' URL may lack it). */
 const pathOf = (url: string) =>
   url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').split(/[?#]/)[0] ?? '';
@@ -147,6 +150,7 @@ export abstract class MobileSession<P> {
     try {
       const who = await this.whoAmI(stored.userId);
       if ('me' in who) this.update({ status: 'signedIn', me: who.me, userId: stored.userId });
+      else if (serverFailed(who.problem)) this.update({ status: 'offline' });
       else await this.forget('expired');
     } catch {
       this.update({ status: 'offline' });
@@ -207,6 +211,11 @@ export abstract class MobileSession<P> {
     }
     if ('me' in who) {
       this.update({ status: 'signedIn', me: who.me, userId });
+      return null;
+    }
+    if (serverFailed(who.problem)) {
+      // Signed in, but the server failed to say who: the offline screen asks again.
+      this.update({ status: 'offline' });
       return null;
     }
     await this.forget('expired');

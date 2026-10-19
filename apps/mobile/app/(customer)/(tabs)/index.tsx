@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Bell,
   ChevronRight,
@@ -9,7 +9,7 @@ import {
   ShoppingCart,
   Star,
 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Pressable,
@@ -98,6 +98,17 @@ export default function CustomerHomeScreen() {
   const favourites = useFavourites();
   const contacts = useContacts();
   const [refreshing, setRefreshing] = useState(false);
+  // «Профайл» → «Холбоо барих» opens «Нүүр» at the contact list.
+  const params = useLocalSearchParams<{ contacts?: string }>();
+  const scroll = useRef<ScrollView>(null);
+  const contactsAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (params.contacts !== '1') return;
+    if (contactsAt.current !== null) {
+      scroll.current?.scrollTo({ y: contactsAt.current, animated: true });
+    }
+    router.setParams({ contacts: undefined });
+  }, [params.contacts, router]);
 
   const date = dateLineOf(today);
   const dateLine = t('mobile.home.dateLong', {
@@ -125,6 +136,7 @@ export default function CustomerHomeScreen() {
   return (
     <Page>
       <ScrollView
+        ref={scroll}
         contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
@@ -196,7 +208,13 @@ export default function CustomerHomeScreen() {
           problem={favourites.error ? problemFrom(favourites.error) : null}
         />
 
-        <Contacts contacts={contacts.data} />
+        <View
+          onLayout={(event) => {
+            contactsAt.current = event.nativeEvent.layout.y;
+          }}
+        >
+          <Contacts contacts={contacts.data} />
+        </View>
       </ScrollView>
     </Page>
   );
@@ -470,8 +488,8 @@ function Favourites({
 function Contacts({ contacts }: { contacts: StoreContact[] | undefined }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const people = shownContacts(contacts ?? []);
-  if (people.length === 0) return null;
+  if (!contacts) return null;
+  const people = shownContacts(contacts);
 
   const call = async (contact: StoreContact) => {
     const phone = phoneShown(contact.phone);
@@ -487,8 +505,15 @@ function Contacts({ contacts }: { contacts: StoreContact[] | undefined }) {
         <Text accessibilityRole="header" style={[type.sectionTitle, styles.grow]} numberOfLines={1}>
           {t('mobile.customer.contacts.title')}
         </Text>
-        <Text style={type.secondary}>{t('mobile.customer.contacts.hint')}</Text>
+        {people.length > 0 ? (
+          <Text style={type.secondary}>{t('mobile.customer.contacts.hint')}</Text>
+        ) : null}
       </View>
+      {people.length === 0 ? (
+        <Text style={[type.secondary, styles.contactsEmpty]}>
+          {t('mobile.customer.contacts.empty')}
+        </Text>
+      ) : null}
       <Group>
         {people.map((contact, index) => {
           const phone = phoneShown(contact.phone);
@@ -642,6 +667,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileName: { ...type.chip, fontFamily: fonts.semibold },
+  contactsEmpty: { paddingHorizontal: 4 },
   contactsTitle: {
     flexDirection: 'row',
     alignItems: 'baseline',

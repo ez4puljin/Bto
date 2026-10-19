@@ -40,6 +40,7 @@ import { PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { BarButton, LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
+import { usePendingWords } from '../../../src/customer/pending-words';
 import { PendingSendView } from '../../../src/ui/pending-send';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
 import { Text } from '../../../src/ui/text';
@@ -57,6 +58,7 @@ export default function StoreCartScreen() {
   const { server } = useCustomer();
   const { cart, dispatch, pending } = useShop();
   const sender = useCustomerSendOrder();
+  const pendingWords = usePendingWords();
   const [editing, setEditing] = useState(false);
   const lines = linesOf(cart);
   const quote = useStoreQuote(lines);
@@ -107,7 +109,7 @@ export default function StoreCartScreen() {
           {t('mobile.cart.count', { n: cart.lines.length })}
         </Text>
 
-        {locked ? <PendingSendView sender={sender} /> : null}
+        {locked ? <PendingSendView sender={sender} words={pendingWords} /> : null}
         {warning ? (
           <View style={styles.credit}>
             <CreditNote
@@ -181,7 +183,7 @@ export default function StoreCartScreen() {
 
         {quote.error ? <ProblemText problem={problemFrom(quote.error)} /> : null}
         {unpriced ? (
-          <Text style={[type.secondary, styles.warning]}>{t('mobile.cart.unpriced')}</Text>
+          <Text style={[type.secondary, styles.warning]}>{t('mobile.customer.cart.unpriced')}</Text>
         ) : null}
         {locked ? null : (
           <PillButton
@@ -292,7 +294,7 @@ function CartRow({
           </Text>
         ) : null}
         {note ? (
-          <Text style={styles.stockNote} numberOfLines={2}>
+          <Text style={[styles.stockNote, note === 'out' && styles.stockOut]} numberOfLines={2}>
             {t(`mobile.customer.stock.notes.${note}`)}
           </Text>
         ) : null}
@@ -302,7 +304,7 @@ function CartRow({
           {quoted?.priced
             ? t('pricing.money', { amount: formatMnt(quoted.total ?? '0') })
             : quoted
-              ? t('mobile.cart.noPrice')
+              ? t('mobile.shop.noPrice')
               : t('common.none')}
         </Text>
         <Pressable
@@ -349,6 +351,7 @@ const styles = StyleSheet.create({
   image: { width: '100%', height: '100%' },
   text: { flex: 1 },
   stockNote: { ...type.caption, fontFamily: fonts.semibold, color: colors.warningText },
+  stockOut: { color: colors.cancelled },
   right: { alignItems: 'flex-end', gap: 6 },
   lineTotal: { ...type.heading, ...tabular },
   red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },

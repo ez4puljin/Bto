@@ -3,9 +3,13 @@ import { normalizeMnPhone } from '@tugeel/shared/phone';
 // The sign-in and «Нууц үг тавих» fields (ADR-0079 #3, the Login and SetPassword boards): the
 // phone typed after «+976», the office's code as `XXXXX-XXXXX`, a new password twice.
 
-/** The phone field: digits only, at most 8, shown as «9911 2233». */
+/**
+ * The phone field: digits only, at most 8, shown as «9911 2233»; a number pasted or filled in by
+ * Android with its country code (`+976 9911 2233`, `00976…`) loses the code first.
+ */
 export function phoneInput(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  const all = raw.replace(/\D/g, '');
+  const digits = (all.length > 8 ? all.replace(/^(00976|976)/, '') : all).slice(0, 8);
   return digits.length > 4 ? `${digits.slice(0, 4)} ${digits.slice(4)}` : digits;
 }
 

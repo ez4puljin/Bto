@@ -199,6 +199,31 @@ describe('the store’s session in «Bto300» (ADR-0079 #3, ADR-0082)', () => {
     expect(session.getSnapshot()).toEqual({ status: 'anonymous', reason: 'logout' });
   });
 
+  it('stays signed in (offline) when the server fails to read the store after signing in', async () => {
+    const { server, store } = setup();
+    const original = server.fetch;
+    server.fetch = async (request) =>
+      request.url.endsWith('/api/v1/customer-app/me')
+        ? new Response(JSON.stringify({ code: 'INTERNAL_ERROR' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          })
+        : original(request);
+    const failing = new CustomerSession({
+      server: SERVER,
+      store,
+      fetch: (request) => server.fetch(request),
+      randomUUID,
+      now: () => server.now,
+    });
+    expect(await failing.login('99112233', 'delguur-nuuts-9')).toBeNull();
+    expect(failing.getSnapshot()).toEqual({ status: 'offline' });
+    expect(store.value).toMatchObject({ userId: 12 });
+    await failing.restore();
+    expect(failing.getSnapshot()).toEqual({ status: 'offline' });
+    expect(store.value).not.toBeNull();
+  });
+
   it('is offline, not signed out, when the store could not be read right after signing in', async () => {
     const { server, store } = setup();
     const original = server.fetch;

@@ -153,7 +153,7 @@ export default function StoreOrdersScreen() {
                 hint={t('mobile.customer.orders.emptyHint')}
               />
               <PillButton
-                title={t('mobile.cart.browse')}
+                title={t('mobile.customer.cart.browse')}
                 variant="soft"
                 height={44}
                 onPress={() => router.navigate('/shop')}

@@ -29,6 +29,7 @@ describe('«Bto300»: the stock in words (ADR-0079 #4)', () => {
     expect(lineStockNote({ stock: 'LOW', mayBackorder: false })).toBe('low');
     expect(lineStockNote({ stock: 'IN', mayBackorder: true })).toBe('mayBackorder');
     expect(lineStockNote({ stock: 'LOW', mayBackorder: true })).toBe('lowMayBackorder');
+    expect(lineStockNote({ stock: 'OUT', mayBackorder: true })).toBe('out');
   });
 });
 
@@ -188,7 +189,9 @@ describe('«Bto300»: «Дахин захиалах» (ADR-0079 #6)', () => {
 describe('«Bto300»: the sign-in fields (ADR-0079 #3)', () => {
   it('takes the phone after «+976»', () => {
     expect(phoneInput('99112233')).toBe('9911 2233');
-    expect(phoneInput('+976 9911-2233 45')).toBe('9769 9112');
+    expect(phoneInput('+976 9911-2233')).toBe('9911 2233');
+    expect(phoneInput('00976 99112233')).toBe('9911 2233');
+    expect(phoneInput('9911223345')).toBe('9911 2233');
     expect(phoneInput('991')).toBe('991');
     expect(phoneOf('9911 2233')).toBe('+97699112233');
     expect(phoneOf('9911 223')).toBeNull();

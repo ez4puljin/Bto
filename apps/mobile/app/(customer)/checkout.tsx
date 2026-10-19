@@ -37,6 +37,7 @@ import { PillButton, Segmented } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { ProblemText } from '../../src/ui/kit';
 import { BarButton, NavBar, Page, SectionHeader } from '../../src/ui/layout';
+import { usePendingWords } from '../../src/customer/pending-words';
 import { PendingSendView } from '../../src/ui/pending-send';
 import { Sheet, SheetClose, SheetHeader } from '../../src/ui/sheet';
 import { PAYMENT_DOTS } from '../../src/ui/status';
@@ -67,6 +68,7 @@ export default function StoreCheckoutScreen() {
   const credit = useCreditCheck(total);
   const warning = credit.data ? creditWarningOf(credit.data) : null;
   const sender = useCustomerSendOrder();
+  const pendingWords = usePendingWords();
   const { send, sending } = sender;
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const [unknown, setUnknown] = useState(false);
@@ -220,7 +222,7 @@ export default function StoreCheckoutScreen() {
             </Text>
           </View>
         ) : null}
-        {locked ? <PendingSendView sender={sender} onSent={setSent} /> : null}
+        {locked ? <PendingSendView sender={sender} onSent={setSent} words={pendingWords} /> : null}
         {options.error ? <ProblemText problem={problemFrom(options.error)} /> : null}
 
         <SectionHeader style={styles.section}>{t('mobile.checkout.receive')}</SectionHeader>
@@ -337,11 +339,13 @@ export default function StoreCheckoutScreen() {
 
         <ProblemText problem={problem} />
         {unknown ? (
-          <Text style={[type.secondary, styles.issue]}>{t('mobile.cart.unknownHint')}</Text>
+          <Text style={[type.secondary, styles.issue]}>{pendingWords.unknownHint}</Text>
         ) : null}
         {!locked && !closed && issues.length > 0 && cart.lines.length > 0 ? (
           <Text style={[type.secondary, styles.issue]}>
-            {t(`mobile.cart.issues.${issues[0] ?? 'lines'}`)}
+            {issues[0] === 'deliveryDate' && cart.fulfilment === 'PICKUP'
+              ? t('mobile.customer.checkout.pickupDateIssue')
+              : t(`mobile.cart.issues.${issues[0] ?? 'lines'}`)}
           </Text>
         ) : null}
       </ScrollView>

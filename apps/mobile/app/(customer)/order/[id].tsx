@@ -98,7 +98,7 @@ export default function StoreOrderScreen() {
     try {
       const answer = await reorder(data.id);
       const plan = reorderPlan(answer.reorder, answer.products);
-      const { fits, full } = fitReorder(plan.lines, cart.lines, MAX_LINES);
+      const { fits, full, otherUnit } = fitReorder(plan.lines, cart.lines, MAX_LINES);
       for (const entry of fits) dispatch({ type: 'add', line: entry.line, qty: entry.qty });
       const skipped: { productId: number; name: string | null; reason: ReorderSkip }[] = [
         ...plan.skipped,
@@ -106,6 +106,11 @@ export default function StoreOrderScreen() {
           productId: entry.line.productId,
           name: entry.line.name,
           reason: 'CART_FULL' as const,
+        })),
+        ...otherUnit.map((entry) => ({
+          productId: entry.line.productId,
+          name: entry.line.name,
+          reason: 'OTHER_UNIT' as const,
         })),
       ];
       const nameOf = (productId: number) =>
@@ -164,11 +169,16 @@ export default function StoreOrderScreen() {
               <StatePill state={data.state} />
             </View>
             <Text style={[type.body, styles.created]}>
-              {t('mobile.customer.order.created', {
-                date: dayText(ubDate(data.createdAt)),
-                time: ubTime(data.createdAt),
-                taker: taker(takerOf(data)),
-              })}
+              {takerOf(data).kind === 'app'
+                ? t('mobile.customer.order.createdApp', {
+                    date: dayText(ubDate(data.createdAt)),
+                    time: ubTime(data.createdAt),
+                  })
+                : t('mobile.customer.order.created', {
+                    date: dayText(ubDate(data.createdAt)),
+                    time: ubTime(data.createdAt),
+                    taker: taker(takerOf(data)),
+                  })}
             </Text>
 
             {cancelled ? (
@@ -322,7 +332,11 @@ export default function StoreOrderScreen() {
               </View>
             </View>
             {data.state !== 'DELIVERED' && !cancelled ? (
-              <FootNote>{t('mobile.customer.order.note')}</FootNote>
+              <FootNote>
+                {data.lines.some((line) => backorderedIn(line) !== null)
+                  ? `${t('mobile.customer.order.noteBackordered')} ${t('mobile.customer.order.noteChanges')}`
+                  : t('mobile.customer.order.noteChanges')}
+              </FootNote>
             ) : null}
             <ProblemText problem={problem} />
           </ScrollView>
