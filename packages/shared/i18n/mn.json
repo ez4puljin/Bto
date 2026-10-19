@@ -4850,7 +4850,16 @@
       "tabs": {
         "account": "Тооцоо"
       },
-      "versionLine": "Bto300 {{version}} ({{build}}) · Бүтэн-Оргил ХХК"
+      "versionLine": "Bto300 {{version}} ({{build}}) · Бүтэн-Оргил ХХК",
+      "orders": {
+        "takerApp": "Апп",
+        "takerOffice": "Оффис",
+        "takerRep": "Төлөөлөгч {{name}}",
+        "takerRepNoName": "Төлөөлөгч",
+        "backorderedLines": "{{n}} мөр хойшилсон",
+        "cancelledReason": "Цуцалсан: {{reason}}",
+        "cancelledNoReason": "Цуцалсан"
+      }
     }
   },
   "notifications": {
