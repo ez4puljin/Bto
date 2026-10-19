@@ -1,6 +1,6 @@
 # Module `customer` — contract
 
-Status: **CA2 built 2026-10-19** (the server of the customer app «Bto300», ADR-0079, ADR-0082). The app's screens (CA3, `apps/mobile` `customer` variant) come next. Code: `apps/api/src/modules/customer/`; the office's «Апп» card lives in partners, the accounts and sign-in in identity (`docs/modules/identity.md` §2a), the hooks in sales, finance and notifications.
+Status: **CA2 built 2026-10-19** (the server of the customer app «Bto300», ADR-0079, ADR-0082). The app's screens (CA3, the `customer` variant of `apps/mobile`, ADR-0083) were built the same day: `docs/modules/mobile.md` §1a. Code: `apps/api/src/modules/customer/`; the office's «Апп» card lives in partners, the accounts and sign-in in identity (`docs/modules/identity.md` §2a), the hooks in sales, finance and notifications.
 
 `customer` is a leaf: it depends on identity, catalog, partners, pricing, inventory, sales, finance and notifications through their `index.ts` and nobody imports it (ESLint `MODULE_DEPS.customer`, ADR-0082 #4). It owns the routes a customer token reaches and two small tables.
 
@@ -76,5 +76,5 @@ Web (Vitest): `features/customer-app/customer-app-pages.test.tsx` (the menu, rea
 
 ## 10. Open items
 
-- CA3: the app's screens on the approved boards (`apps/mobile`, `APP_VARIANT=customer`), `pnpm mobile:apk` for the variant, the owner's walk.
+- The owner's walk of «Bto300» on a phone (CA3 built 2026-10-19, `docs/STATUS.md`).
 - Push (Expo with Firebase) with go-live; a customer's centre when Kharkhorin joins (a new ADR).

@@ -73,7 +73,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ui:shots -- --out tmp/ui-shots/<name> [--only <regex>]` | with `pnpm dev` running: pictures of every route at 1366×633, 1536×730 and 1920×969 in a headless Chrome or Edge, with layout measurements and a gallery (ADR-0066); signs in with a dev login from a gitignored file (`--logins`), never printed |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
-| `pnpm mobile:apk` | the staff app's release APK, built on this PC (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
+| `pnpm mobile:apk [-- --variant customer]` | a release APK built on this PC: the staff app, or «Bto300» with `--variant customer` (`apps/mobile/variants.json`, ADR-0083) (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 
 **`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
 
