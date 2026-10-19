@@ -1,7 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
-import { CircleAlert, HandCoins, Lock, ReceiptText } from 'lucide-react-native';
+import { CircleAlert, Lock } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,45 +16,24 @@ import {
 import {
   STORE_KEY,
   type StoreBankAccount,
-  type StoreInvoice,
-  type StorePayment,
   useBankAccounts,
   useStoreBalance,
-  useStoreInvoices,
   useStoreMe,
-  useStorePayments,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
 import { useCustomer } from '../../../src/state/session';
-import { creditBarOf, debtOf, invoiceDueOf, overdueOf } from '../../../src/customer/account';
+import { creditBarOf, debtOf, overdueOf } from '../../../src/customer/account';
 import { StatementPanel } from '../../../src/customer/statement-panel';
-import {
-  partlyOpen,
-  paymentMethodOf,
-  paymentSignOf,
-  splitAround,
-} from '../../../src/customer/money';
+import { splitAround } from '../../../src/customer/money';
 import { monthDay } from '../../../src/dates/calendar';
 import { formatMnt, initialsOf } from '../../../src/format/format';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
-import { Segmented } from '../../../src/ui/controls';
 import { Group, Separator } from '../../../src/ui/grouped';
-import { EmptyState, ProblemText } from '../../../src/ui/kit';
+import { ProblemText } from '../../../src/ui/kit';
 import { LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
-import { PaymentDot } from '../../../src/ui/status';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
-
-/** «Хуулга» (ADR-0084) first: the owner's statement with Дебит and Кредит. */
-type Part = 'statement' | 'invoices' | 'payments';
-
-/** The tones of an invoice's due pill: overdue red, due today orange, days left grey. */
-const DUE_TONES = {
-  overdue: { background: colors.destructiveSoft, text: colors.cancelled },
-  today: { background: colors.warningSoft, text: colors.warningText },
-  left: { background: colors.canvas, text: colors.label2 },
-} as const;
 
 /**
  * «Тооцоо» (the Account board, ADR-0079 #7), read-only from finance's own figures: the debt (or an
@@ -66,27 +44,21 @@ const DUE_TONES = {
  */
 export default function AccountScreen() {
   const { t } = useTranslation();
-  const router = useRouter();
   const inset = useTabBarInset();
   const toast = useToast();
   const me = useStoreMe();
   const balance = useStoreBalance();
-  const invoices = useStoreInvoices();
-  const payments = useStorePayments();
   const banks = useBankAccounts();
   const queryClient = useQueryClient();
   const { me: signedIn } = useCustomer();
   const today = me.data?.today ?? signedIn.store.today;
-  const [part, setPart] = useState<Part>('statement');
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
   const account = balance.data;
-  const openInvoices = invoices.data ?? [];
-  const paymentRows = payments.data?.pages.flatMap((page) => page.data) ?? [];
   const accounts = banks.data ?? [];
-  const problem = balance.error ?? invoices.error ?? payments.error ?? me.error ?? null;
+  const problem = balance.error ?? me.error ?? null;
 
   const refresh = async () => {
     setRefreshing(true);
@@ -94,8 +66,6 @@ export default function AccountScreen() {
       await Promise.all([
         me.refetch(),
         balance.refetch(),
-        invoices.refetch(),
-        payments.refetch(),
         banks.refetch(),
         queryClient.invalidateQueries({ queryKey: [...STORE_KEY, 'statement'] }),
       ]);
@@ -127,10 +97,9 @@ export default function AccountScreen() {
       : t('mobile.customer.account.overdue', { amount: money(overdue.amount) })
     : null;
   const termDays = account?.paymentTermDays ?? null;
-  const example = openInvoices[0]?.number ?? null;
-  const advice = example
-    ? t('mobile.customer.account.adviceExample', { number: example })
-    : t('mobile.customer.account.advice');
+  // The owner (2026-10-20): the copied invoice number must go in the transfer's description.
+  const advice = t('mobile.customer.account.adviceMust');
+  const adviceStrong = t('mobile.customer.account.adviceMustStrong');
 
   return (
     <Page>
@@ -228,95 +197,7 @@ export default function AccountScreen() {
         </View>
         {problem ? <ProblemText problem={problemFrom(problem)} /> : null}
 
-        <View style={styles.tabs}>
-          <Segmented<Part>
-            label={t('mobile.customer.account.sections')}
-            value={part}
-            onChange={setPart}
-            options={[
-              { value: 'statement', label: t('mobile.customer.statement.tab') },
-              {
-                value: 'invoices',
-                label: t('mobile.customer.account.invoicesTab', {
-                  n: account?.openInvoices ?? openInvoices.length,
-                }),
-              },
-              {
-                value: 'payments',
-                label: t('mobile.customer.account.paymentsTab', {
-                  n: account?.payments ?? payments.data?.pages[0]?.total ?? paymentRows.length,
-                }),
-              },
-            ]}
-          />
-        </View>
-
-        {part === 'statement' ? <StatementPanel today={today} /> : null}
-
-        {part === 'invoices' ? (
-          <>
-            <SectionHeader style={styles.listHeader}>
-              {t('mobile.customer.account.invoicesHeader')}
-            </SectionHeader>
-            {invoices.isLoading ? (
-              <ActivityIndicator style={styles.loading} color={colors.primary} />
-            ) : openInvoices.length === 0 ? (
-              invoices.error ? null : (
-                <EmptyState
-                  icon={<ReceiptText size={44} strokeWidth={1.5} color={colors.input} />}
-                  title={t('mobile.customer.account.noInvoices')}
-                />
-              )
-            ) : (
-              <Group>
-                {openInvoices.map((invoice) => (
-                  <InvoiceRow
-                    key={invoice.id}
-                    invoice={invoice}
-                    onPress={() => router.push(`/invoice/${invoice.id}`)}
-                  />
-                ))}
-              </Group>
-            )}
-          </>
-        ) : (
-          <>
-            <SectionHeader style={styles.listHeader}>
-              {t('mobile.customer.account.paymentsHeader')}
-            </SectionHeader>
-            {payments.isLoading ? (
-              <ActivityIndicator style={styles.loading} color={colors.primary} />
-            ) : paymentRows.length === 0 ? (
-              payments.error ? null : (
-                <EmptyState
-                  icon={<HandCoins size={44} strokeWidth={1.5} color={colors.input} />}
-                  title={t('mobile.customer.account.noPayments')}
-                />
-              )
-            ) : (
-              <Group>
-                {paymentRows.map((payment) => (
-                  <PaymentRow key={payment.id} payment={payment} />
-                ))}
-                {payments.hasNextPage ? (
-                  <Pressable
-                    key="more"
-                    accessibilityRole="button"
-                    disabled={payments.isFetchingNextPage}
-                    onPress={() => void payments.fetchNextPage()}
-                    style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-                  >
-                    {payments.isFetchingNextPage ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : (
-                      <Text style={[type.rowStrong, styles.link]}>{t('common.loadMore')}</Text>
-                    )}
-                  </Pressable>
-                ) : null}
-              </Group>
-            )}
-          </>
-        )}
+        <StatementPanel today={today} />
 
         {accounts.length > 0 ? (
           <>
@@ -362,7 +243,7 @@ export default function AccountScreen() {
               <Emphasis
                 key="advice"
                 text={advice}
-                strong={example ?? ''}
+                strong={adviceStrong}
                 style={[type.secondary, styles.advice]}
                 strongStyle={styles.adviceStrong}
               />
@@ -371,92 +252,6 @@ export default function AccountScreen() {
         ) : null}
       </ScrollView>
     </Page>
-  );
-}
-
-/** An open invoice: its number, date and due date, what is still open and its due pill. */
-function InvoiceRow({ invoice, onPress }: { invoice: StoreInvoice; onPress: () => void }) {
-  const { t } = useTranslation();
-  const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
-  const due = invoiceDueOf(invoice);
-  const tone = DUE_TONES[due.kind];
-  const meta = [
-    t('mobile.customer.account.invoiceMeta', {
-      date: monthDay(invoice.invoiceDate),
-      due: monthDay(invoice.dueDate),
-    }),
-    ...(partlyOpen(invoice)
-      ? [t('mobile.customer.account.ofTotal', { amount: money(invoice.total) })]
-      : []),
-  ].join(' · ');
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-    >
-      <View style={styles.rowText}>
-        <Text style={[type.heading, tabular]} numberOfLines={1}>
-          {invoice.number}
-        </Text>
-        <Text style={type.secondary} numberOfLines={2}>
-          {meta}
-        </Text>
-      </View>
-      <View style={styles.rowRight}>
-        <Text style={[type.heading, tabular]} numberOfLines={1}>
-          {money(invoice.openAmount)}
-        </Text>
-        <View style={[styles.pill, { backgroundColor: tone.background }]}>
-          <Text style={[styles.pillText, { color: tone.text }]}>
-            {due.kind === 'overdue'
-              ? t('mobile.customer.account.dueOverdue', { n: due.days })
-              : due.kind === 'left'
-                ? t('mobile.customer.account.dueLeft', { n: due.days })
-                : t('mobile.customer.account.dueToday')}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-/** A recorded payment: its number, day and method, the invoices it settled, the amount. */
-function PaymentRow({ payment }: { payment: StorePayment }) {
-  const { t } = useTranslation();
-  const method = paymentMethodOf(payment.method);
-  const sign = paymentSignOf(payment.kind);
-  const meta = [
-    monthDay(payment.paidOn),
-    t(`sales.paymentMethods.${method}`),
-    ...(payment.kind === 'CUSTOMER_REFUND' ? [t('mobile.customer.account.refund')] : []),
-  ].join(' · ');
-  return (
-    <View style={styles.listRow}>
-      <View style={styles.rowText}>
-        <Text style={[type.heading, tabular]} numberOfLines={1}>
-          {payment.number}
-        </Text>
-        <View style={styles.meta}>
-          <PaymentDot method={method} />
-          <Text style={type.secondary} numberOfLines={1}>
-            {meta}
-          </Text>
-        </View>
-        {payment.invoices.length > 0 ? (
-          <Text style={type.caption} numberOfLines={3}>
-            {t('mobile.customer.account.settled', {
-              numbers: payment.invoices.map((invoice) => invoice.number).join(', '),
-            })}
-          </Text>
-        ) : null}
-      </View>
-      <Text style={[type.heading, tabular, sign === 'minus' && styles.paid]} numberOfLines={1}>
-        {sign === 'minus'
-          ? t('mobile.cart.minus', { amount: formatMnt(payment.amount) })
-          : t('mobile.customer.account.plus', { amount: formatMnt(payment.amount) })}
-      </Text>
-    </View>
   );
 }
 
@@ -497,7 +292,6 @@ const styles = StyleSheet.create({
   label2: { color: colors.label2 },
   link: { color: colors.primary },
   bold: { fontFamily: fonts.bold },
-  pressed: { backgroundColor: colors.accent },
   debtCard: {
     marginTop: 14,
     backgroundColor: colors.card,
@@ -543,25 +337,7 @@ const styles = StyleSheet.create({
   },
   cardEnd: { height: spacing.md },
   hold: { flex: 1, color: colors.blocked },
-  tabs: { marginTop: 20 },
-  listHeader: { marginTop: spacing.lg },
   section: { marginTop: 22 },
-  loading: { marginTop: spacing.xl },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 14,
-  },
-  rowText: { flex: 1, gap: 2 },
-  rowRight: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pill: { height: 22, paddingHorizontal: spacing.sm, borderRadius: 11, justifyContent: 'center' },
-  pillText: { ...type.secondary, fontFamily: fonts.semibold },
-  paid: { color: colors.success },
-  more: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   bank: {
     flexDirection: 'row',
     alignItems: 'center',

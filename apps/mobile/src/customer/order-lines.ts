@@ -1,4 +1,3 @@
-import { Decimal } from '@tugeel/shared/money';
 import { dayNameOf, monthDay } from '../dates/calendar';
 import { weekdayOf } from '../dates/dates';
 import type { ReorderPlan, SkipReason } from './reorder';
@@ -22,26 +21,6 @@ export function orderDayOf(
     day: monthDay(date),
     weekday: weekdayOf(date) as Weekday,
   };
-}
-
-/**
- * «5 хайрцаг × 20,000₮»: one unit's price, the line's amount (frozen, or today's estimate) divided
- * by its quantity, only when it divides exactly into at most two decimals; null otherwise (the line
- * then says only «5 хайрцаг»).
- */
-export function unitPriceOf(line: {
-  qty: string;
-  total: string | null;
-  estimatedTotal: string | null;
-}): string | null {
-  const amount = line.total ?? line.estimatedTotal;
-  if (amount === null) return null;
-  const qty = new Decimal(line.qty);
-  if (qty.lte(0)) return null;
-  const total = new Decimal(amount);
-  const price = total.div(qty);
-  if (price.decimalPlaces() > 2 || !price.times(qty).eq(total)) return null;
-  return price.toFixed();
 }
 
 /**

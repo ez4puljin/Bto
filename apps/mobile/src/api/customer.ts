@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-query';
 import type { RepProductSort } from '@tugeel/shared/sales';
 import { canonical } from '../cart/send';
+import type { StoreOrderParams } from '../customer/order-filters';
 import { useCustomer } from '../state/session';
 import { unwrap } from './problem';
 
@@ -118,7 +119,7 @@ function shopParams(query: StoreShopQuery) {
 }
 
 /** The shop page by page; the first page holds the total and the favourites' count. */
-export function useStoreProducts(query: StoreShopQuery) {
+export function useStoreProducts(query: StoreShopQuery, enabled = true) {
   const { session } = useCustomer();
   return useInfiniteQuery({
     queryKey: [...STORE_KEY, 'products', shopParams(query)],
@@ -137,6 +138,7 @@ export function useStoreProducts(query: StoreShopQuery) {
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
@@ -270,18 +272,24 @@ export function useStoreQuote(lines: readonly { productUnitId: number; qty: stri
   });
 }
 
-/** The store's orders from every channel between two Ulaanbaatar days, newest first. */
-export function useStoreOrders(range: { from: string; to: string } | null) {
+/** The days and filters «Захиалга» asks for. */
+export type StoreOrderQuery = { from: string; to: string } & StoreOrderParams;
+
+/**
+ * The store's orders from every channel between two Ulaanbaatar days, newest first, with the
+ * filters the store chose (who took them, a product, the payment, delivery, the state).
+ */
+export function useStoreOrders(query: StoreOrderQuery | null) {
   const { session } = useCustomer();
   return useInfiniteQuery({
-    queryKey: [...STORE_KEY, 'orders', range],
+    queryKey: [...STORE_KEY, 'orders', query],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await session.client.GET('/api/v1/customer-app/orders', {
           params: {
             query: {
-              ...(range ? { from: range.from, to: range.to } : {}),
+              ...(query ?? {}),
               ...(pageParam ? { cursor: pageParam } : {}),
               limit: PAGE,
             },
@@ -289,8 +297,35 @@ export function useStoreOrders(range: { from: string; to: string } | null) {
         }),
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    enabled: range !== null,
+    enabled: query !== null,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** How many orders a filter would show (the filter sheet's «N захиалга харуулах»). */
+export function useStoreOrderCount(query: StoreOrderQuery, enabled: boolean) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'orders', 'count', query],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/orders', {
+          params: { query: { ...query, limit: 1 } },
+        }),
+      ).summary?.count ?? null,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** «ХТ» in the order filter: the reps who took the store's orders, by name. */
+export function useStoreOrderReps(enabled = true) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'orders', 'reps'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/customer-app/orders/reps')).reps,
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -1,5 +1,5 @@
 import type { Decimal } from '@tugeel/shared/money';
-import type { CustomerPayment, CustomerStatement } from '../../finance';
+import type { CustomerPayment } from '../../finance';
 import type { CustomerNotice, CustomerNotification } from '../../notifications';
 import type { CustomerOrderDetail, CustomerOrderRow } from '../../sales';
 import type {
@@ -17,6 +17,7 @@ import type {
   CustomerAccount,
   CustomerInvoice,
   CustomerInvoiceDetail,
+  StoreStatement,
 } from '../services/customer-account.service';
 import type { CustomerProduct } from '../services/customer-shop.service';
 
@@ -114,6 +115,11 @@ export function orderDto(
       qtyBackordered: line.qtyBackordered.toString(),
       total: whole(line.total),
       estimatedTotal: whole(line.estimatedTotal),
+      parts: line.parts.map((part) => ({
+        uomName: part.uomName,
+        qty: part.qty.toString(),
+        unitPrice: part.unitPrice.toFixed(0),
+      })),
     })),
   };
 }
@@ -132,7 +138,7 @@ export function accountDto(account: CustomerAccount) {
   };
 }
 
-export function statementDto(statement: CustomerStatement): CustomerAppStatementDto {
+export function statementDto(statement: StoreStatement): CustomerAppStatementDto {
   return {
     from: statement.from,
     to: statement.to,
@@ -143,6 +149,10 @@ export function statementDto(statement: CustomerStatement): CustomerAppStatement
       kind: entry.kind,
       number: entry.docNumber,
       invoiceId: entry.docType === 'INVOICE' ? entry.docId : null,
+      orderId: entry.order?.id ?? null,
+      orderNumber: entry.order?.number ?? null,
+      orderChannel: entry.order?.channel ?? null,
+      orderTakerName: entry.order?.takerName ?? null,
       debit: cents(entry.debit),
       credit: cents(entry.credit),
       balance: cents(entry.balance),
@@ -172,6 +182,8 @@ export function invoiceDetailDto(invoice: CustomerInvoiceDetail): CustomerAppInv
     ...invoiceDto(invoice),
     status: invoice.status,
     orderId: invoice.orderId,
+    orderChannel: invoice.orderChannel,
+    orderTakerName: invoice.orderTakerName,
     subtotal: cents(invoice.subtotal),
     discountTotal: cents(invoice.discountTotal),
     vatTotal: cents(invoice.vatTotal),

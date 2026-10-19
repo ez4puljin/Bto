@@ -249,6 +249,18 @@ describe('customer app account (ADR-0079)', () => {
     ]);
     expect(todays.entries[0]).toMatchObject({ date: today, invoiceId, number: expect.any(String) });
     expect(todays.entries[2]).toMatchObject({ invoiceId: null });
+    // Who took each purchase's order (the owner 2026-10-20): here the app.
+    expect(todays.entries[0]).toMatchObject({
+      orderChannel: 'CUSTOMER_APP',
+      orderNumber: expect.any(String),
+      orderTakerName: null,
+    });
+    expect(todays.entries[2]).toMatchObject({ orderId: null, orderChannel: null });
+    const invoice = (await store.api.get(`/invoices/${invoiceId}`).expect(200)).body as Record<
+      string,
+      unknown
+    >;
+    expect(invoice).toMatchObject({ orderChannel: 'CUSTOMER_APP', orderTakerName: null });
     expect(todays).toMatchObject({
       totalDebit: '12500.00',
       totalCredit: '6000.00',

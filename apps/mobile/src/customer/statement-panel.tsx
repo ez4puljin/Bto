@@ -14,6 +14,8 @@ import { Group } from '../ui/grouped';
 import { ProblemText } from '../ui/kit';
 import { FootNote, SectionHeader } from '../ui/layout';
 import { Text } from '../ui/text';
+import { useTakerText } from './order-row';
+import { takerOf } from './orders';
 import { columnAmount, lastMonthRange } from './statement';
 
 /** The width of each amount column, enough for «12,345,678». */
@@ -37,7 +39,17 @@ export function StatementPanel({ today }: { today: string }) {
     const shown = columnAmount(amount);
     return shown ? formatMnt(shown) : '';
   };
+  const takerText = useTakerText();
   const kindOf = (entry: StoreStatementEntry) => t(`mobile.customer.statement.kinds.${entry.kind}`);
+  /** «10/19 · Худалдан авалт · Төлөөлөгч Бат»: a purchase says who took its order. */
+  const metaOf = (entry: StoreStatementEntry) =>
+    [
+      monthDay(entry.date),
+      kindOf(entry),
+      ...(entry.orderChannel
+        ? [takerText(takerOf({ channel: entry.orderChannel, takerName: entry.orderTakerName }))]
+        : []),
+    ].join(' · ');
 
   return (
     <>
@@ -102,8 +114,8 @@ export function StatementPanel({ today }: { today: string }) {
                   <Text style={styles.number} numberOfLines={1}>
                     {entry.number}
                   </Text>
-                  <Text style={type.caption} numberOfLines={1}>
-                    {`${monthDay(entry.date)} · ${kindOf(entry)}`}
+                  <Text style={type.caption} numberOfLines={2}>
+                    {metaOf(entry)}
                   </Text>
                   <Text style={[type.caption, styles.muted]} numberOfLines={1}>
                     {t('mobile.customer.statement.after', { amount: money(entry.balance) })}

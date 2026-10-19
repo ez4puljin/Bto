@@ -83,6 +83,8 @@ export interface StatementEntry {
   credit: Decimal;
   /** The opening balance plus every entry up to this one, oldest first. */
   balance: Decimal;
+  /** The sales order of an invoice's entry (a purchase, its void); null otherwise. */
+  orderId: number | null;
 }
 
 /**
@@ -286,8 +288,10 @@ export class ArLedgerService {
         docNumber: arEntries.docNumber,
         debit: arEntries.debit,
         credit: arEntries.credit,
+        orderId: invoices.orderId,
       })
       .from(arEntries)
+      .leftJoin(invoices, and(eq(arEntries.docType, 'INVOICE'), eq(invoices.id, arEntries.docId)))
       .where(
         and(
           eq(arEntries.customerId, customerId),

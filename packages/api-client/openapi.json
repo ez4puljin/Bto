@@ -19790,6 +19790,82 @@
             }
           },
           {
+            "name": "taker",
+            "required": false,
+            "in": "query",
+            "description": "Who took it: APP, OFFICE (the office and the till) or REP (one rep with repId)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APP",
+                "OFFICE",
+                "REP"
+              ]
+            }
+          },
+          {
+            "name": "repId",
+            "required": false,
+            "in": "query",
+            "description": "With taker=REP: one rep (from /customer-app/orders/reps)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Orders with a line of this product",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "In the customer’s words",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PREPARING",
+                "READY",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
             "name": "from",
             "required": false,
             "in": "query",
@@ -19837,6 +19913,43 @@
             "customer": []
           }
         ],
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/orders/reps": {
+      "get": {
+        "operationId": "CustomerAppOrders_reps",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAppOrderReps"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "«ХТ» in the order filter: the reps who took the store's orders, by name.",
         "tags": [
           "customer-app"
         ]
@@ -40243,6 +40356,28 @@
           "number"
         ]
       },
+      "CustomerAppOrderLinePart": {
+        "type": "object",
+        "properties": {
+          "uomName": {
+            "type": "string",
+            "example": "хайрцаг"
+          },
+          "qty": {
+            "type": "string",
+            "description": "In that unit"
+          },
+          "unitPrice": {
+            "type": "string",
+            "description": "One unit as confirmed, whole MNT"
+          }
+        },
+        "required": [
+          "uomName",
+          "qty",
+          "unitPrice"
+        ]
+      },
       "CustomerAppOrderLine": {
         "type": "object",
         "properties": {
@@ -40288,6 +40423,13 @@
             "type": "string",
             "nullable": true,
             "description": "A pending line today"
+          },
+          "parts": {
+            "description": "The confirmed price split (whole packs, loose pieces); empty while pending",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppOrderLinePart"
+            }
           }
         },
         "required": [
@@ -40302,7 +40444,8 @@
           "qtyBase",
           "qtyBackordered",
           "total",
-          "estimatedTotal"
+          "estimatedTotal",
+          "parts"
         ]
       },
       "CustomerAppOrder": {
@@ -40633,6 +40776,37 @@
           "summary"
         ]
       },
+      "CustomerAppOrderRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "example": "Бат"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CustomerAppOrderReps": {
+        "type": "object",
+        "properties": {
+          "reps": {
+            "description": "The reps who took the store’s orders",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppOrderRep"
+            }
+          }
+        },
+        "required": [
+          "reps"
+        ]
+      },
       "CustomerAppReorderLine": {
         "type": "object",
         "properties": {
@@ -40894,6 +41068,22 @@
             "type": "number",
             "nullable": true
           },
+          "orderChannel": {
+            "nullable": true,
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string",
+            "description": "Who took the order"
+          },
+          "orderTakerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The rep of a SALES_REP order"
+          },
           "subtotal": {
             "type": "string"
           },
@@ -40932,6 +41122,8 @@
           "daysLeft",
           "status",
           "orderId",
+          "orderChannel",
+          "orderTakerName",
           "subtotal",
           "discountTotal",
           "vatTotal",
@@ -41064,6 +41256,31 @@
             "nullable": true,
             "description": "The invoice it opens"
           },
+          "orderId": {
+            "type": "number",
+            "nullable": true,
+            "description": "A purchase’s order"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderChannel": {
+            "nullable": true,
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string",
+            "description": "Who took the order"
+          },
+          "orderTakerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The rep of a SALES_REP order"
+          },
           "debit": {
             "type": "string",
             "example": "350000.00",
@@ -41085,6 +41302,10 @@
           "kind",
           "number",
           "invoiceId",
+          "orderId",
+          "orderNumber",
+          "orderChannel",
+          "orderTakerName",
           "debit",
           "credit",
           "balance"

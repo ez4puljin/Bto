@@ -304,6 +304,52 @@ describe('customer app orders (ADR-0079)', () => {
     expect(range.data.length).toBe(page.data.length);
   });
 
+  it('filters the store’s orders by who took them, a rep, the product, payment and state', async () => {
+    // A rep's order: an office draft marked as a rep's (the rep app's own flow is tested elsewhere).
+    const rep = await seedUser(app, { roles: ['SALES_REP'] });
+    await sql.query('UPDATE users SET full_name = $2 WHERE id = $1', [rep.id, 'Бат']);
+    const byRep = await flow.draft(store.customerId, [
+      { productUnitId: flow.pcs(water), qty: '2' },
+    ]);
+    await sql.query(
+      "UPDATE sales_orders SET channel = 'SALES_REP', created_by = $2, payment_method = 'CREDIT' WHERE id = $1",
+      [byRep.id, rep.id],
+    );
+    type Page = {
+      data: { id: number; channel: string; takerName: string | null; paymentMethod: string }[];
+      summary: { count: number };
+    };
+    const list = async (query: string) =>
+      ((await store.api.get(`/orders?${query}`).expect(200)).body as Page).data;
+
+    expect((await store.api.get('/orders/reps').expect(200)).body).toEqual({
+      reps: [{ id: rep.id, name: 'Бат' }],
+    });
+    expect((await other.api.get('/orders/reps').expect(200)).body).toEqual({ reps: [] });
+
+    const reps = await list('taker=REP');
+    expect(reps.map((row) => row.id)).toEqual([byRep.id]);
+    expect(reps[0]).toMatchObject({ channel: 'SALES_REP', takerName: 'Бат' });
+    expect((await list(`taker=REP&repId=${rep.id}`)).map((row) => row.id)).toEqual([byRep.id]);
+    expect(await list(`taker=REP&repId=${rep.id + 1000}`)).toEqual([]);
+    expect((await list('taker=APP')).every((row) => row.channel === 'CUSTOMER_APP')).toBe(true);
+    expect((await list('taker=OFFICE')).every((row) => row.channel === 'ADMIN')).toBe(true);
+    expect((await list('taker=OFFICE')).length).toBeGreaterThan(0);
+
+    const withWater = await list(`productId=${water.id}`);
+    expect(withWater.map((row) => row.id)).toContain(byRep.id);
+    expect((await list(`productId=${water.id}&taker=APP`)).map((row) => row.id)).not.toContain(
+      byRep.id,
+    );
+    expect(
+      (await list('paymentMethod=CREDIT')).every((row) => row.paymentMethod === 'CREDIT'),
+    ).toBe(true);
+    const pending = (await store.api.get('/orders?state=PENDING').expect(200)).body as Page;
+    expect(pending.data.map((row) => row.id)).toContain(byRep.id);
+    expect(pending.summary.count).toBe(pending.data.length);
+    await store.api.get('/orders?taker=SOMEONE').expect(422);
+  });
+
   it('repeats an earlier order into the cart, leaving out what cannot be sold', async () => {
     const earlier = (
       await store.api

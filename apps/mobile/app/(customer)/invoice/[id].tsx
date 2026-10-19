@@ -11,8 +11,10 @@ import {
   positive,
   termDaysOf,
 } from '../../../src/customer/money';
+import { useTakerText } from '../../../src/customer/order-row';
+import { takerOf } from '../../../src/customer/orders';
 import { monthDay } from '../../../src/dates/calendar';
-import { formatMnt, formatQty } from '../../../src/format/format';
+import { formatMnt } from '../../../src/format/format';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row, Separator } from '../../../src/ui/grouped';
@@ -32,9 +34,10 @@ const STANDING_TONES: Record<InvoiceStanding['kind'], { background: string; text
 
 /**
  * An invoice of the store (the Invoice board, ADR-0079 #7): what is still to pay and how its due
- * date stands, its date, term and order; the delivered lines at their prices, the discount, the
- * total with its VAT, what was paid or credited; the account to pay into and the number to write
- * in the transfer, copied with one press. A void invoice says so.
+ * date stands, its date, term and order with who took it; the discount, the total with its VAT,
+ * what was paid or credited — no goods list (the owner 2026-10-20: the order holds the lines); the
+ * account to pay into and the number to write in the transfer, copied with one press. A void
+ * invoice says so.
  */
 export default function StoreInvoiceScreen() {
   const { t } = useTranslation();
@@ -64,6 +67,11 @@ export default function StoreInvoiceScreen() {
     }
   };
   const orderId = data?.orderId ?? null;
+  const takerText = useTakerText();
+  const orderText =
+    data?.orderNumber && data.orderChannel
+      ? `${data.orderNumber} · ${takerText(takerOf({ channel: data.orderChannel, takerName: data.orderTakerName }))}`
+      : (data?.orderNumber ?? null);
   const bank = banks.data?.[0] ?? null;
   const payable = standing !== null && standing.kind !== 'void' && standing.kind !== 'settled';
 
@@ -120,46 +128,38 @@ export default function StoreInvoiceScreen() {
                 n: termDaysOf(data.invoiceDate, data.dueDate),
               })}
             />
-            {data.orderNumber ? (
+            {orderText ? (
               orderId !== null ? (
                 <Row
                   title={t('mobile.checkout.order')}
-                  right={<Text style={[type.body, styles.link]}>{data.orderNumber}</Text>}
+                  right={
+                    <Text style={[type.body, styles.link, styles.orderText]} numberOfLines={2}>
+                      {orderText}
+                    </Text>
+                  }
                   onPress={() => router.push(`/order/${orderId}`)}
                 />
               ) : (
-                <Row title={t('mobile.checkout.order')} value={data.orderNumber} />
+                <Row title={t('mobile.checkout.order')} value={orderText} />
               )
             ) : null}
           </Group>
 
-          <SectionHeader style={styles.section}>{t('mobile.customer.invoice.lines')}</SectionHeader>
+          <SectionHeader style={styles.section}>
+            {t('mobile.customer.invoice.amounts')}
+          </SectionHeader>
           <View style={styles.card}>
-            {data.lines.map((line, index) => (
-              <View key={`${line.productId}-${index}`}>
-                {index > 0 ? <Separator /> : null}
-                <View style={styles.line}>
-                  <View style={styles.grow}>
-                    <Text style={type.rowStrong} numberOfLines={2}>
-                      {line.name}
-                    </Text>
-                    <Text style={[type.secondary, tabular]} numberOfLines={1}>
-                      {t('mobile.product.part', {
-                        qty: formatQty(line.qty),
-                        unit: line.uomName,
-                        price: formatMnt(line.unitPrice),
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={styles.lineAmount} numberOfLines={1}>
-                    {money(line.subtotal)}
-                  </Text>
-                </View>
-              </View>
-            ))}
             {positive(data.discountTotal) ? (
               <>
+                <View style={styles.paidRow}>
+                  <Text style={type.row}>{t('mobile.customer.invoice.subtotal')}</Text>
+                  <Text style={[type.row, styles.label2, tabular]}>{money(data.subtotal)}</Text>
+                </View>
                 <Separator />
+              </>
+            ) : null}
+            {positive(data.discountTotal) ? (
+              <>
                 <View style={styles.discount}>
                   <Text style={[type.body, styles.saved]}>{t('mobile.cart.discount')}</Text>
                   <Text style={[type.body, styles.saved, tabular]}>
@@ -168,7 +168,7 @@ export default function StoreInvoiceScreen() {
                 </View>
               </>
             ) : null}
-            <Separator />
+            {positive(data.discountTotal) ? <Separator /> : null}
             <View style={styles.totalRow}>
               <Text style={type.heading}>{t('mobile.cart.total')}</Text>
               <Text style={styles.total} numberOfLines={1}>
@@ -236,6 +236,7 @@ export default function StoreInvoiceScreen() {
 
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.lg },
+  orderText: { textAlign: 'right', flexShrink: 1 },
   body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   eyebrow: { marginTop: 2, marginHorizontal: spacing.xs },
   number: { marginHorizontal: spacing.xs, ...tabular },

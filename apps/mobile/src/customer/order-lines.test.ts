@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitReorder, orderDayOf, skippedByReason, unitPriceOf } from './order-lines';
+import { fitReorder, orderDayOf, skippedByReason } from './order-lines';
 
 const entry = (productUnitId: number) => ({
   qty: 1,
@@ -36,22 +36,6 @@ describe('«Bto300»: the Orders board’s day headings (ADR-0079 #6)', () => {
     });
     expect(orderDayOf('2026-10-19', '2026-10-18').name).toBeNull();
     expect(orderDayOf('2026-10-18', null).name).toBeNull();
-  });
-});
-
-describe('«Bto300»: an order line’s unit price', () => {
-  it('divides the frozen total, or the estimate, by the quantity when it divides exactly', () => {
-    expect(unitPriceOf({ qty: '5.000', total: '100000.00', estimatedTotal: null })).toBe('20000');
-    expect(unitPriceOf({ qty: '1.000', total: '67200.00', estimatedTotal: null })).toBe('67200');
-    expect(unitPriceOf({ qty: '2.500', total: '2500.00', estimatedTotal: null })).toBe('1000');
-    expect(unitPriceOf({ qty: '4', total: null, estimatedTotal: '1002.00' })).toBe('250.5');
-  });
-
-  it('says nothing when the amount does not divide, or there is none', () => {
-    expect(unitPriceOf({ qty: '3', total: '100000.00', estimatedTotal: null })).toBeNull();
-    expect(unitPriceOf({ qty: '3', total: '100.00', estimatedTotal: null })).toBeNull();
-    expect(unitPriceOf({ qty: '2', total: null, estimatedTotal: null })).toBeNull();
-    expect(unitPriceOf({ qty: '0', total: '100.00', estimatedTotal: null })).toBeNull();
   });
 });
 

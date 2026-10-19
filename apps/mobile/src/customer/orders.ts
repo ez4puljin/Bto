@@ -1,6 +1,5 @@
 import { Decimal } from '@tugeel/shared/money';
 import type { CustomerOrderState, OrderChannel } from '@tugeel/shared/sales';
-import { addDays } from '@tugeel/shared/time';
 import { colors } from '../theme/tokens';
 
 // The store's orders in its own words (ADR-0079 #6, the Orders and Order boards): the progress, who
@@ -73,22 +72,6 @@ export function orderAmount(order: {
   if (order.total !== null) return { amount: order.total, estimate: false };
   if (order.estimatedTotal !== null) return { amount: order.estimatedTotal, estimate: true };
   return null;
-}
-
-/** «Өнөөдөр», «7 хоног», «Энэ сар» (the Orders board). */
-export type OrderPreset = 'today' | 'week' | 'month';
-export const ORDER_PRESETS: readonly OrderPreset[] = ['today', 'week', 'month'];
-
-/** The days a preset covers, ending today (the server's Ulaanbaatar day). */
-export function presetRange(preset: OrderPreset, today: string): { from: string; to: string } {
-  switch (preset) {
-    case 'today':
-      return { from: today, to: today };
-    case 'week':
-      return { from: addDays(today, -6), to: today };
-    case 'month':
-      return { from: `${today.slice(0, 8)}01`, to: today };
-  }
 }
 
 /** Orders by the day they were made, newest day first, keeping the server's order within a day. */

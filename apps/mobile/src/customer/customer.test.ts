@@ -1,15 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { creditBarOf, creditWarningOf, debtOf, invoiceDueOf, overdueOf } from './account';
 import { STORE_TILES, storeFactsOf, storeTargetOf } from './notifications';
-import {
-  backorderedIn,
-  byDay,
-  orderAmount,
-  orderNotes,
-  presetRange,
-  progressOf,
-  takerOf,
-} from './orders';
+import { backorderedIn, byDay, orderAmount, orderNotes, progressOf, takerOf } from './orders';
 import { reorderPlan } from './reorder';
 import { codeComplete, codeInput, newPasswordIssue, phoneInput, phoneOf } from './sign-in';
 import { columnAmount, lastMonthRange } from './statement';
@@ -69,10 +61,7 @@ describe('«Bto300»: the store’s orders (ADR-0079 #6)', () => {
     expect(orderAmount({ total: null, estimatedTotal: null })).toBeNull();
   });
 
-  it('turns the presets into days and groups orders by day', () => {
-    expect(presetRange('today', '2026-10-18')).toEqual({ from: '2026-10-18', to: '2026-10-18' });
-    expect(presetRange('week', '2026-10-18')).toEqual({ from: '2026-10-12', to: '2026-10-18' });
-    expect(presetRange('month', '2026-10-18')).toEqual({ from: '2026-10-01', to: '2026-10-18' });
+  it('groups orders by day', () => {
     const rows = [
       { id: 1, createdDate: '2026-10-18' },
       { id: 2, createdDate: '2026-10-18' },

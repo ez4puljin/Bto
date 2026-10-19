@@ -35,6 +35,7 @@ import {
   CustomerAppOrderDto,
   CustomerAppOrderListQueryDto,
   CustomerAppOrderPageDto,
+  CustomerAppOrderRepsDto,
   CustomerAppOrderRequestDto,
   CustomerAppPaymentPageDto,
   CustomerAppProductBatchQueryDto,
@@ -272,6 +273,14 @@ export class CustomerAppOrdersController {
           }
         : null,
     };
+  }
+
+  /** «ХТ» in the order filter: the reps who took the store's orders, by name. */
+  @Get('reps')
+  @CustomerRoute()
+  @ApiOkResponse({ type: CustomerAppOrderRepsDto })
+  async reps(@CurrentCustomer() ctx: CustomerContext): Promise<CustomerAppOrderRepsDto> {
+    return { reps: await this.orders.reps(ctx) };
   }
 
   @Get(':id')

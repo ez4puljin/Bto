@@ -14,7 +14,6 @@ import {
   orderDayOf,
   type ReorderSkip,
   skippedByReason,
-  unitPriceOf,
 } from '../../../src/customer/order-lines';
 import { StatePill, useTakerText } from '../../../src/customer/order-row';
 import {
@@ -31,7 +30,7 @@ import { useCustomer } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
-import { Separator } from '../../../src/ui/grouped';
+import { Group, Row, Separator } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
 import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
 import { PaymentDot } from '../../../src/ui/status';
@@ -251,72 +250,84 @@ export default function StoreOrderScreen() {
               ) : null}
             </View>
 
-            <SectionHeader style={styles.section}>{t('mobile.cart.lines')}</SectionHeader>
-            <View style={styles.card}>
-              {data.lines.map((line, index) => {
+            <SectionHeader style={styles.section}>
+              {t('mobile.order.lines', { n: data.lines.length })}
+            </SectionHeader>
+            <Group inset={LINE_INSET}>
+              {data.lines.map((line) => {
                 const thumb = thumbs.get(line.productId) ?? null;
-                const price = unitPriceOf(line);
-                const qty = price
-                  ? t('mobile.product.part', {
-                      qty: formatQty(line.qty),
-                      unit: line.unitName,
-                      price: formatMnt(price),
-                    })
-                  : `${formatQty(line.qty)} ${line.unitName}`;
+                // The confirmed split («2 хайрцаг × 174,600₮», «3 ш × 29,100₮»); a pending line
+                // says only how many until the office prices it.
+                const parts =
+                  line.parts.length > 0
+                    ? line.parts.map((part) =>
+                        t('mobile.product.part', {
+                          qty: formatQty(part.qty),
+                          unit: part.uomName,
+                          price: formatMnt(part.unitPrice),
+                        }),
+                      )
+                    : [`${formatQty(line.qty)} ${line.unitName}`];
                 const waiting = cancelled ? null : backorderedIn(line);
                 return (
-                  <View key={line.id}>
-                    {index > 0 ? <Separator inset={LINE_INSET} /> : null}
-                    <View style={styles.line}>
-                      <View style={styles.thumb}>
-                        {thumb ? (
-                          <Image
-                            source={{ uri: `${server}${thumb}` }}
-                            style={styles.image}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                            recyclingKey={thumb}
-                          />
-                        ) : (
-                          <Package size={22} strokeWidth={1.5} color={colors.input} />
-                        )}
-                      </View>
-                      <View style={styles.grow}>
-                        <Text style={type.rowStrong} numberOfLines={2}>
-                          {line.productName}
-                        </Text>
-                        <Text style={[type.secondary, tabular]} numberOfLines={1}>
-                          {qty}
-                        </Text>
-                        {waiting ? (
-                          <View style={styles.waiting}>
-                            <Text style={styles.waitingText}>
-                              {t('mobile.customer.order.backordered', {
-                                qty: formatQty(waiting.qty),
-                                unit: waiting.inUnit ? line.unitName : line.baseUnitName,
-                              })}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      {line.total !== null ? (
-                        <Text style={styles.lineTotal} numberOfLines={1}>
-                          {money(line.total)}
-                        </Text>
-                      ) : line.estimatedTotal !== null ? (
-                        <Text style={[styles.lineTotal, styles.estimate]} numberOfLines={1}>
-                          {approx(line.estimatedTotal)}
-                        </Text>
+                  <View key={line.id} style={styles.line}>
+                    <View style={styles.thumb}>
+                      {thumb ? (
+                        <Image
+                          source={{ uri: `${server}${thumb}` }}
+                          style={styles.image}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          recyclingKey={thumb}
+                        />
                       ) : (
-                        <Text style={[type.body, styles.muted]} numberOfLines={1}>
-                          {t('mobile.orders.priceLater')}
-                        </Text>
+                        <Package size={22} strokeWidth={1.5} color={colors.input} />
                       )}
                     </View>
+                    <View style={styles.grow}>
+                      <Text style={styles.lineName} numberOfLines={2}>
+                        {line.productName}
+                      </Text>
+                      {parts.map((part, index) => (
+                        <Text key={index} style={styles.part} numberOfLines={1}>
+                          {part}
+                        </Text>
+                      ))}
+                      {waiting ? (
+                        <View style={styles.waiting}>
+                          <Text style={styles.waitingText}>
+                            {t('mobile.customer.order.backordered', {
+                              qty: formatQty(waiting.qty),
+                              unit: waiting.inUnit ? line.unitName : line.baseUnitName,
+                            })}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {line.total !== null ? (
+                      <Text style={styles.lineTotal} numberOfLines={1}>
+                        {money(line.total)}
+                      </Text>
+                    ) : line.estimatedTotal !== null ? (
+                      <Text style={[styles.lineTotal, styles.estimate]} numberOfLines={1}>
+                        {approx(line.estimatedTotal)}
+                      </Text>
+                    ) : (
+                      <Text style={[type.body, styles.muted]} numberOfLines={1}>
+                        {t('mobile.orders.priceLater')}
+                      </Text>
+                    )}
                   </View>
                 );
               })}
-              <Separator />
+            </Group>
+
+            <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
+            <Group>
+              <Row
+                title={t('mobile.order.items')}
+                value={t('mobile.order.kinds', { n: data.lines.length })}
+              />
               <View style={styles.totalRow}>
                 <Text style={type.heading}>{t('mobile.cart.total')}</Text>
                 <Text
@@ -330,7 +341,7 @@ export default function StoreOrderScreen() {
                     : t('mobile.orders.priceLater')}
                 </Text>
               </View>
-            </View>
+            </Group>
             {data.state !== 'DELIVERED' && !cancelled ? (
               <FootNote>
                 {data.lines.some((line) => backorderedIn(line) !== null)
@@ -519,12 +530,14 @@ const styles = StyleSheet.create({
   },
   line: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: spacing.md,
     paddingLeft: spacing.lg,
     paddingRight: 14,
   },
+  lineName: { ...type.rowStrong, marginBottom: 2 },
+  part: { ...type.secondary, ...tabular },
   thumb: {
     width: THUMB,
     height: THUMB,
@@ -537,7 +550,7 @@ const styles = StyleSheet.create({
   image: { width: '100%', height: '100%' },
   waiting: {
     alignSelf: 'flex-start',
-    marginTop: 3,
+    marginTop: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,

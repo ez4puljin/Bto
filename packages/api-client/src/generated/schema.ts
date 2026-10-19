@@ -4791,6 +4791,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-app/orders/reps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «ХТ» in the order filter: the reps who took the store's orders, by name. */
+        get: operations["CustomerAppOrders_reps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-app/orders/{id}": {
         parameters: {
             query?: never;
@@ -10792,6 +10809,14 @@ export interface components {
             id: number;
             number: string;
         };
+        CustomerAppOrderLinePart: {
+            /** @example хайрцаг */
+            uomName: string;
+            /** @description In that unit */
+            qty: string;
+            /** @description One unit as confirmed, whole MNT */
+            unitPrice: string;
+        };
         CustomerAppOrderLine: {
             id: number;
             productId: number;
@@ -10810,6 +10835,8 @@ export interface components {
             total: string | null;
             /** @description A pending line today */
             estimatedTotal: string | null;
+            /** @description The confirmed price split (whole packs, loose pieces); empty while pending */
+            parts: components["schemas"]["CustomerAppOrderLinePart"][];
         };
         CustomerAppOrder: {
             id: number;
@@ -10898,6 +10925,15 @@ export interface components {
             /** @description First page */
             summary: components["schemas"]["CustomerAppOrderSummary"] | null;
         };
+        CustomerAppOrderRep: {
+            id: number;
+            /** @example Бат */
+            name: string;
+        };
+        CustomerAppOrderReps: {
+            /** @description The reps who took the store’s orders */
+            reps: components["schemas"]["CustomerAppOrderRep"][];
+        };
         CustomerAppReorderLine: {
             productId: number;
             productUnitId: number;
@@ -10978,6 +11014,13 @@ export interface components {
             /** @enum {string} */
             status: "ISSUED" | "VOID";
             orderId: number | null;
+            /**
+             * @description Who took the order
+             * @enum {string|null}
+             */
+            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | null;
+            /** @description The rep of a SALES_REP order */
+            orderTakerName: string | null;
             subtotal: string;
             discountTotal: string;
             /** @description «Үүнд НӨАТ» */
@@ -11023,6 +11066,16 @@ export interface components {
             number: string;
             /** @description The invoice it opens */
             invoiceId: number | null;
+            /** @description A purchase’s order */
+            orderId: number | null;
+            orderNumber: string | null;
+            /**
+             * @description Who took the order
+             * @enum {string|null}
+             */
+            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | null;
+            /** @description The rep of a SALES_REP order */
+            orderTakerName: string | null;
             /**
              * @description «Дебит»: a purchase or a refund
              * @example 350000.00
@@ -22989,6 +23042,16 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
+                /** @description Who took it: APP, OFFICE (the office and the till) or REP (one rep with repId) */
+                taker?: "APP" | "OFFICE" | "REP";
+                /** @description With taker=REP: one rep (from /customer-app/orders/reps) */
+                repId?: number;
+                /** @description Orders with a line of this product */
+                productId?: number;
+                paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
+                fulfilment?: "PICKUP" | "DELIVERY";
+                /** @description In the customer’s words */
+                state?: "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "DELIVERED" | "CANCELLED";
                 /** @description Created on or after (Ulaanbaatar) */
                 from?: string;
                 /** @description Created on or before (Ulaanbaatar) */
@@ -23041,6 +23104,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerAppOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppOrders_reps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppOrderReps"];
                 };
             };
             /** @description RFC 9457 problem details */
