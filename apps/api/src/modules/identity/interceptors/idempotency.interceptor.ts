@@ -82,7 +82,12 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const http = context.switchToHttp();
     const request = http.getRequest<Request & AuthenticatedRequest>();
     const response = http.getResponse<Response>();
-    const actor = request.auth;
+    // A staff member or a customer app account (ADR-0079 #5): keys never collide across kinds.
+    const actor = request.auth
+      ? { kind: 'STAFF' as const, id: request.auth.userId }
+      : request.customer
+        ? { kind: 'CUSTOMER' as const, id: request.customer.customerUserId }
+        : null;
     if (!actor) throw new Error('@Idempotent() needs an authenticated route');
     const key = request.headers['idempotency-key'];
     if (typeof key !== 'string' || !UUID.test(key)) {
@@ -94,8 +99,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const [claimed] = await this.db
       .insert(idempotencyKeys)
       .values({
-        actorKind: 'STAFF',
-        actorId: actor.userId,
+        actorKind: actor.kind,
+        actorId: actor.id,
         key,
         method: request.method,
         path: request.originalUrl.split('?')[0] ?? request.originalUrl,
@@ -104,7 +109,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       })
       .onConflictDoNothing()
       .returning({ id: idempotencyKeys.id });
-    if (!claimed) return this.replay(actor.userId, key, requestHash, response);
+    if (!claimed) return this.replay(actor, key, requestHash, response);
     const status =
       this.reflector.get<number | undefined>(HTTP_CODE_METADATA, handler) ??
       (request.method === 'POST' ? 201 : 200);
@@ -121,7 +126,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
   }
 
   private async replay(
-    actorId: number,
+    actor: { kind: 'STAFF' | 'CUSTOMER'; id: number },
     key: string,
     requestHash: string,
     response: Response,
@@ -131,8 +136,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
       .from(idempotencyKeys)
       .where(
         and(
-          eq(idempotencyKeys.actorKind, 'STAFF'),
-          eq(idempotencyKeys.actorId, actorId),
+          eq(idempotencyKeys.actorKind, actor.kind),
+          eq(idempotencyKeys.actorId, actor.id),
           eq(idempotencyKeys.key, key),
         ),
       );

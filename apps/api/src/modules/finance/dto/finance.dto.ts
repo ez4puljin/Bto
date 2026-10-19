@@ -224,6 +224,8 @@ export class MoneyAccountDto {
   @ApiProperty() glAccountId: number;
   @ApiProperty({ example: '100101' }) glAccountCode: string;
   @ApiProperty() glAccountName: string;
+  @ApiProperty({ description: '«Харилцагчид харуулах»: the customer app lists it (ADR-0079 #7)' })
+  showToCustomers: boolean;
   @ApiProperty({ enum: STATUSES }) status: AccountStatus;
   @ApiProperty({ example: '250000.00', description: 'Σ in − Σ out of the posted vouchers' })
   balance: string;
@@ -261,6 +263,10 @@ export class MoneyAccountRequestDto {
   @IsInt()
   @Min(1)
   glAccountId: number;
+  @ApiPropertyOptional({ description: 'Shown in the customer app; bank accounts only' })
+  @IsOptional()
+  @IsBoolean()
+  showToCustomers?: boolean;
 }
 
 @ApiSchema({ name: 'MoneyAccountPatch' })
@@ -290,6 +296,10 @@ export class MoneyAccountPatchDto {
   @MaxLength(40)
   bankAccountNo?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) glAccountId?: number;
+  @ApiPropertyOptional({ description: 'Shown in the customer app; bank accounts only' })
+  @IsOptional()
+  @IsBoolean()
+  showToCustomers?: boolean;
   @ApiPropertyOptional({ enum: STATUSES }) @IsOptional() @IsIn(STATUSES) status?: AccountStatus;
 }
 

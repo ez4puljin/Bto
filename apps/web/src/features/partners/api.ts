@@ -37,6 +37,10 @@ export type SupplierDetail = Schemas['SupplierDetail'];
 export type SupplierCreate = Schemas['SupplierCreateRequest'];
 export type SupplierUpdate = Schemas['SupplierUpdateRequest'];
 export type ProductSupplierLink = Schemas['ProductSupplierLink'];
+/** The «Апп» card's account (ADR-0079 #11); null while no phone is linked. */
+export type CustomerAppAccount = Schemas['CustomerAppAccount'];
+export type CustomerAppCode = Schemas['CustomerAppCode'];
+export type AppAccountFilter = 'ACTIVE' | 'DISABLED' | 'NONE';
 export type CustomerKind = CustomerDetail['kind'];
 export type PartnerStatus = CustomerDetail['status'];
 
@@ -58,6 +62,8 @@ export interface CustomerFilter {
   gpsMissing?: boolean;
   /** A saved customer segment (ADR-0049). */
   segmentId?: number;
+  /** The customer app account: open, closed or none (ADR-0079 #11). */
+  app?: AppAccountFilter;
 }
 
 export function useCustomers(filter: CustomerFilter, options: ListReadOptions = {}) {
@@ -79,6 +85,7 @@ export function useCustomers(filter: CustomerFilter, options: ListReadOptions = 
               tinPending: filter.tinPending,
               gpsMissing: filter.gpsMissing,
               segmentId: filter.segmentId,
+              app: filter.app,
               cursor: pageParam,
               limit,
             },
@@ -99,6 +106,55 @@ export function useCustomer(id: number, options: { enabled?: boolean } = {}) {
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/customers/{id}', { params: { path: { id } }, signal })),
   });
+}
+
+/** The customer's app account (ADR-0079 #11): `{ account: null }` while no phone is linked. */
+export function useCustomerAppAccount(customerId: number, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.customers, customerId, 'app-account'],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customers/{id}/app-account', {
+          params: { path: { id: customerId } },
+          signal,
+        }),
+      ).account,
+  });
+}
+
+/**
+ * The «Апп» card's writes (partners.customer_app.manage). The code is shown once and never kept:
+ * its POST carries no Idempotency-Key, so a retry is a new code.
+ */
+export function useCustomerAppMutations(customerId: number) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: KEYS.customers });
+  const path = { params: { path: { id: customerId } } };
+  return {
+    link: useMutation({
+      mutationFn: async (phone: string) =>
+        unwrap(await api.PUT('/api/v1/customers/{id}/app-account', { ...path, body: { phone } })),
+      onSuccess: changed,
+    }),
+    issueCode: useMutation({
+      mutationFn: async () =>
+        unwrap(await api.POST('/api/v1/customers/{id}/app-account/code', path)),
+      onSuccess: changed,
+    }),
+    disable: useMutation({
+      mutationFn: async () =>
+        unwrap(await api.POST('/api/v1/customers/{id}/app-account/disable', path)),
+      onSuccess: changed,
+    }),
+    enable: useMutation({
+      mutationFn: async () =>
+        unwrap(await api.POST('/api/v1/customers/{id}/app-account/enable', path)),
+      onSuccess: changed,
+    }),
+  };
 }
 
 export function useNextCustomerCode() {

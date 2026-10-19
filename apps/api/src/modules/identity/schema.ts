@@ -204,8 +204,57 @@ export const SESSION_REVOKE_REASONS = [
   'PASSWORD_CHANGED',
   'USER_DISABLED',
   'TOKEN_REUSE',
+  // A customer account (ADR-0079 #3): the office changed its phone, closed the app, or the
+  // customer itself became inactive.
+  'PHONE_CHANGED',
+  'ACCOUNT_DISABLED',
+  'CUSTOMER_INACTIVE',
 ] as const;
 export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[number];
+
+/** Who a session belongs to: a staff user, or a store's customer app account (ADR-0079 #3). */
+export const SESSION_KINDS = ['STAFF', 'CUSTOMER'] as const;
+export type SessionKind = (typeof SESSION_KINDS)[number];
+
+export const CUSTOMER_USER_STATUSES = ['ACTIVE', 'DISABLED'] as const;
+export type CustomerUserStatus = (typeof CUSTOMER_USER_STATUSES)[number];
+
+/**
+ * A store's account in the customer app «Bto300» (ADR-0005 #2, ADR-0079 #2): one per customer and
+ * one per phone, created only by the office. `customer_id` references partners' `customers`; the
+ * foreign key is added by hand in migration 0031 (identity imports no other module).
+ */
+export const customerUsers = pgTable(
+  'customer_users',
+  {
+    id: id(),
+    customerId: bigint('customer_id', { mode: 'number' }).notNull(),
+    /** The sign-in phone, E.164; not one of the customer's contact phones. */
+    phone: text('phone').notNull(),
+    /** argon2id; NULL until the store redeems a code (and again after a phone change). */
+    passwordHash: text('password_hash'),
+    status: text('status', { enum: CUSTOMER_USER_STATUSES }).notNull().default('ACTIVE'),
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true }),
+    createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedBy: bigint('updated_by', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('customer_users_customer_key').on(t.customerId),
+    uniqueIndex('customer_users_phone_key').on(t.phone),
+    check('customer_users_phone_e164', sql`${t.phone} ~ '^[+]976[0-9]{8}$'`),
+    check('customer_users_status', sql`${t.status} IN ('ACTIVE', 'DISABLED')`),
+    check('customer_users_failed_login_count', sql`${t.failedLoginCount} >= 0`),
+  ],
+);
 
 /** One row per login (device); the refresh token rotates inside it (ADR-0005, ADR-0027 #8). */
 export const authSessions = pgTable(
@@ -214,9 +263,16 @@ export const authSessions = pgTable(
     id: uuid('id')
       .primaryKey()
       .default(sql`uuidv7()`),
-    userId: bigint('user_id', { mode: 'number' })
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: SESSION_KINDS }).notNull().default('STAFF'),
+    /** The staff user of a STAFF session; NULL for a CUSTOMER session. */
+    userId: bigint('user_id', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'cascade',
+    }),
+    /** The customer app account of a CUSTOMER session (ADR-0079 #3); NULL for STAFF. */
+    customerUserId: bigint('customer_user_id', { mode: 'number' }).references(
+      () => customerUsers.id,
+      { onDelete: 'cascade' },
+    ),
     /** SHA-256 (hex) of the current refresh token. */
     tokenHash: text('token_hash').notNull(),
     previousTokenHash: text('previous_token_hash'),
@@ -225,20 +281,58 @@ export const authSessions = pgTable(
     ip: inet('ip'),
     createdAt: createdAt(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
-    /** Fixed at login: login time + auth.staff_session_hours; a refresh never moves it. */
+    /**
+     * STAFF: fixed at login, login time + auth.staff_session_hours; a refresh never moves it.
+     * CUSTOMER: auth.customer_session_days after the last use; every refresh moves it.
+     */
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     revokedReason: text('revoked_reason', { enum: SESSION_REVOKE_REASONS }),
   },
   (t) => [
     index('auth_sessions_user_id_idx').on(t.userId),
+    index('auth_sessions_customer_user_id_idx').on(t.customerUserId),
+    check('auth_sessions_kind', sql`${t.kind} IN ('STAFF', 'CUSTOMER')`),
+    check(
+      'auth_sessions_principal',
+      sql`(${t.kind} = 'STAFF' AND ${t.userId} IS NOT NULL AND ${t.customerUserId} IS NULL)
+        OR (${t.kind} = 'CUSTOMER' AND ${t.customerUserId} IS NOT NULL AND ${t.userId} IS NULL)`,
+    ),
     check(
       'auth_sessions_revoked_reason',
       sql`(${t.revokedAt} IS NULL) = (${t.revokedReason} IS NULL)
         AND (${t.revokedReason} IS NULL OR ${t.revokedReason} IN
-          ('LOGOUT', 'LOGOUT_ALL', 'ADMIN', 'PASSWORD_CHANGED', 'USER_DISABLED', 'TOKEN_REUSE'))`,
+          ('LOGOUT', 'LOGOUT_ALL', 'ADMIN', 'PASSWORD_CHANGED', 'USER_DISABLED', 'TOKEN_REUSE',
+           'PHONE_CHANGED', 'ACCOUNT_DISABLED', 'CUSTOMER_INACTIVE'))`,
     ),
     check('auth_sessions_expiry', sql`${t.expiresAt} > ${t.createdAt}`),
+  ],
+);
+
+/** One-time codes the office issues so a store can set its app password (ADR-0079 #3). */
+export const customerPasswordCodes = pgTable(
+  'customer_password_codes',
+  {
+    id: id(),
+    customerUserId: bigint('customer_user_id', { mode: 'number' })
+      .notNull()
+      .references(() => customerUsers.id, { onDelete: 'cascade' }),
+    /** HMAC-SHA256(AUTH_PEPPER, normalised code), hex. */
+    codeHash: text('code_hash').notNull(),
+    createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('customer_password_codes_one_live')
+      .on(t.customerUserId)
+      .where(sql`${t.usedAt} IS NULL AND ${t.revokedAt} IS NULL`),
+    check('customer_password_codes_attempts', sql`${t.attempts} >= 0`),
   ],
 );
 
@@ -310,7 +404,7 @@ export const auditLog = pgTable(
     id: id(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
     actorKind: text('actor_kind', { enum: AUDIT_ACTOR_KINDS }).notNull(),
-    /** users.id for STAFF (customer_users.id from delivery 6); NULL for SYSTEM. */
+    /** users.id for STAFF, customer_users.id for CUSTOMER (ADR-0079); NULL for SYSTEM. */
     actorId: bigint('actor_id', { mode: 'number' }),
     /** For SYSTEM actors: the job or CLI that acted. */
     actorLabel: text('actor_label'),

@@ -22,6 +22,8 @@ export interface MoneyAccount {
   glAccountId: number;
   glAccountCode: string;
   glAccountName: string;
+  /** The customer app shows it (ADR-0079 #7); bank accounts only. */
+  showToCustomers: boolean;
   status: AccountStatus;
   /** Σ in − Σ out of the posted vouchers. */
   balance: Decimal;
@@ -37,6 +39,16 @@ export interface MoneyAccountInput {
   bankName: string | null;
   bankAccountNo: string | null;
   glAccountId: number;
+  /** «Харилцагчид харуулах» (ADR-0079 #7); false when left out. */
+  showToCustomers?: boolean;
+}
+
+/** A bank account the customer app lists, with the advice to name the invoice (ADR-0079 #7). */
+export interface CustomerBankAccount {
+  id: number;
+  name: string;
+  bankName: string | null;
+  bankAccountNo: string | null;
 }
 
 export type MoneyAccountPatch = Partial<Omit<MoneyAccountInput, 'kind'>> & {
@@ -79,19 +91,40 @@ export class MoneyAccountsService {
     return this.get(id, tx);
   }
 
+  /** The ACTIVE bank accounts marked «Харилцагчид харуулах», by code (ADR-0079 #7). */
+  async shownToCustomers(): Promise<CustomerBankAccount[]> {
+    return this.db
+      .select({
+        id: moneyAccounts.id,
+        name: moneyAccounts.name,
+        bankName: moneyAccounts.bankName,
+        bankAccountNo: moneyAccounts.bankAccountNo,
+      })
+      .from(moneyAccounts)
+      .where(
+        and(
+          eq(moneyAccounts.showToCustomers, true),
+          eq(moneyAccounts.kind, 'BANK'),
+          eq(moneyAccounts.status, 'ACTIVE'),
+        ),
+      )
+      .orderBy(asc(moneyAccounts.code));
+  }
+
   async create(ctx: AuthContext, input: MoneyAccountInput): Promise<MoneyAccount> {
     const values = await this.normalize(input);
+    const showToCustomers = shown(input.kind, input.showToCustomers ?? false);
     return inTransaction(this.db, async (tx) => {
       const [row] = await tx
         .insert(moneyAccounts)
-        .values({ ...values, kind: input.kind })
+        .values({ ...values, kind: input.kind, showToCustomers })
         .returning({ id: moneyAccounts.id });
       if (!row) throw new Error('money_accounts insert returned no row');
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'money_accounts',
         entityId: row.id,
-        after: { ...values, kind: input.kind },
+        after: { ...values, kind: input.kind, showToCustomers },
       });
       return this.get(row.id, tx);
     });
@@ -109,9 +142,15 @@ export class MoneyAccountsService {
           patch.bankAccountNo === undefined ? before.bankAccountNo : patch.bankAccountNo,
         glAccountId: patch.glAccountId ?? before.glAccountId,
       });
+      const showToCustomers = shown(before.kind, patch.showToCustomers ?? before.showToCustomers);
       await tx
         .update(moneyAccounts)
-        .set({ ...values, status: patch.status ?? before.status, updatedAt: sql`now()` })
+        .set({
+          ...values,
+          showToCustomers,
+          status: patch.status ?? before.status,
+          updatedAt: sql`now()`,
+        })
         .where(eq(moneyAccounts.id, id));
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',
@@ -124,9 +163,10 @@ export class MoneyAccountsService {
           bankName: before.bankName,
           bankAccountNo: before.bankAccountNo,
           glAccountId: before.glAccountId,
+          showToCustomers: before.showToCustomers,
           status: before.status,
         },
-        after: { ...values, status: patch.status ?? before.status },
+        after: { ...values, showToCustomers, status: patch.status ?? before.status },
       });
       return this.get(id, tx);
     });
@@ -173,6 +213,14 @@ export class MoneyAccountsService {
       balance: new Decimal(balance),
     }));
   }
+}
+
+/** Only a bank account is shown to customers: they pay by transfer there (ADR-0079 #7). */
+function shown(kind: MoneyAccountKind, value: boolean): boolean {
+  if (value && kind !== 'BANK') {
+    throw invalid('showToCustomers', 'bankOnly', 'only a bank account is shown to customers');
+  }
+  return value;
 }
 
 /** Σ in − Σ out of an account's posted vouchers up to a date, for the book's opening balance. */

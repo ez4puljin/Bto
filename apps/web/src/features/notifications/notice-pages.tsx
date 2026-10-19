@@ -39,9 +39,10 @@ const STATE_BADGES: Record<NoticeState, 'success' | 'default' | 'secondary' | 'o
 };
 
 /**
- * «Систем» → «Апп мэдэгдэл» (ADR-0062, notifications.send): every notice sent to the rep app,
- * newest first, with its period, state and how many reps read it; «Шинэ мэдэгдэл» opens the
- * create dialog (`?new=1`) and a running or scheduled notice can be withdrawn.
+ * «Систем» → «Апп мэдэгдэл» (ADR-0062, notifications.send): every notice sent to the rep app or to
+ * the customers' «Bto300» (ADR-0079 #8), newest first, with its readers, period, state and how many
+ * of them read it; «Шинэ мэдэгдэл» opens the create dialog (`?new=1`) and a running or scheduled
+ * notice can be withdrawn.
  */
 export function AppNoticesPage() {
   const { t } = useTranslation();
@@ -142,6 +143,7 @@ function NoticeRow(props: { notice: AppNotice; onWithdraw: () => void }) {
       <TableCell className="max-w-md whitespace-normal">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary">{t(`notifications.kinds.${notice.kind}`)}</Badge>
+          <Badge variant="outline">{t(`notifications.audiences.${notice.audience}`)}</Badge>
           <span className="font-medium">{notice.title}</span>
         </div>
         <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{notice.body}</p>

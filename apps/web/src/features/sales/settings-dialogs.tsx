@@ -293,7 +293,11 @@ export function NumberingDialog({
 
 const CHANNELS = ORDER_CHANNELS.filter((channel) => channel !== 'POS');
 
-/** «Сувгийн тохиргоо»: where each channel's new orders land — a pipeline and one of its stages. */
+/**
+ * «Сувгийн тохиргоо»: where each channel's new orders land — a pipeline and one of its stages. The
+ * customer app's orders wait for the office (ADR-0079 #5): only stages without an action, in
+ * pipelines that show every order, are offered for it (the API refuses the others).
+ */
 export function ChannelsDialog({ boards }: { boards: readonly SalesBoard[] }) {
   const { t } = useTranslation();
   const channels = useChannels();
@@ -346,6 +350,7 @@ function ChannelRow({
       toast.success(t('sales.boards.saved'));
     });
   const label = t(`sales.channels.${channel}`);
+  const customerApp = channel === 'CUSTOMER_APP';
   const stageValue =
     chosen === null || chosen === current?.pipelineId ? (current?.stageId ?? '') : '';
   return (
@@ -364,7 +369,7 @@ function ChannelRow({
         {boards.map((board) => (
           <optgroup key={board.id} label={board.name}>
             {board.pipelines
-              .filter((entry) => entry.archivedAt === null)
+              .filter((entry) => entry.archivedAt === null && !(customerApp && entry.ownOrdersOnly))
               .map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.name}
@@ -384,13 +389,18 @@ function ChannelRow({
       >
         <option value="">{t('sales.channelsDialog.chooseStage')}</option>
         {(pipeline.data?.stages ?? [])
-          .filter((stage) => stage.archivedAt === null)
+          .filter((stage) => stage.archivedAt === null && (!customerApp || stage.action === 'NONE'))
           .map((stage) => (
             <option key={stage.id} value={stage.id}>
               {stage.name}
             </option>
           ))}
       </NativeSelect>
+      {customerApp ? (
+        <p className="text-xs text-muted-foreground sm:col-span-2 sm:col-start-2">
+          {t('sales.channelsDialog.customerAppHint')}
+        </p>
+      ) : null}
       <ProblemAlert problem={action.problem} />
     </div>
   );

@@ -132,6 +132,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/customer/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAuth_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/customer/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAuth_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/customer/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAuth_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/customer/password/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The phone, the office's code and a new password: sets it and signs in. */
+        post: operations["CustomerAuth_setupPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/customer/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Нууц үг солих»: ends the account's sessions on other phones. */
+        post: operations["CustomerAuth_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/mobile/login": {
         parameters: {
             query?: never;
@@ -1029,6 +1111,72 @@ export interface paths {
         get: operations["Customers_listContacts"];
         put?: never;
         post: operations["Customers_addContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/app-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppAccount_get"];
+        /** Links the phone, or changes it: the password is cleared and every session ends. */
+        put: operations["CustomerAppAccount_link"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/app-account/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Код үүсгэх»: never @Idempotent, so the code is never stored for a replay. */
+        post: operations["CustomerAppAccount_issueCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/app-account/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAppAccount_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}/app-account/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAppAccount_enable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4431,6 +4579,414 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-app/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppStore_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppStore_checkout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/credit-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cart's credit warning for its quoted total (ADR-0079 #5): the store may still send. */
+        get: operations["CustomerAppStore_creditCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Холбоо барих» (ADR-0079 #14): the company's contact people the admins show. */
+        get: operations["CustomerAppStore_contactList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/products/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_batch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/thumbs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_thumbs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/barcodes/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_barcode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/favourites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppShop_favourites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/favourites/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["CustomerAppShop_star"];
+        post?: never;
+        delete: operations["CustomerAppShop_unstar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The cart priced by the server, as the office will price it again at the confirmation. */
+        post: operations["CustomerAppShop_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppOrders_list"];
+        put?: never;
+        /** «Захиалга илгээх»: the Idempotency-Key survives a lost answer (ADR-0061 #8). */
+        post: operations["CustomerAppOrders_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppOrders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/orders/{id}/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Дахин захиалах»: the lines for the cart; the app quotes them again today. */
+        get: operations["CustomerAppOrders_reorder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppMoney_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppMoney_invoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppMoney_invoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppMoney_payments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The bank accounts finance marks «Харилцагчид харуулах»: write the invoice number. */
+        get: operations["CustomerAppMoney_bankAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppNotifications_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerAppNotifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CustomerAppNotifications_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerSettings_list"];
+        /** The whole list in its order (role, name, phone, shown). */
+        put: operations["CustomerSettings_save"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The home's warning when stores use the app but no stage takes its orders. */
+        get: operations["CustomerSettings_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4455,7 +5011,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4509,15 +5065,38 @@ export interface components {
             /** Format: password */
             newPassword: string;
         };
-        MobileLoginResponse: {
+        CustomerLoginRequest: {
+            /**
+             * @description The phone the office linked
+             * @example 99112233
+             */
+            phone: string;
+            /** Format: password */
+            password: string;
+        };
+        CustomerAccount: {
+            /** @description The account (customer_users) id; the app keys its storage on it */
+            id: number;
+            customerId: number;
+            /** @example +97699112233 */
+            phone: string;
+            /**
+             * Format: date-time
+             * @description When this session signed in
+             */
+            sessionStartedAt: string;
+            /** Format: date-time */
+            sessionExpiresAt: string;
+        };
+        CustomerLoginResponse: {
             accessToken: string;
             /** Format: date-time */
             accessTokenExpiresAt: string;
             /** Format: date-time */
             sessionExpiresAt: string;
-            me: components["schemas"]["Me"];
-            /** @description The refresh token: kept in the device secure storage and sent to /auth/mobile/refresh */
+            /** @description Kept in the device secure storage; sent to /auth/customer/refresh */
             refreshToken: string;
+            account: components["schemas"]["CustomerAccount"];
         };
         MobileTokenRequest: {
             refreshToken: string;
@@ -4530,6 +5109,24 @@ export interface components {
             sessionExpiresAt: string;
             /** @description The rotated refresh token; null within the 20-second grace window: keep the stored one */
             refreshToken: string | null;
+        };
+        CustomerPasswordSetupRequest: {
+            /** @example 99112233 */
+            phone: string;
+            /** @description The one-time code the office read out, e.g. 7KQ2M-X9D4F */
+            code: string;
+            /** Format: password */
+            newPassword: string;
+        };
+        MobileLoginResponse: {
+            accessToken: string;
+            /** Format: date-time */
+            accessTokenExpiresAt: string;
+            /** Format: date-time */
+            sessionExpiresAt: string;
+            me: components["schemas"]["Me"];
+            /** @description The refresh token: kept in the device secure storage and sent to /auth/mobile/refresh */
+            refreshToken: string;
         };
         UserLookup: {
             id: number;
@@ -4735,7 +5332,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "credit.payment_term_days";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -5277,6 +5874,11 @@ export interface components {
             /** @example +97699112233 */
             phone: string | null;
         };
+        /**
+         * @description The customer app account (ADR-0079 #11); null = not linked
+         * @enum {string}
+         */
+        CustomerAppAccountStatus: "ACTIVE" | "DISABLED";
         CustomerListItem: {
             id: number;
             code: string;
@@ -5315,6 +5917,8 @@ export interface components {
             gps: components["schemas"]["GpsPoint"] | null;
             /** @description The first contact */
             contact: components["schemas"]["ListContact"] | null;
+            /** @description The customer app account (ADR-0079 #11); null = not linked */
+            appAccount: components["schemas"]["CustomerAppAccountStatus"] | null;
         };
         CustomerPage: {
             data: components["schemas"]["CustomerListItem"][];
@@ -5479,6 +6083,50 @@ export interface components {
             /** @description Mongolian mobile number in any common form; stored as +976XXXXXXXX */
             phone?: string | null;
             note?: string | null;
+        };
+        CustomerAppAccount: {
+            id: number;
+            /**
+             * @description The sign-in phone
+             * @example +97699112233
+             */
+            phone: string;
+            status: components["schemas"]["CustomerAppAccountStatus"];
+            /** @description False until the store redeemed a code */
+            passwordSet: boolean;
+            /** Format: date-time */
+            lastSignInAt: string | null;
+            /** Format: date-time */
+            lockedUntil: string | null;
+            /**
+             * Format: date-time
+             * @description When the live one-time code runs out; null when none is live
+             */
+            codeExpiresAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CustomerAppAccountState: {
+            /** @description null = not linked */
+            account: components["schemas"]["CustomerAppAccount"] | null;
+        };
+        CustomerAppLinkRequest: {
+            /**
+             * @description A Mongolian mobile number, local form allowed
+             * @example 99112233
+             */
+            phone: string;
+        };
+        CustomerAppCode: {
+            /**
+             * @description Shown once; read it out to the store
+             * @example 7KQ2M-X9D4F
+             */
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
         };
         SupplierListItem: {
             id: number;
@@ -8857,6 +9505,8 @@ export interface components {
             /** @example 100101 */
             glAccountCode: string;
             glAccountName: string;
+            /** @description «Харилцагчид харуулах»: the customer app lists it (ADR-0079 #7) */
+            showToCustomers: boolean;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -8880,6 +9530,8 @@ export interface components {
             bankAccountNo?: string | null;
             /** @description The asset account the vouchers hit */
             glAccountId: number;
+            /** @description Shown in the customer app; bank accounts only */
+            showToCustomers?: boolean;
         };
         MoneyAccountPatch: {
             code?: string;
@@ -8888,6 +9540,8 @@ export interface components {
             bankName?: string | null;
             bankAccountNo?: string | null;
             glAccountId?: number;
+            /** @description Shown in the customer app; bank accounts only */
+            showToCustomers?: boolean;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE";
         };
@@ -9809,6 +10463,8 @@ export interface components {
             floatKept: string;
             note?: string | null;
         };
+        /** @enum {string} */
+        NoticeAudience: "SALES_REPS" | "CUSTOMERS";
         AppNoticeProduct: {
             id: number;
             sku: string;
@@ -9819,6 +10475,7 @@ export interface components {
             id: number;
             /** @enum {string} */
             kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            audience: components["schemas"]["NoticeAudience"];
             title: string;
             body: string;
             /** @description Relative to the server */
@@ -9835,7 +10492,7 @@ export interface components {
             state: "SCHEDULED" | "RUNNING" | "ENDED" | "WITHDRAWN";
             /** @description In the order the admin chose */
             products: components["schemas"]["AppNoticeProduct"][];
-            /** @description Active holders of sales.orders.rep beside ADMIN */
+            /** @description SALES_REPS: active holders of sales.orders.rep beside ADMIN; CUSTOMERS: active app accounts */
             recipients: number;
             /** @description Those recipients who read or closed it */
             reads: number;
@@ -9854,6 +10511,8 @@ export interface components {
         AppNoticeRequest: {
             /** @enum {string} */
             kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            /** @description The sales reps (when left out) or the customers of «Bto300» (ADR-0079 #8) */
+            audience?: components["schemas"]["NoticeAudience"];
             /** @description Characters, trimmed */
             title: string;
             /** @description Characters, trimmed */
@@ -9929,8 +10588,489 @@ export interface components {
             /** @description The unread count after marking */
             unread: number;
         };
+        CustomerAppCentre: {
+            /** @description The branch the store orders from */
+            branchName: string;
+            /** @description Its wholesale warehouses («Өөрөө авна») */
+            warehouses: string[];
+        };
+        CustomerAppAddress: {
+            id: number;
+            label: string | null;
+            address: string | null;
+        };
+        CustomerAppMe: {
+            customerId: number;
+            code: string;
+            name: string;
+            /** @description The sign-in phone */
+            phone: string;
+            centre: components["schemas"]["CustomerAppCentre"] | null;
+            defaultAddress: components["schemas"]["CustomerAppAddress"] | null;
+            /** @description Changed only by the office */
+            paymentTermDays: number | null;
+            /** @description False while no stage takes app orders: the app does not send */
+            ordersOpen: boolean;
+            /**
+             * Format: date
+             * @description The server's business date
+             */
+            today: string;
+        };
+        CustomerAppCheckoutAddress: {
+            id: number;
+            label: string | null;
+            address: string | null;
+            isDefault: boolean;
+        };
+        CustomerAppCheckout: {
+            /** Format: date */
+            today: string;
+            /**
+             * Format: date
+             * @description The last day an order may ask for (today + 60)
+             */
+            lastDay: string;
+            /** @description Live, the default first */
+            addresses: components["schemas"]["CustomerAppCheckoutAddress"][];
+            pickup: components["schemas"]["CustomerAppCentre"] | null;
+            ordersOpen: boolean;
+        };
+        CustomerAppCreditCheck: {
+            /** @description Why the office may not confirm yet; the store may still send */
+            warnings: ("HOLD" | "OVERDUE" | "LIMIT")[];
+            /** @example 0.00 */
+            overdueAmount: string;
+            /** Format: date */
+            oldestOverdueDate: string | null;
+            /** @description Only when the store has a limit */
+            creditLimit: string | null;
+            creditAvailable: string | null;
+            /** @description How far this amount passes the limit; 0.00 when it does not */
+            excess: string;
+        };
+        CompanyContact: {
+            id: number;
+            /** @example Захиалга, оффис */
+            role: string;
+            name: string;
+            /** @example +97699112233 */
+            phone: string;
+            /** @description Listed in the app */
+            shown: boolean;
+        };
+        CustomerAppCategory: {
+            id: number;
+            parentId: number | null;
+            name: string;
+        };
+        CustomerAppImage: {
+            url: string;
+            thumbUrl: string | null;
+        };
+        /**
+         * @description «Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4)
+         * @enum {string}
+         */
+        StockWord: "IN" | "LOW" | "OUT";
+        CustomerAppUnit: {
+            id: number;
+            uomName: string;
+            uomCode: string | null;
+            /** @example 12 */
+            factorToBase: string;
+            isBase: boolean;
+            isDefaultSales: boolean;
+            barcodes: string[];
+            /** @description One unit at the wholesale price, whole MNT; null without a price today */
+            wholesale: string | null;
+            /** @enum {string|null} */
+            basis: "WAREHOUSE" | "LOOSE" | "MIXED" | null;
+        };
+        CustomerAppProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            categoryId: number;
+            thumbUrl: string | null;
+            /** @description The primary first */
+            images: components["schemas"]["CustomerAppImage"][];
+            /** @description «Шинэ» */
+            isNew: boolean;
+            /** @description «Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4) */
+            stock: components["schemas"]["StockWord"];
+            /** @description The store starred it */
+            favourite: boolean;
+            /** @description One base unit in whole packs */
+            basePrice: string | null;
+            units: components["schemas"]["CustomerAppUnit"][];
+        };
+        CustomerAppProductPage: {
+            data: components["schemas"]["CustomerAppProduct"][];
+            nextCursor: string | null;
+            /** @description On the first page */
+            total: number | null;
+            /** @description «★ Дуртай N»: the stars the shop still lists, on the first page */
+            favouriteCount: number | null;
+        };
+        CustomerAppThumbs: {
+            urls: string[];
+        };
+        CustomerAppBarcode: {
+            /** @description The unit the barcode names (a box barcode: the box) */
+            productUnitId: number;
+            product: components["schemas"]["CustomerAppProduct"];
+        };
+        CustomerAppFavourites: {
+            /** @description The newest star first */
+            productIds: number[];
+        };
+        CustomerAppQuoteRequest: {
+            lines: components["schemas"]["QuoteLineRequest"][];
+        };
+        CustomerAppQuoteStock: {
+            productUnitId: number;
+            stock: components["schemas"]["StockWord"];
+            /** @description «Зарим нь хойшилж магадгүй»: more than is free now */
+            mayBackorder: boolean;
+        };
+        CustomerAppQuote: {
+            /** @description The WHOLESALE list today; the app never prices */
+            quote: components["schemas"]["Quote"];
+            /** @description By line, as asked */
+            stock: components["schemas"]["CustomerAppQuoteStock"][];
+        };
+        CustomerAppOrderLineRequest: {
+            productUnitId: number;
+            /**
+             * @description In the unit
+             * @example 2
+             */
+            qty: string;
+        };
+        CustomerAppOrderRequest: {
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /**
+             * Format: date
+             * @description Today … today + 60 (Ulaanbaatar)
+             */
+            deliveryDate: string;
+            /** @description One of the store’s live addresses; required for DELIVERY */
+            addressId?: number | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note?: string | null;
+            lines: components["schemas"]["CustomerAppOrderLineRequest"][];
+        };
+        /**
+         * @description The progress in the customer’s words
+         * @enum {string}
+         */
+        CustomerOrderState: "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "DELIVERED" | "CANCELLED";
+        CustomerAppOrderInvoice: {
+            id: number;
+            number: string;
+        };
+        CustomerAppOrderLine: {
+            id: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            unitName: string;
+            /** @description In the unit */
+            qty: string;
+            baseUnitName: string;
+            /** @description Base units */
+            qtyBase: string;
+            /** @description Base units waiting for stock («хойшилсон») */
+            qtyBackordered: string;
+            /** @description Frozen at the confirmation */
+            total: string | null;
+            /** @description A pending line today */
+            estimatedTotal: string | null;
+        };
+        CustomerAppOrder: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            /** @description The progress in the customer’s words */
+            state: components["schemas"]["CustomerOrderState"];
+            /**
+             * @description CUSTOMER_APP «Апп», ADMIN «Оффис», …
+             * @enum {string}
+             */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** @description The rep of a SALES_REP order */
+            takerName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** @description Frozen at the confirmation */
+            total: string | null;
+            /** @description «≈» a pending order today */
+            estimatedTotal: string | null;
+            cancelReason: string | null;
+            addressText: string | null;
+            note: string | null;
+            /** Format: date-time */
+            confirmedAt: string | null;
+            /** Format: date-time */
+            pickedAt: string | null;
+            /** Format: date-time */
+            deliveredAt: string | null;
+            /** Format: date-time */
+            cancelledAt: string | null;
+            invoice: components["schemas"]["CustomerAppOrderInvoice"] | null;
+            lines: components["schemas"]["CustomerAppOrderLine"][];
+        };
+        CustomerAppOrderRow: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            /** @description The progress in the customer’s words */
+            state: components["schemas"]["CustomerOrderState"];
+            /**
+             * @description CUSTOMER_APP «Апп», ADMIN «Оффис», …
+             * @enum {string}
+             */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** @description The rep of a SALES_REP order */
+            takerName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** @description Frozen at the confirmation */
+            total: string | null;
+            /** @description «≈» a pending order today */
+            estimatedTotal: string | null;
+            cancelReason: string | null;
+            /** Format: date */
+            createdDate: string;
+            /** @example 14:05 */
+            createdTime: string;
+            lineCount: number;
+            backorderedLines: number;
+        };
+        CustomerAppOrderSummary: {
+            count: number;
+            /** @description The orders not cancelled, as frozen, whole MNT */
+            confirmedTotal: string;
+            /** @description «Хүлээгдэж буй» */
+            pending: number;
+        };
+        CustomerAppOrderPage: {
+            data: components["schemas"]["CustomerAppOrderRow"][];
+            nextCursor: string | null;
+            /** @description First page */
+            summary: components["schemas"]["CustomerAppOrderSummary"] | null;
+        };
+        CustomerAppReorderLine: {
+            productId: number;
+            productUnitId: number;
+            qty: string;
+        };
+        CustomerAppReorderSkip: {
+            productId: number;
+            name: string | null;
+            /** @enum {string} */
+            reason: "UNAVAILABLE" | "OUT_OF_STOCK" | "UNIT_CHANGED";
+        };
+        CustomerAppReorder: {
+            lines: components["schemas"]["CustomerAppReorderLine"][];
+            skipped: components["schemas"]["CustomerAppReorderSkip"][];
+        };
+        CustomerAppBalance: {
+            /**
+             * @description Negative = an advance
+             * @example 125000.00
+             */
+            balance: string;
+            overdueAmount: string;
+            /** Format: date */
+            oldestOverdueDate: string | null;
+            /** @description Only when a limit is set */
+            creditLimit: string | null;
+            /** @description «үлдсэн боломж» */
+            creditAvailable: string | null;
+            /** @description «Зээл хаалттай»; never its internal reason */
+            creditHold: boolean;
+            paymentTermDays: number | null;
+            /** @description «Нэхэмжлэх (n)» */
+            openInvoices: number;
+            /** @description «Төлбөр (n)» */
+            payments: number;
+        };
+        CustomerAppInvoice: {
+            id: number;
+            number: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            orderNumber: string | null;
+            total: string;
+            openAmount: string;
+            /** @description «N хоног хэтэрсэн»; 0 when not overdue */
+            daysOverdue: number;
+            /** @description «N хоног үлдсэн»; 0 when overdue or due today */
+            daysLeft: number;
+        };
+        CustomerAppInvoiceLine: {
+            productId: number;
+            sku: string;
+            name: string;
+            uomName: string;
+            qty: string;
+            unitPrice: string;
+            subtotal: string;
+            discountAmount: string;
+            total: string;
+            vatAmount: string;
+        };
+        CustomerAppInvoiceDetail: {
+            id: number;
+            number: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            orderNumber: string | null;
+            total: string;
+            openAmount: string;
+            /** @description «N хоног хэтэрсэн»; 0 when not overdue */
+            daysOverdue: number;
+            /** @description «N хоног үлдсэн»; 0 when overdue or due today */
+            daysLeft: number;
+            /** @enum {string} */
+            status: "ISSUED" | "VOID";
+            orderId: number | null;
+            subtotal: string;
+            discountTotal: string;
+            /** @description «Үүнд НӨАТ» */
+            vatTotal: string;
+            cityTaxTotal: string;
+            paidAmount: string;
+            creditedAmount: string;
+            lines: components["schemas"]["CustomerAppInvoiceLine"][];
+        };
+        CustomerAppSettledInvoice: {
+            invoiceId: number;
+            number: string;
+            amount: string;
+        };
+        CustomerAppPayment: {
+            id: number;
+            number: string;
+            /** @enum {string} */
+            kind: "CUSTOMER_PAYMENT" | "CUSTOMER_REFUND";
+            /**
+             * @description Cash or a bank transfer
+             * @enum {string}
+             */
+            method: "CASH" | "BANK";
+            amount: string;
+            /** Format: date */
+            paidOn: string;
+            invoices: components["schemas"]["CustomerAppSettledInvoice"][];
+        };
+        CustomerAppPaymentPage: {
+            data: components["schemas"]["CustomerAppPayment"][];
+            nextCursor: string | null;
+            /** @description On the first page */
+            total: number | null;
+        };
+        CustomerAppBankAccount: {
+            id: number;
+            name: string;
+            bankName: string | null;
+            bankAccountNo: string | null;
+        };
+        CustomerAppNotice: {
+            id: number;
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            title: string;
+            body: string;
+            imageUrl: string | null;
+            popup: boolean;
+            /** Format: date */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+            /** @description «Бараа харах» */
+            productIds: number[];
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CustomerAppNotificationSummary: {
+            /** @description The bell’s count */
+            unread: number;
+            notices: components["schemas"]["CustomerAppNotice"][];
+        };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
+        CustomerNotificationKind: "ORDER_CONFIRMED" | "ORDER_CANCELLED" | "ORDER_SOLD" | "PAYMENT_RECORDED" | "INVOICE_DUE_SOON" | "INVOICE_OVERDUE";
+        CustomerAppNotification: {
+            id: number;
+            kind: components["schemas"]["CustomerNotificationKind"];
+            orderId: number | null;
+            invoiceId: number | null;
+            paymentId: number | null;
+            /** @description By kind: orderNumber, orderTotal, backorderedLines, backordered[], reason, invoiceNumber, invoiceTotal, paymentNumber, amount, paidOn, method, invoices[], dueDate, openAmount */
+            payload: {
+                [key: string]: unknown;
+            };
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CustomerAppNotificationPage: {
+            data: components["schemas"]["CustomerAppNotification"][];
+            nextCursor: string | null;
+        };
+        CustomerAppReadRequest: {
+            noticeIds?: number[];
+            notificationIds?: number[];
+        };
+        CustomerAppReadResult: {
+            unread: number;
+        };
+        CompanyContactRequest: {
+            role: string;
+            name: string;
+            /**
+             * @description A Mongolian mobile number
+             * @example 99112233
+             */
+            phone: string;
+            shown: boolean;
+        };
+        CompanyContactsRequest: {
+            /** @description The whole list, in its order */
+            contacts: components["schemas"]["CompanyContactRequest"][];
+        };
+        CustomerAppAttention: {
+            /** @description Stores whose app account is open */
+            activeAccounts: number;
+            /** @description A stage without an action takes app orders */
+            ordersOpen: boolean;
+        };
+        /** @enum {string} */
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -10192,6 +11332,162 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAuth_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerLoginRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAuth_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTokenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileTokens"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAuth_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTokenRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAuth_setupPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerPasswordSetupRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAuth_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
@@ -12181,6 +13477,8 @@ export interface operations {
                 tinPending?: boolean;
                 /** @description The default address has no GPS point */
                 gpsMissing?: boolean;
+                /** @description The customer app account: ACTIVE, DISABLED or NONE (not linked) */
+                app?: "ACTIVE" | "DISABLED" | "NONE";
                 /** @description A saved customer segment (ADR-0049) */
                 segmentId?: number;
             };
@@ -12516,6 +13814,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Contact"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppAccount_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppAccountState"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppAccount_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAppLinkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppAccount_issueCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppCode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppAccount_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppAccount_enable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppAccount"];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -21073,6 +22525,851 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyNotificationReadResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppStore_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppMe"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppStore_checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppCheckout"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppStore_creditCheck: {
+        parameters: {
+            query: {
+                /** @description The cart's total from the quote */
+                amount: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppCreditCheck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppStore_contactList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyContact"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppCategory"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_products: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name words, code or barcode */
+                q?: string;
+                /** @description Each with its subcategories (repeated) */
+                categoryIds?: number[];
+                /** @description «★ Дуртай»: only the store’s favourites */
+                favourites?: boolean;
+                /** @description NEW when left out */
+                sort?: "NEW" | "PRICE_ASC" | "PRICE_DESC";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppProductPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_batch: {
+        parameters: {
+            query: {
+                /** @description Product ids, comma separated (at most 200) */
+                productIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppProduct"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_thumbs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppThumbs"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_barcode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppBarcode"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_favourites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppFavourites"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_star: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_unstar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppShop_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAppQuoteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppQuote"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppOrders_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Created on or after (Ulaanbaatar) */
+                from?: string;
+                /** @description Created on or before (Ulaanbaatar) */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppOrders_send: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAppOrderRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppOrders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppOrders_reorder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppReorder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_invoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppInvoice"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_invoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppInvoiceDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_payments: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppPaymentPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_bankAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppBankAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppNotifications_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppNotificationSummary"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppNotifications_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppNotificationPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppNotifications_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAppReadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppReadResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerSettings_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyContact"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerSettings_save: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyContactsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyContact"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerSettings_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppAttention"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -141,7 +141,9 @@ describe('price profiles list', () => {
     expect(await dialog.findByText(mn.validation.required)).toBeInTheDocument();
     expect(dialog.getAllByText(mn.validation.markup)).toHaveLength(2);
 
-    await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.name), 'Жишээ: Ундаа');
+    // Pasted, not typed key by key: the flow stays well inside its time under a full parallel run.
+    await user.click(dialog.getByLabelText(mn.pricing.profiles.fields.name));
+    await user.paste('Жишээ: Ундаа');
     await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.loose), '15');
     await user.type(dialog.getByLabelText(mn.pricing.profiles.fields.retail), '30');
     await user.click(dialog.getByRole('switch', { name: mn.pricing.profiles.fields.bulk }));
@@ -178,8 +180,11 @@ describe('price profiles list', () => {
       validFrom: TODAY,
     });
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
-    expect(await screen.findByRole('heading', { name: 'Жишээ: Ундаа' })).toBeInTheDocument();
-  });
+    // The profile's page is loaded on first use; under a full `pnpm check` that can take seconds.
+    expect(
+      await screen.findByRole('heading', { name: 'Жишээ: Ундаа' }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
+  }, 25_000);
 });
 
 describe('price profile page', () => {

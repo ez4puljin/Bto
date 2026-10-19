@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import {
+  NOTICE_AUDIENCES,
   NOTICE_KINDS,
   NOTICE_LIMITS,
   NOTICE_STATES,
+  type NoticeAudience,
   type NoticeKind,
   type NoticeState,
   USER_NOTIFICATION_KINDS,
@@ -32,6 +34,15 @@ const trimmed = ({ value }: { value: unknown }) =>
 @ApiSchema({ name: 'AppNoticeRequest' })
 export class AppNoticeRequestDto {
   @ApiProperty({ enum: NOTICE_KINDS }) @IsIn(NOTICE_KINDS) kind: NoticeKind;
+
+  @ApiPropertyOptional({
+    enum: NOTICE_AUDIENCES,
+    enumName: 'NoticeAudience',
+    description: 'The sales reps (when left out) or the customers of «Bto300» (ADR-0079 #8)',
+  })
+  @IsOptional()
+  @IsIn(NOTICE_AUDIENCES)
+  audience?: NoticeAudience;
 
   @ApiProperty({ maxLength: NOTICE_LIMITS.titleMax, description: 'Characters, trimmed' })
   @Transform(trimmed)
@@ -102,6 +113,7 @@ export class AppNoticeProductDto {
 export class AppNoticeDto {
   @ApiProperty() id: number;
   @ApiProperty({ enum: NOTICE_KINDS }) kind: NoticeKind;
+  @ApiProperty({ enum: NOTICE_AUDIENCES, enumName: 'NoticeAudience' }) audience: NoticeAudience;
   @ApiProperty() title: string;
   @ApiProperty() body: string;
   @ApiProperty({ type: String, nullable: true, description: 'Relative to the server' })
@@ -114,7 +126,10 @@ export class AppNoticeDto {
   state: NoticeState;
   @ApiProperty({ type: [AppNoticeProductDto], description: 'In the order the admin chose' })
   products: AppNoticeProductDto[];
-  @ApiProperty({ description: 'Active holders of sales.orders.rep beside ADMIN' })
+  @ApiProperty({
+    description:
+      'SALES_REPS: active holders of sales.orders.rep beside ADMIN; CUSTOMERS: active app accounts',
+  })
   recipients: number;
   @ApiProperty({ description: 'Those recipients who read or closed it' }) reads: number;
   @ApiProperty() createdBy: number;

@@ -1,10 +1,30 @@
 // Public API of the identity module (docs/modules/identity.md). Other modules import only this
 // file; named exports only (ESLint G2 rejects `export *`).
-export { type Actor, actorUserId, type AuthContext, systemActor } from './auth-context';
-export { Authenticated, CurrentUser, RequirePermission } from './decorators/access.decorators';
+export {
+  type Actor,
+  actorUserId,
+  type AuditActor,
+  type AuthContext,
+  type CustomerActor,
+  type CustomerContext,
+  systemActor,
+} from './auth-context';
+export { CUSTOMER_ACCOUNT_GATE, type CustomerAccountGate } from './customer-account-gate';
+export {
+  Authenticated,
+  CurrentCustomer,
+  CurrentUser,
+  CustomerRoute,
+  RequirePermission,
+} from './decorators/access.decorators';
 export { IdentityHttpModule, IdentityModule, IdentityWorkerModule } from './identity.module';
 export { Idempotent } from './interceptors/idempotency.interceptor';
+export type { CustomerUserStatus } from './schema';
 export { type AuditEntry, AuditService } from './services/audit.service';
+export {
+  type CustomerAccountView,
+  CustomerAccountsService,
+} from './services/customer-accounts.service';
 export { NumberingService } from './services/numbering.service';
 export {
   type Branch,
@@ -13,6 +33,7 @@ export {
   WAREHOUSE_CREATED_HOOK,
   type WarehouseCreatedHook,
 } from './services/org.service';
+export type { IssuedCode } from './services/password-codes';
 export { PermissionHoldersService } from './services/permission-holders.service';
 export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';

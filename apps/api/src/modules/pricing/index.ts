@@ -40,3 +40,6 @@ export {
   type SaleReadyResult,
   SaleReadinessService,
 } from './services/sale-readiness.service';
+// The quote's wire shape, reused by the customer app's own quote route (ADR-0082).
+export { toQuoteDto } from './controllers/mappers';
+export { QuoteDto, QuoteLineRequestDto } from './dto/pricing.dto';

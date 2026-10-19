@@ -2,7 +2,6 @@ import { Body, Controller, Header, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../../../common/auth/public.decorator';
-import { AppError } from '../../../common/errors/app-error';
 import { LoginDto } from '../dto/auth.dto';
 import {
   MobileLoginResponseDto,
@@ -13,18 +12,7 @@ import { requestIdOf } from '../guards/auth.guard';
 import { AccessService } from '../services/access.service';
 import { AuthService } from '../services/auth.service';
 import { clientOf, loginResponseOf, toAccessToken } from './auth-responses';
-
-/**
- * Native clients only (ADR-0061 #4): a browser always sends `Origin`, so a script on the admin's
- * origin can never obtain a refresh token it could read; the web keeps its cookie routes.
- */
-function assertNativeClient(request: Request): void {
-  if (request.headers.origin !== undefined) {
-    throw new AppError('FORBIDDEN', 'a browser request to a native-client route', {
-      reason: 'ORIGIN',
-    });
-  }
-}
+import { assertNativeClient } from './native-client';
 
 /**
  * Login, refresh and logout for the staff app (ADR-0061 #4): the refresh token travels in the JSON

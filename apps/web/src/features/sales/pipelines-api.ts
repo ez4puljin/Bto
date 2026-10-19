@@ -8,6 +8,7 @@ import {
 import { type components, idempotencyKey } from '@tugeel/api-client';
 import type { CardSort, OrderChannel, PrintKind } from '@tugeel/shared/sales';
 import { useApiClient } from '@/app/api-client-context';
+import { ATTENTION_KEY } from '@/features/home/api';
 import { unwrap } from '@/lib/problem';
 import { type PrintFormat, printFormatParam } from '@/lib/print-format';
 
@@ -259,7 +260,9 @@ export function useSalesMutations() {
         pipelineId: number | null;
         stageId: number | null;
       }) => unwrap(await api.PUT('/api/v1/sales-settings/channels', { body })),
-      ...done,
+      // The home page warns while the customer app's orders have no stage (ADR-0079 #5).
+      onSuccess: () =>
+        Promise.all([changed(), queryClient.invalidateQueries({ queryKey: ATTENTION_KEY })]),
     }),
     setNumbering: useMutation({
       mutationFn: async (body: { pattern: string; digits: number }) =>

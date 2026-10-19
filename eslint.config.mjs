@@ -58,12 +58,25 @@ const MODULE_DEPS = {
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
-  notifications: ['identity', 'partners', 'catalog', 'sales'],
+  // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
+  // keys and the open invoices the reminders read.
+  notifications: ['identity', 'partners', 'catalog', 'sales', 'finance'],
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
   ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai
   // ADR-0049: evaluates segments through the owners' index.ts; nobody imports segments (hooks reach it)
   segments: ['identity', 'catalog', 'partners', 'inventory', 'pricing'],
+  // ADR-0082: the customer app's routes read the owners' public services; nobody imports customer.
+  customer: [
+    'identity',
+    'catalog',
+    'partners',
+    'pricing',
+    'inventory',
+    'sales',
+    'finance',
+    'notifications',
+  ],
 };
 const MOD = { type: 'api-module' };
 const INT = { type: 'api-integration' };
@@ -113,6 +126,11 @@ const POLICIES = [
     from: { element: MOD },
     disallow: { to: { element: { ...MOD, captured: { module: 'ai' } } } },
     message: 'Nothing imports the ai module (§3.1 rule 4, ADR-0045).',
+  },
+  {
+    from: { element: MOD },
+    disallow: { to: { element: { ...MOD, captured: { module: 'customer' } } } },
+    message: 'Nothing imports the customer module: the customer app routes end there (ADR-0082).',
   },
   {
     from: { element: MOD },

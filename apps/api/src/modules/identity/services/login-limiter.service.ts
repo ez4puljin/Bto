@@ -87,3 +87,15 @@ export class LoginLimiter {
     }
   }
 }
+
+/**
+ * The customer app's own failure counters (ADR-0079 #3): the same limits as staff, kept apart so
+ * stores behind a carrier's shared address never lock the office out, nor the other way round.
+ * Keyed by the sign-in phone.
+ */
+@Injectable()
+export class CustomerLoginLimiter extends LoginLimiter {
+  constructor(@Inject(LOGIN_LIMITS) limits: LoginLimits) {
+    super(limits);
+  }
+}

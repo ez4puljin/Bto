@@ -3,6 +3,8 @@
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const JWT_ISSUER = 'tugeel';
 export const JWT_AUDIENCE = 'tugeel-api';
+/** The audience of a customer app token (ADR-0079 #3): never accepted where a staff one is. */
+export const JWT_CUSTOMER_AUDIENCE = 'tugeel-customer';
 
 /** httpOnly refresh cookie `<sessionId>.<token>`, sent only to the auth routes. */
 export const REFRESH_COOKIE = 'tugeel_rt';

@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import {
   allocateFifo,
   FINANCE_LIMITS,
+  type MoneyAccountKind,
   PAYMENT_KIND_DIRECTION,
   type PaymentDirection,
   type PaymentKind,
@@ -25,11 +27,19 @@ import {
   moneyAccounts,
   payments,
 } from '../schema';
+import { PAYMENT_LISTENER, type PaymentListener } from '../hooks';
 import { ArLedgerService } from './ar-ledger.service';
 import { FinanceSettingsService } from './finance-settings.service';
 import { GlAccountsService } from './gl-accounts.service';
 import { assertNotFuture, type JournalLineInput, JournalService } from './journal.service';
 import { MoneyAccountsService } from './money-accounts.service';
+
+/** An invoice a payment settled, with the amount it took. */
+interface SettledInvoice {
+  invoiceId: number;
+  number: string;
+  amount: Decimal;
+}
 
 export interface AllocationInput {
   invoiceId: number;
@@ -99,6 +109,17 @@ export interface PaymentDetail extends PaymentSummary {
   allocations: PaymentAllocationView[];
 }
 
+/** A store's payment as the customer app shows it (ADR-0079 #7). */
+export interface CustomerPayment {
+  id: number;
+  number: string;
+  kind: 'CUSTOMER_PAYMENT' | 'CUSTOMER_REFUND';
+  method: MoneyAccountKind;
+  amount: Decimal;
+  paidOn: string;
+  invoices: { invoiceId: number; number: string; amount: Decimal }[];
+}
+
 export interface PaymentQuery {
   /** Part of the number, the reference, a counterparty or a customer's name or code. */
   q?: string;
@@ -143,7 +164,9 @@ const MONEY_SCALE = 2;
  * voucher is voided by a reversing entry that also undoes its allocations.
  */
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
+  private listener: PaymentListener | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
@@ -154,7 +177,17 @@ export class PaymentsService {
     private readonly accounts: GlAccountsService,
     private readonly moneyAccounts: MoneyAccountsService,
     private readonly ledger: ArLedgerService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  /** The payment listener (ADR-0079 #8), or none when notifications is not loaded. */
+  onModuleInit(): void {
+    try {
+      this.listener = this.moduleRef.get<PaymentListener>(PAYMENT_LISTENER, { strict: false });
+    } catch {
+      this.listener = null;
+    }
+  }
 
   async record(ctx: AuthContext, input: PaymentInput): Promise<PaymentDetail> {
     const { id } = await inTransaction(this.db, (tx) => this.recordInTx(tx, ctx, input));
@@ -220,8 +253,10 @@ export class PaymentsService {
       .returning({ id: payments.id });
     if (!payment) throw new Error('payments insert returned no row');
     let allocated = new Decimal(0);
+    let settled: SettledInvoice[] = [];
     if (input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
-      allocated = await this.allocate(tx, payment.id, customerId, input);
+      settled = await this.allocate(tx, payment.id, customerId, input);
+      allocated = settled.reduce((sum, own) => sum.plus(own.amount), new Decimal(0));
     }
     const zero = new Decimal(0);
     const cash = { accountId: account.glAccountId, moneyAccountId: account.id };
@@ -283,6 +318,21 @@ export class PaymentsService {
         paidOn: input.paidOn,
       },
     });
+    if (this.listener && input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
+      await this.listener.onPaymentRecorded(tx, {
+        paymentId: payment.id,
+        paymentNumber: number,
+        customerId,
+        amount: input.amount.toFixed(MONEY_SCALE),
+        paidOn: input.paidOn,
+        method: account.kind,
+        invoices: settled.map((own) => ({
+          invoiceId: own.invoiceId,
+          number: own.number,
+          amount: own.amount.toFixed(MONEY_SCALE),
+        })),
+      });
+    }
     return { id: payment.id, number };
   }
 
@@ -449,6 +499,89 @@ export class PaymentsService {
     return { data: await this.summaries(page.data), nextCursor: page.nextCursor, total };
   }
 
+  /**
+   * The customer app's «Төлбөр» tab (ADR-0079 #7): the store's posted payments and refunds,
+   * newest first, each with the cash box or bank it came through and the invoices it settled.
+   * Nothing internal (accounts, journal, who collected or typed it) leaves finance here.
+   */
+  async ofCustomer(
+    customerId: number,
+    query: { cursor?: string; limit?: number } = {},
+  ): Promise<{ data: CustomerPayment[]; nextCursor: string | null; total: number | null }> {
+    const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const scope = and(
+      eq(payments.customerId, customerId),
+      eq(payments.status, 'POSTED'),
+      inArray(payments.kind, ['CUSTOMER_PAYMENT', 'CUSTOMER_REFUND']),
+    );
+    const after = decodeCursor(query.cursor);
+    const paged =
+      typeof after?.date === 'string' && typeof after?.id === 'number'
+        ? sql`(${payments.paidOn}, ${payments.id}) < (${after.date}::date, ${after.id}::bigint)`
+        : undefined;
+    const rows = await this.db
+      .select({
+        id: payments.id,
+        number: payments.number,
+        kind: payments.kind,
+        method: moneyAccounts.kind,
+        amount: payments.amount,
+        paidOn: payments.paidOn,
+      })
+      .from(payments)
+      .innerJoin(moneyAccounts, eq(moneyAccounts.id, payments.moneyAccountId))
+      .where(and(scope, paged))
+      .orderBy(desc(payments.paidOn), desc(payments.id))
+      .limit(limit + 1);
+    const page = toPage(rows, limit, (row) => ({ date: row.paidOn, id: row.id }));
+    const settled =
+      page.data.length === 0
+        ? []
+        : await this.db
+            .select({
+              paymentId: allocations.sourceId,
+              invoiceId: allocations.invoiceId,
+              number: invoices.number,
+              amount: allocations.amount,
+            })
+            .from(allocations)
+            .innerJoin(invoices, eq(invoices.id, allocations.invoiceId))
+            .where(
+              and(
+                eq(allocations.sourceType, 'PAYMENT'),
+                inArray(
+                  allocations.sourceId,
+                  page.data.map((row) => row.id),
+                ),
+                isNull(allocations.voidedAt),
+              ),
+            )
+            .orderBy(asc(invoices.dueDate), asc(invoices.id));
+    let total: number | null = null;
+    if (!query.cursor) {
+      const [counted] = await this.db
+        .select({ count: sql<string>`count(*)` })
+        .from(payments)
+        .where(scope);
+      total = Number.parseInt(counted?.count ?? '0', 10);
+    }
+    return {
+      data: page.data.map((row) => ({
+        id: row.id,
+        number: row.number,
+        kind: row.kind === 'CUSTOMER_REFUND' ? 'CUSTOMER_REFUND' : 'CUSTOMER_PAYMENT',
+        method: row.method,
+        amount: row.amount,
+        paidOn: row.paidOn,
+        invoices: settled
+          .filter((own) => own.paymentId === row.id)
+          .map((own) => ({ invoiceId: own.invoiceId, number: own.number, amount: own.amount })),
+      })),
+      nextCursor: page.nextCursor,
+      total,
+    };
+  }
+
   async get(id: number): Promise<PaymentDetail> {
     const [row] = await this.db
       .select({ ...this.summaryColumns(), journalNumber: journalEntries.number })
@@ -553,14 +686,14 @@ export class PaymentsService {
   /**
    * Settles the customer's open invoices with a payment: the accountant's allocations when given
    * (each within the invoice's open amount, together within the payment), else oldest due first.
-   * Returns what was allocated; the rest stays an advance.
+   * Returns the invoices it settled; the rest stays an advance.
    */
   private async allocate(
     tx: Tx,
     paymentId: number,
     customerId: number,
     input: PaymentInput,
-  ): Promise<Decimal> {
+  ): Promise<SettledInvoice[]> {
     const open = await tx
       .select({
         id: invoices.id,
@@ -618,7 +751,8 @@ export class PaymentsService {
     } else {
       chosen = allocateFifo(input.amount, open);
     }
-    let allocated = new Decimal(0);
+    const numbers = new Map(open.map((invoice) => [invoice.id, invoice.number]));
+    const settled: SettledInvoice[] = [];
     for (const allocation of chosen) {
       await tx.insert(allocations).values({
         sourceType: 'PAYMENT',
@@ -630,9 +764,13 @@ export class PaymentsService {
         .update(invoices)
         .set({ openAmount: sql`${invoices.openAmount} - ${allocation.amount.toFixed(2)}::numeric` })
         .where(eq(invoices.id, allocation.invoiceId));
-      allocated = allocated.plus(allocation.amount);
+      settled.push({
+        invoiceId: allocation.invoiceId,
+        number: numbers.get(allocation.invoiceId) ?? '',
+        amount: allocation.amount,
+      });
     }
-    return allocated;
+    return settled;
   }
 
   private summaryColumns() {

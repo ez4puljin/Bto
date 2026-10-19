@@ -32,7 +32,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { coordinate, factor, jsonValue, money, qty } from '../../common/db/types';
 import { productUnits, products } from '../catalog/schema';
-import { branches, roles, users, warehouses } from '../identity/schema';
+import { branches, customerUsers, roles, users, warehouses } from '../identity/schema';
 import { bins } from '../inventory/schema';
 import { customerAddresses, customers } from '../partners/schema';
 
@@ -107,6 +107,8 @@ export const salesOrders = pgTable(
     cancelledBy: userRef('cancelled_by'),
     cancelReason: text('cancel_reason'),
     createdBy: userRef('created_by'),
+    /** The store's customer app account that sent a CUSTOMER_APP order (ADR-0079 #5). */
+    customerUserId: ref('customer_user_id').references(() => customerUsers.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -120,6 +122,10 @@ export const salesOrders = pgTable(
     index('sales_orders_pipeline_idx').on(t.pipelineId, t.id),
     check('sales_orders_status', inList(t.status, ORDER_STATUSES)),
     check('sales_orders_channel', inList(t.channel, ORDER_CHANNELS)),
+    check(
+      'sales_orders_customer_app',
+      sql`(${t.channel} = 'CUSTOMER_APP') = (${t.customerUserId} IS NOT NULL)`,
+    ),
     check('sales_orders_fulfilment', inList(t.fulfilment, FULFILMENTS)),
     check('sales_orders_payment_method', inList(t.paymentMethod, PAYMENT_METHODS)),
     check(

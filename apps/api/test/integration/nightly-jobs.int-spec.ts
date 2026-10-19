@@ -480,6 +480,13 @@ describe('nightly jobs', () => {
           timezone: 'Asia/Ulaanbaatar',
           missed: 'once',
         },
+        // The customer app's invoice reminders (ADR-0079 #8): a morning, not a night.
+        {
+          name: 'notifications.invoiceReminders',
+          cron: '0 9 * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
       ]);
     });
 

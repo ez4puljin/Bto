@@ -7,8 +7,14 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
-import { ACCESS_TOKEN_TTL_SECONDS, JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  JWT_AUDIENCE,
+  JWT_CUSTOMER_AUDIENCE,
+  JWT_ISSUER,
+} from './auth.constants';
 import { AuthController } from './controllers/auth.controller';
+import { CustomerAuthController } from './controllers/customer-auth.controller';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { FilesController } from './controllers/files.controller';
 import { AuditController, OrgController, SettingsController } from './controllers/org.controller';
@@ -22,8 +28,16 @@ import { AccessService } from './services/access.service';
 import { AuditQueryService } from './services/audit-query.service';
 import { AuditService } from './services/audit.service';
 import { AuthService } from './services/auth.service';
+import { CustomerAccessService } from './services/customer-access.service';
+import { CustomerAccountsService } from './services/customer-accounts.service';
+import { CustomerAuthService } from './services/customer-auth.service';
 import { HousekeepingService } from './services/housekeeping.service';
-import { DEFAULT_LOGIN_LIMITS, LOGIN_LIMITS, LoginLimiter } from './services/login-limiter.service';
+import {
+  CustomerLoginLimiter,
+  DEFAULT_LOGIN_LIMITS,
+  LOGIN_LIMITS,
+  LoginLimiter,
+} from './services/login-limiter.service';
 import { NumberingService } from './services/numbering.service';
 import { OrgService } from './services/org.service';
 import { PasswordHasher } from './services/password-hasher.service';
@@ -38,6 +52,9 @@ import { StorageUrlSigner } from './storage/url-signer';
 
 const CORE_SERVICES = [
   AuditService,
+  CustomerAccountsService,
+  CustomerLoginLimiter,
+  LoginLimiter,
   NumberingService,
   OrgService,
   PermissionHoldersService,
@@ -48,7 +65,10 @@ const CORE_SERVICES = [
 ];
 
 /** Identity services every process may use (api, worker jobs, CLIs). */
-@Module({ providers: CORE_SERVICES, exports: CORE_SERVICES })
+@Module({
+  providers: [...CORE_SERVICES, { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS }],
+  exports: CORE_SERVICES,
+})
 export class IdentityModule {}
 
 /** Syncs the permission catalog, system roles and TRANSIT before the api serves requests. */
@@ -88,7 +108,8 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
         verifyOptions: {
           algorithms: ['HS256'],
           issuer: JWT_ISSUER,
-          audience: JWT_AUDIENCE,
+          // Staff and customer app tokens; the guard keeps each kind to its own routes.
+          audience: [JWT_AUDIENCE, JWT_CUSTOMER_AUDIENCE],
           clockTolerance: 5,
         },
       }),
@@ -96,6 +117,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   ],
   controllers: [
     AuthController,
+    CustomerAuthController,
     MobileAuthController,
     UsersController,
     RolesController,
@@ -109,12 +131,12 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     AccessService,
     AuditQueryService,
     AuthService,
+    CustomerAccessService,
+    CustomerAuthService,
     PasswordHasher,
-    LoginLimiter,
     RolesService,
     StorageUrlSigner,
     UsersService,
-    { provide: LOGIN_LIMITS, useValue: DEFAULT_LOGIN_LIMITS },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],

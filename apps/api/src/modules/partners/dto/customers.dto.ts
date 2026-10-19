@@ -190,6 +190,13 @@ export class CustomerListItemDto extends CustomerSummaryDto {
   gps: GpsPointDto | null;
   @ApiProperty({ type: ListContactDto, nullable: true, description: 'The first contact' })
   contact: ListContactDto | null;
+  @ApiProperty({
+    enum: ['ACTIVE', 'DISABLED'],
+    enumName: 'CustomerAppAccountStatus',
+    nullable: true,
+    description: 'The customer app account (ADR-0079 #11); null = not linked',
+  })
+  appAccount: 'ACTIVE' | 'DISABLED' | null;
 }
 
 @ApiSchema({ name: 'CustomerPage' })
@@ -355,6 +362,14 @@ export class CustomerListQueryDto extends PageQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   gpsMissing?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['ACTIVE', 'DISABLED', 'NONE'],
+    description: 'The customer app account: ACTIVE, DISABLED or NONE (not linked)',
+  })
+  @IsOptional()
+  @IsIn(['ACTIVE', 'DISABLED', 'NONE'])
+  app?: 'ACTIVE' | 'DISABLED' | 'NONE';
 
   @ApiPropertyOptional({ description: 'A saved customer segment (ADR-0049)' })
   @IsOptional()
