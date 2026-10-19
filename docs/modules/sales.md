@@ -11,20 +11,21 @@ Status (all built in delivery 2 on 2026-10-15):
   - orders are numbered when created, in the company format.
 - **Labels and paper** (ADR-0058): each order's label is its payment method, the card names who entered it, and both documents print on A4 or an 80 mm roll.
 - **The order panel** (ADR-0059): an erxes-like deal view where an order is read, edited (header and products), moved along its stages and filled; new orders start from their customer in a dialog.
+- **The sales-rep app's API** (ADR-0061, built 2026-10-15 for `apps/mobile`): `/sales-rep/*` gives a rep the stages they may place orders on, the shop (sale-ready products with wholesale unit prices and free stock), active customers, a new order created on the chosen stage (confirmed in the same transaction on a CONFIRM stage) and their own orders by days and search; since ADR-0068 the shop filters (category, home warehouse, main supplier, stock free at home), sorts (NEW, by base price) and lists the suppliers to filter by.
 
-Sales reps come in delivery 7 and the POS in delivery 9.
-- **Code:** `apps/api/src/modules/sales/`; shared rules in `packages/shared/src/sales`; screens in `apps/web/src/features/sales/`.
-- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0059 (the order panel), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
+The rest of the sales reps' work (zones, visits, collections) comes in delivery 7 and the POS in delivery 9.
+- **Code:** `apps/api/src/modules/sales/` (the rep facade: `controllers/sales-rep.controller.ts`, `services/sales-rep-orders.service.ts`, `services/sales-rep-shop.service.ts`, `services/rep-access.ts`); shared rules in `packages/shared/src/sales`; screens in `apps/web/src/features/sales/`; the app in `apps/mobile` (`docs/modules/mobile.md`).
+- **Decisions:** ADR-0055, ADR-0056 (boards, stages, picking, the sale), ADR-0057 (pipelines, rights, numbers, the page), ADR-0058 (the payment label, A4 or 80 mm paper), ADR-0059 (the order panel), ADR-0061 (the sales-rep app), ADR-0068 (its design: filters, sorts, suppliers, orders by days), ADR-0048 #4 (quotes in parts), ADR-0044 (only complete products are sold), ADR-0009, ADR-0010.
 - **Architecture:** §5.3 (reservations) and §5.6 (the state machine).
 
 sales depends on these modules, always through their `index.ts`:
 - `identity`: audit, numbering, access.
-- `catalog`: products, units.
-- `partners`: customers, addresses, and the customer search `CustomersService.idsWhere`.
-- `pricing`: the quote.
+- `catalog`: products, units; `ProductQueryService` for the rep's shop.
+- `partners`: customers, addresses, and the customer search `CustomersService.idsWhere`; `list` / `get` for the rep's customer picker.
+- `pricing`: the quote; `ProductPricesService.tablesOf` for the shop's unit prices.
 - `inventory`: home warehouses, `ReservationService`, `StockPostingService`.
 
-Finance answers the two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and imports only those contracts from `sales/index.ts`; delivery will import sales too.
+Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; ADR-0060 #1) and notifications the third (`SALE_LISTENER`, ADR-0062 #4); both import only those contracts from `sales/index.ts`; delivery will import sales too.
 
 ## 1. Owner's answers behind the design (2026-10-15)
 
@@ -81,13 +82,17 @@ AI views (ADR-0045):
 |---|---|
 | `SalesModule` / `SalesHttpModule` | the services; + the controllers (api). The credit checker and the sale sink are resolved from finance through `ModuleRef` (`strict: false`); without finance every order passes and a sale ends DELIVERED |
 | `SalesOrdersService.create / update / submit / move / pickInfo / pick / cancel / archive / unarchive / get / list / productInfo` | the order paths; each takes the caller's `AuthContext`. A SYSTEM actor skips the rights check |
+| `SalesOrdersService.createInTx(tx, ctx, input, { channel, placement, numberLater? })`, `submitDraftInTx(tx, actor, id)` | a draft on a channel and its submit inside the caller's transaction (the rep facade, ADR-0061 #6): `placement` runs after the header checks; `numberLater` leaves the number to the submit, drawn after the stock's locks |
 | `SalesAccessService.load(ctx)` | the caller's rights on pipelines and stages, and the SQL predicate every order read and action uses (ADR-0057 #2) |
 | `SalesBoardsService` | the board groups: `tree`, create, rename, archive |
-| `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `stageRights`, `namesOf`, `printsOf` |
+| `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `lockStage(tx, stageId)` (the pipeline, then the stage, FOR SHARE), `stageRights`, `namesOf`, `printsOf` |
 | `SalesOrderQueryService` | reads for the screens: `cards`, `list`, `details(ids)` |
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
 | `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
+| `SALE_LISTENER`, `SaleListener`, `SaleNotice` | the hook notifications binds (ADR-0062 #4): `onSale(tx, notice)` with the order id and number, channel, author, customer, frozen total and invoice number, inside the sale's transaction; one statement, never caught |
+
+`SalesRepOrdersService` (`context`, `create`, `list`, `map`, `storeOrders`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `suppliers`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported. The shop reads catalog's `ProductQueryService` (the list with a condition tree and `onlyIds`, `imagesOf`, `unitFlagsOf`) and `ProductFiltersService`, pricing's `shopPricesOf` and `orderedByBasePrice`, partners' `mainSupplierCounts` and inventory's `productIdsAvailableAtHome` (ADR-0068); the map reads partners' `CustomersService.located`; a store's order history (ADR-0068 #23) checks partners' `CustomersService.isVisible` and names the takers through identity's `UserNamesService.namesOf`; a draft's estimate (ADR-0068 #20) runs pricing's `PriceQuoteService.quote` outside any transaction.
 
 ## 4. REST surface
 
@@ -96,6 +101,7 @@ Permissions:
 - `sales.orders.manage` (OFFICE, ADMIN; assignable) creates, submits and cancels.
 - `sales.orders.pick` (WAREHOUSE, ADMIN) picks.
 - `sales.boards.manage` (ADMIN; assignable) configures.
+- `sales.orders.rep` (SALES_REP, ADMIN; assignable) opens `/sales-rep/*` only (ADR-0061 #5): a rep holds neither `sales.orders.read` nor `manage`, nor `partners.customers.read`. `/sales-rep/*` answers with the caller's own orders, with one exception: a store's order history (`GET /sales-rep/customers/:id/orders`, ADR-0068 #23) lists every order of the store, everyone's, as rows only; only the caller's own open.
 
 Every board, pipeline and stage route carries `sales.orders.read`; the service checks the rest.
 
@@ -124,6 +130,21 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 | `GET /sales-settings/numbering`, `PUT /sales-settings/numbering` | `{ pattern, digits, updatedAt }` (the shared defaults until first saved). PUT: `sales.boards.manage`; the shared rules' issues at `pattern` / `digits`. The dialog's example is computed in the browser (`renderOrderNumber`, counter 1) |
 | `GET /sales-settings/channels`, `PUT /sales-settings/channels` | Where each channel's new orders land (pipeline, stage); PUT: `sales.boards.manage` |
 
+**The rep app** (`/sales-rep/*`, every route `sales.orders.rep`, ADR-0061 #5):
+
+| Method and path | Notes |
+|---|---|
+| `GET /sales-rep/context` | `{ today, boards, defaultStageId, warehouses, branchNames }`: the server's business date (the phone never computes one); the boards (each with its `branchName`) → pipelines → stages the caller may place on (#5 below); the SALES_REP channel default when it is one of them; the ACTIVE WHOLESALE warehouses with their branches (the shop's location filter); the branches of the caller's write scope, TRANSIT left out (empty when unscoped) |
+| `POST /sales-rep/orders` (`Idempotency-Key`) | The office order's header and lines with `stageId` instead of `pipelineId`; 201 with the order. A stage the caller may not place on: `VALIDATION_FAILED` at `stageId` (`repStage`). Otherwise the office's refusals (`PRODUCT_NOT_SELLABLE`, `PRODUCT_NO_HOME`, `CUSTOMER_INACTIVE`, `PRICE_MISSING`, `errors[].path = lines.N`) |
+| `GET /sales-rep/orders?from&to&q&customerId&productId&paymentMethod&fulfilment&state&cursor&limit` | The caller's own SALES_REP orders created on the Ulaanbaatar days `from`…`to` (both included, real days, at most 366: else `VALIDATION_FAILED` at `from`/`to`), newest first; `q` finds an order number or a customer as the office list does (`filterSql`); `customerId`, `paymentMethod` (CASH/BANK_TRANSFER/CREDIT) and `fulfilment` (PICKUP/DELIVERY) through `filterSql` too, `productId` keeps the orders with a line of that product, `state` (`REP_ORDER_STATES`: DRAFT; ACTIVE = SUBMITTED, APPROVAL_PENDING, CONFIRMED, PICKING, PACKED, DISPATCHED, DELIVERY_FAILED; SOLD = DELIVERED, INVOICED, CLOSED; CANCELLED, by `repOrderStatusesOf`); the first page carries `summary { count, total, drafts, draftsEstimate }` over the range, search and filters (total of the orders not cancelled; `draftsEstimate` the sum of the kept drafts' estimates, a draft without one adding nothing, so the first page quotes every kept draft). Each row has `total` (null for a draft: prices are frozen at SUBMIT, unchanged) and `estimatedTotal` (ADR-0068 #20): a DRAFT's lines quoted as one cart by `PriceQuoteService.quote` — the resolver of `POST /pricing/quote` and the submit — on the WHOLESALE list at today's business date, whole MNT, never stored; null for every other status, or when a line has no price today or the quote refuses the lines (a superseded unit, an inexact quantity). Drafts are quoted one by one (a cart's ORDER/CATEGORY programs and quantity steps count over that cart alone), their lines loaded in one query. The month form is gone (ADR-0068 #8) |
+| `GET /sales-rep/map` | `{ today, freshDays, data }` for the app's map: every ACTIVE customer the caller may see with a GPS point (`CustomersService.located`: the default address's point, else the oldest active address's), by name, each `{ customerId, code, name, phone, addressId, address, lat, lng (6 decimals), lastOrderId, lastOrderAt, lastOrderDate, stale, creditHold, creditHoldReason }` (`addressId`: the customer address whose point is shown, ADR-0068 #21; `creditHold` and its reason: the customer's manual hold, drawn black, ADR-0068 #28). The last order is the caller's own newest SALES_REP order for the customer that is not cancelled (drafts count; another rep's never), its day in Ulaanbaatar; `stale` = none, or none within `freshDays` = `REP_MAP_FRESH_DAYS` (7) days, today included (`storeIsStale`) |
+| `GET /sales-rep/orders/:id` | Header, lines with parts, reserved and backordered quantities, events. A DRAFT also carries `estimatedTotal` on the order and on each line (the same quote as the list's row; a line without a price today has none, and then the order has none; `POST /sales-rep/orders` answers a draft with it too); null for every other status, whose `total` is the frozen one. 404 for any order the caller did not create through the app |
+| `GET /sales-rep/products?q&categoryIds&warehouseId&supplierIds&inStock&sort&cursor&limit`, `GET /sales-rep/products/batch?productIds=1,2&priceBefore` | ACTIVE, sale-ready products (`ProductQueryService`), each with its units' WHOLESALE price today and its `basis`, `uomCode` and `isDefaultSales`, the home warehouse and the base units available there, `sellable`, `isNew` (sale-ready within 14 days), `basePrice` (one base unit in whole packs, the warehouse price; null without terms), `images` (the primary first). Filters (ADR-0068 #5): `categoryIds` (repeated, each with its subtree), `warehouseId` (the home) and `supplierIds` (repeated, main suppliers) as one condition tree, `inStock` (free at home) as `onlyIds`; `sort` NEW (default) or PRICE_ASC/PRICE_DESC (unpriced last; above 100,000 products `SELECTION_TOO_LARGE`; a cursor names its sort and day); the first page's `total`. The batch keeps only products the list would show; `priceBefore` adds each `basePriceBefore` on that day (a price-drop notice) |
+| `GET /sales-rep/suppliers` | The main suppliers of the shop's products (ACTIVE and sale-ready), with how many each has, the most first: the filter's supplier list |
+| `GET /sales-rep/thumbs` | `{ urls }`: the primary picture's thumbnail of every product the shop lists (relative URLs that never change), for the phone to keep once (ADR-0068 #15); catalog's `primaryThumbsOf` over the same shop ids as the suppliers' list |
+| `GET /sales-rep/customers?q&cursor&limit`, `GET /sales-rep/customers/:id` | ACTIVE customers (`CustomersService.list`, so `visibleTo` applies): id, code, name, phone, address. One customer: its live addresses (the default first) and contacts; 404 when not ACTIVE. No credit data |
+| `GET /sales-rep/customers/:id/orders?cursor&limit` | A store's order history (ADR-0068 #23): every order of a customer the caller may see (`CustomersService.isVisible`, else 404 `NOT_FOUND`), any channel, author and status, newest first, keyset by id (`limit` 20 by default, 1–50; `REP_STORE_ORDER_PAGE_LIMIT`). Each `{ id, number, status, channel, createdAt, createdDate, createdTime, takerName, mine, total, estimatedTotal, lineCount }`: `createdDate` / `createdTime` (HH:mm) in Ulaanbaatar; `takerName` the author's full name (null when unknown); `mine` = the caller's own SALES_REP order, exactly what `GET /sales-rep/orders/:id` opens (a rep's own order on another channel is not `mine`); `total` frozen, `estimatedTotal` a DRAFT's quote as in the list (#20). No lines and no other detail of another person's order |
+
 ## 5. Rules worth knowing
 
 - **Rights (ADR-0057 #2).**
@@ -149,7 +170,7 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
 - **Stage actions (ADR-0056 #3)** run inside the move's transaction after the order row and the stage rights are checked:
   - CONFIRM submits a draft (below) and leaves a confirmed order alone.
   - PICK sets CONFIRMED → PICKING.
-  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`; with finance bound it hands the sale sink a snapshot (header, lines with delivered base quantities and frozen parts, the branch of the pipeline's board or of the first line's warehouse) and, when an invoice comes back, sets INVOICED with an event whose reason is the invoice number (ADR-0060 #3).
+  - SALE needs PACKED and posts `DELIVERY_ISSUE` out of STAGING by `qty_picked` (document `SO`, external), then sets DELIVERED with `delivered_at`; with finance bound it hands the sale sink a snapshot (header, lines with delivered base quantities and frozen parts, the branch of the pipeline's board or of the first line's warehouse) and, when an invoice comes back, sets INVOICED with an event whose reason is the invoice number (ADR-0060 #3). Then, with or without finance, it tells the sale listener (ADR-0062 #4: a SALES_REP order's author gets «… борлуулалт боллоо»), and records the SALE audit row last.
   - CANCEL cancels with the reason (`reason` required). NONE moves only.
   - Moving back undoes nothing. Every move writes a `sales_stage_moves` row and an audit `MOVE`. Moves between pipelines are refused.
 - **Picking (ADR-0056 #5).**
@@ -165,8 +186,12 @@ Every board, pipeline and stage route carries `sales.orders.read`; the service c
   6. the credit check (ADR-0060 #2): the customer's other CONFIRMED … DELIVERED orders summed under the lock, then `CreditChecker.check`; a refusal is 409 `CREDIT_BLOCKED` with the amounts;
   7. parts and totals written;
   8. `ReservationService.reserveInTx` (rows in (warehouse, product) order; the rest backordered);
-  9. a number only for an older draft that has none;
+  9. a number for a draft that has none (an older draft, or the rep app's on a CONFIRM stage), before the CONFIRMED row;
   10. events SUBMITTED and CONFIRMED, audit `CONFIRM`.
+- **The rep app (ADR-0061 #5, #6).**
+  - A rep may place an order on a stage when its pipeline is live and PUBLIC or visible to one of the rep's roles, the stage is live with action NONE or CONFIRM, and its MOVE right has no roles or one of the rep's (`repMayPlace`, `services/rep-access.ts`). A holder of `sales.boards.manage` may place on any live NONE or CONFIRM stage. Admins limit reps per stage with MOVE roles.
+  - One transaction: `lockStage` (the pipeline, then the stage, FOR SHARE), the rule checked on what was locked, `createInTx` on the `SALES_REP` channel; a NONE stage keeps a numbered draft, a CONFIRM stage runs `submitDraftInTx` (the submit above) and the number is drawn last. Any refusal rolls everything back.
+  - Reads go by `created_by = caller AND channel = 'SALES_REP'`, never through `Access.visibleSql()`; the office sees the rep's orders through the pipeline rules as usual.
 - **Prices** are today's (Ulaanbaatar) at the submit; the delivery date does not change them.
 - **Cancel** releases the order's ACTIVE reservations (`releaseInTx`) and records the reason.
 - **Backorders** stay on the line.
@@ -181,7 +206,7 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 ## 7. Audit
 
 - **`sales_orders`:**
-  - CREATE (number, pipeline, stage);
+  - CREATE (number, pipeline, stage; the rep app's order on a CONFIRM stage has its number in the CONFIRM row);
   - UPDATE (a draft or a reserved order: the new total and backorders);
   - CONFIRM (total, backordered lines);
   - MOVE (stage before and after, the action);
@@ -281,9 +306,24 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - hidden stages;
   - the card's `paymentMethod` and `createdByName` (ADR-0058);
   - the names in an order's moves and events (ADR-0059).
+- `sales-rep.int-spec.ts` (ADR-0061):
+  - reps kept to the app (no office order route, no customer list) and the office kept out of it;
+  - the NONE and CONFIRM stages a rep may place on, and the channel default;
+  - a numbered draft on a NONE stage, on the rep channel, reserving nothing;
+  - a CONFIRM stage confirming in the same transaction: prices frozen, stock reserved, the rest short;
+  - refusals leave nothing behind (a stage of another kind, an unseen stage, bad data);
+  - a repeated send replayed, the same key with another body refused;
+  - only the rep's own rep orders, by Ulaanbaatar days (the day boundary at 16:00 UTC) and by a customer or number search; impossible days, a reversed range and more than 366 days refused;
+  - the rep's order on the office board, where the office moves it on.
+- `sales-rep-map.int-spec.ts`: the order history's customer, product, payment, fulfilment and state filters narrow the page and the summary (alone, together and with a search; the cursor keeps them; bad values refused); a draft's `estimatedTotal` (row, order and lines) equals `POST /pricing/quote` of its lines while `total` stays null; a submitted or cancelled order has none and its real total; a draft whose product lost its price keeps the priced line's estimate and has no order estimate; `draftsEstimate` sums the kept drafts' (by customer, ACTIVE gives 0) and later pages keep the rows' estimates; the map lists only located active customers, with the default point or else the oldest active one's (and its `addressId`), by name; the caller's own last order (a cancelled one or another rep's does not count, a draft does); stale with no order or one 7 days old, fresh at 6; 403 without the rep permission. The map carries a customer's manual credit hold with its reason for every rep, and drops both when the hold is lifted (ADR-0068 #28).
+- `sales-rep-shop.int-spec.ts`: active, sale-ready products with the prices pricing gives and free stock; products by id, leaving out those the shop would not list; active customers with their addresses, the default first; the routes need the rep permission.
+- `sales-rep-shop-filters.int-spec.ts` (ADR-0068): NEW with products made sale-ready together, page by page; a cursor of another sort refused; the price sorts both ways with the unpriced last; category subtrees, the home warehouse, main suppliers and stock free at home (reserved stock is not); the bad filters refused; pictures, unit flags, the home, the base price and the price on a day before; `/products` without the rep's fields; the suppliers' counts; the context's warehouses (inactive ones left out), the rep's branches and a board's branch.
+
+**Unit:** `rep-access.spec.ts`: the placement rule (open stages, the permission and live rows, MOVE roles and private pipelines, managers).
 
 **Integrity**
 - `sales-races.spec.ts`: the last 30 pieces, opposite line orders, cancels.
+- `sales-rep-races.spec.ts` (ADR-0061): five reps on a CONFIRM stage and the office's confirm over the last 30 pieces: 30 reserved, the rest backordered, six distinct numbers.
 - `sales-picking.spec.ts`: short picks, pick vs submit, edit vs submit, no second pick.
 - `sales-pipelines.spec.ts`: archiving a stage while moving into it; concurrent creates numbered without gaps.
 
@@ -308,4 +348,5 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - free labels per pipeline beside the payment label.
 - **Delivery 3 (done 2026-10-16, ADR-0060):** the credit check without tolerance, invoices from delivered quantities (`docs/modules/finance.md`). No `open_orders` cache: sales sums its own open orders under the customer lock. Still open: CLOSED when the invoice is paid; payments shown in the order panel.
 - **Customer app, sales reps:** the 24-hour re-quote applies once a submit no longer confirms at once.
+- **Delivery 7 (rep zones):** `GET /sales-rep/customers/:id` and the customer check of a rep's order read the customer by id; they must go through `CustomersService.visibleTo` once it scopes reps to zones.
 - **Delivery 9:** the POS page («ПОС борлуулалт»).

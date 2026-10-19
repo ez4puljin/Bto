@@ -91,6 +91,7 @@ export function ProductSearch({
   onScan,
   className,
   variant = 'default',
+  saleReady,
 }: {
   /** Set when a visible label names the search box. */
   id?: string;
@@ -105,6 +106,8 @@ export function ProductSearch({
   className?: string;
   /** `filter`: a pill in a list's filter bar, like `SearchField`. */
   variant?: 'default' | 'filter';
+  /** Only products whose prices are complete (an app notice's products, ADR-0062). */
+  saleReady?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -115,7 +118,7 @@ export function ProductSearch({
   const listId = useId();
   const typed = search.trim();
   const q = useDeferredValue(typed);
-  const products = useProducts({ q, status: 'ACTIVE' });
+  const products = useProducts({ q, status: 'ACTIVE', ...(saleReady ? { saleReady } : {}) });
   // Nothing from an older search once the box is cleared (a pick, Escape).
   const rows = typed && q ? (products.data?.pages[0]?.data ?? []).slice(0, 8) : [];
   const index = highlight.q === q && highlight.index < rows.length ? highlight.index : 0;

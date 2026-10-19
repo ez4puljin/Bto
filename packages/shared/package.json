@@ -117,6 +117,11 @@
       "types": "./dist/pos/index.d.ts",
       "default": "./dist/pos/index.js"
     },
+    "./notifications": {
+      "@tugeel/source": "./src/notifications/index.ts",
+      "types": "./dist/notifications/index.d.ts",
+      "default": "./dist/notifications/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },

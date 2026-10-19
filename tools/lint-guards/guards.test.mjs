@@ -35,6 +35,7 @@ const GUARDS = {
 const [G1, G2, G3, G4, G5, TX] = ['G1', 'G2', 'G3', 'G4', 'G5', 'TX'];
 const M = 'apps/api/src/modules';
 const WEB = 'apps/web/src/features/demo/page.tsx';
+const MOBILE = 'apps/mobile/src/demo/screen.tsx';
 const INTEGRATION = "'../../../integrations/ebarimt/client'";
 const ASK_FLOW = `${M}/ai/services/ask-flow.service.ts`;
 const DB_AND_LLM = `declare const db: { transaction<T>(work: () => Promise<T>): Promise<T> };
@@ -214,6 +215,20 @@ const CASES = [
     `import { bootstrap } from '../../../../api/src/main';\nexport const x = bootstrap;`,
     true,
   ],
+  [
+    'mobile -> api-client (ADR-0061)',
+    G1,
+    MOBILE,
+    `import { createApiClient } from '@tugeel/api-client';\nexport const x = createApiClient;`,
+    false,
+  ],
+  [
+    'mobile -> apps/web source',
+    G1,
+    MOBILE,
+    `import { Page } from '../../../web/src/features/demo/page';\nexport const x = Page;`,
+    true,
+  ],
   // G2 stockLedger
   [
     'stockLedger outside the posting service',
@@ -352,6 +367,7 @@ export const run = () => inTransaction({}, async () => (await fetch('https://exa
   ],
   // G4 Cyrillic in .tsx
   ['Cyrillic string literal', G4, WEB, "export const label = 'Сайн';", true],
+  ['Cyrillic in the staff app', G4, MOBILE, "export const label = 'Сагс';", true],
   [
     'Cyrillic template literal',
     G4,
@@ -368,6 +384,13 @@ export const run = () => inTransaction({}, async () => (await fetch('https://exa
     false,
   ],
   ['Cyrillic JSX text', G5, WEB, 'export const P = () => <p>Үнэ</p>;', true],
+  [
+    'literal JSX text in the staff app',
+    G5,
+    MOBILE,
+    'declare const Text: () => null;\nexport const P = () => <Text>Send</Text>;',
+    true,
+  ],
   [
     'tests may use Cyrillic',
     G5,

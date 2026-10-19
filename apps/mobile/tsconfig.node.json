@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["app.config.ts", "vitest.config.mts"]
+}

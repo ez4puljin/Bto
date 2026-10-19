@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0024 (decision 2: per-worker databases are cloned from one migrated template) |
+| Amended by | ADR-0024 (decision 2: per-worker databases are cloned from one migrated template); ADR-0061 (#1: Vitest unit tests for the staff app's pure modules instead of `jest-expo` until screens need automated tests) |
 
 ## Context
 

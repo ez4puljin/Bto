@@ -132,6 +132,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/mobile/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MobileAuth_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mobile/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MobileAuth_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mobile/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MobileAuth_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/lookup": {
         parameters: {
             query?: never;
@@ -3321,6 +3369,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_list"];
+        put?: never;
+        post: operations["SalesRep_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_map"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/products/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_productBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_suppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/thumbs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_thumbs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_customers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/customers/{id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_storeOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SalesRep_customer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices": {
         parameters: {
             query?: never;
@@ -4127,6 +4351,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AppNotices_list"];
+        put?: never;
+        post: operations["AppNotices_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app-notices/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AppNotices_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyNotifications_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MyNotifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MyNotifications_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4151,7 +4455,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -4168,6 +4472,11 @@ export interface components {
             roles: components["schemas"]["RoleRef"][];
             /** @description Warehouses this user may write documents for; null = every warehouse */
             writableWarehouseIds: number[] | null;
+            /**
+             * Format: date-time
+             * @description When this session signed in
+             */
+            sessionStartedAt: string;
             /** Format: date-time */
             sessionExpiresAt: string;
         };
@@ -4199,6 +4508,28 @@ export interface components {
             code: string;
             /** Format: password */
             newPassword: string;
+        };
+        MobileLoginResponse: {
+            accessToken: string;
+            /** Format: date-time */
+            accessTokenExpiresAt: string;
+            /** Format: date-time */
+            sessionExpiresAt: string;
+            me: components["schemas"]["Me"];
+            /** @description The refresh token: kept in the device secure storage and sent to /auth/mobile/refresh */
+            refreshToken: string;
+        };
+        MobileTokenRequest: {
+            refreshToken: string;
+        };
+        MobileTokens: {
+            accessToken: string;
+            /** Format: date-time */
+            accessTokenExpiresAt: string;
+            /** Format: date-time */
+            sessionExpiresAt: string;
+            /** @description The rotated refresh token; null within the 20-second grace window: keep the stored one */
+            refreshToken: string | null;
         };
         UserLookup: {
             id: number;
@@ -4466,7 +4797,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -7653,6 +7984,348 @@ export interface components {
             pipelineId?: number | null;
             stageId?: number | null;
         };
+        SalesRepStage: {
+            id: number;
+            name: string;
+            /**
+             * @description NONE: a draft; CONFIRM: reserved at once
+             * @enum {string}
+             */
+            action: "NONE" | "CONFIRM" | "PICK" | "SALE" | "CANCEL";
+        };
+        SalesRepPipeline: {
+            id: number;
+            name: string;
+            stages: components["schemas"]["SalesRepStage"][];
+        };
+        SalesRepBoard: {
+            id: number;
+            name: string;
+            /** @description The board's branch, if it has one */
+            branchName: string | null;
+            pipelines: components["schemas"]["SalesRepPipeline"][];
+        };
+        SalesRepWarehouse: {
+            id: number;
+            name: string;
+            branchId: number;
+            branchName: string;
+        };
+        SalesRepContext: {
+            /**
+             * Format: date
+             * @description The server's business date (Ulaanbaatar)
+             */
+            today: string;
+            /** @description Stages the rep may place orders on */
+            boards: components["schemas"]["SalesRepBoard"][];
+            /** @description The SALES_REP channel's stage */
+            defaultStageId: number | null;
+            /** @description Active wholesale warehouses: the shop's homes, the location filter */
+            warehouses: components["schemas"]["SalesRepWarehouse"][];
+            /** @description The branches of the rep's write scope; empty when the rep is not scoped */
+            branchNames: string[];
+        };
+        SalesRepOrderRequest: {
+            customerId: number;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /**
+             * Format: date
+             * @description Today or later (Ulaanbaatar)
+             */
+            deliveryDate: string;
+            /** @description Required for DELIVERY */
+            addressId?: number | null;
+            contactName?: string | null;
+            /** @example 99112233 */
+            contactPhone?: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note?: string | null;
+            lines: components["schemas"]["SalesOrderLineRequest"][];
+            /** @description The stage chosen in the app (one of GET /sales-rep/context) */
+            stageId: number;
+        };
+        SalesRepOrderPart: {
+            uomName: string;
+            /** @description WAREHOUSE, LOOSE, RETAIL or RETAIL_BULK */
+            basis: string;
+            qty: string;
+            unitPrice: string;
+            total: string;
+        };
+        SalesRepOrderLine: {
+            lineNo: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            productUnitId: number;
+            unitName: string;
+            qty: string;
+            qtyBase: string;
+            baseUnitName: string;
+            /** @description Reserved, base units */
+            qtyApproved: string;
+            /** @description Short, base units */
+            qtyBackordered: string;
+            total: string | null;
+            /** @description MNT: a draft's line in the quote of its lines at today's WHOLESALE prices; null for any other order or when the line has no price */
+            estimatedTotal: string | null;
+            parts: components["schemas"]["SalesRepOrderPart"][];
+        };
+        SalesRepOrderEvent: {
+            /** @enum {string|null} */
+            fromStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED" | null;
+            /** @enum {string} */
+            toStatus: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            reason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesRepOrder: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** Format: date */
+            deliveryDate: string;
+            addressText: string | null;
+            contactName: string | null;
+            contactPhone: string | null;
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            note: string | null;
+            subtotal: string | null;
+            discountTotal: string | null;
+            total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
+            boardName: string | null;
+            pipelineName: string | null;
+            stageName: string | null;
+            cancelReason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["SalesRepOrderLine"][];
+            events: components["schemas"]["SalesRepOrderEvent"][];
+        };
+        SalesRepOrderSummary: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            customerId: number;
+            customerName: string;
+            /** @enum {string} */
+            fulfilment: "PICKUP" | "DELIVERY";
+            /** @enum {string} */
+            paymentMethod: "CASH" | "BANK_TRANSFER" | "CREDIT";
+            /** Format: date */
+            deliveryDate: string;
+            /** @description Null for a draft */
+            total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
+            lineCount: number;
+            pipelineName: string | null;
+            stageName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SalesRepRangeSummary: {
+            count: number;
+            /** @description MNT: the orders not cancelled (a draft has no total yet) */
+            total: string;
+            drafts: number;
+            /** @description MNT: the sum of the drafts' estimates (a draft without one adds nothing) */
+            draftsEstimate: string;
+        };
+        SalesRepOrderPage: {
+            data: components["schemas"]["SalesRepOrderSummary"][];
+            nextCursor: string | null;
+            /** @description First page only: every order the range, search and filters keep */
+            summary: components["schemas"]["SalesRepRangeSummary"] | null;
+        };
+        SalesRepMapStore: {
+            customerId: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description The customer's manual credit hold: no new orders (partners) */
+            creditHold: boolean;
+            /** @description Set only while on hold */
+            creditHoldReason: string | null;
+            /** @description The customer address whose point this is */
+            addressId: number;
+            /** @description The point's address text */
+            address: string | null;
+            /**
+             * @description Degrees, 6 decimals
+             * @example 49.639810
+             */
+            lat: string;
+            /**
+             * @description Degrees, 6 decimals
+             * @example 100.162540
+             */
+            lng: string;
+            /** @description The caller's own last rep order for the store (drafts count, cancelled do not) */
+            lastOrderId: number | null;
+            /** Format: date-time */
+            lastOrderAt: string | null;
+            /**
+             * Format: date
+             * @description The last order's Ulaanbaatar day
+             */
+            lastOrderDate: string | null;
+            /** @description No such order within `freshDays` days, today included */
+            stale: boolean;
+        };
+        SalesRepMap: {
+            /**
+             * Format: date
+             * @description The server's business date (Ulaanbaatar)
+             */
+            today: string;
+            /** @description An order within this many days, today included, is fresh */
+            freshDays: number;
+            /** @description Active customers with a GPS point (the default address, else the oldest active one), by name */
+            data: components["schemas"]["SalesRepMapStore"][];
+        };
+        SalesRepProductImage: {
+            /** @description Relative to the server */
+            url: string;
+            thumbUrl: string | null;
+        };
+        SalesRepProductUnit: {
+            /** @description The product unit id an order line takes */
+            id: number;
+            uomName: string;
+            /** @description PCS, BOX …; null for a custom one */
+            uomCode: string | null;
+            factorToBase: string;
+            isBase: boolean;
+            /** @description The unit the shop adds by default */
+            isDefaultSales: boolean;
+            barcodes: string[];
+            /** @description MNT, one unit at the WHOLESALE list */
+            wholesale: string | null;
+            /** @enum {string|null} */
+            basis: "WAREHOUSE" | "LOOSE" | "MIXED" | null;
+        };
+        SalesRepProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            categoryId: number;
+            /** @description Relative to the server */
+            thumbUrl: string | null;
+            /** @description The primary first */
+            images: components["schemas"]["SalesRepProductImage"][];
+            /** @description Became sale-ready within the last 14 days */
+            isNew: boolean;
+            /** @description An order accepts it (active, complete, with a home warehouse) */
+            sellable: boolean;
+            homeWarehouseId: number | null;
+            /** @description Base units free in the home warehouse */
+            available: string;
+            /** @description MNT, one base unit in whole packs (the warehouse price); null without terms */
+            basePrice: string | null;
+            /** @description The base price on `priceBefore`; null without it */
+            basePriceBefore: string | null;
+            units: components["schemas"]["SalesRepProductUnit"][];
+        };
+        SalesRepProductPage: {
+            data: components["schemas"]["SalesRepProduct"][];
+            nextCursor: string | null;
+            /** @description First page only: how many products the filters keep */
+            total: number | null;
+        };
+        SalesRepSupplier: {
+            id: number;
+            name: string;
+            /** @description Shop products whose main supplier this is */
+            productCount: number;
+        };
+        SalesRepThumbs: {
+            /** @description The primary picture's thumbnail of every product the shop lists (relative URLs that never change) */
+            urls: string[];
+        };
+        SalesRepCustomer: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description The default address */
+            address: string | null;
+        };
+        SalesRepCustomerPage: {
+            data: components["schemas"]["SalesRepCustomer"][];
+            nextCursor: string | null;
+        };
+        SalesRepStoreOrder: {
+            id: number;
+            number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
+            /**
+             * @description ADMIN: an office order
+             * @enum {string}
+             */
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date
+             * @description The Ulaanbaatar day the order was taken
+             */
+            createdDate: string;
+            /**
+             * @description The Ulaanbaatar time it was taken, HH:mm
+             * @example 14:05
+             */
+            createdTime: string;
+            /** @description The creator's full name; null when unknown */
+            takerName: string | null;
+            /** @description The caller's own rep order: only these open (GET /sales-rep/orders/{id}), the rest are rows only */
+            mine: boolean;
+            /** @description Null for a draft */
+            total: string | null;
+            /** @description MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price */
+            estimatedTotal: string | null;
+            lineCount: number;
+        };
+        SalesRepStoreOrderPage: {
+            /** @description Every order of the store, anyone's, any status, newest first */
+            data: components["schemas"]["SalesRepStoreOrder"][];
+            nextCursor: string | null;
+        };
+        SalesRepCustomerAddress: {
+            id: number;
+            label: string | null;
+            /** @description Null for a point without text */
+            address: string | null;
+            isDefault: boolean;
+        };
+        SalesRepCustomerContact: {
+            name: string | null;
+            phone: string | null;
+        };
+        SalesRepCustomerDetail: {
+            id: number;
+            code: string;
+            name: string;
+            phone: string | null;
+            /** @description Active, the default first */
+            addresses: components["schemas"]["SalesRepCustomerAddress"][];
+            contacts: components["schemas"]["SalesRepCustomerContact"][];
+        };
         Invoice: {
             id: number;
             /** @example Н-20261016-0001 */
@@ -9136,6 +9809,126 @@ export interface components {
             floatKept: string;
             note?: string | null;
         };
+        AppNoticeProduct: {
+            id: number;
+            sku: string;
+            name: string;
+            thumbUrl: string | null;
+        };
+        AppNotice: {
+            id: number;
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            title: string;
+            body: string;
+            /** @description Relative to the server */
+            imageUrl: string | null;
+            popup: boolean;
+            /** Format: date */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+            /**
+             * @description On the business date of the answer
+             * @enum {string}
+             */
+            state: "SCHEDULED" | "RUNNING" | "ENDED" | "WITHDRAWN";
+            /** @description In the order the admin chose */
+            products: components["schemas"]["AppNoticeProduct"][];
+            /** @description Active holders of sales.orders.rep beside ADMIN */
+            recipients: number;
+            /** @description Those recipients who read or closed it */
+            reads: number;
+            createdBy: number;
+            createdByName: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            withdrawnAt: string | null;
+            withdrawnByName: string | null;
+        };
+        AppNoticePage: {
+            data: components["schemas"]["AppNotice"][];
+            nextCursor: string | null;
+        };
+        AppNoticeRequest: {
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            /** @description Characters, trimmed */
+            title: string;
+            /** @description Characters, trimmed */
+            body: string;
+            /** @description An uploaded file of kind notifications.notice_image */
+            imageFileId?: number | null;
+            /** @description Active, sale-ready products in the order the app shows them */
+            productIds: number[];
+            /**
+             * @description The first day, today or later (Ulaanbaatar)
+             * @example 2026-10-16
+             */
+            validFrom: string;
+            /**
+             * @description Up to, not including; null runs until withdrawn
+             * @example 2026-10-31
+             */
+            validTo?: string | null;
+            /** @description Pops up in the middle of the screen when the app opens */
+            popup: boolean;
+        };
+        MyNotice: {
+            id: number;
+            /** @enum {string} */
+            kind: "PROMOTION" | "PRICE_DROP" | "NEW_PRODUCT" | "NEWS";
+            title: string;
+            body: string;
+            /** @description Relative to the server */
+            imageUrl: string | null;
+            popup: boolean;
+            /**
+             * Format: date
+             * @description The day it first shows
+             */
+            validFrom: string;
+            /** @description Up to, not including */
+            validTo: string | null;
+            /** @description In the order the admin chose */
+            productIds: number[];
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MyNotificationSummary: {
+            /** @description Unread running notices plus unread own notifications */
+            unread: number;
+            /** @description The running notices, newest first (at most 50) */
+            notices: components["schemas"]["MyNotice"][];
+        };
+        MyNotification: {
+            id: number;
+            /** @enum {string} */
+            kind: "ORDER_SOLD";
+            orderId: number | null;
+            orderNumber: string;
+            customerName: string;
+            /** @description Whole MNT, frozen at the submit */
+            orderTotal: string | null;
+            invoiceNumber: string | null;
+            read: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MyNotificationPage: {
+            data: components["schemas"]["MyNotification"][];
+            nextCursor: string | null;
+        };
+        MyNotificationReadRequest: {
+            noticeIds?: number[];
+            notificationIds?: number[];
+        };
+        MyNotificationReadResult: {
+            /** @description The unread count after marking */
+            unread: number;
+        };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
         ProblemFieldError: {
@@ -9399,6 +10192,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MobileAuth_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileLoginResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MobileAuth_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTokenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileTokens"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MobileAuth_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTokenRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
@@ -17656,6 +18543,404 @@ export interface operations {
             };
         };
     };
+    SalesRep_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepContext"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_list: {
+        parameters: {
+            query: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description The first Ulaanbaatar day the orders were made on */
+                from: string;
+                /** @description The last day, included; at most 366 days from `from` */
+                to: string;
+                /** @description Order number or customer (name, code, phone) */
+                q?: string;
+                /** @description Only the orders of this customer */
+                customerId?: number;
+                /** @description Only orders with a line of this product */
+                productId?: number;
+                paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
+                fulfilment?: "PICKUP" | "DELIVERY";
+                /** @description DRAFT; ACTIVE: submitted, not yet delivered; SOLD: delivered, invoiced or closed; CANCELLED */
+                state?: "DRAFT" | "ACTIVE" | "SOLD" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesRepOrderRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepMap"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepOrder"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_products: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name words, code or barcode */
+                q?: string;
+                /** @description Categories, each with its subcategories (1–200 ids, repeated) */
+                categoryIds?: number[];
+                /** @description The products' home warehouse */
+                warehouseId?: number;
+                /** @description Main suppliers (1–200 ids, repeated) */
+                supplierIds?: number[];
+                /** @description Only products with stock free in their home warehouse */
+                inStock?: boolean;
+                /** @description NEW when left out: the latest to become sale-ready first */
+                sort?: "NEW" | "PRICE_ASC" | "PRICE_DESC";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepProductPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_productBatch: {
+        parameters: {
+            query: {
+                /** @description Product ids, comma separated (at most 200) */
+                productIds: string;
+                /** @description Also each base price on this day (a price-drop notice shows the old one) */
+                priceBefore?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepProduct"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_suppliers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepSupplier"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_thumbs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepThumbs"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_customers: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Name, code, phone or registration number */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepCustomerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_storeOrders: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepStoreOrderPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRep_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepCustomerDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Invoices_list: {
         parameters: {
             query?: {
@@ -19599,6 +20884,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosShift"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNoticePage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppNoticeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNotice"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppNotices_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppNotice"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationSummary"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MyNotifications_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyNotificationReadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotificationReadResult"];
                 };
             };
             /** @description RFC 9457 problem details */

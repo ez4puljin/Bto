@@ -14,6 +14,15 @@ tmp/
 .data/
 .vite/
 
+# the staff app's generated native projects and build outputs (ADR-0061: never committed)
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/expo-env.d.ts
+*.apk
+*.aab
+*.keystore
+*.jks
+
 # logs
 *.log
 

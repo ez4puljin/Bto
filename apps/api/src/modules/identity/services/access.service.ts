@@ -7,6 +7,8 @@ import type { AuthContext } from '../auth-context';
 import { roles } from '../schema';
 
 export interface ResolvedAccess extends AuthContext {
+  /** When the session signed in; a refresh rotates its token, never this. */
+  readonly sessionStartedAt: Date;
   readonly sessionExpiresAt: Date;
 }
 
@@ -20,6 +22,7 @@ export interface RoleRef {
 interface AccessRow extends Record<string, unknown> {
   username: string;
   full_name: string;
+  created_at: string | Date;
   expires_at: string | Date;
   permissions: string[];
   role_ids: string[];
@@ -44,7 +47,7 @@ export class AccessService {
     requestId?: string,
   ): Promise<ResolvedAccess | null> {
     const result = await this.db.execute<AccessRow>(sql`
-      SELECT u.username, u.full_name, s.expires_at,
+      SELECT u.username, u.full_name, s.created_at, s.expires_at,
         ARRAY(SELECT DISTINCT rp.permission_code FROM user_roles ur
                 JOIN role_permissions rp ON rp.role_id = ur.role_id
                WHERE ur.user_id = u.id) AS permissions,
@@ -73,6 +76,7 @@ export class AccessService {
       permissions,
       roleIds: row.role_ids.map(toId),
       writableWarehouseIds: row.scoped ? new Set(row.writable.map(toId)) : null,
+      sessionStartedAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
       sessionExpiresAt: row.expires_at instanceof Date ? row.expires_at : new Date(row.expires_at),
       ...(requestId ? { requestId } : {}),
     };

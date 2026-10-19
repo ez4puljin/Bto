@@ -1,5 +1,5 @@
 import { businessDate, isIsoDate } from '@tugeel/shared/time';
-import { sql } from 'drizzle-orm';
+import { type Column, type SQL, sql } from 'drizzle-orm';
 import type { Tx } from '../../../common/db/db.types';
 import { invalid } from '../../../common/errors/app-error';
 
@@ -23,6 +23,11 @@ export function inForceOn(
   date: string,
 ): boolean {
   return row.validFrom <= date && (row.validTo === null || row.validTo > date);
+}
+
+/** `inForceOn` in SQL: the columns (or an alias's) of a row in force on `date`. */
+export function inForceSql(validFrom: Column | SQL, validTo: Column | SQL, date: string): SQL {
+  return sql`(${validFrom} <= ${date}::date AND (${validTo} IS NULL OR ${validTo} > ${date}::date))`;
 }
 
 /** A row that ever applied: not closed on its first day. */

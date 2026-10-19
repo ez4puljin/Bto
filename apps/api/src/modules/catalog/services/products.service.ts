@@ -21,7 +21,12 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { idIn } from '../../../common/db/days';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
-import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import {
+  DEFAULT_PAGE_LIMIT,
+  decodeCursor,
+  invalidCursor,
+  toPage,
+} from '../../../common/pagination/page';
 import { type Actor, AuditService, StorageService } from '../../identity';
 import {
   categories,
@@ -144,8 +149,27 @@ export interface ProductQuery {
   status?: ProductStatus;
   /** true: completed products; false: those waiting for prices (ADR-0044). */
   saleReady?: boolean;
+  /**
+   * After the search rank: NAME (the default) by name, then id; NEW the sale-ready products, the
+   * latest to become sale-ready first, then the higher id (the rep app's shop, ADR-0068).
+   */
+  sort?: ProductSort;
   cursor?: string;
   limit?: number;
+}
+
+export type ProductSort = 'NAME' | 'NEW';
+
+/** A cell of a product's image list: the picture and its thumbnail, relative to the server. */
+export interface ProductImageUrls {
+  url: string;
+  thumbUrl: string | null;
+}
+
+/** What the rep app reads of a current unit beside the list's columns (ADR-0068). */
+export interface UnitFlags {
+  uomCode: string | null;
+  isDefaultSales: boolean;
 }
 
 /** Products with their units, barcodes and images (SPEC §5.2, ADR-0008, ADR-0028). */
@@ -382,9 +406,89 @@ export class ProductsService {
       .select({ id: products.id })
       .from(products)
       .where(and(...filters))
-      .orderBy(...(searched ? [searched] : []), asc(products.name), asc(products.id))
+      .orderBy(...this.orderOf(query, searched))
       .limit(cap);
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * Each product's pictures, the primary first, then as the product page orders them; only those
+   * whose file is ready (the rep app's product page, ADR-0068).
+   */
+  async imagesOf(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, ProductImageUrls[]>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await executor
+      .select()
+      .from(productImages)
+      .where(idIn(productImages.productId, productIds))
+      .orderBy(
+        asc(productImages.productId),
+        desc(productImages.isPrimary),
+        asc(productImages.sortOrder),
+        asc(productImages.id),
+      );
+    const urls = await this.storage.publicUrls(
+      rows.flatMap((row) => [row.imageFileId, row.thumbFileId]),
+      executor,
+    );
+    const result = new Map<number, ProductImageUrls[]>();
+    for (const row of rows) {
+      const url = urls.get(row.imageFileId);
+      if (!url) continue;
+      const list = result.get(row.productId) ?? [];
+      list.push({ url, thumbUrl: urls.get(row.thumbFileId) ?? null });
+      result.set(row.productId, list);
+    }
+    return result;
+  }
+
+  /**
+   * The thumbnail of each product's primary picture, those whose file is ready: the rep app keeps
+   * every shop product's once on the phone (ADR-0068).
+   */
+  async primaryThumbsOf(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ productId: productImages.productId, fileId: productImages.thumbFileId })
+      .from(productImages)
+      .where(and(idIn(productImages.productId, productIds), eq(productImages.isPrimary, true)))
+      .orderBy(asc(productImages.productId));
+    const urls = await this.storage.publicUrls(
+      rows.map((row) => row.fileId),
+      executor,
+    );
+    const result = new Map<number, string>();
+    for (const row of rows) {
+      const url = urls.get(row.fileId);
+      if (url) result.set(row.productId, url);
+    }
+    return result;
+  }
+
+  /** The unit of measure's code and the default-sales flag of these products' current units. */
+  async unitFlagsOf(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, UnitFlags>> {
+    if (productIds.length === 0) return new Map();
+    const rows = await executor
+      .select({
+        id: productUnits.id,
+        uomCode: uoms.code,
+        isDefaultSales: productUnits.isDefaultSales,
+      })
+      .from(productUnits)
+      .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
+      .where(and(idIn(productUnits.productId, productIds), isNull(productUnits.supersededAt)));
+    return new Map(
+      rows.map((row) => [row.id, { uomCode: row.uomCode, isDefaultSales: row.isDefaultSales }]),
+    );
   }
 
   /** List rows of these products, in the order given (an export reads 1,000 at a time). */
@@ -471,7 +575,12 @@ export class ProductsService {
     });
   }
 
-  /** One keyset page of product rows: search rank, then name, then id. */
+  /**
+   * One keyset page of product rows: search rank, then name and id (NAME), or the moment the
+   * product became sale-ready and id, both descending (NEW). A NEW cursor carries that moment as
+   * PostgreSQL's text, never a JS Date, which would drop the microseconds products made sale-ready
+   * together share.
+   */
   private async pageRows(
     query: ProductQuery,
     within: readonly number[] | null = null,
@@ -481,6 +590,40 @@ export class ProductsService {
     // Without a search every row ranks 0; a bare 0 in ORDER BY would mean "column 0".
     const rank = searched ?? sql`0`;
     const after = decodeCursor(query.cursor);
+    if (query.sort === 'NEW') {
+      if (after) {
+        if (
+          after.s !== 'NEW' ||
+          typeof after.id !== 'number' ||
+          typeof after.rank !== 'number' ||
+          typeof after.t !== 'string'
+        ) {
+          throw invalidCursor();
+        }
+        // Every key descending: rank is negated so a smaller rank still comes first.
+        filters.push(
+          sql`(-(${rank}), ${products.saleReadyAt}, ${products.id}) < (${-after.rank}, ${after.t}::timestamptz, ${after.id})`,
+        );
+      }
+      const rows = await this.db
+        .select({
+          product: products,
+          rank: sql<number>`${rank}`,
+          readyAt: sql<string>`${products.saleReadyAt}::text`,
+        })
+        .from(products)
+        .where(and(...filters))
+        .orderBy(...this.orderOf(query, searched))
+        .limit(limit + 1);
+      const page = toPage(rows, limit, (row) => ({
+        s: 'NEW',
+        rank: row.rank,
+        t: row.readyAt,
+        id: row.product.id,
+      }));
+      return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
+    }
+    if (after?.s !== undefined) throw invalidCursor();
     if (typeof after?.id === 'number' && typeof after.rank === 'number') {
       filters.push(
         sql`(${rank}, ${products.name}, ${products.id}) > (${after.rank}, (SELECT name FROM ${products} WHERE id = ${after.id}), ${after.id})`,
@@ -490,10 +633,19 @@ export class ProductsService {
       .select({ product: products, rank: sql<number>`${rank}` })
       .from(products)
       .where(and(...filters))
-      .orderBy(...(searched ? [searched] : []), asc(products.name), asc(products.id))
+      .orderBy(...this.orderOf(query, searched))
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ id: row.product.id, rank: row.rank }));
     return { data: page.data.map((row) => row.product), nextCursor: page.nextCursor };
+  }
+
+  /** The list's order: the search rank first, then the sort's keys. */
+  private orderOf(query: ProductQuery, searched: SQL | null): SQL[] {
+    const keys =
+      query.sort === 'NEW'
+        ? [desc(products.saleReadyAt), desc(products.id)]
+        : [asc(products.name), asc(products.id)];
+    return [...(searched ? [searched] : []), ...keys];
   }
 
   /**
@@ -511,6 +663,9 @@ export class ProductsService {
         query.saleReady ? isNotNull(products.saleReadyAt) : isNull(products.saleReadyAt),
       );
     }
+    // NEW orders by the moment of becoming sale-ready: a row without one has no place in it (and a
+    // row comparison against NULL would drop rows from the keyset).
+    if (query.sort === 'NEW') filters.push(isNotNull(products.saleReadyAt));
     if (query.categoryId !== undefined) {
       filters.push(sql`${products.categoryId} IN (
         WITH RECURSIVE down(id) AS (
