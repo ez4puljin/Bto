@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | **P0b built 2026-10-18** (the scaffold, §3.5): `@tugeel/fin-contract` 1.0.0, a Bto-free platform under `common/**`, `@tugeel/shared/mn`, an empty `FinanceCoreModule`, the lint element and bans, `pnpm core:standalone`; no table, no route, no screen. P0a decisions written 2026-10-18 (ADR-0069 … ADR-0077). Next P1 (§16) |
-| ADRs | ADR-0069 (the boundary), ADR-0070 (tenant, company, branch, source system), ADR-0071 (the intake contract), ADR-0072 (posting rules and open items), ADR-0073 (Bto's `billing` owns the commercial documents), ADR-0074 (the Mongolian localisation layer), ADR-0075 (periods, approvals, rights), ADR-0076 (company isolation), ADR-0077 (scope and roadmap). Carved out of ADR-0060 (Finance I, `docs/modules/finance.md`); the replay precedent is ADR-0063, ADR-0064 and ADR-0067 |
+| Status | **P0b built 2026-10-18** (the scaffold, §3.5): `@tugeel/fin-contract` 1.0.0, a Bto-free platform under `common/**`, `@tugeel/shared/mn`, an empty `FinanceCoreModule`, the lint element and bans, `pnpm core:standalone`; no table, no route, no screen. P0a decisions written 2026-10-18 (ADR-0069 … ADR-0077). **Lean go-live plan 2026-10-20 (ADR-0083, §16.0):** six phases F1–F6, no copy of Finance I's history, fixed assets, the bank import, approvals, isolation, H1 and H2 after go-live. Next F1 |
+| ADRs | ADR-0069 (the boundary), ADR-0070 (tenant, company, branch, source system), ADR-0071 (the intake contract), ADR-0072 (posting rules and open items), ADR-0073 (Bto's `billing` owns the commercial documents), ADR-0074 (the Mongolian localisation layer), ADR-0075 (periods, approvals, rights), ADR-0076 (company isolation), ADR-0077 (scope and roadmap), ADR-0083 (the lean go-live plan, which amends ADR-0071 #12, ADR-0073's H1 timing, ADR-0075 #2, #6–#8, ADR-0076 #2–#4, #10 and ADR-0077 #1–#5). Carved out of ADR-0060 (Finance I, `docs/modules/finance.md`); the replay precedent is ADR-0063, ADR-0064 and ADR-0067 |
 | Owner's answers | §1 (interview of 2026-10-18, four rounds) |
 | Code | `apps/api/src/finance-core/` (ESLint element `api-finance-core`; P0b: `index.ts`, `finance-core.module.ts`, `db/fin-db.ts`, `errors.ts`); `packages/fin-contract` (`@tugeel/fin-contract`); `packages/shared/src/mn` (`@tugeel/shared/mn`); `tools/finance-core/` (the whitelist, `pnpm core:standalone`, the `fin.` SQL scan); planned: PostgreSQL schema `fin` in the existing migration stream (P1) |
 | Depends on | no module: an exact whitelist of `common/**` files, `@tugeel/shared/{money,time}` and `@tugeel/fin-contract` (§3) |
@@ -14,7 +14,7 @@ Finance Core is one finance engine for every business system the owner builds. B
 **How to read this document.**
 - A fact from the code carries a citation `path:line`, checked at commit 3577787.
 - "Seen in Erkhet" means Erkhet's UI or handbook. Erkhet was read through its UI only, and one posted sale was opened. An inference about Erkhet is called one, and is never adopted without the accountant.
-- Everything else is the plan, accepted by the owner in ADR-0069 … ADR-0077.
+- Everything else is the plan, accepted by the owner in ADR-0069 … ADR-0077 and cut to the go-live essentials by ADR-0083 (§16.0). Where a section describes something §16.0 moves after go-live, it describes the later state; the phase that builds it is named there.
 - **TODO-VERIFY** marks an accounting or tax rule the accountant must confirm (§18). It is never resolved by guessing.
 
 Path abbreviations: `F/` = `apps/api/src/modules/finance/`, `P/` = `apps/api/src/modules/pos/`, `S` = `packages/shared/src/finance/index.ts`, `M26` / `M27` = `apps/api/src/db/migrations/0026_finance.sql` / `0027_pos.sql`, `FC/` = the planned `apps/api/src/finance-core/`.
@@ -653,7 +653,50 @@ Each POSTED answer carries the core's number and the open items; the outbox mark
 - **The pending list** (P5, §13) and its attention tile; **drafts** to approve (P5).
 - Today's «Санхүү» pages (`docs/modules/finance.md` §9) keep their routes through every phase; the labels come from `mn.json` in the session that builds each screen (`docs/ui.md`).
 
-## 16. Phase plan (ADR-0077)
+## 16. Phase plan (ADR-0077, cut by ADR-0083)
+
+### 16.0 The lean go-live plan (ADR-0083, 2026-10-20) — this is the plan now
+
+The owner: «Хамгийн чухал нь санхүүгийн цөмийг хурдан хийж дуусгах… Хойшлуулж болох зүйлсийг хойшлуул.»
+
+Two facts drive the cut:
+- **There is no production database (ADR-0026).** The books start on the go-live day from Erkhet's opening trial balance.
+- **The PMS starts after go-live.** Bto books into one company until then.
+
+Consequences:
+- The `fin` tables start empty, and no copy of Finance I's history is made.
+- Each phase that replaces a Finance I table switches its writers to the core and drops that table in the same phase. No frozen copy is kept.
+- The development database's finance documents are posted again through the new path by a one-off development script, run once and checked by `pnpm finance:reconcile`.
+- The copy-migration rules, the backfill, the migration-path test and the golden trial balance below no longer apply.
+- The test gate still applies: today's HTTP scenarios stay unchanged, and the raw-SQL guards and race tests move to `fin.*` with the same scenario and SQLSTATE.
+
+| Phase | Content (drawn from §16.1 and §16.2) | Sessions | Waits on |
+|---|---|---|---|
+| F1 Foundation and ledger | P1 without `identity.user_company_roles` and without `finRead`/scope machinery: schema `fin`, grants, harness truncation of `fin`, tenant, company BO (`company_id` in every key and FK), branches, sources BTO and FIN, parties from customers, `bto.company_code`, `fin-bridge`, `ensureDefaultCompany`; P2's ledger: accounts, money accounts, rules seeded from today's roles, monthly periods (OPEN / CLOSED only), journal entries and lines with the balance guards and UNIQUE `(company_id, reverses_id)`, `fin.audit_log`; Bto's journal writers (invoice, voucher, credit note, POS close and hand-over) post to `fin`; `journal_entries` / `journal_lines` dropped; AI views recreated; the development re-post | 2–3 | — |
+| F2 Intake and open items | P3 without the TESTPMS fixture and P4 without the backfill: the synchronous intake (`submitInTx`) with every class (AR_INVOICE, AR_CREDIT, RECEIPT, PAYMENT, AP_BILL, AP_CREDIT, JOURNAL, ALLOCATION, REVERSE), documents, open items, allocations, party balances, rule resolution, `FinReader` / `FinConfig`; Bto's receivables on the engine (`ar_entries`, `customer_balances`, `payments`, `allocations` dropped); `exposureInTx` and the default overdue rule (§10); the manual allocation dialog (§11); the core reconcile | 2–3 | — |
+| F3 Payables | §16.2 Payables: goods receipts (ADR-0078) as AP_BILLs, or bills settled at once for CASH / BANK; supplier payments; supplier returns as AP_CREDIT; the accountant's screens | 2 | — |
+| F4 Stock and cost | §16.2 COGS and inventory: receipts (stock, input VAT), goods issues by expense type (ADR-0081), adjustments, stocktakes, transfers, returns and the cost of goods sold as JOURNAL documents | 1–2 | D8 |
+| F5 Close and opening | P5 reduced: close and reopen of the latest month with a reason and an event row, a closed month refusing postings in-process, `periods.close` / `periods.reopen`; §16.2 Chart and opening import | 2 | D16, D27 |
+| F6 Reports | §16.2 Statements, VAT return, closing | 2–3 | D17, D25 |
+
+**Order.**
+- F1 → F2 → F3 and F4 in either order → F5 → F6. About 11–15 sessions, re-planned in STATUS after each phase.
+- e-Barimt keeps its own track (ADR-0074).
+- Payables (F3) still precede procurement (delivery 8).
+- H1 no longer precedes delivery 5: the drivers' cash sessions record vouchers through the core from F2.
+
+**After go-live, with the interim practice:**
+
+| Waits | Until then | Then |
+|---|---|---|
+| Fixed-asset register and depreciation runs (§16.2) | the register in a spreadsheet, depreciation as a monthly manual entry, balances in the opening trial balance | after go-live |
+| Bank-statement import (§16.2) | cash and bank vouchers typed by hand | after go-live |
+| Drafts with approval, soft close, override, the pending list, HELD (ADR-0071 #12, ADR-0075 #2, #6) | manual entries post at once and are audited; a closed month refuses | after go-live |
+| The rights beyond `periods.close` / `periods.reopen`, `identity.user_company_roles` (ADR-0075 #7, #8) | today's finance permissions | with the PMS |
+| `finRead`, the scope setting, scoped services, the isolation tests (ADR-0076 #2–#4, #10), the TESTPMS fixture, A1, A2 | one company | at the PMS kickoff, before the PMS posts |
+| H1 (`billing` split, ADR-0073), H2 (POS through the intake) | `modules/finance` and `pos` call the core directly; same behaviour | after go-live |
+
+**Superseded by §16.0.** The rest of §16 is ADR-0077's plan. It is kept for the content each F phase takes. Its sessions, its order constraints and its copy-migration, backfill, migration-path and golden-balance rules are replaced by the above.
 
 **Rules for every phase.**
 - It ends with `pnpm check` green, today's routes and screens working, the development database migrated forward (no applied migration edited), and `docs/modules/*.md` and STATUS updated.
@@ -704,6 +747,15 @@ Each POSTED answer carries the core's number and the open items; the outbox mark
 
 ## 17. Test plan
 
+**Under the lean plan (ADR-0083, §16.0)**, some cases wait:
+- the interrupted-transmission cases wait for A1 and A2;
+- the isolation cases of `fin-isolation.spec.ts` wait for the PMS kickoff, except the catalog test (scope columns, composite FKs, no FK across `fin`), which runs from F1;
+- extraction cases (3), (4) and (6) wait for the TESTPMS fixture and A2;
+- closed-period cases on SOFT_CLOSED, override and HELD wait with those features;
+- the golden trial balance and the N−1 → N migration tests are dropped.
+
+Everything else runs in the F phase that builds its subject.
+
 All tests run on real PostgreSQL (ADR-0016). Race cases go in the integrity suite, `--runInBand`, never retried. Files: `apps/api/test/integrity/fin-*.spec.ts` and `apps/api/test/fin/*.int-spec.ts`.
 
 | Area (file) | Cases |
@@ -716,7 +768,7 @@ All tests run on real PostgreSQL (ADR-0016). Race cases go in the integrity suit
 | Another company's data (`fin-isolation.spec.ts`) | (1) API: a user with rights only in A asks for B's document, items, statement or exposure → 404; a viewer in RES cannot reopen RES while being a manager in BO; (2) service: every `FinReader`, `FinConfig` and intake method for company B with an A-only context → `FIN_COMPANY_FORBIDDEN` (one parameterised test); a context built outside `fin-bridge` fails lint; (3) source principals: a WAREHOUSE user's SALE posts through the source grant alone; over HTTP a `source.system` or tenant that differs from the token → `FIN_SOURCE_MISMATCH`; an ungranted company → 404 with no request row; (4) database: cross-company and cross-tenant references → FK violations, plus the catalog test (scope columns, unique indexes led by scope, every FK between company-owned tables includes `company_id`, no FK crosses `fin`, every row-filtering view is `security_barrier`); (5) AI reader: a user with A gets only A rows, a user without `finance.read` none; an unset setting or a reused pooled connection → an error, not an empty result; `set_config` in model SQL → refused; an error-oracle query (`1/0` on another company's rows) reveals nothing; (6) `groupRef` values of two sources do not collide; (7) later, the control system: approved companies only, 42501 on DML, freshness populated |
 | Credit | (1) `finance-races.spec.ts:50`: exactly one of two confirmations passes, and two payments never settle one invoice twice; (2) a payment void or an ALLOCATION racing a confirmation serialises on the party row; (3) a charge of the TESTPMS fixture (source system `TEST_PMS`) to a shared party racing a Bto confirmation is serialised, and visible if it committed first; (4) the default overdue rule: overdue 50,000 with an open credit of 60,000 → passes, with 40,000 or none → OVERDUE |
 | Extraction (cases 1, 2 and 5 since P0b: `guards.test.mjs`, `pnpm core:standalone`, `tools/finance-core/fin-sql.test.mjs`) | (1) lint fixtures: the core importing `modules/*`, `edge/*`, `common/segments`, `db/schema.ts` or `@tugeel/shared/sales` fails; a module importing `FC/posting/*` or a `fin` table symbol fails; `FinIntakeInTx` outside the allowed set fails; (2) `pnpm core:standalone` lists only the whitelisted files; (3) `FinanceCoreModule` boots without any Bto module and posts a document of the TESTPMS fixture (source system `TEST_PMS`); (4) the TESTPMS fixture configures everything through `FinConfig`, runs §14.2 and asserts GL = sub-ledger, the folio drain and a clean reconcile; (5) no `fin.` table name in SQL strings outside `FC/**` and migrations; (6) from A2, a client built only from the published `@tugeel/fin-contract` posts the TESTPMS run over HTTP |
-| Reconcile, golden, migration path | induced drifts are each detected and exit 2 (a cache, an item or a control account edited by raw SQL); a clearing balance older than its account's age appears on the DRAIN report and does not exit 2; the N−1 → N test of every copy phase; a golden trial balance by account × party before and after P2 and P4 on the dev copy; the tax split identical on 1,000 random lines after the `mn` move |
+| Reconcile (golden and migration path dropped by ADR-0083: no copy migrations) | induced drifts are each detected and exit 2 (a cache, an item or a control account edited by raw SQL); a clearing balance older than its account's age appears on the DRAIN report and does not exit 2; the N−1 → N test of every copy phase; a golden trial balance by account × party before and after P2 and P4 on the dev copy; the tax split identical on 1,000 random lines after the `mn` move |
 
 ## 18. Questions for the accountant (TODO-VERIFY)
 
