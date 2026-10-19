@@ -1,6 +1,7 @@
 // Public surface of the finance module (docs/modules/finance.md, ADR-0060). Modules import only
 // this file; named exports only (ESLint G2 rejects `export *`).
 export { FinanceHttpModule, FinanceModule, FinanceWorkerModule } from './finance.module';
+export { PAYMENT_LISTENER, type PaymentListener, type PaymentRecordedNotice } from './hooks';
 export {
   type ArEntryInput,
   ArLedgerService,
@@ -37,8 +38,13 @@ export {
   type JournalLineInput,
   JournalService,
 } from './services/journal.service';
-export { type MoneyAccount, MoneyAccountsService } from './services/money-accounts.service';
 export {
+  type CustomerBankAccount,
+  type MoneyAccount,
+  MoneyAccountsService,
+} from './services/money-accounts.service';
+export {
+  type CustomerPayment,
   type PaymentDetail,
   type PaymentInput,
   PaymentsService,

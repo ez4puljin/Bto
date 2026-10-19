@@ -132,17 +132,19 @@ export class AuthService {
     const parsed = parseRefreshCookie(cookie);
     if (!parsed) throw new AppError('UNAUTHORIZED', 'no refresh cookie', { reason: 'REFRESH' });
     const outcome = await inTransaction(this.db, async (tx) => {
+      // Staff sessions only: a customer app token never refreshes here (ADR-0079 #3).
       const [session] = await tx
         .select()
         .from(authSessions)
-        .where(eq(authSessions.id, parsed.sessionId))
+        .where(and(eq(authSessions.id, parsed.sessionId), eq(authSessions.kind, 'STAFF')))
         .for('update');
-      if (!session || session.revokedAt) return { kind: 'invalid' as const };
+      if (!session?.userId || session.revokedAt) return { kind: 'invalid' as const };
       if (session.expiresAt <= new Date()) return { kind: 'expired' as const };
+      const userId = session.userId;
       const [user] = await tx
         .select({ status: users.status })
         .from(users)
-        .where(eq(users.id, session.userId));
+        .where(eq(users.id, userId));
       if (user?.status !== 'ACTIVE') return { kind: 'invalid' as const };
       const presented = sha256Hex(parsed.token);
       if (sameDigest(presented, session.tokenHash)) {
@@ -158,7 +160,7 @@ export class AuthService {
           .where(eq(authSessions.id, session.id));
         return {
           kind: 'rotated' as const,
-          userId: session.userId,
+          userId,
           created: { sessionId: session.id, token, expiresAt: session.expiresAt },
         };
       }
@@ -172,7 +174,7 @@ export class AuthService {
         // Two tabs refreshed at once: the other tab already holds the new cookie.
         return {
           kind: 'grace' as const,
-          userId: session.userId,
+          userId,
           sessionId: session.id,
           expiresAt: session.expiresAt,
         };
@@ -211,9 +213,9 @@ export class AuthService {
       const [session] = await tx
         .select()
         .from(authSessions)
-        .where(eq(authSessions.id, parsed.sessionId))
+        .where(and(eq(authSessions.id, parsed.sessionId), eq(authSessions.kind, 'STAFF')))
         .for('update');
-      if (!session || session.revokedAt) return;
+      if (!session?.userId || session.revokedAt) return;
       const presented = sha256Hex(parsed.token);
       const known =
         sameDigest(presented, session.tokenHash) ||
@@ -394,6 +396,7 @@ export class AuthService {
     const [session] = await tx
       .insert(authSessions)
       .values({
+        kind: 'STAFF',
         userId,
         tokenHash: sha256Hex(token),
         userAgent: client.userAgent,

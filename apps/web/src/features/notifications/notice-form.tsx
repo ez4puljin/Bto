@@ -1,5 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { NOTICE_KINDS, NOTICE_LIMITS, noticeTextLength } from '@tugeel/shared/notifications';
+import {
+  NOTICE_AUDIENCES,
+  NOTICE_KINDS,
+  NOTICE_LIMITS,
+  noticeTextLength,
+} from '@tugeel/shared/notifications';
 import { businessDate } from '@tugeel/shared/time';
 import { ImagePlus, LoaderCircle, Package, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -39,6 +44,7 @@ const ACCEPT = 'image/jpeg,image/png,image/webp';
 const noticeSchema = (today: string) =>
   z
     .object({
+      audience: z.enum(NOTICE_AUDIENCES),
       kind: z.enum(NOTICE_KINDS),
       title: z
         .string()
@@ -74,7 +80,8 @@ interface Picture {
 }
 
 /**
- * «Шинэ мэдэгдэл» (ADR-0062 #1, notifications.send): kind, title, text, a picture resized in the
+ * «Шинэ мэдэгдэл» (ADR-0062 #1, notifications.send): who reads it (the sales reps' app or the
+ * customers' «Bto300», ADR-0079 #8), kind, title, text, a picture resized in the
  * browser, up to 20 products on sale, the first and last day and the popup switch, with the
  * phone's popup drawn beside the form as it is typed. One Idempotency-Key per dialog.
  */
@@ -88,6 +95,7 @@ export function NoticeDialog(props: { onClose: () => void }) {
   const form = useForm<NoticeValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      audience: 'SALES_REPS',
       kind: 'PROMOTION',
       title: '',
       body: '',
@@ -129,6 +137,7 @@ export function NoticeDialog(props: { onClose: () => void }) {
     const created = await settle(
       mutations.create.mutateAsync({
         key,
+        audience: values.audience,
         kind: values.kind,
         title: values.title.trim(),
         body: values.body.trim(),
@@ -157,6 +166,15 @@ export function NoticeDialog(props: { onClose: () => void }) {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="flex min-w-0 flex-col gap-4">
               <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label={t('notifications.form.audience')} htmlFor="notice-audience">
+                  <NativeSelect id="notice-audience" {...form.register('audience')}>
+                    {NOTICE_AUDIENCES.map((audience) => (
+                      <option key={audience} value={audience}>
+                        {t(`notifications.audiences.${audience}`)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </FormField>
                 <FormField label={t('notifications.form.kind')} htmlFor="notice-kind">
                   <NativeSelect id="notice-kind" {...form.register('kind')}>
                     {NOTICE_KINDS.map((kind) => (
@@ -170,7 +188,7 @@ export function NoticeDialog(props: { onClose: () => void }) {
                   control={form.control}
                   name="popup"
                   render={({ field }) => (
-                    <div className="flex items-center justify-between gap-3 self-end pb-1.5">
+                    <div className="flex items-center justify-between gap-3 sm:col-span-2">
                       <Label htmlFor="notice-popup">{t('notifications.form.popup')}</Label>
                       <Switch
                         id="notice-popup"

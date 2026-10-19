@@ -152,6 +152,7 @@ export class MoneyAccountsController {
         bankName: body.bankName ?? null,
         bankAccountNo: body.bankAccountNo ?? null,
         glAccountId: body.glAccountId,
+        showToCustomers: body.showToCustomers ?? false,
       }),
     );
   }

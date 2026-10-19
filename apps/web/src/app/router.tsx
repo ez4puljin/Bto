@@ -64,6 +64,7 @@ import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AiReportsPage } from '@/features/ai/reports-page';
+import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
 import { PosSalePrintPage } from '@/features/pos/sale-print-page';
@@ -159,6 +160,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="notifications.send">
                 <AppNoticesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'system/customer-app',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="identity.settings.read">
+                <CustomerAppPage />
               </RequirePermission>
             ),
           },

@@ -11,6 +11,7 @@ Status (all built in delivery 2 on 2026-10-15):
   - orders are numbered when created, in the company format.
 - **Labels and paper** (ADR-0058): each order's label is its payment method, the card names who entered it, and both documents print on A4 or an 80 mm roll.
 - **The order panel** (ADR-0059): an erxes-like deal view where an order is read, edited (header and products), moved along its stages and filled; new orders start from their customer in a dialog.
+- **The customer app's channel** (ADR-0079 #5, ADR-0082, 2026-10-19): `CUSTOMER_APP` orders land only on a stage without an action in a pipeline every reader sees; `customer_user_id` names the store's account; `ORDER_LISTENER` tells notifications of confirmations and cancellations; `CustomerOrdersService` and the exported shop read model serve the `customer` module's routes.
 - **The sales-rep app's API** (ADR-0061, built 2026-10-15 for `apps/mobile`): `/sales-rep/*` gives a rep the stages they may place orders on, the shop (sale-ready products with wholesale unit prices and free stock), active customers, a new order created on the chosen stage (confirmed in the same transaction on a CONFIRM stage) and their own orders by days and search; since ADR-0068 the shop filters (category, home warehouse, main supplier, stock free at home), sorts (NEW, by base price) and lists the suppliers to filter by.
 
 The rest of the sales reps' work (zones, visits, collections) comes in delivery 7 and the POS in delivery 9.
@@ -59,13 +60,14 @@ Finance answers two hooks of `sales/hooks.ts` (`CREDIT_CHECKER`, `SALE_SINK`; AD
 | `sales_pipelines` | a pipeline: board, name, position, `visibility` PUBLIC/PRIVATE, `own_orders_only`, archived, creator | name 1–80; `REVOKE DELETE, TRUNCATE` |
 | `sales_stages` | a pipeline's stage: name, position, `action` NONE/CONFIRM/PICK/SALE/CANCEL, `print_pick_list`, `print_delivery_note`, `card_sort` NEWEST/OLDEST/DELIVERY/TOTAL/WAITING, archived | action and sort lists; unique `(pipeline_id, id)`; `REVOKE DELETE, TRUNCATE` |
 | `sales_pipeline_roles`, `sales_stage_roles` | roles per right: pipelines VIEW / MANAGE / ALL_ORDERS, stages VIEW / EDIT / MOVE | PK (id, role, right); dropped with the role (`ON DELETE CASCADE`) |
-| `sales_channel_defaults` | per channel: the pipeline and stage its new orders land in | channel PK; `(pipeline_id, stage_id)` → the stage of that pipeline |
+| `sales_channel_defaults` | per channel: the pipeline and stage its new orders land in | channel PK; `(pipeline_id, stage_id)` → the stage of that pipeline; CUSTOMER_APP only on a stage without an action in a pipeline that is not own-orders-only (the service refuses `customerAppStage` in the channel settings and in a pipeline save; ADR-0079 #5) |
 | `sales_stage_moves` | every card move: order, from, to, actor, time | `REVOKE UPDATE, DELETE, TRUNCATE` |
 | `sales_settings` | one row (`id = 1`): `number_pattern`, `number_digits`, who changed it and when; no row = the shared defaults | pattern ends with a non-digit; digits 1–8; `REVOKE DELETE, TRUNCATE` |
 
 `sales_orders` also carries:
 - `pipeline_id`, `stage_id`, `stage_entered_at` (all three or none; `(pipeline_id, stage_id)` → the stage of that pipeline);
 - `archived_at` / `archived_by` (only on DELIVERED, INVOICED, CLOSED or CANCELLED orders);
+- `customer_user_id` → identity's `customer_users` (migration `0031_customer_app`), set exactly on CUSTOMER_APP orders (CHECK `sales_orders_customer_app`);
 - `picked_at` / `picked_by` and `delivered_at` / `delivered_by` (a sale needs a pick).
 
 Indexes: `(stage_id, id) WHERE archived_at IS NULL` for the board, `(pipeline_id, id)` for the list.
@@ -90,7 +92,12 @@ AI views (ADR-0045):
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
 | `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |
-| `SALE_LISTENER`, `SaleListener`, `SaleNotice` | the hook notifications binds (ADR-0062 #4): `onSale(tx, notice)` with the order id and number, channel, author, customer, frozen total and invoice number, inside the sale's transaction; one statement, never caught |
+| `SALE_LISTENER`, `SaleListener`, `SaleNotice` | the hook notifications binds (ADR-0062 #4): `onSale(tx, notice)` with the order id and number, channel, author, customer, frozen total and the invoice's id, number and total (ADR-0082), inside the sale's transaction; never caught |
+| `ORDER_LISTENER`, `OrderListener`, `OrderConfirmedNotice`, `OrderCancelledNotice`, `BackorderedLine` | the second hook notifications binds (ADR-0082 #5): `onConfirmed` at the end of every submit (number, total, how many lines wait for stock and the first five of them in the line's unit when it divides) and `onCancelled` with the reason; inside the caller's transaction, never caught |
+| `CustomerOrdersService` | the customer app's reads (ADR-0079 #6): `page(customerId, { from?, to?, cursor, limit })` (every order of the store with lines, any channel, archived included, newest first; state, the rep's name, totals or a pending order's estimate, backorders, the cancel reason; the first page's summary), `detail(customerId, id)` (404 for another store's or an empty order), `reorderLines`, `openExposureOf(customerId)` (the credit check's sum, without a lock) |
+| `SalesRepShopService`, `RepProduct`, `RepProductQuery` | the shop read model, exported for the customer app: `onlyIds` (favourites), `withHome` (a home warehouse required), and on every product `minLevel` (the home minimum) and `packBase` (the base units of the pack the warehouse price is set in) |
+| `SalesPipelinesService.customerAppPlacement(tx)` / `customerAppOpen()` | where an app order lands: the CUSTOMER_APP default locked FOR SHARE and read under the lock — live, action NONE, not own-orders-only — else 409 `CUSTOMER_APP_CLOSED`; whether app orders are accepted now |
+| `SalesOrdersService.createInTx(tx, creator, …)` | `creator` is an `AuthContext` or a `CustomerActor` (ADR-0082 #3): a customer's order has no `created_by`, carries `customer_user_id`, and its events are labelled `customer-app` (`CUSTOMER_APP_LABEL`) |
 
 `SalesRepOrdersService` (`context`, `create`, `list`, `map`, `storeOrders`, `get`) and `SalesRepShopService` (`productPage`, `productsOf`, `suppliers`, `customerPage`, `customer`) serve only `/sales-rep/*` and are not exported. The shop reads catalog's `ProductQueryService` (the list with a condition tree and `onlyIds`, `imagesOf`, `unitFlagsOf`) and `ProductFiltersService`, pricing's `shopPricesOf` and `orderedByBasePrice`, partners' `mainSupplierCounts` and inventory's `productIdsAvailableAtHome` (ADR-0068); the map reads partners' `CustomersService.located`; a store's order history (ADR-0068 #23) checks partners' `CustomersService.isVisible` and names the takers through identity's `UserNamesService.namesOf`; a draft's estimate (ADR-0068 #20) runs pricing's `PriceQuoteService.quote` outside any transaction.
 
@@ -319,6 +326,8 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
 - `sales-rep-shop.int-spec.ts`: active, sale-ready products with the prices pricing gives and free stock; products by id, leaving out those the shop would not list; active customers with their addresses, the default first; the routes need the rep permission.
 - `sales-rep-shop-filters.int-spec.ts` (ADR-0068): NEW with products made sale-ready together, page by page; a cursor of another sort refused; the price sorts both ways with the unpriced last; category subtrees, the home warehouse, main suppliers and stock free at home (reserved stock is not); the bad filters refused; pictures, unit flags, the home, the base price and the price on a day before; `/products` without the rep's fields; the suppliers' counts; the context's warehouses (inactive ones left out), the rep's branches and a board's branch.
 
+**Customer app** (ADR-0079): `customer-app-orders.int-spec.ts`, `customer-app-shop.int-spec.ts` (`docs/modules/customer.md` §9).
+
 **Unit:** `rep-access.spec.ts`: the placement rule (open stages, the permission and live rows, MOVE roles and private pipelines, managers).
 
 **Integrity**
@@ -347,6 +356,6 @@ Also used: `ORDER_STATE_INVALID` (409; `expected: FINISHED` for archiving), `CUS
   - the suggested shelf on the pick list before picking (ADR-0058 follow-up);
   - free labels per pipeline beside the payment label.
 - **Delivery 3 (done 2026-10-16, ADR-0060):** the credit check without tolerance, invoices from delivered quantities (`docs/modules/finance.md`). No `open_orders` cache: sales sums its own open orders under the customer lock. Still open: CLOSED when the invoice is paid; payments shown in the order panel.
-- **Customer app, sales reps:** the 24-hour re-quote applies once a submit no longer confirms at once.
+- **Customer app, sales reps:** the 24-hour re-quote applies once a submit no longer confirms at once. (App orders are priced again at the office's confirmation anyway, ADR-0079 #5.)
 - **Delivery 7 (rep zones):** `GET /sales-rep/customers/:id` and the customer check of a rep's order read the customer by id; they must go through `CustomersService.visibleTo` once it scopes reps to zones.
 - **Delivery 9:** the POS page («ПОС борлуулалт»).

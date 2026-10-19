@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   NOTICE_LIMITS,
+  type NoticeAudience,
   type NoticeKind,
   type NoticeState,
   noticeState,
@@ -18,11 +19,12 @@ import { CatalogService } from '../../catalog';
 import {
   AuditService,
   type AuthContext,
+  CustomerAccountsService,
   PermissionHoldersService,
   StorageService,
   UserNamesService,
 } from '../../identity';
-import { appNoticeProducts, appNoticeReads, appNotices } from '../schema';
+import { appNoticeCustomerReads, appNoticeProducts, appNoticeReads, appNotices } from '../schema';
 
 export const NOTICE_IMAGE = 'notifications.notice_image';
 /** Who the notices are for (ADR-0062 #2). */
@@ -30,6 +32,8 @@ export const RECIPIENT_PERMISSION = 'sales.orders.rep';
 
 export interface NoticeInput {
   kind: NoticeKind;
+  /** The sales reps' app (the default) or the customers' «Bto300» (ADR-0079 #8). */
+  audience?: NoticeAudience;
   title: string;
   body: string;
   imageFileId?: number | null;
@@ -49,6 +53,7 @@ export interface NoticeProduct {
 export interface NoticeView {
   id: number;
   kind: NoticeKind;
+  audience: NoticeAudience;
   title: string;
   body: string;
   imageUrl: string | null;
@@ -82,6 +87,7 @@ export class NoticesService {
     private readonly catalog: CatalogService,
     private readonly holders: PermissionHoldersService,
     private readonly names: UserNamesService,
+    private readonly customerAccounts: CustomerAccountsService,
   ) {}
 
   async create(ctx: AuthContext, input: NoticeInput): Promise<NoticeView> {
@@ -125,6 +131,7 @@ export class NoticesService {
         .insert(appNotices)
         .values({
           kind: input.kind,
+          audience: input.audience ?? 'SALES_REPS',
           title,
           body,
           imageFileId,
@@ -151,6 +158,7 @@ export class NoticesService {
         entityId: row.id,
         after: {
           kind: input.kind,
+          audience: input.audience ?? 'SALES_REPS',
           title,
           popup: input.popup,
           validFrom: input.validFrom,
@@ -250,21 +258,44 @@ export class NoticesService {
         ...(row.withdrawnBy === null ? [] : [row.withdrawnBy]),
       ]),
     );
-    const recipients = await this.holders.activeHolders(RECIPIENT_PERMISSION, {
-      excludeAdminOnly: true,
-    });
+    // The reps who hold the permission through a role other than ADMIN; the stores' active app
+    // accounts (ADR-0079 #8). Each notice counts the reads of its own audience.
+    const recipients = rows.some((row) => row.audience === 'SALES_REPS')
+      ? await this.holders.activeHolders(RECIPIENT_PERMISSION, { excludeAdminOnly: true })
+      : [];
+    const stores = rows.some((row) => row.audience === 'CUSTOMERS')
+      ? await this.customerAccounts.activeAccountIds()
+      : [];
     const reads = new Map<number, number>();
-    if (recipients.length > 0) {
+    const repNotices = rows.filter((row) => row.audience === 'SALES_REPS').map((row) => row.id);
+    if (recipients.length > 0 && repNotices.length > 0) {
       const counted = await this.db
         .select({ noticeId: appNoticeReads.noticeId, reads: count() })
         .from(appNoticeReads)
-        .where(and(idIn(appNoticeReads.noticeId, ids), idIn(appNoticeReads.userId, recipients)))
+        .where(
+          and(idIn(appNoticeReads.noticeId, repNotices), idIn(appNoticeReads.userId, recipients)),
+        )
         .groupBy(appNoticeReads.noticeId);
+      for (const row of counted) reads.set(row.noticeId, row.reads);
+    }
+    const storeNotices = rows.filter((row) => row.audience === 'CUSTOMERS').map((row) => row.id);
+    if (stores.length > 0 && storeNotices.length > 0) {
+      const counted = await this.db
+        .select({ noticeId: appNoticeCustomerReads.noticeId, reads: count() })
+        .from(appNoticeCustomerReads)
+        .where(
+          and(
+            idIn(appNoticeCustomerReads.noticeId, storeNotices),
+            idIn(appNoticeCustomerReads.customerUserId, stores),
+          ),
+        )
+        .groupBy(appNoticeCustomerReads.noticeId);
       for (const row of counted) reads.set(row.noticeId, row.reads);
     }
     return rows.map((row) => ({
       id: row.id,
       kind: row.kind,
+      audience: row.audience,
       title: row.title,
       body: row.body,
       imageUrl: row.imageFileId === null ? null : (images.get(row.imageFileId) ?? null),
@@ -281,7 +312,7 @@ export class NoticesService {
           ? [{ id: product.id, sku: product.sku, name: product.name, thumbUrl: product.thumbUrl }]
           : [];
       }),
-      recipients: recipients.length,
+      recipients: row.audience === 'CUSTOMERS' ? stores.length : recipients.length,
       reads: reads.get(row.id) ?? 0,
       createdBy: row.createdBy,
       createdByName: names.get(row.createdBy) ?? '',

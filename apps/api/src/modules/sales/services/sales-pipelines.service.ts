@@ -12,7 +12,7 @@ import {
   STAGE_RIGHTS,
   type StageRight,
 } from '@tugeel/shared/sales';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -182,6 +182,7 @@ export class SalesPipelinesService {
       const kept = new Set(stages.flatMap((stage) => (stage.id == null ? [] : [stage.id])));
       const removed = [...live.values()].filter((stage) => !kept.has(stage.id));
       for (const stage of removed) await this.assertStageFree(tx, stage);
+      await this.assertCustomerAppStage(tx, id, stages, input.ownOrdersOnly);
 
       await tx
         .update(salesPipelines)
@@ -257,6 +258,37 @@ export class SalesPipelinesService {
       });
       if (entries.length > 0) await this.audit.recordMany(tx, ctx, entries);
     });
+  }
+
+  /**
+   * The CUSTOMER_APP channel lands only on a stage without an action, in a pipeline every reader
+   * sees (ADR-0079 #5): a save may give that stage no action and may not make the pipeline
+   * own-orders-only. The pipeline is locked FOR UPDATE by the save, so a send waits for it.
+   */
+  private async assertCustomerAppStage(
+    tx: Tx,
+    pipelineId: number,
+    stages: readonly StageInput[],
+    ownOrdersOnly: boolean,
+  ): Promise<void> {
+    const [landing] = await tx
+      .select({ stageId: salesChannelDefaults.stageId })
+      .from(salesChannelDefaults)
+      .where(
+        and(
+          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
+          eq(salesChannelDefaults.pipelineId, pipelineId),
+        ),
+      );
+    if (!landing) return;
+    const index = stages.findIndex((stage) => stage.id === landing.stageId);
+    const stage = stages[index];
+    if (stage && stage.action !== 'NONE') {
+      throw invalid(`stages.${index}.action`, 'customerAppStage', 'the app channel lands here');
+    }
+    if (ownOrdersOnly) {
+      throw invalid('ownOrdersOnly', 'customerAppStage', 'the app channel lands in this pipeline');
+    }
   }
 
   /** A copy of a pipeline's settings, roles and live stages (with their sorts) under a new name. */
@@ -479,6 +511,67 @@ export class SalesPipelinesService {
     const pipelineId = await this.pipelineOf(tx, stageId);
     await this.lockShare(tx, pipelineId, stageId);
     return pipelineId;
+  }
+
+  /**
+   * Where an app order lands (ADR-0079 #5): the CUSTOMER_APP default, its pipeline and stage
+   * locked FOR SHARE and read under that lock — live, a stage without an action, a pipeline that
+   * is not own-orders-only. Anything else, or no default at all: 409 CUSTOMER_APP_CLOSED, and the
+   * app does not send.
+   */
+  async customerAppPlacement(tx: Tx): Promise<Placement> {
+    const [target] = await tx
+      .select({
+        pipelineId: salesChannelDefaults.pipelineId,
+        stageId: salesChannelDefaults.stageId,
+      })
+      .from(salesChannelDefaults)
+      .where(eq(salesChannelDefaults.channel, 'CUSTOMER_APP'));
+    const closed = () => new AppError('CUSTOMER_APP_CLOSED', 'no stage takes app orders');
+    if (!target) throw closed();
+    const [pipeline] = await tx
+      .select({
+        archivedAt: salesPipelines.archivedAt,
+        ownOrdersOnly: salesPipelines.ownOrdersOnly,
+      })
+      .from(salesPipelines)
+      .where(eq(salesPipelines.id, target.pipelineId))
+      .for('share');
+    const [stage] = await tx
+      .select({ archivedAt: salesStages.archivedAt, action: salesStages.action })
+      .from(salesStages)
+      .where(and(eq(salesStages.id, target.stageId), eq(salesStages.pipelineId, target.pipelineId)))
+      .for('share');
+    if (
+      !pipeline ||
+      pipeline.archivedAt ||
+      pipeline.ownOrdersOnly ||
+      !stage ||
+      stage.archivedAt ||
+      stage.action !== 'NONE'
+    ) {
+      throw closed();
+    }
+    return target;
+  }
+
+  /** Whether app orders are accepted now (the app's checkout and the admin's warning). */
+  async customerAppOpen(executor: Db | Tx = this.db): Promise<boolean> {
+    const [row] = await executor
+      .select({ stageId: salesChannelDefaults.stageId })
+      .from(salesChannelDefaults)
+      .innerJoin(salesPipelines, eq(salesPipelines.id, salesChannelDefaults.pipelineId))
+      .innerJoin(salesStages, eq(salesStages.id, salesChannelDefaults.stageId))
+      .where(
+        and(
+          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
+          isNull(salesPipelines.archivedAt),
+          eq(salesPipelines.ownOrdersOnly, false),
+          isNull(salesStages.archivedAt),
+          eq(salesStages.action, 'NONE'),
+        ),
+      );
+    return row !== undefined;
   }
 
   /** The documents a stage prints when a card arrives. */

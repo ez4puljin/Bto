@@ -1,3 +1,4 @@
+import type { Decimal } from '../money';
 import { normalizeMnPhone } from '../phone';
 import { addDays, businessDate, isIsoDate } from '../time';
 
@@ -255,6 +256,95 @@ export const REP_MAP_FRESH_DAYS = 7;
 export function storeIsStale(lastOrderDate: string | null, today: string): boolean {
   return lastOrderDate === null || lastOrderDate < addDays(today, -(REP_MAP_FRESH_DAYS - 1));
 }
+
+/**
+ * The customer app's stock in three words (ADR-0079 #4): the number never reaches a customer.
+ * OUT when nothing is free; LOW below the product's minimum level in its home warehouse when one
+ * is set, otherwise below one whole pack, otherwise below CUSTOMER_LOW_STOCK_BASE base units.
+ */
+export const STOCK_WORDS = ['IN', 'LOW', 'OUT'] as const;
+export type StockWord = (typeof STOCK_WORDS)[number];
+
+/** «Цөөхөн» for a product with neither a minimum level nor a pack (Claude's default, ADR-0079 #4). */
+export const CUSTOMER_LOW_STOCK_BASE = 10;
+
+/**
+ * The word for `available` base units: `minLevel` is the home warehouse's minimum (null = none
+ * set), `packBase` the base units of one whole pack (null = no pack).
+ */
+export function stockWord(
+  available: Decimal,
+  minLevel: Decimal | null,
+  packBase: Decimal | null,
+): StockWord {
+  if (available.lte(0)) return 'OUT';
+  const threshold =
+    minLevel !== null && minLevel.gt(0)
+      ? minLevel
+      : packBase !== null && packBase.gt(0)
+        ? packBase
+        : null;
+  if (threshold !== null) return available.lt(threshold) ? 'LOW' : 'IN';
+  return available.lt(CUSTOMER_LOW_STOCK_BASE) ? 'LOW' : 'IN';
+}
+
+/**
+ * An order's progress in the customer's words (ADR-0079 #6): PENDING «Хүлээгдэж буй» until the
+ * office confirms, CONFIRMED «Батлагдсан», PREPARING «Бэлтгэж буй», READY «Бэлэн», DELIVERED
+ * «Хүргэгдсэн», CANCELLED «Цуцлагдсан».
+ */
+export const CUSTOMER_ORDER_STATES = [
+  'PENDING',
+  'CONFIRMED',
+  'PREPARING',
+  'READY',
+  'DELIVERED',
+  'CANCELLED',
+] as const;
+export type CustomerOrderState = (typeof CUSTOMER_ORDER_STATES)[number];
+
+const CUSTOMER_ORDER_STATE_OF: Record<OrderStatus, CustomerOrderState> = {
+  DRAFT: 'PENDING',
+  SUBMITTED: 'PENDING',
+  APPROVAL_PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  PICKING: 'PREPARING',
+  PACKED: 'READY',
+  DISPATCHED: 'READY',
+  DELIVERY_FAILED: 'READY',
+  DELIVERED: 'DELIVERED',
+  INVOICED: 'DELIVERED',
+  CLOSED: 'DELIVERED',
+  CANCELLED: 'CANCELLED',
+};
+
+/** Every order status in the customer's words; exactly one word per status. */
+export function customerOrderStateOf(status: OrderStatus): CustomerOrderState {
+  return CUSTOMER_ORDER_STATE_OF[status];
+}
+
+/** The statuses one customer word stands for (the app's order filter). */
+export function customerOrderStatusesOf(state: CustomerOrderState): OrderStatus[] {
+  return ORDER_STATUSES.filter((status) => CUSTOMER_ORDER_STATE_OF[status] === state);
+}
+
+/**
+ * The day an app order may ask for (ADR-0079 #5): today, tomorrow, the day after, or another day
+ * within this many days of today.
+ */
+export const CUSTOMER_ORDER_MAX_DAYS = 60;
+
+/** True when `deliveryDate` is today … today + CUSTOMER_ORDER_MAX_DAYS (both `YYYY-MM-DD`). */
+export function isCustomerDeliveryDate(deliveryDate: string, today: string): boolean {
+  return (
+    isIsoDate(deliveryDate) &&
+    deliveryDate >= today &&
+    deliveryDate <= addDays(today, CUSTOMER_ORDER_MAX_DAYS)
+  );
+}
+
+/** Orders one page of the store's history carries at most (the app asks for 30, «Нүүр» for 2). */
+export const CUSTOMER_ORDER_PAGE_MAX = 50;
 
 export interface OrderHeaderInput {
   fulfilment: Fulfilment;

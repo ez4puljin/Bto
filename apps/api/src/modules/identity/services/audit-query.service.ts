@@ -30,7 +30,10 @@ export class AuditQueryService {
     if (typeof after?.id === 'number') conditions.push(lt(auditLog.id, after.id));
     if (query.entity) conditions.push(eq(auditLog.entity, query.entity));
     if (query.entityId) conditions.push(eq(auditLog.entityId, query.entityId));
-    if (query.actorId !== undefined) conditions.push(eq(auditLog.actorId, query.actorId));
+    // actorId is a staff user's id: a customer account's rows carry the same numbers (ADR-0079).
+    if (query.actorId !== undefined) {
+      conditions.push(eq(auditLog.actorKind, 'STAFF'), eq(auditLog.actorId, query.actorId));
+    }
     for (const [field, value] of [
       ['from', query.from],
       ['to', query.to],

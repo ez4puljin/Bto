@@ -56,6 +56,7 @@ const summary = (
   note: null,
   gps: overrides.hasGps === false ? null : POINT,
   contact: null,
+  appAccount: null,
   ...overrides,
 });
 const supplierRow = (
@@ -324,6 +325,56 @@ describe('customers list', () => {
     await waitFor(() =>
       expect(second.router.state.location.pathname).toBe('/partners/customers/3'),
     );
+  });
+
+  it('shows the customer app column on request and filters by the app through the URL', async () => {
+    const fetchMock = signedIn(OFFICE_ME, {
+      'GET /api/v1/customers': (request) => {
+        if (new URL(request.url).searchParams.get('app') === 'NONE') {
+          return list([summary({ id: 4, code: '1004', name: 'Шинэ дэлгүүр' })]);
+        }
+        return list([
+          summary({
+            id: 1,
+            code: '1001',
+            name: 'Номин дэлгүүр',
+            status: 'INACTIVE',
+            appAccount: 'ACTIVE',
+          }),
+          summary({ id: 2, code: '1002', name: 'Сараа дэлгүүр', appAccount: 'DISABLED' }),
+        ]);
+      },
+    });
+    const { router } = renderApp('/partners/customers', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByRole('link', { name: 'Номин дэлгүүр' });
+    const { app } = mn.partners.customers.columns;
+    // Hidden until chosen in «Баганууд» (ADR-0066).
+    expect(screen.queryByRole('columnheader', { name: app })).toBeNull();
+    await user.click(screen.getByRole('button', { name: mn.common.columns }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: app }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('columnheader', { name: app })).toBeInTheDocument();
+    const nomin = within(screen.getByRole('row', { name: /Номин дэлгүүр/ }));
+    expect(nomin.getByText(mn.partners.app.statuses.ACTIVE)).toBeInTheDocument();
+    const saraa = within(screen.getByRole('row', { name: /Сараа дэлгүүр/ }));
+    expect(saraa.getByText(mn.partners.app.statuses.DISABLED)).toBeInTheDocument();
+
+    const filter = screen.getByLabelText(mn.partners.customers.appFilter.label);
+    expect(
+      within(filter)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([
+      mn.partners.customers.appFilter.all,
+      mn.partners.customers.appFilter.ACTIVE,
+      mn.partners.customers.appFilter.DISABLED,
+      mn.partners.customers.appFilter.NONE,
+    ]);
+    await user.selectOptions(filter, 'NONE');
+    await waitFor(() => expect(router.state.location.search).toBe('?app=NONE'));
+    expect(await screen.findByRole('link', { name: 'Шинэ дэлгүүр' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Номин дэлгүүр' })).toBeNull();
   });
 
   it('hides a customer column and remembers it in this browser', async () => {
@@ -600,6 +651,168 @@ describe('customer page', () => {
     await waitFor(() =>
       expect(calls(fetchMock, 'DELETE', '/api/v1/customer-addresses/51')).toHaveLength(1),
     );
+  });
+});
+
+describe('customer app card (ADR-0079 #11)', () => {
+  const APP_MANAGER: Me = {
+    ...OFFICE_ME,
+    id: 5,
+    permissions: [...OFFICE_ME.permissions, 'partners.customer_app.manage'],
+  };
+  const ACCOUNT: Schemas['CustomerAppAccount'] = {
+    id: 70,
+    phone: '+97699001122',
+    status: 'ACTIVE',
+    passwordSet: false,
+    lastSignInAt: null,
+    lockedUntil: null,
+    codeExpiresAt: null,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+  };
+  const FAR = '2099-01-01T00:30:00.000Z';
+  const appCard = async () =>
+    within(await screen.findByRole('region', { name: mn.partners.app.title }));
+
+  it('links a phone, then issues a one-time code that is shown once', async () => {
+    let account: Schemas['CustomerAppAccount'] | null = null;
+    let linked: unknown;
+    const fetchMock = signedIn(APP_MANAGER, {
+      'GET /api/v1/customers/9': () => json(CUSTOMER),
+      'GET /api/v1/customers/9/app-account': () => json({ account }),
+      'PUT /api/v1/customers/9/app-account': async (request) => {
+        linked = await request.json();
+        account = ACCOUNT;
+        return json(account);
+      },
+      'POST /api/v1/customers/9/app-account/code': () => {
+        account = { ...ACCOUNT, codeExpiresAt: FAR };
+        return json({ code: '7KQ2M-X9D4F', expiresAt: FAR });
+      },
+    });
+    renderApp('/partners/customers/9', fetchMock);
+    const user = userEvent.setup();
+    const card = await appCard();
+    expect(await card.findByText(mn.partners.app.empty)).toBeInTheDocument();
+
+    await user.click(card.getByRole('button', { name: mn.partners.app.link }));
+    const dialog = within(await screen.findByRole('dialog', { name: mn.partners.app.linkTitle }));
+    expect(dialog.queryByText(mn.partners.app.changeWarning)).toBeNull();
+    await user.type(dialog.getByLabelText(mn.partners.app.phone), '9900 1122');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(linked).toEqual({ phone: '+97699001122' });
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.partners.app.linked);
+    expect(await card.findByText('9900 1122')).toBeInTheDocument();
+    expect(card.getByText(mn.partners.app.statuses.ACTIVE)).toBeInTheDocument();
+    expect(card.getByText(mn.partners.app.waitingForCode)).toBeInTheDocument();
+    expect(card.getByText(mn.partners.app.neverSignedIn)).toBeInTheDocument();
+
+    await user.click(card.getByRole('button', { name: mn.partners.app.issueCode }));
+    const confirm = await screen.findByRole('dialog', { name: mn.partners.app.issueCodeTitle });
+    expect(within(confirm).getByRole('button', { name: mn.partners.app.issueCode })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    const shown = within(await screen.findByRole('dialog', { name: mn.partners.app.codeTitle }));
+    expect(shown.getByText('7KQ2M-X9D4F')).toBeInTheDocument();
+    // Never replayed: the code's POST carries no Idempotency-Key.
+    const issued = calls(fetchMock, 'POST', '/api/v1/customers/9/app-account/code');
+    expect(issued).toHaveLength(1);
+    expect(issued[0]?.headers.get('Idempotency-Key')).toBeNull();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByText('7KQ2M-X9D4F')).toBeNull();
+    // The card says until when the code works, never the code itself.
+    expect(await card.findByText(mn.partners.app.code)).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/customers/9/app-account/code')).toHaveLength(1);
+  });
+
+  it('closes the app after asking, then reopens it', async () => {
+    let account: Schemas['CustomerAppAccount'] = {
+      ...ACCOUNT,
+      passwordSet: true,
+      lastSignInAt: STAMP,
+    };
+    const fetchMock = signedIn(APP_MANAGER, {
+      'GET /api/v1/customers/9': () => json(CUSTOMER),
+      'GET /api/v1/customers/9/app-account': () => json({ account }),
+      'POST /api/v1/customers/9/app-account/disable': () => {
+        account = { ...account, status: 'DISABLED' };
+        return json(account);
+      },
+      'POST /api/v1/customers/9/app-account/enable': () => {
+        account = { ...account, status: 'ACTIVE' };
+        return json(account);
+      },
+    });
+    renderApp('/partners/customers/9', fetchMock);
+    const user = userEvent.setup();
+    const card = await appCard();
+    expect(await card.findByText(mn.partners.app.passwordSet)).toBeInTheDocument();
+
+    await user.click(card.getByRole('button', { name: mn.partners.app.disable }));
+    const confirm = within(
+      await screen.findByRole('dialog', { name: mn.partners.app.disableTitle }),
+    );
+    expect(confirm.getByText(mn.partners.app.disableDescription)).toBeInTheDocument();
+    await user.click(confirm.getByRole('button', { name: mn.partners.app.disable }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls(fetchMock, 'POST', '/api/v1/customers/9/app-account/disable')).toHaveLength(1);
+    expect(await screen.findByRole('status')).toHaveTextContent(mn.partners.app.disabled);
+    expect(await card.findByText(mn.partners.app.statuses.DISABLED)).toBeInTheDocument();
+    // A closed app takes no code until it is opened again.
+    expect(card.queryByRole('button', { name: mn.partners.app.issueCode })).toBeNull();
+
+    await user.click(card.getByRole('button', { name: mn.partners.app.enable }));
+    expect(await card.findByText(mn.partners.app.statuses.ACTIVE)).toBeInTheDocument();
+    expect(calls(fetchMock, 'POST', '/api/v1/customers/9/app-account/enable')).toHaveLength(1);
+    expect(card.getByRole('button', { name: mn.partners.app.issueCode })).toBeInTheDocument();
+  });
+
+  it('shows the account read-only to the office without the app right', async () => {
+    renderApp(
+      '/partners/customers/9',
+      signedIn(OFFICE_ME, {
+        'GET /api/v1/customers/9': () => json(CUSTOMER),
+        'GET /api/v1/customers/9/app-account': () =>
+          json({ account: { ...ACCOUNT, lockedUntil: FAR } }),
+      }),
+    );
+    const card = await appCard();
+    expect(await card.findByText('9900 1122')).toBeInTheDocument();
+    expect(card.getByText(mn.partners.app.locked)).toBeInTheDocument();
+    expect(card.queryByRole('button')).toBeNull();
+  });
+
+  it('checks the phone and shows a phone of another store on its field', async () => {
+    const fetchMock = signedIn(APP_MANAGER, {
+      'GET /api/v1/customers/9': () => json(CUSTOMER),
+      'GET /api/v1/customers/9/app-account': () => json({ account: ACCOUNT }),
+      'PUT /api/v1/customers/9/app-account': () =>
+        problem('DUPLICATE_VALUE', 409, { constraint: 'customer_users_phone_key' }),
+    });
+    renderApp('/partners/customers/9', fetchMock);
+    const user = userEvent.setup();
+    const card = await appCard();
+    await user.click(await card.findByRole('button', { name: mn.partners.app.changePhone }));
+    const dialog = within(await screen.findByRole('dialog', { name: mn.partners.app.changeTitle }));
+    // Changing the phone signs every phone out: the dialog says so before saving.
+    expect(dialog.getByText(mn.partners.app.changeWarning)).toBeInTheDocument();
+    const phone = dialog.getByLabelText(mn.partners.app.phone);
+    expect(phone).toHaveValue('99001122');
+    await user.clear(phone);
+    await user.type(phone, '123');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.validation.phone)).toBeInTheDocument();
+    expect(calls(fetchMock, 'PUT', '/api/v1/customers/9/app-account')).toHaveLength(0);
+
+    await user.clear(phone);
+    await user.type(phone, '88112233');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.validation.phoneTaken)).toBeInTheDocument();
+    expect(dialog.queryByText(mn.errors.DUPLICATE_VALUE)).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
 

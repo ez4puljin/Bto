@@ -61,7 +61,7 @@ export class AccessService {
              ) AS writable
         FROM auth_sessions s
         JOIN users u ON u.id = s.user_id
-       WHERE s.id = ${sessionId} AND s.user_id = ${userId}
+       WHERE s.id = ${sessionId} AND s.kind = 'STAFF' AND s.user_id = ${userId}
          AND s.revoked_at IS NULL AND s.expires_at > now()
          AND u.status = 'ACTIVE'`);
     const row = result.rows[0];

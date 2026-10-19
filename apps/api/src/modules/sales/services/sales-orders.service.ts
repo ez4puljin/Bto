@@ -15,6 +15,7 @@ import {
   type PaymentMethod,
   type PrintKind,
 } from '@tugeel/shared/sales';
+import { NOTIFIED_BACKORDER_LINES } from '@tugeel/shared/notifications';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -27,9 +28,11 @@ import { CatalogService, type ProductSummary, UnitConversionService } from '../.
 import {
   type Actor,
   actorUserId,
+  type AuditActor,
   type AuditEntry,
   AuditService,
   type AuthContext,
+  type CustomerActor,
   OrgService,
   ScopeService,
 } from '../../identity';
@@ -44,8 +47,11 @@ import {
 import { CustomerAddressesService, CustomersService, type LockedCustomer } from '../../partners';
 import { PriceQuoteService } from '../../pricing';
 import {
+  type BackorderedLine,
   CREDIT_CHECKER,
   type CreditChecker,
+  ORDER_LISTENER,
+  type OrderListener,
   SALE_LISTENER,
   SALE_SINK,
   type SaleListener,
@@ -122,6 +128,9 @@ export interface ProductOrderInfo {
   available: Decimal;
 }
 
+/** The events of an order the store sent itself (ADR-0079 #5) are labelled with the app. */
+export const CUSTOMER_APP_LABEL = 'customer-app';
+
 const text = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim() ?? '';
   return trimmed === '' ? null : trimmed;
@@ -142,6 +151,7 @@ export class SalesOrdersService implements OnModuleInit {
   private creditChecker: CreditChecker | null = null;
   private saleSink: SaleSink | null = null;
   private saleListener: SaleListener | null = null;
+  private orderListener: OrderListener | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -169,6 +179,7 @@ export class SalesOrdersService implements OnModuleInit {
     this.creditChecker = this.hook<CreditChecker>(CREDIT_CHECKER);
     this.saleSink = this.hook<SaleSink>(SALE_SINK);
     this.saleListener = this.hook<SaleListener>(SALE_LISTENER);
+    this.orderListener = this.hook<OrderListener>(ORDER_LISTENER);
   }
 
   /** A bound hook, or null when its module is not loaded (the worker, sales-only tests). */
@@ -208,7 +219,7 @@ export class SalesOrdersService implements OnModuleInit {
    */
   async createInTx(
     tx: Tx,
-    ctx: AuthContext,
+    ctx: AuthContext | CustomerActor,
     input: OrderInput,
     options: {
       channel: OrderChannel;
@@ -224,6 +235,8 @@ export class SalesOrdersService implements OnModuleInit {
         ...header,
         channel: options.channel,
         createdBy: actorUserId(ctx),
+        // An app order names the store's account instead of a staff author (ADR-0079 #5).
+        customerUserId: ctx.kind === 'CUSTOMER' ? ctx.customerUserId : null,
         ...(placement
           ? {
               pipelineId: placement.pipelineId,
@@ -774,6 +787,7 @@ export class SalesOrdersService implements OnModuleInit {
         .where(eq(salesOrders.id, id));
       await this.event(tx, actor, id, 'DRAFT', 'SUBMITTED', null);
       await this.event(tx, actor, id, 'SUBMITTED', 'CONFIRMED', null);
+      const waiting = reserved.filter((entry) => entry.backordered.gt(0));
       await this.audit.record(tx, actor, {
         action: 'CONFIRM',
         entity: 'sales_orders',
@@ -781,10 +795,63 @@ export class SalesOrdersService implements OnModuleInit {
         after: {
           number,
           total: quote.total.toFixed(0),
-          backordered: reserved.filter((entry) => entry.backordered.gt(0)).length,
+          backordered: waiting.length,
         },
       });
+      if (this.orderListener) {
+        await this.orderListener.onConfirmed(tx, {
+          orderId: id,
+          orderNumber: number,
+          channel: order.channel,
+          createdBy: order.createdBy,
+          customerId: order.customerId,
+          orderTotal: quote.total.toFixed(0),
+          backorderedLines: waiting.length,
+          backordered: await this.backorderedLines(
+            tx,
+            waiting.slice(0, NOTIFIED_BACKORDER_LINES).map((entry) => entry.lineId),
+          ),
+        });
+      }
     }
+  }
+
+  /** The backordered lines named in a confirmation: product, quantity and unit (ADR-0079 #8). */
+  private async backorderedLines(tx: Tx, lineIds: readonly number[]): Promise<BackorderedLine[]> {
+    if (lineIds.length === 0) return [];
+    const lines = await tx
+      .select({
+        id: salesOrderLines.id,
+        productId: salesOrderLines.productId,
+        productUnitId: salesOrderLines.productUnitId,
+        factorSnapshot: salesOrderLines.factorSnapshot,
+        qtyBackordered: salesOrderLines.qtyBackordered,
+      })
+      .from(salesOrderLines)
+      .where(idIn(salesOrderLines.id, lineIds))
+      .orderBy(asc(salesOrderLines.lineNo));
+    const products = new Map(
+      (await this.catalog.getMany([...new Set(lines.map((line) => line.productId))], tx)).map(
+        (product) => [product.id, product],
+      ),
+    );
+    const units = await this.units.describe(
+      [...new Set(lines.map((line) => line.productUnitId))],
+      tx,
+    );
+    return lines.map((line) => {
+      const product = products.get(line.productId);
+      const inUnit = line.qtyBackordered.div(line.factorSnapshot);
+      const whole = inUnit.isInteger() && !line.factorSnapshot.eq(1);
+      return {
+        productId: line.productId,
+        name: product?.name ?? '',
+        qty: (whole ? inUnit : line.qtyBackordered).toString(),
+        unitName: whole
+          ? (units.get(line.productUnitId)?.uomName ?? '')
+          : (product?.baseUnit.uomName ?? ''),
+      };
+    });
   }
 
   /**
@@ -864,7 +931,9 @@ export class SalesOrdersService implements OnModuleInit {
       createdBy: order.createdBy,
       customerId: order.customerId,
       orderTotal: order.total?.toFixed(0) ?? null,
+      invoiceId: invoice?.invoiceId ?? null,
       invoiceNumber: invoice?.number ?? null,
+      invoiceTotal: invoice?.total.toFixed(0) ?? null,
     });
     await this.audit.record(tx, actor, {
       action: 'SALE',
@@ -1077,6 +1146,14 @@ export class SalesOrdersService implements OnModuleInit {
         before: { status: order.status },
         after: { status: 'CANCELLED', reason: why, released },
       });
+      await this.orderListener?.onCancelled(tx, {
+        orderId: id,
+        orderNumber: order.number ?? String(id),
+        channel: order.channel,
+        createdBy: order.createdBy,
+        customerId: order.customerId,
+        reason: why,
+      });
     }
   }
 
@@ -1255,7 +1332,7 @@ export class SalesOrdersService implements OnModuleInit {
 
   private async event(
     tx: Tx,
-    actor: Actor,
+    actor: AuditActor,
     orderId: number,
     fromStatus: OrderStatus | null,
     toStatus: OrderStatus,
@@ -1267,7 +1344,12 @@ export class SalesOrdersService implements OnModuleInit {
       toStatus,
       reason,
       actorId: actorUserId(actor),
-      actorLabel: actor.kind === 'SYSTEM' ? actor.label : null,
+      actorLabel:
+        actor.kind === 'SYSTEM'
+          ? actor.label
+          : actor.kind === 'CUSTOMER'
+            ? CUSTOMER_APP_LABEL
+            : null,
     });
   }
 }

@@ -19,6 +19,7 @@ import { SalesOrdersService } from './services/sales-orders.service';
 import { SalesPipelinesService } from './services/sales-pipelines.service';
 import { SalesRepOrdersService } from './services/sales-rep-orders.service';
 import { SalesRepShopService } from './services/sales-rep-shop.service';
+import { CustomerOrdersService } from './services/customer-orders.service';
 import { SalesSettingsService } from './services/sales-settings.service';
 
 /**
@@ -37,6 +38,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesOrdersService,
     SalesRepOrdersService,
     SalesRepShopService,
+    CustomerOrdersService,
   ],
   exports: [
     SalesAccessService,
@@ -47,6 +49,7 @@ import { SalesSettingsService } from './services/sales-settings.service';
     SalesOrdersService,
     SalesRepOrdersService,
     SalesRepShopService,
+    CustomerOrdersService,
   ],
 })
 export class SalesModule {}

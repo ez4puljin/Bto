@@ -9,6 +9,7 @@ import { FinanceWorkerModule } from './modules/finance';
 import { IdentityWorkerModule } from './modules/identity';
 import { ImportsWorkerModule } from './modules/imports';
 import { InventoryWorkerModule } from './modules/inventory';
+import { NotificationsWorkerModule } from './modules/notifications';
 
 /** The pg-boss worker (ROLE=worker): job handlers and their schedules (ADR-0040), no public HTTP. */
 @Module({
@@ -22,6 +23,7 @@ import { InventoryWorkerModule } from './modules/inventory';
     InventoryWorkerModule,
     ImportsWorkerModule,
     FinanceWorkerModule,
+    NotificationsWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
@@ -87,5 +87,59 @@ describe('«Анхаарах» tiles (ADR-0047 #7)', () => {
       expect(calls(fetchMock, 'GET', '/api/v1/inventory/attention').length).toBeGreaterThan(0),
     );
     expect(screen.queryByRole('region', { name: mn.home.attention.title })).toBeNull();
+  });
+});
+
+describe('the customer app warning (ADR-0079 #5)', () => {
+  it('warns the boards admin while app orders have no stage to land on', async () => {
+    renderApp(
+      '/',
+      signedIn(ADMIN_ME, {
+        'GET /api/v1/customer/attention': () => json({ activeAccounts: 4, ordersOpen: false }),
+      }),
+    );
+    const warning = (await screen.findByText(mn.home.customerApp.warning)).closest<HTMLElement>(
+      '[data-slot="alert"]',
+    );
+    if (!warning) throw new Error('no alert');
+    expect(
+      within(warning).getByText(mn.home.customerApp.hint.replace('{{n}}', '4')),
+    ).toBeInTheDocument();
+    expect(within(warning).getByRole('link', { name: mn.home.customerApp.open })).toHaveAttribute(
+      'href',
+      '/sales/boards/settings',
+    );
+  });
+
+  it('stays quiet when orders land, when no store uses the app, or without the right', async () => {
+    const open = signedIn(ADMIN_ME, {
+      'GET /api/v1/customer/attention': () => json({ activeAccounts: 4, ordersOpen: true }),
+    });
+    renderApp('/', open);
+    await waitFor(() =>
+      expect(calls(open, 'GET', '/api/v1/customer/attention').length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText(mn.home.customerApp.warning)).toBeNull();
+    cleanup();
+
+    const unused = signedIn(ADMIN_ME, {
+      'GET /api/v1/customer/attention': () => json({ activeAccounts: 0, ordersOpen: false }),
+    });
+    renderApp('/', unused);
+    await waitFor(() =>
+      expect(calls(unused, 'GET', '/api/v1/customer/attention').length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText(mn.home.customerApp.warning)).toBeNull();
+    cleanup();
+
+    const office = signedIn({
+      ...ADMIN_ME,
+      id: 9,
+      permissions: ['sales.orders.read'],
+      roles: [],
+    });
+    renderApp('/', office);
+    await screen.findAllByRole('heading', { level: 1 });
+    expect(calls(office, 'GET', '/api/v1/customer/attention')).toHaveLength(0);
   });
 });

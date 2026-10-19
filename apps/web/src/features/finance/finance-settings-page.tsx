@@ -129,6 +129,11 @@ export function FinanceSettingsPage() {
                         {account.bankAccountNo}
                       </span>
                     ) : null}
+                    {account.showToCustomers ? (
+                      <Badge variant="default" className="ml-2">
+                        {t('finance.settings.shownToCustomers')}
+                      </Badge>
+                    ) : null}
                     {account.status === 'INACTIVE' ? (
                       <Badge variant="secondary" className="ml-2">
                         {t('finance.accountStatuses.INACTIVE')}
@@ -331,6 +336,7 @@ function MoneyAccountDialog({
   const [bankAccountNo, setBankAccountNo] = useState(account?.bankAccountNo ?? '');
   const [glAccountId, setGlAccountId] = useState<number | null>(account?.glAccountId ?? null);
   const [status, setStatus] = useState<MoneyAccount['status']>(account?.status ?? 'ACTIVE');
+  const [showToCustomers, setShowToCustomers] = useState(account?.showToCustomers ?? false);
   const [checked, setChecked] = useState(false);
   const assets = (glAccounts.data ?? []).filter(
     (entry) => entry.kind === 'ASSET' && entry.status === 'ACTIVE',
@@ -346,6 +352,8 @@ function MoneyAccountDialog({
       bankName: bankName.trim() || null,
       bankAccountNo: bankAccountNo.trim() || null,
       glAccountId,
+      // Only a bank account is listed in the customer app (ADR-0079 #7); a cash box never is.
+      ...(kind === 'BANK' ? { showToCustomers } : {}),
     };
     void action
       .run(async () => {
@@ -457,6 +465,24 @@ function MoneyAccountDialog({
                   onChange={(event) => setBankAccountNo(event.target.value)}
                 />
               </FormField>
+            </div>
+          ) : null}
+          {kind === 'BANK' ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="money-show-customers">
+                  {t('finance.settings.moneyAccountDialog.showToCustomers')}
+                </Label>
+                <Switch
+                  id="money-show-customers"
+                  checked={showToCustomers}
+                  aria-describedby="money-show-customers-hint"
+                  onCheckedChange={setShowToCustomers}
+                />
+              </div>
+              <p id="money-show-customers-hint" className="text-xs text-muted-foreground">
+                {t('finance.settings.moneyAccountDialog.showToCustomersHint')}
+              </p>
             </div>
           ) : null}
           <FormField

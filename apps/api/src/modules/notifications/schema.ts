@@ -1,4 +1,10 @@
-import { NOTICE_KINDS, NOTICE_LIMITS, USER_NOTIFICATION_KINDS } from '@tugeel/shared/notifications';
+import {
+  CUSTOMER_NOTIFICATION_KINDS,
+  NOTICE_AUDIENCES,
+  NOTICE_KINDS,
+  NOTICE_LIMITS,
+  USER_NOTIFICATION_KINDS,
+} from '@tugeel/shared/notifications';
 import { type SQL, sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
@@ -17,7 +23,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { jsonValue } from '../../common/db/types';
 import { products } from '../catalog/schema';
-import { files, users } from '../identity/schema';
+import { invoices, payments } from '../finance/schema';
+import { customerUsers, files, users } from '../identity/schema';
 import { salesOrders } from '../sales/schema';
 
 // The tables owned by the notifications module (docs/modules/notifications.md, ADR-0062).
@@ -46,6 +53,8 @@ export const appNotices = pgTable(
   {
     id: id(),
     kind: text('kind', { enum: NOTICE_KINDS }).notNull(),
+    /** Who reads it (ADR-0079 #8): the sales reps' app or the customers' «Bto300». */
+    audience: text('audience', { enum: NOTICE_AUDIENCES }).notNull().default('SALES_REPS'),
     title: text('title').notNull(),
     body: text('body').notNull(),
     imageFileId: ref('image_file_id').references(() => files.id),
@@ -64,6 +73,7 @@ export const appNotices = pgTable(
       .on(t.validFrom, t.id)
       .where(sql`${t.withdrawnAt} IS NULL`),
     check('app_notices_kind', inList(t.kind, NOTICE_KINDS)),
+    check('app_notices_audience', inList(t.audience, NOTICE_AUDIENCES)),
     check(
       'app_notices_title',
       sql`length(btrim(${t.title})) BETWEEN 1 AND ${lim(NOTICE_LIMITS.titleMax)}`,
@@ -110,6 +120,63 @@ export const appNoticeReads = pgTable(
     readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.noticeId, t.userId] })],
+);
+
+/** Which store's account read (or closed) a customers' notice, once (ADR-0079 #8). */
+export const appNoticeCustomerReads = pgTable(
+  'app_notice_customer_reads',
+  {
+    noticeId: ref('notice_id')
+      .notNull()
+      .references(() => appNotices.id),
+    customerUserId: ref('customer_user_id')
+      .notNull()
+      .references(() => customerUsers.id),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.noticeId, t.customerUserId] })],
+);
+
+/**
+ * A notification addressed to a store's customer app account (ADR-0079 #8): its order confirmed,
+ * cancelled or sold, a payment recorded, an invoice due soon or overdue. Written once per kind and
+ * document (the unique keys), the payload by value (money as strings).
+ */
+export const customerNotifications = pgTable(
+  'customer_notifications',
+  {
+    id: id(),
+    customerUserId: ref('customer_user_id')
+      .notNull()
+      .references(() => customerUsers.id),
+    kind: text('kind', { enum: CUSTOMER_NOTIFICATION_KINDS }).notNull(),
+    orderId: ref('order_id').references(() => salesOrders.id),
+    invoiceId: ref('invoice_id').references(() => invoices.id),
+    paymentId: ref('payment_id').references(() => payments.id),
+    payload: jsonValue('payload').notNull(),
+    createdAt: createdAt(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('customer_notifications_order').on(t.kind, t.orderId),
+    unique('customer_notifications_invoice').on(t.kind, t.invoiceId),
+    unique('customer_notifications_payment').on(t.kind, t.paymentId),
+    index('customer_notifications_account_idx').on(t.customerUserId, t.id),
+    index('customer_notifications_unread_idx')
+      .on(t.customerUserId)
+      .where(sql`${t.readAt} IS NULL`),
+    check('customer_notifications_kind', inList(t.kind, CUSTOMER_NOTIFICATION_KINDS)),
+    check(
+      'customer_notifications_document',
+      sql`CASE
+        WHEN ${t.kind} IN ('ORDER_CONFIRMED', 'ORDER_CANCELLED', 'ORDER_SOLD')
+          THEN ${t.orderId} IS NOT NULL AND ${t.paymentId} IS NULL
+        WHEN ${t.kind} = 'PAYMENT_RECORDED'
+          THEN ${t.paymentId} IS NOT NULL AND ${t.orderId} IS NULL AND ${t.invoiceId} IS NULL
+        ELSE ${t.invoiceId} IS NOT NULL AND ${t.orderId} IS NULL AND ${t.paymentId} IS NULL
+      END`,
+    ),
+  ],
 );
 
 /**

@@ -22,6 +22,8 @@ export const PERMISSIONS = [
   'partners.customers.manage',
   'partners.credit.manage',
   'partners.suppliers.manage',
+  // The customer app «Bto300» (ADR-0079 #11): linking a store's phone, one-time codes, closing it.
+  'partners.customer_app.manage',
   'inventory.setup.manage',
   'inventory.locations.manage',
   'inventory.receipts.manage',
@@ -110,6 +112,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   OFFICE: [
     'partners.customers.read',
     'partners.customers.manage',
+    // The office links stores to the customer app and reads them their codes (ADR-0079 #11).
+    'partners.customer_app.manage',
     'sales.orders.read',
     'sales.orders.manage',
     'finance.read',

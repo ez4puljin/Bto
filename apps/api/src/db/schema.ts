@@ -5,6 +5,8 @@ export {
   auditLog,
   authSessions,
   branches,
+  customerPasswordCodes,
+  customerUsers,
   files,
   idempotencyKeys,
   numberSequences,
@@ -114,8 +116,11 @@ export {
   posTills,
 } from '../modules/pos/schema';
 export {
+  appNoticeCustomerReads,
   appNoticeProducts,
   appNoticeReads,
   appNotices,
+  customerNotifications,
   userNotifications,
 } from '../modules/notifications/schema';
+export { companyContacts, customerFavourites } from '../modules/customer/schema';

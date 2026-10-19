@@ -550,7 +550,7 @@ export class SalesRepOrdersService {
     return this.withEstimate(await this.queries.detail(ctx, id));
   }
 
-  private async withEstimate(order: OrderDetail): Promise<RepOrderDetail> {
+  async withEstimate(order: OrderDetail): Promise<RepOrderDetail> {
     const estimate =
       order.status === 'DRAFT' && order.lines.length > 0
         ? await this.estimate(order.lines, businessDate())
@@ -570,7 +570,7 @@ export class SalesRepOrdersService {
    * then quoted on its own, because a cart's programs (ORDER and CATEGORY ones, a product's
    * quantity steps) count over that one cart. A draft without lines has none.
    */
-  private async estimates(orderIds: readonly number[]): Promise<Map<number, DraftEstimate>> {
+  async estimates(orderIds: readonly number[]): Promise<Map<number, DraftEstimate>> {
     const estimates = new Map<number, DraftEstimate>();
     if (orderIds.length === 0) return estimates;
     // A single-table select: the columns stay unqualified, which is unambiguous here.
