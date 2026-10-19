@@ -31,7 +31,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
 
    | Phase | Content | Sessions | Order |
    |---|---|---|---|
-   | R | Merge the `rep-app` branch (it holds migration `0028_notifications.sql`) | 0.5 | before P1 |
+   | R | Merge the `rep-app` branch: done 2026-10-19 (PR #3), its notifications migration renumbered to `0030_notifications.sql` | 0.5 | before P1 (done) |
    | P0a | These decisions (ADR-0069 … ADR-0077), SPEC, architecture, STATUS | 1 | before e-Barimt on invoices |
    | P0b | `packages/fin-contract`, an empty `apps/api/src/finance-core/`, a Bto-free `common/**`, `@tugeel/shared/mn`, the lint elements, `pnpm core:standalone` (ADR-0069, ADR-0074) | 1 | the next finance session |
    | P1 | Schema `fin`, tenant, company BO, branches, source systems, parties, `bto.company_code`, `identity.user_company_roles`, `fin-bridge` (ADR-0070, ADR-0075) | 1 | |
@@ -39,7 +39,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
    | P3 | The intake log, every document class, open items, allocations, `FinReader`, `FinConfig`, proven by the TESTPMS fixture (source system `TEST_PMS`; ADR-0071, ADR-0072) | 2–3 | |
    | P4 | Bto's receivables onto the engine: backfill, vouchers and invoices through the intake, `exposureInTx`, the core reconcile, the manual allocation screen (ADR-0072, ADR-0073) | 2–3 | |
    | P5 | Close, soft close, reopen, the new rights, drafts with approval, the pending list, the OPENING path (ADR-0075) | 2 | |
-   | H1 | `modules/finance` becomes `billing` + `fin-bridge` (ADR-0073) | 2 | before delivery 5 (QPay) |
+   | H1 | `modules/finance` becomes `billing` + `fin-bridge` (ADR-0073) | 2 | before delivery 5 |
    | H2 | The POS shift close and hand-over through the intake (ADR-0071 #8) | 1 | after POS S3 merges, before S4 |
    | A1 | The asynchronous transport: HELD, dependencies, the outbox, the result feed (ADR-0071 #9) | 1 | at the PMS kickoff |
    | A2 | HTTP intake and ports under `/api/fin/v1`, source tokens; `@tugeel/fin-contract` and the `mn` rules the PMS needs as versioned packages (the package cut is chosen then, ADR-0074; the PMS installs them from a private package registry or a git tag, decided in the A2 session's ADR) | 1–2 | before the PMS |
@@ -48,7 +48,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
 
    | Addition | Content | Sessions | Order |
    |---|---|---|---|
-   | Payables | Supplier bills and credits (`AP_BILL`, `AP_CREDIT`, ADR-0072) and supplier payments as open items, with the accountant's screens; procurement later only sends `AP_BILL` commands | 2 | after P3, before delivery 8 |
+   | Payables | Supplier bills and credits (`AP_BILL`, `AP_CREDIT`, ADR-0072) and supplier payments as open items, with the accountant's screens; the source facts are Bto's goods receipts (their payment method, money account, frozen VAT rate and VAT-inclusive line prices, the main session's ADR-0078), which post no payables themselves; procurement later only sends `AP_BILL` commands | 2 | after P3, before delivery 8 |
    | Bank import | The daily statement import, Khan Bank Excel first: lines normalised, duplicates dropped, matched to open items in the order of SPEC §5.8, the rest by hand | 1–2 | after P4 |
    | Fixed assets | A core sub-ledger reusable by the PMS: the asset register, classes with their accounts and rates, depreciation runs posting through the intake, disposals | 2 | after P3 |
    | Cost of goods and inventory | Bto posts the daily cost of goods sold and the inventory postings (receipts, adjustments, stocktakes, transfers, returns) as JOURNAL documents | 1–2 | after P5, once D8 is answered |
@@ -58,7 +58,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
    **Totals.** R to P5: about 13–15 sessions, after which the PMS can be added without rewriting the engine. With H1, H2 and 1–2 sessions of rebase overhead: about 17–20. The go-live additions: 10–14 (the bank import 1–2). So **about 27–34 core sessions before go-live**. A1 and A2 (2–3 sessions) follow at the PMS kickoff, after go-live; the `fin_control` role (about 1, ADR-0076) comes with the control system. These are estimates, re-planned in `docs/STATUS.md` after every phase.
 4. **Order constraints.**
    - P0a precedes the e-Barimt-on-invoices session, so `ebarimt_receipts` is source-keyed from its first migration (ADR-0074); that session then runs whenever the PosAPI spike allows. The certification gate of 2026-11-13 is unchanged.
-   - H1 precedes QPay (delivery 5); payables precede procurement (delivery 8); A2 precedes the PMS.
+   - H1 precedes delivery 5; payables precede procurement (delivery 8); A2 precedes the PMS.
    - POS S3 (ADR-0065, reserved) runs in parallel on the edge: P0b's `mn` subpath lands before S3 starts, and H2 waits until S3 merges.
    - `pnpm check` runs one at a time on one PostgreSQL container.
 5. **The roadmap.** SPEC §9.3 gains a Finance Core track (P0b … P5, H1, H2, A1, A2 and the additions) ahead of deliveries 5 and 8. Delivery 3 keeps e-Barimt; its opening-receivables importer becomes the chart and opening import. Delivery 8 sends supplier bills to the core. Delivery 10 keeps `reporting`, reminders and the driver and rep printing; its bank import and matching and its VAT and city-tax reports move into the track (the cash and bank books were built in Finance I). Delivery 11 posts payroll through the intake. STATUS re-plans the weeks when it is next written.
@@ -98,7 +98,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
 
 **Positive.**
 - One set of books from the go-live day, with no second program to reconcile.
-- e-Barimt, QPay and procurement land on their final homes; the PMS joins an engine that already carries full books.
+- e-Barimt and procurement land on their final homes; the PMS joins an engine that already carries full books.
 - Every phase ends with `pnpm check` green and today's screens working.
 
 **Negative.**

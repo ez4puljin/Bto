@@ -172,6 +172,8 @@ export const MOVEMENT_TYPES = {
   DISPATCH_IN: { sign: 1, legs: [2] },
   DELIVERY_ISSUE: { sign: -1, legs: [1] },
   POS_SALE: { sign: -1, legs: [1] },
+  /** A goods issue (GI, ADR-0081): internal use, write-off, return to a supplier, at the average. */
+  GOODS_ISSUE: { sign: -1, legs: [1] },
   TRANSFER_OUT: { sign: -1, legs: [1, 3, 5] },
   TRANSFER_IN: { sign: 1, legs: [2, 4, 6] },
   RETURN_IN: { sign: 1, legs: [1] },
@@ -192,6 +194,7 @@ export const STOCK_DOC_TYPES = [
   'SO',
   'POS',
   'CN',
+  'GI',
 ] as const;
 export type StockDocType = (typeof STOCK_DOC_TYPES)[number];
 
@@ -397,3 +400,48 @@ export function costingDeadline(postedOn: string): string {
 export function canRecost(postedOn: string, today: string): boolean {
   return today <= costingDeadline(postedOn);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Receipt prices and payment (ADR-0078)
+
+/** How a delivery is paid: on credit (a payable), from a cash box or from a bank account. */
+export const RECEIPT_PAYMENT_METHODS = ['CREDIT', 'CASH', 'BANK'] as const;
+export type ReceiptPaymentMethod = (typeof RECEIPT_PAYMENT_METHODS)[number];
+
+/**
+ * The VAT inside a delivery-note amount at the receipt's rate (0 when the company or the supplier
+ * is not a VAT payer), two decimals half up, the way invoices split their lines (ADR-0010 #4).
+ */
+export function receiptLineVat(docAmount: DecimalInput, vatRatePct: DecimalInput): Decimal {
+  const rate = new Decimal(vatRatePct);
+  if (rate.isZero()) return new Decimal(0);
+  return new Decimal(docAmount)
+    .times(rate)
+    .dividedBy(new Decimal(100).plus(rate))
+    .toDecimalPlaces(MONEY_SCALE);
+}
+
+/** A line's cost: its delivery-note amount without the VAT the company takes back. */
+export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInput): Decimal {
+  return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Goods issues (ADR-0081)
+
+/** Who received an issue: a staff user, a customer, a supplier, or a name typed by hand. */
+export const ISSUE_RECIPIENT_KINDS = ['USER', 'CUSTOMER', 'SUPPLIER', 'OTHER'] as const;
+export type IssueRecipientKind = (typeof ISSUE_RECIPIENT_KINDS)[number];
+
+/** One issue posts at most this many lines (one document per delivery of goods out). */
+export const MAX_ISSUE_LINES = 500;
+
+/** The expense types a fresh database starts with (the admin renames, adds and retires them). */
+export const DEFAULT_ISSUE_EXPENSE_TYPES = [
+  'INTERNAL_USE',
+  'BONUS',
+  'MARKETING',
+  'WRITE_OFF',
+  'SUPPLIER_RETURN',
+  'TRANSFER_OUT',
+] as const;

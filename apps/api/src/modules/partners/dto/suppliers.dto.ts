@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
@@ -28,6 +29,8 @@ export class SupplierSummaryDto {
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) tin: string | null;
   @ApiProperty({ type: String, nullable: true }) phone: string | null;
+  @ApiProperty({ description: 'A VAT payer: delivery-note prices hold VAT (ADR-0078)' })
+  vatPayer: boolean;
   @ApiProperty({ enum: PARTNER_STATUSES }) status: PartnerStatus;
 }
 
@@ -123,6 +126,11 @@ class SupplierFieldsDto {
   @Min(0)
   @Max(365)
   paymentTermDays?: number | null;
+
+  @ApiPropertyOptional({ description: 'A VAT payer (ADR-0078); omitted on create: no' })
+  @IsOptional()
+  @IsBoolean()
+  vatPayer?: boolean;
 
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
   @IsOptional()

@@ -13,6 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { RECEIPT_PAYMENT_METHODS, type ReceiptPaymentMethod } from '@tugeel/shared/inventory';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { COSTING_STATUSES, RECEIPT_STATUSES } from '../schema';
 import { QTY, queryBoolean, trimmed } from './bins.dto';
@@ -37,6 +38,39 @@ export class ReceiptLineDto {
   @ApiProperty() binId: number;
   @ApiProperty({ example: 'A-01-03' }) binCode: string;
   @ApiProperty({ type: Number, nullable: true }) lotId: number | null;
+  // Cost data (ADR-0078): present only for holders of inventory.costs.manage.
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Delivery-note price per unit',
+  })
+  docUnitPrice?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Delivery-note amount, VAT in',
+  })
+  docAmount?: string | null;
+  @ApiPropertyOptional() freeGoods?: boolean;
+  @ApiPropertyOptional({ type: String, nullable: true }) vatAmount?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Amount less VAT' })
+  costAmount?: string | null;
+}
+
+@ApiSchema({ name: 'ReceiptTotals' })
+export class ReceiptTotalsDto {
+  @ApiProperty({ description: 'Σ delivery-note amounts, VAT in' }) docTotal: string;
+  @ApiProperty() vatTotal: string;
+  @ApiProperty() costTotal: string;
+  @ApiProperty({ description: 'Lines priced or free' }) pricedLines: number;
+}
+
+@ApiSchema({ name: 'ReceiptPaymentAccount' })
+export class ReceiptPaymentAccountDto {
+  @ApiProperty() id: number;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: ['CASH', 'BANK'] }) kind: 'CASH' | 'BANK';
 }
 
 /** A receipt without any cost: what every user sees (ADR-0033 #8). */
@@ -54,12 +88,22 @@ export class ReceiptDetailDto {
   @ApiProperty({ type: String, format: 'date', nullable: true }) supplierDocDate: string | null;
   @ApiProperty({ enum: RECEIPT_STATUSES }) status: ReceiptStatus;
   @ApiProperty({ enum: COSTING_STATUSES, nullable: true }) costingStatus: CostingStatus | null;
+  @ApiProperty() costingVersion: number;
+  @ApiProperty({ type: String, format: 'date', nullable: true }) recostUntil: string | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ enum: RECEIPT_PAYMENT_METHODS }) paymentMethod: ReceiptPaymentMethod;
+  @ApiProperty({ type: Number, nullable: true }) moneyAccountId: number | null;
+  @ApiProperty({ type: String, nullable: true }) moneyAccountName: string | null;
+  @ApiProperty() supplierVatPayer: boolean;
+  @ApiProperty({ example: '10', description: 'VAT inside the delivery-note prices' })
+  vatRatePct: string;
   @ApiProperty({ type: String, format: 'date', nullable: true }) effectiveDate: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) postedAt: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
   @ApiProperty({ type: [ReceiptLineDto] }) lines: ReceiptLineDto[];
+  @ApiPropertyOptional({ type: ReceiptTotalsDto, description: 'Cost holders only' })
+  totals?: ReceiptTotalsDto;
 }
 
 @ApiSchema({ name: 'ReceiptSummary' })
@@ -117,6 +161,22 @@ export class ReceiptLineRequestDto {
   @IsInt()
   @Min(1)
   binId?: number | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Delivery-note price per unit',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  docUnitPrice?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Or the line amount, VAT in' })
+  @IsOptional()
+  @Matches(MONEY)
+  docAmount?: string | null;
+  @ApiPropertyOptional({ description: 'Free goods (бонус)' })
+  @IsOptional()
+  @IsBoolean()
+  freeGoods?: boolean;
 }
 
 class ReceiptHeaderFieldsDto {
@@ -138,6 +198,17 @@ class ReceiptHeaderFieldsDto {
   @IsString()
   @MaxLength(500)
   note?: string | null;
+
+  @ApiPropertyOptional({ enum: RECEIPT_PAYMENT_METHODS, description: 'Default CREDIT' })
+  @IsOptional()
+  @IsIn(RECEIPT_PAYMENT_METHODS)
+  paymentMethod?: ReceiptPaymentMethod;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Cash box or bank account' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  moneyAccountId?: number | null;
 }
 
 @ApiSchema({ name: 'ReceiptCreateRequest' })
@@ -162,16 +233,31 @@ export class UpdateReceiptDto extends ReceiptHeaderFieldsDto {
 export class UpdateReceiptLineDto {
   @ApiPropertyOptional({ example: '3' }) @IsOptional() @Matches(QTY) enteredQty?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) binId?: number;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'null clears the price' })
+  @IsOptional()
+  @Matches(MONEY)
+  docUnitPrice?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'null clears the price' })
+  @IsOptional()
+  @Matches(MONEY)
+  docAmount?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() freeGoods?: boolean;
 }
 
 @ApiSchema({ name: 'ReceiptCostLineRequest' })
 export class CostLineRequestDto {
   @ApiProperty() @IsInt() @Min(1) lineId: number;
-  @ApiPropertyOptional({ example: '48000', description: 'Line amount, MNT ex-VAT' })
+  @ApiPropertyOptional({
+    example: '48000',
+    description: 'Line amount as on the delivery note (VAT in)',
+  })
   @IsOptional()
   @Matches(MONEY)
   amount?: string;
-  @ApiPropertyOptional({ example: '24000', description: 'Price per entered unit, MNT ex-VAT' })
+  @ApiPropertyOptional({
+    example: '24000',
+    description: 'Price per entered unit as on the delivery note',
+  })
   @IsOptional()
   @Matches(MONEY)
   unitPrice?: string;
@@ -205,7 +291,10 @@ export class CostedReceiptLineDto {
   @ApiProperty() qtyBase: string;
   @ApiProperty({ description: 'Cost per base unit the goods went in at' })
   provisionalUnitCost: string;
-  @ApiProperty({ type: String, nullable: true }) amount: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Cost: the amount less VAT' })
+  amount: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'As typed, VAT in' })
+  docAmount: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Per base unit' }) unitCost:
     string | null;
   @ApiProperty() freeGoods: boolean;
@@ -221,6 +310,8 @@ export class ReceiptCostingDto {
   @ApiProperty() costingVersion: number;
   @ApiProperty({ type: String, format: 'date', nullable: true }) recostUntil: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) costedAt: string | null;
-  @ApiProperty({ type: String, nullable: true }) total: string | null;
+  @ApiProperty({ example: '10' }) vatRatePct: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Σ cost' }) total: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Σ as typed' }) docTotal: string | null;
   @ApiProperty({ type: [CostedReceiptLineDto] }) lines: CostedReceiptLineDto[];
 }

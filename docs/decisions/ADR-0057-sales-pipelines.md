@@ -6,7 +6,7 @@
 | Date | 2026-10-15 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0056 (#1: boards become groups of pipelines with a visibility, an own-orders-only switch and a third role right; a stage's VIEW now hides its orders everywhere; #2: placement in a pipeline, a stage chosen through «+»; #8: the screens), ADR-0055 (an order is numbered when created, in the company format), architecture §12 (sales orders are numbered at creation) |
-| Amended by | ADR-0058 (#7: the list view gains a payment column; a stage's printout is on A4 or an 80 mm roll); ADR-0059 (#7: a card and a list row open the order panel; «+» and «Шинэ захиалга» open the create dialog); ADR-0060 (#7: `CREDIT_BLOCKED` carries its reasons; the order panel links to the invoice) |
+| Amended by | ADR-0058 (#7: the list view gains a payment column; a stage's printout is on A4 or an 80 mm roll); ADR-0059 (#7: a card and a list row open the order panel; «+» and «Шинэ захиалга» open the create dialog); ADR-0060 (#7: `CREDIT_BLOCKED` carries its reasons; the order panel links to the invoice); ADR-0061 (#4: a sales rep places an order on a stage chosen in the app, among the NONE and CONFIRM stages the rep's roles may move into); ADR-0079 (#5: the `CUSTOMER_APP` channel default must be a stage without an action) |
 
 ## Context
 

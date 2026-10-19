@@ -44,6 +44,7 @@ const MSM: Schemas['SupplierListItem'] = {
   name: 'МСМ ХХК',
   tin: null,
   phone: null,
+  vatPayer: false,
   status: 'ACTIVE',
   regNo: null,
   email: null,

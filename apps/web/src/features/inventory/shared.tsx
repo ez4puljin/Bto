@@ -91,6 +91,7 @@ export function ProductSearch({
   onScan,
   className,
   variant = 'default',
+  saleReady,
 }: {
   /** Set when a visible label names the search box. */
   id?: string;
@@ -105,6 +106,8 @@ export function ProductSearch({
   className?: string;
   /** `filter`: a pill in a list's filter bar, like `SearchField`. */
   variant?: 'default' | 'filter';
+  /** Only products whose prices are complete (an app notice's products, ADR-0062). */
+  saleReady?: boolean;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -115,7 +118,7 @@ export function ProductSearch({
   const listId = useId();
   const typed = search.trim();
   const q = useDeferredValue(typed);
-  const products = useProducts({ q, status: 'ACTIVE' });
+  const products = useProducts({ q, status: 'ACTIVE', ...(saleReady ? { saleReady } : {}) });
   // Nothing from an older search once the box is cleared (a pick, Escape).
   const rows = typed && q ? (products.data?.pages[0]?.data ?? []).slice(0, 8) : [];
   const index = highlight.q === q && highlight.index < rows.length ? highlight.index : 0;
@@ -306,8 +309,9 @@ export function ScanToolbar(props: {
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
-        <div className="min-w-0 lg:flex-1">{props.scanBox}</div>
+      {/* The scan box keeps room for its label and buttons; the search wraps below when tight. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start lg:gap-4">
+        <div className="min-w-0 lg:min-w-[26rem] lg:flex-1">{props.scanBox}</div>
         {props.qty}
         {props.search ? (
           <div className="min-w-0 lg:w-64 xl:w-72 2xl:w-96">{props.search}</div>

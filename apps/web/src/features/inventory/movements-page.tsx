@@ -45,11 +45,12 @@ import { useWarehouseName, useWarehouseOptions } from './helpers';
 import { ProductSearch, WarehouseSelect } from './shared';
 
 const KINDS = ['WHOLESALE', 'STORE', 'VEHICLE', 'TRANSIT'] as const;
-const DOC_TYPES: readonly MovementDocType[] = ['GR', 'BM', 'TR', 'ADJ', 'ST'];
+const DOC_TYPES: readonly MovementDocType[] = ['GR', 'GI', 'BM', 'TR', 'ADJ', 'ST'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** Documents that have a page of their own. */
 const DOC_PAGES: Partial<Record<StockMovement['docType'], string>> = {
   GR: '/inventory/receipts',
+  GI: '/inventory/issues',
   ADJ: '/inventory/adjustments',
   TR: '/inventory/transfers',
   ST: '/inventory/stocktakes',

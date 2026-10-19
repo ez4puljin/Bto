@@ -305,6 +305,7 @@ describe('products list', () => {
       name,
       tin: null,
       phone: null,
+      vatPayer: false,
       status: 'ACTIVE',
       regNo: null,
       email: null,

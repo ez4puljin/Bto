@@ -12,6 +12,7 @@ import { FinanceHttpModule } from './modules/finance';
 import { IdentityHttpModule } from './modules/identity';
 import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
+import { NotificationsHttpModule } from './modules/notifications';
 import { PartnersHttpModule } from './modules/partners';
 import { PosHttpModule } from './modules/pos';
 import { PricingHttpModule } from './modules/pricing';
@@ -39,6 +40,7 @@ import { SegmentsHttpModule } from './modules/segments';
     SalesHttpModule,
     FinanceHttpModule,
     PosHttpModule,
+    NotificationsHttpModule,
   ],
 })
 export class AppModule {}

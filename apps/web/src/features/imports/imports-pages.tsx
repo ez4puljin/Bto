@@ -14,6 +14,7 @@ import {
   SegmentedControl,
   SkeletonRows,
 } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -28,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useWarehouses } from '@/features/identity/api';
+import { WarehouseSelect } from '@/features/inventory/shared';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { problemFromError, problemOf } from '@/lib/problem';
 import { useAction } from '@/lib/use-action';
@@ -36,12 +39,14 @@ import {
   type ImportJob,
   type ImportRow,
   type ImportStatus,
+  type ReceiptImportOptions,
   RUNNING,
   type RowFilter,
   useImport,
   useImportMutations,
   useImportRows,
   useImports,
+  useReceiptPaymentAccounts,
 } from './api';
 import { columnName, fieldNames, issueText } from './helpers';
 
@@ -141,6 +146,30 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const input = useRef<HTMLInputElement>(null);
   const [key, setKey] = useState(randomUuid);
   const [wrongType, setWrongType] = useState(false);
+  // A receipts import names its warehouse and payment before the file (ADR-0078 #7).
+  const [options, setOptions] = useState<Partial<ReceiptImportOptions>>({
+    paymentMethod: 'CREDIT',
+    moneyAccountId: null,
+  });
+  const receiptOptions =
+    kind === 'RECEIPTS' &&
+    options.warehouseId !== undefined &&
+    options.paymentMethod !== undefined &&
+    (options.paymentMethod === 'CREDIT' || options.moneyAccountId)
+      ? {
+          warehouseId: options.warehouseId,
+          paymentMethod: options.paymentMethod,
+          moneyAccountId:
+            options.paymentMethod === 'CREDIT' ? null : (options.moneyAccountId ?? null),
+        }
+      : undefined;
+  // An issues import names its warehouse before the file (ADR-0081).
+  const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
+  const issueOptions =
+    kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
+  const ready =
+    (kind !== 'RECEIPTS' || receiptOptions !== undefined) &&
+    (kind !== 'ISSUES' || issueOptions !== undefined);
 
   const download = () =>
     void action.run(async () => {
@@ -160,7 +189,14 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         return;
       }
       setWrongType(false);
-      const job = await mutations.create.mutateAsync({ kind, file, key });
+      if (!ready) return;
+      const job = await mutations.create.mutateAsync({
+        kind,
+        file,
+        key,
+        receiptOptions,
+        issueOptions,
+      });
       setKey(randomUuid());
       await navigate(`/imports/${job.id}`);
     });
@@ -173,6 +209,10 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         <p className="text-[13px] text-muted-foreground">{t(`imports.kindHints.${kind}`)}</p>
+        {kind === 'RECEIPTS' ? <ReceiptImportFields value={options} onChange={setOptions} /> : null}
+        {kind === 'ISSUES' ? (
+          <IssueImportFields value={issueWarehouse} onChange={setIssueWarehouse} />
+        ) : null}
         {wrongType ? (
           <p role="alert" className="text-[13px] text-destructive">
             {t('imports.xlsxOnly')}
@@ -184,7 +224,7 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
           <Button
             variant="secondary"
             size="sm"
-            disabled={mutations.create.isPending}
+            disabled={mutations.create.isPending || !ready}
             onClick={() => input.current?.click()}
           >
             <Upload />
@@ -214,6 +254,89 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** The warehouse and the payment of the delivery notes a receipts import brings (ADR-0078 #7). */
+function ReceiptImportFields(props: {
+  value: Partial<ReceiptImportOptions>;
+  onChange: (value: Partial<ReceiptImportOptions>) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouses = (useWarehouses().data ?? []).filter(
+    (warehouse) => warehouse.kind === 'WHOLESALE' && warehouse.status === 'ACTIVE',
+  );
+  const method = props.value.paymentMethod ?? 'CREDIT';
+  const accounts = useReceiptPaymentAccounts(method !== 'CREDIT');
+  const choices = (accounts.data ?? []).filter((account) => account.kind === method);
+  return (
+    <div className="grid gap-2">
+      <WarehouseSelect
+        label={t('imports.receiptOptions.warehouse')}
+        options={warehouses}
+        value={props.value.warehouseId}
+        emptyLabel={t('imports.receiptOptions.pickWarehouse')}
+        onChange={(warehouseId) => props.onChange({ ...props.value, warehouseId })}
+      />
+      <NativeSelect
+        aria-label={t('imports.receiptOptions.payment')}
+        value={method}
+        onChange={(event) =>
+          props.onChange({
+            ...props.value,
+            paymentMethod: event.target.value as ReceiptImportOptions['paymentMethod'],
+            moneyAccountId: null,
+          })
+        }
+      >
+        {(['CREDIT', 'CASH', 'BANK'] as const).map((value) => (
+          <option key={value} value={value}>
+            {t(`imports.receiptOptions.methods.${value}`)}
+          </option>
+        ))}
+      </NativeSelect>
+      {method === 'CREDIT' ? null : (
+        <NativeSelect
+          aria-label={t('imports.receiptOptions.account')}
+          value={props.value.moneyAccountId ?? ''}
+          onChange={(event) =>
+            props.onChange({
+              ...props.value,
+              moneyAccountId: event.target.value ? Number.parseInt(event.target.value, 10) : null,
+            })
+          }
+        >
+          <option value="">{t('imports.receiptOptions.pickAccount')}</option>
+          {choices.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
+    </div>
+  );
+}
+
+/** The warehouse or store the goods issues of an import leave (ADR-0081). */
+function IssueImportFields(props: {
+  value: number | undefined;
+  onChange: (warehouseId: number | undefined) => void;
+}) {
+  const { t } = useTranslation();
+  const warehouses = (useWarehouses().data ?? []).filter(
+    (warehouse) =>
+      (warehouse.kind === 'WHOLESALE' || warehouse.kind === 'STORE') &&
+      warehouse.status === 'ACTIVE',
+  );
+  return (
+    <WarehouseSelect
+      label={t('imports.issueOptions.warehouse')}
+      options={warehouses}
+      value={props.value}
+      emptyLabel={t('imports.issueOptions.pickWarehouse')}
+      onChange={props.onChange}
+    />
   );
 }
 

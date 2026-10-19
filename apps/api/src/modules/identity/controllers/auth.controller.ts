@@ -17,7 +17,8 @@ import {
 } from '../dto/auth.dto';
 import { requestIdOf } from '../guards/auth.guard';
 import { AccessService } from '../services/access.service';
-import { AuthService, type ClientInfo, type IssuedSession } from '../services/auth.service';
+import { AuthService, type IssuedSession } from '../services/auth.service';
+import { clientOf, loginResponseOf, toAccessToken, toMe } from './auth-responses';
 
 /** The value of one cookie from the raw header; the refresh cookie needs no full parser. */
 export function readCookie(header: string | undefined, name: string): string | undefined {
@@ -26,16 +27,6 @@ export function readCookie(header: string | undefined, name: string): string | u
     if (index > 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
   }
   return undefined;
-}
-
-function clientOf(request: Request): ClientInfo {
-  const requestId = requestIdOf(request);
-  const userAgent = request.headers['user-agent'];
-  return {
-    ip: request.ip ?? null,
-    userAgent: typeof userAgent === 'string' && userAgent ? userAgent.slice(0, 300) : null,
-    ...(requestId ? { requestId } : {}),
-  };
 }
 
 /** Cookie-authenticated routes accept only requests whose Origin matches the Host (CSRF). */
@@ -75,7 +66,7 @@ export class AuthController {
   ): Promise<LoginResponseDto> {
     const issued = await this.auth.login(body, clientOf(request));
     this.setRefreshCookie(response, issued);
-    return this.loginResponse(issued, requestIdOf(request));
+    return loginResponseOf(this.access, issued, requestIdOf(request));
   }
 
   @Public()
@@ -135,7 +126,7 @@ export class AuthController {
   async me(@CurrentUser() user: AuthContext, @Req() request: Request): Promise<MeDto> {
     const resolved = await this.access.resolve(user.userId, user.sessionId, requestIdOf(request));
     if (!resolved) throw new AppError('UNAUTHORIZED', 'session is not active');
-    return this.toMe(resolved, resolved.sessionExpiresAt);
+    return toMe(this.access, resolved);
   }
 
   @Authenticated()
@@ -163,31 +154,7 @@ export class AuthController {
   ): Promise<LoginResponseDto> {
     const issued = await this.auth.setupPassword(body, clientOf(request));
     this.setRefreshCookie(response, issued);
-    return this.loginResponse(issued, requestIdOf(request));
-  }
-
-  private async loginResponse(
-    issued: IssuedSession,
-    requestId?: string,
-  ): Promise<LoginResponseDto> {
-    const resolved = await this.access.resolve(issued.userId, issued.sessionId, requestId);
-    if (!resolved) throw new Error('a session issued a moment ago is not active');
-    return { ...toAccessToken(issued), me: await this.toMe(resolved, issued.sessionExpiresAt) };
-  }
-
-  private async toMe(ctx: AuthContext, sessionExpiresAt: Date): Promise<MeDto> {
-    return {
-      id: ctx.userId,
-      username: ctx.username,
-      fullName: ctx.fullName,
-      permissions: [...ctx.permissions].sort(),
-      roles: await this.access.roleRefs(ctx.roleIds),
-      writableWarehouseIds:
-        ctx.writableWarehouseIds === null
-          ? null
-          : [...ctx.writableWarehouseIds].sort((a, b) => a - b),
-      sessionExpiresAt: sessionExpiresAt.toISOString(),
-    };
+    return loginResponseOf(this.access, issued, requestIdOf(request));
   }
 
   private setRefreshCookie(response: Response, issued: IssuedSession): void {
@@ -209,12 +176,4 @@ export class AuthController {
       path: REFRESH_COOKIE_PATH,
     });
   }
-}
-
-function toAccessToken(issued: IssuedSession): AccessTokenDto {
-  return {
-    accessToken: issued.accessToken,
-    accessTokenExpiresAt: issued.accessTokenExpiresAt.toISOString(),
-    sessionExpiresAt: issued.sessionExpiresAt.toISOString(),
-  };
 }

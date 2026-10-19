@@ -24,6 +24,7 @@ import { stockLedger, stockValuationAdjustments } from '../ledger.schema';
 import {
   adjustments,
   binMoves,
+  goodsIssues,
   bins,
   goodsReceipts,
   reconciliationRuns,
@@ -34,7 +35,7 @@ import {
 import { advisoryLock, LOCKS } from './support';
 
 /** Inventory's own stock documents; other modules guard their documents themselves (ADR-0034 #5). */
-export type PostedDocType = Extract<StockDocType, 'GR' | 'BM' | 'TR' | 'ADJ' | 'ST'>;
+export type PostedDocType = Extract<StockDocType, 'GR' | 'BM' | 'TR' | 'ADJ' | 'ST' | 'GI'>;
 
 export interface PostingDoc {
   docType: PostedDocType;
@@ -155,6 +156,8 @@ export interface CostedLine {
   lotId?: number | null;
   qtyBase: Decimal;
   amount: Decimal;
+  /** What was typed, VAT included (ADR-0078); null for a costing that typed only the cost. */
+  docAmount?: Decimal | null;
   freeGoods: boolean;
 }
 
@@ -162,6 +165,7 @@ export interface Valuation {
   docLineId: number;
   version: number;
   amount: Decimal;
+  docAmount: Decimal | null;
   freeGoods: boolean;
   valueBefore: Decimal;
   valueDelta: Decimal;
@@ -263,6 +267,7 @@ const DOC_ORDER: Record<PostedDocType | ExternalDocType, number> = {
   SO: 6,
   CN: 7,
   POS: 8,
+  GI: 9,
 };
 const MAX_DIFFS = 100;
 /** Rows per multi-row statement: far below the 65,535 bind parameters of one statement. */
@@ -575,6 +580,7 @@ export class StockPostingService {
           docLineId: line.docLineId,
           version: input.version,
           amount: line.amount,
+          docAmount: line.docAmount ?? null,
           freeGoods: line.freeGoods,
           valueBefore: before.get(line.docLineId) ?? ZERO,
           valueDelta: lineDelta,
@@ -611,6 +617,7 @@ export class StockPostingService {
           qtyBase: line.qtyBase,
           freeGoods: line.freeGoods,
           amount: result.amount,
+          docAmount: result.docAmount,
           valueBefore: result.valueBefore,
           valueDelta: result.valueDelta,
           onHandAt: balance?.onHand ?? ZERO,
@@ -644,6 +651,7 @@ export class StockPostingService {
         docLineId: row.docLineId,
         version: row.version,
         amount: row.amount,
+        docAmount: row.docAmount,
         freeGoods: row.freeGoods,
         valueBefore: row.valueBefore,
         valueDelta: row.valueDelta,
@@ -716,6 +724,7 @@ export class StockPostingService {
           WHEN 'SO' THEN (SELECT d.number FROM sales_orders d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'CN' THEN (SELECT d.number FROM credit_notes d WHERE d.id = "stock_ledger"."doc_id")
           WHEN 'POS' THEN (SELECT d.number FROM pos_sales d WHERE d.id = "stock_ledger"."doc_id")
+          WHEN 'GI' THEN (SELECT d.number FROM goods_issues d WHERE d.id = "stock_ledger"."doc_id")
         END`,
         enteredQty: stockLedger.enteredQty,
         productUnitId: stockLedger.productUnitId,
@@ -1084,6 +1093,14 @@ export class StockPostingService {
           .for('update');
         return row?.status;
       }
+      case 'GI': {
+        const [row] = await tx
+          .select({ status: goodsIssues.status })
+          .from(goodsIssues)
+          .where(eq(goodsIssues.id, doc.docId))
+          .for('update');
+        return row?.status;
+      }
       case 'TR': {
         const [row] = await tx
           .select({ status: transfers.status })
@@ -1134,6 +1151,12 @@ export class StockPostingService {
           .update(stocktakes)
           .set({ ...common, status: 'APPROVED' })
           .where(eq(stocktakes.id, doc.docId));
+        return;
+      case 'GI':
+        await tx
+          .update(goodsIssues)
+          .set({ ...common, status: 'POSTED' })
+          .where(eq(goodsIssues.id, doc.docId));
         return;
     }
   }

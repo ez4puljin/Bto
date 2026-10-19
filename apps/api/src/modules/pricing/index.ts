@@ -29,6 +29,7 @@ export {
   ProductPricesService,
   type ProductPriceView,
   type SetTermsInput,
+  type ShopPrices,
   type TermsInForce,
   type TermsRestore,
   type TermsSnapshot,

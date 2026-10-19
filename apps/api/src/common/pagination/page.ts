@@ -51,8 +51,13 @@ export function decodeCursor(cursor: string | undefined): Record<string, unknown
   } catch {
     // reported below
   }
+  throw invalidCursor();
+}
+
+/** 422 VALIDATION_FAILED at `cursor`: not one of ours, or made for another sort. */
+export function invalidCursor(): AppError {
   const message = 'cursor is not valid';
-  throw new AppError('VALIDATION_FAILED', message, undefined, [
+  return new AppError('VALIDATION_FAILED', message, undefined, [
     { path: 'cursor', constraint: 'isCursor', message },
   ]);
 }

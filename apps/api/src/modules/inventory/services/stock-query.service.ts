@@ -480,6 +480,23 @@ export class StockQueryService {
     return this.balances(productIds);
   }
 
+  /**
+   * The products with stock available in their home warehouse, ascending: sellable on hand, lots
+   * summed, less what is reserved, as `balances()` counts it — the rep app's «in stock» filter,
+   * the same quantity its shop shows (ADR-0068).
+   */
+  async productIdsAvailableAtHome(executor: Db | Tx = this.db): Promise<number[]> {
+    const result = await executor.execute<{ product_id: string }>(sql`
+      SELECT ws.product_id::text AS product_id
+        FROM warehouse_stock ws
+        JOIN product_locations l
+          ON l.product_id = ws.product_id AND l.warehouse_id = ws.warehouse_id AND l.is_home
+       GROUP BY ws.product_id
+      HAVING sum(ws.sellable_on_hand) - sum(ws.reserved) > 0
+       ORDER BY ws.product_id`);
+    return result.rows.map((row) => Number.parseInt(row.product_id, 10));
+  }
+
   /** Warehouse balances per product, lots summed; the value is Σ on hand × average per row. */
   private async balances(
     productIds: readonly number[],

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Permission } from '@tugeel/shared/auth';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
+import { escapeLike } from '../../../common/db/like';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { rolePermissions, userRoles, users } from '../schema';
@@ -28,6 +29,26 @@ export class UserNamesService {
       .from(users)
       .where(inArray(users.id, ids));
     return new Map(rows.map((row) => [row.id, row.fullName]));
+  }
+
+  /**
+   * Active staff by name or login, for pickers anyone signed in may use (a goods issue's
+   * recipient, ADR-0081 #6): id and full name only.
+   */
+  async search(q: string, limit = 20): Promise<{ id: number; fullName: string }[]> {
+    const text = q.trim();
+    const pattern = `%${escapeLike(text)}%`;
+    return this.db
+      .select({ id: users.id, fullName: users.fullName })
+      .from(users)
+      .where(
+        and(
+          eq(users.status, 'ACTIVE'),
+          text ? or(ilike(users.fullName, pattern), ilike(users.username, pattern)) : undefined,
+        ),
+      )
+      .orderBy(asc(users.fullName), asc(users.id))
+      .limit(limit);
   }
 
   /** Name, login and status by id, for modules that keep a list of staff (the POS cashiers). */

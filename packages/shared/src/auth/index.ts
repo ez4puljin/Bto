@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   'inventory.stocktakes.approve',
   'inventory.costs.manage',
   'inventory.transfers.manage',
+  'inventory.issues.manage',
   'imports.manage',
   'pricing.manage',
   'pricing.prices.manage',
@@ -46,6 +47,8 @@ export const PERMISSIONS = [
   // Boards and stages (ADR-0056): configuring them; confirming picked counts.
   'sales.boards.manage',
   'sales.orders.pick',
+  // The sales-rep app (ADR-0061 #5): the rep's own orders only, through /sales-rep/*.
+  'sales.orders.rep',
   // Finance (ADR-0060): reading invoices, balances and books; recording money; voiding invoices
   // and crediting returns; manual journal entries and accounts; numbering, money accounts, roles.
   'finance.read',
@@ -59,6 +62,8 @@ export const PERMISSIONS = [
   'pos.manage',
   'pos.till.operate',
   'pos.till.supervise',
+  // App notices (ADR-0062 #5): writing, listing and withdrawing the notices the rep app shows.
+  'notifications.send',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -119,6 +124,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'inventory.adjustments.manage',
     'inventory.stocktakes.manage',
     'inventory.transfers.manage',
+    'inventory.issues.manage',
     'sales.orders.read',
     'sales.orders.pick',
   ],
@@ -151,7 +157,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'pos.till.supervise',
     'pos.read',
   ],
-  SALES_REP: [],
+  // The rep app only (ADR-0061 #5): not sales.orders.read/manage (other orders), not
+  // partners.customers.read (credit data); /sales-rep/* serves what an order needs.
+  SALES_REP: ['sales.orders.rep'],
   DRIVER: [],
 };
 

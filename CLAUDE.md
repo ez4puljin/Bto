@@ -1,11 +1,11 @@
 # Tugeel (Түгээл) — agent contract
 
 Tugeel is an in-house ERP for the wholesale distribution of Бүтэн-Оргил ХХК (the owner named the main branch «Оргил Бөөний төв» in Mörön, Khövsgöl, and the branch «Боломж бөөний төв» in Kharkhorin, Övörkhangai, on 2026-10-13; older documents assume one centre in Ulaanbaatar — STATUS pending #23): product catalog with multi-unit barcodes,
-multi-warehouse stock with bins on an append-only ledger, customer orders (web, customer app, sales reps), picking,
-zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, QPay
-payments, mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
+multi-warehouse stock with bins on an append-only ledger, customer orders (web, the customer app «Bto300» — ADR-0079, sales reps), picking,
+zone-based delivery by company drivers (pre-packed orders only, no van sales), receivables with credit control, cash and
+bank-transfer payments (no QPay, ADR-0080), mandatory e-Barimt receipts, one supermarket branch with a POS and a bank card terminal, procurement,
 reporting, an AI assistant answering questions from the company's own data (ADR-0045), HR/payroll. One owner-developer builds it with Claude Code, one module per session, and maintains it alone. Development is local-only: every delivery is accepted on the owner's machine and production is deployed once, after the last delivery (ADR-0026).
-Finance is being carved into the **Finance Core** (decided 2026-10-18, ADR-0069 … ADR-0077; nothing built yet): one finance engine for several of the owner's systems, Bto being its first source system and a resort PMS (a separate company and repository) the next; its books replace Erkhet on the go-live day (`docs/modules/finance-core.md`).
+Finance is being carved into the **Finance Core** (decided 2026-10-18, ADR-0069 … ADR-0077; the P0b scaffold built the same day, no tables yet): one finance engine for several of the owner's systems, Bto being its first source system and a resort PMS (a separate company and repository) the next; its books replace Erkhet on the go-live day (`docs/modules/finance-core.md`).
 Repo `tugeel`, packages `@tugeel/*`. On screen the system is called **Bto** (Бүтэн-Оргил ХХК's internal system, owner 2026-10-13, ADR-0042 #11); code names stay `tugeel`. UI is Mongolian only; code, schema, API and every document except `docs/SPEC.md` are English.
 
 ## Start of every session
@@ -37,12 +37,12 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | jest, ts-jest, supertest | 30.5.2, 29.4.14, 7.3.1 | Jest always via `apps/api/scripts/jest.cjs` (`--experimental-vm-modules`) |
 | eslint, typescript-eslint, eslint-plugin-boundaries | 10.12.0, 8.71.1, 7.2.0 | |
 | vite, @vitejs/plugin-react, vitest | 8.3.4, 6.1.2, 5.0.3 | |
-| react, react-router, @tanstack/react-query | 19.3.0, 7.18.4, 5.104.1 | v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
+| react, react-dom, react-router, @tanstack/react-query | 19.2.3, 19.2.3, 7.18.4, 5.104.1 | ONE React workspace-wide, the Expo SDK's (ADR-0061; a test fails on a second copy); v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
 | i18next, react-i18next, @fontsource-variable/inter | 26.4.2, 17.0.16, 5.3.0 | Inter is the web font (ADR-0042); PDFs embed Noto Sans (ADR-0011) |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |
-| Expo SDK | the stable SDK at delivery-4 kickoff; pinned then in `docs/modules/mobile.md` | |
+| Expo SDK | 57 (expo 57.0.28, react-native 0.86.3, expo-router 57.0.26; 2026-10-15, ADR-0061), `docs/modules/mobile.md` | APK built on the owner's PC: JDK 17 and Android SDK 36, NDK 27.1.12297006, CMake 3.22.1 in `C:\Android` (no spaces) |
 | argon2, @nestjs/jwt | 0.45.1 (`allowBuilds: argon2: true`, prebuilt binaries), 12.0.2 | identity (ADR-0027); no passport |
 | react-hook-form, @hookform/resolvers, @testing-library/user-event | 7.89.0, 5.9.1, 14.6.7 | web forms with zod from the catalog |
 | barcode-detector, zxing-wasm | 3.2.2, 3.1.3 | web camera fallback; `zxing-wasm` = the exact version `barcode-detector` declares, `.wasm` served from our build (ADR-0031) |
@@ -74,6 +74,7 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `pnpm gen:api` | export OpenAPI from the api build and regenerate `packages/api-client`; commit the result |
 | `pnpm ui:shots -- --out tmp/ui-shots/<name> [--only <regex>]` | with `pnpm dev` running: pictures of every route at 1366×633, 1536×730 and 1920×969 in a headless Chrome or Edge, with layout measurements and a gallery (ADR-0066); signs in with a dev login from a gitignored file (`--logins`), never printed |
 | `pnpm ci:rehearse` / `pnpm docker:build` | run the CI check job in Linux Docker against HEAD / build both images |
+| `pnpm mobile:apk` | the staff app's release APK, built on this PC (JDK 17 and the Android SDK in `C:\Android`, a robocopy mirror in `C:\Android\m`; ~10 min, never while `pnpm check` runs); `BTO_SERVER=http://<LAN address>:<port>` sets the server the app starts with; the APK lands in `apps/mobile/build/apk/` (ADR-0061, `docs/modules/mobile.md` §9) |
 
 **`pnpm check` green is the definition of done.** CI runs the same command with a `postgres:18` service; nothing merges red. `apps/api/.env` comes from `apps/api/.env.example` (gitignored).
 
@@ -110,9 +111,10 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 - Build a business date with `new Date().toISOString().slice(0, 10)` or any UTC date; use dayjs in Asia/Ulaanbaatar.
 - Write literal Cyrillic in `.tsx` (i18n keys only); hard-code VAT or city-tax rates.
 - Write `stock_ledger` outside `StockPostingService`, or write another module's tables.
-- Make an HTTP call (PosAPI, QPay, SMS, push) while a DB transaction is open; blind-retry a timed-out PosAPI call.
+- Make an HTTP call (PosAPI, push, an LLM) while a DB transaction is open; blind-retry a timed-out PosAPI call.
 - Persist or log e-Barimt `lottery` / `qrData` anywhere (DB, logs, Sentry, `ebarimt_submission_log`, fixtures) — the single exception is the rendered receipt bitmap in `print_jobs.payload`, nulled on ack and expired after 10 min (ADR-0022).
-- Mark a payment paid from a callback body; only `payment/check`, a cash session or a statement match records a payment.
+- Mark a payment paid from a customer's word or any callback; only the accountant's voucher, a cash session, a till tender or a statement match records a payment (no QPay, ADR-0080).
+- Take a customer id from the client on a customer-app route; a customer token reads only its own store (ADR-0079).
 - Install `typescript@7` or a second TypeScript version; upgrade a major dependency inside a delivery session.
 - Skip, weaken or retry the integrity suite; add `jest.retryTimes` or any retry to CI.
 - Commit secrets or `.env*` files (only `.env.example`); paste credentials into docs or code.
@@ -130,6 +132,6 @@ DB pool budget (env `DB_POOL_MAX` / `PGBOSS_POOL_MAX` / `AI_POOL_MAX`): producti
 | `docs/modules/<module>.md` | the module's contract (owned tables, public services, invariants, status); created with the module |
 | `docs/modules/finance-core.md` | before any finance work: the planned Finance Core (data model, intake contract, phases, tests, the accountant's open questions) |
 | `docs/ui.md` | before building or changing a screen: tokens, building blocks, page patterns, do/don't, test notes (ADR-0042) |
-| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt / QPay outages (written from delivery 1 on) |
+| `deploy/runbook.md`, `deploy/ebarimt-box/`, `docs/runbooks/` | deploy, rollback, restore, secret rotation, Tailscale pattern, mini-PC setup, e-Barimt outages (written from delivery 1 on) |
 
 `CLAUDE.local.md` is gitignored and holds personal settings (local paths, tailnet addresses, preferences); it never overrides the rules in this file.

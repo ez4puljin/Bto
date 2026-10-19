@@ -33,6 +33,13 @@ export const FILE_KINDS = {
     visibility: 'public',
     permissions: ['catalog.products.manage', 'catalog.products.register'],
   },
+  /** The picture of an app notice (ADR-0062 #1), resized in the browser like product photos. */
+  'notifications.notice_image': {
+    contentTypes: IMAGE_TYPES,
+    maxBytes: 1024 * 1024,
+    visibility: 'public',
+    permissions: ['notifications.send'],
+  },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {
     contentTypes: [XLSX_CONTENT_TYPE],

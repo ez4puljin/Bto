@@ -37,6 +37,7 @@ type Fields = Partial<{
   bankName: string | null;
   bankAccount: string | null;
   paymentTermDays: number | null;
+  vatPayer: boolean;
   note: string | null;
   status: 'ACTIVE' | 'INACTIVE';
 }>;
@@ -283,6 +284,15 @@ export class SuppliersImporter implements Importer<SupplierPlan> {
       if (read.ok) paymentTermDays = read.value;
       else check.error('paymentTermDays', read.code);
     }
+    // A VAT payer (ADR-0078): «Тийм» / «Үгүй» (also yes / no, 1 / 0); empty keeps it.
+    const vatText = check.text('vatPayer');
+    let vatPayer: boolean | undefined;
+    if (vatText !== null) {
+      const word = vatText.trim().toLowerCase();
+      if (['тийм', 'yes', 'y', '1', 'x', 'true'].includes(word)) vatPayer = true;
+      else if (['үгүй', 'no', 'n', '0', 'false'].includes(word)) vatPayer = false;
+      else check.error('vatPayer', 'FORMAT');
+    }
     const note = check.text('note') ?? undefined;
     if (note !== undefined && note.length > 1_000) check.error('note', 'TOO_LONG');
     return {
@@ -294,6 +304,7 @@ export class SuppliersImporter implements Importer<SupplierPlan> {
       bankName,
       bankAccount,
       paymentTermDays,
+      vatPayer,
       note,
     };
   }
