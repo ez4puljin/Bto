@@ -95,7 +95,7 @@ export interface SaleSink {
     tx: Tx,
     actor: Actor,
     snapshot: SaleSnapshot,
-  ): Promise<{ invoiceId: number; number: string } | null>;
+  ): Promise<{ invoiceId: number; number: string; total: Decimal } | null>;
 }
 
 export const SALE_SINK = Symbol('SALE_SINK');
@@ -114,7 +114,10 @@ export interface SaleNotice {
   /** The total frozen at the submit, whole MNT; null when the order was never priced. */
   orderTotal: string | null;
   /** The invoice the sale issued; null without finance or when nothing was delivered. */
+  invoiceId: number | null;
   invoiceNumber: string | null;
+  /** The invoice's total, whole MNT strings as `orderTotal` (ADR-0079 #8: the amount sold). */
+  invoiceTotal: string | null;
 }
 
 export interface SaleListener {
@@ -123,3 +126,49 @@ export interface SaleListener {
 }
 
 export const SALE_LISTENER = Symbol('SALE_LISTENER');
+
+/** A backordered line of a confirmed order, in the line's unit when it divides, else base units. */
+export interface BackorderedLine {
+  productId: number;
+  name: string;
+  qty: string;
+  unitName: string;
+}
+
+/**
+ * An order confirmed (the submit, ADR-0055), told by value inside its transaction after the
+ * reservations (ADR-0079 #8): the store learns what was confirmed and what waits.
+ */
+export interface OrderConfirmedNotice {
+  orderId: number;
+  orderNumber: string;
+  channel: OrderChannel;
+  createdBy: number | null;
+  customerId: number;
+  /** The total frozen at the submit, whole MNT. */
+  orderTotal: string;
+  /** How many lines wait for stock, and the first few of them. */
+  backorderedLines: number;
+  backordered: BackorderedLine[];
+}
+
+/** An order cancelled with its reason, told inside the cancel's transaction (ADR-0079 #8). */
+export interface OrderCancelledNotice {
+  orderId: number;
+  orderNumber: string;
+  channel: OrderChannel;
+  createdBy: number | null;
+  customerId: number;
+  reason: string;
+}
+
+/**
+ * Confirmations and cancellations told to whoever listens (notifications binds it for the
+ * customer app); one statement each in the caller's transaction, never caught (25P02).
+ */
+export interface OrderListener {
+  onConfirmed(tx: Tx, notice: OrderConfirmedNotice): Promise<void>;
+  onCancelled(tx: Tx, notice: OrderCancelledNotice): Promise<void>;
+}
+
+export const ORDER_LISTENER = Symbol('ORDER_LISTENER');

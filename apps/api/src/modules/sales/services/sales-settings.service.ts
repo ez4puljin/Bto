@@ -133,7 +133,10 @@ export class SalesSettingsService {
         await tx.delete(salesChannelDefaults).where(eq(salesChannelDefaults.channel, channel));
       } else {
         const [pipeline] = await tx
-          .select({ archivedAt: salesPipelines.archivedAt })
+          .select({
+            archivedAt: salesPipelines.archivedAt,
+            ownOrdersOnly: salesPipelines.ownOrdersOnly,
+          })
           .from(salesPipelines)
           .where(eq(salesPipelines.id, target.pipelineId))
           .for('share');
@@ -141,7 +144,7 @@ export class SalesSettingsService {
           throw invalid('pipelineId', 'live', 'a live pipeline');
         }
         const [stage] = await tx
-          .select({ archivedAt: salesStages.archivedAt })
+          .select({ archivedAt: salesStages.archivedAt, action: salesStages.action })
           .from(salesStages)
           .where(
             and(eq(salesStages.id, target.stageId), eq(salesStages.pipelineId, target.pipelineId)),
@@ -149,6 +152,11 @@ export class SalesSettingsService {
           .for('share');
         if (!stage || stage.archivedAt) {
           throw invalid('stageId', 'ofPipeline', 'a live stage of the pipeline');
+        }
+        // App orders wait for the office (ADR-0079 #5): a stage without an action, in a pipeline
+        // where the office sees them (they have no author an own-orders-only pipeline could show).
+        if (channel === 'CUSTOMER_APP' && (stage.action !== 'NONE' || pipeline.ownOrdersOnly)) {
+          throw invalid('stageId', 'customerAppStage', 'a stage without an action, seen by all');
         }
         await tx
           .insert(salesChannelDefaults)

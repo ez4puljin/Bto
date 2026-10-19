@@ -124,6 +124,9 @@
       },
       "suppliers": {
         "manage": "Нийлүүлэгч бүртгэх, засах"
+      },
+      "customer_app": {
+        "manage": "Харилцагчийн апп"
       }
     },
     "inventory": {
@@ -268,7 +271,8 @@
         "city_tax_payer": "Компани НХАТ төлөгч"
       },
       "auth": {
-        "staff_session_hours": "Ажилтны нэвтрэлтийн хугацаа (цаг)"
+        "staff_session_hours": "Ажилтны нэвтрэлтийн хугацаа (цаг)",
+        "customer_session_days": "Харилцагчийн аппын сесс дуусах хугацаа (ашиглаагүй хоног)"
       },
       "credit": {
         "payment_term_days": "Зээлийн төлбөрийн хугацаа (хоног)"
@@ -581,7 +585,9 @@
       "pos_sales": "Кассын борлуулалт",
       "pos_shortfalls": "Үлдэгдлийн зөрүү",
       "pos_sync_rejections": "Касс серверийн татгалзсан баримт",
-      "app_notices": "Апп мэдэгдэл"
+      "app_notices": "Апп мэдэгдэл",
+      "customer_users": "Харилцагчийн аппын данс",
+      "company_contacts": "Холбоо барих жагсаалт"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -620,7 +626,10 @@
       "COMPLETE": "Бүрэн болгосон",
       "ADD_PRODUCTS": "Бараа нэмсэн",
       "REMOVE_PRODUCTS": "Бараа хассан",
-      "WITHDRAW": "Буцаасан"
+      "WITHDRAW": "Буцаасан",
+      "PHONE_CHANGE": "Утас солив",
+      "DISABLE": "Хаав",
+      "ENABLE": "Нээв"
     }
   },
   "errors": {
@@ -748,7 +757,8 @@
     "POS_CASHIER_LOCKED": "PIN олон удаа буруу оруулсан тул түр түгжигдлээ",
     "POS_SESSION_EXPIRED": "Нэвтрэлтийн хугацаа дууссан, дахин PIN оруулна уу",
     "POS_SNAPSHOT_MISSING": "Касс сервер төвөөс барааны мэдээлэл хараахан аваагүй байна",
-    "EXPENSE_TYPE_INACTIVE": "Энэ зардлын төрөл идэвхгүй болсон байна"
+    "EXPENSE_TYPE_INACTIVE": "Энэ зардлын төрөл идэвхгүй болсон байна",
+    "CUSTOMER_APP_CLOSED": "Захиалга хүлээн авах тохиргоо хийгдээгүй байна"
   },
   "catalog": {
     "products": {
@@ -3432,6 +3442,19 @@
       "description": "Харилцагчаа сонгоход ноорог дугаартайгаа үүсээд захиалгын цонх нээгдэнэ. Бараагаа тэнд нэмнэ.",
       "create": "Үүсгэх",
       "customerRequired": "Харилцагч сонгоно уу"
+    },
+    "customerStates": {
+      "PENDING": "Хүлээгдэж буй",
+      "CONFIRMED": "Батлагдсан",
+      "PREPARING": "Бэлтгэж буй",
+      "READY": "Бэлэн",
+      "DELIVERED": "Хүргэгдсэн",
+      "CANCELLED": "Цуцлагдсан"
+    },
+    "stockWords": {
+      "IN": "Байгаа",
+      "LOW": "Цөөхөн үлдсэн",
+      "OUT": "Дууссан"
     }
   },
   "finance": {
@@ -4831,6 +4854,18 @@
       "close": "Хаах",
       "placeholderTitle": "Гарчиг энд харагдана",
       "placeholderBody": "Мэдэгдлийн текст энд харагдана"
+    },
+    "audiences": {
+      "SALES_REPS": "Борлуулалтын төлөөлөгчид",
+      "CUSTOMERS": "Харилцагчид (Bto300)"
+    },
+    "customerKinds": {
+      "ORDER_CONFIRMED": "Захиалга батлагдлаа",
+      "ORDER_CANCELLED": "Захиалга цуцлагдлаа",
+      "ORDER_SOLD": "Захиалга борлуулалт боллоо",
+      "PAYMENT_RECORDED": "Төлбөр бүртгэгдлээ",
+      "INVOICE_DUE_SOON": "Нэхэмжлэхийн хугацаа дуусах гэж байна",
+      "INVOICE_OVERDUE": "Нэхэмжлэхийн хугацаа хэтэрлээ"
     }
   }
 }

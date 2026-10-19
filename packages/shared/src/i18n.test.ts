@@ -5,7 +5,12 @@ import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
 import { ADJUSTMENT_REASON_CODES } from './inventory';
-import { NOTICE_KINDS, NOTICE_STATES } from './notifications';
+import {
+  CUSTOMER_NOTIFICATION_KINDS,
+  NOTICE_AUDIENCES,
+  NOTICE_KINDS,
+  NOTICE_STATES,
+} from './notifications';
 import { PRICE_BASES, PRICE_ROUNDINGS } from './pricing';
 import {
   PRODUCT_MISSING,
@@ -15,6 +20,7 @@ import {
   SEGMENT_MATCHES,
   SEGMENT_OPERATORS,
 } from './segments';
+import { CUSTOMER_ORDER_STATES, STOCK_WORDS } from './sales';
 import { SETTING_KEYS } from './settings';
 
 function lookup(path: string): unknown {
@@ -82,6 +88,10 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   it.each([
     ...NOTICE_KINDS.map((kind) => `notifications.kinds.${kind}`),
     ...NOTICE_STATES.map((state) => `notifications.states.${state}`),
+    ...NOTICE_AUDIENCES.map((audience) => `notifications.audiences.${audience}`),
+    ...CUSTOMER_NOTIFICATION_KINDS.map((kind) => `notifications.customerKinds.${kind}`),
+    ...CUSTOMER_ORDER_STATES.map((state) => `sales.customerStates.${state}`),
+    ...STOCK_WORDS.map((word) => `sales.stockWords.${word}`),
   ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });

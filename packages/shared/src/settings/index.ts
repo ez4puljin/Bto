@@ -15,6 +15,11 @@ export const SETTINGS = {
   /** Lifetime of a staff login in hours, counted from the login (owner answer 2026-10-10). */
   'auth.staff_session_hours': { kind: 'integer', min: 1, max: 168, default: 12 },
   /**
+   * Days a customer app session lives without use (ADR-0079 #3: until sign-out or this many days
+   * since the last refresh; Claude's default 90).
+   */
+  'auth.customer_session_days': { kind: 'integer', min: 1, max: 365, default: 90 },
+  /**
    * Days a customer has to pay an invoice, the same for everyone unless a customer has its own
    * (owner answers 2026-10-11 and 2026-10-16: 30 days, ADR-0060 #2).
    */

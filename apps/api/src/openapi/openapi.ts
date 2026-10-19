@@ -12,6 +12,8 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
     .setTitle('Tugeel API')
     .setVersion('1.0.0')
     .addBearerAuth()
+    // The customer app's routes (ADR-0079 #3): a separate scheme, so a staff token never fits one.
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'customer')
     .addGlobalResponse({
       status: 'default',
       description: 'RFC 9457 problem details',

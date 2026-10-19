@@ -54,7 +54,7 @@ export class InvoicingService implements SaleSink {
     tx: Tx,
     actor: Actor,
     snapshot: SaleSnapshot,
-  ): Promise<{ invoiceId: number; number: string } | null> {
+  ): Promise<{ invoiceId: number; number: string; total: Decimal } | null> {
     const today = businessDate();
     const company = await this.tax.companyRates(today, tx);
     const lines: NewLine[] = [];
@@ -154,7 +154,7 @@ export class InvoicingService implements SaleSink {
         dueDate,
       },
     });
-    return { invoiceId: invoice.id, number };
+    return { invoiceId: invoice.id, number, total: totals.total };
   }
 
   /**

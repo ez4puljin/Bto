@@ -18,6 +18,7 @@ import { type SQL, sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -99,6 +100,8 @@ export const moneyAccounts = pgTable(
     glAccountId: ref('gl_account_id')
       .notNull()
       .references(() => glAccounts.id),
+    /** «Харилцагчид харуулах»: the customer app shows this bank account (ADR-0079 #7). */
+    showToCustomers: boolean('show_to_customers').notNull().default(false),
     status: text('status', { enum: STATUSES }).notNull().default('ACTIVE'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -111,6 +114,7 @@ export const moneyAccounts = pgTable(
       sql`length(${t.name}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxName)}`,
     ),
     check('money_accounts_kind', inList(t.kind, MONEY_ACCOUNT_KINDS)),
+    check('money_accounts_show_to_customers', sql`NOT ${t.showToCustomers} OR ${t.kind} = 'BANK'`),
     check('money_accounts_status', inList(t.status, STATUSES)),
     check(
       'money_accounts_bank',

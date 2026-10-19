@@ -26,11 +26,35 @@ export type Actor =
   | { readonly kind: 'STAFF'; readonly userId: number; readonly requestId?: string }
   | { readonly kind: 'SYSTEM'; readonly label: string; readonly requestId?: string };
 
+/**
+ * A store's customer app account acting (ADR-0079): deliberately not an `Actor`, so no staff
+ * service can take a customer for a trusted caller; only the audit and the services built for the
+ * customer routes accept it.
+ */
+export interface CustomerActor {
+  readonly kind: 'CUSTOMER';
+  readonly customerUserId: number;
+  readonly requestId?: string;
+}
+
+/**
+ * The signed-in store of a customer route, resolved per request by the AuthGuard (ADR-0079 #3):
+ * `customerId` is always the token's own store; no customer route takes one from the client.
+ */
+export interface CustomerContext extends CustomerActor {
+  readonly customerId: number;
+  readonly sessionId: string;
+  readonly phone: string;
+}
+
+/** Who an audit row names: staff, a job, or a customer account. */
+export type AuditActor = Actor | CustomerActor;
+
 export function systemActor(label: string): Actor {
   return { kind: 'SYSTEM', label };
 }
 
-/** users.id of a staff actor, for `created_by` columns; NULL for system actors. */
-export function actorUserId(actor: Actor): number | null {
+/** users.id of a staff actor, for `created_by` columns; NULL for system and customer actors. */
+export function actorUserId(actor: AuditActor): number | null {
   return actor.kind === 'STAFF' ? actor.userId : null;
 }

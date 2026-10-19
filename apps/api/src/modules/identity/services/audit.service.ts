@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Tx } from '../../../common/db/db.types';
-import type { Actor } from '../auth-context';
+import type { AuditActor } from '../auth-context';
 import { auditLog } from '../schema';
 
 export interface AuditEntry {
@@ -44,12 +44,12 @@ export function auditSnapshot(value: unknown): unknown {
  */
 @Injectable()
 export class AuditService {
-  async record(tx: Tx, actor: Actor, entry: AuditEntry): Promise<void> {
+  async record(tx: Tx, actor: AuditActor, entry: AuditEntry): Promise<void> {
     await tx.insert(auditLog).values(auditRow(actor, entry));
   }
 
   /** Many entries of one change (an import), a chunk of rows per statement. */
-  async recordMany(tx: Tx, actor: Actor, entries: readonly AuditEntry[]): Promise<void> {
+  async recordMany(tx: Tx, actor: AuditActor, entries: readonly AuditEntry[]): Promise<void> {
     for (let start = 0; start < entries.length; start += AUDIT_CHUNK) {
       await tx
         .insert(auditLog)
@@ -61,10 +61,15 @@ export class AuditService {
 /** Rows per multi-row insert: far below the bind-parameter limit of one statement. */
 const AUDIT_CHUNK = 1_000;
 
-function auditRow(actor: Actor, entry: AuditEntry) {
+function auditRow(actor: AuditActor, entry: AuditEntry) {
   return {
     actorKind: actor.kind,
-    actorId: actor.kind === 'STAFF' ? actor.userId : null,
+    actorId:
+      actor.kind === 'STAFF'
+        ? actor.userId
+        : actor.kind === 'CUSTOMER'
+          ? actor.customerUserId
+          : null,
     actorLabel: actor.kind === 'SYSTEM' ? actor.label : null,
     action: entry.action,
     entity: entry.entity,

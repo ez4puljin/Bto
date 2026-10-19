@@ -265,6 +265,59 @@ export class InvoiceQueryService {
     };
   }
 
+  /**
+   * One invoice of the customer app's store (ADR-0079 #7): 404 for an invoice of any other
+   * customer, exactly as for one that does not exist.
+   */
+  async ofCustomer(customerId: number, id: number): Promise<InvoiceDetail> {
+    const [own] = await this.db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.id, id), eq(invoices.customerId, customerId)));
+    if (!own) throw notFound('invoice', id);
+    return this.get(id);
+  }
+
+  /** The invoice of a sold order, if one was issued (the customer app's order page). */
+  async ofOrder(
+    orderId: number,
+  ): Promise<{ id: number; number: string; status: InvoiceStatus } | null> {
+    const [row] = await this.db
+      .select({ id: invoices.id, number: invoices.number, status: invoices.status })
+      .from(invoices)
+      .where(eq(invoices.orderId, orderId));
+    return row ?? null;
+  }
+
+  /**
+   * The open invoices the nightly reminders look at (ADR-0079 #8): due on `fromDue` … `toDue`
+   * (both `YYYY-MM-DD`, included), with what the notification says.
+   */
+  async openDueBetween(
+    fromDue: string,
+    toDue: string,
+  ): Promise<
+    { id: number; number: string; customerId: number; dueDate: string; openAmount: Decimal }[]
+  > {
+    return this.db
+      .select({
+        id: invoices.id,
+        number: invoices.number,
+        customerId: invoices.customerId,
+        dueDate: invoices.dueDate,
+        openAmount: invoices.openAmount,
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.status, 'ISSUED'),
+          gt(invoices.openAmount, new Decimal(0)),
+          sql`${invoices.dueDate} BETWEEN ${fromDue}::date AND ${toDue}::date`,
+        ),
+      )
+      .orderBy(asc(invoices.dueDate), asc(invoices.id));
+  }
+
   /** The open invoices of a customer, oldest due first (what a payment is allocated to). */
   async openOf(customerId: number): Promise<InvoiceSummary[]> {
     const rows = await this.db

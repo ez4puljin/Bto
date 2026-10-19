@@ -2,10 +2,15 @@
 // named exports only (ESLint G2 rejects `export *`).
 export { SalesHttpModule, SalesModule } from './sales.module';
 export {
+  type BackorderedLine,
   CREDIT_CHECKER,
   type CreditChecker,
   type CreditCheckInput,
   type CreditDecision,
+  ORDER_LISTENER,
+  type OrderCancelledNotice,
+  type OrderConfirmedNotice,
+  type OrderListener,
   SALE_LISTENER,
   SALE_SINK,
   type SaleListener,
@@ -15,6 +20,12 @@ export {
   type SoldLine,
   type SoldPart,
 } from './hooks';
+export {
+  type CustomerOrderDetail,
+  type CustomerOrderPage,
+  type CustomerOrderRow,
+  CustomerOrdersService,
+} from './services/customer-orders.service';
 export {
   type Access,
   type PipelineRights,
@@ -39,6 +50,12 @@ export {
   type StageCards,
 } from './services/sales-order-query.service';
 export {
+  type RepProduct,
+  type RepProductQuery,
+  SalesRepShopService,
+} from './services/sales-rep-shop.service';
+export {
+  CUSTOMER_APP_LABEL,
   type MoveResult,
   type OrderInput,
   type OrderLineInput,

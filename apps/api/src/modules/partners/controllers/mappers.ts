@@ -69,6 +69,7 @@ export function toCustomerListItemDto(row: CustomerListItem): CustomerListItemDt
     note: row.note,
     gps: row.gps ? { lat: row.gps.lat.toFixed(6), lng: row.gps.lng.toFixed(6) } : null,
     contact: row.contact,
+    appAccount: row.appAccount,
   };
 }
 

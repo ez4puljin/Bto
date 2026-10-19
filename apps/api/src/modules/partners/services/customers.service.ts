@@ -18,7 +18,14 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { type Actor, type AuthContext, AuditService, SettingsService } from '../../identity';
+import {
+  type Actor,
+  type AuthContext,
+  AuditService,
+  CustomerAccountsService,
+  type CustomerUserStatus,
+  SettingsService,
+} from '../../identity';
 import { customerAddresses, customerContacts, customers, type PARTNER_STATUSES } from '../schema';
 import { type AddressInput, CustomerAddressesService } from './customer-addresses.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
@@ -85,6 +92,8 @@ export interface CustomerQuery {
   tinPending?: boolean;
   /** No GPS point on the default address. */
   gpsMissing?: boolean;
+  /** The customer app account (ADR-0079 #11): ACTIVE, DISABLED, or NONE for stores without one. */
+  app?: CustomerUserStatus | 'NONE';
   cursor?: string;
   limit?: number;
 }
@@ -140,6 +149,8 @@ export interface CustomerListItem extends CustomerSummary {
   /** The point of the default address. */
   gps: { lat: Decimal; lng: Decimal } | null;
   contact: ListContact | null;
+  /** The customer app account's status; null when the store has none (ADR-0079 #11). */
+  appAccount: CustomerUserStatus | null;
 }
 
 export interface CustomerDetail extends Omit<
@@ -170,6 +181,7 @@ export class CustomersService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly addresses: CustomerAddressesService,
+    private readonly appAccounts: CustomerAccountsService,
   ) {}
 
   /** The rows a user may read; every customer until sales reps arrive (delivery 7). */
@@ -292,6 +304,10 @@ export class CustomersService {
       before: customerAuditView(before),
       after: customerAuditView(after),
     });
+    // An inactive customer cannot use the app (ADR-0079 #2): its sessions end with the change.
+    if (before.status === 'ACTIVE' && after.status !== 'ACTIVE') {
+      await this.appAccounts.endSessionsOfCustomerInTx(tx, actor, id, 'CUSTOMER_INACTIVE');
+    }
   }
 
   setCredit(actor: Actor, id: number, input: CreditInput): Promise<CustomerDetail> {
@@ -413,6 +429,7 @@ export class CustomersService {
       businessDate(),
       this.db,
     );
+    const appOf = await this.appAccounts.statusOf(ids);
     const pointOf = new Map(points.map((point) => [point.customerId, point]));
     const contactOf = new Map(contacts.map((contact) => [contact.customerId, contact]));
     return {
@@ -431,6 +448,7 @@ export class CustomersService {
           note: row.note,
           gps: point?.lat && point.lng ? { lat: point.lat, lng: point.lng } : null,
           contact: contact ? { name: contact.name, phone: contact.phone } : null,
+          appAccount: appOf.get(row.id) ?? null,
         };
       }),
       nextCursor: page.nextCursor,
@@ -544,6 +562,13 @@ export class CustomersService {
     if (query.gpsMissing) {
       filters.push(sql`NOT EXISTS (SELECT 1 FROM customer_addresses a
         WHERE a.customer_id = customers.id AND a.is_default AND a.lat IS NOT NULL)`);
+    }
+    // The app accounts live in identity: their customer ids, never a join (ADR-0079 #11).
+    if (query.app === 'NONE') {
+      const linked = await this.appAccounts.customerIdsWithAccount();
+      filters.push(sql`NOT (${idIn(customers.id, linked)})`);
+    } else if (query.app) {
+      filters.push(idIn(customers.id, await this.appAccounts.customerIdsWithAccount(query.app)));
     }
     const searched = partnerSearch(customers, query.q);
     if (searched) filters.push(searched.match);

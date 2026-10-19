@@ -19,7 +19,7 @@ import {
   ProductQueryService,
 } from '../../catalog';
 import type { AuthContext } from '../../identity';
-import { StockQueryService } from '../../inventory';
+import { ProductLocationsService, StockQueryService } from '../../inventory';
 import { CustomersService, ProductSuppliersService } from '../../partners';
 import { ProductPricesService } from '../../pricing';
 import { SalesOrdersService } from './sales-orders.service';
@@ -40,6 +40,10 @@ export interface RepProduct {
   homeWarehouseId: number | null;
   /** Base units free in the home warehouse (on hand, sellable, less what is reserved). */
   available: Decimal;
+  /** The home warehouse's minimum level (ADR-0039); null when none is set. */
+  minLevel: Decimal | null;
+  /** Base units of one whole pack, the unit the warehouse price is set in; null without one. */
+  packBase: Decimal | null;
   /** One base unit in whole packs (the warehouse price), whole MNT; null without terms today. */
   basePrice: Decimal | null;
   /** The base price on the day asked for (a price-drop notice); null when not asked or none. */
@@ -69,6 +73,10 @@ export interface RepProductQuery {
   supplierIds?: readonly number[];
   /** Only products with stock free in their home warehouse. */
   inStock?: boolean;
+  /** Only these products (the customer app's favourites, ADR-0079 #4). */
+  onlyIds?: readonly number[];
+  /** Only products with a home warehouse (the customer app's shop, ADR-0079 #4). */
+  withHome?: boolean;
   sort?: RepProductSort;
   cursor?: string;
   limit?: number;
@@ -101,6 +109,13 @@ export interface RepCustomerDetail {
 
 const DAY_MS = 86_400_000;
 
+/** The base units of the pack the warehouse price is set in; null for loose goods. */
+function packBaseOf(row: ProductListItem, wholeUomId: number | null): Decimal | null {
+  if (wholeUomId === null) return null;
+  const unit = row.units.find((own) => own.uomId === wholeUomId);
+  return unit && !unit.isBase ? unit.factorToBase : null;
+}
+
 /**
  * The category, home warehouse and main supplier filters as one product-list condition tree
  * (ADR-0049 #4): the owning modules answer them through the segments resolver. None set: no tree
@@ -117,6 +132,7 @@ function shopWhere(query: RepProductQuery): SegmentDefinition | undefined {
   if (query.supplierIds?.length) {
     conditions.push({ field: 'supplier', op: 'MAIN_IN', ids: [...query.supplierIds] });
   }
+  if (query.withHome) conditions.push({ field: 'homeWarehouse', op: 'ANY' });
   return conditions.length === 0
     ? undefined
     : { match: 'ALL', groups: [{ match: 'ALL', conditions }] };
@@ -159,6 +175,7 @@ export class SalesRepShopService {
     private readonly stock: StockQueryService,
     private readonly customers: CustomersService,
     private readonly productSuppliers: ProductSuppliersService,
+    private readonly locations: ProductLocationsService,
   ) {}
 
   /**
@@ -171,7 +188,11 @@ export class SalesRepShopService {
   ): Promise<{ data: RepProduct[]; nextCursor: string | null; total: number | null }> {
     const today = businessDate();
     const where = shopWhere(query);
-    const onlyIds = query.inStock ? await this.stock.productIdsAvailableAtHome() : undefined;
+    const inStock = query.inStock ? await this.stock.productIdsAvailableAtHome() : undefined;
+    const onlyIds =
+      query.onlyIds && inStock
+        ? query.onlyIds.filter((id) => new Set(inStock).has(id))
+        : (query.onlyIds ?? inStock);
     const base: ProductListQuery = {
       ...(query.q ? { q: query.q } : {}),
       status: 'ACTIVE',
@@ -314,6 +335,12 @@ export class SalesRepShopService {
       priceBefore === undefined ? null : await this.prices.shopPricesOf(ids, priceBefore);
     const images = await this.products.imagesOf(ids);
     const flags = await this.products.unitFlagsOf(ids);
+    const terms = await this.prices.inForce(ids, today);
+    const minLevels = new Map(
+      (await this.locations.ofProductIds(ids))
+        .filter((location) => location.isHome)
+        .map((location) => [location.productId, location.minQty]),
+    );
     const newSince = Date.now() - NEW_PRODUCT_DAYS * DAY_MS;
     return rows.map((row) => {
       const own = info.get(row.id);
@@ -330,6 +357,8 @@ export class SalesRepShopService {
         sellable: own?.sellable === true && own.homeWarehouseId !== null,
         homeWarehouseId: own?.homeWarehouseId ?? null,
         available: own?.available ?? new Decimal(0),
+        minLevel: minLevels.get(row.id) ?? null,
+        packBase: packBaseOf(row, terms.get(row.id)?.wholeUomId ?? null),
         basePrice: priced?.basePrice ?? null,
         basePriceBefore: before?.get(row.id)?.basePrice ?? null,
         units: row.units.map((unit) => {

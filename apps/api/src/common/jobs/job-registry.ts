@@ -26,6 +26,8 @@ export interface JobPayloads {
   'imports.housekeeping': ScheduledPayload;
   /** Nightly: the receivables cache against the ledger and the invoices (ADR-0060 #4). */
   'finance.reconcile': ScheduledPayload;
+  /** Mornings: the customer app's «due soon» and «overdue» invoice reminders (ADR-0079 #8). */
+  'notifications.invoiceReminders': ScheduledPayload;
 }
 
 /** Scheduled jobs carry no data: the schedule sends null (ADR-0040). */
@@ -80,6 +82,7 @@ export const JOB_QUEUES: Readonly<Record<JobName, Omit<Queue, 'name'>>> = {
   'identity.housekeeping': scheduledQueue(),
   'imports.housekeeping': scheduledQueue(),
   'finance.reconcile': scheduledQueue(),
+  'notifications.invoiceReminders': scheduledQueue(),
 };
 
 export const JOB_NAME_PATTERN = /^[a-z]+\.[a-z][A-Za-z]*$/;

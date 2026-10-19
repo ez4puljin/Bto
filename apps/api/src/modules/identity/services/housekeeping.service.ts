@@ -2,14 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { lt, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
-import { authSessions, idempotencyKeys, passwordResets } from '../schema';
+import { authSessions, customerPasswordCodes, idempotencyKeys, passwordResets } from '../schema';
 import { StorageService } from './storage.service';
 
 /** How long identity keeps its short-lived rows (ADR-0040). */
 export const RETENTION = {
   /** Sessions after they expired or were revoked: the sign-in trail (device, address) an admin reads. */
   sessionDays: 90,
-  /** One-time password codes after they expired (a code lives 30 minutes). */
+  /** One-time password codes, staff and customer app ones, after they expired (30 minutes). */
   passwordCodeDays: 30,
   /** Idempotency keys after they were claimed: clients retry within minutes, never after days. */
   idempotencyKeyDays: 7,
@@ -55,6 +55,9 @@ export class HousekeepingService {
     const passwordCodes = await this.db
       .delete(passwordResets)
       .where(lt(passwordResets.expiresAt, daysAgo(RETENTION.passwordCodeDays)));
+    const customerCodes = await this.db
+      .delete(customerPasswordCodes)
+      .where(lt(customerPasswordCodes.expiresAt, daysAgo(RETENTION.passwordCodeDays)));
     const keys = await this.db
       .delete(idempotencyKeys)
       .where(lt(idempotencyKeys.createdAt, daysAgo(RETENTION.idempotencyKeyDays)));
@@ -62,7 +65,7 @@ export class HousekeepingService {
     const filesPurged = await this.storage.purgeDeleted();
     return {
       sessions: sessions.rowCount ?? 0,
-      passwordCodes: passwordCodes.rowCount ?? 0,
+      passwordCodes: (passwordCodes.rowCount ?? 0) + (customerCodes.rowCount ?? 0),
       idempotencyKeys: keys.rowCount ?? 0,
       filesRemoved: pending.removed,
       filesAbandoned: pending.abandoned,

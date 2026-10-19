@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { Decimal } from '../money';
 import {
+  CUSTOMER_LOW_STOCK_BASE,
+  CUSTOMER_ORDER_MAX_DAYS,
+  CUSTOMER_ORDER_STATES,
+  customerOrderStateOf,
+  customerOrderStatusesOf,
   defaultDeliveryDate,
+  isCustomerDeliveryDate,
   formatOrderNumber,
   isCancellable,
   isFinished,
@@ -13,6 +20,7 @@ import {
   REP_ORDER_STATES,
   renderOrderNumber,
   repOrderStatusesOf,
+  stockWord,
   storeIsStale,
 } from './index';
 
@@ -145,5 +153,42 @@ describe('order number format', () => {
     expect(orderNumberPatternIssues('ХРХ-{year}-', 0)).toEqual([{ path: 'digits', code: 'RANGE' }]);
     expect(orderNumberPatternIssues('ХРХ-{year}-', 9)).toEqual([{ path: 'digits', code: 'RANGE' }]);
     expect(orderNumberPatternIssues('ХРХ-{year}-', 4)).toEqual([]);
+  });
+});
+
+describe('the customer app (ADR-0079)', () => {
+  const d = (value: number | string) => new Decimal(value);
+
+  it('says OUT, LOW or IN by the minimum level, else one pack, else 10 base units', () => {
+    expect(stockWord(d(0), d(5), d(12))).toBe('OUT');
+    expect(stockWord(d(-1), null, null)).toBe('OUT');
+    expect(stockWord(d(4), d(5), d(12))).toBe('LOW');
+    expect(stockWord(d(5), d(5), d(12))).toBe('IN');
+    expect(stockWord(d(11), null, d(12))).toBe('LOW');
+    expect(stockWord(d(12), null, d(12))).toBe('IN');
+    expect(stockWord(d(11), d(0), d(12))).toBe('LOW');
+    expect(stockWord(d('9.5'), null, null)).toBe('LOW');
+    expect(stockWord(d(CUSTOMER_LOW_STOCK_BASE), null, null)).toBe('IN');
+  });
+
+  it('puts every order status into exactly one customer word', () => {
+    const all = CUSTOMER_ORDER_STATES.flatMap((state) => customerOrderStatusesOf(state));
+    expect([...all].sort()).toEqual([...ORDER_STATUSES].sort());
+    expect(new Set(all).size).toBe(ORDER_STATUSES.length);
+    expect(customerOrderStateOf('DRAFT')).toBe('PENDING');
+    expect(customerOrderStateOf('CONFIRMED')).toBe('CONFIRMED');
+    expect(customerOrderStateOf('PICKING')).toBe('PREPARING');
+    expect(customerOrderStateOf('PACKED')).toBe('READY');
+    expect(customerOrderStateOf('INVOICED')).toBe('DELIVERED');
+    expect(customerOrderStateOf('CANCELLED')).toBe('CANCELLED');
+  });
+
+  it('takes delivery days from today to 60 days ahead', () => {
+    expect(isCustomerDeliveryDate('2026-10-19', '2026-10-19')).toBe(true);
+    expect(isCustomerDeliveryDate('2026-12-18', '2026-10-19')).toBe(true);
+    expect(isCustomerDeliveryDate('2026-12-19', '2026-10-19')).toBe(false);
+    expect(isCustomerDeliveryDate('2026-10-18', '2026-10-19')).toBe(false);
+    expect(isCustomerDeliveryDate('2026-02-30', '2026-01-19')).toBe(false);
+    expect(CUSTOMER_ORDER_MAX_DAYS).toBe(60);
   });
 });

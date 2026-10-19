@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   NOTICE_LIMITS,
+  type NoticeAudience,
   type NoticeKind,
   type UserNotificationKind,
 } from '@tugeel/shared/notifications';
@@ -65,8 +66,9 @@ function soldPayload(value: unknown): SoldPayload {
 }
 
 /**
- * The signed-in user's notices and notifications (ADR-0062 #3): the running notices for holders of
- * `sales.orders.rep`, and the notifications addressed to the user. Reading is idempotent.
+ * The signed-in user's notices and notifications (ADR-0062 #3): the running notices addressed to
+ * the sales reps for holders of `sales.orders.rep`, and the notifications addressed to the user.
+ * Reading is idempotent.
  */
 @Injectable()
 export class InboxService {
@@ -153,7 +155,7 @@ export class InboxService {
       const running = await this.db
         .select({ id: appNotices.id })
         .from(appNotices)
-        .where(and(idIn(appNotices.id, noticeIds), runningOn(today)));
+        .where(and(idIn(appNotices.id, noticeIds), runningOn(today, 'SALES_REPS')));
       if (running.length > 0) {
         await this.db
           .insert(appNoticeReads)
@@ -186,7 +188,7 @@ export class InboxService {
         appNoticeReads,
         and(eq(appNoticeReads.noticeId, appNotices.id), eq(appNoticeReads.userId, ctx.userId)),
       )
-      .where(runningOn(today))
+      .where(runningOn(today, 'SALES_REPS'))
       .orderBy(desc(appNotices.id))
       .limit(NOTICE_LIMITS.summaryMax);
     const productIds = await this.notices.productIdsOf(rows.map((row) => row.notice.id));
@@ -209,9 +211,13 @@ export class InboxService {
   }
 }
 
-/** Not withdrawn, started and not ended on `today` (Ulaanbaatar, ADR-0062 #1). */
-function runningOn(today: string) {
+/**
+ * Not withdrawn, started and not ended on `today` (Ulaanbaatar, ADR-0062 #1), for one audience
+ * (ADR-0079 #8: a customers' notice never reaches the reps' app, nor the other way round).
+ */
+export function runningOn(today: string, audience: NoticeAudience) {
   return and(
+    eq(appNotices.audience, audience),
     isNull(appNotices.withdrawnAt),
     lte(appNotices.validFrom, today),
     or(isNull(appNotices.validTo), gt(appNotices.validTo, today)),
