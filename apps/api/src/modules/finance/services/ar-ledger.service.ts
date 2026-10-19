@@ -88,7 +88,7 @@ export interface StatementEntry {
 }
 
 /**
- * A customer's statement for a period (ADR-0084): the balance before `from`, every entry dated
+ * A customer's statement for a period (ADR-0085): the balance before `from`, every entry dated
  * `from` … `to` oldest first (by date, then as recorded), the totals and the balance after `to`.
  */
 export interface CustomerStatement {
@@ -270,7 +270,7 @@ export class ArLedgerService {
     };
   }
 
-  /** The customer's statement for `from` … `to` (inclusive business dates, ADR-0084). */
+  /** The customer's statement for `from` … `to` (inclusive business dates, ADR-0085). */
   async statement(customerId: number, from: string, to: string): Promise<CustomerStatement> {
     const [before] = await this.db
       .select({

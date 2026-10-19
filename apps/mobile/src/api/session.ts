@@ -85,7 +85,7 @@ export interface SessionOptions {
 }
 
 /**
- * The native token transport of ADR-0061 #4, for either app (ADR-0083): the access token lives in
+ * The native token transport of ADR-0061 #4, for either app (ADR-0084): the access token lives in
  * memory, the refresh token in secure storage; one refresh at a time, its rotated token stored
  * before anyone uses it; a call answered 401 refreshes once and is sent again (a 403 never is). A
  * refresh nobody answered leaves the phone `offline` with its session kept; one the server refused

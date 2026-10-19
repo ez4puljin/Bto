@@ -1,4 +1,4 @@
-/** The two apps of one Expo project (ADR-0006 #1, ADR-0083): the sales rep's and the stores' «Bto300». */
+/** The two apps of one Expo project (ADR-0006 #1, ADR-0084): the sales rep's and the stores' «Bto300». */
 export type AppVariant = 'staff' | 'customer';
 
 export interface AppConfig {

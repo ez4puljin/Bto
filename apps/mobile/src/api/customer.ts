@@ -423,7 +423,7 @@ export function useStorePayments() {
 }
 
 /**
- * «Тооцооны хуулга» (ADR-0084): the opening balance, the purchases (Дебит) and the payments and
+ * «Тооцооны хуулга» (ADR-0085): the opening balance, the purchases (Дебит) and the payments and
  * returns (Кредит) of the days asked for, oldest first, the totals and the closing balance.
  */
 export function useStoreStatement(range: { from: string; to: string }) {

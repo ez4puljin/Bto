@@ -14,7 +14,7 @@ import { colors } from '../src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
 
-/** Which app this build is (ADR-0083): the other app's screens are never reachable. */
+/** Which app this build is (ADR-0084): the other app's screens are never reachable. */
 const STAFF = APP.variant === 'staff';
 const CUSTOMER = APP.variant === 'customer';
 

@@ -227,7 +227,7 @@ export class CustomerAccountService {
   }
 
   /**
-   * The store's statement (ADR-0084): «Эхний үлдэгдэл», the purchases (Дебит) and the payments
+   * The store's statement (ADR-0085): «Эхний үлдэгдэл», the purchases (Дебит) and the payments
    * and returns (Кредит) of `from` … `to`, «Эцсийн үлдэгдэл»; at most 366 days, never past today.
    */
   async statement(ctx: CustomerContext, from: string, to: string): Promise<StoreStatement> {

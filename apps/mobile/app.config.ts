@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-// One Expo project, one app per APP_VARIANT (ADR-0006 #1, ADR-0083): `staff`, the sales-rep app
+// One Expo project, one app per APP_VARIANT (ADR-0006 #1, ADR-0084): `staff`, the sales-rep app
 // (ADR-0061), and `customer`, the stores' app «Bto300» (ADR-0079). variants.json holds what differs
 // (name, package, version, icons, the APK's name); `pnpm mobile:apk -- --variant <name>` reads it too.
 interface Variant {
@@ -100,7 +100,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/with-cmake-object-path.cjs',
   ],
   extra: {
-    /** Which app this build is: src/config/app.ts picks its screens (ADR-0083). */
+    /** Which app this build is: src/config/app.ts picks its screens (ADR-0084). */
     variant: variantName,
     defaultServer,
     /** A production build talks only to the server it was built for (ADR-0079 #10). */

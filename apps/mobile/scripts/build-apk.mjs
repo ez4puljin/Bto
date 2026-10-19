@@ -1,4 +1,4 @@
-// `pnpm mobile:apk`: builds an app's APK on the owner's PC (ADR-0061 #2, ADR-0083, docs/modules/mobile.md).
+// `pnpm mobile:apk`: builds an app's APK on the owner's PC (ADR-0061 #2, ADR-0084, docs/modules/mobile.md).
 //   1. JDK 17 or 21 and the Android SDK packages are found (one-time setup: docs/modules/mobile.md).
 //   2. The workspace is mirrored to a short folder without spaces (C:\Android\m) and installed
 //      there: the repository's own path holds spaces and is long, which the NDK's CMake and Ninja do

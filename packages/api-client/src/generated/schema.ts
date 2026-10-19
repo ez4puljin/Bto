@@ -4913,7 +4913,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * «Тооцооны хуулга» (ADR-0084): the opening balance, the purchases (Дебит) and the payments and
+         * «Тооцооны хуулга» (ADR-0085): the opening balance, the purchases (Дебит) and the payments and
          *     returns (Кредит) of the days asked for, the totals and the closing balance.
          */
         get: operations["CustomerAppMoney_statement"];

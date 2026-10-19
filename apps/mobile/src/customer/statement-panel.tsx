@@ -22,7 +22,7 @@ import { columnAmount, lastMonthRange } from './statement';
 const COLUMN = 84;
 
 /**
- * «Тооцооны хуулга» on «Тооцоо» (ADR-0084, the owner 2026-10-20): the days (the last month at
+ * «Тооцооны хуулга» on «Тооцоо» (ADR-0085, the owner 2026-10-20): the days (the last month at
  * first, any range from the calendar), «Эхний үлдэгдэл», every entry oldest first with its
  * purchase in «Дебит» or its payment or return in «Кредит» and the balance after it, «Нийт» and
  * «Эцсийн үлдэгдэл». A purchase opens its invoice.

@@ -37,7 +37,7 @@ const LOADING: SessionState = { status: 'loading' };
 const ANONYMOUS: SessionState = { status: 'anonymous' };
 const never = () => () => undefined;
 
-/** This build's session on a server: the rep's (`staff`) or the store's (`customer`, ADR-0083). */
+/** This build's session on a server: the rep's (`staff`) or the store's (`customer`, ADR-0084). */
 function sessionOn(server: string): AnySession {
   const options: SessionOptions = {
     server,
