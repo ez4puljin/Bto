@@ -5,6 +5,7 @@ import { DB } from '../../src/common/db/db.tokens';
 import type { Db } from '../../src/common/db/db.types';
 import { inTransaction } from '../../src/common/db/transaction';
 import { roles, userRoles, userScopes, users } from '../../src/modules/identity/schema';
+import { mirrorCompanyRoles } from '../../src/modules/identity/services/company-roles';
 import { issuePasswordCode } from '../../src/modules/identity/services/password-codes';
 import { PasswordHasher } from '../../src/modules/identity/services/password-hasher.service';
 
@@ -68,6 +69,7 @@ export async function seedUser(
       .from(roles)
       .where(inArray(roles.code, options.roles));
     await db.insert(userRoles).values(found.map((role) => ({ userId: user.id, roleId: role.id })));
+    await inTransaction(db, (tx) => mirrorCompanyRoles(tx, user.id));
   }
   for (const warehouseId of options.warehouseIds ?? []) {
     await db.insert(userScopes).values({ userId: user.id, warehouseId });

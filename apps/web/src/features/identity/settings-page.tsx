@@ -1,4 +1,5 @@
 import {
+  isLockedSetting,
   parseSettingValue,
   SETTINGS,
   type SettingDefinition,
@@ -72,17 +73,22 @@ function SettingValue({
   if (SETTINGS[settingKey].kind === 'boolean') {
     return <>{value === true ? t('settings.true') : t('settings.false')}</>;
   }
+  if (SETTINGS[settingKey].kind === 'code')
+    return <span className="font-mono">{String(value)}</span>;
   return <>{String(value)}</>;
 }
 
 /**
  * One setting: its value today, its history and planned changes (a planned one can be deleted,
  * asked first), and «Шинэ утга» for a value from a date (ADR-0043: a dialog, yes/no as a switch).
+ * A key fixed at installation (the Finance Core company code, ADR-0084 #3) is shown, never edited.
  */
 function SettingCard({ view }: { view: SettingView }) {
   const { t } = useTranslation();
   const settingKey = view.key;
-  const canManage = useHasPermission('identity.settings.manage');
+  const mayManage = useHasPermission('identity.settings.manage');
+  const locked = isLockedSetting(settingKey);
+  const canManage = mayManage && !locked;
   const mutations = useIdentityMutations();
   const [adding, setAdding] = useState(false);
   const deletion = useDeleteConfirm<SettingEntry>((id) => mutations.deleteSetting.mutateAsync(id));
@@ -112,7 +118,9 @@ function SettingCard({ view }: { view: SettingView }) {
       </CardHeader>
       {/* The history runs to the card's edges, so its first column lines up with the title. */}
       <CardContent className={view.entries.length ? 'px-0' : undefined}>
-        {view.entries.length ? (
+        {locked ? (
+          <p className="text-sm text-muted-foreground">{t('settings.locked')}</p>
+        ) : view.entries.length ? (
           <Table>
             <TableHeader>
               <TableRow>

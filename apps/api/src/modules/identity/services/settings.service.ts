@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  isLockedSetting,
   isSettingKey,
   parseSettingValue,
   SETTING_KEYS,
@@ -102,6 +103,9 @@ export class SettingsService {
   async create(actor: Actor, input: CreateSettingInput): Promise<SettingEntry> {
     const key = input.key;
     if (!isSettingKey(key)) throw invalid('key', 'isSettingKey', `unknown setting ${key}`);
+    if (isLockedSetting(key)) {
+      throw new AppError('SETTING_NOT_EDITABLE', `${key} is fixed at installation`, { key });
+    }
     if (!isIsoDate(input.effectiveFrom)) {
       throw invalid('effectiveFrom', 'isIsoDate', 'effectiveFrom must be YYYY-MM-DD');
     }

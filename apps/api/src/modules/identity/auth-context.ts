@@ -18,6 +18,11 @@ export interface AuthContext {
    * Branch scopes are expanded to their warehouses, and TRANSIT is always included.
    */
   readonly writableWarehouseIds: ReadonlySet<number> | null;
+  /**
+   * Finance rights per Finance Core company code, from `user_company_roles` (ADR-0075, ADR-0084
+   * #2): what `modules/fin-bridge` hands the core for a USER principal. No entry, no access there.
+   */
+  readonly companyPermissions: ReadonlyMap<string, ReadonlySet<Permission>>;
   readonly requestId?: string;
 }
 

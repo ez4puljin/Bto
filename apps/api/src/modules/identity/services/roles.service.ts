@@ -11,7 +11,7 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
 import type { AuthContext } from '../auth-context';
-import { rolePermissions, roles, userRoles } from '../schema';
+import { rolePermissions, roles, userCompanyRoles, userRoles } from '../schema';
 import { AuditService } from './audit.service';
 
 export interface RoleView {
@@ -114,10 +114,17 @@ export class RolesService {
   async remove(actor: AuthContext, id: number): Promise<void> {
     await inTransaction(this.db, async (tx) => {
       const before = await this.lockCustom(tx, id);
+      // Users holding it directly or in a company (ADR-0084 #2; the two agree unless a mirror drifted).
       const [assigned] = await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(userRoles)
-        .where(eq(userRoles.roleId, id));
+        .execute<{ count: number }>(
+          sql`
+        SELECT count(*)::int AS count FROM (
+          SELECT ${userRoles.userId} FROM ${userRoles} WHERE ${userRoles.roleId} = ${id}
+          UNION
+          SELECT ${userCompanyRoles.userId} FROM ${userCompanyRoles} WHERE ${userCompanyRoles.roleId} = ${id}
+        ) holders`,
+        )
+        .then((result) => result.rows);
       if ((assigned?.count ?? 0) > 0) {
         throw new AppError('ROLE_IN_USE', `role ${id} is assigned to users`, {
           id,

@@ -1,6 +1,13 @@
 // Public API of the partners module (docs/modules/partners.md). Other modules import only this
 // file; named exports only (ESLint G2 rejects `export *`).
-export { PARTNER_SET_RESOLVER, type PartnerSetEntity, type PartnerSetResolver } from './hooks';
+export {
+  CUSTOMER_CHANGED_HOOK,
+  type CustomerChangedHook,
+  type CustomerPartyFacts,
+  PARTNER_SET_RESOLVER,
+  type PartnerSetEntity,
+  type PartnerSetResolver,
+} from './hooks';
 export { PartnersHttpModule, PartnersModule } from './partners.module';
 export {
   type ContactInput,

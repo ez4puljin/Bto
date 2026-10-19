@@ -354,6 +354,17 @@ describe('settings', () => {
     await user.click(confirm.getByRole('button', { name: mn.common.delete }));
     await waitFor(() => expect(calledWith(fetchMock, 'DELETE', '/api/v1/settings/2')).toBe(true));
   });
+
+  it('shows the company code fixed at installation without a way to change it (ADR-0084 #3)', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/settings': () => list([{ key: 'bto.company_code', current: 'BO', entries: [] }]),
+    });
+    renderApp('/settings', fetchMock);
+    const card = cardOf(await screen.findByText(mn.settings.keys.bto.company_code));
+    expect(card.getByText('BO')).toBeInTheDocument();
+    expect(card.getByText(mn.settings.locked)).toBeInTheDocument();
+    expect(card.queryByRole('button', { name: mn.settings.add })).toBeNull();
+  });
 });
 
 describe('branches', () => {

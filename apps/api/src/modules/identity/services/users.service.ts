@@ -12,6 +12,7 @@ import type { AuthContext } from '../auth-context';
 import { authSessions, branches, roles, userRoles, userScopes, users, warehouses } from '../schema';
 import { AuditService } from './audit.service';
 import { AuthService } from './auth.service';
+import { mirrorCompanyRoles } from './company-roles';
 import { LoginLimiter } from './login-limiter.service';
 import { type IssuedCode, issuePasswordCode } from './password-codes';
 
@@ -359,6 +360,7 @@ export class UsersService {
     if (unique.length) {
       await tx.insert(userRoles).values(unique.map((roleId) => ({ userId, roleId })));
     }
+    await mirrorCompanyRoles(tx, userId);
   }
 
   private async replaceScopes(tx: Tx, userId: number, scopes: UserScopes): Promise<void> {

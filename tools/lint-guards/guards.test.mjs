@@ -130,6 +130,30 @@ const CASES = [
     true,
   ],
   [
+    'fin-bridge -> partners index (CUSTOMER_CHANGED, ADR-0084)',
+    G1,
+    `${M}/fin-bridge/services/contexts.service.ts`,
+    `import { partners } from '../../partners';
+export const x = partners;`,
+    false,
+  ],
+  [
+    'fin-bridge never imports sales (identity and partners only, ADR-0084)',
+    G1,
+    `${M}/fin-bridge/services/contexts.service.ts`,
+    `import { sales } from '../../sales';
+export const x = sales;`,
+    true,
+  ],
+  [
+    'partners never imports fin-bridge (fin-bridge binds its hook)',
+    G1,
+    `${M}/partners/services/customers.service.ts`,
+    `import { finBridge } from '../../fin-bridge';
+export const x = finBridge;`,
+    true,
+  ],
+  [
     'nobody imports segments (ADR-0049)',
     G1,
     `${M}/catalog/services/catalog.service.ts`,
@@ -611,6 +635,38 @@ export const x = createFinCallContext;`,
     `import { createFinCallContext, FinIntakeInTx } from '../../../finance-core';
 export const x = [createFinCallContext, FinIntakeInTx];`,
     false,
+  ],
+  [
+    'pos never runs the installation step',
+    FIN_CONTEXT,
+    `${M}/pos/services/pos-shifts.service.ts`,
+    `import { ensureDefaultCompany } from '../../../finance-core';
+export const x = ensureDefaultCompany;`,
+    true,
+  ],
+  [
+    'fin-bridge runs the installation step',
+    FIN_CONTEXT,
+    `${M}/fin-bridge/services/contexts.service.ts`,
+    `import { ensureDefaultCompany } from '../../../finance-core';
+export const x = ensureDefaultCompany;`,
+    false,
+  ],
+  [
+    'the StaticCaller builds test contexts',
+    FIN_CONTEXT,
+    'apps/api/test/harness/static-caller.ts',
+    `import { createFinCallContext, ensureDefaultCompany } from '../../src/finance-core';
+export const x = [createFinCallContext, ensureDefaultCompany];`,
+    false,
+  ],
+  [
+    'another test never builds a context',
+    FIN_CONTEXT,
+    'apps/api/test/integration/fin.int-spec.ts',
+    `import { createFinCallContext } from '../../src/finance-core';
+export const x = createFinCallContext;`,
+    true,
   ],
   // StaticCaller and the harness stay in apps/api/test (ADR-0076)
   [

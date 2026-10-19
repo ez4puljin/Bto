@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { type SalesOrder, useSalesOrder } from './api';
 import { useOrderBatch } from './pipelines-api';
 import { PrintFrame as SharedPrintFrame } from '@/components/print-frame';
+import { useCompany, useCompanyName } from '@/features/company/api';
 
 const isKind = (value: string | undefined): value is PrintKind =>
   value !== undefined && (PRINT_KINDS as readonly string[]).includes(value);
@@ -77,7 +78,8 @@ function PrintFrame({
 }) {
   const { t } = useTranslation();
   const warehouses = useWarehouses();
-  const ready = (orders?.length ?? 0) > 0 && !warehouses.isPending;
+  const company = useCompany();
+  const ready = (orders?.length ?? 0) > 0 && !warehouses.isPending && !company.isPending;
   return (
     <SharedPrintFrame
       ready={ready}
@@ -113,6 +115,7 @@ function PrintFrame({
  */
 function Heading({ order, title, narrow }: { order: SalesOrder; title: string; narrow: boolean }) {
   const { t } = useTranslation();
+  const companyName = useCompanyName();
   const rows = [
     { label: t('sales.order.customer'), value: `${order.customerName} · ${order.customerCode}` },
     {
@@ -141,7 +144,7 @@ function Heading({ order, title, narrow }: { order: SalesOrder; title: string; n
   if (narrow) {
     return (
       <header className="border-b border-dashed border-foreground pb-2">
-        <h1 className="text-center font-semibold">{t('brand.company')}</h1>
+        <h1 className="text-center font-semibold">{companyName}</h1>
         <h2 className="mt-1 text-center text-sm font-bold">
           {title} · {number}
         </h2>
@@ -162,7 +165,7 @@ function Heading({ order, title, narrow }: { order: SalesOrder; title: string; n
   return (
     <header className="mb-4 border-b border-border pb-3">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-lg font-semibold">{t('brand.company')}</h1>
+        <h1 className="text-lg font-semibold">{companyName}</h1>
         <span className="text-xs text-muted-foreground">{formatUbDateTime(Date.now())}</span>
       </div>
       <h2 className="mt-2 text-base font-semibold">
