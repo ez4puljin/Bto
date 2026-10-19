@@ -43,6 +43,16 @@ describe('permission catalog', () => {
   });
 });
 
+describe('the sales rep (ADR-0061)', () => {
+  it('holds the rep app only: no other order, no credit data', () => {
+    expect(SYSTEM_ROLE_PERMISSIONS.SALES_REP).toEqual(['sales.orders.rep']);
+    for (const role of SYSTEM_ROLES) {
+      if (role === 'ADMIN' || role === 'SALES_REP') continue;
+      expect(SYSTEM_ROLE_PERMISSIONS[role]).not.toContain('sales.orders.rep');
+    }
+  });
+});
+
 describe('usernames', () => {
   it('normalises and validates login names', () => {
     expect(normalizeUsername('  Bat.Erdene ')).toBe('bat.erdene');

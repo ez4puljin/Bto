@@ -113,3 +113,9 @@ export {
   posTillDevices,
   posTills,
 } from '../modules/pos/schema';
+export {
+  appNoticeProducts,
+  appNoticeReads,
+  appNotices,
+  userNotifications,
+} from '../modules/notifications/schema';

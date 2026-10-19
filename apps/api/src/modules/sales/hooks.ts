@@ -7,9 +7,10 @@ import type { Actor } from '../identity';
 import type { LockedCustomer } from '../partners';
 
 /**
- * What sales asks of finance (ADR-0060 #1). Finance binds these tokens with `useExisting`;
- * `SalesOrdersService` resolves them through `ModuleRef` (`strict: false`) and does without them
- * when nothing is bound (the worker, tests that load sales alone).
+ * What sales asks of finance (ADR-0060 #1) and tells notifications (ADR-0062 #4). The modules bind
+ * these tokens with `useExisting`; `SalesOrdersService` resolves them through `ModuleRef`
+ * (`strict: false`) and does without them when nothing is bound (the worker, tests that load sales
+ * alone).
  */
 
 export interface CreditCheckInput {
@@ -98,3 +99,27 @@ export interface SaleSink {
 }
 
 export const SALE_SINK = Symbol('SALE_SINK');
+
+/**
+ * A sale told to whoever listens (ADR-0062 #4), by value, inside the sale's transaction after the
+ * invoice. Notifications binds it to tell the rep their order was sold; only one listener binds.
+ */
+export interface SaleNotice {
+  orderId: number;
+  orderNumber: string;
+  channel: OrderChannel;
+  /** Who created the order; null for orders without an author. */
+  createdBy: number | null;
+  customerId: number;
+  /** The total frozen at the submit, whole MNT; null when the order was never priced. */
+  orderTotal: string | null;
+  /** The invoice the sale issued; null without finance or when nothing was delivered. */
+  invoiceNumber: string | null;
+}
+
+export interface SaleListener {
+  /** One statement in the sale's transaction; an error aborts the sale (never caught, 25P02). */
+  onSale(tx: Tx, notice: SaleNotice): Promise<void>;
+}
+
+export const SALE_LISTENER = Symbol('SALE_LISTENER');

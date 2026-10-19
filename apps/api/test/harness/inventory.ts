@@ -24,6 +24,8 @@ export interface WarehouseJson {
   code: string;
   name: string;
   kind: string;
+  /** The branch `warehouse()` made for it. */
+  branchId: number;
 }
 
 /** HTTP helpers for inventory tests, acting as the user behind `token` (an admin by default). */

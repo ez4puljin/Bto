@@ -5,6 +5,7 @@ import { PERMISSIONS, SYSTEM_ROLES } from './auth';
 import { ERROR_CODES } from './errors';
 import { IMPORT_COLUMNS, IMPORT_KINDS, ROW_ERROR_CODES, ROW_WARNING_CODES } from './imports';
 import { ADJUSTMENT_REASON_CODES } from './inventory';
+import { NOTICE_KINDS, NOTICE_STATES } from './notifications';
 import { PRICE_BASES, PRICE_ROUNDINGS } from './pricing';
 import {
   PRODUCT_MISSING,
@@ -74,6 +75,13 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
       Object.keys(SEGMENT_FIELDS[entity]).map((field) => `segments.fields.${entity}.${field}`),
     ),
     ...SEGMENT_ISSUES.map((issue) => `segments.issues.${issue}`),
+  ])('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...NOTICE_KINDS.map((kind) => `notifications.kinds.${kind}`),
+    ...NOTICE_STATES.map((state) => `notifications.states.${state}`),
   ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });

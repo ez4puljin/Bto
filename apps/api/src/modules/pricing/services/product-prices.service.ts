@@ -12,7 +12,7 @@ import {
   wholeUnitProblem,
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
-import { type SQL, and, asc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { type SQL, and, asc, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -22,7 +22,7 @@ import { CatalogService, type UnitInfo, UnitConversionService } from '../../cata
 import { type Actor, actorUserId, type AuditEntry, AuditService } from '../../identity';
 import { productPrices } from '../schema';
 import { assertLive, PriceProfilesService } from './price-profiles.service';
-import { advisoryLock, applied, assertNotPast, inForceOn, LOCKS } from './support';
+import { advisoryLock, applied, assertNotPast, inForceOn, inForceSql, LOCKS } from './support';
 import { planChange } from './timeline';
 
 type TermsRow = typeof productPrices.$inferSelect;
@@ -41,6 +41,13 @@ export interface PriceTerms {
   wholeUomId: number | null;
   validFrom: string;
   validTo: string | null;
+}
+
+/** The rep app's prices of a product (ADR-0068): the unit table and one base unit in whole packs. */
+export interface ShopPrices {
+  /** The warehouse price per base unit, whole MNT, VAT included. */
+  basePrice: Decimal;
+  units: UnitPrices[];
 }
 
 /** A product's current unit, as the price card and dialog need it. */
@@ -257,6 +264,96 @@ export class ProductPricesService {
   }
 
   /**
+   * The unit table `view()` gives one product, for many products on a day (the rep app's shop,
+   * ADR-0061 #7): one of each current unit on both lists, without discount programs. Products
+   * without terms, or whose profile has no values that day, are left out.
+   */
+  async tablesOf(
+    productIds: readonly number[],
+    date: string = businessDate(),
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, UnitPrices[]>> {
+    const prices = await this.shopPricesOf(productIds, date, executor);
+    return new Map([...prices].map(([productId, own]) => [productId, own.units]));
+  }
+
+  /**
+   * `tablesOf` with each product's warehouse price per base unit (whole MNT): what one base unit
+   * costs in whole packs, the price the rep app's shop shows and sorts by (ADR-0068). The same
+   * products are left out, so a product never shows a base price without its unit table.
+   */
+  async shopPricesOf(
+    productIds: readonly number[],
+    date: string = businessDate(),
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, ShopPrices>> {
+    const terms = await this.inForce(productIds, date, executor);
+    if (terms.size === 0) return new Map();
+    const versions = await this.profiles.versionsInForce(
+      [...terms.values()].map((own) => own.profileId),
+      date,
+      executor,
+    );
+    const units = await this.units.currentUnits([...terms.keys()], executor);
+    const result = new Map<number, ShopPrices>();
+    for (const [productId, own] of terms) {
+      const profile = versions.get(own.profileId);
+      if (!profile) continue;
+      result.set(productId, {
+        basePrice: own.warehousePrice,
+        units: unitPriceTable(
+          { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
+          quoteUnitsOf(units.get(productId) ?? []),
+        ),
+      });
+    }
+    return result;
+  }
+
+  /**
+   * These products ordered by their warehouse price per base unit on a day, then by id, one keyset
+   * page of them (the rep app's price sorts, ADR-0068). A price counts as `shopPricesOf` counts
+   * it — terms in force whose profile has values that day; products without one come last in
+   * either direction. `after` is the last row of the previous page; the price is NUMERIC text.
+   */
+  async orderedByBasePrice(
+    productIds: readonly number[],
+    options: {
+      direction: 'ASC' | 'DESC';
+      after: { price: string | null; id: number } | null;
+      limit: number;
+      date: string;
+    },
+    executor: Db | Tx = this.db,
+  ): Promise<{ productId: number; price: string | null }[]> {
+    if (productIds.length === 0) return [];
+    const { direction, after, limit, date } = options;
+    const price = sql`pp.warehouse_price`;
+    const up = direction === 'ASC';
+    let keyset: SQL = sql`true`;
+    if (after) {
+      const next = up ? sql`>` : sql`<`;
+      keyset =
+        after.price === null
+          ? sql`${price} IS NULL AND k.id ${next} ${after.id}`
+          : sql`((${price}, k.id) ${next} (${after.price}::numeric, ${after.id}) OR ${price} IS NULL)`;
+    }
+    const { rows } = await executor.execute<{ id: string; price: string | null }>(sql`
+      SELECT k.id::text AS id, ${price}::text AS price
+        FROM unnest(${sql.param([...new Set(productIds)])}::bigint[]) AS k(id)
+        LEFT JOIN product_prices pp
+          ON pp.product_id = k.id
+         AND ${inForceSql(sql`pp.valid_from`, sql`pp.valid_to`, date)}
+         AND EXISTS (SELECT 1 FROM price_profile_versions v
+                      WHERE v.profile_id = pp.profile_id
+                        AND ${inForceSql(sql`v.valid_from`, sql`v.valid_to`, date)})
+       WHERE ${keyset}
+       ORDER BY ${up ? sql`${price} ASC NULLS LAST, k.id ASC` : sql`${price} DESC NULLS LAST, k.id DESC`}
+       LIMIT ${limit}`);
+    return rows.map((row) => ({ productId: Number.parseInt(row.id, 10), price: row.price }));
+  }
+
+  /**
    * The products one segment condition on prices keeps, ascending (ADR-0049 #3), by the terms in
    * force on a day: using these profiles (`IN`) or any (`ANY`), or a warehouse price within
    * whole-MNT bounds, both included (`BETWEEN`).
@@ -266,10 +363,7 @@ export class ProductPricesService {
     date: string,
     executor: Db | Tx = this.db,
   ): Promise<number[]> {
-    const filters: SQL[] = [
-      lte(productPrices.validFrom, date),
-      or(isNull(productPrices.validTo), gt(productPrices.validTo, sql`${date}::date`)) ?? sql`true`,
-    ];
+    const filters: SQL[] = [inForceSql(productPrices.validFrom, productPrices.validTo, date)];
     if (condition.field === 'priceProfile') {
       if (condition.op === 'IN') {
         if (!condition.ids?.length) return [];
@@ -313,8 +407,7 @@ export class ProductPricesService {
       .where(
         and(
           idIn(productPrices.productId, [...new Set(productIds)]),
-          lte(productPrices.validFrom, date),
-          or(isNull(productPrices.validTo), gt(productPrices.validTo, sql`${date}::date`)),
+          inForceSql(productPrices.validFrom, productPrices.validTo, date),
         ),
       );
     return new Map(rows.map(({ productId, ...terms }) => [productId, terms]));

@@ -283,6 +283,122 @@
         ]
       }
     },
+    "/api/v1/auth/mobile/login": {
+      "post": {
+        "operationId": "MobileAuth_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileLoginResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/refresh": {
+      "post": {
+        "operationId": "MobileAuth_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTokens"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/logout": {
+      "post": {
+        "operationId": "MobileAuth_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/users/lookup": {
       "get": {
         "operationId": "Users_lookup",
@@ -13977,6 +14093,768 @@
         ]
       }
     },
+    "/api/v1/sales-rep/context": {
+      "get": {
+        "operationId": "SalesRep_context",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepContext"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/orders": {
+      "post": {
+        "operationId": "SalesRep_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesRepOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrder"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      },
+      "get": {
+        "operationId": "SalesRep_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "The first Ulaanbaatar day the orders were made on",
+            "schema": {
+              "format": "date",
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "The last day, included; at most 366 days from `from`",
+            "schema": {
+              "format": "date",
+              "example": "2026-10-16",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Order number or customer (name, code, phone)",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders of this customer",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Only orders with a line of this product",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "paymentMethod",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "BANK_TRANSFER",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "fulfilment",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PICKUP",
+                "DELIVERY"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "DRAFT; ACTIVE: submitted, not yet delivered; SOLD: delivered, invoiced or closed; CANCELLED",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "ACTIVE",
+                "SOLD",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/map": {
+      "get": {
+        "operationId": "SalesRep_map",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepMap"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/orders/{id}": {
+      "get": {
+        "operationId": "SalesRep_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepOrder"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/products": {
+      "get": {
+        "operationId": "SalesRep_products",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name words, code or barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Categories, each with its subcategories (1–200 ids, repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "description": "The products' home warehouse",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "supplierIds",
+            "required": false,
+            "in": "query",
+            "description": "Main suppliers (1–200 ids, repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "Only products with stock free in their home warehouse",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "NEW when left out: the latest to become sale-ready first",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "PRICE_ASC",
+                "PRICE_DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepProductPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/products/batch": {
+      "get": {
+        "operationId": "SalesRep_productBatch",
+        "parameters": [
+          {
+            "name": "productIds",
+            "required": true,
+            "in": "query",
+            "description": "Product ids, comma separated (at most 200)",
+            "schema": {
+              "pattern": "^\\d+(,\\d+){0,199}$",
+              "example": "12,15",
+              "type": "string"
+            }
+          },
+          {
+            "name": "priceBefore",
+            "required": false,
+            "in": "query",
+            "description": "Also each base price on this day (a price-drop notice shows the old one)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRepProduct"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/suppliers": {
+      "get": {
+        "operationId": "SalesRep_suppliers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SalesRepSupplier"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/thumbs": {
+      "get": {
+        "operationId": "SalesRep_thumbs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepThumbs"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/customers": {
+      "get": {
+        "operationId": "SalesRep_customers",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Name, code, phone or registration number",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepCustomerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/customers/{id}/orders": {
+      "get": {
+        "operationId": "SalesRep_storeOrders",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepStoreOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/customers/{id}": {
+      "get": {
+        "operationId": "SalesRep_customer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepCustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
     "/api/v1/invoices": {
       "get": {
         "operationId": "Invoices_list",
@@ -17497,6 +18375,301 @@
           "pos-dev"
         ]
       }
+    },
+    "/api/v1/app-notices": {
+      "get": {
+        "operationId": "AppNotices_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNoticePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      },
+      "post": {
+        "operationId": "AppNotices_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppNoticeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/app-notices/{id}/withdraw": {
+      "post": {
+        "operationId": "AppNotices_withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotice"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications/summary": {
+      "get": {
+        "operationId": "MyNotifications_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications": {
+      "get": {
+        "operationId": "MyNotifications_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/me/notifications/read": {
+      "post": {
+        "operationId": "MyNotifications_read",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyNotificationReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyNotificationReadResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
     }
   },
   "info": {
@@ -17613,6 +18786,7 @@
           "sales.orders.manage",
           "sales.boards.manage",
           "sales.orders.pick",
+          "sales.orders.rep",
           "finance.read",
           "finance.payments.record",
           "finance.invoices.manage",
@@ -17621,7 +18795,8 @@
           "pos.read",
           "pos.manage",
           "pos.till.operate",
-          "pos.till.supervise"
+          "pos.till.supervise",
+          "notifications.send"
         ]
       },
       "RoleRef": {
@@ -17683,6 +18858,11 @@
               "type": "number"
             }
           },
+          "sessionStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this session signed in"
+          },
           "sessionExpiresAt": {
             "type": "string",
             "format": "date-time"
@@ -17695,6 +18875,7 @@
           "permissions",
           "roles",
           "writableWarehouseIds",
+          "sessionStartedAt",
           "sessionExpiresAt"
         ]
       },
@@ -17788,6 +18969,76 @@
           "username",
           "code",
           "newPassword"
+        ]
+      },
+      "MobileLoginResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sessionExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "me": {
+            "$ref": "#/components/schemas/Me"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token: kept in the device secure storage and sent to /auth/mobile/refresh"
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "sessionExpiresAt",
+          "me",
+          "refreshToken"
+        ]
+      },
+      "MobileTokenRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "MobileTokens": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sessionExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true,
+            "description": "The rotated refresh token; null within the 20-second grace window: keep the stored one"
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "sessionExpiresAt",
+          "refreshToken"
         ]
       },
       "UserLookup": {
@@ -18784,6 +20035,7 @@
             "enum": [
               "catalog.product_image",
               "catalog.product_thumb",
+              "notifications.notice_image",
               "imports.source"
             ],
             "type": "string"
@@ -29643,6 +30895,1229 @@
           "channel"
         ]
       },
+      "SalesRepStage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "action": {
+            "enum": [
+              "NONE",
+              "CONFIRM",
+              "PICK",
+              "SALE",
+              "CANCEL"
+            ],
+            "type": "string",
+            "description": "NONE: a draft; CONFIRM: reserved at once"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "action"
+        ]
+      },
+      "SalesRepPipeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepStage"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "stages"
+        ]
+      },
+      "SalesRepBoard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The board's branch, if it has one"
+          },
+          "pipelines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepPipeline"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "branchName",
+          "pipelines"
+        ]
+      },
+      "SalesRepWarehouse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number"
+          },
+          "branchName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "branchId",
+          "branchName"
+        ]
+      },
+      "SalesRepContext": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "description": "The server's business date (Ulaanbaatar)"
+          },
+          "boards": {
+            "description": "Stages the rep may place orders on",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepBoard"
+            }
+          },
+          "defaultStageId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The SALES_REP channel's stage"
+          },
+          "warehouses": {
+            "description": "Active wholesale warehouses: the shop's homes, the location filter",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepWarehouse"
+            }
+          },
+          "branchNames": {
+            "description": "The branches of the rep's write scope; empty when the rep is not scoped",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "today",
+          "boards",
+          "defaultStageId",
+          "warehouses",
+          "branchNames"
+        ]
+      },
+      "SalesRepOrderRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Today or later (Ulaanbaatar)"
+          },
+          "addressId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Required for DELIVERY"
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 120
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "example": "99112233"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderLineRequest"
+            }
+          },
+          "stageId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The stage chosen in the app (one of GET /sales-rep/context)"
+          }
+        },
+        "required": [
+          "customerId",
+          "fulfilment",
+          "deliveryDate",
+          "paymentMethod",
+          "lines",
+          "stageId"
+        ]
+      },
+      "SalesRepOrderPart": {
+        "type": "object",
+        "properties": {
+          "uomName": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string",
+            "description": "WAREHOUSE, LOOSE, RETAIL or RETAIL_BULK"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uomName",
+          "basis",
+          "qty",
+          "unitPrice",
+          "total"
+        ]
+      },
+      "SalesRepOrderLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "baseUnitName": {
+            "type": "string"
+          },
+          "qtyApproved": {
+            "type": "string",
+            "description": "Reserved, base units"
+          },
+          "qtyBackordered": {
+            "type": "string",
+            "description": "Short, base units"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's line in the quote of its lines at today's WHOLESALE prices; null for any other order or when the line has no price"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderPart"
+            }
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "productSku",
+          "productName",
+          "productUnitId",
+          "unitName",
+          "qty",
+          "qtyBase",
+          "baseUnitName",
+          "qtyApproved",
+          "qtyBackordered",
+          "total",
+          "estimatedTotal",
+          "parts"
+        ]
+      },
+      "SalesRepOrderEvent": {
+        "type": "object",
+        "properties": {
+          "fromStatus": {
+            "nullable": true,
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "toStatus": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "fromStatus",
+          "toStatus",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "SalesRepOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "addressText": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactName": {
+            "type": "string",
+            "nullable": true
+          },
+          "contactPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountTotal": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "nullable": true
+          },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
+          "boardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderLine"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderEvent"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "customerId",
+          "customerCode",
+          "customerName",
+          "fulfilment",
+          "deliveryDate",
+          "addressText",
+          "contactName",
+          "contactPhone",
+          "paymentMethod",
+          "note",
+          "subtotal",
+          "discountTotal",
+          "total",
+          "estimatedTotal",
+          "boardName",
+          "pipelineName",
+          "stageName",
+          "cancelReason",
+          "createdAt",
+          "lines",
+          "events"
+        ]
+      },
+      "SalesRepOrderSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "fulfilment": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "paymentMethod": {
+            "enum": [
+              "CASH",
+              "BANK_TRANSFER",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a draft"
+          },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "customerId",
+          "customerName",
+          "fulfilment",
+          "paymentMethod",
+          "deliveryDate",
+          "total",
+          "estimatedTotal",
+          "lineCount",
+          "pipelineName",
+          "stageName",
+          "createdAt"
+        ]
+      },
+      "SalesRepRangeSummary": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "description": "MNT: the orders not cancelled (a draft has no total yet)"
+          },
+          "drafts": {
+            "type": "number"
+          },
+          "draftsEstimate": {
+            "type": "string",
+            "description": "MNT: the sum of the drafts' estimates (a draft without one adds nothing)"
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "drafts",
+          "draftsEstimate"
+        ]
+      },
+      "SalesRepOrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepOrderSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "nullable": true,
+            "description": "First page only: every order the range, search and filters keep",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesRepRangeSummary"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "summary"
+        ]
+      },
+      "SalesRepMapStore": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditHold": {
+            "type": "boolean",
+            "description": "The customer's manual credit hold: no new orders (partners)"
+          },
+          "creditHoldReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set only while on hold"
+          },
+          "addressId": {
+            "type": "number",
+            "description": "The customer address whose point this is"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "The point's address text"
+          },
+          "lat": {
+            "type": "string",
+            "example": "49.639810",
+            "description": "Degrees, 6 decimals"
+          },
+          "lng": {
+            "type": "string",
+            "example": "100.162540",
+            "description": "Degrees, 6 decimals"
+          },
+          "lastOrderId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The caller's own last rep order for the store (drafts count, cancelled do not)"
+          },
+          "lastOrderAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastOrderDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "The last order's Ulaanbaatar day"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "No such order within `freshDays` days, today included"
+          }
+        },
+        "required": [
+          "customerId",
+          "code",
+          "name",
+          "phone",
+          "creditHold",
+          "creditHoldReason",
+          "addressId",
+          "address",
+          "lat",
+          "lng",
+          "lastOrderId",
+          "lastOrderAt",
+          "lastOrderDate",
+          "stale"
+        ]
+      },
+      "SalesRepMap": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "description": "The server's business date (Ulaanbaatar)"
+          },
+          "freshDays": {
+            "type": "number",
+            "description": "An order within this many days, today included, is fresh"
+          },
+          "data": {
+            "description": "Active customers with a GPS point (the default address, else the oldest active one), by name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepMapStore"
+            }
+          }
+        },
+        "required": [
+          "today",
+          "freshDays",
+          "data"
+        ]
+      },
+      "SalesRepProductImage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Relative to the server"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "url",
+          "thumbUrl"
+        ]
+      },
+      "SalesRepProductUnit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The product unit id an order line takes"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "uomCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "PCS, BOX …; null for a custom one"
+          },
+          "factorToBase": {
+            "type": "string"
+          },
+          "isBase": {
+            "type": "boolean"
+          },
+          "isDefaultSales": {
+            "type": "boolean",
+            "description": "The unit the shop adds by default"
+          },
+          "barcodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wholesale": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one unit at the WHOLESALE list"
+          },
+          "basis": {
+            "nullable": true,
+            "enum": [
+              "WAREHOUSE",
+              "LOOSE",
+              "MIXED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "uomName",
+          "uomCode",
+          "factorToBase",
+          "isBase",
+          "isDefaultSales",
+          "barcodes",
+          "wholesale",
+          "basis"
+        ]
+      },
+      "SalesRepProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "number"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "images": {
+            "description": "The primary first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductImage"
+            }
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Became sale-ready within the last 14 days"
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "An order accepts it (active, complete, with a home warehouse)"
+          },
+          "homeWarehouseId": {
+            "type": "number",
+            "nullable": true
+          },
+          "available": {
+            "type": "string",
+            "description": "Base units free in the home warehouse"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one base unit in whole packs (the warehouse price); null without terms"
+          },
+          "basePriceBefore": {
+            "type": "string",
+            "nullable": true,
+            "description": "The base price on `priceBefore`; null without it"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProductUnit"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "categoryId",
+          "thumbUrl",
+          "images",
+          "isNew",
+          "sellable",
+          "homeWarehouseId",
+          "available",
+          "basePrice",
+          "basePriceBefore",
+          "units"
+        ]
+      },
+      "SalesRepProductPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "First page only: how many products the filters keep"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "SalesRepSupplier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Shop products whose main supplier this is"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "productCount"
+        ]
+      },
+      "SalesRepThumbs": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "description": "The primary picture's thumbnail of every product the shop lists (relative URLs that never change)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "urls"
+        ]
+      },
+      "SalesRepCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "The default address"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "address"
+        ]
+      },
+      "SalesRepCustomerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomer"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepStoreOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVAL_PENDING",
+              "CONFIRMED",
+              "PICKING",
+              "PACKED",
+              "DISPATCHED",
+              "DELIVERED",
+              "DELIVERY_FAILED",
+              "INVOICED",
+              "CLOSED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "ADMIN",
+              "CUSTOMER_APP",
+              "SALES_REP",
+              "POS"
+            ],
+            "type": "string",
+            "description": "ADMIN: an office order"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date",
+            "description": "The Ulaanbaatar day the order was taken"
+          },
+          "createdTime": {
+            "type": "string",
+            "example": "14:05",
+            "description": "The Ulaanbaatar time it was taken, HH:mm"
+          },
+          "takerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The creator's full name; null when unknown"
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "The caller's own rep order: only these open (GET /sales-rep/orders/{id}), the rest are rows only"
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a draft"
+          },
+          "estimatedTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT: a draft's lines quoted at today's WHOLESALE prices, never stored; null for any other order or when a line has no price"
+          },
+          "lineCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "channel",
+          "createdAt",
+          "createdDate",
+          "createdTime",
+          "takerName",
+          "mine",
+          "total",
+          "estimatedTotal",
+          "lineCount"
+        ]
+      },
+      "SalesRepStoreOrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Every order of the store, anyone's, any status, newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepStoreOrder"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "SalesRepCustomerAddress": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a point without text"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "address",
+          "isDefault"
+        ]
+      },
+      "SalesRepCustomerContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "SalesRepCustomerDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "addresses": {
+            "description": "Active, the default first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerAddress"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepCustomerContact"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "phone",
+          "addresses",
+          "contacts"
+        ]
+      },
       "Invoice": {
         "type": "object",
         "properties": {
@@ -34635,6 +37110,406 @@
         "required": [
           "countedCash",
           "floatKept"
+        ]
+      },
+      "AppNoticeProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "thumbUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "thumbUrl"
+        ]
+      },
+      "AppNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "popup": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          },
+          "state": {
+            "enum": [
+              "SCHEDULED",
+              "RUNNING",
+              "ENDED",
+              "WITHDRAWN"
+            ],
+            "type": "string",
+            "description": "On the business date of the answer"
+          },
+          "products": {
+            "description": "In the order the admin chose",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppNoticeProduct"
+            }
+          },
+          "recipients": {
+            "type": "number",
+            "description": "Active holders of sales.orders.rep beside ADMIN"
+          },
+          "reads": {
+            "type": "number",
+            "description": "Those recipients who read or closed it"
+          },
+          "createdBy": {
+            "type": "number"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "withdrawnByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "imageUrl",
+          "popup",
+          "validFrom",
+          "validTo",
+          "state",
+          "products",
+          "recipients",
+          "reads",
+          "createdBy",
+          "createdByName",
+          "createdAt",
+          "withdrawnAt",
+          "withdrawnByName"
+        ]
+      },
+      "AppNoticePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppNotice"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "AppNoticeRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Characters, trimmed"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Characters, trimmed"
+          },
+          "imageFileId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An uploaded file of kind notifications.notice_image"
+          },
+          "productIds": {
+            "uniqueItems": true,
+            "maxItems": 20,
+            "description": "Active, sale-ready products in the order the app shows them",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-10-16",
+            "description": "The first day, today or later (Ulaanbaatar)"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-31",
+            "description": "Up to, not including; null runs until withdrawn"
+          },
+          "popup": {
+            "type": "boolean",
+            "description": "Pops up in the middle of the screen when the app opens"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "body",
+          "productIds",
+          "validFrom",
+          "popup"
+        ]
+      },
+      "MyNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "PRICE_DROP",
+              "NEW_PRODUCT",
+              "NEWS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative to the server"
+          },
+          "popup": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The day it first shows"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Up to, not including"
+          },
+          "productIds": {
+            "description": "In the order the admin chose",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "imageUrl",
+          "popup",
+          "validFrom",
+          "validTo",
+          "productIds",
+          "read",
+          "createdAt"
+        ]
+      },
+      "MyNotificationSummary": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number",
+            "description": "Unread running notices plus unread own notifications"
+          },
+          "notices": {
+            "description": "The running notices, newest first (at most 50)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyNotice"
+            }
+          }
+        },
+        "required": [
+          "unread",
+          "notices"
+        ]
+      },
+      "MyNotification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "ORDER_SOLD"
+            ],
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "orderTotal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Whole MNT, frozen at the submit"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "orderId",
+          "orderNumber",
+          "customerName",
+          "orderTotal",
+          "invoiceNumber",
+          "read",
+          "createdAt"
+        ]
+      },
+      "MyNotificationPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyNotification"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "MyNotificationReadRequest": {
+        "type": "object",
+        "properties": {
+          "noticeIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "notificationIds": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      "MyNotificationReadResult": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "number",
+            "description": "The unread count after marking"
+          }
+        },
+        "required": [
+          "unread"
         ]
       },
       "ErrorCode": {

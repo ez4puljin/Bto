@@ -1,6 +1,6 @@
 # Web UI guide
 
-How screens are built in `apps/web` (ADR-0042, desktop density and widths ADR-0066). Read it before building or changing a screen; it is short on purpose. The owner chose an Apple-like look on 2026-10-13: a calm grey canvas, white cards, one blue for actions, large titles, 14px text; on 2026-10-16 the same look, denser, fitted to 1366×768 laptops and 1920×1080 monitors (Chrome leaves about 1366×633, 1536×730 and 1920×969 for the page).
+How screens are built in `apps/web` (ADR-0042, desktop density and widths ADR-0066). Read it before building or changing a screen; it is short on purpose. The owner chose an Apple-like look on 2026-10-13: a calm grey canvas, white cards, one blue for actions, large titles, 14px text; on 2026-10-16 the same look, denser, fitted to 1366×768 laptops and 1920×1080 monitors (Chrome leaves about 1366×633, 1536×730 and 1920×969 for the page). The staff app (`apps/mobile`, ADR-0061) copies these values into `src/theme/tokens.ts` with touch targets of at least 44 points; change both together (`docs/modules/mobile.md` §4).
 
 ## 1. Tokens (`apps/web/src/index.css`, light theme only)
 

@@ -13,6 +13,7 @@ export {
   WAREHOUSE_CREATED_HOOK,
   type WarehouseCreatedHook,
 } from './services/org.service';
+export { PermissionHoldersService } from './services/permission-holders.service';
 export { ScopeService } from './services/scope.service';
 export { SettingsService } from './services/settings.service';
 export { StorageService, type StoredFile } from './services/storage.service';

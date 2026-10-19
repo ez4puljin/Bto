@@ -155,6 +155,25 @@ export class ProductSuppliersService {
     return new Map(rows.map((row) => [row.productId, row.supplierId]));
   }
 
+  /**
+   * How many of these products each supplier is the main supplier of, the most first, then by
+   * name: the rep app's supplier filter (ADR-0068). A supplier with none of them is left out.
+   */
+  async mainSupplierCounts(
+    productIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<{ supplierId: number; name: string; productCount: number }[]> {
+    if (productIds.length === 0) return [];
+    const productCount = sql<number>`count(*)::int`;
+    return executor
+      .select({ supplierId: suppliers.id, name: suppliers.name, productCount })
+      .from(productSuppliers)
+      .innerJoin(suppliers, eq(suppliers.id, productSuppliers.supplierId))
+      .where(and(eq(productSuppliers.isMain, true), idIn(productSuppliers.productId, productIds)))
+      .groupBy(suppliers.id, suppliers.name)
+      .orderBy(desc(productCount), asc(suppliers.name), asc(suppliers.id));
+  }
+
   link(actor: Actor, productId: number, supplierId: number): Promise<ProductSupplierLink> {
     return inTransaction(this.db, async (tx) => {
       const id = await this.linkInTx(tx, actor, productId, supplierId);

@@ -199,6 +199,63 @@ export function defaultDeliveryDate(today: string = businessDate()): string {
   return addDays(today, 1);
 }
 
+/**
+ * The rep app's shop orders (ADR-0068): NEW, the latest to become sale-ready first; PRICE_ASC and
+ * PRICE_DESC by one base unit's price in whole packs (the warehouse price), unpriced last.
+ */
+export const REP_PRODUCT_SORTS = ['NEW', 'PRICE_ASC', 'PRICE_DESC'] as const;
+export type RepProductSort = (typeof REP_PRODUCT_SORTS)[number];
+
+/**
+ * Products a price sort orders at most. A price sort reads every product the filters keep; above
+ * this it is refused with the count (SELECTION_TOO_LARGE), never cut short.
+ */
+export const REP_PRICE_SORT_MAX = 100_000;
+
+/** Days one request of the rep's orders may span, both ends included. */
+export const REP_ORDER_RANGE_MAX_DAYS = 366;
+
+/**
+ * The rep app's order-history state filter: DRAFT; ACTIVE, submitted but not yet delivered; SOLD,
+ * delivered (invoiced and closed included); CANCELLED.
+ */
+export const REP_ORDER_STATES = ['DRAFT', 'ACTIVE', 'SOLD', 'CANCELLED'] as const;
+export type RepOrderState = (typeof REP_ORDER_STATES)[number];
+
+const REP_ORDER_STATE_STATUSES: Record<RepOrderState, readonly OrderStatus[]> = {
+  DRAFT: ['DRAFT'],
+  ACTIVE: [
+    'SUBMITTED',
+    'APPROVAL_PENDING',
+    'CONFIRMED',
+    'PICKING',
+    'PACKED',
+    'DISPATCHED',
+    'DELIVERY_FAILED',
+  ],
+  SOLD: ['DELIVERED', 'INVOICED', 'CLOSED'],
+  CANCELLED: ['CANCELLED'],
+};
+
+/** The order statuses a rep's state filter keeps; every status belongs to exactly one state. */
+export function repOrderStatusesOf(state: RepOrderState): readonly OrderStatus[] {
+  return REP_ORDER_STATE_STATUSES[state];
+}
+
+/**
+ * The rep app's map: a store the rep ordered for within this many days, today included, is fresh;
+ * any other store (or one never ordered for) is shown as waiting for a visit.
+ */
+export const REP_MAP_FRESH_DAYS = 7;
+
+/**
+ * True when a store has no order, or its last order's Ulaanbaatar day lies before the fresh window
+ * (`today` and the REP_MAP_FRESH_DAYS - 1 days before it). Both dates are `YYYY-MM-DD`.
+ */
+export function storeIsStale(lastOrderDate: string | null, today: string): boolean {
+  return lastOrderDate === null || lastOrderDate < addDays(today, -(REP_MAP_FRESH_DAYS - 1));
+}
+
 export interface OrderHeaderInput {
   fulfilment: Fulfilment;
   deliveryDate: string;

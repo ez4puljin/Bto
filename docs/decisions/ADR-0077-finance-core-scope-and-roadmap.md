@@ -31,7 +31,7 @@ Erkhet was studied through its screens and handbook only: report outputs need a 
 
    | Phase | Content | Sessions | Order |
    |---|---|---|---|
-   | R | Merge the `rep-app` branch (it holds migration `0028_notifications.sql`) | 0.5 | before P1 |
+   | R | Merge the `rep-app` branch: done 2026-10-19 (PR #3), its notifications migration renumbered to `0030_notifications.sql` | 0.5 | before P1 (done) |
    | P0a | These decisions (ADR-0069 … ADR-0077), SPEC, architecture, STATUS | 1 | before e-Barimt on invoices |
    | P0b | `packages/fin-contract`, an empty `apps/api/src/finance-core/`, a Bto-free `common/**`, `@tugeel/shared/mn`, the lint elements, `pnpm core:standalone` (ADR-0069, ADR-0074) | 1 | the next finance session |
    | P1 | Schema `fin`, tenant, company BO, branches, source systems, parties, `bto.company_code`, `identity.user_company_roles`, `fin-bridge` (ADR-0070, ADR-0075) | 1 | |

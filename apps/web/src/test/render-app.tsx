@@ -40,6 +40,7 @@ export const ADMIN_ME: Me = {
   permissions: [...PERMISSIONS],
   roles: [{ id: 1, code: 'ADMIN', name: null, isSystem: true }],
   writableWarehouseIds: null,
+  sessionStartedAt: '2026-10-10T08:00:00.000Z',
   sessionExpiresAt: '2026-10-10T20:00:00.000Z',
 };
 

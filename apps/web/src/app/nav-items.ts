@@ -25,6 +25,7 @@ import {
   KeyRound,
   LayoutGrid,
   type LucideIcon,
+  Megaphone,
   Monitor,
   Move,
   Package,
@@ -295,6 +296,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'imports.manage',
       },
       { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
+      {
+        to: '/system/app-notices',
+        label: 'nav.appNotices',
+        icon: Megaphone,
+        permission: 'notifications.send',
+      },
     ],
   },
 ];

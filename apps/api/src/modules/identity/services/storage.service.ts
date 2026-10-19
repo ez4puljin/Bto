@@ -8,8 +8,9 @@ import {
   isFileKind,
   matchesMagicBytes,
 } from '@tugeel/shared/files';
-import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { AppConfig } from '../../../common/config/app-config';
+import { idIn } from '../../../common/db/days';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
@@ -252,7 +253,7 @@ export class StorageService {
     const rows = await executor
       .select({ id: files.id, key: files.key })
       .from(files)
-      .where(and(inArray(files.id, [...fileIds]), eq(files.status, 'READY')));
+      .where(and(idIn(files.id, fileIds), eq(files.status, 'READY')));
     return new Map(rows.map((row) => [row.id, this.publicUrl(row)]));
   }
 

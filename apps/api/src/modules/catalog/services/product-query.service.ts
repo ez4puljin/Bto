@@ -5,10 +5,21 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
 import { PRODUCT_SET_RESOLVER, type ProductSetFilter, type ProductSetResolver } from '../hooks';
-import { type ProductListItem, type ProductQuery, ProductsService } from './products.service';
+import {
+  type ProductImageUrls,
+  type ProductListItem,
+  type ProductQuery,
+  ProductsService,
+  type UnitFlags,
+} from './products.service';
 
-/** The product list's filters: today's (search, category, stage) and a segment filter. */
-export interface ProductListQuery extends ProductQuery, ProductSetFilter {}
+/**
+ * The product list's filters: today's (search, category, stage), a segment filter, and a set of
+ * products another module chose (the rep app's «in stock», ADR-0068) that the rest narrows.
+ */
+export interface ProductListQuery extends ProductQuery, ProductSetFilter {
+  onlyIds?: readonly number[];
+}
 
 /**
  * The product list with filters on other modules' data (ADR-0049 #4). Catalog keeps its rows,
@@ -36,16 +47,26 @@ export class ProductQueryService implements OnModuleInit {
     }
   }
 
-  /** The products a segment filter keeps, ascending; null when the query has none. */
-  async within(filter: ProductSetFilter): Promise<number[] | null> {
-    if (filter.where === undefined && filter.segmentId === undefined) return null;
+  /**
+   * The products a segment filter and `onlyIds` keep, ascending; null when the query has neither.
+   * Every reader of the list (the page, the ids, a selection, an export) narrows the same way.
+   */
+  async within(
+    filter: ProductSetFilter & { onlyIds?: readonly number[] },
+  ): Promise<number[] | null> {
+    const only =
+      filter.onlyIds === undefined ? null : [...new Set(filter.onlyIds)].sort((a, b) => a - b);
+    if (filter.where === undefined && filter.segmentId === undefined) return only;
     if (!this.resolver) {
       throw new AppError('SERVICE_UNAVAILABLE', 'segment filters are not available');
     }
-    return this.resolver.productIds({
+    const kept = await this.resolver.productIds({
       ...(filter.where === undefined ? {} : { where: filter.where }),
       ...(filter.segmentId === undefined ? {} : { segmentId: filter.segmentId }),
     });
+    if (only === null) return kept;
+    const keep = new Set(kept);
+    return only.filter((id) => keep.has(id));
   }
 
   /** One page of the list and, on the first page, how many products the filters keep. */
@@ -97,5 +118,29 @@ export class ProductQueryService implements OnModuleInit {
   /** List rows of these products in the order given. */
   listItemsOf(ids: readonly number[], executor: Db | Tx = this.db): Promise<ProductListItem[]> {
     return this.products.listItemsOf(ids, executor);
+  }
+
+  /** Each product's ready pictures, the primary first. */
+  imagesOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, ProductImageUrls[]>> {
+    return this.products.imagesOf(ids, executor);
+  }
+
+  /** product id → its primary picture's thumbnail URL, for products that have a ready one. */
+  primaryThumbsOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    return this.products.primaryThumbsOf(ids, executor);
+  }
+
+  /** unit id → its unit of measure's code and default-sales flag, for current units. */
+  unitFlagsOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, UnitFlags>> {
+    return this.products.unitFlagsOf(ids, executor);
   }
 }

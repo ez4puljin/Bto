@@ -471,6 +471,16 @@ export class SalesPipelinesService {
     return { ...found, rights: access.stageRights(found.pipeline, found.stage), access };
   }
 
+  /**
+   * Locks a stage and its pipeline FOR SHARE and returns the pipeline (the rep app's placement,
+   * ADR-0061 #6: its own rule decides, not the caller's stage rights).
+   */
+  async lockStage(tx: Tx, stageId: number): Promise<number> {
+    const pipelineId = await this.pipelineOf(tx, stageId);
+    await this.lockShare(tx, pipelineId, stageId);
+    return pipelineId;
+  }
+
   /** The documents a stage prints when a card arrives. */
   printsOf(stage: StageView): PrintKind[] {
     return [
