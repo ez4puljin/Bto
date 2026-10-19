@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { PrintFrame } from '@/components/print-frame';
+import { useCompany, useCompanyName } from '@/features/company/api';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { cn } from '@/lib/utils';
@@ -14,9 +15,10 @@ export function PosSalePrintPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
   const sale = useSale(id > 0 ? id : null);
+  const company = useCompany();
   return (
     <PrintFrame
-      ready={sale.data !== undefined}
+      ready={sale.data !== undefined && !company.isPending}
       error={sale.error}
       title={sale.data ? t('pos.sales.printTitle', { number: sale.data.number }) : ''}
     >
@@ -27,6 +29,7 @@ export function PosSalePrintPage() {
 
 function ReceiptSheet({ sale, narrow }: { sale: SaleDetail; narrow: boolean }) {
   const { t } = useTranslation();
+  const companyName = useCompanyName();
   const rows: [string, string][] = [
     [t('pos.fields.soldAt'), formatUbDateTime(Date.parse(sale.soldAt))],
     [t('pos.fields.till'), sale.tillCode],
@@ -39,9 +42,7 @@ function ReceiptSheet({ sale, narrow }: { sale: SaleDetail; narrow: boolean }) {
   return (
     <article className={cn(narrow ? 'flex flex-col gap-2' : 'flex flex-col gap-6')}>
       <header className={cn('border-b border-dashed border-foreground pb-2', narrow ? '' : 'pb-4')}>
-        <h1 className={cn('text-center font-semibold', narrow ? '' : 'text-lg')}>
-          {t('brand.company')}
-        </h1>
+        <h1 className={cn('text-center font-semibold', narrow ? '' : 'text-lg')}>{companyName}</h1>
         <h2 className={cn('mt-1 text-center font-bold', narrow ? 'text-sm' : 'text-xl')}>
           {t(`pos.saleKinds.${sale.kind}`)} · {sale.number}
         </h2>

@@ -28,14 +28,16 @@ interface AccessRow extends Record<string, unknown> {
   role_ids: string[];
   scoped: boolean;
   writable: string[];
+  /** Company code → its finance permission codes. */
+  company_permissions: Record<string, string[]>;
 }
 
 const toId = (value: string): number => Number.parseInt(value, 10);
 
 /**
  * Resolves the AuthContext of a session on every request (ADR-0027 #2): one query for session
- * validity, user status, effective permissions and the expanded write scope. Revocations and role
- * changes therefore apply to the very next request.
+ * validity, user status, effective permissions, the expanded write scope and the finance rights
+ * per company (ADR-0084 #2). Revocations and role changes therefore apply to the very next request.
  */
 @Injectable()
 export class AccessService {
@@ -58,7 +60,14 @@ export class AccessService {
                WHERE w.kind = 'TRANSIT'
                   OR w.id IN (SELECT us.warehouse_id FROM user_scopes us WHERE us.user_id = u.id)
                   OR w.branch_id IN (SELECT us.branch_id FROM user_scopes us WHERE us.user_id = u.id)
-             ) AS writable
+             ) AS writable,
+        COALESCE((SELECT json_object_agg(c.company_code, c.codes) FROM (
+            SELECT ucr.company_code,
+                   array_agg(DISTINCT rp.permission_code ORDER BY rp.permission_code) AS codes
+              FROM user_company_roles ucr
+              JOIN role_permissions rp ON rp.role_id = ucr.role_id
+             WHERE ucr.user_id = u.id AND rp.permission_code LIKE 'finance.%'
+             GROUP BY ucr.company_code) c), '{}'::json) AS company_permissions
         FROM auth_sessions s
         JOIN users u ON u.id = s.user_id
        WHERE s.id = ${sessionId} AND s.kind = 'STAFF' AND s.user_id = ${userId}
@@ -76,6 +85,12 @@ export class AccessService {
       permissions,
       roleIds: row.role_ids.map(toId),
       writableWarehouseIds: row.scoped ? new Set(row.writable.map(toId)) : null,
+      companyPermissions: new Map(
+        Object.entries(row.company_permissions).map(([company, codes]) => [
+          company,
+          new Set(codes.filter(isPermission)),
+        ]),
+      ),
       sessionStartedAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at),
       sessionExpiresAt: row.expires_at instanceof Date ? row.expires_at : new Date(row.expires_at),
       ...(requestId ? { requestId } : {}),

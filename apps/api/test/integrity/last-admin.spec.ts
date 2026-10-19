@@ -14,6 +14,7 @@ const adminContext = (userId: number): AuthContext => ({
   permissions: new Set(['identity.users.manage']),
   roleIds: [],
   writableWarehouseIds: null,
+  companyPermissions: new Map(),
 });
 
 /**

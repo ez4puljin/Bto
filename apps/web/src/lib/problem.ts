@@ -1,9 +1,17 @@
 import type { ProblemDetails } from '@tugeel/api-client';
-import { isErrorCode } from '@tugeel/shared/errors';
+import { isErrorCode, isFinErrorCode } from '@tugeel/shared/errors';
 
-/** The problem+json body of a failed call, or a generic one for network failures (ADR-0004 #4). */
+/**
+ * The problem+json body of a failed call, or a generic one for network failures (ADR-0004 #4).
+ * Bto's codes and the Finance Core's (`FIN_*`, ADR-0069 #7) both pass.
+ */
 export function problemOf(error: unknown): ProblemDetails {
-  if (typeof error === 'object' && error !== null && 'code' in error && isErrorCode(error.code)) {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (isErrorCode(error.code) || isFinErrorCode(error.code))
+  ) {
     return error as ProblemDetails;
   }
   return { type: 'about:blank', title: 'Internal error', status: 500, code: 'INTERNAL_ERROR' };

@@ -15,6 +15,7 @@ export {
   rolePermissions,
   roles,
   settings,
+  userCompanyRoles,
   userRoles,
   userScopes,
   users,
@@ -124,3 +125,18 @@ export {
   userNotifications,
 } from '../modules/notifications/schema';
 export { companyContacts, customerFavourites } from '../modules/customer/schema';
+export {
+  finAuditLog,
+  finBranches,
+  finBranchRefs,
+  finCompanies,
+  finCompanyTaxRegistrations,
+  finParties,
+  finPartyCompanies,
+  finPartyRefs,
+  finPostingKeys,
+  finSchema,
+  finSourceGrants,
+  finSourceSystems,
+  finTenants,
+} from '../finance-core/schema';

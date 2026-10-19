@@ -11,6 +11,7 @@ const context = (writable: number[] | null): AuthContext => ({
   permissions: new Set(),
   roleIds: [],
   writableWarehouseIds: writable === null ? null : new Set(writable),
+  companyPermissions: new Map(),
 });
 
 describe('ScopeService', () => {

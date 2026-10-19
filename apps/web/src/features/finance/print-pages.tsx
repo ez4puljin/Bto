@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { PrintFrame } from '@/components/print-frame';
+import { useCompany, useCompanyName } from '@/features/company/api';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatMnt } from '@/lib/money';
 import { cn } from '@/lib/utils';
@@ -11,9 +12,10 @@ export function InvoicePrintPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
   const invoice = useInvoice(id > 0 ? id : null);
+  const company = useCompany();
   return (
     <PrintFrame
-      ready={invoice.data !== undefined}
+      ready={invoice.data !== undefined && !company.isPending}
       error={invoice.error}
       title={
         invoice.data
@@ -34,13 +36,14 @@ export function PaymentPrintPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
   const payment = usePayment(id > 0 ? id : null);
+  const company = useCompany();
   const kind =
     payment.data?.direction === 'OUT'
       ? t('finance.print.voucherOut')
       : t('finance.print.voucherIn');
   return (
     <PrintFrame
-      ready={payment.data !== undefined}
+      ready={payment.data !== undefined && !company.isPending}
       error={payment.error}
       title={payment.data ? t('finance.print.tabTitle', { number: payment.data.number, kind }) : ''}
     >
@@ -60,11 +63,11 @@ function Heading({
   rows: [string, string][];
   narrow: boolean;
 }) {
-  const { t } = useTranslation();
+  const companyName = useCompanyName();
   if (narrow) {
     return (
       <header className="border-b border-dashed border-foreground pb-2">
-        <h1 className="text-center font-semibold">{t('brand.company')}</h1>
+        <h1 className="text-center font-semibold">{companyName}</h1>
         <h2 className="mt-1 text-center text-sm font-bold">
           {title} · {number}
         </h2>
@@ -82,7 +85,7 @@ function Heading({
   return (
     <header className="mb-6 flex items-start justify-between gap-6 border-b border-foreground pb-4">
       <div>
-        <h1 className="text-lg font-semibold">{t('brand.company')}</h1>
+        <h1 className="text-lg font-semibold">{companyName}</h1>
         <h2 className="mt-2 text-2xl font-bold">{title}</h2>
         <p className="font-mono text-base">{number}</p>
       </div>

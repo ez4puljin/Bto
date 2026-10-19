@@ -225,6 +225,13 @@
       "when": 1792383625857,
       "tag": "0031_customer_app",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792428928211,
+      "tag": "0032_fin_foundation",
+      "breakpoints": true
     }
   ]
 }

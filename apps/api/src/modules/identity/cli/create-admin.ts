@@ -15,6 +15,7 @@ import { roles, userRoles, users } from '../../../db/schema';
 import { systemActor } from '../auth-context';
 import { syncAccessCatalog } from '../reference-data';
 import { AuditService } from '../services/audit.service';
+import { mirrorCompanyRoles } from '../services/company-roles';
 import { type IssuedCode, issuePasswordCode } from '../services/password-codes';
 
 export interface CreateAdminResult extends IssuedCode {
@@ -48,6 +49,7 @@ export async function createAdmin(
       : await tx.insert(users).values({ username, fullName: input.fullName.trim() }).returning();
     if (!user) throw new Error('admin user was not written');
     await tx.insert(userRoles).values({ userId: user.id, roleId: admin.id }).onConflictDoNothing();
+    await mirrorCompanyRoles(tx, user.id);
     await audit.record(tx, actor, {
       action: existing ? 'ADMIN_RECOVERED' : 'CREATE',
       entity: 'users',

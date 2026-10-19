@@ -113,6 +113,33 @@ export const userRoles = pgTable(
   ],
 );
 
+/**
+ * A user's roles inside one Finance Core company (ADR-0075 #8, ADR-0076): no row, no access to that
+ * company's books. This installation books into one company (`bto.company_code`), so every write of
+ * `user_roles` mirrors itself here for it (ADR-0084). `company_code` is the core's company code, not
+ * a foreign key: identity never references the core's tables.
+ */
+export const userCompanyRoles = pgTable(
+  'user_company_roles',
+  {
+    userId: bigint('user_id', { mode: 'number' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    companyCode: text('company_code').notNull(),
+    roleId: bigint('role_id', { mode: 'number' })
+      .notNull()
+      .references(() => roles.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.companyCode, t.roleId] }),
+    index('user_company_roles_role_id_idx').on(t.roleId),
+    check(
+      'user_company_roles_company_code',
+      sql`${t.companyCode} ~ '^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$'`,
+    ),
+  ],
+);
+
 export const branches = pgTable(
   'branches',
   {

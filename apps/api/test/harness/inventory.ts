@@ -117,5 +117,9 @@ export function staffContext(
     permissions: new Set(SYSTEM_ROLE_PERMISSIONS[role]),
     roleIds: [],
     writableWarehouseIds: writableWarehouseIds === null ? null : new Set(writableWarehouseIds),
+    // The role's finance rights in the installation's company, as user_company_roles mirrors them.
+    companyPermissions: new Map([
+      ['BO', new Set(SYSTEM_ROLE_PERMISSIONS[role].filter((code) => code.startsWith('finance.')))],
+    ]),
   };
 }

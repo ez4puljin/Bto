@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Company_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Company_update"];
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -5004,6 +5020,59 @@ export interface components {
             /** @example sha-0a1b2c3 */
             version: string;
         };
+        CompanyTaxRegistration: {
+            /** @example VAT */
+            taxKind: string;
+            /** Format: date */
+            effectiveFrom: string;
+            registered: boolean;
+            activityCode: string | null;
+        };
+        CompanyBranchRef: {
+            /**
+             * @description The source system that knows the branch
+             * @example BTO
+             */
+            system: string;
+            /** @description The branch's id in that system */
+            externalId: string;
+        };
+        CompanyBranch: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            refs: components["schemas"]["CompanyBranchRef"][];
+        };
+        Company: {
+            /**
+             * @description The Finance Core company code (bto.company_code)
+             * @example BO
+             */
+            code: string;
+            legalName: string;
+            /** @description State register number */
+            registerNo: string | null;
+            /** @description Taxpayer number (ТТД) */
+            tin: string | null;
+            /** @example MNT */
+            functionalCurrency: string;
+            /** @example Asia/Ulaanbaatar */
+            timezone: string;
+            fiscalYearStartMonth: number;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            taxRegistrations: components["schemas"]["CompanyTaxRegistration"][];
+            /** @description Branches mapped from source systems */
+            branches: components["schemas"]["CompanyBranch"][];
+        };
+        CompanyUpdateRequest: {
+            legalName: string;
+            /** @description State register number: 7 digits for a company; null or blank clears it */
+            registerNo: string | null;
+            /** @description Taxpayer number: 11 digits for a company; null or blank clears it */
+            tin: string | null;
+        };
         LoginRequest: {
             /** @example bat.erdene */
             username: string;
@@ -5332,7 +5401,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "bto.company_code";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -11129,6 +11198,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Company_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Company_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
                 };
             };
             /** @description RFC 9457 problem details */
