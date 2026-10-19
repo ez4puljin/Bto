@@ -30,7 +30,7 @@ export interface FinInstallationSpec {
     requiredControl: FinAccountControl;
     requiresTaxCode: boolean;
   }[];
-  /** The party that takes control-account lines without a known counterparty (P2). */
+  /** The party that takes control-account lines without a known counterparty (F1's ledger). */
   legacyParty: { system: string; ref: string; name: string };
   /** The source's branches; inactive ones are never mapped (ADR-0084 #1). */
   branches: readonly {

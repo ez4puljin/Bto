@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0083 (2026-10-20: #2 soft close and override, #6 drafts and approval, #7 the rights beyond periods.close and periods.reopen, and #8 rights per company wait until after go-live) |
 | Amends | ADR-0027 (#2: finance permissions are resolved per company from `identity.user_company_roles`); ADR-0060 (#9: seven new finance rights, and manual and opening entries post only after approval) |
 
 ## Context

@@ -248,7 +248,7 @@ export const FIN_ACCOUNT_CONTROLS = [
   'MONEY',
 ] as const;
 
-/** A company's posting keys (ADR-0072): what a line means; rules turn keys into accounts (P2). */
+/** A company's posting keys (ADR-0072): what a line means; rules turn keys into accounts (F1's ledger). */
 export const finPostingKeys = finSchema.table(
   'posting_keys',
   {

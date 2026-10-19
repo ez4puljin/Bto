@@ -17,7 +17,7 @@ class FinBootGuard implements OnApplicationBootstrap {
 /**
  * The Finance Core (ADR-0069): its own database handle, the organisation (P1) — companies and
  * parties behind `FinCallContext` — and the boot guard. It needs only the process's `DB_POOL`,
- * never a Bto module; P2 adds the ledger, P3 the intake (docs/modules/finance-core.md §16).
+ * never a Bto module; the rest of F1 adds the ledger, F2 the intake (docs/modules/finance-core.md §16.0).
  */
 @Module({
   providers: [

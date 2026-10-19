@@ -14,7 +14,7 @@ The interview of 2026-10-20 (ADR-0084): tenant `BUTEN_ORGIL`; this installation 
 |---|---|
 | `FinBridgeModule`, `FinBridgeHttpModule` | the services and the boot step; the HTTP side adds `CompanyController` |
 | `FinContexts` | `companyCode()` (the locked setting `bto.company_code`, read once per process); `forSource(actor)` → principal `SOURCE {tenant BUTEN_ORGIL, system BTO}`; `forUser(ctx)` → principal `USER {tenant, ref user:<id>}` with `ctx.companyPermissions` as its rights. The actor (`STAFF user:<id>` with the full name, or `SYSTEM <label>`) is recorded, never trusted |
-| `FinPartiesBridge` | bound as partners' `CUSTOMER_CHANGED_HOOK`: `onCustomerChanged(tx, actor, customer)` upserts the party `customer:<id>` in the customer's transaction; `resolveCustomerParty(tx, actor, customerId)` for P2 |
+| `FinPartiesBridge` | bound as partners' `CUSTOMER_CHANGED_HOOK`: `onCustomerChanged(tx, actor, customer)` upserts the party `customer:<id>` in the customer's transaction; `resolveCustomerParty(tx, actor, customerId)` for F2's invoices (ADR-0083) |
 | `FinCompanyBridge` | `get(actor)` (as source BTO, for every staff member); `update(ctx, {legalName, registerNo, tin})` checks the Mongolian shapes (`regNoShape` = COMPANY: 7 digits; `isTinFor('COMPANY')`: 11 digits; blank clears) and calls the core as the user |
 | `btoInstallationSpec`, `POSTING_KEY_OF_ROLE`, `BTO_TENANT`, `BTO_SOURCE`, `FIN_SOURCE`, `LEGACY_PARTY_REF`, `customerRef` | what the installation books into (§3) |
 
@@ -51,4 +51,4 @@ Insert-only otherwise: a company the owner edited on «Компани» is never
 
 ## 7. Not built now
 
-The POS kiosk snapshot's company name (the edge keeps its own until the POS sessions take it from the core), a per-company grant screen, a branch hook (the boot sync is enough), and everything that posts: P2 moves the ledger and uses `resolveCustomerParty`.
+The POS kiosk snapshot's company name (the edge keeps its own until the POS sessions take it from the core), a per-company grant screen, a branch hook (the boot sync is enough), and everything that posts: the rest of F1 moves the ledger, and F2 posts invoices with `resolveCustomerParty` (ADR-0083).

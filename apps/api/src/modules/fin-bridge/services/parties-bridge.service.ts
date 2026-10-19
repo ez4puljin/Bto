@@ -31,7 +31,7 @@ export class FinPartiesBridge implements CustomerChangedHook {
     });
   }
 
-  /** The party of a customer, or null when the core has not seen it (P2 posts invoices with it). */
+  /** The party of a customer, or null when the core has not seen it (F2 posts invoices with it). */
   async resolveCustomerParty(
     tx: Tx,
     actor: Actor,

@@ -26,7 +26,7 @@ const key = (
 ): PostingKeySpec => ({ code, requiredControl, requiresTaxCode });
 
 /**
- * One posting key per chart role of today (docs/modules/finance-core.md §5): the carve in P2 posts
+ * One posting key per chart role of today (docs/modules/finance-core.md §5): F1's ledger posts
  * the same accounts. The tax roles are named for what the line is, not where it lands. A new
  * chart role fails typecheck here until it has a key.
  */
