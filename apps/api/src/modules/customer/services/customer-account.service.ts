@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate } from '@tugeel/shared/time';
+import { invalid } from '../../../common/errors/app-error';
 import {
   ArLedgerService,
+  type CustomerStatement,
   type CustomerBankAccount,
   type CustomerPayment,
   type InvoiceDetail,
@@ -16,6 +18,9 @@ import { CustomersService } from '../../partners';
 import { CustomerOrdersService, SalesPipelinesService } from '../../sales';
 
 const ZERO = new Decimal(0);
+
+/** The longest statement a store may ask for (a year). */
+export const STATEMENT_MAX_DAYS = 366;
 const DAY_MS = 86_400_000;
 
 /** «Тооцоо» (ADR-0079 #7): the store's balance and credit, never the hold's internal reason. */
@@ -199,6 +204,20 @@ export class CustomerAccountService {
         vatAmount: line.vatAmount,
       })),
     };
+  }
+
+  /**
+   * The store's statement (ADR-0084): «Эхний үлдэгдэл», the purchases (Дебит) and the payments
+   * and returns (Кредит) of `from` … `to`, «Эцсийн үлдэгдэл»; at most 366 days, never past today.
+   */
+  statement(ctx: CustomerContext, from: string, to: string): Promise<CustomerStatement> {
+    const today = businessDate();
+    if (to > today) throw invalid('to', 'notFuture', 'today at the latest');
+    if (from > to) throw invalid('from', 'beforeTo', 'on or before to');
+    if (addDays(from, STATEMENT_MAX_DAYS - 1) < to) {
+      throw invalid('from', 'maxDays', `at most ${STATEMENT_MAX_DAYS} days`);
+    }
+    return this.ledger.statement(ctx.customerId, from, to);
   }
 
   paymentsPage(

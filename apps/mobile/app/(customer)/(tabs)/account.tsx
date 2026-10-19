@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { CircleAlert, HandCoins, Lock, ReceiptText } from 'lucide-react-native';
@@ -14,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import {
+  STORE_KEY,
   type StoreBankAccount,
   type StoreInvoice,
   type StorePayment,
@@ -24,7 +26,9 @@ import {
   useStorePayments,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
+import { useCustomer } from '../../../src/state/session';
 import { creditBarOf, debtOf, invoiceDueOf, overdueOf } from '../../../src/customer/account';
+import { StatementPanel } from '../../../src/customer/statement-panel';
 import {
   partlyOpen,
   paymentMethodOf,
@@ -43,7 +47,8 @@ import { useTabBarInset } from '../../../src/ui/tab-bar';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
-type Part = 'invoices' | 'payments';
+/** «Хуулга» (ADR-0084) first: the owner's statement with Дебит and Кредит. */
+type Part = 'statement' | 'invoices' | 'payments';
 
 /** The tones of an invoice's due pill: overdue red, due today orange, days left grey. */
 const DUE_TONES = {
@@ -69,7 +74,10 @@ export default function AccountScreen() {
   const invoices = useStoreInvoices();
   const payments = useStorePayments();
   const banks = useBankAccounts();
-  const [part, setPart] = useState<Part>('invoices');
+  const queryClient = useQueryClient();
+  const { me: signedIn } = useCustomer();
+  const today = me.data?.today ?? signedIn.store.today;
+  const [part, setPart] = useState<Part>('statement');
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -89,6 +97,7 @@ export default function AccountScreen() {
         invoices.refetch(),
         payments.refetch(),
         banks.refetch(),
+        queryClient.invalidateQueries({ queryKey: [...STORE_KEY, 'statement'] }),
       ]);
     } finally {
       setRefreshing(false);
@@ -225,6 +234,7 @@ export default function AccountScreen() {
             value={part}
             onChange={setPart}
             options={[
+              { value: 'statement', label: t('mobile.customer.statement.tab') },
               {
                 value: 'invoices',
                 label: t('mobile.customer.account.invoicesTab', {
@@ -240,6 +250,8 @@ export default function AccountScreen() {
             ]}
           />
         </View>
+
+        {part === 'statement' ? <StatementPanel today={today} /> : null}
 
         {part === 'invoices' ? (
           <>

@@ -1,5 +1,5 @@
 import type { Decimal } from '@tugeel/shared/money';
-import type { CustomerPayment } from '../../finance';
+import type { CustomerPayment, CustomerStatement } from '../../finance';
 import type { CustomerNotice, CustomerNotification } from '../../notifications';
 import type { CustomerOrderDetail, CustomerOrderRow } from '../../sales';
 import type {
@@ -11,6 +11,7 @@ import type {
   CustomerAppOrderRowDto,
   CustomerAppPaymentDto,
   CustomerAppProductDto,
+  CustomerAppStatementDto,
 } from '../dto/customer-app.dto';
 import type {
   CustomerAccount,
@@ -128,6 +129,27 @@ export function accountDto(account: CustomerAccount) {
     paymentTermDays: account.paymentTermDays,
     openInvoices: account.openInvoices,
     payments: account.payments,
+  };
+}
+
+export function statementDto(statement: CustomerStatement): CustomerAppStatementDto {
+  return {
+    from: statement.from,
+    to: statement.to,
+    opening: cents(statement.opening),
+    entries: statement.entries.map((entry) => ({
+      id: entry.id,
+      date: entry.entryDate,
+      kind: entry.kind,
+      number: entry.docNumber,
+      invoiceId: entry.docType === 'INVOICE' ? entry.docId : null,
+      debit: cents(entry.debit),
+      credit: cents(entry.credit),
+      balance: cents(entry.balance),
+    })),
+    totalDebit: cents(statement.totalDebit),
+    totalCredit: cents(statement.totalCredit),
+    closing: cents(statement.closing),
   };
 }
 

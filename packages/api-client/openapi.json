@@ -20110,6 +20110,64 @@
         ]
       }
     },
+    "/api/v1/customer-app/statement": {
+      "get": {
+        "operationId": "CustomerAppMoney_statement",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "The first day (Ulaanbaatar)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "The last day (Ulaanbaatar), today at the latest; at most 366 days",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAppStatement"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "«Тооцооны хуулга» (ADR-0084): the opening balance, the purchases (Дебит) and the payments and\nreturns (Кредит) of the days asked for, the totals and the closing balance.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
     "/api/v1/customer-app/bank-accounts": {
       "get": {
         "operationId": "CustomerAppMoney_bankAccounts",
@@ -40973,6 +41031,106 @@
           "data",
           "nextCursor",
           "total"
+        ]
+      },
+      "CustomerAppStatementEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "REFUND",
+              "ADJUSTMENT",
+              "OPENING",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "example": "Н-20261019-0001"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The invoice it opens"
+          },
+          "debit": {
+            "type": "string",
+            "example": "350000.00",
+            "description": "«Дебит»: a purchase or a refund"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00",
+            "description": "«Кредит»: a payment or a return"
+          },
+          "balance": {
+            "type": "string",
+            "description": "The balance after it"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "kind",
+          "number",
+          "invoiceId",
+          "debit",
+          "credit",
+          "balance"
+        ]
+      },
+      "CustomerAppStatement": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "opening": {
+            "type": "string",
+            "description": "«Эхний үлдэгдэл»: the balance before from; negative = an advance"
+          },
+          "entries": {
+            "description": "Oldest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppStatementEntry"
+            }
+          },
+          "totalDebit": {
+            "type": "string"
+          },
+          "totalCredit": {
+            "type": "string"
+          },
+          "closing": {
+            "type": "string",
+            "description": "«Эцсийн үлдэгдэл»: the balance after to"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "opening",
+          "entries",
+          "totalDebit",
+          "totalCredit",
+          "closing"
         ]
       },
       "CustomerAppBankAccount": {

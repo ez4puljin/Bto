@@ -4888,6 +4888,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-app/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * «Тооцооны хуулга» (ADR-0084): the opening balance, the purchases (Дебит) and the payments and
+         *     returns (Кредит) of the days asked for, the totals and the closing balance.
+         */
+        get: operations["CustomerAppMoney_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-app/bank-accounts": {
         parameters: {
             query?: never;
@@ -10992,6 +11012,43 @@ export interface components {
             nextCursor: string | null;
             /** @description On the first page */
             total: number | null;
+        };
+        CustomerAppStatementEntry: {
+            id: number;
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            /** @example Н-20261019-0001 */
+            number: string;
+            /** @description The invoice it opens */
+            invoiceId: number | null;
+            /**
+             * @description «Дебит»: a purchase or a refund
+             * @example 350000.00
+             */
+            debit: string;
+            /**
+             * @description «Кредит»: a payment or a return
+             * @example 0.00
+             */
+            credit: string;
+            /** @description The balance after it */
+            balance: string;
+        };
+        CustomerAppStatement: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description «Эхний үлдэгдэл»: the balance before from; negative = an advance */
+            opening: string;
+            /** @description Oldest first */
+            entries: components["schemas"]["CustomerAppStatementEntry"][];
+            totalDebit: string;
+            totalCredit: string;
+            /** @description «Эцсийн үлдэгдэл»: the balance after to */
+            closing: string;
         };
         CustomerAppBankAccount: {
             id: number;
@@ -23162,6 +23219,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerAppPaymentPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppMoney_statement: {
+        parameters: {
+            query: {
+                /** @description The first day (Ulaanbaatar) */
+                from: string;
+                /** @description The last day (Ulaanbaatar), today at the latest; at most 366 days */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppStatement"];
                 };
             };
             /** @description RFC 9457 problem details */

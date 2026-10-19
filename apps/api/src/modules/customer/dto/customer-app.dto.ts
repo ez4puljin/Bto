@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { MONEY_ACCOUNT_KINDS, type MoneyAccountKind } from '@tugeel/shared/finance';
+import {
+  AR_ENTRY_KINDS,
+  type ArEntryKind,
+  MONEY_ACCOUNT_KINDS,
+  type MoneyAccountKind,
+} from '@tugeel/shared/finance';
 import {
   CUSTOMER_NOTIFICATION_KINDS,
   type CustomerNotificationKind,
@@ -524,6 +529,47 @@ export class CustomerAppPaymentPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
   @ApiProperty({ type: Number, nullable: true, description: 'On the first page' })
   total: number | null;
+}
+
+@ApiSchema({ name: 'CustomerAppStatementQuery' })
+export class CustomerAppStatementQueryDto {
+  @ApiProperty({ format: 'date', description: 'The first day (Ulaanbaatar)' })
+  @Matches(ISO_DATE)
+  from: string;
+  @ApiProperty({
+    format: 'date',
+    description: 'The last day (Ulaanbaatar), today at the latest; at most 366 days',
+  })
+  @Matches(ISO_DATE)
+  to: string;
+}
+
+@ApiSchema({ name: 'CustomerAppStatementEntry' })
+export class CustomerAppStatementEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ format: 'date' }) date: string;
+  @ApiProperty({ enum: AR_ENTRY_KINDS }) kind: ArEntryKind;
+  @ApiProperty({ example: 'Н-20261019-0001' }) number: string;
+  @ApiProperty({ type: Number, nullable: true, description: 'The invoice it opens' })
+  invoiceId: number | null;
+  @ApiProperty({ example: '350000.00', description: '«Дебит»: a purchase or a refund' })
+  debit: string;
+  @ApiProperty({ example: '0.00', description: '«Кредит»: a payment or a return' })
+  credit: string;
+  @ApiProperty({ description: 'The balance after it' }) balance: string;
+}
+
+@ApiSchema({ name: 'CustomerAppStatement' })
+export class CustomerAppStatementDto {
+  @ApiProperty({ format: 'date' }) from: string;
+  @ApiProperty({ format: 'date' }) to: string;
+  @ApiProperty({ description: '«Эхний үлдэгдэл»: the balance before from; negative = an advance' })
+  opening: string;
+  @ApiProperty({ type: [CustomerAppStatementEntryDto], description: 'Oldest first' })
+  entries: CustomerAppStatementEntryDto[];
+  @ApiProperty() totalDebit: string;
+  @ApiProperty() totalCredit: string;
+  @ApiProperty({ description: '«Эцсийн үлдэгдэл»: the balance after to' }) closing: string;
 }
 
 @ApiSchema({ name: 'CustomerAppBankAccount' })

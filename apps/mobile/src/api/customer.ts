@@ -35,6 +35,8 @@ export type StoreInvoice = components['schemas']['CustomerAppInvoice'];
 export type StoreInvoiceDetail = components['schemas']['CustomerAppInvoiceDetail'];
 export type StorePayment = components['schemas']['CustomerAppPayment'];
 export type StoreBankAccount = components['schemas']['CustomerAppBankAccount'];
+export type StoreStatement = components['schemas']['CustomerAppStatement'];
+export type StoreStatementEntry = components['schemas']['CustomerAppStatementEntry'];
 
 /** Every cache key of «Bto300» starts here. */
 export const STORE_KEY = ['customer'] as const;
@@ -385,6 +387,24 @@ export function useStorePayments() {
   });
 }
 
+/**
+ * «Тооцооны хуулга» (ADR-0084): the opening balance, the purchases (Дебит) and the payments and
+ * returns (Кредит) of the days asked for, oldest first, the totals and the closing balance.
+ */
+export function useStoreStatement(range: { from: string; to: string }) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'statement', range.from, range.to],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/statement', {
+          params: { query: { from: range.from, to: range.to } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** The company's accounts the finance settings show to customers (ADR-0079 #7). */
 export function useBankAccounts() {
   const { session } = useCustomer();
@@ -399,4 +419,5 @@ export function useBankAccounts() {
 export async function refreshAfterOrder(client: QueryClient): Promise<void> {
   await client.invalidateQueries({ queryKey: [...STORE_KEY, 'orders'] });
   await client.invalidateQueries({ queryKey: [...STORE_KEY, 'credit-check'] });
+  await client.invalidateQueries({ queryKey: [...STORE_KEY, 'statement'] });
 }

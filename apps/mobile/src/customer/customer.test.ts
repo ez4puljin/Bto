@@ -12,6 +12,7 @@ import {
 } from './orders';
 import { reorderPlan } from './reorder';
 import { codeComplete, codeInput, newPasswordIssue, phoneInput, phoneOf } from './sign-in';
+import { columnAmount, lastMonthRange } from './statement';
 import { canOrder, lineStockNote } from './stock';
 
 describe('«Bto300»: the stock in words (ADR-0079 #4)', () => {
@@ -245,5 +246,20 @@ describe('«Bto300»: notifications (ADR-0079 #8)', () => {
       dueDate: null,
       backorderedLines: 0,
     });
+  });
+});
+
+describe('«Bto300»: the statement (ADR-0084)', () => {
+  it('opens on the last month, today included', () => {
+    expect(lastMonthRange('2026-10-20')).toEqual({ from: '2026-09-21', to: '2026-10-20' });
+    expect(lastMonthRange('2026-03-31')).toEqual({ from: '2026-03-01', to: '2026-03-31' });
+    expect(lastMonthRange('2026-01-15')).toEqual({ from: '2025-12-16', to: '2026-01-15' });
+  });
+
+  it('leaves a zero out of its column', () => {
+    expect(columnAmount('0.00')).toBeNull();
+    expect(columnAmount('-0.00')).toBeNull();
+    expect(columnAmount('350000.00')).toBe('350000.00');
+    expect(columnAmount('0.50')).toBe('0.50');
   });
 });
