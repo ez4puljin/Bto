@@ -5,21 +5,47 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
 import type { AppProblem } from '../api/problem';
 import type { RepOrder } from '../api/rep';
+import type { Sender } from '../cart/use-idempotent-send';
 import { useSendOrder } from '../cart/use-send';
 import { colors, fonts, radii, spacing, type } from '../theme/tokens';
 import { PillButton } from './controls';
 import { ProblemText } from './kit';
 import { ActionSheet } from './sheet';
 
-/**
- * A send whose answer never came (ADR-0061 #8): the cart stays locked until «Дахин илгээх» repeats
- * it with its own key (the server replays the order, never a second one), the rep finds it among
- * their orders, or drops it.
- */
+export interface PendingSendWords {
+  unknownHint: string;
+  checkOrders: string;
+  forgetHint: string;
+}
+
+/** The rep's pending send (ADR-0061 #8) on the staff app's send. */
 export function PendingSendCard({ onSent }: { onSent?: (order: RepOrder) => void }) {
+  return <PendingSendView sender={useSendOrder()} {...(onSent ? { onSent } : {})} />;
+}
+
+/**
+ * A send whose answer never came (ADR-0061 #8, ADR-0079 #5): the cart stays locked until «Дахин
+ * илгээх» repeats it with its own key (the server replays the order, never a second one), the
+ * orders show it, or it is dropped. Either app passes its own sender.
+ */
+export function PendingSendView<O extends { id: number }>({
+  sender,
+  onSent,
+  words,
+}: {
+  sender: Sender<O>;
+  onSent?: (order: O) => void;
+  /** The app's own words where they name its orders' tab («Миний захиалгууд» / «Захиалга»). */
+  words?: PendingSendWords;
+}) {
   const { t } = useTranslation();
+  const said = words ?? {
+    unknownHint: t('mobile.cart.unknownHint'),
+    checkOrders: t('mobile.cart.checkOrders'),
+    forgetHint: t('mobile.cart.forgetHint'),
+  };
   const router = useRouter();
-  const { resend, forget, sending } = useSendOrder();
+  const { resend, forget, sending } = sender;
   const [unknown, setUnknown] = useState(false);
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const [asking, setAsking] = useState(false);
@@ -41,9 +67,7 @@ export function PendingSendCard({ onSent }: { onSent?: (order: RepOrder) => void
   return (
     <View style={styles.card} accessibilityRole="alert">
       <Text style={styles.title}>{t('mobile.cart.pendingTitle')}</Text>
-      <Text style={styles.body}>
-        {unknown ? t('mobile.cart.unknownHint') : t('mobile.cart.pendingHint')}
-      </Text>
+      <Text style={styles.body}>{unknown ? said.unknownHint : t('mobile.cart.pendingHint')}</Text>
       <ProblemText problem={problem} />
       <PillButton
         title={t('mobile.cart.resend')}
@@ -57,7 +81,7 @@ export function PendingSendCard({ onSent }: { onSent?: (order: RepOrder) => void
           onPress={() => router.navigate('/orders')}
           hitSlop={6}
         >
-          <Text style={styles.link}>{t('mobile.cart.checkOrders')}</Text>
+          <Text style={styles.link}>{said.checkOrders}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => setAsking(true)} hitSlop={6}>
           <Text style={[styles.link, styles.danger]}>{t('mobile.cart.forget')}</Text>
@@ -66,7 +90,7 @@ export function PendingSendCard({ onSent }: { onSent?: (order: RepOrder) => void
       <ActionSheet
         visible={asking}
         title={t('mobile.cart.forgetTitle')}
-        message={t('mobile.cart.forgetHint')}
+        message={said.forgetHint}
         actions={[
           {
             label: t('mobile.cart.forget'),

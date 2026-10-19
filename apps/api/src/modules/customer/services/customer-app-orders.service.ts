@@ -10,6 +10,7 @@ import { InvoiceQueryService } from '../../finance';
 import type { CustomerContext } from '../../identity';
 import {
   type CustomerOrderDetail,
+  type CustomerOrderFilters,
   type CustomerOrderPage,
   CustomerOrdersService,
   SalesOrdersService,
@@ -86,9 +87,14 @@ export class CustomerAppOrdersService {
 
   page(
     ctx: CustomerContext,
-    query: { from?: string; to?: string; cursor?: string; limit?: number },
+    query: { from?: string; to?: string; cursor?: string; limit?: number } & CustomerOrderFilters,
   ): Promise<CustomerOrderPage> {
     return this.history.page(ctx.customerId, query);
+  }
+
+  /** The reps who took the store's orders: the order filter's «ХТ» choices. */
+  reps(ctx: CustomerContext): Promise<{ id: number; name: string }[]> {
+    return this.history.reps(ctx.customerId);
   }
 
   /** One of the store's orders with its invoice once sold. */

@@ -22,9 +22,12 @@ export {
 } from './hooks';
 export {
   type CustomerOrderDetail,
+  type CustomerOrderFilters,
+  type CustomerOrderOrigin,
   type CustomerOrderPage,
   type CustomerOrderRow,
   CustomerOrdersService,
+  type CustomerOrderTaker,
 } from './services/customer-orders.service';
 export {
   type Access,

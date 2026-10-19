@@ -1,6 +1,6 @@
 # Module `customer` — contract
 
-Status: **CA2 built 2026-10-19** (the server of the customer app «Bto300», ADR-0079, ADR-0082). The app's screens (CA3, `apps/mobile` `customer` variant) come next. Code: `apps/api/src/modules/customer/`; the office's «Апп» card lives in partners, the accounts and sign-in in identity (`docs/modules/identity.md` §2a), the hooks in sales, finance and notifications.
+Status: **CA2 built 2026-10-19** (the server of the customer app «Bto300», ADR-0079, ADR-0082). The app's screens (CA3, the `customer` variant of `apps/mobile`, ADR-0085) were built the same day: `docs/modules/mobile.md` §1a. Code: `apps/api/src/modules/customer/`; the office's «Апп» card lives in partners, the accounts and sign-in in identity (`docs/modules/identity.md` §2a), the hooks in sales, finance and notifications.
 
 `customer` is a leaf: it depends on identity, catalog, partners, pricing, inventory, sales, finance and notifications through their `index.ts` and nobody imports it (ESLint `MODULE_DEPS.customer`, ADR-0082 #4). It owns the routes a customer token reaches and two small tables.
 
@@ -43,6 +43,8 @@ Every `/customer-app/*` route is `@CustomerRoute()`: only a customer token reach
 | `GET /customer-app/account` | «Тооцоо»: balance (negative = an advance), the overdue amount and oldest due date, the limit and what remains (only with a limit), «Зээл хаалттай», the payment term, the tab counts |
 | `GET /customer-app/invoices`, `GET /customer-app/invoices/:id` | the open invoices oldest due first with the days overdue or left; one invoice with its lines, discount, VAT, paid and credited amounts |
 | `GET /customer-app/payments?cursor&limit` | the store's posted payments and refunds with their method (CASH / BANK) and the invoices each settled; `total` on the first page |
+| `GET /customer-app/statement?from&to` | «Тооцооны хуулга» (ADR-0086, 2026-10-20): the balance before `from`, every ledger entry of `from` … `to` oldest first with its debit, credit, kind, number, invoice and the balance after it, a purchase's order and who took it (`orderId`, `orderNumber`, `orderChannel`, `orderTakerName`, ADR-0087), the totals and the closing balance; `to` today at the latest, at most 366 days (422 otherwise) |
+| `GET /customer-app/orders/reps` | the reps who took the store's orders, by name: the order filter's «ХТ» (ADR-0087) |
 | `GET /customer-app/bank-accounts` | the ACTIVE bank accounts finance marks «Харилцагчид харуулах» |
 | `GET /customer-app/notifications/summary`, `GET /customer-app/notifications`, `POST /customer-app/notifications/read` | the bell: running notices for customers (with their product ids) and the store's notifications (kind, document ids, payload by value), read idempotently |
 | `GET /customer/contacts` [`identity.settings.read`], `PUT /customer/contacts` [`identity.settings.manage`] | the admins' list: the whole ordered list each save (phones typed locally are stored in E.164) |
@@ -76,5 +78,5 @@ Web (Vitest): `features/customer-app/customer-app-pages.test.tsx` (the menu, rea
 
 ## 10. Open items
 
-- CA3: the app's screens on the approved boards (`apps/mobile`, `APP_VARIANT=customer`), `pnpm mobile:apk` for the variant, the owner's walk.
+- The owner's walk of «Bto300» on a phone (CA3 built 2026-10-19, `docs/STATUS.md`).
 - Push (Expo with Firebase) with go-live; a customer's centre when Kharkhorin joins (a new ADR).

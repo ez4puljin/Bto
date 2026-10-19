@@ -4,6 +4,8 @@ import {
   cartFrom,
   cartIssues,
   cartReducer,
+  customerCartIssues,
+  customerOrderRequestOf,
   EMPTY_CART,
   lineOf,
   MAX_LINES,
@@ -188,5 +190,45 @@ describe('the pending send (ADR-0061 #8)', () => {
     expect(outcomeOf(503, 'SERVICE_UNAVAILABLE')).toBe('unknown');
     expect(outcomeOf(422, 'VALIDATION_FAILED')).toBe('refused');
     expect(outcomeOf(409, 'IDEMPOTENCY_KEY_REUSED')).toBe('refused');
+  });
+
+  it('makes «Bto300»’s order: no customer, stage or contact; a day up to the last one', () => {
+    const line = {
+      productId: 5,
+      productUnitId: 51,
+      sku: '1',
+      name: 'Coca-Cola 0.5л',
+      uomName: 'хайрцаг',
+      uomCode: 'BOX',
+      factorToBase: '20',
+      isBase: false,
+      wholesale: '20000',
+      thumbUrl: null,
+    };
+    let cart = cartReducer(EMPTY_CART, { type: 'add', line, qty: 2 });
+    expect(customerCartIssues(cart, '2026-10-19', '2026-12-18')).toEqual([
+      'address',
+      'deliveryDate',
+      'payment',
+    ]);
+    cart = cartReducer(cart, { type: 'address', addressId: 3 });
+    cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-12-19' });
+    cart = cartReducer(cart, { type: 'payment', method: 'CREDIT' });
+    expect(customerCartIssues(cart, '2026-10-19', '2026-12-18')).toEqual(['deliveryDate']);
+    cart = cartReducer(cart, { type: 'deliveryDate', date: '2026-10-20' });
+    cart = cartReducer(cart, { type: 'note', note: '  10 цагаас өмнө  ' });
+    expect(customerCartIssues(cart, '2026-10-19', '2026-12-18')).toEqual([]);
+    expect(customerOrderRequestOf(cart)).toEqual({
+      fulfilment: 'DELIVERY',
+      deliveryDate: '2026-10-20',
+      addressId: 3,
+      paymentMethod: 'CREDIT',
+      note: '10 цагаас өмнө',
+      lines: [{ productUnitId: 51, qty: '2' }],
+    });
+    expect(customerOrderRequestOf(cartReducer(cart, { type: 'pickup' }))).toMatchObject({
+      fulfilment: 'PICKUP',
+      addressId: null,
+    });
   });
 });

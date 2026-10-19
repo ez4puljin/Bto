@@ -8,9 +8,11 @@ export {
   type Attention,
   type CustomerBalance,
   type CustomerBalanceRow,
+  type CustomerStatement,
   type FinanceReconcileRun,
   type LedgerEntry,
   reconcileReceivables,
+  type StatementEntry,
 } from './services/ar-ledger.service';
 export { CreditControlService } from './services/credit-control.service';
 export {

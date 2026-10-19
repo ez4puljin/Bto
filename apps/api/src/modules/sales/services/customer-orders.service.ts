@@ -4,13 +4,14 @@ import {
   CUSTOMER_ORDER_PAGE_MAX,
   type CustomerOrderState,
   customerOrderStateOf,
+  customerOrderStatusesOf,
   type Fulfilment,
   type OrderChannel,
   type OrderStatus,
   type PaymentMethod,
 } from '@tugeel/shared/sales';
 import { businessDate, businessDateTime } from '@tugeel/shared/time';
-import { and, asc, desc, eq, inArray, lt, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, lt, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { onBusinessDays } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -52,6 +53,30 @@ export interface CustomerOrderPage {
   summary: { count: number; confirmedTotal: Decimal; pending: number } | null;
 }
 
+/**
+ * The store's order filters (the owner 2026-10-20, like the rep app's): who took it — the app,
+ * the office (and the till), or the reps, one of them with `repId` —, a product on a line, the
+ * payment, delivery or pickup, and the state in the customer's words.
+ */
+export interface CustomerOrderFilters {
+  taker?: CustomerOrderTaker;
+  repId?: number;
+  productId?: number;
+  paymentMethod?: PaymentMethod;
+  fulfilment?: Fulfilment;
+  state?: CustomerOrderState;
+}
+
+export type CustomerOrderTaker = 'APP' | 'OFFICE' | 'REP';
+
+/** Where an order came from, as the store reads it: its number, channel and rep. */
+export interface CustomerOrderOrigin {
+  id: number;
+  number: string | null;
+  channel: OrderChannel;
+  takerName: string | null;
+}
+
 /** A store's own order with its lines, the stage stamps and a pending order's estimate. */
 export type CustomerOrderDetail = RepOrderDetail;
 
@@ -83,7 +108,12 @@ export class CustomerOrdersService {
    */
   async page(
     customerId: number,
-    query: { from?: string; to?: string; cursor?: string; limit?: number } = {},
+    query: {
+      from?: string;
+      to?: string;
+      cursor?: string;
+      limit?: number;
+    } & CustomerOrderFilters = {},
   ): Promise<CustomerOrderPage> {
     const limit = Math.min(query.limit ?? DEFAULT_PAGE_LIMIT, CUSTOMER_ORDER_PAGE_MAX);
     const cursor = decodeCursor(query.cursor);
@@ -92,6 +122,7 @@ export class CustomerOrdersService {
       eq(salesOrders.customerId, customerId),
       HAS_LINES,
       onBusinessDays(salesOrders.createdAt, { from: query.from, to: query.to }),
+      ...filtersOf(query),
     ];
     const rows = await this.db
       .select({
@@ -149,6 +180,62 @@ export class CustomerOrdersService {
       nextCursor: page.nextCursor,
       summary: after === null ? await this.summary(scope) : null,
     };
+  }
+
+  /** The reps who took orders for the store, by name: the order filter's «ХТ» choices. */
+  async reps(customerId: number): Promise<{ id: number; name: string }[]> {
+    const rows = await this.db
+      .selectDistinct({ id: salesOrders.createdBy })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.customerId, customerId),
+          eq(salesOrders.channel, 'SALES_REP'),
+          isNotNull(salesOrders.createdBy),
+          HAS_LINES,
+        ),
+      );
+    const ids = rows.flatMap((row) => (row.id === null ? [] : [row.id]));
+    const names = await this.names.namesOf(ids);
+    return ids
+      .map((id) => ({ id, name: names.get(id) ?? '' }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'mn'));
+  }
+
+  /** Where these orders of the store came from (a statement's purchases, an invoice). */
+  async origins(
+    customerId: number,
+    ids: readonly number[],
+  ): Promise<Map<number, CustomerOrderOrigin>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        id: salesOrders.id,
+        number: salesOrders.number,
+        channel: salesOrders.channel,
+        createdBy: salesOrders.createdBy,
+      })
+      .from(salesOrders)
+      .where(and(eq(salesOrders.customerId, customerId), inArray(salesOrders.id, [...ids])));
+    const reps = await this.names.namesOf(
+      rows.flatMap((row) =>
+        row.channel === 'SALES_REP' && row.createdBy !== null ? [row.createdBy] : [],
+      ),
+    );
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          number: row.number,
+          channel: row.channel,
+          takerName:
+            row.channel === 'SALES_REP' && row.createdBy !== null
+              ? (reps.get(row.createdBy) ?? null)
+              : null,
+        },
+      ]),
+    );
   }
 
   /** One of the store's orders; 404 for any other order (never "forbidden": it does not exist). */
@@ -211,4 +298,26 @@ export class CustomerOrdersService {
       .where(and(eq(salesOrders.id, id), eq(salesOrders.customerId, customerId), HAS_LINES));
     if (!row) throw notFound('sales order', id);
   }
+}
+
+/** The store's chosen filters as conditions on its orders. */
+function filtersOf(filters: CustomerOrderFilters): SQL[] {
+  const conditions: SQL[] = [];
+  if (filters.taker === 'APP') conditions.push(eq(salesOrders.channel, 'CUSTOMER_APP'));
+  if (filters.taker === 'OFFICE') conditions.push(inArray(salesOrders.channel, ['ADMIN', 'POS']));
+  if (filters.taker === 'REP') {
+    conditions.push(eq(salesOrders.channel, 'SALES_REP'));
+    if (filters.repId !== undefined) conditions.push(eq(salesOrders.createdBy, filters.repId));
+  }
+  if (filters.productId !== undefined) {
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM sales_order_lines l WHERE l.order_id = sales_orders.id AND l.product_id = ${filters.productId})`,
+    );
+  }
+  if (filters.paymentMethod) conditions.push(eq(salesOrders.paymentMethod, filters.paymentMethod));
+  if (filters.fulfilment) conditions.push(eq(salesOrders.fulfilment, filters.fulfilment));
+  if (filters.state) {
+    conditions.push(inArray(salesOrders.status, customerOrderStatusesOf(filters.state)));
+  }
+  return conditions;
 }

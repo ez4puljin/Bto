@@ -31,12 +31,15 @@ export function DateRangeSheet({
   range,
   onApply,
   onClose,
+  applyLabel,
 }: {
   visible: boolean;
   today: string;
   range: DateRange;
   onApply: (range: DateRange) => void;
   onClose: () => void;
+  /** The button's words for a range of `days` days; the orders' «… хоногийн захиалга» by default. */
+  applyLabel?: (range: DateRange, days: number) => string;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(range);
@@ -86,11 +89,15 @@ export function DateRangeSheet({
       }
       footer={
         <PillButton
-          title={t('mobile.dateRange.apply', {
-            from: monthDay(draft.from),
-            to: monthDay(draft.to),
-            n: daysBetween(draft.from, draft.to),
-          })}
+          title={
+            applyLabel
+              ? applyLabel(draft, daysBetween(draft.from, draft.to))
+              : t('mobile.dateRange.apply', {
+                  from: monthDay(draft.from),
+                  to: monthDay(draft.to),
+                  n: daysBetween(draft.from, draft.to),
+                })
+          }
           onPress={() => onApply(draft)}
         />
       }

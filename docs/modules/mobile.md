@@ -2,6 +2,8 @@
 
 Status: **v1 built** 2026-10-15 (the sales-rep app, ADR-0061), pulled forward from deliveries 4 and 7 at the owner's request; **redrawn to the owner's design** 2026-10-16 (ADR-0068, version 0.2.0; 0.2.1 on 2026-10-17 gives every call a 10 s limit; 0.3.0 the same day after the owner's first look, ADR-0068 #11–#16: smaller text, a new home, server and sign-in, «Хүлээн авах», pictures kept on the phone; **0.4.0** on 2026-10-18, ADR-0068 #17–#22: no contact person, order settings redrawn, order filters and draft estimates, the store map; **0.5.0** the same day, ADR-0068 #23–#27: a store's order history and direct calls on the map, no quick steps on a product, still OpenStreetMap; **0.6.0** the same day, ADR-0068 #28–#31: the map opens on the phone's position, names over the pins, black for a credit hold). Code: `apps/mobile/` (Expo, the `staff` variant of ADR-0006), the API it uses in `apps/api/src/modules/sales/` (`/sales-rep/*`) and `apps/api/src/modules/identity/` (`/auth/mobile/*`). Decisions: ADR-0006, ADR-0016, ADR-0025, ADR-0027, ADR-0061, ADR-0062 (notices, 2026-10-16), ADR-0068 (the design, 2026-10-16). The design: the artifact «Bto Бараа дэлгэц» (15 boards, https://claude.ai/artifact/BAV6mPG85WCGKu6NjUBhNd).
 
+**The customer variant «Bto300» 0.1.0** was built on 2026-10-19 (CA3, ADR-0079, ADR-0085) on the server of CA2 (ADR-0082) and the boards «Bto300 дэлгэц» (15 boards, https://claude.ai/artifact/GFhasAC4DUASUM2WibYuRe): §1a. Both apps come from this one project: `APP_VARIANT` picks a row of `variants.json`.
+
 ## 1. Scope (v1, owner 2026-10-15)
 
 The sales rep's app, modelled on the screens of the erxes SR app the owner uses (only its flow: no code, logo or picture of it):
@@ -23,13 +25,29 @@ The sales rep's app, modelled on the screens of the erxes SR app the owner uses 
 
 Not in v1: payments and returns (with finance, delivery 3), new customers, biometric login, offline mode (ADR-0020), visit plans, iOS, keyboard-wedge scanners, EAS.
 
+## 1a. «Bto300», the customer variant (ADR-0079, ADR-0085; built 2026-10-19)
+
+A linked store's app (the office links the phone on the customer's «Апп» card, ADR-0079 #2), on the rep app's kit; the screens follow the boards «Bto300 дэлгэц»:
+
+- **Sign-in** (`app/sign-in.tsx`, `app/set-password.tsx`): the «B300» mark, the phone after «+976» and the password with an eye; «Анх удаа эсвэл нууц үгээ мартсан» to «Нууц үг тавих» (the phone, the office's code typed as `XXXXX-XXXXX`, the new password twice, the 30-minute and 5-attempt note; setting it signs in and signs other phones out). No SMS. The server chip only in development builds (a production build has its server fixed, ADR-0079 #10). The store's own wording for a wrong password, a closed app, a lock and too many tries (`src/customer/sign-in-problems.ts`).
+- **The tabs:** «Нүүр · Бараа · Сагс · Захиалга · Тооцоо» on the floating bar, the cart's count on «Сагс».
+- **«Нүүр»:** the scanner, the bell with its count and the store's initials (→ «Профайл»); the date and the store; the debt card (the debt or an advance, the overdue amount and its oldest due date, the credit bar «үлдсэн боломж / лимит» only with a limit) opening «Тооцоо»; the unsent cart's banner; the last two orders; ★ as three tiles; «Холбоо барих» (ADR-0079 #14): the company's contact people, a tap on a row calls at once (`src/phone/`, the «Залгаж байна…» toast).
+- **«Бараа»:** search, «Бүгд / ★ Дуртай N», categories and the order in one sheet, two cards a row with ★ on the picture, the base price, the stock as a coloured word («Байгаа», «Цөөхөн үлдсэн», «Дууссан» faded without «+»), the pack and the cart's quantity. **A product:** the pictures, ★, the code and category, the word, the unit switch, the unit's price, − n + with the keypad (`src/customer/qty-keypad.tsx` on `KeypadSheet`), «Зарим нь хойшилж магадгүй» when the quote's `mayBackorder` says so, the line total, «Сагсанд нэмэх / шинэчлэх», «Сагснаас хасах». **The scanner:** the rep's camera and scan gate, the read product with «Хайрцгаар нээх» for a box barcode.
+- **«Сагс»:** the credit warning card (`/credit-check` of the quote's total: a hold without its reason, the overdue amount, the excess over the limit — the store may still send), one row per product with a low-stock note, «Засах», «Бараа нэмэх», the total «өнөөдрийн үнээр», «Үргэлжлүүлэх». **Checkout:** «Хүргэлтээр» (the default address, another from a sheet) or «Өөрөө авна» (the centre's warehouses), four day tiles to `lastDay`, the payment as three coloured segments with the note that the app takes no payment, the note (500), the warning, «оффис шалгаж батална», «Захиалга илгээх» with the Idempotency-Key kept until an answer; a closed channel (`ordersOpen` false or 409 `CUSTOMER_APP_CLOSED`) says «Захиалга хүлээн авах тохиргоо хийгдээгүй байна»; then «Захиалга илгээгдлээ» with the number, the «≈» amount and «Хүлээгдэж буй».
+- **«Захиалга»:** today / 7 days / this month or days from the calendar, the filter button and sheet like the rep app's (ADR-0087: «ХТ, хэн авсан» — «Апп», «Оффис», «Бүх ХТ» or one rep —, a product, the payment, delivery or pickup, the state; chips with ×), the count, the confirmed total and the pending count, the store's orders from every channel by day with the payment's colour, who took it («Апп», «Оффис», «Төлөөлөгч <name>»), the time, backordered lines or a cancellation's reason, «≈» while pending and the state in the customer's words. **An order:** the progress «Илгээсэн → Батлагдсан → Бэлтгэж буй → Бэлэн → Хүргэгдсэн» (a cancelled one shows its reason), receiving, address, payment and invoice, the lines as the rep app shows them (ADR-0087: picture, name, the confirmed split «2 хайрцаг × 174,600₮», what waits for stock, the line total), «Дүн» with the kinds and the total, the advice to call the office, «Дахин захиалах» (today's prices; skipped products named).
+- **«Тооцоо»** (ADR-0087: the statement alone, no invoice or payment lists): the debt, the overdue banner, the credit bar, «Зээл хаалттай» (never its reason), the payment term; **«Хуулга»** (ADR-0086, the owner 2026-10-20; each purchase says who took its order, «Төлөөлөгч Бат»): the days as a chip — the last month at first, any range from the calendar sheet —, the columns «Огноо, баримт · Дебит · Кредит», «Эхний үлдэгдэл», one row per ledger entry (the number, the day, the kind in the store's words, the balance after it; a purchase opens its invoice), «Нийт», «Эцсийн үлдэгдэл» (`src/customer/statement-panel.tsx`, `GET /customer-app/statement`); the bank accounts the finance settings show to customers, the number shown whole and copied unchanged — the accountant types the IBAN there (ADR-0087) — with «Хуулах» (`expo-clipboard`) and the firm advice «…хуулсан нэхэмжлэхийн дугаараа заавал бичнэ үү». **An invoice:** the open amount and its due state, the dates, its order with who took it (opens the order), «Дүн» — no goods list (ADR-0087) —, «Үүнд НӨАТ», the paid amount, «Нэхэмжлэхийн дугаар хуулах».
+- **Notifications:** the bell's feed by day (confirmed, cancelled, sold, a payment, due soon / overdue, the admin's notices for customers) with unread dots and «Бүгдийг уншсан», a tap opening the order, the invoice or «Тооцоо»; the launch notice as the rep app's popup; a notice's products.
+- **«Профайл»:** the store, its code and centre; the sign-in phone, the default address and the payment term (changed only by the office); «Нууц үг солих», «Мэдэгдэл», «Холбоо барих»; «Гарах» with its question (the cart is kept); the version.
+
+Not in v1 (ADR-0079 #1): paying in the app, push, iOS, editing or cancelling an order, self sign-up, a second centre.
+
 ## 2. Pins (2026-10-15)
 
 | Package | Version |
 |---|---|
 | Expo SDK | 57: `expo` 57.0.28, `expo-router` 57.0.26, `@expo/metro-runtime` 57.0.16 |
 | React Native / React | 0.86.3 / 19.2.3 (`react-dom` 19.2.3 too) — ONE React for the workspace (the web too): a test fails on a second copy |
-| Native modules | expo-camera 57.0.6, expo-secure-store 57.0.4, expo-crypto 57.0.4, expo-image 57.0.5, expo-font 57.0.4, expo-splash-screen 57.0.10, expo-system-ui 57.0.4, expo-build-properties 57.0.22, expo-constants 57.0.21, expo-linking 57.0.12, expo-status-bar 57.0.1, react-native-screens 4.26.2, react-native-safe-area-context 5.7.0, react-native-svg 15.15.4, @react-native-async-storage/async-storage 2.2.0, expo-location 57.0.21 (2026-10-18), expo-intent-launcher 57.0.1 (2026-10-18, direct calls; `app.config.ts` declares `android.permission.CALL_PHONE`; an APK or dev client built before it crashes on the map, so build a fresh one with `pnpm mobile:apk`) |
+| Native modules | expo-camera 57.0.6, expo-secure-store 57.0.4, expo-crypto 57.0.4, expo-image 57.0.5, expo-font 57.0.4, expo-splash-screen 57.0.10, expo-system-ui 57.0.4, expo-build-properties 57.0.22, expo-constants 57.0.21, expo-linking 57.0.12, expo-status-bar 57.0.1, react-native-screens 4.26.2, react-native-safe-area-context 5.7.0, react-native-svg 15.15.4, @react-native-async-storage/async-storage 2.2.0, expo-location 57.0.21 (2026-10-18), expo-intent-launcher 57.0.1 (2026-10-18, direct calls; `app.config.ts` declares `android.permission.CALL_PHONE`; an APK or dev client built before it crashes on the map, so build a fresh one with `pnpm mobile:apk`), expo-clipboard 57.0.2 (2026-10-19, «Bto300»'s «Хуулах», SDK 57's bundled version) |
 | Web inside the app | react-native-web 0.21.4 (Expo DOM components), maplibre-gl 6.14.0 (the store map; its worker file from jsDelivr, pinned and SHA-384-checked against the installed copy), tiles from OpenFreeMap (no key) |
 | UI | @expo-google-fonts/inter 0.4.2 (embedded at build), lucide-react-native 1.53.0 |
 | Data, i18n | @tanstack/react-query 5.104.1, i18next 26.4.2, react-i18next 17.0.16 (the web's) |
@@ -41,26 +59,43 @@ SDK upgrades only in their own session between deliveries (SDK 58 brings an Expo
 
 ```
 apps/mobile/
-  app.config.ts            APP_VARIANT=staff, package mn.butenorgil.bto.staff (TODO-VERIFY), plugins
+  variants.json            the two apps: name, slug, version, package (TODO-VERIFY), icons, APK prefix,
+                           location (ADR-0085)
+  app.config.ts            the row of APP_VARIANT (staff | customer), extra.variant / defaultServer /
+                           serverFixed, plugins (expo-location for staff only)
+  assets/customer/         «Bto300»'s placeholder «B300» icons (the owner's logo replaces them)
   metro.config.js          the workspace, @tugeel/source, react/react-native pinned to the app
   plugins/with-cmake-object-path.cjs   CMAKE_OBJECT_PATH_MAX=250 (Windows' 260-character limit)
   scripts/build-apk.mjs    `pnpm mobile:apk`; apk-env.mjs (pure helpers), expo.mjs (the Expo CLI)
-  app/                     Expo Router: _layout (phases), server, login, offline, not-rep,
+  app/                     Expo Router: _layout (phases by variant), server, offline; staff: login,
+                           not-rep; customer: sign-in, set-password, (customer)/(tabs)/{index,shop,cart,
+                           orders,account}, (customer)/{product/[id],scan,checkout,order/[id],
+                           invoice/[id],notifications,notice/[id],notice-popup,profile,password};
                            (staff)/(tabs)/{index,shop,cart,orders,profile} (the floating tab bar),
                            (staff)/{product/[id],checkout,order/[id],customers,scan,settings,
                            profile-info,password,notifications,notice/[id],map,store-orders/[id]},
                            (staff)/notice-popup (a transparentModal route)
-  src/api/                 session.ts (tokens, a 10 s limit per call), problem.ts, rep.ts, notifications.ts
+  src/api/                 session.ts (MobileSession: StaffSession, CustomerSession; tokens, a 10 s limit
+                           per call), problem.ts, rep.ts, notifications.ts, customer.ts and
+                           customer-notifications.ts («Bto300»'s /customer-app/* reads)
+  src/config/              app-config.ts (the build's variant and server), app.ts
+  src/customer/            «Bto300»'s rules and pieces: stock words, orders, account, reorder, sign-in
+                           fields and problems, notifications, home, shop, money, order lines (all
+                           with Vitest); the order row and state pill, the product card, the keypad,
+                           the credit box, the filter sheet, the sign-in rows
   src/images/              thumbs.ts + thumb-keeper.tsx (every shop thumbnail kept), pictures.ts
   src/home/                home.ts (the greeting's name, the date line, the new products)
   src/notifications/       feed.ts (the list by day, the popup queue and replay), kinds.tsx, popup-gate.tsx
-  src/cart/                cart.ts (reducer, the order body), send.ts (the pending send), use-send.ts
+  src/cart/                cart.ts (reducer, the rep's and the store's order bodies), send.ts (the pending
+                           send), use-idempotent-send.ts (either app's send), use-send.ts (the rep's),
+                           use-customer-send.ts (the store's)
   src/shop/                filters.ts (+ use-filters), units.ts, unit-words.ts, filter-sheet,
                            supplier-sheet, qty-keypad, use-line-quote, use-add
   src/orders/              date-range-sheet, store-orders.ts (a store history's taker, time, amount,
                            days) + store-order-row
   src/phone/               dial.ts (the tel: URI, call or dialer, the 2 s cooldown), call.ts (Android)
-  src/state/               session.tsx (server + session), shop.tsx (cart, stage, pending send),
+  src/state/               session.tsx (server + session; useSignedIn, useCustomer), phase.ts,
+                           shop.tsx (cart, stage, pending send),
                            placement.ts, role.ts, use-debounced.ts
   src/ui/                  the boards' kit: text (Text/TextInput with the capped font scaling),
                            layout, grouped, controls, field, brand, sheet, toast, tab-bar,
@@ -84,11 +119,13 @@ apps/mobile/
 
 `MobileSession` (`src/api/session.ts`): `POST /auth/mobile/login` gives the access token (memory) and the refresh token (expo-secure-store `bto.session.v1`, with the server and user). One refresh at a time, 30 s before the access token ends or after a 401 (then the call is sent again once); a rotated token is stored before it is used; `refreshToken: null` (the grace answer) keeps the stored one. A refresh nobody answered → `offline` (session kept); one refused → anonymous (`expired`). Every call gives up after 10 s (`REQUEST_TIMEOUT_MS`, an `AbortController` per request) and then counts as no connection: React Native's fetch has no timeout of its own, and a stored server that had left the Wi-Fi held the start logo for minutes (2026-10-17); now the phone shows «Сервертэй холбогдсонгүй» with «Дахин оролдох» and «Сервер солих». The server screen's `GET /health` gives up after 8 s. Logout clears the store even without a connection. Known limit: a refresh answer lost on the network ends in TOKEN_REUSE and a new login.
 
+Both apps share this transport (ADR-0085): `StaffSession` signs in on `/auth/mobile/*` and reads the user from `GET /auth/me`; `CustomerSession` signs in on `/auth/customer/login` (phone and password) or `/auth/customer/password/setup` (phone, the office's code, the new password), keys the stored session on the store's app account (`account.id`) and reads the store from `GET /customer-app/me`; its session slides 90 days. A 403 (`ACCOUNT_DISABLED`, the wrong kind of token) is never refreshed. The two apps are separate Android packages, so their secure stores never meet.
+
 ## 6. API used
 
 `GET /health`; `/auth/mobile/{login,refresh,logout}`, `GET /auth/me` (with `sessionStartedAt`), `POST /auth/password`; `GET /sales-rep/context` (with `warehouses`, `branchNames`, boards' `branchName`), `GET /sales-rep/products?q=&categoryIds=&warehouseId=&supplierIds=&inStock=&sort=` (and `limit=1` for the filter's count), `GET /sales-rep/products/batch?productIds=&priceBefore=`, `GET /sales-rep/suppliers`, `GET /sales-rep/thumbs` (every shop product's primary thumbnail, kept on the phone), `GET /sales-rep/customers`, `GET /sales-rep/customers/:id`, `POST /sales-rep/orders` (contact null), `GET /sales-rep/orders?from=&to=&customerId=&productId=&paymentMethod=&fulfilment=&state=` (rows and summary with draft estimates), `GET /sales-rep/map`, `GET /sales-rep/customers/:id/orders?cursor=&limit=` (a store's history, 30 a page), `GET /sales-rep/orders/:id`; `POST /pricing/quote` (the cart, a product's line, the keypad), `GET /categories`, `GET /barcodes/:code` (these three need only a signed-in user); `GET /me/notifications/summary` (at start, on foreground, every 60 s), `GET /me/notifications`, `POST /me/notifications/read`; product and notice pictures from `/api/v1/files/public/<key>`. Rights: `sales.orders.rep` (the SALES_REP role); `docs/modules/sales.md` §4.
 
-### 6a. The customer variant's API (CA2, built 2026-10-19; the screens are CA3)
+### 6a. The customer variant's API (CA2, the server, and CA3, the screens, both 2026-10-19)
 
 The server of «Bto300» (ADR-0079, ADR-0082; `docs/modules/customer.md` §4) is ready for the `customer` variant:
 
@@ -102,7 +139,7 @@ The server of «Bto300» (ADR-0079, ADR-0082; `docs/modules/customer.md` §4) is
 |---|---|---|
 | expo-secure-store | `bto.session.v1` | `{server, userId, refreshToken}` |
 | AsyncStorage | `bto.server.v1` | the server address |
-| AsyncStorage | `bto.cart.v1:<server>:<userId>` | the cart (one line per product, customer, delivery, date, payment, note; an old stored contact is dropped), written 300 ms after a change |
+| AsyncStorage | `bto.cart.v1:<server>:<userId>` (in «Bto300» `<userId>` is the store's app account; there is no stage key in use) | the cart (one line per product, customer, delivery, date, payment, note; an old stored contact is dropped), written 300 ms after a change |
 | AsyncStorage | `bto.shopFilters.v1:<server>:<userId>` | the shop's order and filters |
 | AsyncStorage | `bto.stage.v1:<server>:<userId>` | the chosen stage |
 | AsyncStorage | `bto.send.v1:<server>:<userId>` | the pending send `{key, body, startedAt}`, stored BEFORE the request leaves |
@@ -124,7 +161,7 @@ The send (`src/cart/use-send.ts`): the same body keeps its Idempotency-Key (cano
 1. Finds JDK 17/21 (`BTO_JAVA_HOME`, `JAVA_HOME`, `C:\Android\jdk-17*`) and the SDK packages.
 2. Mirrors the workspace with robocopy to `C:\Android\m` (no node_modules, .git, .claude, android, build, tmp) and runs `pnpm install --frozen-lockfile` there (the shared store): the repository's own path has spaces and is long, and a `subst` drive mixed two roots that React Native's codegen refuses.
 3. `expo prebuild --platform android --clean` (the generated `android/` is never committed), then `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a`. The config plugin `plugins/with-cmake-object-path.cjs` passes `CMAKE_OBJECT_PATH_MAX=250`, so CMake hashes the long object names of the codegen targets and ninja's paths stay under Windows' 260 characters. The limit must leave room for a 32-character hash plus the file name after the object directory (react-native-gesture-handler's: 172 + 33 + 40 on arm64-v8a, two more on armeabi-v7a); 240 was too small. A new native library or a longer mirror path can need it raised (keep it under 255).
-4. Copies the APK to `apps/mobile/build/apk/bto-staff-<version>-<versionCode>.apk` (versionCode = minutes since 2026-01-01, so it only grows).
+4. Copies the APK to `apps/mobile/build/apk/<prefix>-<version>-<versionCode>.apk` (versionCode = minutes since 2026-01-01, so it only grows): `bto-staff-0.6.0-…` for the staff app, `bto300-0.1.0-…` for `pnpm mobile:apk -- --variant customer` (`variants.json`, ADR-0085).
 
 Do not run it while `pnpm check` runs: the load makes the integrity suite time out.
 
@@ -134,12 +171,13 @@ Do not run it while `pnpm check` runs: the load makes the integrity suite time o
 
 ## 10. Tests
 
-- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, a server that never answers (offline after the limit), other server, logout offline), the thumbnails' schedule and runs, the card's and the page's pictures, the home's name, date line and new products, the recent servers, the cart reducer (one line per product, the contact, an old stored cart) and order body, the pending send, the placement rule, dates without time zones, the calendar (Monday first, presets, the range picker, 366 days), the shop filters (the default warehouse, the count, stored filters, top categories, supplier letters), units (the default and pack units, shortages), money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace, the credit refusal's text (`creditMessage`), the notifications feed by day, the popup queue, its replay and pictures, and initials.
+- **Vitest** (`pnpm --filter @tugeel/mobile test`, in `pnpm check`): «Bto300» (CA3): the variants table and the build's config, the phases of both apps, the store's session (sign-in keyed on the account, the office's code, refresh and grace, restore, a closed app, offline after sign-in), its order body and issues, stock words and line notes, order progress, takers, notes, amounts, presets and days, backorders in the line's unit, the account card, the credit warning, reorder plans, the sign-in fields and problems, notification targets and lines, the home's pieces, the shop's helpers, money and order lines, the APK options; the session (login, one refresh for concurrent 401s, early refresh, grace, restore online/offline/refused, a server that never answers (offline after the limit), other server, logout offline), the thumbnails' schedule and runs, the card's and the page's pictures, the home's name, date line and new products, the recent servers, the cart reducer (one line per product, the contact, an old stored cart) and order body, the pending send, the placement rule, dates without time zones, the calendar (Monday first, presets, the range picker, 366 days), the shop filters (the default warehouse, the count, stored filters, top categories, supplier letters), units (the default and pack units, shortages), money and stock texts, the scan gate, the server address, the APK helpers, the Metro pin, one React in the workspace, the credit refusal's text (`creditMessage`), the notifications feed by day, the popup queue, its replay and pictures, and initials.
 - **API:** `auth-mobile.int-spec.ts`, `sales-rep.int-spec.ts`, `sales-rep-shop.int-spec.ts`, `sales-rep-shop-filters.int-spec.ts`, `sales-rep-races.spec.ts` (integrity), `rep-access.spec.ts`, `notifications.int-spec.ts`, `notifications-guards.spec.ts` (integrity).
 - **On the phone:** the owner's walk, board by board (ADR-0068): the shop's grid, chips, «+» and quantities; the filter and the suppliers; a product's pictures, units, keypad, shortage and total; the cart's edit; the checkout's sheets, the note over the keyboard and the sent order; the orders' presets, calendar and search; the profile, the details and a password change, the order settings, the notifications, the popup and its toast; a lost connection while sending.
 
 ## 11. Open items
 
+- **TODO-VERIFY (owner), «Bto300»:** the package id `mn.butenorgil.bto300` (permanent once handed out), a 1024×1024 logo instead of the placeholder «B300», a release key; the owner's walk on a phone with the two test stores of the walk copy (STATUS).
 - **TODO-VERIFY (owner):** the package id `mn.butenorgil.bto.staff`, permanent once handed out; a release key and how APKs reach the reps; a logo (1024×1024 PNG) instead of the placeholder «B»; the reps' phones (Android ≥ 7, arm64).
 - Payments, returns, receivables on the customer card (with finance, delivery 3); visit plans and rep zones (delivery 5/7; the customer reads by id must then pass `CustomersService.visibleTo`, `docs/modules/sales.md` §10); biometric unlock; keyboard-wedge scanners (delivery 4's warehouse flows).
 - EAS Build and Update, the Play internal track and HTTPS at go-live (row 12); push for notices then (ADR-0062 #7).

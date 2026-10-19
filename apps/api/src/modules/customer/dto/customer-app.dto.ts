@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { MONEY_ACCOUNT_KINDS, type MoneyAccountKind } from '@tugeel/shared/finance';
+import {
+  AR_ENTRY_KINDS,
+  type ArEntryKind,
+  MONEY_ACCOUNT_KINDS,
+  type MoneyAccountKind,
+} from '@tugeel/shared/finance';
 import {
   CUSTOMER_NOTIFICATION_KINDS,
   type CustomerNotificationKind,
@@ -321,8 +326,58 @@ export class CustomerAppOrderRequestDto {
 
 // ----------------------------------------------------------------------------------- the orders
 
+/** Who took an order, as the store filters them (the owner 2026-10-20). */
+export const CUSTOMER_ORDER_TAKERS = ['APP', 'OFFICE', 'REP'] as const;
+export type CustomerOrderTaker = (typeof CUSTOMER_ORDER_TAKERS)[number];
+
+@ApiSchema({ name: 'CustomerAppOrderRep' })
+export class CustomerAppOrderRepDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'Бат' }) name: string;
+}
+
+@ApiSchema({ name: 'CustomerAppOrderReps' })
+export class CustomerAppOrderRepsDto {
+  @ApiProperty({
+    type: [CustomerAppOrderRepDto],
+    description: 'The reps who took the store’s orders',
+  })
+  reps: CustomerAppOrderRepDto[];
+}
+
 @ApiSchema({ name: 'CustomerAppOrderListQuery' })
 export class CustomerAppOrderListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional({
+    enum: CUSTOMER_ORDER_TAKERS,
+    description: 'Who took it: APP, OFFICE (the office and the till) or REP (one rep with repId)',
+  })
+  @IsOptional()
+  @IsIn(CUSTOMER_ORDER_TAKERS)
+  taker?: CustomerOrderTaker;
+  @ApiPropertyOptional({ description: 'With taker=REP: one rep (from /customer-app/orders/reps)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  repId?: number;
+  @ApiPropertyOptional({ description: 'Orders with a line of this product' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  productId?: number;
+  @ApiPropertyOptional({ enum: PAYMENT_METHODS })
+  @IsOptional()
+  @IsIn(PAYMENT_METHODS)
+  paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional({ enum: FULFILMENTS })
+  @IsOptional()
+  @IsIn(FULFILMENTS)
+  fulfilment?: Fulfilment;
+  @ApiPropertyOptional({ enum: CUSTOMER_ORDER_STATES, description: 'In the customer’s words' })
+  @IsOptional()
+  @IsIn(CUSTOMER_ORDER_STATES)
+  state?: CustomerOrderState;
   @ApiPropertyOptional({ format: 'date', description: 'Created on or after (Ulaanbaatar)' })
   @IsOptional()
   @Matches(ISO_DATE)
@@ -382,6 +437,13 @@ export class CustomerAppOrderPageDto {
   summary: CustomerAppOrderSummaryDto | null;
 }
 
+@ApiSchema({ name: 'CustomerAppOrderLinePart' })
+export class CustomerAppOrderLinePartDto {
+  @ApiProperty({ example: 'хайрцаг' }) uomName: string;
+  @ApiProperty({ description: 'In that unit' }) qty: string;
+  @ApiProperty({ description: 'One unit as confirmed, whole MNT' }) unitPrice: string;
+}
+
 @ApiSchema({ name: 'CustomerAppOrderLine' })
 export class CustomerAppOrderLineDto {
   @ApiProperty() id: number;
@@ -399,6 +461,11 @@ export class CustomerAppOrderLineDto {
   total: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'A pending line today' })
   estimatedTotal: string | null;
+  @ApiProperty({
+    type: [CustomerAppOrderLinePartDto],
+    description: 'The confirmed price split (whole packs, loose pieces); empty while pending',
+  })
+  parts: CustomerAppOrderLinePartDto[];
 }
 
 @ApiSchema({ name: 'CustomerAppOrderInvoice' })
@@ -489,6 +556,10 @@ export class CustomerAppInvoiceLineDto {
 export class CustomerAppInvoiceDetailDto extends CustomerAppInvoiceDto {
   @ApiProperty({ enum: ['ISSUED', 'VOID'] }) status: 'ISSUED' | 'VOID';
   @ApiProperty({ type: Number, nullable: true }) orderId: number | null;
+  @ApiProperty({ enum: ORDER_CHANNELS, nullable: true, description: 'Who took the order' })
+  orderChannel: OrderChannel | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The rep of a SALES_REP order' })
+  orderTakerName: string | null;
   @ApiProperty() subtotal: string;
   @ApiProperty() discountTotal: string;
   @ApiProperty({ description: '«Үүнд НӨАТ»' }) vatTotal: string;
@@ -524,6 +595,54 @@ export class CustomerAppPaymentPageDto {
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
   @ApiProperty({ type: Number, nullable: true, description: 'On the first page' })
   total: number | null;
+}
+
+@ApiSchema({ name: 'CustomerAppStatementQuery' })
+export class CustomerAppStatementQueryDto {
+  @ApiProperty({ format: 'date', description: 'The first day (Ulaanbaatar)' })
+  @Matches(ISO_DATE)
+  from: string;
+  @ApiProperty({
+    format: 'date',
+    description: 'The last day (Ulaanbaatar), today at the latest; at most 366 days',
+  })
+  @Matches(ISO_DATE)
+  to: string;
+}
+
+@ApiSchema({ name: 'CustomerAppStatementEntry' })
+export class CustomerAppStatementEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ format: 'date' }) date: string;
+  @ApiProperty({ enum: AR_ENTRY_KINDS }) kind: ArEntryKind;
+  @ApiProperty({ example: 'Н-20261019-0001' }) number: string;
+  @ApiProperty({ type: Number, nullable: true, description: 'The invoice it opens' })
+  invoiceId: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'A purchase’s order' })
+  orderId: number | null;
+  @ApiProperty({ type: String, nullable: true }) orderNumber: string | null;
+  @ApiProperty({ enum: ORDER_CHANNELS, nullable: true, description: 'Who took the order' })
+  orderChannel: OrderChannel | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The rep of a SALES_REP order' })
+  orderTakerName: string | null;
+  @ApiProperty({ example: '350000.00', description: '«Дебит»: a purchase or a refund' })
+  debit: string;
+  @ApiProperty({ example: '0.00', description: '«Кредит»: a payment or a return' })
+  credit: string;
+  @ApiProperty({ description: 'The balance after it' }) balance: string;
+}
+
+@ApiSchema({ name: 'CustomerAppStatement' })
+export class CustomerAppStatementDto {
+  @ApiProperty({ format: 'date' }) from: string;
+  @ApiProperty({ format: 'date' }) to: string;
+  @ApiProperty({ description: '«Эхний үлдэгдэл»: the balance before from; negative = an advance' })
+  opening: string;
+  @ApiProperty({ type: [CustomerAppStatementEntryDto], description: 'Oldest first' })
+  entries: CustomerAppStatementEntryDto[];
+  @ApiProperty() totalDebit: string;
+  @ApiProperty() totalCredit: string;
+  @ApiProperty({ description: '«Эцсийн үлдэгдэл»: the balance after to' }) closing: string;
 }
 
 @ApiSchema({ name: 'CustomerAppBankAccount' })

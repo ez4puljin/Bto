@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { javaMajor, lanAddressOf, MIRROR_SKIP, robocopyFailed, versionCodeAt } from './apk-env.mjs';
+import {
+  apkFileName,
+  apkOptionsOf,
+  javaMajor,
+  lanAddressOf,
+  MIRROR_SKIP,
+  robocopyFailed,
+  versionCodeAt,
+} from './apk-env.mjs';
 
 describe('the APK build environment', () => {
   it('reads the Java major version', () => {
@@ -37,5 +45,27 @@ describe('the APK build environment', () => {
     expect(MIRROR_SKIP).not.toContain('apps');
     expect([0, 1, 3, 7].map(robocopyFailed)).toEqual([false, false, false, false]);
     expect([8, 16, null].map(robocopyFailed)).toEqual([true, true, true]);
+  });
+
+  it('reads the variant and the debug flag, with or without pnpm’s --', () => {
+    expect(apkOptionsOf([])).toEqual({ variant: 'staff', debug: false });
+    expect(apkOptionsOf(['--', '--variant', 'customer'])).toEqual({
+      variant: 'customer',
+      debug: false,
+    });
+    expect(apkOptionsOf(['--variant=customer', '--debug'])).toEqual({
+      variant: 'customer',
+      debug: true,
+    });
+    expect(apkOptionsOf(['--variant'])).toEqual({ variant: '', debug: false });
+  });
+
+  it('names the APK after the variant, its version and the version code', () => {
+    expect(
+      apkFileName({ prefix: 'bto300', version: '0.1.0', versionCode: 414000, debug: false }),
+    ).toBe('bto300-0.1.0-414000.apk');
+    expect(
+      apkFileName({ prefix: 'bto-staff', version: '0.6.0', versionCode: 7, debug: true }),
+    ).toBe('bto-staff-0.6.0-7-debug.apk');
   });
 });

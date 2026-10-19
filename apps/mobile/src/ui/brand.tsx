@@ -3,16 +3,28 @@ import { Server } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from './text';
+import customerIcon from '../../assets/customer/splash-icon.png';
 import splashIcon from '../../assets/splash-icon.png';
+import { APP } from '../config/app';
 import { serverHost } from '../server/server-url';
 import { colors, fonts, radii, shadows, type } from '../theme/tokens';
 
-/** The splash's tile: a white «B» on rounded blue, the same picture the phone starts with. */
-const LOGO = splashIcon;
+/**
+ * The splash's tile, the same picture the phone starts with: a white «B» on rounded blue, or
+ * «B300» for the stores' app (ADR-0079 #13).
+ */
+const LOGO = APP.variant === 'customer' ? customerIcon : splashIcon;
 
-/** The logo with «Bto» and the company: the top of the server, sign-in and offline screens. */
+/** This build's name: «Bto», or «Bto300» for the stores (ADR-0079). */
+export function useAppName(): string {
+  const { t } = useTranslation();
+  return APP.variant === 'customer' ? t('mobile.customer.appName') : t('app.name');
+}
+
+/** The logo with the app's name and the company: the top of the server, sign-in and offline screens. */
 export function BrandLockup({ style }: { style?: StyleProp<ViewStyle> }) {
   const { t } = useTranslation();
+  const name = useAppName();
   return (
     <View style={[styles.lockup, style]}>
       <View style={styles.logo} accessible={false} importantForAccessibility="no-hide-descendants">
@@ -20,7 +32,7 @@ export function BrandLockup({ style }: { style?: StyleProp<ViewStyle> }) {
       </View>
       <View style={styles.names}>
         <Text accessibilityRole="header" style={type.wordmark}>
-          {t('app.name')}
+          {name}
         </Text>
         <Text style={type.secondary}>{t('brand.company')}</Text>
       </View>

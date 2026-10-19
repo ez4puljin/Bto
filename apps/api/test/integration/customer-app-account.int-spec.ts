@@ -214,6 +214,81 @@ describe('customer app account (ADR-0079)', () => {
     expect(invoice.body).toMatchObject({ paidAmount: '6000.00', openAmount: '4000.00' });
   });
 
+  it('gives the store its own statement: opening, debits, credits, running and closing balances', async () => {
+    const [cash] = (
+      await sql.query<{ id: string }>("SELECT id FROM money_accounts WHERE code = 'CAA-CASH'")
+    ).rows;
+    if (!cash) throw new Error('no cash box');
+    // A payment dated yesterday: before a statement of today, inside one from yesterday.
+    await financeApi(app, accountant)
+      .payment({
+        kind: 'CUSTOMER_PAYMENT',
+        moneyAccountId: Number.parseInt(cash.id, 10),
+        customerId: store.customerId,
+        amount: '1000',
+        paidOn: addDays(today, -1),
+      })
+      .expect(201);
+    const statement = (from: string, to: string, target: AppStore = store) =>
+      target.api.get(`/statement?from=${from}&to=${to}`);
+
+    const todays = (await statement(today, today).expect(200)).body as {
+      opening: string;
+      entries: Record<string, unknown>[];
+      totalDebit: string;
+      totalCredit: string;
+      closing: string;
+    };
+    expect(todays.opening).toBe('-1000.00');
+    expect(
+      todays.entries.map((entry) => [entry.kind, entry.debit, entry.credit, entry.balance]),
+    ).toEqual([
+      ['INVOICE', '10000.00', '0.00', '9000.00'],
+      ['INVOICE', '2500.00', '0.00', '11500.00'],
+      ['PAYMENT', '0.00', '6000.00', '5500.00'],
+    ]);
+    expect(todays.entries[0]).toMatchObject({ date: today, invoiceId, number: expect.any(String) });
+    expect(todays.entries[2]).toMatchObject({ invoiceId: null });
+    // Who took each purchase's order (the owner 2026-10-20): here the app.
+    expect(todays.entries[0]).toMatchObject({
+      orderChannel: 'CUSTOMER_APP',
+      orderNumber: expect.any(String),
+      orderTakerName: null,
+    });
+    expect(todays.entries[2]).toMatchObject({ orderId: null, orderChannel: null });
+    const invoice = (await store.api.get(`/invoices/${invoiceId}`).expect(200)).body as Record<
+      string,
+      unknown
+    >;
+    expect(invoice).toMatchObject({ orderChannel: 'CUSTOMER_APP', orderTakerName: null });
+    expect(todays).toMatchObject({
+      totalDebit: '12500.00',
+      totalCredit: '6000.00',
+      closing: '5500.00',
+    });
+
+    const twoDays = (await statement(addDays(today, -1), today).expect(200)).body as typeof todays;
+    expect(twoDays.opening).toBe('0.00');
+    expect(twoDays.entries.map((entry) => entry.kind)).toEqual([
+      'PAYMENT',
+      'INVOICE',
+      'INVOICE',
+      'PAYMENT',
+    ]);
+    expect(twoDays).toMatchObject({ totalCredit: '7000.00', closing: '5500.00' });
+
+    const quiet = (await statement(addDays(today, -30), addDays(today, -2)).expect(200)).body;
+    expect(quiet).toMatchObject({ opening: '0.00', entries: [], closing: '0.00' });
+    const others = (await statement(today, today, other).expect(200)).body as typeof todays;
+    expect(others).toMatchObject({ opening: '0.00', totalDebit: '2500.00', closing: '2500.00' });
+
+    await statement(today, addDays(today, 1)).expect(422);
+    await statement(today, addDays(today, -1)).expect(422);
+    await statement(addDays(today, -366), today).expect(422);
+    await statement(addDays(today, -365), today).expect(200);
+    await store.api.get('/statement').expect(422);
+  });
+
   it('lists only the active bank accounts finance shows to customers', async () => {
     const finance = financeApi(app, admin);
     const bankGl = await finance.account('110101');

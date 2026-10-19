@@ -78,7 +78,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `JournalService.post(tx, actor, input)` / `reverse(tx, actor, id, …)` / `postManual(ctx, …)` / `reverseManual` / `list` / `get` / `accountLedger(accountId, query)` | the journal; `post` throws 422 `JOURNAL_UNBALANCED` |
 | `GlAccountsService.list` / `listWithBalances(asOf)` / `byRole(role)` / `create` / `update` / `setRole` | the chart; `byRole` throws 409 `ACCOUNT_ROLE_MISSING` |
 | `MoneyAccountsService.list` / `get` / `lockActive(tx, id)` / `create` / `update` | cash boxes and bank accounts with their balances |
-| `ArLedgerService.record(tx, entry)` / `balanceOf` / `overdueOf` / `rowOf` / `ledger` / `balances(ctx, query)` / `attention` / `reconcile(kind)`; `reconcileReceivables(db, kind)` | the ledger, the cache and its check (the plain function serves the CLI) |
+| `ArLedgerService.record(tx, entry)` / `balanceOf` / `overdueOf` / `rowOf` / `ledger` / `statement(customerId, from, to)` / `balances(ctx, query)` / `attention` / `reconcile(kind)`; `reconcileReceivables(db, kind)` | the ledger, the cache and its check (the plain function serves the CLI); `statement` is a customer's statement for a period — opening, entries oldest first by date with the balance after each, totals, closing (ADR-0086, read by the customer app) |
 | `FinanceSettingsService.numbering` / `setNumbering(ctx, input)` / `allocateNumber(tx, kind, day)` | the number formats and the counters (`INV_NO`, `PAY_NO`, `CN_NO`, `JE_NO`, period = the rendered prefix) |
 
 ## 4. REST surface (`/api/v1`, permissions in brackets)

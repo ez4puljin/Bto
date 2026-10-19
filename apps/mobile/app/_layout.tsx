@@ -6,30 +6,17 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import type { SessionState } from '../src/api/session';
+import { APP } from '../src/config/app';
 import { i18n } from '../src/i18n/i18n';
+import { phaseOf } from '../src/state/phase';
 import { SessionProvider, useSession } from '../src/state/session';
 import { colors } from '../src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
 
-type Phase = 'boot' | 'server' | 'login' | 'offline' | 'notRep' | 'app';
-
-/** Which screens the phone may show now: the server, the login, or the rep app (ADR-0061). */
-function phaseOf(server: string | null | undefined, state: SessionState): Phase {
-  if (server === undefined) return 'boot';
-  if (server === null) return 'server';
-  switch (state.status) {
-    case 'loading':
-      return 'boot';
-    case 'anonymous':
-      return 'login';
-    case 'offline':
-      return 'offline';
-    case 'signedIn':
-      return state.me.permissions.includes('sales.orders.rep') ? 'app' : 'notRep';
-  }
-}
+/** Which app this build is (ADR-0085): the other app's screens are never reachable. */
+const STAFF = APP.variant === 'staff';
+const CUSTOMER = APP.variant === 'customer';
 
 /** Server data in one cache per user and server: the provider is remounted when either changes. */
 function DataProvider({ children }: { children: ReactNode }) {
@@ -45,7 +32,7 @@ function DataProvider({ children }: { children: ReactNode }) {
 function Navigator() {
   const { server, state } = useSession();
   const phase = phaseOf(server, state);
-  const userId = state.status === 'signedIn' ? state.me.id : 0;
+  const userId = state.status === 'signedIn' ? state.userId : 0;
 
   useEffect(() => {
     if (phase !== 'boot') void SplashScreen.hideAsync();
@@ -60,17 +47,25 @@ function Navigator() {
         <Stack.Protected guard={phase === 'server'}>
           <Stack.Screen name="server" />
         </Stack.Protected>
-        <Stack.Protected guard={phase === 'login'}>
+        <Stack.Protected guard={STAFF && phase === 'login'}>
           <Stack.Screen name="login" />
+        </Stack.Protected>
+        {/* «Bto300»: the phone and password, or the office's code (ADR-0079 #3, #13). */}
+        <Stack.Protected guard={CUSTOMER && phase === 'login'}>
+          <Stack.Screen name="sign-in" />
+          <Stack.Screen name="set-password" />
         </Stack.Protected>
         <Stack.Protected guard={phase === 'offline'}>
           <Stack.Screen name="offline" />
         </Stack.Protected>
-        <Stack.Protected guard={phase === 'notRep'}>
+        <Stack.Protected guard={STAFF && phase === 'notRep'}>
           <Stack.Screen name="not-rep" />
         </Stack.Protected>
-        <Stack.Protected guard={phase === 'app'}>
+        <Stack.Protected guard={STAFF && phase === 'app'}>
           <Stack.Screen name="(staff)" />
+        </Stack.Protected>
+        <Stack.Protected guard={CUSTOMER && phase === 'app'}>
+          <Stack.Screen name="(customer)" />
         </Stack.Protected>
       </Stack>
     </DataProvider>

@@ -16,7 +16,7 @@ import { Text } from '../src/ui/text';
  */
 export default function OfflineScreen() {
   const { t } = useTranslation();
-  const { session, server, setServer } = useSession();
+  const { session, server, setServer, serverFixed } = useSession();
   const [busy, setBusy] = useState(false);
   const address = session?.server ?? server ?? '';
 
@@ -50,7 +50,7 @@ export default function OfflineScreen() {
           onPress={() => void retry()}
         />
         <View style={styles.spacer} />
-        <ServerChip server={address} onPress={() => void setServer(null)} />
+        {serverFixed ? null : <ServerChip server={address} onPress={() => void setServer(null)} />}
       </ScrollView>
     </Page>
   );

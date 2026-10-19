@@ -217,6 +217,48 @@ export function orderRequestOf(cart: Cart, stageId: number): OrderRequest {
 }
 
 /**
+ * What keeps «Bto300»'s cart from being sent (ADR-0079 #5): no customer and no stage to choose (the
+ * store is the token's own, the stage the CUSTOMER_APP channel's), a day from today to `lastDay`.
+ */
+export type CustomerCartIssue = 'lines' | 'address' | 'deliveryDate' | 'payment';
+
+export function customerCartIssues(
+  cart: Cart,
+  today: string,
+  lastDay: string,
+): CustomerCartIssue[] {
+  const issues: CustomerCartIssue[] = [];
+  if (cart.lines.length === 0) issues.push('lines');
+  if (cart.fulfilment === 'DELIVERY' && cart.addressId === null) issues.push('address');
+  if (!cart.deliveryDate || cart.deliveryDate < today || cart.deliveryDate > lastDay) {
+    issues.push('deliveryDate');
+  }
+  if (!cart.paymentMethod) issues.push('payment');
+  return issues;
+}
+
+/** POST /customer-app/orders' body (ADR-0082): the store and its contact come from the token. */
+export interface CustomerOrderRequest {
+  fulfilment: Fulfilment;
+  deliveryDate: string;
+  addressId: number | null;
+  paymentMethod: PaymentMethod;
+  note: string | null;
+  lines: { productUnitId: number; qty: string }[];
+}
+
+export function customerOrderRequestOf(cart: Cart): CustomerOrderRequest {
+  return {
+    fulfilment: cart.fulfilment,
+    deliveryDate: cart.deliveryDate ?? '',
+    addressId: cart.fulfilment === 'DELIVERY' ? cart.addressId : null,
+    paymentMethod: cart.paymentMethod ?? 'CASH',
+    note: textOrNull(cart.note),
+    lines: linesOf(cart),
+  };
+}
+
+/**
  * A stored cart read back: anything that is not a cart is an empty one; the contact an older cart
  * kept is dropped.
  */

@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
+import type { OrderChannel } from '@tugeel/shared/sales';
+import { addDays, businessDate } from '@tugeel/shared/time';
+import { invalid } from '../../../common/errors/app-error';
 import {
   ArLedgerService,
+  type CustomerStatement,
   type CustomerBankAccount,
   type CustomerPayment,
   type InvoiceDetail,
@@ -13,9 +16,16 @@ import {
 } from '../../finance';
 import { type CustomerContext, OrgService } from '../../identity';
 import { CustomersService } from '../../partners';
-import { CustomerOrdersService, SalesPipelinesService } from '../../sales';
+import {
+  type CustomerOrderOrigin,
+  CustomerOrdersService,
+  SalesPipelinesService,
+} from '../../sales';
 
 const ZERO = new Decimal(0);
+
+/** The longest statement a store may ask for (a year). */
+export const STATEMENT_MAX_DAYS = 366;
 const DAY_MS = 86_400_000;
 
 /** «Тооцоо» (ADR-0079 #7): the store's balance and credit, never the hold's internal reason. */
@@ -34,6 +44,11 @@ export interface CustomerAccount {
   paymentTermDays: number | null;
   openInvoices: number;
   payments: number;
+}
+
+/** A statement whose purchases say which order, and who took it, they came from. */
+export interface StoreStatement extends Omit<CustomerStatement, 'entries'> {
+  entries: (CustomerStatement['entries'][number] & { order: CustomerOrderOrigin | null })[];
 }
 
 /** The checkout's warning (ADR-0079 #5): the store may still send. */
@@ -65,6 +80,9 @@ export interface CustomerInvoice {
 export interface CustomerInvoiceDetail extends CustomerInvoice {
   status: 'ISSUED' | 'VOID';
   orderId: number | null;
+  /** Who took the invoice's order: the app, the office, a rep (`orderTakerName`). */
+  orderChannel: OrderChannel | null;
+  orderTakerName: string | null;
   subtotal: Decimal;
   discountTotal: Decimal;
   vatTotal: Decimal;
@@ -171,6 +189,11 @@ export class CustomerAccountService {
   /** One invoice of the store; 404 for another store's, as for one that does not exist. */
   async invoice(ctx: CustomerContext, id: number): Promise<CustomerInvoiceDetail> {
     const detail: InvoiceDetail = await this.invoices.ofCustomer(ctx.customerId, id);
+    const origin =
+      detail.orderId === null
+        ? null
+        : ((await this.orders.origins(ctx.customerId, [detail.orderId])).get(detail.orderId) ??
+          null);
     const live = detail.allocations.filter((allocation) => allocation.voidedAt === null);
     const sum = (source: 'PAYMENT' | 'CREDIT_NOTE') =>
       live
@@ -180,6 +203,8 @@ export class CustomerAccountService {
       ...toCustomerInvoice(detail, businessDate()),
       status: detail.status,
       orderId: detail.orderId,
+      orderChannel: origin?.channel ?? null,
+      orderTakerName: origin?.takerName ?? null,
       subtotal: detail.subtotal,
       discountTotal: detail.discountTotal,
       vatTotal: detail.vatTotal,
@@ -197,6 +222,32 @@ export class CustomerAccountService {
         discountAmount: line.discountAmount,
         total: line.total,
         vatAmount: line.vatAmount,
+      })),
+    };
+  }
+
+  /**
+   * The store's statement (ADR-0086): «Эхний үлдэгдэл», the purchases (Дебит) and the payments
+   * and returns (Кредит) of `from` … `to`, «Эцсийн үлдэгдэл»; at most 366 days, never past today.
+   */
+  async statement(ctx: CustomerContext, from: string, to: string): Promise<StoreStatement> {
+    const today = businessDate();
+    if (to > today) throw invalid('to', 'notFuture', 'today at the latest');
+    if (from > to) throw invalid('from', 'beforeTo', 'on or before to');
+    if (addDays(from, STATEMENT_MAX_DAYS - 1) < to) {
+      throw invalid('from', 'maxDays', `at most ${STATEMENT_MAX_DAYS} days`);
+    }
+    const statement = await this.ledger.statement(ctx.customerId, from, to);
+    // Who took each purchase's order: the app, the office, or a rep by name (the owner 2026-10-20).
+    const origins = await this.orders.origins(
+      ctx.customerId,
+      statement.entries.flatMap((entry) => (entry.orderId === null ? [] : [entry.orderId])),
+    );
+    return {
+      ...statement,
+      entries: statement.entries.map((entry) => ({
+        ...entry,
+        order: entry.orderId === null ? null : (origins.get(entry.orderId) ?? null),
       })),
     };
   }

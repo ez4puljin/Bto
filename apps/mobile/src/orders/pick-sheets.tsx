@@ -18,7 +18,7 @@ import type { PickedRecord } from './order-filters';
 
 const THUMB = 40;
 
-interface PickSheetProps {
+export interface PickSheetProps {
   visible: boolean;
   selected: PickedRecord | null;
   /** A record, or null for every one («Бүх харилцагч»). */
@@ -30,7 +30,7 @@ interface PickSheetProps {
  * Over the order filter: a search, «Бүх …» and the records, the chosen one ticked; a tap picks
  * and goes back to the filter. The list asks the server only while the sheet is open.
  */
-function PickSheet({
+export function PickSheet({
   visible,
   selected,
   onPick,
@@ -65,7 +65,7 @@ function PickSheet({
 }
 
 /** One grouped list: «Бүх …» on its own, then the records the search finds, page by page. */
-function PickList<T extends { id: number }>({
+export function PickList<T extends { id: number }>({
   rows,
   query,
   search,

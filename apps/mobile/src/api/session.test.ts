@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MobileSession, type StoredSession, type TokenStore } from './session';
+import { StaffSession, type StoredSession, type TokenStore } from './session';
 
 const SERVER = 'http://192.168.1.10:3300';
 let uuids = 0;
@@ -82,7 +82,7 @@ class FakeServer {
 function setup() {
   const server = new FakeServer();
   const store = new MemoryStore();
-  const session = new MobileSession({
+  const session = new StaffSession({
     server: SERVER,
     store,
     fetch: server.fetch,
@@ -139,7 +139,7 @@ describe('the staff app session (ADR-0061 #4)', () => {
   it('restores a stored session, offline without a connection, anonymous when refused', async () => {
     const first = setup();
     await first.session.login('rep', 'secret');
-    const again = new MobileSession({
+    const again = new StaffSession({
       server: SERVER,
       store: first.store,
       fetch: first.server.fetch,
@@ -150,7 +150,7 @@ describe('the staff app session (ADR-0061 #4)', () => {
     expect(again.getSnapshot()).toMatchObject({ status: 'signedIn' });
 
     first.server.offline = true;
-    const offline = new MobileSession({
+    const offline = new StaffSession({
       server: SERVER,
       store: first.store,
       fetch: first.server.fetch,
@@ -162,7 +162,7 @@ describe('the staff app session (ADR-0061 #4)', () => {
 
     first.server.offline = false;
     first.server.rejectRefresh = true;
-    const refused = new MobileSession({
+    const refused = new StaffSession({
       server: SERVER,
       store: first.store,
       fetch: first.server.fetch,
@@ -177,7 +177,7 @@ describe('the staff app session (ADR-0061 #4)', () => {
     const first = setup();
     await first.session.login('rep', 'secret');
     const signals: AbortSignal[] = [];
-    const silent = new MobileSession({
+    const silent = new StaffSession({
       server: SERVER,
       store: first.store,
       // Like OkHttp after a dropped packet: no answer and no error, not even on the abort.
@@ -197,7 +197,7 @@ describe('the staff app session (ADR-0061 #4)', () => {
   it('ignores a session stored for another server', async () => {
     const { store, server } = setup();
     store.value = { server: 'http://10.0.0.1:3300', userId: 7, refreshToken: 'rt-1' };
-    const session = new MobileSession({ server: SERVER, store, fetch: server.fetch, randomUUID });
+    const session = new StaffSession({ server: SERVER, store, fetch: server.fetch, randomUUID });
     await session.restore();
     expect(session.getSnapshot()).toEqual({ status: 'anonymous' });
   });

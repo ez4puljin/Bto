@@ -35,6 +35,7 @@ import {
   CustomerAppOrderDto,
   CustomerAppOrderListQueryDto,
   CustomerAppOrderPageDto,
+  CustomerAppOrderRepsDto,
   CustomerAppOrderRequestDto,
   CustomerAppPaymentPageDto,
   CustomerAppProductBatchQueryDto,
@@ -46,6 +47,8 @@ import {
   CustomerAppReadRequestDto,
   CustomerAppReadResultDto,
   CustomerAppReorderDto,
+  CustomerAppStatementDto,
+  CustomerAppStatementQueryDto,
   CustomerAppThumbsDto,
 } from '../dto/customer-app.dto';
 import { PageQueryDto } from '../../../common/pagination/page';
@@ -64,6 +67,7 @@ import {
   orderRowDto,
   paymentDto,
   productDto,
+  statementDto,
   whole,
 } from './mappers';
 
@@ -271,6 +275,14 @@ export class CustomerAppOrdersController {
     };
   }
 
+  /** «ХТ» in the order filter: the reps who took the store's orders, by name. */
+  @Get('reps')
+  @CustomerRoute()
+  @ApiOkResponse({ type: CustomerAppOrderRepsDto })
+  async reps(@CurrentCustomer() ctx: CustomerContext): Promise<CustomerAppOrderRepsDto> {
+    return { reps: await this.orders.reps(ctx) };
+  }
+
   @Get(':id')
   @CustomerRoute()
   @ApiOkResponse({ type: CustomerAppOrderDto })
@@ -338,6 +350,20 @@ export class CustomerAppMoneyController {
   ): Promise<CustomerAppPaymentPageDto> {
     const page = await this.account.paymentsPage(ctx, query);
     return { data: page.data.map(paymentDto), nextCursor: page.nextCursor, total: page.total };
+  }
+
+  /**
+   * «Тооцооны хуулга» (ADR-0086): the opening balance, the purchases (Дебит) and the payments and
+   * returns (Кредит) of the days asked for, the totals and the closing balance.
+   */
+  @Get('statement')
+  @CustomerRoute()
+  @ApiOkResponse({ type: CustomerAppStatementDto })
+  async statement(
+    @CurrentCustomer() ctx: CustomerContext,
+    @Query() query: CustomerAppStatementQueryDto,
+  ): Promise<CustomerAppStatementDto> {
+    return statementDto(await this.account.statement(ctx, query.from, query.to));
   }
 
   /** The bank accounts finance marks «Харилцагчид харуулах»: write the invoice number. */

@@ -7,7 +7,7 @@ import {
 } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { and, desc, eq, gt, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -69,6 +69,36 @@ export interface LedgerPage {
   nextCursor: string | null;
   /** The balance before `from` (0 without `from`). */
   opening: Decimal;
+}
+
+/** A statement's entry: its own debit or credit and the balance after it, by date. */
+export interface StatementEntry {
+  id: number;
+  entryDate: string;
+  kind: ArEntryKind;
+  docType: FinanceDocKind;
+  docId: number;
+  docNumber: string;
+  debit: Decimal;
+  credit: Decimal;
+  /** The opening balance plus every entry up to this one, oldest first. */
+  balance: Decimal;
+  /** The sales order of an invoice's entry (a purchase, its void); null otherwise. */
+  orderId: number | null;
+}
+
+/**
+ * A customer's statement for a period (ADR-0086): the balance before `from`, every entry dated
+ * `from` … `to` oldest first (by date, then as recorded), the totals and the balance after `to`.
+ */
+export interface CustomerStatement {
+  from: string;
+  to: string;
+  opening: Decimal;
+  entries: StatementEntry[];
+  totalDebit: Decimal;
+  totalCredit: Decimal;
+  closing: Decimal;
 }
 
 export interface CustomerBalanceRow extends CustomerBalance {
@@ -238,6 +268,51 @@ export class ArLedgerService {
       nextCursor: page.nextCursor,
       opening,
     };
+  }
+
+  /** The customer's statement for `from` … `to` (inclusive business dates, ADR-0086). */
+  async statement(customerId: number, from: string, to: string): Promise<CustomerStatement> {
+    const [before] = await this.db
+      .select({
+        balance: sql<string>`coalesce(sum(${arEntries.debit} - ${arEntries.credit}), 0)`,
+      })
+      .from(arEntries)
+      .where(and(eq(arEntries.customerId, customerId), lt(arEntries.entryDate, from)));
+    const rows = await this.db
+      .select({
+        id: arEntries.id,
+        entryDate: arEntries.entryDate,
+        kind: arEntries.kind,
+        docType: arEntries.docType,
+        docId: arEntries.docId,
+        docNumber: arEntries.docNumber,
+        debit: arEntries.debit,
+        credit: arEntries.credit,
+        orderId: invoices.orderId,
+      })
+      .from(arEntries)
+      .leftJoin(invoices, and(eq(arEntries.docType, 'INVOICE'), eq(invoices.id, arEntries.docId)))
+      .where(
+        and(
+          eq(arEntries.customerId, customerId),
+          gte(arEntries.entryDate, from),
+          lte(arEntries.entryDate, to),
+        ),
+      )
+      .orderBy(asc(arEntries.entryDate), asc(arEntries.id));
+    const opening = new Decimal(before?.balance ?? 0);
+    let balance = opening;
+    let totalDebit = new Decimal(0);
+    let totalCredit = new Decimal(0);
+    const entries = rows.map((row) => {
+      const debit = new Decimal(row.debit);
+      const credit = new Decimal(row.credit);
+      totalDebit = totalDebit.plus(debit);
+      totalCredit = totalCredit.plus(credit);
+      balance = balance.plus(debit).minus(credit);
+      return { ...row, debit, credit, balance };
+    });
+    return { from, to, opening, entries, totalDebit, totalCredit, closing: balance };
   }
 
   /**
