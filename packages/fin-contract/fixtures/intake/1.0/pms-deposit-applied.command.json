@@ -1,0 +1,33 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0193f4a0-9f00-7d80-b000-000000005532",
+  "tenant": "BUTEN_ORGIL",
+  "company": "RES",
+  "source": { "system": "PMS", "docType": "DEPOSIT_APPLIED", "docId": "F-5531" },
+  "actor": { "kind": "STAFF", "ref": "pms:user:12", "label": "Ресепшн С." },
+  "body": {
+    "action": "POST",
+    "documentType": "PMS.DEPOSIT_APPLIED",
+    "documentDate": "2026-12-22",
+    "currency": "MNT",
+    "party": { "ref": "company:7", "name": "Монгол Шуудан ХК", "kind": "COMPANY" },
+    "description": "F-5531 гарахад урьдчилгааг тооцов",
+    "controlTotal": "132000.00",
+    "lines": [
+      {
+        "lineNo": 1,
+        "key": "GUEST_DEPOSIT",
+        "side": "DEBIT",
+        "amount": "132000.00",
+        "settles": [{ "target": { "system": "PMS", "docType": "DEPOSIT", "docId": "R-1001-1" } }]
+      },
+      {
+        "lineNo": 2,
+        "key": "GUEST_LEDGER",
+        "side": "CREDIT",
+        "amount": "132000.00",
+        "settles": [{ "target": { "groupRef": "folio:F-5531" } }]
+      }
+    ]
+  }
+}

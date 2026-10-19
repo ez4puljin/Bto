@@ -1,0 +1,15 @@
+{
+  "contract": "fin.intake/1",
+  "commandId": "0192f3a1-6c00-7a10-8000-000000000812",
+  "source": { "system": "BTO", "docType": "SALES_INVOICE", "docId": "812", "revision": 1 },
+  "action": "POST",
+  "outcome": "REJECTED",
+  "errors": [
+    {
+      "code": "FIN_MAPPING_MISSING",
+      "params": { "key": "SALES_DISCOUNT", "documentType": "BTO.SALES_INVOICE", "branch": "3" },
+      "path": "body.lines[1].key"
+    }
+  ],
+  "retryable": false
+}

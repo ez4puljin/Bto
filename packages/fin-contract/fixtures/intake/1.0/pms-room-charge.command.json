@@ -1,0 +1,34 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0193ef80-4e00-7c70-a000-000000005531",
+  "tenant": "BUTEN_ORGIL",
+  "company": "RES",
+  "source": { "system": "PMS", "docType": "ROOM_CHARGE", "docId": "F-5531:2026-12-20" },
+  "actor": { "kind": "SYSTEM", "ref": "pms:night-audit", "label": "Night audit" },
+  "body": {
+    "action": "POST",
+    "documentType": "PMS.ROOM_CHARGE",
+    "documentDate": "2026-12-20",
+    "currency": "MNT",
+    "party": { "ref": "company:7", "name": "Монгол Шуудан ХК", "kind": "COMPANY" },
+    "description": "F-5531 өрөөний төлбөр 2026-12-20",
+    "controlTotal": "220000.00",
+    "lines": [
+      {
+        "lineNo": 1,
+        "key": "GUEST_LEDGER",
+        "side": "DEBIT",
+        "amount": "220000.00",
+        "openItem": { "groupRef": "folio:F-5531" }
+      },
+      { "lineNo": 2, "key": "ROOM_REVENUE", "side": "CREDIT", "amount": "200000.00" },
+      {
+        "lineNo": 3,
+        "key": "VAT_OUTPUT",
+        "side": "CREDIT",
+        "amount": "20000.00",
+        "tax": { "code": "MN.VAT.STD", "base": "200000.00", "lineCount": 1 }
+      }
+    ]
+  }
+}

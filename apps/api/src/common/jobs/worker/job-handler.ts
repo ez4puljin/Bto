@@ -1,5 +1,5 @@
 import type { Job, WorkOptions } from 'pg-boss';
-import type { JobName, JobPayloads } from '../job-registry';
+import type { JobName, JobPayloads } from '../job-catalog';
 
 /**
  * One handler per queue. pg-boss delivers at least once, so `handle` must be idempotent.

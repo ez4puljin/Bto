@@ -16,6 +16,7 @@ import { catchError, from, map, mergeMap, type Observable, of, throwError } from
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
+import { canonicalJson } from '../../../common/json/canonical';
 import type { AuthenticatedRequest } from '../decorators/access.decorators';
 import { idempotencyKeys } from '../schema';
 
@@ -57,18 +58,7 @@ function storable(body: unknown, without: readonly string[] = []): unknown {
   );
 }
 
-/** JSON with sorted object keys, so equal bodies hash equally whatever the key order. */
-export function canonicalJson(value: unknown): string {
-  if (value === undefined) return 'null';
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, nested]) => nested !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([key, nested]) => `${JSON.stringify(key)}:${canonicalJson(nested)}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
+export { canonicalJson };
 
 /**
  * Global interceptor that acts only on @Idempotent() routes (ADR-0027 #11): the key row is claimed
