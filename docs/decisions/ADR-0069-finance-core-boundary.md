@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0088 (2026-10-20: #9 superseded — the resort copies the module; #1–#4 now describe Bto's own finance module, bounded so it can be copied) |
 | Amends | ADR-0002 (#3: a third element type beside modules and integrations, `apps/api/src/finance-core/`, which imports no module and is reached only through its `index.ts`); ADR-0060 (#1: the direction is reversed; source systems depend on the Finance Core, and the core depends on none of them); ADR-0063 (#2: from phase H1 `MODULE_DEPS.pos` lists `fin-bridge` instead of `finance`); architecture §3 (repo layout, boundary rules) and §4 (the module graph) |
 
 ## Context

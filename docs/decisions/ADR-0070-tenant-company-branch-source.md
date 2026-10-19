@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0088 (2026-10-20: one tenant and one company per installation; #9 intercompany superseded) |
 | Amends | ADR-0010 (core amounts carry a currency code, MNT enforced until foreign currencies are decided; #4: whole-tugrik unit prices and the per-line split stay rules of the source systems; #7: the company's rates and flags move to `fin.company_tax_registrations` and `fin.tax_rates`, copied in P1 and read from P4); SPEC §2.2 and §10 (the «Олон валют, олон компани» exclusion: several companies in finance are now in scope, inside one tenant; currency stays MNT); SPEC §11 #11 (answered: only the owner's own group; the resort is a separate ХХК); architecture §5.1 (the core's company register beside Bto's branches and warehouses) |
 
 ## Context

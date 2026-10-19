@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0083 (2026-10-20: #2–#4 and the isolation tests of #10 wait for the PMS kickoff; #1 and #5 hold from F1) |
+| Amended by | ADR-0083 (2026-10-20: #2–#4 and the isolation tests of #10 wait for the PMS kickoff; #1 and #5 hold from F1); ADR-0088 (2026-10-20: the multi-company isolation work cancelled; one company per installation) |
 | Amends | ADR-0027 (#7: Finance Core reads are scoped by company; Bto's own reads stay unscoped); ADR-0045 (#2: finance views filter by company and are `security_barrier`; #5 and #9: the AI reader sets, on every query, the companies where the user holds `finance.read`) |
 
 ## Context

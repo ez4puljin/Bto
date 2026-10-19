@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-20 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0088 (2026-10-20: the PMS rows of #4 cancelled rather than deferred) |
 | Amends | ADR-0077 (#1 the go-live scope, #2 the phases, #3 the go-live additions, #4 the order constraints, #5 the roadmap), ADR-0075 (#2 soft close, #6 drafts and approval, #7 and #8 the rights wait), ADR-0076 (#2–#4 and the isolation tests of #10 wait for the PMS), ADR-0071 (#12 the pending list waits), ADR-0073 (the `billing` split, phase H1, moves after go-live) |
 
 ## Context

@@ -9,6 +9,8 @@
 | Depends on | no module: an exact whitelist of `common/**` files, `@tugeel/shared/{money,time}` and `@tugeel/fin-contract` (§3) |
 | Used by | Bto modules through `finance-core/index.ts` only (`billing`, `fin-bridge`, `pos`; later `delivery`, `procurement`, `hr`); the resort's PMS (its own repository, after Bto's go-live) through `@tugeel/fin-contract` over HTTP (A2) |
 
+**Each system keeps its own books (ADR-0088, owner 2026-10-20).** This module is Bto's finance module and books only Бүтэн-Оргил ХХК. The resort's system will copy it (code, screens, principles) into its own project and keep its own books. Nothing posts between the two systems. Wherever this document plans a PMS posting to this core, an HTTP or asynchronous intake (A1, A2), the TESTPMS fixture, intercompany parties, consolidation or isolation between companies on one server, that plan is **cancelled**. §14.2 is kept only as an example of the rules' reach. The boundary (§3) and `pnpm core:standalone` stay, because they make the copy cheap.
+
 Finance Core is one finance engine for every business system the owner builds. Bto (the wholesale centre's system) is its first source system. The resort's PMS follows after Bto's go-live, in its own repository and on its own site server. A group control system comes later and only reads. Bto keeps picking, delivery, warehouses, products, orders, tills and its credit policy; the PMS will keep bookings, rooms, guests and housekeeping. The core keeps parties, receivables and payables as open items, payments, the journal, account balances, periods and the financial reports. If using the core from another project ever needs Bto code, the boundary is wrong (the owner's requirement, 2026-10-18).
 
 **How to read this document.**
@@ -639,7 +641,7 @@ Basis (facts): the seeded accounts 100101 cash, 120101 AR, 311004 VAT payable, 3
 
 **E7. Void instead of a return** (invoice 813). Bto sends `REVERSE` with `source = BTO/SALES_INVOICE/813/1`; the business key is that key plus `action = REVERSE`. The mirror entry is dated today, its AR item is allocated against the original, and the reversal document gets its `Ж-` number. A resend after a lost acknowledgement answers DUPLICATE. The reversal is refused with `FIN_REVERSAL_BLOCKED` while another allocation (a receipt's, or an ALLOCATION document) is live on the invoice's item.
 
-### 14.2 A future PMS: deposit → stay → checkout to a company account → forfeited deposit
+### 14.2 A future PMS: deposit → stay → checkout to a company account → forfeited deposit (cancelled as a Bto posting by ADR-0088: the resort keeps its own copy of this module; kept as an example of what the rules express)
 
 All PMS behaviour is the plan; every tax point is TODO-VERIFY (D12, D25). The resort is company RES (D2). The PMS runs on the resort's server and pushes its outbox to `POST /api/fin/v1/intake` (A2); the core holds a document dated in a closed month or sent before the one it depends on (A1), so a checkout is never refused at the desk.
 
@@ -718,7 +720,7 @@ Consequences:
 | Bank-statement import (§16.2) | cash and bank vouchers typed by hand | after go-live |
 | Drafts with approval, soft close, override, the pending list, HELD (ADR-0071 #12, ADR-0075 #2, #6) | manual entries post at once and are audited; a closed month refuses | after go-live |
 | The rights beyond `periods.close` / `periods.reopen`, a per-company grant screen (ADR-0075 #7, #8) | today's finance permissions: `identity.user_company_roles` exists since P1 as a mirror of `user_roles` (ADR-0084 #2), so it grants exactly them | with the PMS |
-| `finRead`, the scope setting, scoped services, the isolation tests (ADR-0076 #2–#4, #10), the TESTPMS fixture, A1, A2 | one company | at the PMS kickoff, before the PMS posts |
+| ~~`finRead`, the scope setting, scoped services, the isolation tests (ADR-0076 #2–#4, #10), the TESTPMS fixture, A1, A2~~ **cancelled by ADR-0088** (each system its own books) | one company per installation | never (was: at the PMS kickoff), before the PMS posts |
 | H1 (`billing` split, ADR-0073), H2 (POS through the intake) | `modules/finance` and `pos` call the core directly; same behaviour | after go-live |
 
 **Superseded by §16.0.** The rest of §16 is ADR-0077's plan. It is kept for the content each F phase takes. Its sessions, its order constraints and its copy-migration, backfill, migration-path and golden-balance rules are replaced by the above.

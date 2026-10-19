@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0088 (2026-10-20: #4 shared with the resort by copy only) |
 | Amends | ADR-0010 (#4: the split's code moves to `@tugeel/shared/mn`; the rounding is unchanged); ADR-0017 ("Module": `ebarimt_receipts` is keyed by company and source document and has no `invoice_id`; the module depends on no other module; the topology, the two-phase issue, the `lottery` / `qrData` ban, the receipt type per customer kind, the corrections, the spike and the certification gate stand); architecture §4 (the `ebarimt` row) and §5.9 (the row model) |
 
 ## Context

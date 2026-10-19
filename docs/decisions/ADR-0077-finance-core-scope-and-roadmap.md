@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0083 (2026-10-20: the go-live scope, the phases, the additions, the order constraints and the roadmap become the lean F1–F6 plan; fixed assets, the bank import, H1 and H2 move after go-live; no copy of Finance I's history) |
+| Amended by | ADR-0083 (2026-10-20: the go-live scope, the phases, the additions, the order constraints and the roadmap become the lean F1–F6 plan; fixed assets, the bank import, H1 and H2 move after go-live; no copy of Finance I's history); ADR-0088 (2026-10-20: the PMS items, A1 and A2 cancelled) |
 | Supersedes | ADR-0060's scope sentence (Context, the owner's answers: "Balance sheet, income statement, payroll and fixed assets stay in Erkhet for now") |
 | Amends | ADR-0018 (#6: the bank statement import is a go-live addition of the Finance Core, matched to open items, no longer delivery 10); ADR-0026 (#3 and its delivery-3 follow-up: the cut-over imports Erkhet's chart and the opening full trial balance instead of opening receivables per customer, and the delivery-3 opening-receivables importer becomes the chart and opening import); SPEC §5.8 (the full books), §5.11 (supplier bills are payables in the core, not `supplier_bills` in finance), §5.13 (payroll posts through the intake), §9.3 (a Finance Core track), §11 #13 (Erkhet stops at go-live); `docs/STATUS.md` rows 3, 8 and 10 |
 
