@@ -1,8 +1,8 @@
 # Module `fin-bridge` — contract
 
-Status: **built 2026-10-20** (Finance Core P1, ADR-0084). Code: `apps/api/src/modules/fin-bridge/`; the web page «Компани» in `apps/web/src/features/company/`.
+Status: **built 2026-10-20** (Finance Core P1, ADR-0084); F1's ledger (ADR-0089) added the chart seed, the customers' parties for journal lines and `finance` as an importer. Code: `apps/api/src/modules/fin-bridge/`; the web page «Компани» in `apps/web/src/features/company/`.
 
-`fin-bridge` is Bto's side of the Finance Core (`docs/modules/finance-core.md`): the only Bto code that builds a `FinCallContext` and runs the installation step `ensureDefaultCompany` (ESLint G2, ADR-0076, ADR-0084 #4). It depends on identity and partners through their `index.ts` and on the core through `finance-core/index.ts` (`MODULE_DEPS['fin-bridge']`); only the composition roots import it: `FinBridgeHttpModule` in the api's `AppModule`, `FinBridgeModule` in the `WorkerModule` (the customer import runs in the worker). It owns no table: the core writes `fin.*`, identity writes `user_company_roles`.
+`fin-bridge` is Bto's side of the Finance Core (`docs/modules/finance-core.md`): the only Bto code that builds a `FinCallContext` and runs the installation step `ensureDefaultCompany` (ESLint G2, ADR-0076, ADR-0084 #4). It depends on identity and partners through their `index.ts` and on the core through `finance-core/index.ts` (`MODULE_DEPS['fin-bridge']`); the composition roots import it — `FinBridgeHttpModule` in the api's `AppModule`, `FinBridgeModule` in the `WorkerModule` (the customer import runs in the worker) — and, since F1's ledger, `modules/finance` for its contexts and the customers' parties (ADR-0089 #7). It owns no table: the core writes `fin.*`, identity writes `user_company_roles`.
 
 ## 1. Owner's answers behind the design
 
@@ -14,9 +14,9 @@ The interview of 2026-10-20 (ADR-0084): tenant `BUTEN_ORGIL`; this installation 
 |---|---|
 | `FinBridgeModule`, `FinBridgeHttpModule` | the services and the boot step; the HTTP side adds `CompanyController` |
 | `FinContexts` | `companyCode()` (the locked setting `bto.company_code`, read once per process); `forSource(actor)` → principal `SOURCE {tenant BUTEN_ORGIL, system BTO}`; `forUser(ctx)` → principal `USER {tenant, ref user:<id>}` with `ctx.companyPermissions` as its rights. The actor (`STAFF user:<id>` with the full name, or `SYSTEM <label>`) is recorded, never trusted |
-| `FinPartiesBridge` | bound as partners' `CUSTOMER_CHANGED_HOOK`: `onCustomerChanged(tx, actor, customer)` upserts the party `customer:<id>` in the customer's transaction; `resolveCustomerParty(tx, actor, customerId)` for F2's invoices (ADR-0083) |
+| `FinPartiesBridge` | bound as partners' `CUSTOMER_CHANGED_HOOK`: `onCustomerChanged(tx, actor, customer)` upserts the party `customer:<id>` in the customer's transaction; `resolveCustomerParty(tx, actor, customerId)` for F2's invoices (ADR-0083); since F1's ledger `customerPartyInTx(tx, actor, customerId)` (the party a journal line carries, made from the customer's facts when the core has not seen it), `partiesOfCustomers(ids)` and `customersOfParties(partyIds)` (the journal's filters and lines in Bto's terms) |
 | `FinCompanyBridge` | `get(actor)` (as source BTO, for every staff member); `update(ctx, {legalName, registerNo, tin})` checks the Mongolian shapes (`regNoShape` = COMPANY: 7 digits; `isTinFor('COMPANY')`: 11 digits; blank clears) and calls the core as the user |
-| `btoInstallationSpec`, `POSTING_KEY_OF_ROLE`, `BTO_TENANT`, `BTO_SOURCE`, `FIN_SOURCE`, `LEGACY_PARTY_REF`, `customerRef` | what the installation books into (§3) |
+| `btoInstallationSpec`, `btoChartTemplate`, `POSTING_KEY_OF_ROLE`, `ROLE_OF_POSTING_KEY`, `BTO_TENANT`, `BTO_SOURCE`, `FIN_SOURCE`, `LEGACY_PARTY_REF`, `customerRef`, `customerIdOfRef` | what the installation books into (§3); the role of each posting key (finance shows roles) |
 
 ## 3. The installation (`installation.ts`, `FinBridgeBootstrap`)
 
@@ -27,6 +27,8 @@ At every api and worker start, `FinBridgeBootstrap` builds the spec from `bto.co
 - 15 posting keys, one per chart role (`POSTING_KEY_OF_ROLE`, typed over `GlRole`, so a new role fails typecheck until it has a key): `AR` (RECEIVABLE), `SALES`, `SALES_DISCOUNT`, `SALES_RETURN`, `VAT_OUTPUT` and `CITY_TAX_OUTPUT` (requiring a tax code), `CUSTOMER_ADVANCE` (ADVANCE_RECEIVED), `CASH` and `BANK` (MONEY), `OTHER_INCOME`, `OTHER_EXPENSE`, `POS_CASH`, `CARD_CLEARING`, `POS_SALES`, `CASH_VARIANCE`;
 - the party `LEGACY_UNASSIGNED` under source FIN;
 - the branches: every Bto branch by its id under source BTO; an unmapped INACTIVE one is skipped, a mapped one follows its code, name and status (a branch added or closed on «Салбар» reaches the core at the next start).
+
+In the same transaction, since F1's ledger (ADR-0089), the core's `ensureDefaultChart` fills an **empty** chart from `btoChartTemplate()` — today's `DEFAULT_GL_ACCOUNTS` named from mn.json, debit-normal for assets, expenses and the two contra-income roles, the control of each role's key — with one rule per role from 2000-01-01; a chart with accounts is never re-seeded.
 
 Insert-only otherwise: a company the owner edited on «Компани» is never overwritten. Migration `0032_fin_foundation` wrote the same rows for the existing database (plus one party per customer and the role mirror).
 
@@ -51,4 +53,4 @@ Insert-only otherwise: a company the owner edited on «Компани» is never
 
 ## 7. Not built now
 
-The POS kiosk snapshot's company name (the edge keeps its own until the POS sessions take it from the core), a per-company grant screen, a branch hook (the boot sync is enough), and everything that posts: the rest of F1 moves the ledger, and F2 posts invoices with `resolveCustomerParty` (ADR-0083).
+The POS kiosk snapshot's company name (the edge keeps its own until the POS sessions take it from the core), a per-company grant screen, a branch hook (the boot sync is enough), and the intake: F2 posts invoices with `resolveCustomerParty` through `submitInTx` (ADR-0083); the F1 façade is `modules/finance`'s, never fin-bridge's (ESLint G2).
