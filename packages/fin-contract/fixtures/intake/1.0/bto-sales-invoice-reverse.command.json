@@ -1,0 +1,9 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0192fa10-0c00-7a50-8000-000000000813",
+  "tenant": "BUTEN_ORGIL",
+  "company": "BO",
+  "source": { "system": "BTO", "docType": "SALES_INVOICE", "docId": "813", "revision": 1 },
+  "actor": { "kind": "STAFF", "ref": "bto:user:3", "label": "Нягтлан Д." },
+  "body": { "action": "REVERSE", "reason": "Нэхэмжлэхийг хүчингүй болгов" }
+}

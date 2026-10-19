@@ -1,0 +1,26 @@
+{
+  "contract": "fin.intake/1",
+  "commandId": "0192f3a1-6c00-7a10-8000-000000000812",
+  "source": { "system": "BTO", "docType": "SALES_INVOICE", "docId": "812", "revision": 1 },
+  "action": "POST",
+  "outcome": "POSTED",
+  "document": {
+    "id": "1",
+    "number": "Н-20261020-0004",
+    "journalNo": "Ж-20261020-0011",
+    "amount": "120000.00",
+    "accountingDate": "2026-10-20",
+    "period": "2026-10",
+    "reversed": false,
+    "lines": [
+      { "lineNo": 1, "account": "120101", "ruleId": "1", "side": "DEBIT", "amount": "110000.00" },
+      { "lineNo": 2, "account": "520201", "ruleId": "3", "side": "DEBIT", "amount": "10000.00" },
+      { "lineNo": 3, "account": "510101", "ruleId": "2", "side": "CREDIT", "amount": "110000.00" },
+      { "lineNo": 4, "account": "311004", "ruleId": "5", "side": "CREDIT", "amount": "10000.00" }
+    ],
+    "openItems": [
+      { "id": "1", "key": "AR", "side": "DEBIT", "amount": "110000.00", "openAmount": "110000.00" }
+    ],
+    "allocations": []
+  }
+}

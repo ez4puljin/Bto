@@ -1,31 +1,25 @@
 import type { ErrorCode } from '@tugeel/shared';
+import {
+  CodedError,
+  type FieldError,
+  type ProblemParams,
+  registerErrorStatuses,
+} from './coded-error';
 import { ERROR_HTTP_STATUS } from './error-status';
 
-/** Values the client interpolates into its Mongolian message for `code`. */
-export type ProblemParams = Record<string, string | number | boolean | null>;
+export type { FieldError, ProblemParams };
 
-export interface FieldError {
-  path: string;
-  constraint: string;
-  message: string;
-}
+const STATUS = registerErrorStatuses('bto', ERROR_HTTP_STATUS);
 
 /**
- * The one exception type services throw for expected failures. `detail` is English for logs; the
- * client shows Mongolian text chosen by `code` (ADR-0004, ADR-0011).
+ * The one exception type Bto's services throw for expected failures, over Bto's catalog
+ * (`@tugeel/shared` ErrorCode). `detail` is English for logs; the client shows Mongolian text chosen
+ * by `code` (ADR-0004, ADR-0011).
  */
-export class AppError extends Error {
-  readonly status: number;
-
-  constructor(
-    readonly code: ErrorCode,
-    readonly detail?: string,
-    readonly params?: ProblemParams,
-    readonly errors?: FieldError[],
-  ) {
-    super(detail ?? code);
+export class AppError extends CodedError<ErrorCode> {
+  constructor(code: ErrorCode, detail?: string, params?: ProblemParams, errors?: FieldError[]) {
+    super(code, STATUS[code], detail, params, errors);
     this.name = 'AppError';
-    this.status = ERROR_HTTP_STATUS[code];
   }
 }
 

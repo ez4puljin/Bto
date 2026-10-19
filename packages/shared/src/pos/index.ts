@@ -1,4 +1,5 @@
-import { daysBetween, taxSplit } from '../finance';
+import { daysBetween } from '../finance';
+import { taxSplit } from '../mn';
 import { Decimal, type DecimalInput, toMoney } from '../money';
 
 /**
@@ -18,24 +19,8 @@ export type SaleKind = (typeof SALE_KINDS)[number];
 export const SHIFT_STATUSES = ['OPEN', 'CLOSED', 'HANDED_OVER'] as const;
 export type ShiftStatus = (typeof SHIFT_STATUSES)[number];
 
-/** The e-Barimt receipt a sale gets: a citizen's with a lottery, or a company's with its TIN. */
-export const RECEIPT_TYPES = ['B2C', 'B2B'] as const;
-export type ReceiptType = (typeof RECEIPT_TYPES)[number];
-
-/**
- * The receipt's state as the edge reports it (architecture §5.9); NONE until the edge issues
- * receipts (ADR-0065), which the central module only records.
- */
-export const EBARIMT_STATUSES = [
-  'NONE',
-  'PENDING',
-  'CONFIRMED',
-  'INDETERMINATE',
-  'ERROR',
-  'CANCELLED',
-  'UNCONFIRMED_RETURN',
-] as const;
-export type EbarimtStatus = (typeof EBARIMT_STATUSES)[number];
+/** The e-Barimt receipt types and states live in the Mongolian layer (ADR-0074 #2). */
+export { EBARIMT_STATUSES, type EbarimtStatus, RECEIPT_TYPES, type ReceiptType } from '../mn';
 
 /** The documents an edge replays to the centre, in the order they happened (ADR-0063 #4). */
 export const POS_EVENT_KINDS = [

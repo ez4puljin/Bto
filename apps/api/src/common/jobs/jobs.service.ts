@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { fromDrizzle, type PgBoss, type SendOptions } from 'pg-boss';
-import type { Tx } from '../db/db.types';
-import type { JobName, JobPayloads } from './job-registry';
-import { PG_BOSS } from './pg-boss.provider';
+import type { AnyTx } from '../db/any-tx';
+import type { JobName, JobPayloads } from './job-catalog';
+import { PG_BOSS } from './jobs.tokens';
 
 export type EnqueueOptions = Omit<SendOptions, 'db'>;
 
-/** Transactional enqueue (outbox semantics, ADR-0013). */
+/** Transactional enqueue (outbox semantics, ADR-0013); knows no owner's schema (ADR-0069 #7). */
 @Injectable()
 export class JobsService {
   constructor(@Inject(PG_BOSS) private readonly boss: PgBoss) {}
@@ -18,7 +18,7 @@ export class JobsService {
    * policy dropped it.
    */
   enqueue<N extends JobName>(
-    tx: Tx,
+    tx: AnyTx,
     name: N,
     payload: JobPayloads[N],
     options: EnqueueOptions = {},

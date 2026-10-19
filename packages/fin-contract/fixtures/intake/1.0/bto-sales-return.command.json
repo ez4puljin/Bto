@@ -1,0 +1,40 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0192f8d0-5a00-7e30-a000-000000000077",
+  "tenant": "BUTEN_ORGIL",
+  "company": "BO",
+  "source": {
+    "system": "BTO",
+    "docType": "SALES_RETURN",
+    "docId": "77",
+    "docNo": "К-20261027-0001"
+  },
+  "actor": { "kind": "STAFF", "ref": "bto:user:3", "label": "Нягтлан Д." },
+  "body": {
+    "action": "POST",
+    "documentType": "BTO.SALES_RETURN",
+    "documentDate": "2026-10-27",
+    "currency": "MNT",
+    "branch": "3",
+    "party": { "ref": "customer:412", "name": "Мөрөн-Од ХХК", "kind": "COMPANY" },
+    "description": "К-20261027-0001 — 2 шуудай буцаалт",
+    "controlTotal": "22000.00",
+    "lines": [
+      { "lineNo": 1, "key": "SALES_RETURN", "side": "DEBIT", "amount": "20000.00" },
+      {
+        "lineNo": 2,
+        "key": "VAT_OUTPUT",
+        "side": "DEBIT",
+        "amount": "2000.00",
+        "tax": { "code": "MN.VAT.STD", "base": "20000.00", "lineCount": 1 }
+      },
+      {
+        "lineNo": 3,
+        "key": "AR",
+        "side": "CREDIT",
+        "amount": "22000.00",
+        "settles": [{ "target": { "system": "BTO", "docType": "SALES_INVOICE", "docId": "812" } }]
+      }
+    ]
+  }
+}

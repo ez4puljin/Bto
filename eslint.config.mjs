@@ -3,16 +3,23 @@
 // proves that each guard fires (`pnpm lint:guards`, part of `pnpm check`).
 //
 // GUARDS (docs/architecture.md §3.1 and §12) — never delete or weaken them:
-//   G1 boundaries/dependencies       module boundaries, integrations, client apps, packages
-//   G2 no-restricted-imports         stockLedger is written only by the stock-posting service
-//   G3 no-restricted-syntax          no Number()/parseFloat() in apps/api/src/modules/** (ADR-0010)
+//   G1 boundaries/dependencies       module boundaries, integrations, client apps, packages, and the
+//                                    Finance Core element (ADR-0069 #2: its exact import whitelist,
+//                                    others only through finance-core/index.ts)
+//   G2 no-restricted-imports         stockLedger is written only by the stock-posting service; the
+//                                    fin ledger symbols only by finance-core/posting/**; FinIntakeInTx
+//                                    and createFinCallContext only by their modules; no test code in
+//                                    apps/api/src; @tugeel/shared/mn imports only money/time/taxpayer
+//   G3 no-restricted-syntax          no Number()/parseFloat() in apps/api/src/modules/** and the
+//                                    Finance Core (ADR-0010, ADR-0069 #6)
 //   G4 no-restricted-syntax          no Cyrillic literals or JSX text in .tsx (ADR-0011)
 //   G5 no-restricted-syntax          no literal text in JSX (any letter) in .tsx (ADR-0011)
 //   G6 linterOptions.noInlineConfig  eslint-disable comments are ignored: exceptions live in this file
 //   TX no-restricted-syntax          no fetch/axios/LLM call inside a transaction callback (ADR-0045)
 // Flat config REPLACES a rule's options when a later object sets the same rule for the same file, so
 // no-restricted-syntax and no-restricted-imports are each set once per file group: TX_GUARD has its
-// own apps/api/src/** object and is spread into the G3 object, which wins for module files.
+// own apps/api/src/** object and is spread into the G3 object, which wins for module and core files;
+// the G2 bans are composed per file group from API_IMPORT_BANS.
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier/flat';
 import boundaries from 'eslint-plugin-boundaries';
@@ -21,6 +28,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import { FINANCE_CORE_API_FILES, FINANCE_CORE_PACKAGES } from './tools/finance-core/whitelist.mjs';
 
 const ROOT = import.meta.dirname; // never process.cwd(): boundaries compares paths case-sensitively
 const TS = ['**/*.{ts,tsx,mts,cts}'];
@@ -72,6 +80,8 @@ const MODULE_DEPS = {
 };
 const MOD = { type: 'api-module' };
 const INT = { type: 'api-integration' };
+const CORE = { type: 'api-finance-core' };
+const API = { type: 'app', captured: { app: 'api' } };
 const CLIENT_APP = { type: 'app', captured: { app: ['web', 'mobile'] } };
 
 // Policies are evaluated in order; the last matching policy decides.
@@ -142,8 +152,8 @@ const POLICIES = [
   { allow: { to: { element: INT }, dependency: { kind: ['type', 'typeof'] } } },
   {
     from: { element: INT },
-    disallow: { to: { element: MOD } },
-    message: 'Integration clients never import modules.',
+    disallow: { to: { element: { type: ['api-module', 'api-finance-core'] } } },
+    message: 'Integration clients never import modules or the Finance Core.',
   },
   // G1c §3.1 rule 3: client apps use only the generated API client and the shared package.
   {
@@ -151,7 +161,11 @@ const POLICIES = [
     disallow: {
       to: [
         { module: { source: '@tugeel/*' } },
-        { element: { type: ['app', 'api-module', 'api-integration', 'package'] } },
+        {
+          element: {
+            type: ['app', 'api-module', 'api-integration', 'api-finance-core', 'package'],
+          },
+        },
       ],
     },
     message:
@@ -166,10 +180,110 @@ const POLICIES = [
   // G1d: shared packages never depend on application code.
   {
     from: { element: { type: 'package' } },
-    disallow: { to: { element: { type: ['app', 'api-module', 'api-integration'] } } },
+    disallow: {
+      to: { element: { type: ['app', 'api-module', 'api-integration', 'api-finance-core'] } },
+    },
     message: 'packages/* never import application code.',
   },
+  // G1e ADR-0069 #2 (docs/modules/finance-core.md §3.2 rules 1-2): the Finance Core imports no Bto
+  // code, type imports included; last in the list, so no earlier allow (tests, jobs) reopens it.
+  {
+    from: { element: CORE },
+    disallow: {
+      to: [
+        { element: { type: ['app', 'api-module', 'api-integration', 'package'] } },
+        { module: { source: ['@tugeel/*', '@tugeel/*/**'] } },
+      ],
+    },
+    message:
+      'The Finance Core imports only its own files, the whitelist of tools/finance-core/whitelist.mjs, @tugeel/shared/money, @tugeel/shared/time and @tugeel/fin-contract (ADR-0069 #2).',
+  },
+  {
+    from: { element: CORE },
+    allow: { to: { element: { ...API, fileInternalPath: FINANCE_CORE_API_FILES } } },
+  },
+  {
+    // module.source is the package name, so the exact import specifier decides the subpath.
+    from: { element: CORE },
+    allow: {
+      to: { module: { source: '@tugeel/*' } },
+      dependency: { source: FINANCE_CORE_PACKAGES },
+    },
+  },
+  {
+    // Bto's modules and the api's own files only: client apps, packages and integration clients
+    // stay refused by their own policies above.
+    from: [{ element: MOD }, { element: API }],
+    disallow: { to: { element: CORE } },
+    message:
+      'The Finance Core is reached only through apps/api/src/finance-core/index.ts (ADR-0069 #2).',
+  },
+  {
+    from: [{ element: MOD }, { element: API }],
+    allow: { to: { element: { ...CORE, fileInternalPath: 'index.ts' } } },
+  },
+  {
+    // The aggregated Drizzle schema lists the fin tables (ADR-0069 #5); tests may read them too.
+    from: [
+      { element: { ...API, fileInternalPath: 'src/db/schema.ts' } },
+      { file: { categories: 'test' } },
+    ],
+    allow: { to: { element: { ...CORE, fileInternalPath: 'schema.ts' } } },
+  },
+  { from: { element: CORE }, allow: { to: { element: CORE } } },
 ];
+
+// G2 (§3.1 rules 2 and 9, ADR-0069 #6, ADR-0071 #8, ADR-0076): what apps/api imports never name.
+const RELATIVE = '^\\.{1,2}/';
+const FINANCE_CORE_INDEX = '(^|/)finance-core(/index)?$';
+const API_IMPORT_BANS = {
+  stockLedger: {
+    regex: RELATIVE,
+    importNames: ['stockLedger', 'stockValuationAdjustments'],
+    message:
+      'stockLedger and stockValuationAdjustments are imported only by inventory/services/stock-posting.service.ts and inventory tests (§3.1 rule 2, ADR-0007, ADR-0034).',
+  },
+  finLedger: {
+    regex: RELATIVE,
+    importNames: [
+      'finDocuments',
+      'finJournalEntries',
+      'finJournalLines',
+      'finOpenItems',
+      'finAllocations',
+      'finIntakeRequests',
+      'finIntakeAttempts',
+    ],
+    message:
+      'The fin ledger tables (documents, journal, open items, allocations, intake log) are imported only by finance-core/posting/** (§3.1 rule 9, ADR-0069 #6).',
+  },
+  finIntakeInTx: {
+    regex: FINANCE_CORE_INDEX,
+    importNames: ['FinIntakeInTx'],
+    message:
+      'FinIntakeInTx is imported only by modules finance (until H1), billing, pos and fin-bridge; another caller needs its session ADR (§3.1 rule 8, ADR-0071 #8).',
+  },
+  finCallContext: {
+    regex: FINANCE_CORE_INDEX,
+    importNames: ['createFinCallContext'],
+    message: 'Only modules/fin-bridge builds a FinCallContext (§3.1 rule 8, ADR-0076).',
+  },
+  testCode: {
+    regex: '(^|/)test/',
+    message:
+      'apps/api/src never imports test code: StaticCaller and the harness live under apps/api/test/** (§3.1 rule 8, ADR-0076).',
+  },
+};
+const importBans = (...ids) => ({
+  'no-restricted-imports': ['error', { patterns: ids.map((id) => API_IMPORT_BANS[id]) }],
+});
+// Drizzle needs the whole aggregated schema namespace (ADR-0024); they never write tables.
+const DRIZZLE_SCHEMA_FILES = [
+  'apps/api/src/common/db/db.module.ts',
+  'apps/api/src/common/db/db.types.ts',
+];
+const MN_MESSAGE =
+  '@tugeel/shared/mn imports only ../money, ../time and ../taxpayer: it is the Mongolian layer every system uses (ADR-0074 #2).';
 
 const NUMERIC_MESSAGE =
   'NUMERIC values never go through Number()/parseFloat(): use Decimal from @tugeel/shared/money (§12, ADR-0010).';
@@ -376,6 +490,8 @@ export default defineConfig([
           partialMatch: false,
           capture: ['integration'],
         },
+        // ADR-0069 #2: the Finance Core, a third element beside modules and integrations.
+        { type: 'api-finance-core', pattern: 'apps/api/src/finance-core', partialMatch: false },
         { type: 'app', pattern: 'apps/*', partialMatch: false, capture: ['app'] },
         { type: 'package', pattern: 'packages/*', partialMatch: false, capture: ['pkg'] },
       ],
@@ -398,32 +514,66 @@ export default defineConfig([
       ],
     },
   },
+  // G2: each file group gets the bans of API_IMPORT_BANS minus its own exemptions (later wins).
   {
     name: 'guard/G2',
     files: ['apps/api/**/*.{ts,mts,cts}'],
-    ignores: [
+    ignores: DRIZZLE_SCHEMA_FILES,
+    rules: importBans('stockLedger', 'finLedger', 'finIntakeInTx', 'finCallContext'),
+  },
+  {
+    name: 'guard/G2-src',
+    files: ['apps/api/src/**/*.{ts,mts,cts}'],
+    ignores: DRIZZLE_SCHEMA_FILES,
+    rules: importBans('stockLedger', 'finLedger', 'finIntakeInTx', 'finCallContext', 'testCode'),
+  },
+  {
+    name: 'guard/G2-stock-posting',
+    files: [
       'apps/api/src/modules/inventory/services/stock-posting.service.ts',
       'apps/api/src/modules/inventory/**/*.{spec,test}.ts',
       'apps/api/src/modules/inventory/**/__tests__/**',
-      // Drizzle needs the whole aggregated schema namespace (ADR-0024); they never write tables.
-      'apps/api/src/common/db/db.module.ts',
-      'apps/api/src/common/db/db.types.ts',
     ],
+    rules: importBans('finLedger', 'finIntakeInTx', 'finCallContext', 'testCode'),
+  },
+  {
+    name: 'guard/G2-fin-posting',
+    files: ['apps/api/src/finance-core/posting/**/*.{ts,mts,cts}'],
+    rules: importBans('stockLedger', 'finIntakeInTx', 'finCallContext', 'testCode'),
+  },
+  {
+    // ADR-0071 #8: the modules that post inside their own transaction; the list grows by ADR.
+    name: 'guard/G2-fin-intake',
+    files: ['apps/api/src/modules/{finance,billing,pos}/**/*.{ts,mts,cts}'],
+    rules: importBans('stockLedger', 'finLedger', 'finCallContext', 'testCode'),
+  },
+  {
+    name: 'guard/G2-fin-bridge',
+    files: ['apps/api/src/modules/fin-bridge/**/*.{ts,mts,cts}'],
+    rules: importBans('stockLedger', 'finLedger', 'testCode'),
+  },
+  {
+    // ADR-0074 #2: the Mongolian layer stands on money, time and taxpayer only.
+    name: 'guard/G2-mn',
+    files: ['packages/shared/src/mn/**/*.ts'],
+    ignores: ['packages/shared/src/mn/**/*.test.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
-            {
-              regex: '^\\.{1,2}/',
-              importNames: ['stockLedger', 'stockValuationAdjustments'],
-              message:
-                'stockLedger and stockValuationAdjustments are imported only by inventory/services/stock-posting.service.ts and inventory tests (§3.1 rule 2, ADR-0007, ADR-0034).',
-            },
+            { regex: '^\\.\\./(?!(money|time|taxpayer)$)', message: MN_MESSAGE },
+            { regex: '^[^.]', message: MN_MESSAGE },
           ],
         },
       ],
     },
+  },
+  {
+    // AnyTx must accept every schema's transaction (ADR-0069 #7); `unknown` would not.
+    name: 'any-tx',
+    files: ['apps/api/src/common/db/any-tx.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {
     name: 'guard/TX',
@@ -432,7 +582,10 @@ export default defineConfig([
   },
   {
     name: 'guard/G3',
-    files: ['apps/api/src/modules/**/*.{ts,mts,cts}'],
+    files: [
+      'apps/api/src/modules/**/*.{ts,mts,cts}',
+      'apps/api/src/finance-core/**/*.{ts,mts,cts}',
+    ],
     rules: { 'no-restricted-syntax': ['error', ...NUMBER_PARSE_BAN, ...TX_GUARD] },
   },
   {

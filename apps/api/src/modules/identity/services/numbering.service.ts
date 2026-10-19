@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { type CounterTable, nextCounterValue } from '../../../common/db/counters';
 import type { Tx } from '../../../common/db/db.types';
 import { numberSequences } from '../schema';
+
+const NUMBER_SEQUENCES: CounterTable<typeof numberSequences> = {
+  table: numberSequences,
+  key: [numberSequences.scopeKey, numberSequences.period],
+  value: numberSequences.lastValue,
+  valueProperty: 'lastValue',
+};
 
 /**
  * Gap-free document numbers (ADR-0002 #7, SPEC §6.13). Call inside the posting transaction under
@@ -11,17 +18,7 @@ import { numberSequences } from '../schema';
 @Injectable()
 export class NumberingService {
   /** The next value for `scopeKey` (e.g. `GR`, `BILLID:<posNo>`) in `period` (e.g. `2026`). */
-  async next(tx: Tx, scopeKey: string, period: string): Promise<number> {
-    const rows = await tx
-      .insert(numberSequences)
-      .values({ scopeKey, period, lastValue: 1 })
-      .onConflictDoUpdate({
-        target: [numberSequences.scopeKey, numberSequences.period],
-        set: { lastValue: sql`${numberSequences.lastValue} + 1` },
-      })
-      .returning({ value: numberSequences.lastValue });
-    const value = rows[0]?.value;
-    if (value === undefined) throw new Error(`number sequence ${scopeKey}/${period} not returned`);
-    return value;
+  next(tx: Tx, scopeKey: string, period: string): Promise<number> {
+    return nextCounterValue(tx, NUMBER_SEQUENCES, { scopeKey, period });
   }
 }

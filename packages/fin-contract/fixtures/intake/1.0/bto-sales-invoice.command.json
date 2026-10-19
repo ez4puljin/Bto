@@ -1,0 +1,44 @@
+{
+  "contract": "fin.intake/1.0",
+  "commandId": "0192f3a1-6c00-7a10-8000-000000000812",
+  "tenant": "BUTEN_ORGIL",
+  "company": "BO",
+  "source": {
+    "system": "BTO",
+    "docType": "SALES_INVOICE",
+    "docId": "812",
+    "revision": 1,
+    "docNo": "Н-20261020-0004"
+  },
+  "actor": { "kind": "STAFF", "ref": "bto:user:7", "label": "Нярав Б." },
+  "body": {
+    "action": "POST",
+    "documentType": "BTO.SALES_INVOICE",
+    "documentDate": "2026-10-20",
+    "currency": "MNT",
+    "branch": "3",
+    "party": { "ref": "customer:412", "name": "Мөрөн-Од ХХК", "kind": "COMPANY", "tin": "1234567" },
+    "dueDate": "2026-11-19",
+    "description": "Н-20261020-0004 — Мөрөн-Од ХХК",
+    "controlTotal": "120000.00",
+    "attributes": { "orderNumber": "20261020_0007" },
+    "lines": [
+      {
+        "lineNo": 1,
+        "key": "AR",
+        "side": "DEBIT",
+        "amount": "110000.00",
+        "openItem": { "dueDate": "2026-11-19" }
+      },
+      { "lineNo": 2, "key": "SALES_DISCOUNT", "side": "DEBIT", "amount": "10000.00" },
+      { "lineNo": 3, "key": "SALES", "side": "CREDIT", "amount": "110000.00" },
+      {
+        "lineNo": 4,
+        "key": "VAT_OUTPUT",
+        "side": "CREDIT",
+        "amount": "10000.00",
+        "tax": { "code": "MN.VAT.STD", "base": "100000.00", "lineCount": 1 }
+      }
+    ]
+  }
+}

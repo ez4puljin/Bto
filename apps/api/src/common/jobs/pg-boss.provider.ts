@@ -2,9 +2,10 @@ import type { FactoryProvider } from '@nestjs/common';
 import { PgBoss } from 'pg-boss';
 import { AppConfig } from '../config/app-config';
 import { PROCESS_ROLE, type ProcessRole } from '../config/process-role';
-import { PGBOSS_SCHEMA } from './job-registry';
+import { PGBOSS_SCHEMA } from './job-catalog';
+import { PG_BOSS } from './jobs.tokens';
 
-export const PG_BOSS = Symbol('PG_BOSS');
+export { PG_BOSS };
 
 /**
  * Runtime pg-boss on role app (ADR-0024): it never installs or migrates its schema (`db:migrate` does,

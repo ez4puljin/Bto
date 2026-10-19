@@ -122,6 +122,11 @@
       "types": "./dist/notifications/index.d.ts",
       "default": "./dist/notifications/index.js"
     },
+    "./mn": {
+      "@tugeel/source": "./src/mn/index.ts",
+      "types": "./dist/mn/index.d.ts",
+      "default": "./dist/mn/index.js"
+    },
     "./i18n/*.json": "./i18n/*.json",
     "./package.json": "./package.json"
   },
@@ -136,6 +141,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tugeel/fin-contract": "workspace:*",
     "dayjs": "catalog:",
     "decimal.js": "catalog:"
   },

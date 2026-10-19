@@ -1,4 +1,13 @@
-import { Decimal, type DecimalInput, toMoney, toWholeMnt } from '../money';
+import {
+  ACCOUNT_KINDS,
+  type AccountKind,
+  CHART_ROLES,
+  CHART_TEMPLATE,
+  type ChartRole,
+  NUMBER_DEFAULTS,
+  type NumberFormat,
+} from '../mn';
+import { Decimal, type DecimalInput, toWholeMnt } from '../money';
 import {
   formatOrderNumber,
   type OrderNumberIssue,
@@ -9,25 +18,21 @@ import {
 
 /**
  * Finance (ADR-0060): the rules invoices, payments, credit notes and the journal share between the
- * api and the web. Messages live in mn.json under `finance`.
+ * api and the web. Messages live in mn.json under `finance`. The tax split, the chart template and
+ * the number defaults live in the Mongolian layer `@tugeel/shared/mn` (ADR-0074 #2) and are
+ * re-exported here under their old names.
  */
+
+export { type TaxSplit, taxSplit } from '../mn';
+export type { NumberFormat };
 
 /** The documents finance numbers (ADR-0060 #8); each has its own pattern and counter. */
 export const FINANCE_DOC_KINDS = ['INVOICE', 'PAYMENT', 'CREDIT_NOTE', 'JOURNAL'] as const;
 export type FinanceDocKind = (typeof FINANCE_DOC_KINDS)[number];
 
-export interface NumberFormat {
-  pattern: string;
-  digits: number;
-}
-
 /** The owner's defaults (2026-10-16): a letter, the day and a counter starting again each day. */
-export const FINANCE_NUMBER_DEFAULTS: Readonly<Record<FinanceDocKind, NumberFormat>> = {
-  INVOICE: { pattern: 'Н-{year}{month}{day}-', digits: 4 },
-  PAYMENT: { pattern: 'Т-{year}{month}{day}-', digits: 4 },
-  CREDIT_NOTE: { pattern: 'К-{year}{month}{day}-', digits: 4 },
-  JOURNAL: { pattern: 'Ж-{year}{month}{day}-', digits: 4 },
-};
+export const FINANCE_NUMBER_DEFAULTS: Readonly<Record<FinanceDocKind, NumberFormat>> =
+  NUMBER_DEFAULTS;
 
 /** `number_sequences.scope_key` per document; the rendered prefix is the period. */
 export const FINANCE_NUMBER_SCOPES: Readonly<Record<FinanceDocKind, string>> = {
@@ -84,30 +89,12 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export const MONEY_ACCOUNT_KINDS = ['CASH', 'BANK'] as const;
 export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
 
-export const GL_ACCOUNT_KINDS = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
-export type GlAccountKind = (typeof GL_ACCOUNT_KINDS)[number];
+export const GL_ACCOUNT_KINDS = ACCOUNT_KINDS;
+export type GlAccountKind = AccountKind;
 
 /** Which account an automatic entry hits (ADR-0060 #7); at most one account holds a role. */
-export const GL_ROLES = [
-  'AR',
-  'SALES',
-  'SALES_DISCOUNT',
-  'SALES_RETURN',
-  'VAT_PAYABLE',
-  'CITY_TAX_PAYABLE',
-  'CUSTOMER_ADVANCE',
-  'CASH',
-  'BANK',
-  'OTHER_INCOME',
-  'OTHER_EXPENSE',
-  // The supermarket POS (ADR-0064): the tills' cash until it is handed over, card money until the
-  // bank settles it, the store's sales, and what a count missed or found.
-  'POS_CASH',
-  'CARD_CLEARING',
-  'POS_SALES',
-  'CASH_VARIANCE',
-] as const;
-export type GlRole = (typeof GL_ROLES)[number];
+export const GL_ROLES = CHART_ROLES;
+export type GlRole = ChartRole;
 
 export const JOURNAL_SOURCES = [
   'AUTO_INVOICE',
@@ -171,32 +158,6 @@ export function agingBucketOf(dueDate: string, today: string): AgingBucket {
   if (late <= 60) return 'D31_60';
   if (late <= 90) return 'D61_90';
   return 'D90_PLUS';
-}
-
-export interface TaxSplit {
-  /** Two decimals (ADR-0010). */
-  vat: Decimal;
-  cityTax: Decimal;
-  /** What is left of the tax-inclusive amount. */
-  net: Decimal;
-}
-
-/**
- * The taxes inside a tax-inclusive amount (ADR-0010 #4): `vat = round2(total × r / (100 + r + c))`
- * and the same for the city tax, both rates in percent; never recomputed from a header.
- */
-export function taxSplit(
-  total: DecimalInput,
-  vatRatePct: DecimalInput,
-  cityTaxRatePct: DecimalInput,
-): TaxSplit {
-  const amount = new Decimal(total);
-  const vatRate = new Decimal(vatRatePct);
-  const cityRate = new Decimal(cityTaxRatePct);
-  const divisor = new Decimal(100).plus(vatRate).plus(cityRate);
-  const vat = vatRate.isZero() ? new Decimal(0) : toMoney(amount.times(vatRate).div(divisor));
-  const cityTax = cityRate.isZero() ? new Decimal(0) : toMoney(amount.times(cityRate).div(divisor));
-  return { vat, cityTax, net: amount.minus(vat).minus(cityTax) };
 }
 
 /** A part of an order line as it was frozen at the submit (ADR-0048 #4). */
@@ -329,21 +290,4 @@ export const DEFAULT_GL_ACCOUNTS: readonly {
   code: string;
   kind: GlAccountKind;
   role: GlRole | null;
-}[] = [
-  { code: '100101', kind: 'ASSET', role: 'CASH' },
-  { code: '110101', kind: 'ASSET', role: 'BANK' },
-  { code: '120101', kind: 'ASSET', role: 'AR' },
-  { code: '311004', kind: 'LIABILITY', role: 'VAT_PAYABLE' },
-  { code: '311005', kind: 'LIABILITY', role: 'CITY_TAX_PAYABLE' },
-  { code: '320201', kind: 'LIABILITY', role: 'CUSTOMER_ADVANCE' },
-  { code: '510101', kind: 'INCOME', role: 'SALES' },
-  { code: '511020', kind: 'INCOME', role: 'OTHER_INCOME' },
-  { code: '520101', kind: 'INCOME', role: 'SALES_RETURN' },
-  { code: '520201', kind: 'INCOME', role: 'SALES_DISCOUNT' },
-  { code: '730101', kind: 'EXPENSE', role: 'OTHER_EXPENSE' },
-  // The supermarket POS (ADR-0064 #2).
-  { code: '100102', kind: 'ASSET', role: 'POS_CASH' },
-  { code: '120301', kind: 'ASSET', role: 'CARD_CLEARING' },
-  { code: '510102', kind: 'INCOME', role: 'POS_SALES' },
-  { code: '740101', kind: 'EXPENSE', role: 'CASH_VARIANCE' },
-];
+}[] = CHART_TEMPLATE;
