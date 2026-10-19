@@ -137,7 +137,7 @@ Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'1
 | `/finance/cash` (+ `?account=`) | the money accounts as cards with balances, the chosen one's book newest first with the balance after each voucher and the opening before `from` |
 | `/finance/customers`, `/finance/customers/:id` (+ `?new=1`) | who owes what with aging and credit terms; one customer's balance card and ledger with «Төлбөр бүртгэх» for that customer; `CustomerBalanceCard` («Тооцоо») on `/partners/customers/:id` |
 | `/finance/journal` (+ `?new=1`, `?entry=`), `/finance/accounts`, `/finance/accounts/:id` | the journal with «Гараар бичилт» (lines that must balance before sending) and the entry panel (a manual entry's «Эсрэг бичилт»); the chart with turnover and balances, account dialogs, the role dialog (`finance.settings.manage`), an account's ledger |
-| `/finance/settings` (`finance.settings.manage`) | the four number formats with today's example; the money accounts |
+| `/finance/settings` (`finance.settings.manage`) | the four number formats with today's example; the money accounts, a bank account's «Харилцагчид харуулах» switch (the customer app lists it with the advice to name the invoice) and its «Апп-д харагдана» badge |
 
 Also: the home tile «Хугацаа хэтэрсэн авлагатай харилцагч» (`GET /finance/attention`, opens the balances filtered to overdue), the order panel's «Нэхэмжлэх» fact with the settlement badge, and `ProblemAlert` rendering `CREDIT_BLOCKED` as one line per reason with the formatted amounts.
 

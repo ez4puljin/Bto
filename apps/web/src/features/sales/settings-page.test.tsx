@@ -300,4 +300,67 @@ describe('boards and pipelines settings', () => {
       stageId: 1,
     });
   });
+
+  it('offers the customer app only stages without an action in pipelines of every order', async () => {
+    const [board] = TREE;
+    const [wholesale] = board?.pipelines ?? [];
+    const [arrived] = PIPELINE.stages;
+    if (!board || !wholesale || !arrived) throw new Error('fixtures');
+    const tree: Schemas['SalesBoard'][] = [
+      {
+        ...board,
+        pipelines: [
+          wholesale,
+          { ...wholesale, id: 11, name: 'Миний захиалга', position: 1, ownOrdersOnly: true },
+        ],
+      },
+    ];
+    const pipeline: Schemas['SalesPipeline'] = {
+      ...PIPELINE,
+      stages: [arrived, { ...arrived, id: 2, name: 'Нөөцөлсөн', position: 1, action: 'CONFIRM' }],
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...routes,
+      'GET /api/v1/sales-boards': () => json(tree),
+      'GET /api/v1/sales-pipelines/10': () => json(pipeline),
+      'PUT /api/v1/sales-settings/channels': () =>
+        json([{ channel: 'CUSTOMER_APP', pipelineId: 10, stageId: 1 }]),
+    });
+    renderApp('/sales/boards/settings', fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.sales.channelsDialog.button }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: mn.sales.channelsDialog.title }),
+    );
+    const names = (select: HTMLElement) =>
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+    const app = mn.sales.channels.CUSTOMER_APP;
+    const office = mn.sales.channels.ADMIN;
+    expect(dialog.getByText(mn.sales.channelsDialog.customerAppHint)).toBeInTheDocument();
+    // The office's channel keeps every pipeline; the app's leaves out the own-orders-only one.
+    const appPipeline = dialog.getByLabelText(`${mn.sales.channelsDialog.pipeline}: ${app}`);
+    expect(names(dialog.getByLabelText(`${mn.sales.channelsDialog.pipeline}: ${office}`))).toEqual([
+      mn.sales.channelsDialog.none,
+      'Бөөний борлуулалт',
+      'Миний захиалга',
+    ]);
+    expect(names(appPipeline)).toEqual([mn.sales.channelsDialog.none, 'Бөөний борлуулалт']);
+
+    await user.selectOptions(appPipeline, '10');
+    const appStage = dialog.getByLabelText(`${mn.sales.channelsDialog.stage}: ${app}`);
+    await within(appStage).findByRole('option', { name: 'Ирсэн' });
+    // A CONFIRM stage would reserve stock before the office checks the order.
+    expect(names(appStage)).toEqual([mn.sales.channelsDialog.chooseStage, 'Ирсэн']);
+    await user.selectOptions(appStage, '1');
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/sales-settings/channels')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/sales-settings/channels')[0])).toEqual({
+      channel: 'CUSTOMER_APP',
+      pipelineId: 10,
+      stageId: 1,
+    });
+  });
 });

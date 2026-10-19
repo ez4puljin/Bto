@@ -26,6 +26,7 @@ export const CUSTOMER_COLUMN_KEYS = [
   'paymentTerm',
   'creditHold',
   'note',
+  'app',
   'status',
 ] as const;
 export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
@@ -48,6 +49,7 @@ export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
   'creditLimit',
   'paymentTerm',
   'note',
+  'app',
 ];
 
 export interface CustomerColumn {
@@ -165,6 +167,18 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
     key: 'note',
     truncate: { text: (row, t) => row.note ?? t('common.none') },
     cell: (row, t) => text(row.note, t),
+  },
+  {
+    // The customer app «Bto300» (ADR-0079 #11): open, closed, or no account.
+    key: 'app',
+    cell: (row, t) =>
+      row.appAccount === null ? (
+        none(t)
+      ) : (
+        <Badge variant={row.appAccount === 'ACTIVE' ? 'success' : 'secondary'}>
+          {t(`partners.app.statuses.${row.appAccount}`)}
+        </Badge>
+      ),
   },
   {
     key: 'status',

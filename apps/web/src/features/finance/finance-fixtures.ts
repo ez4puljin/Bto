@@ -191,6 +191,7 @@ export const CASH_BOX: Schemas['MoneyAccount'] = {
   glAccountName: 'Касс',
   status: 'ACTIVE',
   balance: '50000.00',
+  showToCustomers: false,
   createdAt: STAMP,
   updatedAt: STAMP,
 };

@@ -24,6 +24,7 @@ const list = <T,>(data: T[]) => json({ data, nextCursor: null });
 const notice = (fields: Partial<Schemas['AppNotice']> = {}): Schemas['AppNotice'] => ({
   id: 3,
   kind: 'PROMOTION',
+  audience: 'SALES_REPS',
   title: 'Кола урамшуулал',
   body: 'Хайрцаг бүрт нэг ширхэг бэлэг.',
   imageUrl: '/api/v1/files/public/a.jpg',
@@ -45,6 +46,7 @@ const RUNNING = notice();
 const ENDED = notice({
   id: 2,
   kind: 'NEWS',
+  audience: 'CUSTOMERS',
   title: 'Амралтын өдөр',
   state: 'ENDED',
   validTo: null,
@@ -106,6 +108,7 @@ describe('app notices list', () => {
     const running = rowOf(RUNNING.title);
     for (const text of [
       mn.notifications.kinds.PROMOTION,
+      mn.notifications.audiences.SALES_REPS,
       '2026-10-16 – 2026-10-23',
       mn.notifications.states.RUNNING,
       '2/5',
@@ -117,6 +120,7 @@ describe('app notices list', () => {
     }
     const ended = rowOf(ENDED.title);
     expect(ended.getByText('2026-10-16-с хойш')).toBeInTheDocument();
+    expect(ended.getByText(mn.notifications.audiences.CUSTOMERS)).toBeInTheDocument();
     expect(ended.queryByRole('button', { name: mn.notifications.withdraw })).toBeNull();
 
     await user.click(running.getByRole('button', { name: mn.notifications.withdraw }));
@@ -151,6 +155,15 @@ describe('app notices list', () => {
     );
     expect(preview.getByText(mn.notifications.preview.placeholderTitle)).toBeInTheDocument();
 
+    // Sales reps by default; this one goes to the stores' «Bto300» (ADR-0079 #8).
+    const audience = within(dialog).getByLabelText(mn.notifications.form.audience);
+    expect(audience).toHaveValue('SALES_REPS');
+    expect(
+      within(audience)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([mn.notifications.audiences.SALES_REPS, mn.notifications.audiences.CUSTOMERS]);
+    await user.selectOptions(audience, 'CUSTOMERS');
     await user.selectOptions(
       within(dialog).getByLabelText(mn.notifications.form.kind),
       'PRICE_DROP',
@@ -181,6 +194,7 @@ describe('app notices list', () => {
     const [sent] = calls(fetchMock, 'POST', '/api/v1/app-notices');
     expect(sent?.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await sent?.clone().json()).toEqual({
+      audience: 'CUSTOMERS',
       kind: 'PRICE_DROP',
       title: 'Кола хямдарлаа',
       body: 'Кола 10% хямд.',

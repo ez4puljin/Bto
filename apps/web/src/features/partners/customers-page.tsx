@@ -26,7 +26,7 @@ import { useSetParam } from '@/lib/search-params';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
-import { type CustomerKind, type PartnerStatus, useCustomers } from './api';
+import { type AppAccountFilter, type CustomerKind, type PartnerStatus, useCustomers } from './api';
 import {
   CUSTOMER_COLUMN_KEYS,
   CUSTOMER_COLUMNS,
@@ -37,6 +37,8 @@ import { ListColumnCell, ListColumnHead } from './list-column-cell';
 import { PARTNER_STATUSES } from './partner-schema';
 
 const FLAGS = ['tinPending', 'gpsMissing', 'creditHold'] as const;
+/** The customer app filter (ADR-0079 #11): open, closed, or no account linked. */
+const APP_FILTERS: readonly AppAccountFilter[] = ['ACTIVE', 'DISABLED', 'NONE'];
 /** The list's name in the column-choice key (ADR-0050). */
 const COLUMNS_LIST = 'partners.customers';
 type Flag = (typeof FLAGS)[number];
@@ -45,11 +47,13 @@ const isKind = (value: string | null): value is CustomerKind =>
   CUSTOMER_KINDS.some((kind) => kind === value);
 const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
+const isAppFilter = (value: string | null): value is AppAccountFilter =>
+  APP_FILTERS.some((entry) => entry === value);
 
 /**
  * Customers: search by name in either script, code, phone, TIN or registration number; filter by
- * kind and status, and find the rows that still miss a TIN or a GPS point, or are on credit hold
- * (SPEC §5.3). Filters live in the URL so "back" keeps them. A user who never chose sees the
+ * kind, status and the customer app account (ADR-0079 #11), and find the rows that still miss a
+ * TIN or a GPS point, or are on credit hold (SPEC §5.3). Filters live in the URL so "back" keeps them. A user who never chose sees the
  * columns that fit a 1366px screen (ADR-0066).
  */
 export function CustomersPage() {
@@ -63,6 +67,8 @@ export function CustomersPage() {
   const statusParam = params.get('status');
   const kind = isKind(kindParam) ? kindParam : undefined;
   const status = isStatus(statusParam) ? statusParam : undefined;
+  const appParam = params.get('app');
+  const app = isAppFilter(appParam) ? appParam : undefined;
   const flag = (name: Flag) => (params.get(name) === '1' ? true : undefined);
   const segmentId = segmentParam(params);
   const customers = useCustomers({
@@ -70,6 +76,7 @@ export function CustomersPage() {
     kind,
     status,
     segmentId,
+    app,
     tinPending: flag('tinPending'),
     gpsMissing: flag('gpsMissing'),
     creditHold: flag('creditHold'),
@@ -87,7 +94,7 @@ export function CustomersPage() {
     [hidden],
   );
   const filtered = Boolean(
-    q || kind || status || segmentId || FLAGS.some((name) => flag(name) === true),
+    q || kind || status || app || segmentId || FLAGS.some((name) => flag(name) === true),
   );
   const clearFilters = () => {
     setSearch('');
@@ -154,6 +161,19 @@ export function CustomersPage() {
           {PARTNER_STATUSES.map((value) => (
             <option key={value} value={value}>
               {t(`partners.status.${value}`)}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          variant="filter"
+          aria-label={t('partners.customers.appFilter.label')}
+          value={app ?? ''}
+          onChange={(event) => setParam('app', event.target.value)}
+        >
+          <option value="">{t('partners.customers.appFilter.all')}</option>
+          {APP_FILTERS.map((value) => (
+            <option key={value} value={value}>
+              {t(`partners.customers.appFilter.${value}`)}
             </option>
           ))}
         </NativeSelect>

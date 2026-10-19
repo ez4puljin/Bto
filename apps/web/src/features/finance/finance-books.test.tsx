@@ -166,6 +166,9 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       dialog.getByLabelText(mn.finance.settings.moneyAccountDialog.name),
       'Хаан банк',
     );
+    const showToCustomers = mn.finance.settings.moneyAccountDialog.showToCustomers;
+    // A cash box is never listed in the customer app (ADR-0079 #7).
+    expect(dialog.queryByRole('switch', { name: showToCustomers })).toBeNull();
     await user.selectOptions(
       dialog.getByLabelText(mn.finance.settings.moneyAccountDialog.kind),
       'BANK',
@@ -178,6 +181,12 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       dialog.getByLabelText(mn.finance.settings.moneyAccountDialog.glAccount),
       '1',
     );
+    const shown = dialog.getByRole('switch', { name: showToCustomers });
+    expect(shown).not.toBeChecked();
+    expect(shown).toHaveAccessibleDescription(
+      mn.finance.settings.moneyAccountDialog.showToCustomersHint,
+    );
+    await user.click(shown);
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/money-accounts')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/money-accounts')[0])).toEqual({
@@ -188,6 +197,53 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       bankName: null,
       bankAccountNo: '5000000000',
       glAccountId: 1,
+      showToCustomers: true,
+    });
+  });
+
+  it('marks a bank account shown to customers and turns it off', async () => {
+    const user = userEvent.setup();
+    const KHAN = {
+      ...CASH_BOX,
+      id: 2,
+      code: 'KHAN',
+      name: 'Хаан банк',
+      kind: 'BANK' as const,
+      bankName: 'Хаан банк',
+      bankAccountNo: '5000000000',
+      showToCustomers: true,
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...routes(),
+      'GET /api/v1/money-accounts': () => json([CASH_BOX, KHAN]),
+      'PUT /api/v1/money-accounts/2': () => json({ ...KHAN, showToCustomers: false }),
+    });
+    renderApp('/finance/settings', fetchMock);
+    const row = within(await screen.findByRole('row', { name: /KHAN/ }));
+    expect(row.getByText(mn.finance.settings.shownToCustomers)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('row', { name: /CASH-1/ })).queryByText(
+        mn.finance.settings.shownToCustomers,
+      ),
+    ).toBeNull();
+    await user.click(row.getByRole('button', { name: `KHAN: ${mn.common.actions}` }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.common.edit }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: mn.finance.settings.moneyAccountDialog.editTitle }),
+    );
+    const shown = dialog.getByRole('switch', {
+      name: mn.finance.settings.moneyAccountDialog.showToCustomers,
+    });
+    expect(shown).toBeChecked();
+    await user.click(shown);
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/money-accounts/2')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/money-accounts/2')[0])).toMatchObject({
+      code: 'KHAN',
+      status: 'ACTIVE',
+      showToCustomers: false,
     });
   });
 });

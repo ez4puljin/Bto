@@ -18,6 +18,7 @@ import { useAction } from '@/lib/use-action';
 import { CustomerBalanceCard } from '@/features/finance/customer-balance-card';
 import { AddressesCard } from './addresses-card';
 import { type CustomerDetail, useCustomer, usePartnersMutations } from './api';
+import { CustomerAppCard } from './customer-app-card';
 import { ContactsCard } from './contacts-card';
 import { CustomerFacts, CustomerForm } from './customer-form';
 import {
@@ -32,7 +33,8 @@ import {
 
 /**
  * One customer: data and delivery addresses, then from `xl` on a side column with the credit
- * terms, the balance («Тооцоо», finance) and the contacts (SPEC §5.3, ADR-0066).
+ * terms, the balance («Тооцоо», finance), the customer app («Апп», ADR-0079 #11) and the contacts
+ * (SPEC §5.3, ADR-0066).
  */
 export function CustomerPage() {
   const { t } = useTranslation();
@@ -100,6 +102,7 @@ export function CustomerPage() {
         <div className="flex min-w-0 flex-col gap-4">
           <CreditCard customer={detail} canEdit={canCredit} />
           <CustomerBalanceCard customerId={id} />
+          <CustomerAppCard customerId={id} />
           <ContactsCard
             contacts={detail.contacts}
             canManage={canManage}

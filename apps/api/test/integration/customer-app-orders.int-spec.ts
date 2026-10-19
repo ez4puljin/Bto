@@ -177,8 +177,9 @@ describe('customer app orders (ADR-0079)', () => {
       [order.id],
     );
     expect(reserved.rows[0]?.count).toBe('0');
-    // The office sees it on its board; the customer never takes a customer id from the client.
-    expect((await flow.orders.get(order.id)).channel).toBe('CUSTOMER_APP');
+    // The office sees it on its board, on the app's channel.
+    const onBoard = (await flow.orders.get(order.id)) as unknown as { channel: string };
+    expect(onBoard.channel).toBe('CUSTOMER_APP');
   });
 
   it('refuses a day past 60 days, a delivery without the store’s own address and empty carts', async () => {

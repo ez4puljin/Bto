@@ -1,10 +1,13 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useAuthState } from '@/app/auth-context';
 import { visibleNav, visibleQuickActions } from '@/app/nav-items';
 import { PageHeader } from '@/components/page-header';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useCustomerAppAttention } from '@/features/customer-app/api';
+import { formatCount } from '@/lib/money';
 import { formatUbToday } from '@/lib/dayjs';
 import { readRecentPages } from '@/lib/recent-pages';
 import { cn } from '@/lib/utils';
@@ -15,7 +18,9 @@ import { tileColumns } from './tile-columns';
  * «Нүүр» (ADR-0042, ADR-0066): a greeting with today's date; then the work waiting for this person
  * («Анхаарах», ADR-0047 #7) and the shortcuts to the day's work (each behind the right to do it) as
  * compact tiles, with the pages this user opened last in this browser (ADR-0053) in a side column
- * from `xl`, so all three fit a laptop's first screen. «Системийн төлөв» lives in «Систем».
+ * from `xl`, so all three fit a laptop's first screen. Above them, for people who set up the
+ * boards, a warning while the customer app's orders have no stage to land on (ADR-0079 #5).
+ * «Системийн төлөв» lives in «Систем».
  */
 export function HomePage() {
   const { t } = useTranslation();
@@ -52,6 +57,7 @@ export function HomePage() {
         )}
       >
         <div className="flex min-w-0 flex-col gap-6">
+          <CustomerAppWarning enabled={permissions.includes('sales.boards.manage')} />
           <AttentionTiles permissions={permissions} />
           {actions.length > 0 ? (
             <section aria-labelledby="home-actions">
@@ -122,6 +128,30 @@ export function HomePage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Stores use «Bto300» but no stage takes the CUSTOMER_APP channel (ADR-0079 #5): their orders are
+ * refused until the boards' «Сувгийн тохиргоо» names a stage without an action. Only for people who
+ * set up the boards; nothing while loading, after an error or when all is well.
+ */
+function CustomerAppWarning({ enabled }: { enabled: boolean }) {
+  const { t } = useTranslation();
+  const attention = useCustomerAppAttention(enabled);
+  const data = attention.data;
+  if (!enabled || !data || data.activeAccounts === 0 || data.ordersOpen) return null;
+  return (
+    <Alert className="border-transparent bg-warning-soft shadow-none!">
+      <TriangleAlert aria-hidden className="text-warning" />
+      <AlertTitle className="text-warning">{t('home.customerApp.warning')}</AlertTitle>
+      <AlertDescription className="flex flex-col gap-1 text-warning">
+        <span>{t('home.customerApp.hint', { n: formatCount(data.activeAccounts) })}</span>
+        <Link to="/sales/boards/settings" className="self-start font-medium">
+          {t('home.customerApp.open')}
+        </Link>
+      </AlertDescription>
+    </Alert>
   );
 }
 
