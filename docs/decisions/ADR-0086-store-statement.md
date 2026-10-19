@@ -1,4 +1,4 @@
-# ADR-0085: The store's statement on «Тооцоо» — Дебит and Кредит, opening and closing balances, any days, the last month first
+# ADR-0086: The store's statement on «Тооцоо» — Дебит and Кредит, opening and closing balances, any days, the last month first
 
 | | |
 |---|---|
@@ -6,7 +6,7 @@
 | Date | 2026-10-20 |
 | Deciders | Owner (asked 2026-10-20: «Тооцоо цэс дээр Кредит болон Дебит багануудтай болгож харуул … Эхний болон эцсийн үлдэгдэлтэй. Date_range тайлангаа харах боломжтой. Default нь сүүлийн нэг сарынх»), Claude (Claude Code session, CA3) |
 | Amends | ADR-0079 #7 and #13 («Тооцоо» gains a statement before the open invoices and the payments) |
-| Related | ADR-0060 (the receivables ledger), ADR-0082 (the customer routes), ADR-0084 (the app's build) |
+| Related | ADR-0060 (the receivables ledger), ADR-0082 (the customer routes), ADR-0085 (the app's build) |
 
 ## Context
 
@@ -37,4 +37,4 @@ Finance already keeps every receivable movement in the append-only ledger `ar_en
 
 ## Related
 
-ADR-0060, ADR-0079, ADR-0082, ADR-0084, `docs/modules/customer.md`, `docs/modules/finance.md`, `docs/modules/mobile.md` §1a.
+ADR-0060, ADR-0079, ADR-0082, ADR-0085, `docs/modules/customer.md`, `docs/modules/finance.md`, `docs/modules/mobile.md` §1a.

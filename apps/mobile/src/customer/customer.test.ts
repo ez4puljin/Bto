@@ -238,7 +238,7 @@ describe('«Bto300»: notifications (ADR-0079 #8)', () => {
   });
 });
 
-describe('«Bto300»: the statement (ADR-0085)', () => {
+describe('«Bto300»: the statement (ADR-0086)', () => {
   it('opens on the last month, today included', () => {
     expect(lastMonthRange('2026-10-20')).toEqual({ from: '2026-09-21', to: '2026-10-20' });
     expect(lastMonthRange('2026-03-31')).toEqual({ from: '2026-03-01', to: '2026-03-31' });

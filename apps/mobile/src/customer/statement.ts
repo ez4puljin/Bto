@@ -1,7 +1,7 @@
 import { addDays, addMonths } from '@tugeel/shared/time';
 import type { DateRange } from '../dates/calendar';
 
-// «Тооцооны хуулга» (ADR-0085): the store's statement on «Тооцоо» — the opening balance, the
+// «Тооцооны хуулга» (ADR-0086): the store's statement on «Тооцоо» — the opening balance, the
 // purchases (Дебит) and the payments and returns (Кредит), the closing balance — for any days.
 
 /** The statement's first view: the last month, today included (10/20 → 09/21 – 10/20). */

@@ -6,7 +6,7 @@ const appRoot = path.resolve(import.meta.dirname, '..');
 const variants = JSON.parse(readFileSync(path.join(appRoot, 'variants.json'), 'utf8'));
 const pkg = JSON.parse(readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
 
-describe('the two apps of apps/mobile (ADR-0084)', () => {
+describe('the two apps of apps/mobile (ADR-0085)', () => {
   it('keeps the staff app as it was', () => {
     expect(variants.staff).toEqual({
       name: 'Bto',

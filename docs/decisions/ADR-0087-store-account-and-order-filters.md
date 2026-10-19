@@ -1,16 +1,16 @@
-# ADR-0086: «Bto300» after the owner's look — the statement alone on «Тооцоо», who took each purchase, tidy order lines, order filters like the rep app's
+# ADR-0087: «Bto300» after the owner's look — the statement alone on «Тооцоо», who took each purchase, tidy order lines, order filters like the rep app's
 
 | | |
 |---|---|
 | Status | Accepted |
 | Date | 2026-10-20 |
 | Deciders | Owner (asked 2026-10-20, seven points; the IBAN answered the same day: «Дансны дугаарт IBAN бичих»), Claude (Claude Code session, CA3) |
-| Amends | ADR-0079 #6, #7 and #13 (the Orders, Order, Account and Invoice boards), ADR-0085 #3 («Тооцоо» keeps only the statement) |
-| Related | ADR-0082 (the customer routes), ADR-0084 (the app's build), ADR-0068 #19 (the rep app's order filters) |
+| Amends | ADR-0079 #6, #7 and #13 (the Orders, Order, Account and Invoice boards), ADR-0086 #3 («Тооцоо» keeps only the statement) |
+| Related | ADR-0082 (the customer routes), ADR-0085 (the app's build), ADR-0068 #19 (the rep app's order filters) |
 
 ## Context
 
-After ADR-0085 put «Хуулга» first on «Тооцоо», the owner asked (2026-10-20):
+After ADR-0086 put «Хуулга» first on «Тооцоо», the owner asked (2026-10-20):
 
 1. no «Нэхэмжлэх / Төлбөр» parts on «Тооцоо», no «Бүртгэгдсэн төлбөр — шинэ эхэндээ» list;
 2. copying the company's account copies it in full, with the IBAN;
@@ -24,7 +24,7 @@ Finance keeps one free-text account number per bank account (`money_accounts.ban
 
 ## Decision
 
-1. **«Тооцоо» = the debt card, «Тооцооны хуулга» (ADR-0085) and the bank accounts.** The open-invoice and payment lists leave the app (their routes stay for later use); the statement is the account.
+1. **«Тооцоо» = the debt card, «Тооцооны хуулга» (ADR-0086) and the bank accounts.** The open-invoice and payment lists leave the app (their routes stay for later use); the statement is the account.
 2. **The account number is copied exactly as finance keeps it.** The accountant types the full IBAN (`MN…`) in «Дансны дугаар» of a bank account shown to customers; the app shows the whole text and «Хуулах» copies it unchanged. No new field.
 3. **The advice is firm:** «Гүйлгээний утга дээр хуулсан нэхэмжлэхийн дугаараа **заавал бичнэ үү**. Төлбөрийг нягтлан шалгаж бүртгэнэ.»
 4. **Who took a purchase.** The statement's invoice entries carry their order (`orderId`, `orderNumber`, `orderChannel`, `orderTakerName`; finance joins the invoice's order, the customer facade asks sales for its origin), and each row says «10/19 · Худалдан авалт · Төлөөлөгч Бат» (or «Апп», «Оффис»). The invoice says the same beside its order number, which opens the order; the order page names its taker as before.
@@ -49,4 +49,4 @@ Finance keeps one free-text account number per bank account (`money_accounts.ban
 
 ## Related
 
-ADR-0068, ADR-0079, ADR-0082, ADR-0084, ADR-0085, `docs/modules/customer.md`, `docs/modules/mobile.md` §1a.
+ADR-0068, ADR-0079, ADR-0082, ADR-0085, ADR-0086, `docs/modules/customer.md`, `docs/modules/mobile.md` §1a.

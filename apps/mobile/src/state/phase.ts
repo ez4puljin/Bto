@@ -1,6 +1,6 @@
 import type { CustomerPrincipal, Me, SessionState } from '../api/session';
 
-/** Which screens the phone may show now (ADR-0061, ADR-0084). */
+/** Which screens the phone may show now (ADR-0061, ADR-0085). */
 export type Phase = 'boot' | 'server' | 'login' | 'offline' | 'notRep' | 'app';
 
 /** A staff member may use the staff app only with the rep's right; every signed-in store may use «Bto300». */

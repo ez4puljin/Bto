@@ -80,7 +80,7 @@ export function robocopyFailed(status) {
 
 /**
  * The options of `pnpm mobile:apk [--] [--variant <name>|--variant=<name>] [--debug]` (pnpm 11 hands
- * the `--` over as it is); the variant is the staff app unless named (ADR-0084).
+ * the `--` over as it is); the variant is the staff app unless named (ADR-0085).
  */
 export function apkOptionsOf(argv) {
   const args = argv.filter((arg) => arg !== '--');
