@@ -164,7 +164,8 @@ export async function ensureDefaultCompany(
   return { tenantId, companyId };
 }
 
-async function syncBranch(
+/** Maps a source's branch, or makes a mapped one follow its code, name and status (ADR-0084 #1). */
+export async function syncBranch(
   tx: FinTx,
   scope: { tenantId: number; companyId: number; sourceSystemId: number },
   branch: FinInstallationSpec['branches'][number],

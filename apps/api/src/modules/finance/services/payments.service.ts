@@ -19,14 +19,7 @@ import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
-import {
-  allocations,
-  glAccounts,
-  invoices,
-  journalEntries,
-  moneyAccounts,
-  payments,
-} from '../schema';
+import { allocations, invoices, payments } from '../schema';
 import { PAYMENT_LISTENER, type PaymentListener } from '../hooks';
 import { ArLedgerService } from './ar-ledger.service';
 import { FinanceSettingsService } from './finance-settings.service';
@@ -259,29 +252,13 @@ export class PaymentsService implements OnModuleInit {
       allocated = settled.reduce((sum, own) => sum.plus(own.amount), new Decimal(0));
     }
     const zero = new Decimal(0);
-    const cash = { accountId: account.glAccountId, moneyAccountId: account.id };
-    const ar = async () => ({ accountId: (await this.accounts.byRole('AR', tx)).id, customerId });
-    const other = { accountId: glAccountId ?? 0 };
-    const lines: JournalLineInput[] =
-      input.kind === 'CUSTOMER_PAYMENT'
-        ? [
-            { ...cash, debit: input.amount, credit: zero },
-            { ...(await ar()), debit: zero, credit: input.amount },
-          ]
-        : input.kind === 'CUSTOMER_REFUND'
-          ? [
-              { ...(await ar()), debit: input.amount, credit: zero },
-              { ...cash, debit: zero, credit: input.amount },
-            ]
-          : input.kind === 'OTHER_IN'
-            ? [
-                { ...cash, debit: input.amount, credit: zero },
-                { ...other, debit: zero, credit: input.amount },
-              ]
-            : [
-                { ...other, debit: input.amount, credit: zero },
-                { ...cash, debit: zero, credit: input.amount },
-              ];
+    const lines = paymentEntryLines({
+      kind: input.kind,
+      amount: input.amount,
+      moneyAccount: { id: account.id, glAccountId: account.glAccountId },
+      customerId,
+      glAccountId,
+    });
     const entry = await this.journal.post(tx, ctx, {
       entryDate: input.paidOn,
       description: label(number, customerName ?? input.counterpartyName ?? input.description),
@@ -524,16 +501,18 @@ export class PaymentsService implements OnModuleInit {
         id: payments.id,
         number: payments.number,
         kind: payments.kind,
-        method: moneyAccounts.kind,
+        moneyAccountId: payments.moneyAccountId,
         amount: payments.amount,
         paidOn: payments.paidOn,
       })
       .from(payments)
-      .innerJoin(moneyAccounts, eq(moneyAccounts.id, payments.moneyAccountId))
       .where(and(scope, paged))
       .orderBy(desc(payments.paidOn), desc(payments.id))
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ date: row.paidOn, id: row.id }));
+    const kinds = new Map(
+      (await this.moneyAccounts.list()).map((account) => [account.id, account.kind]),
+    );
     const settled =
       page.data.length === 0
         ? []
@@ -570,7 +549,7 @@ export class PaymentsService implements OnModuleInit {
         id: row.id,
         number: row.number,
         kind: row.kind === 'CUSTOMER_REFUND' ? 'CUSTOMER_REFUND' : 'CUSTOMER_PAYMENT',
-        method: row.method,
+        method: kinds.get(row.moneyAccountId) ?? 'CASH',
         amount: row.amount,
         paidOn: row.paidOn,
         invoices: settled
@@ -584,9 +563,8 @@ export class PaymentsService implements OnModuleInit {
 
   async get(id: number): Promise<PaymentDetail> {
     const [row] = await this.db
-      .select({ ...this.summaryColumns(), journalNumber: journalEntries.number })
+      .select(this.summaryColumns())
       .from(payments)
-      .leftJoin(journalEntries, eq(journalEntries.id, payments.journalEntryId))
       .where(eq(payments.id, id));
     if (!row) throw notFound('payment', id);
     const [summary] = await this.summaries([row]);
@@ -608,7 +586,12 @@ export class PaymentsService implements OnModuleInit {
     return {
       ...summary,
       journalEntryId: row.payment.journalEntryId,
-      journalNumber: row.journalNumber,
+      journalNumber:
+        row.payment.journalEntryId === null
+          ? null
+          : ((await this.journal.numbersOf([row.payment.journalEntryId])).get(
+              row.payment.journalEntryId,
+            ) ?? null),
       voidedAt: row.payment.voidedAt,
       voidedByName,
       voidReason: row.payment.voidReason,
@@ -786,9 +769,9 @@ export class PaymentsService implements OnModuleInit {
   ): Promise<PaymentSummary[]> {
     if (rows.length === 0) return [];
     const accounts = new Map(
-      (await this.db.select().from(moneyAccounts)).map((account) => [account.id, account]),
+      (await this.moneyAccounts.list()).map((account) => [account.id, account]),
     );
-    const gl = new Map((await this.db.select().from(glAccounts)).map((row) => [row.id, row]));
+    const gl = new Map((await this.accounts.list()).map((row) => [row.id, row]));
     const customers = new Map(
       (
         await this.customers.getMany(
@@ -837,7 +820,53 @@ export class PaymentsService implements OnModuleInit {
   }
 }
 
+/**
+ * A voucher's entry (ADR-0060 #5): Dr the cash box or bank (its money account on the line) / Cr
+ * receivables for a customer payment, the reverse for a refund; other income Dr cash / Cr the
+ * account, an expense Dr the account / Cr cash. Also used by the development re-post
+ * (`pnpm finance:repost-journal`, ADR-0089).
+ */
+export function paymentEntryLines(input: {
+  kind: PaymentKind;
+  amount: Decimal;
+  moneyAccount: { id: number; glAccountId: number };
+  customerId: number | null;
+  glAccountId: number | null;
+}): JournalLineInput[] {
+  const zero = new Decimal(0);
+  const { amount } = input;
+  const cash = { accountId: input.moneyAccount.glAccountId, moneyAccountId: input.moneyAccount.id };
+  const ar = { role: 'AR' as const, customerId: input.customerId };
+  const other = { accountId: input.glAccountId ?? 0 };
+  switch (input.kind) {
+    case 'CUSTOMER_PAYMENT':
+      return [
+        { ...cash, debit: amount, credit: zero },
+        { ...ar, debit: zero, credit: amount },
+      ];
+    case 'CUSTOMER_REFUND':
+      return [
+        { ...ar, debit: amount, credit: zero },
+        { ...cash, debit: zero, credit: amount },
+      ];
+    case 'OTHER_IN':
+      return [
+        { ...cash, debit: amount, credit: zero },
+        { ...other, debit: zero, credit: amount },
+      ];
+    case 'OTHER_OUT':
+      return [
+        { ...other, debit: amount, credit: zero },
+        { ...cash, debit: zero, credit: amount },
+      ];
+  }
+}
+
 /** The automatic entry's description: the voucher's number and whom it concerns. */
+export function paymentLabel(number: string, who: string | null | undefined): string {
+  return label(number, who);
+}
+
 function label(number: string, who: string | null | undefined): string {
   const name = who?.trim();
   return name ? `${number} — ${name}`.slice(0, FINANCE_LIMITS.maxDescription) : number;

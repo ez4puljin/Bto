@@ -5,9 +5,11 @@ import { Pool } from 'pg';
 import { DB_POOL } from '../../src/common/db/db.tokens';
 import {
   createFinCallContext,
+  ensureDefaultChart,
   ensureDefaultCompany,
   FIN_DB,
   type FinCallContext,
+  type FinChartTemplateAccount,
   FinanceCoreModule,
   type FinDb,
   type FinInstallationSpec,
@@ -69,7 +71,45 @@ export const StaticCaller = {
   ensure(db: FinDb, spec: FinInstallationSpec = TEST_SPEC) {
     return db.transaction((tx) => ensureDefaultCompany(tx, spec));
   },
+
+  /** The installation step and the test chart (F1's ledger, ADR-0089). */
+  ensureWithChart(db: FinDb, spec: FinInstallationSpec = TEST_SPEC) {
+    return db.transaction(async (tx) => {
+      const scope = await ensureDefaultCompany(tx, spec);
+      await ensureDefaultChart(tx, scope, TEST_CHART);
+      return scope;
+    });
+  },
 };
+
+/** A small chart: a receivable and a tax account mapped by key, a cash and a sales account. */
+export const TEST_CHART: FinChartTemplateAccount[] = [
+  { code: '1001', name: 'Касс', kind: 'ASSET', normalSide: 'DEBIT', control: 'MONEY', key: null },
+  {
+    code: '1201',
+    name: 'Авлага',
+    kind: 'ASSET',
+    normalSide: 'DEBIT',
+    control: 'RECEIVABLE',
+    key: 'AR',
+  },
+  {
+    code: '3110',
+    name: 'НӨАТ',
+    kind: 'LIABILITY',
+    normalSide: 'CREDIT',
+    control: 'NONE',
+    key: 'VAT_OUTPUT',
+  },
+  {
+    code: '5101',
+    name: 'Орлого',
+    kind: 'INCOME',
+    normalSide: 'CREDIT',
+    control: 'NONE',
+    key: null,
+  },
+];
 
 /** The core alone over this worker's test database: no AppModule, no Bto module. */
 export async function createFinanceCoreOnly(): Promise<{

@@ -2,8 +2,9 @@
  * The Finance Core's only public file (ADR-0069 #2; docs/modules/finance-core.md). Every other
  * element imports from here and nothing else; the core itself imports no module, only its whitelist
  * in `common/**`, `@tugeel/shared/money`, `@tugeel/shared/time` and `@tugeel/fin-contract`
- * (ESLint `api-finance-core`, `pnpm core:standalone`). `createFinCallContext` and
- * `ensureDefaultCompany` are for `modules/fin-bridge` only (ESLint G2, §3.1 rule 8).
+ * (ESLint `api-finance-core`, `pnpm core:standalone`). `createFinCallContext`,
+ * `ensureDefaultCompany` and `ensureDefaultChart` are for `modules/fin-bridge` only, the posting
+ * façade `FinJournalPosting` for `modules/finance` only (ESLint G2, §3.1 rule 8, ADR-0089).
  */
 export {
   createFinCallContext,
@@ -21,5 +22,36 @@ export {
   type FinAccountControl,
   type FinInstallationSpec,
 } from './org/ensure-default-company';
+export {
+  ensureDefaultChart,
+  type FinAccountKind,
+  type FinAccountView,
+  type FinBranchRef,
+  FinChartService,
+  type FinChartTemplateAccount,
+  type FinMoneyAccountInput,
+  type FinMoneyAccountKind,
+  type FinMoneyAccountPatch,
+  type FinMoneyAccountView,
+  type FinRuleView,
+  type FinSide,
+  type FinStatus,
+  FIN_RULES_FROM_START,
+} from './ledger/chart.service';
 export { type FinCompanyPatch, type FinCompanyView, FinOrgService } from './org/org.service';
 export { type FinPartyRef, FinPartiesService } from './parties/parties.service';
+export {
+  type FinEntryIn,
+  type FinEntryLineIn,
+  type FinEntryRef,
+  FinJournalPosting,
+  FIN_OWN_SOURCE,
+} from './posting/journal-posting.service';
+export {
+  type FinEntryDetail,
+  type FinEntryLine,
+  type FinEntryOrigin,
+  type FinEntrySummary,
+  FinJournalReader,
+  type FinLedgerRow,
+} from './posting/journal-reader.service';

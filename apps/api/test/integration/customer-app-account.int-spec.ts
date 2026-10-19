@@ -216,7 +216,7 @@ describe('customer app account (ADR-0079)', () => {
 
   it('gives the store its own statement: opening, debits, credits, running and closing balances', async () => {
     const [cash] = (
-      await sql.query<{ id: string }>("SELECT id FROM money_accounts WHERE code = 'CAA-CASH'")
+      await sql.query<{ id: string }>("SELECT id FROM fin.money_accounts WHERE code = 'CAA-CASH'")
     ).rows;
     if (!cash) throw new Error('no cash box');
     // A payment dated yesterday: before a statement of today, inside one from yesterday.

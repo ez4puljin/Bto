@@ -7,9 +7,10 @@ import { login, seedUser } from '../harness/identity';
 import { partnersApi } from '../harness/partners';
 
 /**
- * The database guards of finance (ADR-0060, migration 0026): the receivables ledger and the journal
- * are append-only for app and for migrator alike, documents are never deleted, and an entry that
- * does not balance never commits.
+ * The database guards of finance (ADR-0060, migration 0026; the journal and the chart in the Finance
+ * Core since F1's ledger, ADR-0089, migration 0033): the receivables ledger and the journal are
+ * append-only for app and for migrator alike, documents and accounts are never deleted, and an
+ * entry that does not balance never commits, whoever writes it.
  */
 describe('finance guards', () => {
   let app: NestExpressApplication;
@@ -49,11 +50,14 @@ describe('finance guards', () => {
       await sqlStateOf(asApp.query('DELETE FROM ar_entries WHERE doc_id = $1', [invoiceId])),
     ).toBe('42501');
     expect(
-      await sqlStateOf(asApp.query('DELETE FROM journal_lines WHERE entry_id = $1', [entryId])),
+      await sqlStateOf(asApp.query('DELETE FROM fin.journal_lines WHERE entry_id = $1', [entryId])),
     ).toBe('42501');
     expect(
       await sqlStateOf(
-        asApp.query('UPDATE journal_entries SET description = $2 WHERE id = $1', [entryId, 'x']),
+        asApp.query('UPDATE fin.journal_entries SET description = $2 WHERE id = $1', [
+          entryId,
+          'x',
+        ]),
       ),
     ).toBe('42501');
     expect(await sqlStateOf(asApp.query('DELETE FROM invoices WHERE id = $1', [invoiceId]))).toBe(
@@ -63,7 +67,7 @@ describe('finance guards', () => {
       await sqlStateOf(asApp.query('DELETE FROM invoice_lines WHERE invoice_id = $1', [invoiceId])),
     ).toBe('42501');
     expect(
-      await sqlStateOf(asApp.query('DELETE FROM gl_accounts WHERE code = $1', ['120101'])),
+      await sqlStateOf(asApp.query('DELETE FROM fin.accounts WHERE code = $1', ['120101'])),
     ).toBe('42501');
     expect(await sqlStateOf(asApp.query('TRUNCATE allocations'))).toBe('42501');
   });
@@ -71,11 +75,13 @@ describe('finance guards', () => {
   it('stops even the owner from rewriting the ledger or the journal', async () => {
     expect(
       await sqlStateOf(
-        migrator.query('UPDATE journal_lines SET debit = debit + 1 WHERE entry_id = $1', [entryId]),
+        migrator.query('UPDATE fin.journal_lines SET debit = debit + 1 WHERE entry_id = $1', [
+          entryId,
+        ]),
       ),
     ).toBe('23001');
     expect(
-      await sqlStateOf(migrator.query('DELETE FROM journal_entries WHERE id = $1', [entryId])),
+      await sqlStateOf(migrator.query('DELETE FROM fin.journal_entries WHERE id = $1', [entryId])),
     ).toBe('23001');
     expect(
       await sqlStateOf(
@@ -85,39 +91,53 @@ describe('finance guards', () => {
     expect(await sqlStateOf(migrator.query('TRUNCATE ar_entries'))).toBe('23001');
   });
 
-  it('never commits an entry that does not balance or has one line', async () => {
-    const attempt = async (lines: [number, number][]): Promise<string | undefined> => {
-      await migrator.query('BEGIN');
+  it('never commits an entry that does not balance or has one line, as app or as migrator', async () => {
+    const attempt = async (as: Client, lines: [number, number][]): Promise<string | undefined> => {
+      await as.query('BEGIN');
       try {
-        const { rows } = await migrator.query<{ id: number }>(
-          `INSERT INTO journal_entries (number, entry_date, description, source)
-           VALUES ($1, $2, 'guard test', 'MANUAL') RETURNING id`,
-          [`G-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, businessDate()],
+        // The entry's month exists (the invoice of beforeAll opened it), dated today.
+        const { rows } = await as.query<{ id: string; company_id: string }>(
+          `INSERT INTO fin.journal_entries (company_id, number, entry_date, period_id, source_system_id,
+                                            description, actor_kind, actor_ref, actor_label)
+           SELECT c.id, $1, $2, p.id, s.id, 'guard test', 'SYSTEM', 'test', 'test'
+             FROM fin.companies c
+             JOIN fin.fiscal_periods p ON p.company_id = c.id AND p.code = $3
+             JOIN fin.source_systems s ON s.tenant_id = c.tenant_id AND s.code = 'FIN'
+            WHERE c.code = 'BO'
+           RETURNING id, company_id`,
+          [
+            `G-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            businessDate(),
+            businessDate().slice(0, 7),
+          ],
         );
-        const account = await migrator.query<{ id: number }>(
-          `SELECT id FROM gl_accounts WHERE code = '100101'`,
-        );
+        const entry = rows[0];
+        if (!entry) throw new Error('no guard entry');
         for (const [index, [debit, credit]] of lines.entries()) {
-          await migrator.query(
-            `INSERT INTO journal_lines (entry_id, line_no, account_id, debit, credit) VALUES ($1, $2, $3, $4, $5)`,
-            [rows[0]?.id, index + 1, account.rows[0]?.id, debit, credit],
+          await as.query(
+            `INSERT INTO fin.journal_lines (company_id, entry_id, line_no, account_id, debit, credit)
+             SELECT $1, $2, $3, a.id, $4, $5 FROM fin.accounts a
+              WHERE a.company_id = $1 AND a.code = '100101'`,
+            [entry.company_id, entry.id, index + 1, debit, credit],
           );
         }
-        return await sqlStateOf(migrator.query('COMMIT'));
+        return await sqlStateOf(as.query('COMMIT'));
       } catch (error) {
-        await migrator.query('ROLLBACK');
+        await as.query('ROLLBACK');
         throw error;
       }
     };
+    for (const as of [asApp, migrator]) {
+      expect(
+        await attempt(as, [
+          [100, 0],
+          [0, 90],
+        ]),
+      ).toBe('23514');
+      expect(await attempt(as, [[100, 0]])).toBe('23514');
+    }
     expect(
-      await attempt([
-        [100, 0],
-        [0, 90],
-      ]),
-    ).toBe('23514');
-    expect(await attempt([[100, 0]])).toBe('23514');
-    expect(
-      await attempt([
+      await attempt(migrator, [
         [100, 0],
         [0, 100],
       ]),

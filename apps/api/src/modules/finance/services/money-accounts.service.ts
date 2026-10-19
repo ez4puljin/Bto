@@ -1,14 +1,23 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { MoneyAccountKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { invalid, notFound } from '../../../common/errors/app-error';
+import {
+  type FinBranchRef,
+  FinChartService,
+  type FinMoneyAccountView,
+  FinOrgService,
+} from '../../../finance-core';
+import { BTO_SOURCE } from '../../fin-bridge';
 import { AuditService, type AuthContext, OrgService } from '../../identity';
-import { glAccounts, moneyAccounts, payments } from '../schema';
+import { payments } from '../schema';
+import { FinBooks } from './fin-books';
 import type { AccountStatus } from './gl-accounts.service';
+import { GlAccountsService } from './gl-accounts.service';
 
 export interface MoneyAccount {
   id: number;
@@ -56,8 +65,10 @@ export type MoneyAccountPatch = Partial<Omit<MoneyAccountInput, 'kind'>> & {
 };
 
 /**
- * The cash boxes and bank accounts (ADR-0060 #5): one per branch and bank account, each mapped to
- * the journal account its vouchers hit. Never deleted (vouchers point at them); deactivated.
+ * The cash boxes and bank accounts (ADR-0060 #5), kept by the Finance Core since F1's ledger
+ * (`fin.money_accounts`, ADR-0089): one per branch and bank account, each mapped to the journal
+ * account its vouchers hit. Never deleted (vouchers point at them); deactivated. The balance is
+ * still Σ of Bto's posted vouchers until the receivables move to the core (F2).
  */
 @Injectable()
 export class MoneyAccountsService {
@@ -65,6 +76,10 @@ export class MoneyAccountsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly org: OrgService,
+    private readonly chart: FinChartService,
+    private readonly finOrg: FinOrgService,
+    private readonly accounts: GlAccountsService,
+    private readonly books: FinBooks,
   ) {}
 
   async list(executor: Db | Tx = this.db): Promise<MoneyAccount[]> {
@@ -72,20 +87,19 @@ export class MoneyAccountsService {
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<MoneyAccount> {
-    const [row] = await this.rows(eq(moneyAccounts.id, id), executor);
+    const [row] = await this.rows([id], executor);
     if (!row) throw notFound('money_account', id);
     return row;
   }
 
   /** The account a voucher is posted to: shared-locked and active. */
   async lockActive(tx: Tx, id: number): Promise<MoneyAccount> {
-    const [row] = await tx
-      .select({ id: moneyAccounts.id, status: moneyAccounts.status })
-      .from(moneyAccounts)
-      .where(eq(moneyAccounts.id, id))
-      .for('share');
-    if (!row) throw invalid('moneyAccountId', 'exists', `money account ${id} does not exist`);
-    if (row.status !== 'ACTIVE') {
+    const locked = await this.chart.lockMoneyAccountInTx(tx, this.books.source(), {
+      company: await this.books.company(),
+      id,
+    });
+    if (!locked) throw invalid('moneyAccountId', 'exists', `money account ${id} does not exist`);
+    if (locked.status !== 'ACTIVE') {
       throw invalid('moneyAccountId', 'active', `money account ${id} is inactive`);
     }
     return this.get(id, tx);
@@ -93,33 +107,30 @@ export class MoneyAccountsService {
 
   /** The ACTIVE bank accounts marked «Харилцагчид харуулах», by code (ADR-0079 #7). */
   async shownToCustomers(): Promise<CustomerBankAccount[]> {
-    return this.db
-      .select({
-        id: moneyAccounts.id,
-        name: moneyAccounts.name,
-        bankName: moneyAccounts.bankName,
-        bankAccountNo: moneyAccounts.bankAccountNo,
-      })
-      .from(moneyAccounts)
-      .where(
-        and(
-          eq(moneyAccounts.showToCustomers, true),
-          eq(moneyAccounts.kind, 'BANK'),
-          eq(moneyAccounts.status, 'ACTIVE'),
-        ),
-      )
-      .orderBy(asc(moneyAccounts.code));
+    const accounts = await this.chart.moneyAccounts(this.books.source(), {
+      company: await this.books.company(),
+    });
+    return accounts
+      .filter((row) => row.showToCustomers && row.kind === 'BANK' && row.status === 'ACTIVE')
+      .map(({ id, name, bankName, bankAccountNo }) => ({ id, name, bankName, bankAccountNo }));
   }
 
   async create(ctx: AuthContext, input: MoneyAccountInput): Promise<MoneyAccount> {
     const values = await this.normalize(input);
     const showToCustomers = shown(input.kind, input.showToCustomers ?? false);
     return inTransaction(this.db, async (tx) => {
-      const [row] = await tx
-        .insert(moneyAccounts)
-        .values({ ...values, kind: input.kind, showToCustomers })
-        .returning({ id: moneyAccounts.id });
-      if (!row) throw new Error('money_accounts insert returned no row');
+      const branch = await this.mappedBranch(tx, ctx, values.branchId);
+      const row = await this.chart.createMoneyAccountInTx(tx, this.books.user(ctx), {
+        company: await this.books.company(),
+        code: values.code,
+        name: values.name,
+        kind: input.kind,
+        branch,
+        accountId: values.glAccountId,
+        bankName: values.bankName,
+        bankAccountNo: values.bankAccountNo,
+        showToCustomers,
+      });
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'money_accounts',
@@ -143,15 +154,22 @@ export class MoneyAccountsService {
         glAccountId: patch.glAccountId ?? before.glAccountId,
       });
       const showToCustomers = shown(before.kind, patch.showToCustomers ?? before.showToCustomers);
-      await tx
-        .update(moneyAccounts)
-        .set({
-          ...values,
+      const status = patch.status ?? before.status;
+      const branchChanged = values.branchId !== before.branchId;
+      await this.chart.updateMoneyAccountInTx(tx, this.books.user(ctx), {
+        company: await this.books.company(),
+        id,
+        patch: {
+          code: values.code,
+          name: values.name,
+          ...(branchChanged ? { branch: await this.mappedBranch(tx, ctx, values.branchId) } : {}),
+          accountId: values.glAccountId,
+          bankName: values.bankName,
+          bankAccountNo: values.bankAccountNo,
           showToCustomers,
-          status: patch.status ?? before.status,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(moneyAccounts.id, id));
+          status,
+        },
+      });
       await this.audit.record(tx, ctx, {
         action: 'UPDATE',
         entity: 'money_accounts',
@@ -166,17 +184,14 @@ export class MoneyAccountsService {
           showToCustomers: before.showToCustomers,
           status: before.status,
         },
-        after: { ...values, showToCustomers, status: patch.status ?? before.status },
+        after: { ...values, showToCustomers, status },
       });
       return this.get(id, tx);
     });
   }
 
   private async normalize(input: Omit<MoneyAccountInput, 'kind'>) {
-    const [account] = await this.db
-      .select({ kind: glAccounts.kind, status: glAccounts.status })
-      .from(glAccounts)
-      .where(eq(glAccounts.id, input.glAccountId));
+    const account = await this.accounts.get(input.glAccountId).catch(() => null);
     if (!account || account.status !== 'ACTIVE' || account.kind !== 'ASSET') {
       throw invalid('glAccountId', 'asset', 'an active asset account');
     }
@@ -191,28 +206,91 @@ export class MoneyAccountsService {
     };
   }
 
-  private async rows(where: ReturnType<typeof eq> | undefined, executor: Db | Tx) {
-    const rows = await executor
-      .select({
-        account: moneyAccounts,
-        glAccountCode: glAccounts.code,
-        glAccountName: glAccounts.name,
-        balance: sql<string>`(SELECT coalesce(sum(CASE p.direction WHEN 'IN' THEN p.amount ELSE -p.amount END), 0)
-          FROM payments p WHERE p.money_account_id = money_accounts.id AND p.status = 'POSTED')`,
-      })
-      .from(moneyAccounts)
-      .innerJoin(glAccounts, eq(glAccounts.id, moneyAccounts.glAccountId))
-      .where(where)
-      .orderBy(asc(moneyAccounts.code));
-    const branches = new Map((await this.org.listBranches()).map((branch) => [branch.id, branch]));
-    return rows.map(({ account, glAccountCode, glAccountName, balance }) => ({
-      ...account,
-      branchName: account.branchId === null ? null : (branches.get(account.branchId)?.name ?? null),
-      glAccountCode,
-      glAccountName,
-      balance: new Decimal(balance),
-    }));
+  /**
+   * The core's ref of a Bto branch, mapped now if it was added after the last boot; a closed branch
+   * takes no new money account (the core never maps a closed branch, ADR-0084 #1).
+   */
+  private async mappedBranch(
+    tx: Tx,
+    ctx: AuthContext,
+    branchId: number | null,
+  ): Promise<FinBranchRef | null> {
+    if (branchId === null) return null;
+    const branch = await this.org.getBranch(branchId);
+    if (branch.status !== 'ACTIVE') {
+      throw invalid('branchId', 'active', `branch ${branch.code} is closed`);
+    }
+    await this.finOrg.syncBranchInTx(tx, this.books.source(ctx), {
+      company: await this.books.company(),
+      branch: { externalId: String(branch.id), code: branch.code, name: branch.name, active: true },
+    });
+    return { system: BTO_SOURCE, externalId: String(branch.id) };
   }
+
+  private async rows(
+    ids: readonly number[] | undefined,
+    executor: Db | Tx,
+  ): Promise<MoneyAccount[]> {
+    const accounts = await this.chart.moneyAccounts(
+      this.books.source(),
+      { company: await this.books.company(), ...(ids ? { ids } : {}) },
+      this.books.executor(executor),
+    );
+    if (accounts.length === 0) return [];
+    const balances = new Map(
+      (
+        await executor
+          .select({
+            id: payments.moneyAccountId,
+            balance: sql<string>`coalesce(sum(CASE ${payments.direction} WHEN 'IN' THEN ${payments.amount} ELSE -${payments.amount} END), 0)`,
+          })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.status, 'POSTED'),
+              inArray(
+                payments.moneyAccountId,
+                accounts.map((account) => account.id),
+              ),
+            ),
+          )
+          .groupBy(payments.moneyAccountId)
+      ).map((row) => [row.id, new Decimal(row.balance)]),
+    );
+    const branches = new Map((await this.org.listBranches()).map((branch) => [branch.id, branch]));
+    return accounts.map((account) => {
+      const branchId = btoBranchId(account);
+      return {
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        kind: moneyKind(account),
+        branchId,
+        branchName: branchId === null ? null : (branches.get(branchId)?.name ?? null),
+        bankName: account.bankName,
+        bankAccountNo: account.bankAccountNo,
+        glAccountId: account.accountId,
+        glAccountCode: account.accountCode,
+        glAccountName: account.accountName,
+        showToCustomers: account.showToCustomers,
+        status: account.status,
+        balance: balances.get(account.id) ?? new Decimal(0),
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+      };
+    });
+  }
+}
+
+/** Bto's id of the money account's branch (its ref under source BTO). */
+function btoBranchId(account: FinMoneyAccountView): number | null {
+  const ref = account.branchRefs.find((own) => own.system === BTO_SOURCE);
+  return ref === undefined ? null : Number.parseInt(ref.externalId, 10);
+}
+
+/** Bto opens CASH and BANK accounts only; a CLEARING account of the core reads as BANK nowhere. */
+function moneyKind(account: FinMoneyAccountView): MoneyAccountKind {
+  return account.kind === 'CASH' ? 'CASH' : 'BANK';
 }
 
 /** Only a bank account is shown to customers: they pay by transfer there (ADR-0079 #7). */

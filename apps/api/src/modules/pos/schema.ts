@@ -26,7 +26,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products, VAT_TYPES } from '../catalog/schema';
-import { journalEntries, moneyAccounts, payments } from '../finance/schema';
+import { payments } from '../finance/schema';
 import { users, warehouses } from '../identity/schema';
 import { adjustments } from '../inventory/schema';
 
@@ -58,8 +58,8 @@ export const posSettings = pgTable(
     id: smallint('id').primaryKey(),
     /** The STORE warehouse whose SALESFLOOR the tills sell from. */
     storeWarehouseId: ref('store_warehouse_id').references(() => warehouses.id),
-    /** The cash box the accountant books a shift's cash into by default. */
-    handoverMoneyAccountId: ref('handover_money_account_id').references(() => moneyAccounts.id),
+    /** The cash box the accountant books a shift's cash into by default (`fin.money_accounts`). */
+    handoverMoneyAccountId: ref('handover_money_account_id'),
     returnWindowDays: smallint('return_window_days')
       .notNull()
       .default(POS_LIMITS.defaultReturnWindowDays),
@@ -260,7 +260,8 @@ export const posShifts = pgTable(
     returnsVat: money('returns_vat')
       .notNull()
       .default(sql`0`),
-    journalEntryId: ref('journal_entry_id').references(() => journalEntries.id),
+    /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
+    journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
     handoverPaymentId: ref('handover_payment_id').references(() => payments.id),
     handoverNumber: text('handover_number'),

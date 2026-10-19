@@ -3,8 +3,9 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { recordFinAudit } from '../audit/fin-audit';
 import type { FinCallContext } from '../context/call-context';
 import { type FinExecutor, resolveCompany } from '../context/authorize';
-import { FIN_DB, type FinDb } from '../db/fin-db';
+import { FIN_DB, type FinDb, type FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
+import { syncBranch } from './ensure-default-company';
 import {
   finBranches,
   finBranchRefs,
@@ -124,6 +125,34 @@ export class FinOrgService {
       }
       return this.view(tx, scope.companyId);
     });
+  }
+
+  /**
+   * Maps the calling source's branch now (a branch added after boot that a money account names),
+   * or makes a mapped one follow it; a closed branch is never mapped (ADR-0084 #1).
+   */
+  async syncBranchInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: {
+      company: string;
+      branch: { externalId: string; code: string; name: string; active: boolean };
+    },
+  ): Promise<void> {
+    if (ctx.principal.kind !== 'SOURCE') {
+      throw new FinError('FIN_COMPANY_FORBIDDEN', undefined, { company: input.company });
+    }
+    const scope = await resolveCompany(tx, ctx, input.company, { source: true, userAnyOf: [] });
+    if (scope.sourceSystemId === null) throw new Error('a SOURCE scope without its source');
+    await syncBranch(
+      tx,
+      {
+        tenantId: scope.tenantId,
+        companyId: scope.companyId,
+        sourceSystemId: scope.sourceSystemId,
+      },
+      { system: ctx.principal.system, ...input.branch },
+    );
   }
 
   private async view(executor: FinExecutor, companyId: number): Promise<FinCompanyView> {

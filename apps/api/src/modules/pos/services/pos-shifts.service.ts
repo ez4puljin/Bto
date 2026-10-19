@@ -3,7 +3,7 @@ import type { GlRole } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { cashVariance, expectedCash, handoverAmount, POS_LIMITS } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -333,35 +333,70 @@ export class PosShiftsService {
     return row ?? null;
   }
 
+  /**
+   * The development re-post of F1's ledger (ADR-0089): a closed shift whose entry went with Finance
+   * I's journal is booked again from the totals kept on it, dated its close day, and keeps the new
+   * entry's id and number. Null when the shift has its entry, is still open, or moved nothing.
+   */
+  async repostCloseInTx(
+    tx: Tx,
+    actor: Actor,
+    shiftId: number,
+  ): Promise<{ id: number; number: string } | null> {
+    const [row] = await tx.select().from(posShifts).where(eq(posShifts.id, shiftId)).for('update');
+    if (
+      !row ||
+      row.status === 'OPEN' ||
+      row.journalEntryId !== null ||
+      row.countedCash === null ||
+      row.variance === null ||
+      row.closedAt === null
+    ) {
+      return null;
+    }
+    const entry = await this.bookClose(
+      tx,
+      actor,
+      row,
+      row,
+      row.countedCash,
+      row.variance,
+      businessDate(row.closedAt),
+    );
+    if (!entry) return null;
+    await tx
+      .update(posShifts)
+      .set({ journalEntryId: entry.id, journalNumber: entry.number, updatedAt: sql`now()` })
+      .where(eq(posShifts.id, row.id));
+    return entry;
+  }
+
+  /** The closed shifts without an entry, oldest close first (the development re-post). */
+  async closedWithoutEntry(): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: posShifts.id })
+      .from(posShifts)
+      .where(and(isNull(posShifts.journalEntryId), isNotNull(posShifts.closedAt)))
+      .orderBy(asc(posShifts.closedAt), asc(posShifts.id));
+    return rows.map((row) => row.id);
+  }
+
   /** The close entry; null when nothing moved and the count matched. */
   private async bookClose(
     tx: Tx,
     actor: Actor,
     shift: ShiftRow,
-    totals: ShiftTotals,
+    totals: Parameters<typeof shiftCloseLines>[0]['totals'],
     countedCash: Decimal,
     variance: Decimal,
     closeDay: string,
   ): Promise<{ id: number; number: string } | null> {
-    const signed: { role: GlRole; amount: Decimal }[] = [
-      // Positive = debit, negative = credit.
-      { role: 'POS_CASH', amount: countedCash.minus(shift.openingFloat) },
-      { role: 'CARD_CLEARING', amount: totals.cardSales.minus(totals.cardRefunds) },
-      { role: 'CASH_VARIANCE', amount: variance.negated() },
-      { role: 'SALES_RETURN', amount: totals.returnsTotal.minus(totals.returnsVat) },
-      { role: 'POS_SALES', amount: totals.salesTotal.minus(totals.salesVat).negated() },
-      { role: 'VAT_PAYABLE', amount: totals.returnsVat.minus(totals.salesVat) },
-    ];
-    const lines: JournalLineInput[] = [];
-    for (const entry of signed) {
-      if (entry.amount.isZero()) continue;
-      const account = await this.accounts.byRole(entry.role, tx);
-      lines.push({
-        accountId: account.id,
-        debit: entry.amount.gt(0) ? entry.amount : ZERO,
-        credit: entry.amount.lt(0) ? entry.amount.negated() : ZERO,
-      });
-    }
+    const lines = shiftCloseLines({
+      openingFloat: shift.openingFloat,
+      countedCash,
+      variance,
+      totals,
+    });
     if (lines.length === 0) return null;
     const till = await this.tills.get(shift.tillId, tx);
     const cashierName = (await this.names.namesOf([shift.cashierUserId])).get(shift.cashierUserId);
@@ -375,6 +410,40 @@ export class PosShiftsService {
     });
     return entry;
   }
+}
+
+/**
+ * A shift close's entry (ADR-0064 #2): Dr POS_CASH (counted − float), Dr CARD_CLEARING, Dr
+ * SALES_RETURN and VAT_PAYABLE for the returns, Cr POS_SALES and VAT_PAYABLE for the sales, the
+ * variance on CASH_VARIANCE; zero lines skipped, none at all when nothing moved. Also used by the
+ * development re-post (`pnpm finance:repost-journal`, ADR-0089) from the totals kept on the shift.
+ */
+export function shiftCloseLines(input: {
+  openingFloat: Decimal;
+  countedCash: Decimal;
+  variance: Decimal;
+  totals: Pick<
+    ShiftTotals,
+    'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
+  >;
+}): JournalLineInput[] {
+  const { totals } = input;
+  const signed: { role: GlRole; amount: Decimal }[] = [
+    // Positive = debit, negative = credit.
+    { role: 'POS_CASH', amount: input.countedCash.minus(input.openingFloat) },
+    { role: 'CARD_CLEARING', amount: totals.cardSales.minus(totals.cardRefunds) },
+    { role: 'CASH_VARIANCE', amount: input.variance.negated() },
+    { role: 'SALES_RETURN', amount: totals.returnsTotal.minus(totals.returnsVat) },
+    { role: 'POS_SALES', amount: totals.salesTotal.minus(totals.salesVat).negated() },
+    { role: 'VAT_PAYABLE', amount: totals.returnsVat.minus(totals.salesVat) },
+  ];
+  return signed
+    .filter((entry) => !entry.amount.isZero())
+    .map((entry) => ({
+      role: entry.role,
+      debit: entry.amount.gt(0) ? entry.amount : ZERO,
+      credit: entry.amount.lt(0) ? entry.amount.negated() : ZERO,
+    }));
 }
 
 function label(number: string, who: string | null | undefined): string {

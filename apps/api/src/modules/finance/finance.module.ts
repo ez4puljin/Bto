@@ -1,10 +1,9 @@
-import { Inject, Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
-import { DB } from '../../common/db/db.tokens';
-import type { Db } from '../../common/db/db.types';
-import { inTransaction } from '../../common/db/transaction';
+import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
+import { FinanceCoreModule } from '../../finance-core';
 import { CatalogModule } from '../catalog';
+import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
 import { InventoryModule, RECEIPT_MONEY_ACCOUNTS } from '../inventory';
 import { PartnersModule } from '../partners';
@@ -25,20 +24,22 @@ import {
   FinanceSettingsController,
 } from './controllers/receivables.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
-import { ensureDefaultAccounts } from './reference-data';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
+import { FinBooks } from './services/fin-books';
 import { FinanceSettingsService } from './services/finance-settings.service';
 import { GlAccountsService } from './services/gl-accounts.service';
 import { InvoiceQueryService } from './services/invoice-query.service';
 import { InvoicingService } from './services/invoicing.service';
+import { JournalRepostService } from './services/journal-repost.service';
 import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
 
 const SERVICES = [
+  FinBooks,
   FinanceSettingsService,
   GlAccountsService,
   JournalService,
@@ -50,16 +51,25 @@ const SERVICES = [
   PaymentsService,
   CreditNotesService,
   ReceiptMoneyAccountsService,
+  JournalRepostService,
 ];
 
 /**
  * Finance I (docs/modules/finance.md, ADR-0060): invoices from sold orders, the receivables
- * ledger, the cash and bank vouchers, credit notes and the general journal. It answers the two
- * hooks of sales (`CREDIT_CHECKER`, `SALE_SINK`); sales finds them through `ModuleRef` and never
- * imports this module.
+ * ledger, the cash and bank vouchers, credit notes and the general journal — the chart, the money
+ * accounts and the journal kept by the Finance Core since F1's ledger (ADR-0089), reached through
+ * fin-bridge's contexts. It answers the two hooks of sales (`CREDIT_CHECKER`, `SALE_SINK`); sales
+ * finds them through `ModuleRef` and never imports this module.
  */
 @Module({
-  imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule],
+  imports: [
+    IdentityModule,
+    CatalogModule,
+    PartnersModule,
+    InventoryModule,
+    FinanceCoreModule,
+    FinBridgeModule,
+  ],
   providers: [
     ...SERVICES,
     { provide: CREDIT_CHECKER, useExisting: CreditControlService },
@@ -70,17 +80,10 @@ const SERVICES = [
 })
 export class FinanceModule {}
 
-/** Inserts the default accounts that are missing before the api serves requests (ADR-0060 #7). */
-@Injectable()
-export class FinanceBootstrap implements OnApplicationBootstrap {
-  constructor(@Inject(DB) private readonly db: Db) {}
-
-  async onApplicationBootstrap(): Promise<void> {
-    await inTransaction(this.db, (tx) => ensureDefaultAccounts(tx));
-  }
-}
-
-/** The HTTP side of finance (api only): the controllers and the boot-time account sync. */
+/**
+ * The HTTP side of finance (api only): the controllers. The default chart of an empty company is
+ * seeded by fin-bridge's boot step (ADR-0089).
+ */
 @Module({
   imports: [FinanceModule],
   controllers: [
@@ -94,7 +97,6 @@ export class FinanceBootstrap implements OnApplicationBootstrap {
     FinanceAttentionController,
     FinanceSettingsController,
   ],
-  providers: [FinanceBootstrap],
 })
 export class FinanceHttpModule {}
 

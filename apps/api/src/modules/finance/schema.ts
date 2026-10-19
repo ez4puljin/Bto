@@ -2,12 +2,7 @@ import {
   ALLOCATION_SOURCES,
   AR_ENTRY_KINDS,
   FINANCE_LIMITS,
-  GL_ACCOUNT_KINDS,
-  GL_ROLES,
   INVOICE_STATUSES,
-  JOURNAL_SOURCE_DOC_TYPES,
-  JOURNAL_SOURCES,
-  MONEY_ACCOUNT_KINDS,
   PAYMENT_DIRECTIONS,
   PAYMENT_KINDS,
   PAYMENT_STATUSES,
@@ -18,7 +13,6 @@ import { type SQL, sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigint,
-  boolean,
   check,
   date,
   index,
@@ -38,8 +32,9 @@ import { salesOrders } from '../sales/schema';
 
 // The tables owned by the finance module (docs/modules/finance.md, ADR-0060). Migration
 // 0026_finance adds by hand: the REVOKEs that keep every document from being deleted, the
-// append-only guards of the receivables ledger and the journal lines, the deferred trigger that
-// refuses an unbalanced journal entry, the seeded chart of accounts, and the assistant's views.
+// append-only guards of the receivables ledger, and the assistant's views. Since F1's ledger
+// (ADR-0089, migration 0033) the chart, the money accounts and the journal are the Finance Core's
+// (`fin.accounts`, `fin.money_accounts`, `fin.journal_*`); the ids here point there without an FK.
 
 const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
 const ref = (name: string) => bigint(name, { mode: 'number' });
@@ -53,75 +48,10 @@ const inList = (column: AnyPgColumn, values: readonly string[]): SQL =>
   )})`;
 /** A limit from the shared package, inlined: a bound parameter would not do in a CHECK. */
 const lim = (value: number): SQL => sql.raw(String(value));
-const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 const DOC_TYPES = ['INVOICE', 'PAYMENT', 'CREDIT_NOTE', 'JOURNAL'] as const;
 /** A number format: as the order format (ADR-0057 #3), never ending in a digit or a token. */
 const patternCheck = (column: AnyPgColumn): SQL =>
   sql`length(${column}) BETWEEN 1 AND 24 AND ${column} !~ '[0-9}]$'`;
-
-/**
- * The chart of accounts (ADR-0060 #7): a code in Erkhet's style, a kind, and at most one role an
- * automatic entry looks the account up by.
- */
-export const glAccounts = pgTable(
-  'gl_accounts',
-  {
-    id: id(),
-    code: text('code').notNull(),
-    name: text('name').notNull(),
-    kind: text('kind', { enum: GL_ACCOUNT_KINDS }).notNull(),
-    role: text('role', { enum: GL_ROLES }),
-    status: text('status', { enum: STATUSES }).notNull().default('ACTIVE'),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    uniqueIndex('gl_accounts_code').on(t.code),
-    uniqueIndex('gl_accounts_role').on(t.role),
-    check('gl_accounts_code_shape', sql`${t.code} ~ '^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$'`),
-    check('gl_accounts_name', sql`length(${t.name}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxName)}`),
-    check('gl_accounts_kind', inList(t.kind, GL_ACCOUNT_KINDS)),
-    check('gl_accounts_role_value', sql`${t.role} IS NULL OR ${inList(t.role, GL_ROLES)}`),
-    check('gl_accounts_status', inList(t.status, STATUSES)),
-  ],
-);
-
-/** A cash box or a bank account (ADR-0060 #5), on a branch, mapped to a journal account. */
-export const moneyAccounts = pgTable(
-  'money_accounts',
-  {
-    id: id(),
-    code: text('code').notNull(),
-    name: text('name').notNull(),
-    kind: text('kind', { enum: MONEY_ACCOUNT_KINDS }).notNull(),
-    branchId: ref('branch_id').references(() => branches.id),
-    bankName: text('bank_name'),
-    bankAccountNo: text('bank_account_no'),
-    glAccountId: ref('gl_account_id')
-      .notNull()
-      .references(() => glAccounts.id),
-    /** «Харилцагчид харуулах»: the customer app shows this bank account (ADR-0079 #7). */
-    showToCustomers: boolean('show_to_customers').notNull().default(false),
-    status: text('status', { enum: STATUSES }).notNull().default('ACTIVE'),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    uniqueIndex('money_accounts_code').on(t.code),
-    check('money_accounts_code_shape', sql`${t.code} ~ '^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$'`),
-    check(
-      'money_accounts_name',
-      sql`length(${t.name}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxName)}`,
-    ),
-    check('money_accounts_kind', inList(t.kind, MONEY_ACCOUNT_KINDS)),
-    check('money_accounts_show_to_customers', sql`NOT ${t.showToCustomers} OR ${t.kind} = 'BANK'`),
-    check('money_accounts_status', inList(t.status, STATUSES)),
-    check(
-      'money_accounts_bank',
-      sql`(${t.bankName} IS NULL OR length(${t.bankName}) BETWEEN 1 AND 120) AND (${t.bankAccountNo} IS NULL OR length(${t.bankAccountNo}) BETWEEN 1 AND 40)`,
-    ),
-  ],
-);
 
 /** The four number formats (ADR-0060 #8); a single row, the shared defaults until it is saved. */
 export const financeSettings = pgTable(
@@ -153,77 +83,6 @@ export const financeSettings = pgTable(
 );
 
 /**
- * A journal entry (ADR-0060 #7): numbered, dated, from a document or typed; never changed, only
- * reversed by another entry that names it.
- */
-export const journalEntries = pgTable(
-  'journal_entries',
-  {
-    id: id(),
-    number: text('number').notNull(),
-    entryDate: date('entry_date').notNull(),
-    description: text('description').notNull(),
-    source: text('source', { enum: JOURNAL_SOURCES }).notNull(),
-    sourceType: text('source_type', { enum: JOURNAL_SOURCE_DOC_TYPES }),
-    sourceId: ref('source_id'),
-    reversesId: ref('reverses_id').references((): AnyPgColumn => journalEntries.id),
-    postedBy: userRef('posted_by'),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    uniqueIndex('journal_entries_number').on(t.number),
-    index('journal_entries_date_idx').on(t.entryDate, t.id),
-    index('journal_entries_source_idx').on(t.sourceType, t.sourceId),
-    check(
-      'journal_entries_description',
-      sql`length(${t.description}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxDescription)}`,
-    ),
-    check('journal_entries_source', inList(t.source, JOURNAL_SOURCES)),
-    check(
-      'journal_entries_source_doc',
-      sql`(${t.sourceType} IS NULL) = (${t.sourceId} IS NULL) AND (${t.sourceType} IS NULL OR ${inList(t.sourceType, JOURNAL_SOURCE_DOC_TYPES)})`,
-    ),
-  ],
-);
-
-/** One side of an entry; the trigger of 0026 keeps Σ debit = Σ credit per entry at commit. */
-export const journalLines = pgTable(
-  'journal_lines',
-  {
-    id: id(),
-    entryId: ref('entry_id')
-      .notNull()
-      .references(() => journalEntries.id),
-    lineNo: smallint('line_no').notNull(),
-    accountId: ref('account_id')
-      .notNull()
-      .references(() => glAccounts.id),
-    debit: money('debit')
-      .notNull()
-      .default(sql`0`),
-    credit: money('credit')
-      .notNull()
-      .default(sql`0`),
-    customerId: ref('customer_id').references(() => customers.id),
-    moneyAccountId: ref('money_account_id').references(() => moneyAccounts.id),
-    description: text('description'),
-  },
-  (t) => [
-    uniqueIndex('journal_lines_entry_line').on(t.entryId, t.lineNo),
-    index('journal_lines_account_idx').on(t.accountId, t.id),
-    index('journal_lines_customer_idx').on(t.customerId, t.id),
-    check(
-      'journal_lines_amounts',
-      sql`${t.debit} >= 0 AND ${t.credit} >= 0 AND (${t.debit} = 0 OR ${t.credit} = 0) AND (${t.debit} <> 0 OR ${t.credit} <> 0)`,
-    ),
-    check(
-      'journal_lines_description',
-      sql`${t.description} IS NULL OR length(${t.description}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxDescription)}`,
-    ),
-  ],
-);
-
-/**
  * An invoice (ADR-0060 #3): one per sold order, the delivered quantities at the frozen prices,
  * the tax split per line, its open amount kept by the allocations. Immutable; voided by a
  * reversing entry while nothing is allocated to it.
@@ -250,13 +109,14 @@ export const invoices = pgTable(
     cityTaxTotal: money('city_tax_total').notNull(),
     openAmount: money('open_amount').notNull(),
     note: text('note'),
-    journalEntryId: ref('journal_entry_id').references(() => journalEntries.id),
+    /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id, no FK leaves `fin`. */
+    journalEntryId: ref('journal_entry_id'),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidedBy: userRef('voided_by'),
     voidReason: text('void_reason'),
-    voidJournalEntryId: ref('void_journal_entry_id').references(() => journalEntries.id),
+    voidJournalEntryId: ref('void_journal_entry_id'),
   },
   (t) => [
     uniqueIndex('invoices_number').on(t.number),
@@ -361,7 +221,7 @@ export const creditNotes = pgTable(
     total: money('total').notNull(),
     vatTotal: money('vat_total').notNull(),
     cityTaxTotal: money('city_tax_total').notNull(),
-    journalEntryId: ref('journal_entry_id').references(() => journalEntries.id),
+    journalEntryId: ref('journal_entry_id'),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
   },
@@ -431,24 +291,24 @@ export const payments = pgTable(
     status: text('status', { enum: PAYMENT_STATUSES }).notNull().default('POSTED'),
     kind: text('kind', { enum: PAYMENT_KINDS }).notNull(),
     direction: text('direction', { enum: PAYMENT_DIRECTIONS }).notNull(),
-    moneyAccountId: ref('money_account_id')
-      .notNull()
-      .references(() => moneyAccounts.id),
+    /** `fin.money_accounts` (ADR-0089): a plain id. */
+    moneyAccountId: ref('money_account_id').notNull(),
     customerId: ref('customer_id').references(() => customers.id),
-    glAccountId: ref('gl_account_id').references(() => glAccounts.id),
+    /** `fin.accounts` (ADR-0089): a plain id. */
+    glAccountId: ref('gl_account_id'),
     amount: money('amount').notNull(),
     paidOn: date('paid_on').notNull(),
     description: text('description'),
     reference: text('reference'),
     counterpartyName: text('counterparty_name'),
     collectedBy: userRef('collected_by'),
-    journalEntryId: ref('journal_entry_id').references(() => journalEntries.id),
+    journalEntryId: ref('journal_entry_id'),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidedBy: userRef('voided_by'),
     voidReason: text('void_reason'),
-    voidJournalEntryId: ref('void_journal_entry_id').references(() => journalEntries.id),
+    voidJournalEntryId: ref('void_journal_entry_id'),
   },
   (t) => [
     uniqueIndex('payments_number').on(t.number),
