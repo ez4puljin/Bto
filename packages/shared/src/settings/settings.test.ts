@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isSettingKey, parseSettingValue, SETTING_KEYS, settingDefault } from './index';
+import {
+  isLockedSetting,
+  isSettingKey,
+  parseSettingValue,
+  SETTING_KEYS,
+  settingDefault,
+} from './index';
 
 describe('settings registry', () => {
   it('never lets one key be a segment prefix of another (i18n key paths would collide)', () => {
@@ -28,6 +34,18 @@ describe('settings registry', () => {
     });
     expect(parseSettingValue('tax.vat_rate_pct', '1.234')).toEqual({ ok: false, problem: 'RANGE' });
     expect(parseSettingValue('tax.vat_rate_pct', 10)).toEqual({ ok: false, problem: 'TYPE' });
+  });
+
+  it('fixes the Finance Core company code at installation (ADR-0084 #3)', () => {
+    expect(settingDefault('bto.company_code')).toBe('BO');
+    expect(isLockedSetting('bto.company_code')).toBe(true);
+    expect(SETTING_KEYS.filter(isLockedSetting)).toEqual(['bto.company_code']);
+    expect(parseSettingValue('bto.company_code', 'BOLOMJ')).toEqual({ ok: true, value: 'BOLOMJ' });
+    expect(parseSettingValue('bto.company_code', 'two words')).toEqual({
+      ok: false,
+      problem: 'RANGE',
+    });
+    expect(parseSettingValue('bto.company_code', 7)).toEqual({ ok: false, problem: 'TYPE' });
   });
 
   it('checks booleans and integer ranges', () => {

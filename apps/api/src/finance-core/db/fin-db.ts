@@ -1,12 +1,40 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { AnyTx } from '../../common/db/any-tx';
+import {
+  finAuditLog,
+  finBranches,
+  finBranchRefs,
+  finCompanies,
+  finCompanyTaxRegistrations,
+  finParties,
+  finPartyCompanies,
+  finPartyRefs,
+  finPostingKeys,
+  finSourceGrants,
+  finSourceSystems,
+  finTenants,
+} from '../schema';
 
 /**
  * The core's own Drizzle database over the process's shared pool, with the core's schema only (the
- * `createEdgeDb` pattern, ADR-0069 #7). P1 adds the `fin` tables of `../schema.ts` here.
+ * `createEdgeDb` pattern, ADR-0069 #7). The tables are listed by name: ESLint G2 refuses namespace
+ * imports.
  */
-const schema = {};
+const schema = {
+  finAuditLog,
+  finBranches,
+  finBranchRefs,
+  finCompanies,
+  finCompanyTaxRegistrations,
+  finParties,
+  finPartyCompanies,
+  finPartyRefs,
+  finPostingKeys,
+  finSourceGrants,
+  finSourceSystems,
+  finTenants,
+};
 
 export type FinSchema = typeof schema;
 export type FinDb = NodePgDatabase<FinSchema> & { $client: Pool };

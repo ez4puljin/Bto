@@ -2,7 +2,10 @@ import { Client } from 'pg';
 
 jest.setTimeout(30_000);
 
-/** Every test file starts from empty business tables and an empty job queue (ADR-0016 #2). */
+/**
+ * Every test file starts from empty business tables (Bto's and the Finance Core's schema `fin`) and
+ * an empty job queue (ADR-0016 #2). The boot steps (identity, finance, fin-bridge) seed again.
+ */
 beforeAll(async () => {
   const admin = new Client({ connectionString: process.env.TEST_DATABASE_ADMIN_URL });
   await admin.connect();
@@ -11,7 +14,7 @@ beforeAll(async () => {
       `DO $$ BEGIN IF to_regclass('pgboss.job') IS NOT NULL THEN DELETE FROM pgboss.job; END IF; END $$`,
     );
     const { rows } = await admin.query<{ name: string }>(
-      `SELECT format('%I.%I', schemaname, tablename) AS name FROM pg_tables WHERE schemaname = 'public'`,
+      `SELECT format('%I.%I', schemaname, tablename) AS name FROM pg_tables WHERE schemaname IN ('public', 'fin')`,
     );
     if (rows.length) {
       await admin.query('BEGIN');

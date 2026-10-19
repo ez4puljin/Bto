@@ -61,6 +61,9 @@ const MODULE_DEPS = {
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.
   notifications: ['identity', 'partners', 'catalog', 'sales', 'finance'],
+  // ADR-0084: Bto's side of the Finance Core; identity for contexts and branches, partners for its
+  // CUSTOMER_CHANGED hook. Only the composition roots import fin-bridge.
+  'fin-bridge': ['identity', 'partners'],
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
   ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai
@@ -265,8 +268,9 @@ const API_IMPORT_BANS = {
   },
   finCallContext: {
     regex: FINANCE_CORE_INDEX,
-    importNames: ['createFinCallContext'],
-    message: 'Only modules/fin-bridge builds a FinCallContext (§3.1 rule 8, ADR-0076).',
+    importNames: ['createFinCallContext', 'ensureDefaultCompany'],
+    message:
+      'Only modules/fin-bridge builds a FinCallContext and runs the installation step ensureDefaultCompany (§3.1 rule 8, ADR-0076, ADR-0084).',
   },
   testCode: {
     regex: '(^|/)test/',
@@ -551,6 +555,13 @@ export default defineConfig([
     name: 'guard/G2-fin-bridge',
     files: ['apps/api/src/modules/fin-bridge/**/*.{ts,mts,cts}'],
     rules: importBans('stockLedger', 'finLedger', 'testCode'),
+  },
+  {
+    // ADR-0084 #4: the one test file that builds contexts without any Bto module (the core boots
+    // alone); every other test reaches the core through fin-bridge or the HTTP api.
+    name: 'guard/G2-static-caller',
+    files: ['apps/api/test/harness/static-caller.ts'],
+    rules: importBans('stockLedger', 'finLedger', 'finIntakeInTx'),
   },
   {
     // ADR-0074 #2: the Mongolian layer stands on money, time and taxpayer only.

@@ -14,6 +14,7 @@ import { ProductPage } from '@/features/catalog/product-page';
 import { ProductsPage } from '@/features/catalog/products-page';
 import { ReadinessPage } from '@/features/catalog/readiness-page';
 import { AuditPage } from '@/features/identity/audit-page';
+import { CompanyPage } from '@/features/company/company-page';
 import { BranchesPage, WarehousesPage } from '@/features/identity/org-pages';
 import { RolesPage } from '@/features/identity/roles-page';
 import { SettingsPage } from '@/features/identity/settings-page';
@@ -448,6 +449,7 @@ export const routes: RouteObject[] = [
               </RequirePermission>
             ),
           },
+          { path: 'company', handle: { width: 'reading' }, element: <CompanyPage /> },
           { path: 'branches', handle: { width: 'wide' }, element: <BranchesPage /> },
           { path: 'warehouses', handle: { width: 'wide' }, element: <WarehousesPage /> },
           {

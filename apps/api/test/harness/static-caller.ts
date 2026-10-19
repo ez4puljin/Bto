@@ -1,0 +1,96 @@
+import { Global, Module } from '@nestjs/common';
+import { Test, type TestingModule } from '@nestjs/testing';
+import type { FinPermission } from '@tugeel/fin-contract';
+import { Pool } from 'pg';
+import { DB_POOL } from '../../src/common/db/db.tokens';
+import {
+  createFinCallContext,
+  ensureDefaultCompany,
+  FIN_DB,
+  type FinCallContext,
+  FinanceCoreModule,
+  type FinDb,
+  type FinInstallationSpec,
+  STATIC_CALLER_MARK,
+} from '../../src/finance-core';
+
+/**
+ * The test StaticCaller (ADR-0076 #2, ADR-0084 #4): builds Finance Core call contexts and runs the
+ * installation step without any Bto module, so the core is proven on its own (a stand-in for a
+ * second source system, e.g. the PMS). ESLint lets only this test file call `createFinCallContext`;
+ * loading it marks the process, and a production process with the mark refuses to start.
+ */
+(globalThis as Record<symbol, unknown>)[STATIC_CALLER_MARK] = true;
+
+export const TEST_TENANT = 'TEST_T';
+export const TEST_COMPANY = 'TST';
+export const TEST_SOURCE = 'TEST_PMS';
+
+export const TEST_SPEC: FinInstallationSpec = {
+  tenant: { code: TEST_TENANT, name: 'Туршилтын групп' },
+  company: {
+    code: TEST_COMPANY,
+    legalName: 'Туршилтын ХХК',
+    timezone: 'Asia/Ulaanbaatar',
+    functionalCurrency: 'MNT',
+  },
+  sources: [
+    { code: TEST_SOURCE, linkTemplate: null },
+    { code: 'FIN', linkTemplate: null },
+  ],
+  postingKeys: [
+    { code: 'AR', requiredControl: 'RECEIVABLE', requiresTaxCode: false },
+    { code: 'VAT_OUTPUT', requiredControl: 'NONE', requiresTaxCode: true },
+  ],
+  legacyParty: { system: 'FIN', ref: 'LEGACY_UNASSIGNED', name: 'LEGACY_UNASSIGNED' },
+  branches: [{ system: TEST_SOURCE, externalId: '1', code: 'MAIN', name: 'Төв', active: true }],
+};
+
+export const StaticCaller = {
+  source(system: string = TEST_SOURCE, tenant: string = TEST_TENANT): FinCallContext {
+    return createFinCallContext({
+      principal: { kind: 'SOURCE', tenant, system },
+      actor: { kind: 'SOURCE', ref: `test:${system}`, label: system },
+    });
+  },
+
+  user(
+    permissions: Record<string, FinPermission[]>,
+    tenant: string = TEST_TENANT,
+    ref = 'test-user',
+  ): FinCallContext {
+    return createFinCallContext({
+      principal: { kind: 'USER', tenant, ref },
+      permissions,
+      actor: { kind: 'STAFF', ref, label: 'Тест хэрэглэгч' },
+    });
+  },
+
+  ensure(db: FinDb, spec: FinInstallationSpec = TEST_SPEC) {
+    return db.transaction((tx) => ensureDefaultCompany(tx, spec));
+  },
+};
+
+/** The core alone over this worker's test database: no AppModule, no Bto module. */
+export async function createFinanceCoreOnly(): Promise<{
+  module: TestingModule;
+  db: FinDb;
+  close: () => Promise<void>;
+}> {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
+  @Global()
+  @Module({ providers: [{ provide: DB_POOL, useValue: pool }], exports: [DB_POOL] })
+  class PoolOnly {}
+  const module = await Test.createTestingModule({
+    imports: [PoolOnly, FinanceCoreModule],
+  }).compile();
+  await module.init();
+  return {
+    module,
+    db: module.get<FinDb>(FIN_DB),
+    close: async () => {
+      await module.close();
+      await pool.end();
+    },
+  };
+}

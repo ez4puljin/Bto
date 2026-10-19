@@ -5,6 +5,7 @@ import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
+import { FinBridgeModule } from './modules/fin-bridge';
 import { FinanceWorkerModule } from './modules/finance';
 import { IdentityWorkerModule } from './modules/identity';
 import { ImportsWorkerModule } from './modules/imports';
@@ -23,6 +24,8 @@ import { NotificationsWorkerModule } from './modules/notifications';
     InventoryWorkerModule,
     ImportsWorkerModule,
     FinanceWorkerModule,
+    // Imports create customers in the worker: their Finance Core parties follow (ADR-0084).
+    FinBridgeModule,
     NotificationsWorkerModule,
   ],
   providers: [WorkerHealthServer],

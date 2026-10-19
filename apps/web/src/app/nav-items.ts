@@ -12,6 +12,7 @@ import {
   WalletCards,
   BadgePercent,
   Boxes,
+  Briefcase,
   Building2,
   Calculator,
   ClipboardCheck,
@@ -271,6 +272,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/users', label: 'nav.users', icon: Users, permission: 'identity.users.read' },
       { to: '/roles', label: 'nav.roles', icon: ShieldCheck, permission: 'identity.users.read' },
+      // ADR-0084: the Finance Core company; everyone reads it, finance.settings.manage edits it.
+      { to: '/company', label: 'nav.company', icon: Briefcase, permission: 'finance.read' },
       {
         to: '/branches',
         label: 'nav.branches',

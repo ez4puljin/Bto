@@ -42,6 +42,86 @@
         ]
       }
     },
+    "/api/v1/company": {
+      "get": {
+        "operationId": "Company_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "company"
+        ]
+      },
+      "patch": {
+        "operationId": "Company_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "company"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "Auth_login",
@@ -20473,6 +20553,174 @@
           "version"
         ]
       },
+      "CompanyTaxRegistration": {
+        "type": "object",
+        "properties": {
+          "taxKind": {
+            "type": "string",
+            "example": "VAT"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "registered": {
+            "type": "boolean"
+          },
+          "activityCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "taxKind",
+          "effectiveFrom",
+          "registered",
+          "activityCode"
+        ]
+      },
+      "CompanyBranchRef": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "example": "BTO",
+            "description": "The source system that knows the branch"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "The branch's id in that system"
+          }
+        },
+        "required": [
+          "system",
+          "externalId"
+        ]
+      },
+      "CompanyBranch": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyBranchRef"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "status",
+          "refs"
+        ]
+      },
+      "Company": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "BO",
+            "description": "The Finance Core company code (bto.company_code)"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "registerNo": {
+            "type": "string",
+            "nullable": true,
+            "description": "State register number"
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true,
+            "description": "Taxpayer number (ТТД)"
+          },
+          "functionalCurrency": {
+            "type": "string",
+            "example": "MNT"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Ulaanbaatar"
+          },
+          "fiscalYearStartMonth": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "taxRegistrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyTaxRegistration"
+            }
+          },
+          "branches": {
+            "description": "Branches mapped from source systems",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyBranch"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "legalName",
+          "registerNo",
+          "tin",
+          "functionalCurrency",
+          "timezone",
+          "fiscalYearStartMonth",
+          "status",
+          "taxRegistrations",
+          "branches"
+        ]
+      },
+      "CompanyUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "legalName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "registerNo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 32,
+            "description": "State register number: 7 digits for a company; null or blank clears it"
+          },
+          "tin": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 32,
+            "description": "Taxpayer number: 11 digits for a company; null or blank clears it"
+          }
+        },
+        "required": [
+          "legalName",
+          "registerNo",
+          "tin"
+        ]
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -21652,7 +21900,8 @@
           "company.city_tax_payer",
           "auth.staff_session_hours",
           "auth.customer_session_days",
-          "credit.payment_term_days"
+          "credit.payment_term_days",
+          "bto.company_code"
         ]
       },
       "SettingEntry": {

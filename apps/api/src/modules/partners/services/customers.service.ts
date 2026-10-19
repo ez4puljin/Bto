@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { Decimal } from '@tugeel/shared/money';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import {
@@ -26,6 +27,7 @@ import {
   type CustomerUserStatus,
   SettingsService,
 } from '../../identity';
+import { CUSTOMER_CHANGED_HOOK, type CustomerChangedHook, type CustomerPartyFacts } from '../hooks';
 import { customerAddresses, customerContacts, customers, type PARTNER_STATUSES } from '../schema';
 import { type AddressInput, CustomerAddressesService } from './customer-addresses.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
@@ -172,17 +174,32 @@ export function customerAuditView(row: CustomerRow) {
 /**
  * Customers (SPEC §5.3, §6.2, §6.10; docs/modules/partners.md): every store is its own customer.
  * Credit fields change only through setCredit (partners.credit.manage); reads go through
- * `visibleTo`, the single place that will scope sales reps to their zones in delivery 7.
+ * `visibleTo`, the single place that will scope sales reps to their zones in delivery 7. A new
+ * customer, or a change of its kind, name, TIN or register number, reaches its Finance Core party
+ * through CUSTOMER_CHANGED_HOOK in the same transaction (ADR-0084).
  */
 @Injectable()
-export class CustomersService {
+export class CustomersService implements OnModuleInit {
+  private changedHook: CustomerChangedHook | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly addresses: CustomerAddressesService,
     private readonly appAccounts: CustomerAccountsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    try {
+      this.changedHook = this.moduleRef.get<CustomerChangedHook>(CUSTOMER_CHANGED_HOOK, {
+        strict: false,
+      });
+    } catch {
+      this.changedHook = null;
+    }
+  }
 
   /** The rows a user may read; every customer until sales reps arrive (delivery 7). */
   visibleTo(_ctx: AuthContext): SQL {
@@ -241,6 +258,7 @@ export class CustomersService {
       entityId: row.id,
       after: customerAuditView(row),
     });
+    await this.changedHook?.onCustomerChanged(tx, actor, partyFacts(row));
     if (input.address) {
       await this.addresses.addInTx(tx, actor, row.id, input.address, { isDefault: true });
     }
@@ -304,6 +322,14 @@ export class CustomersService {
       before: customerAuditView(before),
       after: customerAuditView(after),
     });
+    if (
+      after.kind !== before.kind ||
+      after.name !== before.name ||
+      after.tin !== before.tin ||
+      after.regNo !== before.regNo
+    ) {
+      await this.changedHook?.onCustomerChanged(tx, actor, partyFacts(after));
+    }
     // An inactive customer cannot use the app (ADR-0079 #2): its sessions end with the change.
     if (before.status === 'ACTIVE' && after.status !== 'ACTIVE') {
       await this.appAccounts.endSessionsOfCustomerInTx(tx, actor, id, 'CUSTOMER_INACTIVE');
@@ -760,6 +786,11 @@ export class CustomersService {
         WHERE a.customer_id = customers.id AND a.is_default AND a.lat IS NOT NULL)`,
     };
   }
+}
+
+/** What a customer's Finance Core party follows (CUSTOMER_CHANGED_HOOK). */
+function partyFacts(row: CustomerRow): CustomerPartyFacts {
+  return { id: row.id, kind: row.kind, name: row.name, tin: row.tin, regNo: row.regNo };
 }
 
 /** A customer's own days, else the company setting's, else unset. */

@@ -16,6 +16,7 @@ const ctx = (permissions: Permission[], roleIds: number[] = [REP_ROLE]): AuthCon
   permissions: new Set(permissions),
   roleIds,
   writableWarehouseIds: null,
+  companyPermissions: new Map(),
 });
 
 const stage = (fields: Partial<StageView> = {}): StageView => ({

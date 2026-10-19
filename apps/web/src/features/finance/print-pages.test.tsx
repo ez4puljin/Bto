@@ -33,6 +33,34 @@ describe('finance print pages', () => {
     expect(document.title).toContain('Н-20261016-0001');
   });
 
+  it('heads the paper with the legal name from «Компани» (ADR-0084)', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    renderApp(
+      '/finance/invoices/11/print?format=a4',
+      signedIn(ACCOUNTANT_ME, {
+        'GET /api/v1/invoices/11': () => json(INVOICE),
+        'GET /api/v1/company': () =>
+          json({
+            code: 'BO',
+            legalName: 'Туршилтын шинэ нэр ХХК',
+            registerNo: null,
+            tin: null,
+            functionalCurrency: 'MNT',
+            timezone: 'Asia/Ulaanbaatar',
+            fiscalYearStartMonth: 1,
+            status: 'ACTIVE',
+            taxRegistrations: [],
+            branches: [],
+          }),
+      }),
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Туршилтын шинэ нэр ХХК' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(mn.brand.company)).toBeNull();
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+  });
+
   it('prints a voucher on the 80 mm roll with the payer and the settled invoices', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     renderApp(

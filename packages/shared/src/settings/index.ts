@@ -24,13 +24,20 @@ export const SETTINGS = {
    * (owner answers 2026-10-11 and 2026-10-16: 30 days, ADR-0060 #2).
    */
   'credit.payment_term_days': { kind: 'integer', min: 0, max: 365, default: 30 },
+  /**
+   * The Finance Core company this installation books into (ADR-0070 #2): set at installation and
+   * never changed through the api (ADR-0084 #3; the PMS or a second Bto books into its own).
+   */
+  'bto.company_code': { kind: 'code', default: 'BO', locked: true },
 } as const satisfies Record<string, SettingDefinition>;
 
 export interface SettingDefinition {
-  kind: 'percent' | 'boolean' | 'integer';
+  kind: 'percent' | 'boolean' | 'integer' | 'code';
   min?: number;
   max?: number;
   default?: string | boolean | number;
+  /** Fixed at installation: the api refuses a new value (SETTING_NOT_EDITABLE). */
+  locked?: boolean;
 }
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -40,6 +47,8 @@ interface SettingKinds {
   percent: string;
   boolean: boolean;
   integer: number;
+  /** A Finance Core code: a letter or digit, then up to 63 of `A-Za-z0-9_.:-` (ADR-0071). */
+  code: string;
 }
 
 export type SettingValueOf<K extends SettingKey> = SettingKinds[(typeof SETTINGS)[K]['kind']];
@@ -56,6 +65,13 @@ export function settingDefault<K extends SettingKey>(key: K): SettingValueOf<K> 
   return definition.default as SettingValueOf<K> | undefined;
 }
 
+/** Whether the api refuses new values for `key` (fixed at installation). */
+export function isLockedSetting(key: SettingKey): boolean {
+  const definition: SettingDefinition = SETTINGS[key];
+  return definition.locked === true;
+}
+
+const CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 const PERCENT = /^(100(\.0{1,2})?|\d{1,2}(\.\d{1,2})?)$/;
 
 export type SettingValueProblem = 'TYPE' | 'RANGE';
@@ -85,5 +101,10 @@ export function parseSettingValue<K extends SettingKey>(
         return { ok: false, problem: 'RANGE' };
       }
       return { ok: true, value: raw as SettingValueOf<K> };
+    case 'code':
+      if (typeof raw !== 'string') return { ok: false, problem: 'TYPE' };
+      return CODE.test(raw)
+        ? { ok: true, value: raw as SettingValueOf<K> }
+        : { ok: false, problem: 'RANGE' };
   }
 }
