@@ -11,7 +11,7 @@ import { Page } from '../src/ui/layout';
 export default function NotRepScreen() {
   const { t } = useTranslation();
   const { session, state } = useSession();
-  const name = state.status === 'signedIn' ? state.me.fullName : '';
+  const name = state.status === 'signedIn' && 'fullName' in state.me ? state.me.fullName : '';
   return (
     <Page edges={['top', 'bottom']}>
       <View style={styles.body}>

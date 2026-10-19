@@ -77,3 +77,27 @@ export const MIRROR_SKIP = [
 export function robocopyFailed(status) {
   return status === null || status >= 8;
 }
+
+/**
+ * The options of `pnpm mobile:apk [--] [--variant <name>|--variant=<name>] [--debug]` (pnpm 11 hands
+ * the `--` over as it is); the variant is the staff app unless named (ADR-0083).
+ */
+export function apkOptionsOf(argv) {
+  const args = argv.filter((arg) => arg !== '--');
+  let variant = 'staff';
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--variant') {
+      variant = args[index + 1] ?? '';
+      index += 1;
+    } else if (arg.startsWith('--variant=')) {
+      variant = arg.slice('--variant='.length);
+    }
+  }
+  return { variant, debug: args.includes('--debug') };
+}
+
+/** `bto300-0.1.0-414000.apk`: the variant's prefix, its version and the build's version code. */
+export function apkFileName({ prefix, version, versionCode, debug }) {
+  return `${prefix}-${version}-${versionCode}${debug ? '-debug' : ''}.apk`;
+}

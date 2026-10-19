@@ -5,21 +5,33 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './text';
 import type { AppProblem } from '../api/problem';
 import type { RepOrder } from '../api/rep';
+import type { Sender } from '../cart/use-idempotent-send';
 import { useSendOrder } from '../cart/use-send';
 import { colors, fonts, radii, spacing, type } from '../theme/tokens';
 import { PillButton } from './controls';
 import { ProblemText } from './kit';
 import { ActionSheet } from './sheet';
 
-/**
- * A send whose answer never came (ADR-0061 #8): the cart stays locked until «Дахин илгээх» repeats
- * it with its own key (the server replays the order, never a second one), the rep finds it among
- * their orders, or drops it.
- */
+/** The rep's pending send (ADR-0061 #8) on the staff app's send. */
 export function PendingSendCard({ onSent }: { onSent?: (order: RepOrder) => void }) {
+  return <PendingSendView sender={useSendOrder()} {...(onSent ? { onSent } : {})} />;
+}
+
+/**
+ * A send whose answer never came (ADR-0061 #8, ADR-0079 #5): the cart stays locked until «Дахин
+ * илгээх» repeats it with its own key (the server replays the order, never a second one), the
+ * orders show it, or it is dropped. Either app passes its own sender.
+ */
+export function PendingSendView<O extends { id: number }>({
+  sender,
+  onSent,
+}: {
+  sender: Sender<O>;
+  onSent?: (order: O) => void;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { resend, forget, sending } = useSendOrder();
+  const { resend, forget, sending } = sender;
   const [unknown, setUnknown] = useState(false);
   const [problem, setProblem] = useState<AppProblem | null>(null);
   const [asking, setAsking] = useState(false);

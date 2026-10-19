@@ -1,40 +1,72 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-// One Expo project, one variant per APP_VARIANT (ADR-0006 #1). Only the staff app exists so far
-// (ADR-0061): the sales-rep route group. The customer app comes with delivery 6.
-const variant = process.env.APP_VARIANT ?? 'staff';
-if (variant !== 'staff') throw new Error(`APP_VARIANT=${variant} is not built yet (ADR-0061)`);
+// One Expo project, one app per APP_VARIANT (ADR-0006 #1, ADR-0083): `staff`, the sales-rep app
+// (ADR-0061), and `customer`, the stores' app «Bto300» (ADR-0079). variants.json holds what differs
+// (name, package, version, icons, the APK's name); `pnpm mobile:apk -- --variant <name>` reads it too.
+interface Variant {
+  name: string;
+  slug: string;
+  version: string;
+  package: string;
+  assets: string;
+  apkPrefix: string;
+  location: boolean;
+}
+
+const variants = JSON.parse(readFileSync(path.join(__dirname, 'variants.json'), 'utf8')) as Record<
+  string,
+  Variant
+>;
+const variantName = process.env.APP_VARIANT ?? 'staff';
+const variant = variants[variantName];
+if (!variant) throw new Error(`APP_VARIANT=${variantName} is not one of variants.json's apps`);
 
 /** Production builds talk HTTPS only; builds for the office network may use plain HTTP (ADR-0061 #2). */
 const production = process.env.APP_ENV === 'production';
+
+/** The PC's address on the office network, filled in by `pnpm mobile:apk`. */
+const defaultServer = process.env.BTO_DEFAULT_SERVER || null;
 
 const versionCode = Number.parseInt(process.env.BTO_VERSION_CODE ?? '1', 10);
 
 const inter = (face: string) =>
   require.resolve(`@expo-google-fonts/inter/${face}/Inter_${face}.ttf`);
 
+const location = [
+  'android.permission.ACCESS_FINE_LOCATION',
+  'android.permission.ACCESS_COARSE_LOCATION',
+];
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Bto',
-  slug: 'bto-staff',
-  scheme: 'bto-staff',
-  version: '0.6.0',
+  name: variant.name,
+  slug: variant.slug,
+  scheme: variant.slug,
+  version: variant.version,
   orientation: 'portrait',
   userInterfaceStyle: 'light',
-  icon: './assets/icon.png',
+  icon: `${variant.assets}/icon.png`,
   backgroundColor: '#F2F2F7',
   android: {
-    // TODO-VERIFY (owner): permanent once the app is handed to the reps.
-    package: 'mn.butenorgil.bto.staff',
+    // TODO-VERIFY (owner): permanent once the app is handed out (ADR-0061, ADR-0079 #10).
+    package: variant.package,
     versionCode: Number.isSafeInteger(versionCode) && versionCode > 0 ? versionCode : 1,
     allowBackup: false,
-    adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#0071E3' },
-    // A store's number calls at once (the owner, 2026-10-18): src/phone/call.ts, asked on first tap.
+    adaptiveIcon: {
+      foregroundImage: `${variant.assets}/adaptive-icon.png`,
+      backgroundColor: '#0071E3',
+    },
+    // A store's number (staff) or the office's (customer, ADR-0079 #14) calls at once:
+    // src/phone/call.ts, asked on the first tap.
     permissions: ['android.permission.CALL_PHONE'],
-    // The store map asks for the position only while it is open (foreground, the owner 2026-10-18).
+    // The store map asks for the position only while it is open (foreground, the owner 2026-10-18);
+    // the customer app never asks for it.
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',
       'android.permission.ACCESS_BACKGROUND_LOCATION',
+      ...(variant.location ? [] : location),
     ],
     softwareKeyboardLayoutMode: 'resize',
   },
@@ -42,14 +74,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     ['expo-camera', { recordAudioAndroid: false }],
     'expo-secure-store',
-    [
-      'expo-location',
-      {
-        isAndroidBackgroundLocationEnabled: false,
-        isAndroidForegroundServiceEnabled: false,
-        isIosBackgroundLocationEnabled: false,
-      },
-    ],
+    ...(variant.location
+      ? [
+          [
+            'expo-location',
+            {
+              isAndroidBackgroundLocationEnabled: false,
+              isAndroidForegroundServiceEnabled: false,
+              isIosBackgroundLocationEnabled: false,
+            },
+          ] as [string, Record<string, boolean>],
+        ]
+      : []),
     [
       'expo-font',
       {
@@ -58,13 +94,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     [
       'expo-splash-screen',
-      { image: './assets/splash-icon.png', imageWidth: 96, backgroundColor: '#FFFFFF' },
+      { image: `${variant.assets}/splash-icon.png`, imageWidth: 96, backgroundColor: '#FFFFFF' },
     ],
     ['expo-build-properties', { android: { usesCleartextTraffic: !production } }],
     './plugins/with-cmake-object-path.cjs',
   ],
   extra: {
-    /** The PC's address on the office network, filled in by `pnpm mobile:apk`. */
-    defaultServer: process.env.BTO_DEFAULT_SERVER ?? null,
+    /** Which app this build is: src/config/app.ts picks its screens (ADR-0083). */
+    variant: variantName,
+    defaultServer,
+    /** A production build talks only to the server it was built for (ADR-0079 #10). */
+    serverFixed: production && defaultServer !== null,
   },
 });

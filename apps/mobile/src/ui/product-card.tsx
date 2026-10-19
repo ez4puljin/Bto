@@ -1,5 +1,6 @@
 import { Decimal } from '@tugeel/shared/money';
 import { Plus } from 'lucide-react-native';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { CardPictures } from './card-pictures';
@@ -9,7 +10,7 @@ import type { CartLine } from '../cart/cart';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
-import { baseUnitOf, packOf } from '../shop/units';
+import { baseUnitOf, packOf, type UnitLike } from '../shop/units';
 import { colors, fonts, radii, shadows, spacing, tabular, type } from '../theme/tokens';
 
 /** «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй». */
@@ -33,11 +34,14 @@ export function useStockLine() {
   };
 }
 
-/** «29,100₮ / ш»: one base unit in whole packs, as the server prices it. */
+/** «29,100₮ / ш»: one base unit in whole packs, as the server prices it (either app's product). */
 export function usePriceParts() {
   const { t } = useTranslation();
   const words = useUnitWords();
-  return (product: RepProduct): { price: string; per: string } | null => {
+  return (product: {
+    basePrice: string | null;
+    units: readonly UnitLike[];
+  }): { price: string; per: string } | null => {
     const base = baseUnitOf(product.units);
     if (product.basePrice === null || !base) return null;
     return {
@@ -48,7 +52,7 @@ export function usePriceParts() {
 }
 
 /**
- * A product of the shop's grid (ADR-0068 #3): its pictures (swiped when it has several) with «Шинэ»
+ * A product of the rep's grid (ADR-0068 #3): its pictures (swiped when it has several) with «Шинэ»
  * and the cart's quantity or «+», the name, the code, the base price and the stock. The card opens
  * the product; «+» adds one of its default unit, the quantity opens the product to change it.
  */
@@ -69,13 +73,72 @@ export function ProductCard({
   onOpen: () => void;
   onAdd: () => void;
 }) {
+  const stockLine = useStockLine();
+  const stock = stockLine(product);
+  return (
+    <ProductCardFrame
+      product={product}
+      server={server}
+      line={line}
+      locked={locked}
+      canAdd
+      dim={new Decimal(product.available).lte(0)}
+      onOpen={onOpen}
+      onAdd={onAdd}
+      footer={
+        <Text style={[type.caption, stock.out && styles.out]} numberOfLines={1}>
+          {stock.text}
+        </Text>
+      }
+    />
+  );
+}
+
+/**
+ * A grid card of either app (ADR-0068 #3, ADR-0079 #13): the pictures with «Шинэ», a corner of the
+ * app's own (the store's ★), the cart's quantity or «+», the name, the code, the base price, then
+ * the app's footer (the rep's stock count, the store's stock word and pack).
+ */
+export function ProductCardFrame({
+  product,
+  server,
+  line,
+  locked,
+  canAdd,
+  dim,
+  corner,
+  footer,
+  onOpen,
+  onAdd,
+}: {
+  product: {
+    name: string;
+    sku: string;
+    isNew: boolean;
+    basePrice: string | null;
+    thumbUrl: string | null;
+    images: readonly { url: string; thumbUrl: string | null }[];
+    units: readonly UnitLike[];
+  };
+  server: string;
+  /** The product's line in the cart. */
+  line: CartLine | undefined;
+  /** A send is pending: the cart waits for its answer. */
+  locked: boolean;
+  /** «+» is offered (a product the store cannot order shows none). */
+  canAdd: boolean;
+  /** The picture faded: nothing to sell. */
+  dim: boolean;
+  /** Over the picture's top right corner. */
+  corner?: ReactNode;
+  footer: ReactNode;
+  onOpen: () => void;
+  onAdd: () => void;
+}) {
   const { t } = useTranslation();
   const words = useUnitWords();
-  const stockLine = useStockLine();
   const priceParts = usePriceParts();
-  const stock = stockLine(product);
   const price = priceParts(product);
-  const dim = new Decimal(product.available).lte(0);
   return (
     <Pressable
       accessibilityRole="button"
@@ -90,6 +153,7 @@ export function ProductCard({
             <Text style={styles.newText}>{t('mobile.shop.new')}</Text>
           </View>
         ) : null}
+        {corner ? <View style={styles.corner}>{corner}</View> : null}
         {locked ? null : line ? (
           <Pressable
             accessibilityRole="button"
@@ -103,7 +167,7 @@ export function ProductCard({
           >
             <Text style={styles.qtyText}>{`${line.qty} ${words(line).name}`}</Text>
           </Pressable>
-        ) : (
+        ) : canAdd ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('mobile.shop.add', { name: product.name })}
@@ -113,7 +177,7 @@ export function ProductCard({
           >
             <Plus size={18} strokeWidth={2.6} color={colors.primary} />
           </Pressable>
-        )}
+        ) : null}
       </View>
       <View style={styles.text}>
         <Text style={styles.name} numberOfLines={2}>
@@ -128,9 +192,7 @@ export function ProductCard({
         ) : (
           <Text style={[type.secondary, styles.priceRow]}>{t('mobile.shop.noPrice')}</Text>
         )}
-        <Text style={[type.caption, stock.out && styles.out]} numberOfLines={1}>
-          {stock.text}
-        </Text>
+        {footer}
       </View>
     </Pressable>
   );
@@ -157,6 +219,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   newText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.link },
+  corner: { position: 'absolute', top: 6, right: 6 },
   add: {
     position: 'absolute',
     right: 10,

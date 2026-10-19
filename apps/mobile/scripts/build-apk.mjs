@@ -1,11 +1,12 @@
-// `pnpm mobile:apk`: builds the staff app's APK on the owner's PC (ADR-0061 #2, docs/modules/mobile.md).
+// `pnpm mobile:apk`: builds an app's APK on the owner's PC (ADR-0061 #2, ADR-0083, docs/modules/mobile.md).
 //   1. JDK 17 or 21 and the Android SDK packages are found (one-time setup: docs/modules/mobile.md).
 //   2. The workspace is mirrored to a short folder without spaces (C:\Android\m) and installed
 //      there: the repository's own path holds spaces and is long, which the NDK's CMake and Ninja do
 //      not survive, and a drive letter (`subst`) mixes two roots that React Native's codegen refuses.
 //   3. `expo prebuild --clean` generates apps/mobile/android in the mirror, then Gradle builds.
 //   4. The APK is copied to apps/mobile/build/apk/ in the repository.
-// Options: --debug (a debug APK instead of release). Environment: BTO_SERVER (the address the app
+// Options: --variant staff|customer (variants.json; the staff app unless named), --debug (a debug
+// APK instead of release). Environment: BTO_SERVER (the address the app
 // starts with, default http://<this PC's Wi-Fi address>:3300), BTO_JAVA_HOME, ANDROID_HOME.
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -13,6 +14,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   JAVA_MAJORS,
+  apkFileName,
+  apkOptionsOf,
   MIRROR_SKIP,
   SDK_PACKAGES,
   javaMajor,
@@ -24,7 +27,7 @@ import { EXPO_ENV } from './expo.mjs';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const workspaceRoot = path.resolve(appRoot, '../..');
-const debug = process.argv.includes('--debug');
+const { variant: variantName, debug } = apkOptionsOf(process.argv.slice(2));
 /** Tools and the build mirror live in a folder without spaces: the NDK refuses paths with spaces. */
 const TOOLS = 'C:\\Android';
 /** Short on purpose: C++ object paths repeat it (Windows tools stop at 260 characters). */
@@ -92,12 +95,15 @@ const javaHome = findJavaHome();
 const androidHome = findAndroidHome();
 console.log(`  JDK ${javaVersionOf(javaHome)}: ${javaHome}\n  Android SDK: ${androidHome}`);
 
-const { version } = JSON.parse(readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
+const variants = JSON.parse(readFileSync(path.join(appRoot, 'variants.json'), 'utf8'));
+const app = variants[variantName];
+if (!app) fail(`--variant ${variantName}: not one of ${Object.keys(variants).join(', ')}`);
+const { version } = app;
 const versionCode = versionCodeAt(new Date());
 const lan = lanAddressOf(os.networkInterfaces());
 const server = process.env.BTO_SERVER ?? (lan ? `http://${lan}:3300` : '');
 console.log(
-  `  version ${version} (${versionCode}), server ${server || '(none: the rep types it)'}`,
+  `  ${app.name} (${variantName}) ${version} (${versionCode}), server ${server || '(none: typed on the phone)'}`,
 );
 
 step(`Mirroring the workspace to ${MIRROR}`);
@@ -113,7 +119,7 @@ const env = withJava(
   {
     ...process.env,
     ...EXPO_ENV,
-    APP_VARIANT: 'staff',
+    APP_VARIANT: variantName,
     CI: '1',
     NODE_ENV: 'production',
     BTO_VERSION_CODE: String(versionCode),
@@ -133,12 +139,12 @@ run('pnpm', ['install', '--frozen-lockfile'], {
   shell: true,
 });
 
-const app = path.join(MIRROR, 'apps', 'mobile');
+const mirrorApp = path.join(MIRROR, 'apps', 'mobile');
 step('expo prebuild (generates apps/mobile/android in the mirror)');
 run(
   process.execPath,
   [
-    path.join(app, 'scripts', 'expo.mjs'),
+    path.join(mirrorApp, 'scripts', 'expo.mjs'),
     'prebuild',
     '--platform',
     'android',
@@ -146,7 +152,7 @@ run(
     '--no-install',
   ],
   {
-    cwd: app,
+    cwd: mirrorApp,
     env,
   },
 );
@@ -155,26 +161,29 @@ const task = debug ? 'assembleDebug' : 'assembleRelease';
 step(`Gradle ${task} (the first build downloads Gradle and its libraries: 15–30 minutes)`);
 // The full path: cmd does not look in the working folder (NoDefaultCurrentDirectoryInExePath).
 run(
-  path.join(app, 'android', 'gradlew.bat'),
+  path.join(mirrorApp, 'android', 'gradlew.bat'),
   [task, '-PreactNativeArchitectures=arm64-v8a,armeabi-v7a'],
-  { cwd: path.join(app, 'android'), env, shell: true },
+  { cwd: path.join(mirrorApp, 'android'), env, shell: true },
 );
 
-const variant = debug ? 'debug' : 'release';
+const buildType = debug ? 'debug' : 'release';
 const built = path.join(
-  app,
+  mirrorApp,
   'android',
   'app',
   'build',
   'outputs',
   'apk',
-  variant,
-  `app-${variant}.apk`,
+  buildType,
+  `app-${buildType}.apk`,
 );
 if (!existsSync(built)) fail(`Gradle finished but ${built} is missing`);
 const outDir = path.join(appRoot, 'build', 'apk');
 mkdirSync(outDir, { recursive: true });
-const target = path.join(outDir, `bto-staff-${version}-${versionCode}${debug ? '-debug' : ''}.apk`);
+const target = path.join(
+  outDir,
+  apkFileName({ prefix: app.apkPrefix, version, versionCode, debug }),
+);
 copyFileSync(built, target);
 const megabytes = (statSync(target).size / 1024 / 1024).toFixed(1);
 console.log(`\n✔ ${target} (${megabytes} MB)\n`);
