@@ -6,6 +6,7 @@
 | Date | 2026-10-10 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0006 (store listings), ADR-0012 (when hosting is created), ADR-0014 (when the Spaces driver is built), ADR-0015 (go-live import), ADR-0017 (where the week-1 spike runs) |
+| Amended by | ADR-0077 (#3 and its delivery-3 follow-up: the cut-over imports Erkhet's chart and the opening full trial balance instead of opening receivables per customer, and the delivery-3 opening-receivables importer becomes the chart and opening import) |
 
 ## Context
 

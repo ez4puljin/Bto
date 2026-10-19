@@ -5,7 +5,7 @@
 | Status | Deferred (principles accepted now; implementation in delivery 5, reused in delivery 6, bank reconciliation in delivery 10) |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0060 (payments are recorded by hand from cash and internet banking; QPay stays deferred); ADR-0080 (QPay dropped from the whole system on 2026-10-18: #1–#5, #7 and #8 superseded; #6, bank statement import and matching, stands) |
+| Amended by | ADR-0060 (payments are recorded by hand from cash and internet banking; QPay stays deferred); ADR-0077 (#6: the bank statement import is a go-live addition of the Finance Core, matched to open items, no longer delivery 10); ADR-0080 (QPay dropped from the whole system on 2026-10-18: #1–#5, #7 and #8 superseded; #6, bank statement import and matching, stands) |
 
 ## Context
 

@@ -5,6 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
+| Amended by | ADR-0070 (core amounts carry a currency code, MNT enforced until foreign currencies are decided; #4: whole-tugrik unit prices and the per-line split stay rules of the source systems; #7: the company's rates and flags move to `fin.company_tax_registrations` and `fin.tax_rates`, copied in P1 and read from P4); ADR-0074 (#4: the split's code moves to `@tugeel/shared/mn`; the rounding is unchanged) |
 
 ## Context
 
