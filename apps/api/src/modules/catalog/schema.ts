@@ -82,6 +82,11 @@ export const categories = pgTable(
      */
     skuFrom: numeric('sku_from', { precision: 20, scale: 0 }),
     skuTo: numeric('sku_to', { precision: 20, scale: 0 }),
+    /**
+     * A top category's picture in «Bto300»'s category grid (ADR-0092 #6), a file owned by identity;
+     * only a category without a parent has one (moving it under a parent drops the picture).
+     */
+    imageFileId: ref('image_file_id').references(() => files.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -99,6 +104,8 @@ export const categories = pgTable(
       'categories_sku_range',
       sql`${t.skuFrom} IS NULL OR (${t.skuFrom} >= 0 AND ${t.skuFrom} <= ${t.skuTo})`,
     ),
+    unique('categories_image_file_key').on(t.imageFileId),
+    check('categories_image_top_level', sql`${t.imageFileId} IS NULL OR ${t.parentId} IS NULL`),
   ],
 );
 

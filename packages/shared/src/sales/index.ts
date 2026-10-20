@@ -346,6 +346,80 @@ export function isCustomerDeliveryDate(deliveryDate: string, today: string): boo
 /** Orders one page of the store's history carries at most (the app asks for 30, «Нүүр» for 2). */
 export const CUSTOMER_ORDER_PAGE_MAX = 50;
 
+/** Products a section of «Bto300»'s home carries at most (ADR-0092 #1); its chevron opens all. */
+export const HOME_SECTION_SIZE = 10;
+
+/** «Сүүлд захиалсан бараа»: the store's orders of this many days, today included (ADR-0092 #4). */
+export const RECENT_ORDER_DAYS = 90;
+
+/**
+ * The home's product sections (ADR-0092 #1, ADR-0093): RECENT, PROMOTIONS, the shown SEGMENTs in
+ * their order, DISCOUNTS, NEW and FAVOURITES, always in that order; DEALS (promotions and
+ * discounts together) is a category page's «Хямдралтай бараа» and the shop's chip.
+ */
+export const HOME_SECTION_KINDS = [
+  'RECENT',
+  'PROMOTIONS',
+  'SEGMENT',
+  'DISCOUNTS',
+  'NEW',
+  'FAVOURITES',
+  'DEALS',
+] as const;
+export type HomeSectionKind = (typeof HOME_SECTION_KINDS)[number];
+
+/** A section's key in the routes: `recent`, …, or `segment-<id>`. */
+export type HomeSectionKey =
+  | { kind: Exclude<HomeSectionKind, 'SEGMENT'> }
+  | {
+      kind: 'SEGMENT';
+      segmentId: number;
+    };
+
+export function homeSectionKey(key: HomeSectionKey): string {
+  return key.kind === 'SEGMENT' ? `segment-${key.segmentId}` : key.kind.toLowerCase();
+}
+
+/** The section a route's key names, or null. */
+export function parseHomeSectionKey(value: string): HomeSectionKey | null {
+  const segment = /^segment-([1-9][0-9]{0,14})$/.exec(value);
+  if (segment?.[1]) return { kind: 'SEGMENT', segmentId: Number.parseInt(segment[1], 10) };
+  const kind = value.toUpperCase();
+  return kind !== 'SEGMENT' && (HOME_SECTION_KINDS as readonly string[]).includes(kind)
+    ? { kind: kind as Exclude<HomeSectionKind, 'SEGMENT'> }
+    : null;
+}
+
+/**
+ * A section's full list orders (ADR-0092 #7): DEFAULT, the home row's own order (the most ordered,
+ * the biggest discount, the newest, the latest ♡); DEAL, the biggest discount first; NEW; the
+ * price either way. «Дууссан» products always come last.
+ */
+export const HOME_SECTION_SORTS = ['DEFAULT', 'DEAL', 'NEW', 'PRICE_ASC', 'PRICE_DESC'] as const;
+export type HomeSectionSort = (typeof HOME_SECTION_SORTS)[number];
+
+/** What a banner of the home opens (ADR-0092 #5): nothing, a segment's list, a category, a product. */
+export const BANNER_LINK_KINDS = ['NONE', 'SEGMENT', 'CATEGORY', 'PRODUCT'] as const;
+export type BannerLinkKind = (typeof BANNER_LINK_KINDS)[number];
+
+/** A banner's title (its alt text) is 1–80 characters. */
+export const BANNER_TITLE_MAX = 80;
+
+/** A banner relative to today: not started, shown, past its last day, or archived. */
+export const BANNER_STATES = ['SCHEDULED', 'RUNNING', 'ENDED', 'ARCHIVED'] as const;
+export type BannerState = (typeof BANNER_STATES)[number];
+
+/** `validTo` is exclusive, like notices and discount programs (YYYY-MM-DD). */
+export function bannerState(
+  banner: { validFrom: string; validTo: string | null; archived: boolean },
+  today: string,
+): BannerState {
+  if (banner.archived) return 'ARCHIVED';
+  if (banner.validFrom > today) return 'SCHEDULED';
+  if (banner.validTo !== null && banner.validTo <= today) return 'ENDED';
+  return 'RUNNING';
+}
+
 export interface OrderHeaderInput {
   fulfilment: Fulfilment;
   deliveryDate: string;

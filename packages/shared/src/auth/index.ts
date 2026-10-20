@@ -66,6 +66,8 @@ export const PERMISSIONS = [
   'pos.till.supervise',
   // App notices (ADR-0062 #5): writing, listing and withdrawing the notices the rep app shows.
   'notifications.send',
+  // The customer app's home (ADR-0092 #9): banners, the segments it shows and category pictures.
+  'customer.home.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

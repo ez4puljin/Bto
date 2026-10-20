@@ -6,7 +6,7 @@ import {
   MAX_SEGMENT_DESCRIPTION,
   MAX_SEGMENT_NAME,
 } from '@tugeel/shared/segments';
-import { Archive, Pencil, Plus, Shapes } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, Pencil, Plus, Shapes, Smartphone } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -32,8 +32,10 @@ import { ProblemAlert } from '@/components/problem-alert';
 import { StickyActions } from '@/components/sticky-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -154,6 +156,11 @@ export function SegmentsPage() {
                   {row.kind === 'LIST' ? (
                     <Badge variant="secondary" className="ml-2">
                       {t('segments.kinds.LIST')}
+                    </Badge>
+                  ) : null}
+                  {row.appRank !== null ? (
+                    <Badge variant="default" className="ml-2" title={t('segments.app.badgeHint')}>
+                      {t('segments.app.badge')}
                     </Badge>
                   ) : null}
                 </TableCell>
@@ -278,6 +285,7 @@ export function SegmentPage() {
           )}
         </CardContent>
       </Card>
+      {data.entity === 'PRODUCT' ? <AppCard segment={data} /> : null}
       <ConfirmDialog
         open={asking}
         title={t('segments.archiveTitle', { name: data.name })}
@@ -289,6 +297,89 @@ export function SegmentPage() {
         onClose={() => setAsking(false)}
       />
     </div>
+  );
+}
+
+/**
+ * «Bto300 апп» (ADR-0092 #2): whether «Bto300»'s home shows the product segment as a section (its
+ * name the title, its description the subtitle) and its place among the shown segments; holders
+ * of customer.home.manage switch it and move it up or down, everyone else reads it.
+ */
+function AppCard({ segment }: { segment: Segment }) {
+  const { t } = useTranslation();
+  const canManage = useHasPermission('customer.home.manage');
+  const mutations = useSegmentMutations();
+  const action = useAction();
+  const shown = segment.appRank !== null;
+  const rank = segment.appRank ?? 0;
+  const count = segment.appShownCount ?? 0;
+  const busy = mutations.showInApp.isPending || mutations.moveInApp.isPending;
+  const toggle = async (next: boolean) => {
+    const ok = await action.run(() =>
+      mutations.showInApp.mutateAsync({ id: segment.id, shown: next }),
+    );
+    if (ok) toast.success(next ? t('segments.app.shownToast') : t('segments.app.hiddenToast'));
+  };
+  const move = (direction: 'UP' | 'DOWN') =>
+    void action.run(() => mutations.moveInApp.mutateAsync({ id: segment.id, direction }));
+  return (
+    <Card role="region" aria-label={t('segments.app.title')} className="mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Smartphone aria-hidden className="size-4 text-muted-foreground" />
+          {t('segments.app.title')}
+        </CardTitle>
+        <CardDescription>{t('segments.app.description')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <ProblemAlert problem={action.problem} />
+        {canManage ? (
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="segment-app-shown">{t('segments.app.shown')}</Label>
+            <Switch
+              id="segment-app-shown"
+              checked={shown}
+              disabled={busy}
+              onCheckedChange={(next) => void toggle(next)}
+            />
+          </div>
+        ) : (
+          <p className="text-sm">
+            {shown ? t('segments.app.isShown') : t('segments.app.isHidden')}
+          </p>
+        )}
+        {shown ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm">{t('segments.app.rank', { rank, count })}</span>
+            {canManage ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || rank <= 1}
+                  onClick={() => move('UP')}
+                >
+                  <ArrowUp />
+                  {t('segments.app.up')}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || rank >= count}
+                  onClick={() => move('DOWN')}
+                >
+                  <ArrowDown />
+                  {t('segments.app.down')}
+                </Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+        <p className="text-[13px] text-muted-foreground">{t('segments.app.orderHint')}</p>
+      </CardContent>
+    </Card>
   );
 }
 

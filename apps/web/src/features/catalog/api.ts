@@ -284,6 +284,22 @@ export function useCatalogMutations() {
         unwrap(await api.DELETE('/api/v1/categories/{id}', { params: { path: { id } } })),
       onSuccess: () => invalidate(KEYS.categories),
     }),
+    /** A top category's picture in «Bto300» (ADR-0092 #6), replacing an earlier one. */
+    setCategoryImage: useMutation({
+      mutationFn: async ({ id, imageFileId }: { id: number; imageFileId: number }) =>
+        unwrap(
+          await api.PUT('/api/v1/categories/{id}/image', {
+            params: { path: { id } },
+            body: { imageFileId },
+          }),
+        ),
+      onSuccess: () => invalidate(KEYS.categories),
+    }),
+    removeCategoryImage: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.DELETE('/api/v1/categories/{id}/image', { params: { path: { id } } })),
+      onSuccess: () => invalidate(KEYS.categories),
+    }),
     register: useMutation({
       mutationFn: async ({ key, ...body }: Keyed<RegistrationRequest>) =>
         unwrap(

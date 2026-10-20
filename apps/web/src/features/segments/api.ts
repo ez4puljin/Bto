@@ -127,6 +127,24 @@ export function useSegmentMutations() {
         unwrap(await api.DELETE('/api/v1/segments/{id}', { params: { path: { id } } })),
       onSuccess: invalidate,
     }),
+    /** «Апп-д харуулах» (ADR-0092 #2): a product segment on «Bto300»'s home, or not. */
+    showInApp: useMutation({
+      mutationFn: async ({ id, shown }: { id: number; shown: boolean }) =>
+        unwrap(
+          await api.PUT('/api/v1/segments/{id}/app', { params: { path: { id } }, body: { shown } }),
+        ),
+      onSuccess: invalidate,
+    }),
+    moveInApp: useMutation({
+      mutationFn: async ({ id, direction }: { id: number; direction: 'UP' | 'DOWN' }) =>
+        unwrap(
+          await api.POST('/api/v1/segments/{id}/app/move', {
+            params: { path: { id } },
+            body: { direction },
+          }),
+        ),
+      onSuccess: invalidate,
+    }),
   };
 }
 

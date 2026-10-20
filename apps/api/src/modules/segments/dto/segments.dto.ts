@@ -19,6 +19,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -151,8 +152,36 @@ export class SegmentDto {
     description: 'Null for a LIST segment',
   })
   definition: SegmentDefinitionDto | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Its place among the sections «Bto300» shows (1 first); null when not shown',
+  })
+  appRank: number | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'How many segments «Bto300» shows; null when this one is not shown',
+  })
+  appShownCount: number | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
+}
+
+@ApiSchema({ name: 'SegmentAppRequest' })
+export class SegmentAppDto {
+  @ApiProperty({ description: "«Апп-д харуулах»: shown on «Bto300»'s home (ADR-0092 #2)" })
+  @IsBoolean()
+  shown: boolean;
+}
+
+export const APP_MOVES = ['UP', 'DOWN'] as const;
+
+@ApiSchema({ name: 'SegmentAppMoveRequest' })
+export class SegmentAppMoveDto {
+  @ApiProperty({ enum: APP_MOVES, description: 'One place up or down among the shown segments' })
+  @IsIn(APP_MOVES)
+  direction: (typeof APP_MOVES)[number];
 }
 
 @ApiSchema({ name: 'SegmentPage' })

@@ -11,6 +11,7 @@ import { DiscountProgramsService } from './services/discount-programs.service';
 import { PriceProfilesService } from './services/price-profiles.service';
 import { PriceQuoteService } from './services/price-quote.service';
 import { PricingUnitsHook } from './services/pricing-units.hook';
+import { ProductDealsService } from './services/product-deals.service';
 import { ProductPricesService } from './services/product-prices.service';
 import { SaleReadinessService } from './services/sale-readiness.service';
 
@@ -18,6 +19,7 @@ const CORE_SERVICES = [
   DiscountProgramsService,
   PriceProfilesService,
   PriceQuoteService,
+  ProductDealsService,
   ProductPricesService,
   SaleReadinessService,
 ];

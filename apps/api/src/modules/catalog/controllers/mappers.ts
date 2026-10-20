@@ -33,6 +33,7 @@ export const toCategoryDto = (row: CategoryView): CategoryDto => ({
   skuTo: row.skuTo,
   productCount: row.productCount,
   childCount: row.childCount,
+  imageUrl: row.imageUrl,
 });
 
 export const toBarcodeDto = (row: Barcode): BarcodeDto => ({

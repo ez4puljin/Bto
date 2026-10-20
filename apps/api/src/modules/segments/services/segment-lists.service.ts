@@ -65,7 +65,7 @@ export class SegmentListsService {
         entityId: row.id,
         after: { ...auditView(row), productIds: ids },
       });
-      return toSegment(row);
+      return toSegment(row, []);
     });
   }
 

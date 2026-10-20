@@ -13,6 +13,7 @@ import {
 } from '../../../common/pagination/page';
 import {
   type ProductImageUrls,
+  type ProductIndexRow,
   type ProductListItem,
   type ProductListQuery,
   ProductFiltersService,
@@ -109,6 +110,9 @@ export interface RepCustomerDetail {
 
 const DAY_MS = 86_400_000;
 
+/** Products with a home warehouse (the customer app's shop, ADR-0079 #4). */
+const HOME_ANY: SegmentCondition = { field: 'homeWarehouse', op: 'ANY' };
+
 /** The base units of the pack the warehouse price is set in; null for loose goods. */
 function packBaseOf(row: ProductListItem, wholeUomId: number | null): Decimal | null {
   if (wholeUomId === null) return null;
@@ -132,7 +136,7 @@ function shopWhere(query: RepProductQuery): SegmentDefinition | undefined {
   if (query.supplierIds?.length) {
     conditions.push({ field: 'supplier', op: 'MAIN_IN', ids: [...query.supplierIds] });
   }
-  if (query.withHome) conditions.push({ field: 'homeWarehouse', op: 'ANY' });
+  if (query.withHome) conditions.push(HOME_ANY);
   return conditions.length === 0
     ? undefined
     : { match: 'ALL', groups: [{ match: 'ALL', conditions }] };
@@ -258,6 +262,22 @@ export class SalesRepShopService {
       rows.filter((row) => row.status === 'ACTIVE' && row.saleReadyAt !== null),
       businessDate(),
       priceBefore,
+    );
+  }
+
+  /**
+   * «Bto300»'s shop index (ADR-0093): every product the customer app lists — active, sale-ready,
+   * with a home warehouse — in the NEW order, with its category and sale-ready moment.
+   */
+  index(): Promise<ProductIndexRow[]> {
+    return this.products.index(
+      {
+        status: 'ACTIVE',
+        saleReady: true,
+        sort: 'NEW',
+        where: { match: 'ALL', groups: [{ match: 'ALL', conditions: [HOME_ANY] }] },
+      },
+      REP_PRICE_SORT_MAX,
     );
   }
 

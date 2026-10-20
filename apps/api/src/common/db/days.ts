@@ -5,7 +5,7 @@ import { and, type Column, type SQL, sql } from 'drizzle-orm';
  * A timestamp column within Ulaanbaatar days, both ends included; an open end is unbounded (the
  * date conditions of segments and list filters, ADR-0049 #2).
  */
-export function onBusinessDays(column: Column, range: { from?: string; to?: string }): SQL {
+export function onBusinessDays(column: Column | SQL, range: { from?: string; to?: string }): SQL {
   const parts: SQL[] = [];
   if (range.from) {
     parts.push(sql`${column} >= (${range.from}::date)::timestamp AT TIME ZONE ${BUSINESS_TZ}`);

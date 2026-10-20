@@ -3,7 +3,7 @@ import { House } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation } from 'react-router';
-import { useAuthState, useHasPermission } from '@/app/auth-context';
+import { useAuthState, useHasAnyPermission } from '@/app/auth-context';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 
@@ -36,10 +36,11 @@ export function RequirePermission({
   permission,
   children,
 }: {
-  permission: Permission;
+  /** One permission, or several of which any one is enough. */
+  permission: Permission | readonly Permission[];
   children: ReactNode;
 }) {
-  const allowed = useHasPermission(permission);
+  const allowed = useHasAnyPermission(permission);
   const { t } = useTranslation();
   if (allowed) return children;
   return (

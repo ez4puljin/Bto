@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { type Decimal } from '@tugeel/shared/money';
+import { Decimal, roundHalfUp } from '@tugeel/shared/money';
 import {
   MAX_QUOTE_LINES,
   type PricedPart,
@@ -8,6 +8,7 @@ import {
   type QuoteProduct,
   type QuoteProgram,
   resolveQuote,
+  wholeUnitOf,
 } from '@tugeel/shared/pricing';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -56,6 +57,14 @@ export interface Quote {
   subtotal: Decimal;
   discountTotal: Decimal;
   total: Decimal;
+  /** The amount ORDER thresholds were checked on: the cart after its category programs. */
+  orderAmount: Decimal;
+}
+
+/** One pack's price per base unit, without and with the programs asked for (ADR-0093). */
+export interface PackPrice {
+  regular: Decimal;
+  price: Decimal;
 }
 
 /**
@@ -90,28 +99,12 @@ export class PriceQuoteService {
       converted.push({ ...base, qty: line.qty });
     }
     const productIds = [...new Set(converted.map((line) => line.productId))];
-    const summaries = await this.catalog.getMany(productIds, executor);
-    const unitsByProduct = await this.units.currentUnits(productIds, executor);
-    const programs = await this.programs.inForce(request.list, request.date, executor);
-    const terms = await this.prices.inForce(productIds, request.date, executor);
-    const versions = await this.profiles.versionsInForce(
-      [...terms.values()].map((own) => own.profileId),
+    const { products, unitsByProduct } = await this.quoteProducts(
+      productIds,
       request.date,
       executor,
     );
-    const products = new Map<number, QuoteProduct>();
-    for (const summary of summaries) {
-      const own = terms.get(summary.id);
-      const values = own ? versions.get(own.profileId) : undefined;
-      products.set(summary.id, {
-        categoryId: summary.categoryId,
-        units: quoteUnitsOf(unitsByProduct.get(summary.id) ?? []),
-        terms:
-          own && values
-            ? { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile: values }
-            : null,
-      });
-    }
+    const programs = await this.programs.inForce(request.list, request.date, executor);
     const subtrees = new Map<number, ReadonlySet<number>>();
     const quotePrograms: QuoteProgram[] = [];
     for (const program of programs) {
@@ -171,6 +164,70 @@ export class PriceQuoteService {
       subtotal: result.subtotal,
       discountTotal: result.discountTotal,
       total: result.total,
+      orderAmount: result.orderAmount,
     };
+  }
+
+  /**
+   * One whole pack of each product (one base unit without packs) priced WHOLESALE on `date`,
+   * alone in its own cart, without programs and with the programs given for it, per base unit in
+   * whole MNT half up: the struck-through price of «Bto300»'s cards (ADR-0093). Products without
+   * terms that day are left out.
+   */
+  async packPrices(
+    date: string,
+    items: readonly { productId: number; programs: readonly QuoteProgram[] }[],
+  ): Promise<Map<number, PackPrice>> {
+    const result = new Map<number, PackPrice>();
+    if (items.length === 0) return result;
+    const { products } = await this.quoteProducts(
+      [...new Set(items.map((item) => item.productId))],
+      date,
+      this.db,
+    );
+    for (const item of items) {
+      const product = products.get(item.productId);
+      const base = product?.units.find((unit) => unit.isBase);
+      if (!product?.terms || !base) continue;
+      const unit = wholeUnitOf(product.units, product.terms.wholeUomId) ?? base;
+      const line: QuoteLineInput = {
+        productId: item.productId,
+        unitId: unit.unitId,
+        qty: new Decimal(1),
+        qtyBase: unit.factor,
+      };
+      const perBase = (programs: readonly QuoteProgram[]) => {
+        const priced = resolveQuote([line], { list: 'WHOLESALE', products, programs });
+        return roundHalfUp(priced.total.div(unit.factor), 0);
+      };
+      result.set(item.productId, { regular: perBase([]), price: perBase(item.programs) });
+    }
+    return result;
+  }
+
+  /** The products a quote prices: their category, current units and the terms on `date`. */
+  private async quoteProducts(productIds: readonly number[], date: string, executor: Db | Tx) {
+    const summaries = await this.catalog.getMany(productIds, executor);
+    const unitsByProduct = await this.units.currentUnits(productIds, executor);
+    const terms = await this.prices.inForce(productIds, date, executor);
+    const versions = await this.profiles.versionsInForce(
+      [...terms.values()].map((own) => own.profileId),
+      date,
+      executor,
+    );
+    const products = new Map<number, QuoteProduct>();
+    for (const summary of summaries) {
+      const own = terms.get(summary.id);
+      const values = own ? versions.get(own.profileId) : undefined;
+      products.set(summary.id, {
+        categoryId: summary.categoryId,
+        units: quoteUnitsOf(unitsByProduct.get(summary.id) ?? []),
+        terms:
+          own && values
+            ? { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile: values }
+            : null,
+      });
+    }
+    return { products, unitsByProduct };
   }
 }

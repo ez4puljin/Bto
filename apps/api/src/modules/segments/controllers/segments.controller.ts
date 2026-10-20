@@ -21,6 +21,8 @@ import {
 import {
   CreateSegmentDto,
   CreateSegmentListDto,
+  SegmentAppDto,
+  SegmentAppMoveDto,
   SegmentCountDto,
   SegmentCountsQueryDto,
   SegmentDto,
@@ -36,6 +38,8 @@ import { SegmentListsService } from '../services/segment-lists.service';
 import { type Segment, SegmentsService } from '../services/segments.service';
 
 const MANAGE = 'segments.manage';
+/** «Bto300»'s home (ADR-0092 #9): which product segments it shows, and in what order. */
+const HOME = 'customer.home.manage';
 
 function toSegmentDto(segment: Segment): SegmentDto {
   return {
@@ -45,6 +49,8 @@ function toSegmentDto(segment: Segment): SegmentDto {
     name: segment.name,
     description: segment.description,
     definition: segment.definition,
+    appRank: segment.appRank,
+    appShownCount: segment.appShownCount,
     createdAt: segment.createdAt.toISOString(),
     updatedAt: segment.updatedAt.toISOString(),
   };
@@ -172,6 +178,30 @@ export class SegmentsController {
     @Body() body: UpdateSegmentDto,
   ): Promise<SegmentDto> {
     return toSegmentDto(await this.segments.update(ctx, id, body));
+  }
+
+  /** «Апп-д харуулах» (ADR-0092 #2): a product segment shown on «Bto300»'s home, or not. */
+  @Put(':id/app')
+  @RequirePermission(HOME)
+  @ApiOkResponse({ type: SegmentDto })
+  async setShownInApp(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SegmentAppDto,
+  ): Promise<SegmentDto> {
+    return toSegmentDto(await this.segments.setShownInApp(ctx, id, body.shown));
+  }
+
+  @Post(':id/app/move')
+  @RequirePermission(HOME)
+  @HttpCode(200)
+  @ApiOkResponse({ type: SegmentDto })
+  async moveInApp(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SegmentAppMoveDto,
+  ): Promise<SegmentDto> {
+    return toSegmentDto(await this.segments.moveInApp(ctx, id, body.direction));
   }
 
   /** Archives the segment: segments are never deleted (ADR-0049 #1). */

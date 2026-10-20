@@ -23,6 +23,8 @@ const segment = (
   name,
   description: null,
   definition,
+  appRank: null,
+  appShownCount: null,
   createdAt: STAMP,
   updatedAt: STAMP,
 });

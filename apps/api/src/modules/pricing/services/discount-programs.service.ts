@@ -284,6 +284,25 @@ export class DiscountProgramsService {
   }
 
   /**
+   * The programs of a list in force on a date as their views (units named, exclusive `validTo`,
+   * steps ascending): «Bto300»'s badges (ADR-0093).
+   */
+  async inForceViews(list: PriceList, date: string): Promise<DiscountProgram[]> {
+    const rows = await this.db
+      .select()
+      .from(discountPrograms)
+      .where(
+        and(
+          eq(discountPrograms.list, list),
+          lte(discountPrograms.validFrom, date),
+          or(isNull(discountPrograms.validTo), gt(discountPrograms.validTo, date)),
+        ),
+      )
+      .orderBy(asc(discountPrograms.id));
+    return this.views(rows);
+  }
+
+  /**
    * A superseded unit (ADR-0041 #6): programs on it stop today, planned ones never start; a new
    * price for the new unit is a new program.
    */

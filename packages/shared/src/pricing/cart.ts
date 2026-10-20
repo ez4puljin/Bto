@@ -110,6 +110,8 @@ export interface QuoteResult {
   subtotal: Decimal;
   discountTotal: Decimal;
   total: Decimal;
+  /** The cart's amount after the category programs: what ORDER thresholds are checked on. */
+  orderAmount: Decimal;
 }
 
 const ZERO = new Decimal(0);
@@ -298,7 +300,7 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
       total: lineTotal,
     };
   });
-  return { lines: results, subtotal, discountTotal: subtotal.minus(total), total };
+  return { lines: results, subtotal, discountTotal: subtotal.minus(total), total, orderAmount };
 }
 
 /** Steps 1–2 for one line: its parts, their list prices and the product's own programs. */
