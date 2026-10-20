@@ -1,5 +1,7 @@
 # Module `partners` — contract
 
+**F3 note (2026-10-20, ADR-0091).** `SUPPLIER_CHANGED_HOOK` (`hooks.ts`, `SupplierPartyFacts`): `SuppliersService.createInTx` and `updateInTx` (when the name, TIN or register number changes) call it in their transaction; fin-bridge binds it to keep the supplier's Finance Core party `supplier:<id>` in step, as the customers' hook does.
+
 Status: **built** (minimal) in delivery 1 (week 2), session of 2026-10-11; accepted locally together with the rest of delivery 1. The customer app's «Апп» card, the list's app column and filter, and the account gate added 2026-10-19 (ADR-0079 #11, ADR-0082). `CUSTOMER_CHANGED_HOOK` (a customer's Finance Core party follows it) added 2026-10-20 (ADR-0084). Code: `apps/api/src/modules/partners/`, shared rules in `packages/shared/src/{taxpayer,geo}`, screens in `apps/web/src/features/partners/`. Decisions: ADR-0027 (access control), ADR-0028 (search keys), ADR-0032 (product ↔ supplier link), architecture §4 (partners row) and §5.5.
 
 partners depends on `identity` (audit, settings, access decorators) and, for `product_suppliers` only, on `catalog` (ADR-0032: `CatalogModule`, read through `CatalogService.getMany`). inventory, imports, pricing, sales, finance, delivery, procurement, notifications and fin-bridge import its `index.ts`.
