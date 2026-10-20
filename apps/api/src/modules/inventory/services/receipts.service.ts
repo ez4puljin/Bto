@@ -18,7 +18,7 @@ import { escapeLike } from '../../../common/db/like';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { CatalogService, TaxService, UnitConversionService } from '../../catalog';
+import { CatalogService, UnitConversionService } from '../../catalog';
 import {
   type Actor,
   actorUserId,
@@ -32,10 +32,13 @@ import {
   RECEIPT_MONEY_ACCOUNTS,
   type ReceiptMoneyAccount,
   type ReceiptMoneyAccounts,
+  type ReceiptBookFacts,
+  type ReceiptBookTotals,
 } from '../hooks';
 import { bins, goodsReceiptLines, goodsReceipts, RECEIPT_STATUSES } from '../schema';
 import { BinsService } from './bins.service';
 import { ProductLocationsService } from './product-locations.service';
+import { PurchaseBooksService } from './purchase-books.service';
 import { StockPostingService } from './stock-posting.service';
 import { optionalText } from './support';
 
@@ -243,8 +246,8 @@ export class ReceiptsService implements OnModuleInit {
     private readonly posting: StockPostingService,
     private readonly scope: ScopeService,
     private readonly suppliers: SuppliersService,
-    private readonly tax: TaxService,
     private readonly units: UnitConversionService,
+    private readonly purchases: PurchaseBooksService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -490,6 +493,7 @@ export class ReceiptsService implements OnModuleInit {
             costedBy: actorUserId(ctx),
           })
           .where(eq(goodsReceipts.id, id));
+        await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, null));
       }
       await this.audit.record(tx, ctx, {
         action: 'POST',
@@ -576,6 +580,8 @@ export class ReceiptsService implements OnModuleInit {
       }
       const rates = await this.lineVatRates(tx, lines, header.vatRatePct);
       const version = header.costingVersion + 1;
+      // The books take the difference from the version this costing replaces (F3, ADR-0091).
+      const previous = version > 1 ? (await this.bookFacts(id, tx, null)).totals : null;
       const typed = new Map(
         lines.map((line) => {
           const cost = given.get(line.id);
@@ -620,6 +626,7 @@ export class ReceiptsService implements OnModuleInit {
           lines: lines.map((line) => ({ lineId: line.id, docAmount: typed.get(line.id) ?? null })),
         },
       });
+      await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, previous));
       return this.costing(id, tx);
     });
   }
@@ -815,35 +822,72 @@ export class ReceiptsService implements OnModuleInit {
    * VAT inside the delivery note (ADR-0078 #1): the company's rate when the company and the
    * supplier both pay VAT, on the note's date (today without one); else 0.
    */
-  private async vatRateOf(
+  private vatRateOf(
     executor: Db | Tx,
     supplierId: number,
     onDate: string | null,
   ): Promise<Decimal> {
-    const company = await this.tax.companyRates(onDate ?? businessDate(), executor);
-    if (!company.vatPayer) return new Decimal(0);
-    const [supplier] = await this.suppliers.getMany([supplierId], executor);
-    return supplier?.vatPayer ? company.vatRatePct : new Decimal(0);
+    return this.purchases.supplierRate(executor, supplierId, onDate);
   }
 
   /** Each line's VAT rate: the receipt's for a product that carries VAT, 0 for an exempt one. */
-  private async lineVatRates(
+  private lineVatRates(
     executor: Db | Tx,
     lines: readonly LineRow[],
     receiptRate: Decimal,
   ): Promise<Map<number, Decimal>> {
-    if (receiptRate.isZero()) return new Map(lines.map((line) => [line.id, new Decimal(0)]));
-    const products = new Map(
-      (await this.catalog.getMany([...new Set(lines.map((line) => line.productId))], executor)).map(
-        (product) => [product.id, product],
-      ),
-    );
-    return new Map(
-      lines.map((line) => [
-        line.id,
-        products.get(line.productId)?.vatType === 'VAT_ABLE' ? receiptRate : new Decimal(0),
-      ]),
-    );
+    return this.purchases.lineRates(executor, lines, receiptRate);
+  }
+
+  /** The posted, costed receipts, oldest first (the development re-post of their bills, F3). */
+  async postedCostedIds(): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: goodsReceipts.id })
+      .from(goodsReceipts)
+      .where(and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'COSTED')))
+      .orderBy(goodsReceipts.id);
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * A posted, costed receipt's figures for the books at its latest costing version (F3, ADR-0091):
+   * the payable Σ delivery-note amounts, the stock Σ ex-VAT costs, the VAT their difference and its
+   * base the stock of the lines that carry VAT. `previous`: the replaced version's totals.
+   */
+  async bookFacts(
+    id: number,
+    executor: Db | Tx = this.db,
+    previous: ReceiptBookTotals | null = null,
+  ): Promise<ReceiptBookFacts> {
+    const [header] = await executor.select().from(goodsReceipts).where(eq(goodsReceipts.id, id));
+    if (!header) throw notFound('goods receipt', id);
+    if (header.status !== 'POSTED' || header.costingVersion === 0 || header.number === null) {
+      throw new Error(`receipt ${id} is not posted and costed`);
+    }
+    const rows = await this.linesOf(executor, id);
+    const latest = await this.posting.costingOf(id, executor);
+    const rates = await this.lineVatRates(executor, rows, header.vatRatePct);
+    const zero = new Decimal(0);
+    const totals = { payable: zero, vat: zero, vatBase: zero, stock: zero };
+    for (const row of rows) {
+      const valuation = latest.get(row.id);
+      if (!valuation || valuation.freeGoods) continue;
+      const stock = valuation.amount;
+      const payable = valuation.docAmount ?? valuation.amount;
+      totals.payable = totals.payable.plus(payable);
+      totals.stock = totals.stock.plus(stock);
+      totals.vat = totals.vat.plus(payable.minus(stock));
+      if (!(rates.get(row.id) ?? zero).isZero()) totals.vatBase = totals.vatBase.plus(stock);
+    }
+    return {
+      receiptId: id,
+      number: header.number,
+      supplierId: header.supplierId,
+      date: header.supplierDocDate ?? header.effectiveDate ?? businessDate(),
+      version: header.costingVersion,
+      totals,
+      previous,
+    };
   }
 
   private async cancelLocked(tx: Tx, actor: Actor, header: ReceiptRow): Promise<void> {

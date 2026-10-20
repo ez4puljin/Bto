@@ -10,7 +10,7 @@ import { invalid, notFound } from '../../../common/errors/app-error';
 import { type FinOpenItemRow, FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FIN_SOURCE, FinPartiesBridge } from '../../fin-bridge';
 import { AuditService, type AuthContext } from '../../identity';
-import { CustomersService } from '../../partners';
+import { CustomersService, SuppliersService } from '../../partners';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
 import { assertNotFuture } from './journal.service';
@@ -31,7 +31,9 @@ export interface OpenItem {
 }
 
 export interface AllocationInput {
-  customerId: number;
+  /** A customer's receivables, or (F3, ADR-0091) a supplier's payables: exactly one of them. */
+  customerId?: number | null;
+  supplierId?: number | null;
   date: string | null;
   description: string | null;
   pairs: readonly { debitItemId: number; creditItemId: number; amount: Decimal }[];
@@ -43,7 +45,8 @@ export interface AllocationResult {
   id: number;
   number: string;
   date: string;
-  customerId: number;
+  customerId: number | null;
+  supplierId: number | null;
   amount: Decimal;
   pairs: { debitItemId: number; creditItemId: number; amount: Decimal }[];
 }
@@ -59,7 +62,8 @@ const KIND_OF_TYPE: Readonly<Record<string, { kind: ArEntryKind; docType: Financ
 /**
  * The accountant's manual allocation (ADR-0072 #7, docs/modules/finance-core.md §11): a customer's
  * open credit item (a payment's or a credit note's remainder) paired with open debit items (its
- * invoices, a refund) by hand. Nothing in Bto or the core applies a credit on its own (owner, D7).
+ * invoices, a refund) by hand; since F3 (ADR-0091) also a supplier's open bills (credit items) with
+ * its open debits (a payment or a return booked against the payables). Nothing in Bto or the core applies a credit on its own (owner, D7).
  * Each allocation is a FIN.ALLOCATION document of the core, posted as the user with
  * `finance.payments.record`; it books no journal entry and is undone by a reversal.
  */
@@ -69,6 +73,7 @@ export class AllocationsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
+    private readonly suppliers: SuppliersService,
     private readonly reader: FinReader,
     private readonly posting: FinPosting,
     private readonly books: FinBooks,
@@ -103,10 +108,22 @@ export class AllocationsService {
     if (description && description.length > FINANCE_LIMITS.maxDescription) {
       throw invalid('description', 'length', `1 to ${FINANCE_LIMITS.maxDescription} characters`);
     }
-    const customer = await this.customerOrThrow(input.customerId);
+    const customerId = input.customerId ?? null;
+    const supplierId = input.supplierId ?? null;
+    if ((customerId === null) === (supplierId === null)) {
+      throw invalid('customerId', 'oneParty', 'a customer or a supplier, not both');
+    }
+    const party =
+      customerId !== null
+        ? { side: 'customer' as const, ...(await this.customerOrThrow(customerId)) }
+        : { side: 'supplier' as const, ...(await this.supplierOrThrow(supplierId ?? 0)) };
     const result = await inTransaction(this.db, async (tx) => {
-      await this.customers.lockForUpdate(tx, customer.id);
-      await this.parties.customerPartyInTx(tx, ctx, customer.id);
+      if (party.side === 'customer') {
+        await this.customers.lockForUpdate(tx, party.id);
+        await this.parties.customerPartyInTx(tx, ctx, party.id);
+      } else {
+        await this.parties.supplierPartyInTx(tx, ctx, party.id);
+      }
       const posted = await this.posting.submitInTx(tx, this.books.user(ctx), {
         source: {
           system: FIN_SOURCE,
@@ -118,12 +135,15 @@ export class AllocationsService {
           documentType: FIN_DOC_TYPES.ALLOCATION.code,
           documentDate: date,
           currency: 'MNT',
-          party: await this.parties.customerPartyIn(tx, customer.id),
-          description: (description ?? customer.name).slice(0, FINANCE_LIMITS.maxDescription),
+          party:
+            party.side === 'customer'
+              ? await this.parties.customerPartyIn(tx, party.id)
+              : await this.parties.supplierPartyIn(tx, party.id),
+          description: (description ?? party.name).slice(0, FINANCE_LIMITS.maxDescription),
           controlTotal: total.toFixed(2),
           lines: [],
           allocate: {
-            key: 'AR',
+            key: party.side === 'customer' ? 'AR' : 'AP',
             pairs: input.pairs.map((pair) => ({
               debit: { itemId: String(pair.debitItemId) },
               credit: { itemId: String(pair.creditItemId) },
@@ -138,7 +158,12 @@ export class AllocationsService {
         action: 'CREATE',
         entity: 'allocations',
         entityId: Number.parseInt(document.id, 10),
-        after: { number: document.number, customerId: customer.id, amount: total.toFixed(2) },
+        after: {
+          number: document.number,
+          customerId,
+          supplierId,
+          amount: total.toFixed(2),
+        },
       });
       return document;
     });
@@ -146,7 +171,8 @@ export class AllocationsService {
       id: Number.parseInt(result.id, 10),
       number: result.number,
       date,
-      customerId: customer.id,
+      customerId,
+      supplierId,
       amount: total,
       pairs: result.allocations.map((pair) => ({
         debitItemId: Number.parseInt(pair.debitItemId, 10),
@@ -201,6 +227,12 @@ export class AllocationsService {
       });
     });
     return { id, number: document.number };
+  }
+
+  private async supplierOrThrow(supplierId: number) {
+    const [supplier] = await this.suppliers.getMany([supplierId]);
+    if (!supplier) throw notFound('supplier', supplierId);
+    return supplier;
   }
 
   private async customerOrThrow(customerId: number) {

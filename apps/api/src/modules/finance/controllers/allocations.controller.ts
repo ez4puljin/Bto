@@ -54,7 +54,8 @@ export class AllocationsController {
     @IdempotencyKey() key?: string,
   ): Promise<AllocationDto> {
     const result = await this.allocations.allocate(ctx, {
-      customerId: body.customerId,
+      customerId: body.customerId ?? null,
+      supplierId: body.supplierId ?? null,
       date: body.date ?? null,
       description: body.description ?? null,
       pairs: body.pairs.map((pair) => ({

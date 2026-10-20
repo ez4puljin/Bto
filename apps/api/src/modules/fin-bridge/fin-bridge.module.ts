@@ -4,7 +4,7 @@ import type { Db } from '../../common/db/db.types';
 import { inTransaction } from '../../common/db/transaction';
 import { ensureDefaultChart, ensureDefaultCompany, FinanceCoreModule } from '../../finance-core';
 import { IdentityModule, OrgService } from '../identity';
-import { CUSTOMER_CHANGED_HOOK, PartnersModule } from '../partners';
+import { CUSTOMER_CHANGED_HOOK, PartnersModule, SUPPLIER_CHANGED_HOOK } from '../partners';
 import { CompanyController } from './controllers/company.controller';
 import { btoChartTemplate, btoInstallationSpec } from './installation';
 import { FinCompanyBridge } from './services/company-bridge.service';
@@ -42,7 +42,7 @@ const SERVICES = [FinContexts, FinPartiesBridge, FinCompanyBridge];
 
 /**
  * Bto's side of the Finance Core (ADR-0084, docs/modules/fin-bridge.md): the call contexts, the
- * customers' parties through partners' CUSTOMER_CHANGED_HOOK, the company record and the boot step.
+ * customers' and suppliers' parties through partners' CUSTOMER_CHANGED_HOOK and SUPPLIER_CHANGED_HOOK, the company record and the boot step.
  * Imported by the api and the worker (imports create customers there); nothing else imports it.
  */
 @Module({
@@ -51,8 +51,9 @@ const SERVICES = [FinContexts, FinPartiesBridge, FinCompanyBridge];
     ...SERVICES,
     FinBridgeBootstrap,
     { provide: CUSTOMER_CHANGED_HOOK, useExisting: FinPartiesBridge },
+    { provide: SUPPLIER_CHANGED_HOOK, useExisting: FinPartiesBridge },
   ],
-  exports: [...SERVICES, CUSTOMER_CHANGED_HOOK],
+  exports: [...SERVICES, CUSTOMER_CHANGED_HOOK, SUPPLIER_CHANGED_HOOK],
 })
 export class FinBridgeModule {}
 

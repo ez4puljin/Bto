@@ -4127,6 +4127,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/supplier-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierBalances_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/supplier-balances/{supplierId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierBalances_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/supplier-balances/{supplierId}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierBalances_entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/supplier-balances/{supplierId}/open-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierBalances_openItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -9569,7 +9633,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -9609,7 +9673,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -9796,6 +9860,8 @@ export interface components {
             credit: string;
             customerId: number | null;
             customerName: string | null;
+            supplierId: number | null;
+            supplierName: string | null;
             moneyAccountId: number | null;
             moneyAccountName: string | null;
             description: string | null;
@@ -9842,6 +9908,8 @@ export interface components {
              */
             credit?: string;
             customerId?: number | null;
+            /** @description The supplier of a line on the payables (F3) */
+            supplierId?: number | null;
             moneyAccountId?: number | null;
             description?: string | null;
         };
@@ -9993,7 +10061,10 @@ export interface components {
             amount: string;
         };
         AllocationRequest: {
-            customerId: number;
+            /** @description A customer, or… */
+            customerId?: number | null;
+            /** @description …a supplier (F3) */
+            supplierId?: number | null;
             /** @example 2026-11-03 */
             date?: string | null;
             description?: string | null;
@@ -10011,7 +10082,8 @@ export interface components {
             number: string;
             /** @example 2026-11-03 */
             date: string;
-            customerId: number;
+            customerId: number | null;
+            supplierId: number | null;
             /** @example 12000.00 */
             amount: string;
             pairs: components["schemas"]["AllocationPair"][];
@@ -10020,6 +10092,88 @@ export interface components {
             id: number;
             /** @example Х-20261103-0001 */
             number: string;
+        };
+        SupplierBalance: {
+            supplierId: number;
+            /** @example 0012 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /**
+             * @description What the company owes; negative = paid ahead
+             * @example 150000.00
+             */
+            balance: string;
+            /** @example 2026-10-20 */
+            oldestBillDate: string | null;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        SupplierBalancesPage: {
+            data: components["schemas"]["SupplierBalance"][];
+            nextCursor: string | null;
+        };
+        PayableEntry: {
+            id: number;
+            /** @example 2026-10-20 */
+            entryDate: string;
+            /** @enum {string} */
+            kind: "BILL" | "RECOST" | "RETURN" | "MANUAL" | "VOID";
+            /**
+             * @description Where the document opens
+             * @enum {string}
+             */
+            docType: "RECEIPT" | "ISSUE" | "JOURNAL";
+            docId: number;
+            /** @example GR-20261020-0001 */
+            docNumber: string;
+            /** @example 0.00 */
+            debit: string;
+            /** @example 150000.00 */
+            credit: string;
+            /**
+             * @description What is owed after this line
+             * @example 150000.00
+             */
+            balanceAfter: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SupplierLedgerPage: {
+            data: components["schemas"]["PayableEntry"][];
+            nextCursor: string | null;
+            /**
+             * @description What was owed before `from`
+             * @example 0.00
+             */
+            opening: string;
+        };
+        PayableOpenItem: {
+            id: number;
+            /** @enum {string} */
+            side: "DEBIT" | "CREDIT";
+            /** @enum {string} */
+            kind: "BILL" | "RECOST" | "RETURN" | "MANUAL" | "VOID";
+            /**
+             * @description Where the document opens
+             * @enum {string}
+             */
+            documentType: "RECEIPT" | "ISSUE" | "JOURNAL";
+            documentId: number;
+            /** @example GR-20261020-0001 */
+            number: string;
+            /** @example 2026-10-20 */
+            itemDate: string;
+            /** @example 2026-10-20 */
+            dueDate: string | null;
+            /** @example 150000.00 */
+            amount: string;
+            /** @example 50000.00 */
+            openAmount: string;
+        };
+        PayableOpenItemList: {
+            data: components["schemas"]["PayableOpenItem"][];
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -21807,6 +21961,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AllocationReversal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierBalances_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description Part of a supplier's name or code */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierBalancesPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierBalances_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierBalances_entries: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierLedgerPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierBalances_openItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayableOpenItemList"];
                 };
             };
             /** @description RFC 9457 problem details */

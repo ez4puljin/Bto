@@ -1,6 +1,7 @@
 import { conditionDays, type SegmentCondition } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import { cleanTaxNumber, normalizeRegNo, TIN_PATTERN } from '@tugeel/shared/taxpayer';
 import { nameKey, normalizeName, searchKeys } from '@tugeel/shared/text';
@@ -12,6 +13,7 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type Actor, AuditService } from '../../identity';
+import { SUPPLIER_CHANGED_HOOK, type SupplierChangedHook, type SupplierPartyFacts } from '../hooks';
 import { productSuppliers, supplierContacts, suppliers } from '../schema';
 import { type SupplierContact, SupplierContactsService } from './contacts.service';
 import type { ListContact, PartnerStatus } from './customers.service';
@@ -81,6 +83,11 @@ export interface SupplierQuery {
   limit?: number;
 }
 
+/** What a supplier's Finance Core party carries (F3, ADR-0091). */
+export function supplierPartyFacts(row: SupplierRow): SupplierPartyFacts {
+  return { id: row.id, name: row.name, tin: row.tin, regNo: row.regNo };
+}
+
 /** The audit snapshot and API view of a supplier row: no derived keys. */
 export function supplierView(row: SupplierRow): Supplier {
   const {
@@ -95,15 +102,30 @@ export function supplierView(row: SupplierRow): Supplier {
 
 /**
  * Suppliers (SPEC §5.3): names are unique (by `nameKey`) so the product sheet's supplier column
- * can be matched by name in the Excel import; every signed-in user reads them (receiving).
+ * can be matched by name in the Excel import; every signed-in user reads them (receiving). A new
+ * supplier, or a change of its name, TIN or register number, reaches its Finance Core party through
+ * SUPPLIER_CHANGED_HOOK in the same transaction (F3, ADR-0091).
  */
 @Injectable()
-export class SuppliersService {
+export class SuppliersService implements OnModuleInit {
+  private changedHook: SupplierChangedHook | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly contacts: SupplierContactsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    try {
+      this.changedHook = this.moduleRef.get<SupplierChangedHook>(SUPPLIER_CHANGED_HOOK, {
+        strict: false,
+      });
+    } catch {
+      this.changedHook = null;
+    }
+  }
 
   async nextCode(executor: Db | Tx = this.db): Promise<string> {
     return nextNumericCode(executor, 'suppliers');
@@ -141,6 +163,7 @@ export class SuppliersService {
       entityId: row.id,
       after: supplierView(row),
     });
+    await this.changedHook?.onSupplierChanged(tx, actor, supplierPartyFacts(row));
     return row.id;
   }
 
@@ -198,6 +221,9 @@ export class SuppliersService {
       before: supplierView(before),
       after: supplierView(after),
     });
+    if (after.name !== before.name || after.tin !== before.tin || after.regNo !== before.regNo) {
+      await this.changedHook?.onSupplierChanged(tx, actor, supplierPartyFacts(after));
+    }
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<SupplierDetail> {

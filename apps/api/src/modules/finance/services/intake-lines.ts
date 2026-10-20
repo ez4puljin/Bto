@@ -18,6 +18,7 @@ export interface RoleLine {
 export const TAX_CODE_OF_ROLE: Partial<Record<GlRole, string>> = {
   VAT_PAYABLE: 'MN.VAT.STD',
   CITY_TAX_PAYABLE: 'MN.CITY.STD',
+  VAT_INPUT: 'MN.VAT.STD',
 };
 
 /** Role lines as the intake's lines: the posting key of each role, the side, the amount. */

@@ -122,6 +122,17 @@ export const AR_ENTRY_KINDS = [
 ] as const;
 export type ArEntryKind = (typeof AR_ENTRY_KINDS)[number];
 
+/**
+ * A line of a supplier's payables (F3, ADR-0091): a receipt's bill, a re-costing's difference, a
+ * supplier return, a manual entry (a payment, a service bill), a reversal.
+ */
+export const PAYABLE_ENTRY_KINDS = ['BILL', 'RECOST', 'RETURN', 'MANUAL', 'VOID'] as const;
+export type PayableEntryKind = (typeof PAYABLE_ENTRY_KINDS)[number];
+
+/** Where a payable line's document opens: the goods receipt, the goods issue, the journal entry. */
+export const PAYABLE_DOC_KINDS = ['RECEIPT', 'ISSUE', 'JOURNAL'] as const;
+export type PayableDocKind = (typeof PAYABLE_DOC_KINDS)[number];
+
 /** What settled an invoice: a voucher, a credit note, or the accountant's allocation (F2, ADR-0090). */
 export const ALLOCATION_SOURCES = ['PAYMENT', 'CREDIT_NOTE', 'ALLOCATION'] as const;
 export type AllocationSource = (typeof ALLOCATION_SOURCES)[number];

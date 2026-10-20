@@ -246,6 +246,13 @@
       "when": 1792471689906,
       "tag": "0034_fin_intake",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792489119728,
+      "tag": "0035_fin_payables",
+      "breakpoints": true
     }
   ]
 }

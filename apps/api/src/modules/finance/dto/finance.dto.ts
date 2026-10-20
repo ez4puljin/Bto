@@ -20,6 +20,10 @@ import {
   type JournalSourceDocType,
   MONEY_ACCOUNT_KINDS,
   type MoneyAccountKind,
+  PAYABLE_DOC_KINDS,
+  PAYABLE_ENTRY_KINDS,
+  type PayableDocKind,
+  type PayableEntryKind,
   PAYMENT_DIRECTIONS,
   PAYMENT_KINDS,
   PAYMENT_STATUSES,
@@ -323,6 +327,15 @@ export class JournalLineRequestDto {
   @IsInt()
   @Min(1)
   customerId?: number | null;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'The supplier of a line on the payables (F3)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  supplierId?: number | null;
   @ApiPropertyOptional({ type: Number, nullable: true })
   @IsOptional()
   @IsInt()
@@ -395,6 +408,8 @@ export class JournalLineDto {
   @ApiProperty({ example: '0.00' }) credit: string;
   @ApiProperty({ type: Number, nullable: true }) customerId: number | null;
   @ApiProperty({ type: String, nullable: true }) customerName: string | null;
+  @ApiProperty({ type: Number, nullable: true }) supplierId: number | null;
+  @ApiProperty({ type: String, nullable: true }) supplierName: string | null;
   @ApiProperty({ type: Number, nullable: true }) moneyAccountId: number | null;
   @ApiProperty({ type: String, nullable: true }) moneyAccountName: string | null;
   @ApiProperty({ type: String, nullable: true }) description: string | null;
@@ -937,7 +952,16 @@ export class AllocationPairRequestDto {
 
 @ApiSchema({ name: 'AllocationRequest' })
 export class AllocationRequestDto {
-  @ApiProperty() @IsInt() @Min(1) customerId: number;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'A customer, or…' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  customerId?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: '…a supplier (F3)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  supplierId?: number | null;
   @ApiPropertyOptional({ type: String, nullable: true, example: '2026-11-03' })
   @IsOptional()
   @Matches(DATE)
@@ -969,7 +993,8 @@ export class AllocationDto {
   @ApiProperty() id: number;
   @ApiProperty({ example: 'Х-20261103-0001' }) number: string;
   @ApiProperty({ example: '2026-11-03' }) date: string;
-  @ApiProperty() customerId: number;
+  @ApiProperty({ type: Number, nullable: true }) customerId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) supplierId: number | null;
   @ApiProperty({ example: '12000.00' }) amount: string;
   @ApiProperty({ type: [AllocationPairDto] }) pairs: AllocationPairDto[];
 }
@@ -978,4 +1003,81 @@ export class AllocationDto {
 export class AllocationReversalDto {
   @ApiProperty() id: number;
   @ApiProperty({ example: 'Х-20261103-0001' }) number: string;
+}
+
+// ---------------------------------------------------------------- payables (F3, ADR-0091)
+
+@ApiSchema({ name: 'SupplierBalance' })
+export class SupplierBalanceDto {
+  @ApiProperty() supplierId: number;
+  @ApiProperty({ example: '0012' }) code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: STATUSES }) status: string;
+  @ApiProperty({
+    example: '150000.00',
+    description: 'What the company owes; negative = paid ahead',
+  })
+  balance: string;
+  @ApiProperty({ type: String, nullable: true, example: '2026-10-20' }) oldestBillDate:
+    string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
+}
+
+@ApiSchema({ name: 'SupplierBalancesQuery' })
+export class SupplierBalancesQueryDto extends PageQueryDto {
+  @ApiPropertyOptional({ description: "Part of a supplier's name or code" })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+}
+
+@ApiSchema({ name: 'SupplierBalancesPage' })
+export class SupplierBalancesPageDto {
+  @ApiProperty({ type: [SupplierBalanceDto] }) data: SupplierBalanceDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
+
+@ApiSchema({ name: 'PayableEntry' })
+export class PayableEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: '2026-10-20' }) entryDate: string;
+  @ApiProperty({ enum: PAYABLE_ENTRY_KINDS }) kind: PayableEntryKind;
+  @ApiProperty({ enum: PAYABLE_DOC_KINDS, description: 'Where the document opens' })
+  docType: PayableDocKind;
+  @ApiProperty() docId: number;
+  @ApiProperty({ example: 'GR-20261020-0001' }) docNumber: string;
+  @ApiProperty({ example: '0.00' }) debit: string;
+  @ApiProperty({ example: '150000.00' }) credit: string;
+  @ApiProperty({ example: '150000.00', description: 'What is owed after this line' })
+  balanceAfter: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'SupplierLedgerPage' })
+export class SupplierLedgerPageDto {
+  @ApiProperty({ type: [PayableEntryDto] }) data: PayableEntryDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty({ example: '0.00', description: 'What was owed before `from`' }) opening: string;
+}
+
+@ApiSchema({ name: 'PayableOpenItem' })
+export class PayableOpenItemDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: ['DEBIT', 'CREDIT'] }) side: 'DEBIT' | 'CREDIT';
+  @ApiProperty({ enum: PAYABLE_ENTRY_KINDS }) kind: PayableEntryKind;
+  @ApiProperty({ enum: PAYABLE_DOC_KINDS, description: 'Where the document opens' })
+  documentType: PayableDocKind;
+  @ApiProperty() documentId: number;
+  @ApiProperty({ example: 'GR-20261020-0001' }) number: string;
+  @ApiProperty({ example: '2026-10-20' }) itemDate: string;
+  @ApiProperty({ type: String, nullable: true, example: '2026-10-20' }) dueDate: string | null;
+  @ApiProperty({ example: '150000.00' }) amount: string;
+  @ApiProperty({ example: '50000.00' }) openAmount: string;
+}
+
+@ApiSchema({ name: 'PayableOpenItemList' })
+export class PayableOpenItemListDto {
+  @ApiProperty({ type: [PayableOpenItemDto] }) data: PayableOpenItemDto[];
 }

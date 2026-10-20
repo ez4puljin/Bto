@@ -18,7 +18,9 @@ export const LEGACY_PARTY_REF = 'LEGACY_UNASSIGNED';
 /**
  * Bto's document types in the core (F2, ADR-0090; migration 0034 wrote the same rows): the sale's
  * invoice and the sales return numbered by Bto, the vouchers, manual entries and allocations of the
- * core's screens (source FIN) numbered by the core.
+ * core's screens (source FIN) numbered by the core. F3 (ADR-0091; migration 0035): the goods
+ * receipt's supplier bill, a re-costing's difference (a bill, a credit or a journal by its sign) and
+ * the supplier return, all numbered by Bto.
  */
 export const FIN_DOC_TYPES = {
   SALES_INVOICE: { code: 'BTO.SALES_INVOICE', system: BTO_SOURCE, docType: 'SALES_INVOICE' },
@@ -29,6 +31,14 @@ export const FIN_DOC_TYPES = {
   OTHER_PAYMENT: { code: 'FIN.OTHER_PAYMENT', system: FIN_SOURCE, docType: 'PAYMENT' },
   JOURNAL: { code: 'FIN.JOURNAL', system: FIN_SOURCE, docType: 'JOURNAL' },
   ALLOCATION: { code: 'FIN.ALLOCATION', system: FIN_SOURCE, docType: 'ALLOCATION' },
+  SUPPLIER_BILL: { code: 'BTO.SUPPLIER_BILL', system: BTO_SOURCE, docType: 'GOODS_RECEIPT' },
+  SUPPLIER_BILL_CREDIT: {
+    code: 'BTO.SUPPLIER_BILL_CREDIT',
+    system: BTO_SOURCE,
+    docType: 'RECEIPT_RECOST',
+  },
+  RECEIPT_RECOST: { code: 'BTO.RECEIPT_RECOST', system: BTO_SOURCE, docType: 'RECEIPT_RECOST' },
+  SUPPLIER_RETURN: { code: 'BTO.SUPPLIER_RETURN', system: BTO_SOURCE, docType: 'SUPPLIER_RETURN' },
 } as const;
 
 /** The allocations' number format until the accountant chooses one (TODO-VERIFY, ADR-0090). */
@@ -40,6 +50,15 @@ export const customerRef = (customerId: number): string => `customer:${customerI
 /** The customer id of a `customer:<id>` ref, or null for another kind of ref. */
 export function customerIdOfRef(ref: string): number | null {
   const match = /^customer:([0-9]+)$/.exec(ref);
+  return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
+}
+
+/** A supplier's ref under source BTO (F3, ADR-0091); 0035_fin_payables backfilled the same refs. */
+export const supplierRef = (supplierId: number): string => `supplier:${supplierId}`;
+
+/** The supplier id of a `supplier:<id>` ref, or null for another kind of ref. */
+export function supplierIdOfRef(ref: string): number | null {
+  const match = /^supplier:([0-9]+)$/.exec(ref);
   return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
 }
 
@@ -78,6 +97,10 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   CARD_CLEARING: key('CARD_CLEARING'),
   POS_SALES: key('POS_SALES'),
   CASH_VARIANCE: key('CASH_VARIANCE'),
+  // Payables (F3, ADR-0091): the supplier's bill credits AP and debits the stock and the input VAT.
+  AP: key('AP', 'PAYABLE'),
+  VAT_INPUT: key('VAT_INPUT', 'NONE', true),
+  INVENTORY: key('INVENTORY'),
 };
 
 /** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */
@@ -200,6 +223,20 @@ export function btoInstallationSpec(input: {
         numberMode: 'CORE',
         numberSeries: 'ALLOCATION',
       },
+      ...(
+        [
+          [FIN_DOC_TYPES.SUPPLIER_BILL.code, 'AP_BILL'],
+          [FIN_DOC_TYPES.SUPPLIER_BILL_CREDIT.code, 'AP_CREDIT'],
+          [FIN_DOC_TYPES.RECEIPT_RECOST.code, 'JOURNAL'],
+          [FIN_DOC_TYPES.SUPPLIER_RETURN.code, 'AP_CREDIT'],
+        ] as const
+      ).map(([code, docClass]) => ({
+        code,
+        system: BTO_SOURCE,
+        class: docClass,
+        numberMode: 'SOURCE' as const,
+        numberSeries: null,
+      })),
     ],
     branches: input.branches.map((branch) => ({
       system: BTO_SOURCE,

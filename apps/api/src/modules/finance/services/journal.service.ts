@@ -34,7 +34,7 @@ import {
   POSTING_KEY_OF_ROLE,
 } from '../../fin-bridge';
 import { type Actor, AuditService, type AuthContext, UserNamesService } from '../../identity';
-import { CustomersService } from '../../partners';
+import { CustomersService, SuppliersService } from '../../partners';
 import { creditNotes, invoices } from '../schema';
 import { FinBooks, staffContext } from './fin-books';
 import { FinPosting, translated } from './fin-posting';
@@ -51,6 +51,8 @@ export interface JournalLineInput {
   debit: Decimal;
   credit: Decimal;
   customerId?: number | null;
+  /** The supplier of a line on the payables (F3, ADR-0091). */
+  supplierId?: number | null;
   moneyAccountId?: number | null;
   description?: string | null;
 }
@@ -99,6 +101,8 @@ export interface JournalLineView {
   credit: Decimal;
   customerId: number | null;
   customerName: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
   moneyAccountId: number | null;
   moneyAccountName: string | null;
   description: string | null;
@@ -173,6 +177,7 @@ export class JournalService {
     private readonly accounts: GlAccountsService,
     private readonly moneyAccounts: MoneyAccountsService,
     private readonly customers: CustomersService,
+    private readonly suppliers: SuppliersService,
     private readonly names: UserNamesService,
     private readonly posting: FinJournalPosting,
     private readonly reader: FinJournalReader,
@@ -253,8 +258,9 @@ export class JournalService {
   /**
    * A manual entry (`finance.journal.manage`), dated today or earlier: a JOURNAL document of the
    * core's screens, posted as the staff member (source FIN). A line on a cash or bank account names
-   * its cash box or bank account, a line on the receivables its customer (the controls, ADR-0072
-   * #2). `key` is the request's Idempotency-Key: the document's identity.
+   * its cash box or bank account, a line on the receivables its customer, a line on the payables its
+   * supplier (the controls, ADR-0072 #2; suppliers since F3, ADR-0091): a supplier's payment or a
+   * service bill is such an entry (owner, 2026-10-20). `key` is the request's Idempotency-Key: the document's identity.
    */
   async postManual(
     ctx: AuthContext,
@@ -294,9 +300,17 @@ export class JournalService {
           );
         }
         let party: LineV1['party'];
+        if (line.customerId != null && line.supplierId != null) {
+          throw invalid(`lines[${index}].supplierId`, 'oneParty', 'a customer or a supplier');
+        }
         if (line.customerId != null) {
           await this.parties.customerPartyInTx(tx, ctx, line.customerId);
           party = await this.parties.customerPartyIn(tx, line.customerId);
+        }
+        if (line.supplierId != null) {
+          await this.suppliers.get(line.supplierId, tx);
+          await this.parties.supplierPartyInTx(tx, ctx, line.supplierId);
+          party = await this.parties.supplierPartyIn(tx, line.supplierId);
         }
         lines.push({
           lineNo: index + 1,
@@ -310,7 +324,12 @@ export class JournalService {
         });
       }
       const total = input.lines.reduce((sum, line) => sum.plus(line.debit), new Decimal(0));
-      const result = await this.submitManual(tx, ctx, {
+      const payableLines = new Set(
+        input.lines.flatMap((_, index) =>
+          accounts.get(ids[index] ?? 0)?.role === 'AP' ? [index] : [],
+        ),
+      );
+      const result = await this.submitManual(tx, ctx, payableLines, {
         source: { system: FIN_SOURCE, docType: MANUAL_DOC_TYPE, docId: key ?? randomUUID() },
         body: {
           action: 'POST',
@@ -358,7 +377,7 @@ export class JournalService {
         throw invalid('entryId', 'manual', 'only a manual or opening entry is reversed by hand');
       }
       await this.assertNotReversed(tx, company, entryId, original.number);
-      const result = await this.submitManual(tx, ctx, {
+      const result = await this.submitManual(tx, ctx, new Set(), {
         source: {
           system: FIN_SOURCE,
           docType: original.sourceDocType ?? MANUAL_DOC_TYPE,
@@ -413,14 +432,16 @@ export class JournalService {
     if (!entry) throw notFound('journal_entry', id);
     const [summary] = await this.summaries([entry]);
     if (!summary) throw notFound('journal_entry', id);
-    const customerOf = await this.parties.customersOfParties(
-      entry.lines.flatMap((line) => (line.partyId === null ? [] : [line.partyId])),
-    );
+    const partyIds = entry.lines.flatMap((line) => (line.partyId === null ? [] : [line.partyId]));
+    const customerOf = await this.parties.customersOfParties(partyIds);
     const customerNames = await this.customerNames([...customerOf.values()]);
+    const supplierOf = await this.parties.suppliersOfParties(partyIds);
+    const supplierNames = await this.supplierNames([...supplierOf.values()]);
     return {
       ...summary,
       lines: entry.lines.map((line) => {
         const customerId = line.partyId === null ? null : (customerOf.get(line.partyId) ?? null);
+        const supplierId = line.partyId === null ? null : (supplierOf.get(line.partyId) ?? null);
         return {
           id: line.id,
           lineNo: line.lineNo,
@@ -431,6 +452,8 @@ export class JournalService {
           credit: line.credit,
           customerId,
           customerName: customerId === null ? null : (customerNames.get(customerId) ?? null),
+          supplierId,
+          supplierName: supplierId === null ? null : (supplierNames.get(supplierId) ?? null),
           moneyAccountId: line.moneyAccountId,
           moneyAccountName: line.moneyAccountName,
           description: line.description,
@@ -506,12 +529,13 @@ export class JournalService {
   private async submitManual(
     tx: Tx,
     ctx: AuthContext,
+    payableLines: ReadonlySet<number>,
     command: Parameters<FinPosting['submitInTx']>[2],
   ) {
     try {
       return await this.intake.submitInTx(tx, this.books.user(staffContext(ctx)), command);
     } catch (error) {
-      throw manualRefusal(error);
+      throw manualRefusal(error, payableLines);
     }
   }
 
@@ -611,6 +635,16 @@ export class JournalService {
     return result;
   }
 
+  private async supplierNames(ids: readonly number[]): Promise<Map<number, string>> {
+    if (ids.length === 0) return new Map();
+    return new Map(
+      (await this.suppliers.getMany([...new Set(ids)])).map((supplier) => [
+        supplier.id,
+        supplier.name,
+      ]),
+    );
+  }
+
   private async customerNames(ids: readonly number[]): Promise<Map<number, string>> {
     if (ids.length === 0) return new Map();
     return new Map(
@@ -654,7 +688,7 @@ function checkLines(lines: readonly JournalLineInput[]): void {
 }
 
 /** A manual line the controls refuse, as the field the accountant must fill (ADR-0072 #2). */
-function manualRefusal(error: unknown): unknown {
+function manualRefusal(error: unknown, payableLines: ReadonlySet<number>): unknown {
   if (!(error instanceof FinError)) return translated(error);
   const path = typeof error.params?.path === 'string' ? error.params.path : '';
   const index = /lines\.(\d+)/.exec(path)?.[1];
@@ -662,7 +696,9 @@ function manualRefusal(error: unknown): unknown {
     return invalid(`lines[${index}].moneyAccountId`, 'required', 'a cash box or bank account');
   }
   if (index !== undefined && error.code === 'FIN_PARTY_REQUIRED') {
-    return invalid(`lines[${index}].customerId`, 'required', 'a customer');
+    return payableLines.has(Number.parseInt(index, 10))
+      ? invalid(`lines[${index}].supplierId`, 'required', 'a supplier')
+      : invalid(`lines[${index}].customerId`, 'required', 'a customer');
   }
   if (index !== undefined && error.code === 'FIN_ACCOUNT_INACTIVE') {
     return invalid(`lines[${index}].accountId`, 'active', 'the account is inactive');

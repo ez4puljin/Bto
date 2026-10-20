@@ -5,7 +5,7 @@ import { FinanceCoreModule } from '../../finance-core';
 import { CatalogModule } from '../catalog';
 import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
-import { InventoryModule, RECEIPT_MONEY_ACCOUNTS } from '../inventory';
+import { InventoryModule, PURCHASE_BOOKS, RECEIPT_MONEY_ACCOUNTS } from '../inventory';
 import { PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
 import {
@@ -24,8 +24,10 @@ import {
   FinanceSettingsController,
 } from './controllers/receivables.controller';
 import { AllocationsController } from './controllers/allocations.controller';
+import { SupplierBalancesController } from './controllers/payables.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
 import { AllocationsService } from './services/allocations.service';
+import { ApLedgerService } from './services/ap-ledger.service';
 import { FinPosting } from './services/fin-posting';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
@@ -40,6 +42,7 @@ import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
+import { SupplierBillsService } from './services/supplier-bills.service';
 
 const SERVICES = [
   FinBooks,
@@ -49,6 +52,7 @@ const SERVICES = [
   GlAccountsService,
   JournalService,
   ArLedgerService,
+  ApLedgerService,
   CreditControlService,
   InvoiceQueryService,
   InvoicingService,
@@ -56,6 +60,7 @@ const SERVICES = [
   PaymentsService,
   CreditNotesService,
   ReceiptMoneyAccountsService,
+  SupplierBillsService,
   JournalRepostService,
 ];
 
@@ -63,8 +68,9 @@ const SERVICES = [
  * Finance I (docs/modules/finance.md, ADR-0060): invoices from sold orders, the receivables
  * ledger, the cash and bank vouchers, credit notes and the general journal — the chart, the money
  * accounts and the journal kept by the Finance Core since F1's ledger (ADR-0089), reached through
- * fin-bridge's contexts. It answers the two hooks of sales (`CREDIT_CHECKER`, `SALE_SINK`); sales
- * finds them through `ModuleRef` and never imports this module.
+ * fin-bridge's contexts. It answers the two hooks of sales (`CREDIT_CHECKER`, `SALE_SINK`) and
+ * inventory's `RECEIPT_MONEY_ACCOUNTS` and `PURCHASE_BOOKS` (the suppliers' payables, F3,
+ * ADR-0091); those modules find them through `ModuleRef` and never import this module.
  */
 @Module({
   imports: [
@@ -80,8 +86,9 @@ const SERVICES = [
     { provide: CREDIT_CHECKER, useExisting: CreditControlService },
     { provide: SALE_SINK, useExisting: InvoicingService },
     { provide: RECEIPT_MONEY_ACCOUNTS, useExisting: ReceiptMoneyAccountsService },
+    { provide: PURCHASE_BOOKS, useExisting: SupplierBillsService },
   ],
-  exports: [...SERVICES, CREDIT_CHECKER, SALE_SINK, RECEIPT_MONEY_ACCOUNTS],
+  exports: [...SERVICES, CREDIT_CHECKER, SALE_SINK, RECEIPT_MONEY_ACCOUNTS, PURCHASE_BOOKS],
 })
 export class FinanceModule {}
 
@@ -102,6 +109,7 @@ export class FinanceModule {}
     FinanceAttentionController,
     FinanceSettingsController,
     AllocationsController,
+    SupplierBalancesController,
   ],
 })
 export class FinanceHttpModule {}

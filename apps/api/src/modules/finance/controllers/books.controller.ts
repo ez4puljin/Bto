@@ -232,6 +232,7 @@ export class JournalController {
             debit: new Decimal(line.debit ?? '0'),
             credit: new Decimal(line.credit ?? '0'),
             customerId: line.customerId ?? null,
+            supplierId: line.supplierId ?? null,
             moneyAccountId: line.moneyAccountId ?? null,
             description: line.description ?? null,
           })),

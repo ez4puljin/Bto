@@ -37,3 +37,22 @@ export interface CustomerChangedHook {
 }
 
 export const CUSTOMER_CHANGED_HOOK = Symbol('CUSTOMER_CHANGED_HOOK');
+
+/** A supplier as its Finance Core party follows it (F3, ADR-0091). */
+export interface SupplierPartyFacts {
+  id: number;
+  name: string;
+  tin: string | null;
+  regNo: string | null;
+}
+
+/**
+ * Called inside the transaction that creates a supplier or changes its name, TIN or register number
+ * (F3, ADR-0091). fin-bridge binds it to keep the supplier's Finance Core party in step, in the api
+ * and in the worker (imports); partners may not import fin-bridge.
+ */
+export interface SupplierChangedHook {
+  onSupplierChanged(tx: Tx, actor: Actor, supplier: SupplierPartyFacts): Promise<void>;
+}
+
+export const SUPPLIER_CHANGED_HOOK = Symbol('SUPPLIER_CHANGED_HOOK');
