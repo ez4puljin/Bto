@@ -62,6 +62,7 @@ const quote = (
     stock: 'LOW',
     mayBackorder: line.mayBackorder ?? false,
   })),
+  orderDeals: [],
 });
 
 describe('«Bto300»: the shop (ADR-0079 #4)', () => {

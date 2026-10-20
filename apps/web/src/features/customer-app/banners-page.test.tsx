@@ -79,7 +79,7 @@ const KEEPER: Me = {
   id: 8,
   username: 'keeper',
   fullName: 'Нүүр Сараа',
-  permissions: ['customer_app.home.manage'],
+  permissions: ['customer.home.manage'],
   roles: [],
 };
 

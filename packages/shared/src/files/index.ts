@@ -45,14 +45,14 @@ export const FILE_KINDS = {
     contentTypes: IMAGE_TYPES,
     maxBytes: 512 * 1024,
     visibility: 'public',
-    permissions: ['customer_app.home.manage'],
+    permissions: ['customer.home.manage'],
   },
   /** A banner of «Bto300»'s home (ADR-0092 #5): 2:1, cropped and resized in the browser. */
   'customer.banner_image': {
     contentTypes: IMAGE_TYPES,
     maxBytes: 1024 * 1024,
     visibility: 'public',
-    permissions: ['customer_app.home.manage'],
+    permissions: ['customer.home.manage'],
   },
   /** An Excel sheet for the importer (ADR-0036): kept privately as the record of what was imported. */
   'imports.source': {

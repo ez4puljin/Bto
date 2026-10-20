@@ -79,7 +79,7 @@ const VIEWS = ['LIVE', 'ARCHIVED'] as const;
 type View = (typeof VIEWS)[number];
 
 /**
- * «Систем» → «Харилцагчийн апп» → «Баннер» (ADR-0092 #5, customer_app.home.manage): the banners
+ * «Систем» → «Харилцагчийн апп» → «Баннер» (ADR-0092 #5, customer.home.manage): the banners
  * of «Bto300»'s home in the order the app shows them, with their link, period and state; moved
  * up or down, archived (asked first), or added in a dialog (`?new=1`). A banner is never edited.
  */

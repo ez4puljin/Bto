@@ -67,7 +67,7 @@ const requestOf = (contact: CompanyContact): CompanyContactRequest => ({
 });
 
 /**
- * «Систем» → «Харилцагчийн апп» (ADR-0079 #14, identity.settings.read or customer_app.home.manage):
+ * «Систем» → «Харилцагчийн апп» (ADR-0079 #14, identity.settings.read or customer.home.manage):
  * the company's contact people every store sees on the app's «Профайл» (ADR-0092 #8) — role, name,
  * phone, shown or hidden, in order; each change saves the whole list (identity.settings.manage).
  * Beside it, for the home's keepers, the banners (ADR-0092 #5), and for people who set up the
@@ -77,7 +77,7 @@ export function CustomerAppPage() {
   const { t } = useTranslation();
   const canBoards = useHasPermission('sales.boards.manage');
   const canContacts = useHasPermission('identity.settings.read');
-  const canHome = useHasPermission('customer_app.home.manage');
+  const canHome = useHasPermission('customer.home.manage');
   return (
     <div className="space-y-4">
       <PageHeader title={t('customerApp.title')} description={t('customerApp.description')} />

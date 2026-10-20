@@ -39,7 +39,7 @@ import { type Segment, SegmentsService } from '../services/segments.service';
 
 const MANAGE = 'segments.manage';
 /** «Bto300»'s home (ADR-0092 #9): which product segments it shows, and in what order. */
-const HOME = 'customer_app.home.manage';
+const HOME = 'customer.home.manage';
 
 function toSegmentDto(segment: Segment): SegmentDto {
   return {

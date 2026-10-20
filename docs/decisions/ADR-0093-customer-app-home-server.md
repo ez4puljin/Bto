@@ -6,7 +6,7 @@
 | Date | 2026-10-20 |
 | Deciders | Owner (the CA4 plan, 2026-10-20), Claude (Claude Code session, CA4) |
 | Implements | ADR-0092 (#1–#11): the server and the admin web of «Bto300»'s home; CA5 builds the screens |
-| Amends | ADR-0049 #4 (segments now also bind a second catalog hook), ADR-0082 (the `customer` module gains banners and the home), `docs/modules/customer.md`, `segments.md`, `catalog.md`, `pricing.md`, `sales.md` |
+| Amends | ADR-0049 #4 (segments now also bind a second catalog hook), ADR-0092 #9 (the right's code is `customer.home.manage`), ADR-0082 (the `customer` module gains banners and the home), `docs/modules/customer.md`, `segments.md`, `catalog.md`, `pricing.md`, `sales.md` |
 
 ## Context
 
@@ -25,7 +25,7 @@ The owner approved the plan with eight defaults on 2026-10-20 (below, #8).
    - `segments.app_position` smallint: CHECK it is set only on a live PRODUCT segment; archiving clears it in the same statement.
    - `categories.image_file_id` → `files`: CHECK only a category without a parent has one; moving it under a parent or deleting it drops the picture in the same statement and marks the file deleted.
    - Both position constraints are `UNIQUE … DEFERRABLE INITIALLY IMMEDIATE`, written by hand (Drizzle 0.45 cannot say it): two rows swap places in one UPDATE, checked at the statement's end. Positions may have gaps; an advisory lock per list (72_036_001 segments, 72_036_002 banners) serialises the changes.
-2. **The right `customer_app.home.manage`** («Апп-ын нүүр удирдах», ADR-0092 #9): ADMIN, assignable. It guards the banner routes, `PUT /segments/:id/app`, `POST /segments/:id/app/move`, `PUT` / `DELETE /categories/:id/image` and the file kinds `customer.banner_image` and `catalog.category_image` (public, ≤ 512 KB).
+2. **The right `customer.home.manage`** («Апп-ын нүүр удирдах», ADR-0092 #9): ADMIN, assignable. ADR-0092 wrote `customer_app.home.manage`; a permission code starts with its module's name in lowercase letters (`<module>.<resource>.<action>`, checked by `auth.test.ts`), so the code is `customer.home.manage` — the label is unchanged. It guards the banner routes, `PUT /segments/:id/app`, `POST /segments/:id/app/move`, `PUT` / `DELETE /categories/:id/image` and the file kinds `customer.banner_image` and `catalog.category_image` (public, ≤ 512 KB).
 3. **Segments through catalog.** Catalog declares a second hook, `PRODUCT_SEGMENT_DIRECTORY` (live product segments by id, or those the app shows in their order), bound by the segments module like `PRODUCT_SET_RESOLVER`; `ProductQueryService.productSegments()` passes it on, and a segment's members come from `ProductQueryService.within({ segmentId })`. The customer module never imports segments; MODULE_DEPS and the ESLint guards are unchanged.
 4. **Deals in pricing.** `ProductDealsService` reads the WHOLESALE programs in force on the business date once per request (`DiscountProgramsService.inForceViews`) and marks products: a PRODUCT program its product, a CATEGORY program every product of its subtree (catalog's `category IN` answer); ORDER programs are kept apart for the cart.
    - A product marked by a program with an end date is a **promotion**, otherwise a **discount**; in both it is a promotion only. «Хямдралтай» (the shop's chip, a category page's «Хямдралтай бараа») is both together.

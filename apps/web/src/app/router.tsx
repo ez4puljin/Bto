@@ -173,9 +173,7 @@ export const routes: RouteObject[] = [
             path: 'system/customer-app',
             handle: { width: 'reading' },
             element: (
-              <RequirePermission
-                permission={['identity.settings.read', 'customer_app.home.manage']}
-              >
+              <RequirePermission permission={['identity.settings.read', 'customer.home.manage']}>
                 <CustomerAppPage />
               </RequirePermission>
             ),
@@ -184,7 +182,7 @@ export const routes: RouteObject[] = [
             path: 'system/customer-app/banners',
             handle: { width: 'wide' },
             element: (
-              <RequirePermission permission="customer_app.home.manage">
+              <RequirePermission permission="customer.home.manage">
                 <BannersPage />
               </RequirePermission>
             ),

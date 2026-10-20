@@ -372,7 +372,7 @@ describe('customer app home (ADR-0092)', () => {
     // Without the right.
     const clerk = await customRoleUser(app, admin, ['segments.manage']);
     await http().get('/api/v1/customer/banners').set(bearer(clerk)).expect(403);
-    const keeper = await customRoleUser(app, admin, ['customer_app.home.manage']);
+    const keeper = await customRoleUser(app, admin, ['customer.home.manage']);
     await http().get('/api/v1/customer/banners').set(bearer(keeper)).expect(200);
   });
 

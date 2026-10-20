@@ -218,7 +218,7 @@
     "notifications": {
       "send": "Апп мэдэгдэл илгээх"
     },
-    "customer_app": {
+    "customer": {
       "home": {
         "manage": "Апп-ын нүүр удирдах"
       }

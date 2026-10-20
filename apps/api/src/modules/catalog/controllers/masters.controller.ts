@@ -29,7 +29,7 @@ import { toCategoryDto, toUomDto } from './mappers';
 
 const MANAGE = 'catalog.products.manage';
 /** The customer app's home (ADR-0092 #9): banners, shown segments and category pictures. */
-const HOME = 'customer_app.home.manage';
+const HOME = 'customer.home.manage';
 
 @ApiTags('catalog')
 @Controller('uoms')

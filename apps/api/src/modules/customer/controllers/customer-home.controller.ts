@@ -29,7 +29,7 @@ import { CustomerHomeService, type HomeSection } from '../services/customer-home
 import { productDto } from './mappers';
 
 /** The right that manages «Bto300»'s home (ADR-0092 #9). */
-const HOME = 'customer_app.home.manage';
+const HOME = 'customer.home.manage';
 
 const sectionDto = (section: HomeSection) => ({
   key: section.key,

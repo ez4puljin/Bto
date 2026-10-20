@@ -91,7 +91,7 @@ export function CategoriesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('catalog.products.manage');
   // «Bto300»'s category grid (ADR-0092 #6): top categories carry a picture.
-  const canPicture = useHasPermission('customer_app.home.manage');
+  const canPicture = useHasPermission('customer.home.manage');
   const [picturing, setPicturing] = useState<Category | null>(null);
   const withActions = canManage || canPicture;
   const categories = useCategories();
@@ -271,7 +271,7 @@ export function CategoriesPage() {
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
 /**
- * «Апп-ын зураг» (ADR-0092 #6, customer_app.home.manage): a top category's picture on «Bto300»'s
+ * «Апп-ын зураг» (ADR-0092 #6, customer.home.manage): a top category's picture on «Bto300»'s
  * category grid, cut square (512×512) in the browser and saved at once (the tree then shows it);
  * «Зураг устгах» takes it away (the app then shows one of the category's products).
  */

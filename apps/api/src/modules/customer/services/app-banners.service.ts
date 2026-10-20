@@ -60,7 +60,7 @@ export interface RunningBanner {
 type BannerRow = typeof appBanners.$inferSelect;
 
 /**
- * The banners of «Bto300»'s home (ADR-0092 #5): admins with `customer_app.home.manage` add them
+ * The banners of «Bto300»'s home (ADR-0092 #5): admins with `customer.home.manage` add them
  * with a picture, a title, a link and a period, move them up or down and archive them; nothing is
  * edited (a wrong banner is archived and made again, ADR-0093). Targets live in other modules and
  * are checked on every read: a banner whose target is gone stays, without its link.

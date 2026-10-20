@@ -318,7 +318,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.customerApp',
         icon: Smartphone,
         // The contact list's readers and the home's keepers (ADR-0092 #9: banners).
-        permission: ['identity.settings.read', 'customer_app.home.manage'],
+        permission: ['identity.settings.read', 'customer.home.manage'],
       },
     ],
   },

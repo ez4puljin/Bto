@@ -21982,7 +21982,7 @@
           "pos.till.operate",
           "pos.till.supervise",
           "notifications.send",
-          "customer_app.home.manage"
+          "customer.home.manage"
         ]
       },
       "RoleRef": {

@@ -303,11 +303,11 @@ export function SegmentPage() {
 /**
  * «Bto300 апп» (ADR-0092 #2): whether «Bto300»'s home shows the product segment as a section (its
  * name the title, its description the subtitle) and its place among the shown segments; holders
- * of customer_app.home.manage switch it and move it up or down, everyone else reads it.
+ * of customer.home.manage switch it and move it up or down, everyone else reads it.
  */
 function AppCard({ segment }: { segment: Segment }) {
   const { t } = useTranslation();
-  const canManage = useHasPermission('customer_app.home.manage');
+  const canManage = useHasPermission('customer.home.manage');
   const mutations = useSegmentMutations();
   const action = useAction();
   const shown = segment.appRank !== null;
