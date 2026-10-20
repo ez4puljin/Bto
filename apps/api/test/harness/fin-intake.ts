@@ -46,8 +46,10 @@ export async function intakeCore() {
   }
   const intake = core.module.get(FinIntakeInTx);
   const reader = core.module.get(FinReader);
-  const submit = (command: IntakeCommandV1, ctx = StaticCaller.source()): Promise<FinIntakeResult> =>
-    core.db.transaction((tx) => intake.submitInTx(tx, ctx, command));
+  const submit = (
+    command: IntakeCommandV1,
+    ctx = StaticCaller.source(),
+  ): Promise<FinIntakeResult> => core.db.transaction((tx) => intake.submitInTx(tx, ctx, command));
   return { ...core, intake, reader, chart, submit };
 }
 

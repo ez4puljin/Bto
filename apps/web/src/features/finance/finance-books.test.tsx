@@ -63,6 +63,9 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       'Бусад орлого',
     );
     await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 1`), '1');
+    // A line on the cash account names its cash box; the only one is chosen already (ADR-0090).
+    expect(dialog.getByLabelText(`${mn.finance.journal.dialog.moneyAccount} 1`)).toHaveValue('1');
+    expect(dialog.queryByLabelText(`${mn.finance.journal.dialog.moneyAccount} 2`)).toBeNull();
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.debit} 1`), '5000');
     await user.selectOptions(dialog.getByLabelText(`${mn.finance.journal.dialog.account} 2`), '8');
     await user.type(dialog.getByLabelText(`${mn.finance.journal.dialog.credit} 2`), '4000');
@@ -84,7 +87,7 @@ describe('finance books (ADR-0060 #7, #8)', () => {
       entryDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       description: 'Бусад орлого',
       lines: [
-        { accountId: 1, debit: '5000', credit: '0', description: null },
+        { accountId: 1, debit: '5000', credit: '0', moneyAccountId: 1, description: null },
         { accountId: 8, debit: '0', credit: '5000', description: null },
       ],
     });

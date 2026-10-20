@@ -8,8 +8,10 @@ import {
   BALANCE,
   CASH_BOX,
   INVOICE,
+  INVOICE_ALLOCATED,
   INVOICE_ROW,
   LEDGER,
+  OPEN_ITEMS,
   PAYMENT,
   PAYMENT_ROW,
 } from './finance-fixtures';
@@ -44,6 +46,7 @@ const routes = () => ({
     }),
   'GET /api/v1/customer-balances': () => list([BALANCE]),
   'GET /api/v1/customer-balances/9': () => json(BALANCE),
+  'GET /api/v1/customer-balances/9/open-items': () => json({ data: OPEN_ITEMS }),
   'GET /api/v1/customer-balances/9/ledger': () =>
     json({ data: LEDGER, nextCursor: null, opening: '0.00' }),
   'GET /api/v1/customers': () => list([CUSTOMER_ROW]),
@@ -235,4 +238,113 @@ describe('finance pages (ADR-0060 #11)', () => {
       await screen.findByRole('link', { name: `${mn.home.attention.overdueReceivables}: 3` }),
     ).toHaveAttribute('href', '/finance/customers?overdue=1');
   });
+
+  it('pairs a payment remainder with invoices oldest due first on the customer ledger', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      ...routes(),
+      'POST /api/v1/finance/allocations': () =>
+        json(
+          {
+            id: 601,
+            number: 'Х-20261020-0001',
+            date: '2026-10-20',
+            customerId: 9,
+            amount: '80000.00',
+            pairs: [],
+          },
+          201,
+        ),
+    });
+    renderApp('/finance/customers/9', fetchMock);
+    await user.click(await screen.findByRole('button', { name: mn.finance.allocations.action }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: mn.finance.allocations.title }),
+    );
+    // Two credits: nothing is chosen for the accountant, and nothing is sent without one.
+    await dialog.findByRole('radio', { name: 'Т-20261020-0002' });
+    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.submit }));
+    expect(await dialog.findByRole('alert')).toHaveTextContent(mn.finance.allocations.chooseCredit);
+    await user.click(dialog.getByRole('radio', { name: 'Т-20261020-0002' }));
+    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.oldestFirst }));
+    // The older invoice (due 2026-10-31) is settled whole first, the rest goes on the next one.
+    const amount = (number: string) =>
+      dialog.getByLabelText(`${mn.finance.allocations.amount}: ${number}`);
+    expect(amount('Н-20261001-0003')).toHaveValue('30000');
+    expect(amount('Н-20261016-0001')).toHaveValue('50000');
+    expect(calls(fetchMock, 'POST', '/api/v1/finance/allocations')).toHaveLength(0);
+    // More than the invoice still owes is refused before sending.
+    await user.clear(amount('Н-20261001-0003'));
+    await user.click(amount('Н-20261001-0003'));
+    await user.paste('35000');
+    expect(await dialog.findByRole('alert')).toHaveTextContent(
+      mn.finance.allocations.overDebit.replace('{{number}}', 'Н-20261001-0003'),
+    );
+    await user.clear(amount('Н-20261001-0003'));
+    await user.click(amount('Н-20261001-0003'));
+    await user.paste('30000');
+    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.submit }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/finance/allocations')).toHaveLength(1),
+    );
+    const request = calls(fetchMock, 'POST', '/api/v1/finance/allocations')[0];
+    expect(await bodyOf(request)).toEqual({
+      customerId: 9,
+      date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      description: null,
+      pairs: [
+        { debitItemId: 502, creditItemId: 503, amount: '30000' },
+        { debitItemId: 501, creditItemId: 503, amount: '50000' },
+      ],
+    });
+    expect(request?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(
+      await screen.findByText(mn.finance.allocations.done.replace('{{number}}', 'Х-20261020-0001')),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  }, 15_000);
+
+  it('opens the allocation dialog from the address', async () => {
+    renderApp('/finance/customers/9?allocate=1', signedIn(ACCOUNTANT_ME, routes()));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: mn.finance.allocations.title }),
+    );
+    expect(await dialog.findByRole('row', { name: /К-20261018-0001/ })).toBeInTheDocument();
+  });
+
+  it('reverses an allocation from the invoice panel with a reason', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      ...routes(),
+      'GET /api/v1/invoices/11': () => json(INVOICE_ALLOCATED),
+      'POST /api/v1/finance/allocations/601/reverse': () =>
+        json({ id: 602, number: 'Х-20261020-0002' }),
+    });
+    renderApp('/finance/invoices?invoice=11', fetchMock);
+    const panel = within(
+      await screen.findByRole('dialog', {
+        name: mn.finance.invoices.panelTitle.replace('{{number}}', 'Н-20261016-0001'),
+      }),
+    );
+    const row = within(await panel.findByRole('row', { name: /Х-20261020-0001/ }));
+    expect(row.getByText(mn.finance.arKinds.ALLOCATION)).toBeInTheDocument();
+    // A payment's own allocation is voided with its voucher, not from here.
+    expect(
+      panel.queryByRole('button', { name: `Т-20261016-0001: ${mn.common.actions}` }),
+    ).toBeNull();
+    await user.click(row.getByRole('button', { name: `Х-20261020-0001: ${mn.common.actions}` }));
+    await user.click(await screen.findByRole('menuitem', { name: mn.finance.allocations.reverse }));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: mn.finance.allocations.reverseTitle }),
+    );
+    await user.type(dialog.getByLabelText(mn.finance.fields.reason), 'Буруу тулгасан');
+    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.reverse }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/finance/allocations/601/reverse')).toHaveLength(1),
+    );
+    const request = calls(fetchMock, 'POST', '/api/v1/finance/allocations/601/reverse')[0];
+    expect(await bodyOf(request)).toEqual({ reason: 'Буруу тулгасан' });
+    expect(request?.headers.get('Idempotency-Key')).toMatch(UUID);
+    expect(await screen.findByText(mn.finance.allocations.reversed)).toBeInTheDocument();
+  }, 15_000);
 });

@@ -118,7 +118,8 @@ export class FinJournalReader {
     if (query.from) filters.push(sql`${finJournalEntries.entryDate} >= ${query.from}`);
     if (query.to) filters.push(sql`${finJournalEntries.entryDate} <= ${query.to}`);
     if (query.origin) {
-      const codes = typeof query.origin.system === 'string' ? [query.origin.system] : [...query.origin.system];
+      const codes =
+        typeof query.origin.system === 'string' ? [query.origin.system] : [...query.origin.system];
       const systems = await this.db
         .select({ id: finSourceSystems.id })
         .from(finSourceSystems)
@@ -126,7 +127,12 @@ export class FinJournalReader {
           and(eq(finSourceSystems.tenantId, scope.tenantId), inArray(finSourceSystems.code, codes)),
         );
       if (systems.length === 0) return [];
-      filters.push(...originFilters(systems.map((system) => system.id), query.origin));
+      filters.push(
+        ...originFilters(
+          systems.map((system) => system.id),
+          query.origin,
+        ),
+      );
     }
     const lineFilter = (condition: SQL) =>
       exists(

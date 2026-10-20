@@ -1,17 +1,13 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
-import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  type AuthContext,
+  CurrentUser,
+  IdempotencyKey,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import {
   CreditNoteDetailDto,
   CreditNoteListQueryDto,
@@ -160,7 +156,7 @@ export class PaymentsController {
   async record(
     @CurrentUser() ctx: AuthContext,
     @Body() body: PaymentRequestDto,
-    @Headers('idempotency-key') key?: string,
+    @IdempotencyKey() key?: string,
   ): Promise<PaymentDetailDto> {
     return paymentDetailDto(
       await this.payments.record(ctx, {

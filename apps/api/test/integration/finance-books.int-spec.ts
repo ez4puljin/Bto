@@ -262,7 +262,11 @@ describe('finance books', () => {
           entryDate: today,
           description: 'Дугаарлалт',
           lines: [
-            { accountId: cash.id, moneyAccountId: (await financeApi(app, admin).cashBox('FB-NUMBERS')).id, debit: '100' },
+            {
+              accountId: cash.id,
+              moneyAccountId: (await financeApi(app, admin).cashBox('FB-NUMBERS')).id,
+              debit: '100',
+            },
             { accountId: income.id, credit: '100' },
           ],
         })

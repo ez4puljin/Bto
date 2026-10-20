@@ -85,18 +85,26 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     await core.submit(invoice('i1', '500', { party: p }));
     await core.submit(receipt('r1', '800', null, { party: p }));
     const before = await trialBalance();
-    const entries = await admin.query<{ n: string }>('SELECT count(*)::text AS n FROM fin.journal_entries');
+    const entries = await admin.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM fin.journal_entries',
+    );
     const posted = await core.submit(
       allocation('a:1', [{ debit: await itemOf('i1'), credit: await itemOf('r1'), amount: '300' }]),
       accountant(),
     );
     expect(posted).toMatchObject({
       outcome: 'POSTED',
-      document: { number: expect.stringMatching(/^A-\d{8}-\d{4}$/), journalNo: null, amount: '300.00' },
+      document: {
+        number: expect.stringMatching(/^A-\d{8}-\d{4}$/),
+        journalNo: null,
+        amount: '300.00',
+      },
     });
     expect([await open('i1'), await open('r1')]).toEqual(['200.00', '500.00']);
     expect(await trialBalance()).toBe(before);
-    const after = await admin.query<{ n: string }>('SELECT count(*)::text AS n FROM fin.journal_entries');
+    const after = await admin.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM fin.journal_entries',
+    );
     expect(after.rows[0]?.n).toBe(entries.rows[0]?.n);
     const { rows: cache } = await admin.query<{ debit: string; credit: string }>(
       `SELECT b.open_debit::text AS debit, b.open_credit::text AS credit FROM fin.party_balances b
@@ -104,12 +112,16 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     );
     expect(cache).toEqual([{ debit: '200.00', credit: '500.00' }]);
     // Reversed: both open amounts come back; a resend of the reversal is a duplicate.
-    const undo = command({ system: 'FIN', docType: 'ALLOCATION', docId: `a${next}` }, { action: 'REVERSE', reason: 'Буруу' });
+    const undo = command(
+      { system: 'FIN', docType: 'ALLOCATION', docId: `a${next}` },
+      { action: 'REVERSE', reason: 'Буруу' },
+    );
     expect((await core.submit(undo, accountant())).outcome).toBe('POSTED');
     expect([await open('i1'), await open('r1')]).toEqual(['500.00', '800.00']);
-    expect((await core.submit({ ...undo, commandId: invoice('n', '1').commandId }, accountant())).outcome).toBe(
-      'DUPLICATE',
-    );
+    expect(
+      (await core.submit({ ...undo, commandId: invoice('n', '1').commandId }, accountant()))
+        .outcome,
+    ).toBe('DUPLICATE');
   });
 
   it('(2) refuses a pair above an open amount, of another party, or with the sides swapped', async () => {
@@ -119,24 +131,44 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     await core.submit(invoice('i2x', '100', { party: guest('a:2x', 'a:2x') }));
     expect(
       await codeOf(
-        core.submit(allocation('a:2', [{ debit: await itemOf('i2'), credit: await itemOf('r2'), amount: '60' }]), accountant()),
+        core.submit(
+          allocation('a:2', [
+            { debit: await itemOf('i2'), credit: await itemOf('r2'), amount: '60' },
+          ]),
+          accountant(),
+        ),
       ),
     ).toBe('FIN_OVER_ALLOCATION');
     expect(
       await codeOf(
-        core.submit(allocation('a:2', [{ debit: await itemOf('i2x'), credit: await itemOf('r2'), amount: '10' }]), accountant()),
+        core.submit(
+          allocation('a:2', [
+            { debit: await itemOf('i2x'), credit: await itemOf('r2'), amount: '10' },
+          ]),
+          accountant(),
+        ),
       ),
     ).toBe('FIN_SETTLE_TARGET_NOT_FOUND');
     expect(
       await codeOf(
-        core.submit(allocation('a:2', [{ debit: await itemOf('r2'), credit: await itemOf('i2'), amount: '10' }]), accountant()),
+        core.submit(
+          allocation('a:2', [
+            { debit: await itemOf('r2'), credit: await itemOf('i2'), amount: '10' },
+          ]),
+          accountant(),
+        ),
       ),
     ).toBe('FIN_CLASS_RULE');
     // Only the accountant's right allocates.
     const reader = StaticCaller.user({ [TEST_COMPANY]: ['finance.read'] });
     expect(
       await codeOf(
-        core.submit(allocation('a:2', [{ debit: await itemOf('i2'), credit: await itemOf('r2'), amount: '10' }]), reader),
+        core.submit(
+          allocation('a:2', [
+            { debit: await itemOf('i2'), credit: await itemOf('r2'), amount: '10' },
+          ]),
+          reader,
+        ),
       ),
     ).toBe('FIN_COMPANY_FORBIDDEN');
   });
@@ -148,8 +180,14 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     await core.submit(receipt('r3', '100', null, { party: p }));
     const credit = await itemOf('r3');
     const results = await Promise.allSettled([
-      core.submit(allocation('a:3', [{ debit: await itemOf('i3a'), credit, amount: '80' }]), accountant()),
-      core.submit(allocation('a:3', [{ debit: await itemOf('i3b'), credit, amount: '80' }]), accountant()),
+      core.submit(
+        allocation('a:3', [{ debit: await itemOf('i3a'), credit, amount: '80' }]),
+        accountant(),
+      ),
+      core.submit(
+        allocation('a:3', [{ debit: await itemOf('i3b'), credit, amount: '80' }]),
+        accountant(),
+      ),
     ]);
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(await open('r3')).toBe('20.00');
@@ -159,10 +197,19 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     const p = guest('a:5', 'a:5');
     await core.submit(invoice('i5', '100', { party: p }));
     await core.submit(receipt('r5', '100', null, { party: p }));
-    await core.submit(allocation('a:5', [{ debit: await itemOf('i5'), credit: await itemOf('r5'), amount: '100' }]), accountant());
+    await core.submit(
+      allocation('a:5', [{ debit: await itemOf('i5'), credit: await itemOf('r5'), amount: '100' }]),
+      accountant(),
+    );
     const used = `a${next}`;
     expect(await codeOf(core.submit(reverse('RECEIPT', 'r5')))).toBe('FIN_REVERSAL_BLOCKED');
-    await core.submit(command({ system: 'FIN', docType: 'ALLOCATION', docId: used }, { action: 'REVERSE', reason: 'Буцаах' }), accountant());
+    await core.submit(
+      command(
+        { system: 'FIN', docType: 'ALLOCATION', docId: used },
+        { action: 'REVERSE', reason: 'Буцаах' },
+      ),
+      accountant(),
+    );
     expect((await core.submit(reverse('RECEIPT', 'r5'))).outcome).toBe('POSTED');
   });
 
@@ -199,7 +246,9 @@ describe('Finance Core: manual allocation and the sub-ledger', () => {
     );
     const cache = await reconcileBooks(core.db, 'NIGHTLY');
     expect(cache.find((run) => run.kind === 'CACHE')?.status).toBe('DRIFT');
-    expect((await reconcileBooks(core.db, 'MANUAL')).every((run) => run.status === 'OK')).toBe(true);
+    expect((await reconcileBooks(core.db, 'MANUAL')).every((run) => run.status === 'OK')).toBe(
+      true,
+    );
     // An item's open amount written by hand (the column the application may change).
     await admin.query(
       `UPDATE fin.open_items SET open_amount = open_amount - 1

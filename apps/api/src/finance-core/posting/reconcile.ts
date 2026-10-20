@@ -87,7 +87,11 @@ export async function sourceOpenAmounts(
   return new Map(result.rows.map((row) => [String(row.source_doc_id), dec(row.open)]));
 }
 
-async function cacheRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANUAL'): Promise<FinReconcileRun> {
+async function cacheRun(
+  tx: FinTx,
+  companyId: number,
+  trigger: 'NIGHTLY' | 'MANUAL',
+): Promise<FinReconcileRun> {
   const startedAt = new Date();
   const result = await tx.execute<Row>(sql`
     WITH pairs AS (
@@ -123,7 +127,11 @@ async function cacheRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANU
   return record(tx, companyId, 'CACHE', trigger, startedAt, result.rows.length, drifts);
 }
 
-async function itemsRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANUAL'): Promise<FinReconcileRun> {
+async function itemsRun(
+  tx: FinTx,
+  companyId: number,
+  trigger: 'NIGHTLY' | 'MANUAL',
+): Promise<FinReconcileRun> {
   const startedAt = new Date();
   const result = await tx.execute<Row>(sql`
     SELECT i.id, i.party_id, i.account_id, i.open_amount,
@@ -149,7 +157,11 @@ async function itemsRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANU
   return record(tx, companyId, 'ITEMS', trigger, startedAt, result.rows.length, drifts);
 }
 
-async function subledgerRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANUAL'): Promise<FinReconcileRun> {
+async function subledgerRun(
+  tx: FinTx,
+  companyId: number,
+  trigger: 'NIGHTLY' | 'MANUAL',
+): Promise<FinReconcileRun> {
   const startedAt = new Date();
   const result = await tx.execute<Row>(sql`
     WITH gl AS (

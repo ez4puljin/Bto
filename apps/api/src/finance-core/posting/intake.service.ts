@@ -459,7 +459,10 @@ export class FinIntakeInTx {
     }
     const isAllocation = type.class === 'ALLOCATION';
     if (isAllocation !== (body.allocate !== undefined)) throw rule('ALLOCATION_BODY');
-    if (scope.sourceSystemId !== (await this.ownSourceId(tx, scope)) && body.lines.some((l) => l.accountCode)) {
+    if (
+      scope.sourceSystemId !== (await this.ownSourceId(tx, scope)) &&
+      body.lines.some((l) => l.accountCode)
+    ) {
       throw rule('ACCOUNT_CODE_SOURCE');
     }
 
@@ -471,15 +474,22 @@ export class FinIntakeInTx {
     }
 
     // Parties: inserted on first sight for a source, never for the core's screens; then locked.
-    const headerParty = body.party ? await this.partyOf(tx, ctx, scope, body.party, 'body.party') : null;
+    const headerParty = body.party
+      ? await this.partyOf(tx, ctx, scope, body.party, 'body.party')
+      : null;
     const lineParties = new Map<number, number>();
     for (const [index, line] of body.lines.entries()) {
       if (line.party) {
-        lineParties.set(index, await this.partyOf(tx, ctx, scope, line.party, `body.lines.${index}.party`));
+        lineParties.set(
+          index,
+          await this.partyOf(tx, ctx, scope, line.party, `body.lines.${index}.party`),
+        );
       }
     }
     // Money accounts FOR SHARE (by code, in id order).
-    const moneyCodes = [...new Set(body.lines.flatMap((line) => (line.moneyAccount ? [line.moneyAccount] : [])))];
+    const moneyCodes = [
+      ...new Set(body.lines.flatMap((line) => (line.moneyAccount ? [line.moneyAccount] : []))),
+    ];
     const money = new Map<string, { id: number; accountId: number; status: string }>();
     if (moneyCodes.length) {
       const rows = await tx
@@ -490,13 +500,27 @@ export class FinIntakeInTx {
           status: finMoneyAccounts.status,
         })
         .from(finMoneyAccounts)
-        .where(and(eq(finMoneyAccounts.companyId, scope.companyId), inArray(finMoneyAccounts.code, moneyCodes)))
+        .where(
+          and(
+            eq(finMoneyAccounts.companyId, scope.companyId),
+            inArray(finMoneyAccounts.code, moneyCodes),
+          ),
+        )
         .orderBy(asc(finMoneyAccounts.id))
         .for('share');
       for (const row of rows) money.set(row.code, row);
     }
 
-    const lines = await this.resolveLines(tx, scope, body, type, accountingDate, headerParty, lineParties, money);
+    const lines = await this.resolveLines(
+      tx,
+      scope,
+      body,
+      type,
+      accountingDate,
+      headerParty,
+      lineParties,
+      money,
+    );
     this.checkAmounts(body, lines);
     this.checkClass(type.class, headerParty, lines);
 
@@ -540,7 +564,9 @@ export class FinIntakeInTx {
         sourceDocNo: cmd.source.docNo ?? null,
         attributes: body.attributes ?? {},
         moneyAccountId:
-          (type.class === 'RECEIPT' || type.class === 'PAYMENT') && moneyLine ? moneyLine.moneyAccountId : null,
+          (type.class === 'RECEIPT' || type.class === 'PAYMENT') && moneyLine
+            ? moneyLine.moneyAccountId
+            : null,
         intakeRequestId: claim.requestId,
         actorKind: ctx.actor.kind,
         actorRef: ctx.actor.ref,
@@ -580,7 +606,9 @@ export class FinIntakeInTx {
           groupRef: line.input.openItem?.groupRef ?? null,
           itemRef: line.input.openItem?.itemRef ?? null,
           itemDate: line.input.openItem?.itemDate ?? accountingDate,
-          dueDate: debit ? (line.input.openItem?.dueDate ?? body.dueDate ?? accountingDate) : (line.input.openItem?.dueDate ?? null),
+          dueDate: debit
+            ? (line.input.openItem?.dueDate ?? body.dueDate ?? accountingDate)
+            : (line.input.openItem?.dueDate ?? null),
           amount: line.amount,
           openAmount: line.amount,
         })
@@ -596,7 +624,8 @@ export class FinIntakeInTx {
       let remaining = settlement.amount;
       for (const target of settlement.targets) {
         if (remaining.lte(0)) break;
-        const take = target.amount === null ? Decimal.min(remaining, target.item.openAmount) : target.amount;
+        const take =
+          target.amount === null ? Decimal.min(remaining, target.item.openAmount) : target.amount;
         if (take.lte(0)) continue;
         if (take.gt(target.item.openAmount) || take.gt(remaining)) {
           throw new FinError('FIN_OVER_ALLOCATION', undefined, {
@@ -627,7 +656,11 @@ export class FinIntakeInTx {
       action: 'POST',
       entity: 'document',
       entityId: document.id,
-      after: { type: type.code, number, source: `${cmd.source.system}/${cmd.source.docType}/${cmd.source.docId}` },
+      after: {
+        type: type.code,
+        number,
+        source: `${cmd.source.system}/${cmd.source.docType}/${cmd.source.docId}`,
+      },
     });
     return this.result(tx, scope, cmd, 'POSTED', document.id, allocationIds);
   }
@@ -668,7 +701,16 @@ export class FinIntakeInTx {
     for (const [index, ref] of refs.entries()) {
       const pairIndex = Math.floor(index / 2);
       const side = index % 2 === 0 ? 'debit' : 'credit';
-      ids.push(await this.itemIdOf(tx, scope, ref, partyId, accountId, `body.allocate.pairs.${pairIndex}.${side}`));
+      ids.push(
+        await this.itemIdOf(
+          tx,
+          scope,
+          ref,
+          partyId,
+          accountId,
+          `body.allocate.pairs.${pairIndex}.${side}`,
+        ),
+      );
     }
     const items = await this.lockItems(tx, scope.companyId, ids);
     const byId = new Map(items.map((item) => [item.id, item]));
@@ -676,17 +718,25 @@ export class FinIntakeInTx {
     allocate.pairs.forEach((pair, index) => {
       const debit = byId.get(ids[index * 2] ?? 0);
       const credit = byId.get(ids[index * 2 + 1] ?? 0);
-      if (!debit || !credit) throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path: `body.allocate.pairs.${index}` });
-      if (debit.side !== 'DEBIT' || credit.side !== 'CREDIT') throw rule('ALLOCATION_SIDES', { pair: index });
+      if (!debit || !credit)
+        throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, {
+          path: `body.allocate.pairs.${index}`,
+        });
+      if (debit.side !== 'DEBIT' || credit.side !== 'CREDIT')
+        throw rule('ALLOCATION_SIDES', { pair: index });
       if (debit.partyId !== partyId || credit.partyId !== partyId) {
-        throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path: `body.allocate.pairs.${index}` });
+        throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, {
+          path: `body.allocate.pairs.${index}`,
+        });
       }
       if (debit.accountId !== accountId || credit.accountId !== accountId) {
         throw rule('ALLOCATION_ACCOUNT', { pair: index });
       }
       const amount = new Decimal(pair.amount);
       if (amount.gt(debit.openAmount) || amount.gt(credit.openAmount)) {
-        throw new FinError('FIN_OVER_ALLOCATION', undefined, { path: `body.allocate.pairs.${index}.amount` });
+        throw new FinError('FIN_OVER_ALLOCATION', undefined, {
+          path: `body.allocate.pairs.${index}.amount`,
+        });
       }
       debit.openAmount = debit.openAmount.minus(amount);
       credit.openAmount = credit.openAmount.minus(amount);
@@ -792,7 +842,12 @@ export class FinIntakeInTx {
       await tx
         .update(finIntakeRequests)
         .set({ status: 'CANCELLED', lastAt: sql`now()` })
-        .where(and(eq(finIntakeRequests.companyId, scope.companyId), eq(finIntakeRequests.id, target.id)));
+        .where(
+          and(
+            eq(finIntakeRequests.companyId, scope.companyId),
+            eq(finIntakeRequests.id, target.id),
+          ),
+        );
       return {
         contract: 'fin.intake/1',
         commandId: cmd.commandId,
@@ -805,7 +860,9 @@ export class FinIntakeInTx {
     const [original] = await tx
       .select()
       .from(finDocuments)
-      .where(and(eq(finDocuments.companyId, scope.companyId), eq(finDocuments.id, target.documentId)));
+      .where(
+        and(eq(finDocuments.companyId, scope.companyId), eq(finDocuments.id, target.documentId)),
+      );
     if (!original) throw new Error('the reversed document vanished');
     const type = await this.documentTypeById(tx, scope, original.documentTypeId);
     this.authorise(ctx, scope, type.class);
@@ -814,19 +871,24 @@ export class FinIntakeInTx {
     if (accountingDate < original.accountingDate) {
       throw invalid('body.accountingDate');
     }
-    if (accountingDate > today) throw new FinError('FIN_FUTURE_DATE', undefined, { path: 'body.accountingDate' });
+    if (accountingDate > today)
+      throw new FinError('FIN_FUTURE_DATE', undefined, { path: 'body.accountingDate' });
     const periodId = await openPeriodInTx(tx, scope.companyId, accountingDate);
 
     const originalItems = await tx
       .select(ITEM_COLUMNS)
       .from(finOpenItems)
-      .where(and(eq(finOpenItems.companyId, scope.companyId), eq(finOpenItems.documentId, original.id)));
+      .where(
+        and(eq(finOpenItems.companyId, scope.companyId), eq(finOpenItems.documentId, original.id)),
+      );
     // The allocations a document made itself, or (for an ALLOCATION) its pairs.
     const own = await this.liveAllocations(tx, scope.companyId, { documentId: original.id });
     const onItems =
       originalItems.length === 0
         ? []
-        : await this.liveAllocations(tx, scope.companyId, { itemIds: originalItems.map((item) => item.id) });
+        : await this.liveAllocations(tx, scope.companyId, {
+            itemIds: originalItems.map((item) => item.id),
+          });
     const ownIds = new Set(own.map((row) => row.id));
     const others = onItems.filter((row) => !ownIds.has(row.id));
     if (others.length > 0) {
@@ -838,7 +900,12 @@ export class FinIntakeInTx {
       ...(original.partyId === null ? [] : [original.partyId]),
     ]);
     await lockPartiesInTx(tx, scope.companyId, parties);
-    const itemIds = [...new Set([...originalItems.map((item) => item.id), ...own.flatMap((row) => [row.debitItemId, row.creditItemId])])];
+    const itemIds = [
+      ...new Set([
+        ...originalItems.map((item) => item.id),
+        ...own.flatMap((row) => [row.debitItemId, row.creditItemId]),
+      ]),
+    ];
     await this.lockItems(tx, scope.companyId, itemIds);
 
     const journalNo =
@@ -882,7 +949,8 @@ export class FinIntakeInTx {
 
     const allocationIds: number[] = [];
     const touched = new Map<string, { partyId: number; accountId: number }>();
-    const touch = (partyId: number, accountId: number) => touched.set(`${partyId}:${accountId}`, { partyId, accountId });
+    const touch = (partyId: number, accountId: number) =>
+      touched.set(`${partyId}:${accountId}`, { partyId, accountId });
     for (const row of own) {
       const undone = await writeAllocationInTx(tx, {
         companyId: scope.companyId,
@@ -902,12 +970,22 @@ export class FinIntakeInTx {
       const [originalEntry] = await tx
         .select({ id: finJournalEntries.id, description: finJournalEntries.description })
         .from(finJournalEntries)
-        .where(and(eq(finJournalEntries.companyId, scope.companyId), eq(finJournalEntries.documentId, original.id)));
+        .where(
+          and(
+            eq(finJournalEntries.companyId, scope.companyId),
+            eq(finJournalEntries.documentId, original.id),
+          ),
+        );
       if (!originalEntry) throw new Error('the reversed document has no entry');
       const lines = await tx
         .select()
         .from(finJournalLines)
-        .where(and(eq(finJournalLines.companyId, scope.companyId), eq(finJournalLines.entryId, originalEntry.id)))
+        .where(
+          and(
+            eq(finJournalLines.companyId, scope.companyId),
+            eq(finJournalLines.entryId, originalEntry.id),
+          ),
+        )
         .orderBy(asc(finJournalLines.lineNo));
       const entryId = await this.writeEntry(tx, ctx, scope, {
         number: journalNo,
@@ -946,7 +1024,15 @@ export class FinIntakeInTx {
         ? await tx
             .select({ id: finOpenItems.id, journalLineId: finOpenItems.journalLineId })
             .from(finOpenItems)
-            .where(and(eq(finOpenItems.companyId, scope.companyId), inArray(finOpenItems.id, originalItems.map((item) => item.id))))
+            .where(
+              and(
+                eq(finOpenItems.companyId, scope.companyId),
+                inArray(
+                  finOpenItems.id,
+                  originalItems.map((item) => item.id),
+                ),
+              ),
+            )
         : [];
       const lineOfItem = new Map(itemLines.map((row) => [row.id, row.journalLineId]));
       for (const item of originalItems) {
@@ -1011,7 +1097,12 @@ export class FinIntakeInTx {
     const [own] = await tx
       .select({ id: finSourceSystems.id })
       .from(finSourceSystems)
-      .where(and(eq(finSourceSystems.tenantId, scope.tenantId), eq(finSourceSystems.code, FIN_OWN_SOURCE)));
+      .where(
+        and(
+          eq(finSourceSystems.tenantId, scope.tenantId),
+          eq(finSourceSystems.code, FIN_OWN_SOURCE),
+        ),
+      );
     return own?.id ?? null;
   }
 
@@ -1070,9 +1161,18 @@ export class FinIntakeInTx {
    * The party of a ref: a source's own ref (inserted on first sight, following the source's
    * facts); for the core's screens an existing party known by that ref to any source of the tenant.
    */
-  private async partyOf(tx: FinTx, ctx: FinCallContext, scope: Scope, party: PartyIn, path: string): Promise<number> {
+  private async partyOf(
+    tx: FinTx,
+    ctx: FinCallContext,
+    scope: Scope,
+    party: PartyIn,
+    path: string,
+  ): Promise<number> {
     if (ctx.principal.kind === 'SOURCE') {
-      const made = await this.parties.upsertPartyInTx(tx, ctx, { company: scope.companyCode, party });
+      const made = await this.parties.upsertPartyInTx(tx, ctx, {
+        company: scope.companyCode,
+        party,
+      });
       return Number.parseInt(made.partyId, 10);
     }
     const found = await this.existingParty(tx, scope, party.ref);
@@ -1087,7 +1187,10 @@ export class FinIntakeInTx {
       .from(finPartyRefs)
       .innerJoin(
         finPartyCompanies,
-        and(eq(finPartyCompanies.partyId, finPartyRefs.partyId), eq(finPartyCompanies.companyId, scope.companyId)),
+        and(
+          eq(finPartyCompanies.partyId, finPartyRefs.partyId),
+          eq(finPartyCompanies.companyId, scope.companyId),
+        ),
       )
       .where(and(eq(finPartyRefs.tenantId, scope.tenantId), eq(finPartyRefs.externalId, ref)));
     const own = rows.find((row) => row.sourceSystemId === scope.sourceSystemId);
@@ -1097,7 +1200,13 @@ export class FinIntakeInTx {
   }
 
   /** The account a key's rule names on a date (the company default; ADR-0072 #2). */
-  private async accountOfKey(tx: FinTx, scope: Scope, key: string, on: string, documentType: string): Promise<number> {
+  private async accountOfKey(
+    tx: FinTx,
+    scope: Scope,
+    key: string,
+    on: string,
+    documentType: string,
+  ): Promise<number> {
     const rules = await rulesOn(tx, scope.companyId, on);
     const found = rules.get(key);
     if (!found || found.accountId === null) {
@@ -1122,7 +1231,9 @@ export class FinIntakeInTx {
       .where(eq(finPostingKeys.companyId, scope.companyId));
     const keyOf = new Map(keys.map((row) => [row.code, row]));
     const rules = await rulesOn(tx, scope.companyId, accountingDate);
-    const codes = [...new Set(body.lines.flatMap((line) => (line.accountCode ? [line.accountCode] : [])))];
+    const codes = [
+      ...new Set(body.lines.flatMap((line) => (line.accountCode ? [line.accountCode] : []))),
+    ];
     const byCode = new Map<string, number>();
     if (codes.length) {
       for (const row of await tx
@@ -1135,7 +1246,12 @@ export class FinIntakeInTx {
     const draft = body.lines.map((line, index) => {
       const path = `body.lines.${index}`;
       const key = keyOf.get(line.key);
-      if (!key) throw new FinError('FIN_MAPPING_MISSING', undefined, { key: line.key, documentType: type.code, branch: body.branch ?? null });
+      if (!key)
+        throw new FinError('FIN_MAPPING_MISSING', undefined, {
+          key: line.key,
+          documentType: type.code,
+          branch: body.branch ?? null,
+        });
       if (key.requiresTaxCode && !line.tax) {
         throw new FinError('FIN_TAX_CODE_UNKNOWN', undefined, { path: `${path}.tax` });
       }
@@ -1150,7 +1266,8 @@ export class FinIntakeInTx {
         }
         moneyAccountId = account.id;
         accountId = account.accountId;
-        if (line.accountCode && byCode.get(line.accountCode) !== accountId) throw invalid(`${path}.accountCode`);
+        if (line.accountCode && byCode.get(line.accountCode) !== accountId)
+          throw invalid(`${path}.accountCode`);
       } else if (line.accountCode) {
         const found = byCode.get(line.accountCode);
         if (found === undefined) throw invalid(`${path}.accountCode`);
@@ -1158,7 +1275,11 @@ export class FinIntakeInTx {
       } else {
         const found = rules.get(line.key);
         if (!found || found.accountId === null) {
-          throw new FinError('FIN_MAPPING_MISSING', undefined, { key: line.key, documentType: type.code, branch: body.branch ?? null });
+          throw new FinError('FIN_MAPPING_MISSING', undefined, {
+            key: line.key,
+            documentType: type.code,
+            branch: body.branch ?? null,
+          });
         }
         accountId = found.accountId;
         ruleId = found.ruleId;
@@ -1168,9 +1289,19 @@ export class FinIntakeInTx {
     const accounts = new Map(
       (
         await tx
-          .select({ id: finAccounts.id, code: finAccounts.code, control: finAccounts.control, status: finAccounts.status })
+          .select({
+            id: finAccounts.id,
+            code: finAccounts.code,
+            control: finAccounts.control,
+            status: finAccounts.status,
+          })
           .from(finAccounts)
-          .where(and(eq(finAccounts.companyId, scope.companyId), inArray(finAccounts.id, [...new Set(draft.map((row) => row.accountId))])))
+          .where(
+            and(
+              eq(finAccounts.companyId, scope.companyId),
+              inArray(finAccounts.id, [...new Set(draft.map((row) => row.accountId))]),
+            ),
+          )
       ).map((row) => [row.id, row]),
     );
     return draft.map((row) => {
@@ -1187,12 +1318,14 @@ export class FinIntakeInTx {
       let partyId = lineParties.get(row.index) ?? null;
       if (PARTY_CONTROLS.has(control)) {
         partyId ??= headerParty;
-        if (partyId === null) throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: row.path });
+        if (partyId === null)
+          throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: row.path });
       }
       if (control === 'MONEY' && row.moneyAccountId === null) {
         throw new FinError('FIN_MONEY_ACCOUNT_REQUIRED', undefined, { path: row.path });
       }
-      if (row.line.settles && !PARTY_CONTROLS.has(control)) throw rule('SETTLES_PARTY_LINE', { line: row.line.lineNo });
+      if (row.line.settles && !PARTY_CONTROLS.has(control))
+        throw rule('SETTLES_PARTY_LINE', { line: row.line.lineNo });
       return {
         input: row.line,
         path: row.path,
@@ -1216,7 +1349,10 @@ export class FinIntakeInTx {
       else credit = credit.plus(line.amount);
     }
     if (!debit.eq(credit)) {
-      throw new FinError('FIN_UNBALANCED', undefined, { debit: debit.toFixed(2), credit: credit.toFixed(2) });
+      throw new FinError('FIN_UNBALANCED', undefined, {
+        debit: debit.toFixed(2),
+        credit: credit.toFixed(2),
+      });
     }
     if (!debit.eq(body.controlTotal)) {
       throw new FinError('FIN_TOTAL_MISMATCH', undefined, {
@@ -1228,7 +1364,11 @@ export class FinIntakeInTx {
   }
 
   /** The class rules of ADR-0072 #1. */
-  private checkClass(documentClass: FinDocumentClass, headerParty: number | null, lines: readonly ResolvedLine[]): void {
+  private checkClass(
+    documentClass: FinDocumentClass,
+    headerParty: number | null,
+    lines: readonly ResolvedLine[],
+  ): void {
     const controlled = lines.filter((line) => PARTY_CONTROLS.has(line.control));
     const onControl = (control: Control, side: Side) =>
       controlled.filter((line) => line.control === control && line.input.side === side);
@@ -1237,7 +1377,8 @@ export class FinIntakeInTx {
     switch (documentClass) {
       case 'AR_INVOICE':
       case 'AP_BILL': {
-        if (headerParty === null) throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: 'body.party' });
+        if (headerParty === null)
+          throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: 'body.party' });
         const control = documentClass === 'AR_INVOICE' ? 'RECEIVABLE' : 'PAYABLE';
         const side: Side = documentClass === 'AR_INVOICE' ? 'DEBIT' : 'CREDIT';
         // One receivable (payable) line, or none for a document that amounts to nothing owed.
@@ -1248,16 +1389,19 @@ export class FinIntakeInTx {
       }
       case 'AR_CREDIT':
       case 'AP_CREDIT': {
-        if (headerParty === null) throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: 'body.party' });
+        if (headerParty === null)
+          throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: 'body.party' });
         const control = documentClass === 'AR_CREDIT' ? 'RECEIVABLE' : 'PAYABLE';
         const side: Side = documentClass === 'AR_CREDIT' ? 'CREDIT' : 'DEBIT';
-        if (onControl(control, side).length !== 1 || controlled.length !== 1) throw rule(`${documentClass}_LINES`);
+        if (onControl(control, side).length !== 1 || controlled.length !== 1)
+          throw rule(`${documentClass}_LINES`);
         return;
       }
       case 'RECEIPT':
       case 'PAYMENT': {
         const side: Side = documentClass === 'RECEIPT' ? 'DEBIT' : 'CREDIT';
-        if (moneyLines.length !== 1 || moneyLines[0]?.input.side !== side) throw rule(`${documentClass}_MONEY_LINE`);
+        if (moneyLines.length !== 1 || moneyLines[0]?.input.side !== side)
+          throw rule(`${documentClass}_MONEY_LINE`);
         return;
       }
       case 'JOURNAL':
@@ -1304,7 +1448,10 @@ export class FinIntakeInTx {
           .select(ITEM_COLUMNS)
           .from(finOpenItems)
           .where(and(scoped, sql`${finOpenItems.openAmount} > 0`))
-          .orderBy(sql`coalesce(${finOpenItems.dueDate}, ${finOpenItems.itemDate})`, asc(finOpenItems.id))
+          .orderBy(
+            sql`coalesce(${finOpenItems.dueDate}, ${finOpenItems.itemDate})`,
+            asc(finOpenItems.id),
+          )
           .for('update');
         result.push({
           lineIndex,
@@ -1319,10 +1466,19 @@ export class FinIntakeInTx {
       for (const [index, target] of settles.entries()) {
         const path = `${line.path}.settles.${index}`;
         const found = await this.targetItems(tx, scope, target.target, scoped);
-        if (found.length === 0) throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
-        ids.push({ ids: found, amount: target.amount === undefined ? null : new Decimal(target.amount), path });
+        if (found.length === 0)
+          throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
+        ids.push({
+          ids: found,
+          amount: target.amount === undefined ? null : new Decimal(target.amount),
+          path,
+        });
       }
-      const locked = await this.lockItems(tx, scope.companyId, ids.flatMap((row) => row.ids));
+      const locked = await this.lockItems(
+        tx,
+        scope.companyId,
+        ids.flatMap((row) => row.ids),
+      );
       const byId = new Map(locked.map((item) => [item.id, item]));
       const targets: { item: ItemRow; amount: Decimal | null }[] = [];
       let named = new Decimal(0);
@@ -1347,14 +1503,26 @@ export class FinIntakeInTx {
           left = left.minus(take);
         }
       }
-      if (named.gt(line.amount)) throw new FinError('FIN_OVER_ALLOCATION', undefined, { path: `${line.path}.settles` });
-      result.push({ lineIndex, path: `${line.path}.settles`, side: line.input.side, amount: line.amount, targets });
+      if (named.gt(line.amount))
+        throw new FinError('FIN_OVER_ALLOCATION', undefined, { path: `${line.path}.settles` });
+      result.push({
+        lineIndex,
+        path: `${line.path}.settles`,
+        side: line.input.side,
+        amount: line.amount,
+        targets,
+      });
     }
     return result;
   }
 
   /** The open items a settle target names, on the line's party, account and opposite side. */
-  private async targetItems(tx: FinTx, scope: Scope, target: SettleTarget, scoped: SQL): Promise<number[]> {
+  private async targetItems(
+    tx: FinTx,
+    scope: Scope,
+    target: SettleTarget,
+    scoped: SQL,
+  ): Promise<number[]> {
     let where: SQL;
     if ('itemId' in target) {
       const id = Number.parseInt(target.itemId, 10);
@@ -1374,7 +1542,10 @@ export class FinIntakeInTx {
       .select({ id: finOpenItems.id })
       .from(finOpenItems)
       .where(and(scoped, where, sql`${finOpenItems.openAmount} > 0`))
-      .orderBy(sql`coalesce(${finOpenItems.dueDate}, ${finOpenItems.itemDate})`, asc(finOpenItems.id));
+      .orderBy(
+        sql`coalesce(${finOpenItems.dueDate}, ${finOpenItems.itemDate})`,
+        asc(finOpenItems.id),
+      );
     return rows.map((row) => row.id);
   }
 
@@ -1385,7 +1556,10 @@ export class FinIntakeInTx {
       .from(finDocuments)
       .innerJoin(
         finSourceSystems,
-        and(eq(finSourceSystems.id, finDocuments.sourceSystemId), eq(finSourceSystems.tenantId, scope.tenantId)),
+        and(
+          eq(finSourceSystems.id, finDocuments.sourceSystemId),
+          eq(finSourceSystems.tenantId, scope.tenantId),
+        ),
       )
       .where(
         and(
@@ -1411,7 +1585,8 @@ export class FinIntakeInTx {
   ): Promise<number> {
     if ('itemId' in ref) {
       const id = Number.parseInt(ref.itemId, 10);
-      if (!Number.isSafeInteger(id)) throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
+      if (!Number.isSafeInteger(id))
+        throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
       const [row] = await tx
         .select({ id: finOpenItems.id })
         .from(finOpenItems)
@@ -1420,13 +1595,17 @@ export class FinIntakeInTx {
       return row.id;
     }
     const documentIds = await this.documentsOfKey(tx, scope, ref.source);
-    if (documentIds.length === 0) throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
+    if (documentIds.length === 0)
+      throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
     const rows = await tx
       .select({ id: finOpenItems.id, lineNo: finJournalLines.lineNo })
       .from(finOpenItems)
       .innerJoin(
         finJournalLines,
-        and(eq(finJournalLines.companyId, finOpenItems.companyId), eq(finJournalLines.id, finOpenItems.journalLineId)),
+        and(
+          eq(finJournalLines.companyId, finOpenItems.companyId),
+          eq(finJournalLines.id, finOpenItems.journalLineId),
+        ),
       )
       .where(
         and(
@@ -1436,13 +1615,19 @@ export class FinIntakeInTx {
           eq(finOpenItems.accountId, accountId),
         ),
       );
-    const chosen = ref.lineNo === undefined ? rows : rows.filter((row) => row.lineNo === ref.lineNo);
-    if (chosen.length !== 1 || !chosen[0]) throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
+    const chosen =
+      ref.lineNo === undefined ? rows : rows.filter((row) => row.lineNo === ref.lineNo);
+    if (chosen.length !== 1 || !chosen[0])
+      throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
     return chosen[0].id;
   }
 
   /** Locks items FOR UPDATE by (due date, id) and reads them. */
-  private async lockItems(tx: FinTx, companyId: number, ids: readonly number[]): Promise<ItemRow[]> {
+  private async lockItems(
+    tx: FinTx,
+    companyId: number,
+    ids: readonly number[],
+  ): Promise<ItemRow[]> {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return [];
     return tx
@@ -1459,7 +1644,14 @@ export class FinIntakeInTx {
     companyId: number,
     query: { documentId: number } | { itemIds: readonly number[] },
   ): Promise<
-    { id: number; partyId: number; accountId: number; debitItemId: number; creditItemId: number; amount: Decimal }[]
+    {
+      id: number;
+      partyId: number;
+      accountId: number;
+      debitItemId: number;
+      creditItemId: number;
+      amount: Decimal;
+    }[]
   > {
     const filter =
       'documentId' in query
@@ -1502,7 +1694,8 @@ export class FinIntakeInTx {
       if (!number) throw invalid('source.docNo');
       return number;
     }
-    if (!type.numberSeries) throw new FinError('FIN_DOCTYPE_UNKNOWN', undefined, { documentType: type.code });
+    if (!type.numberSeries)
+      throw new FinError('FIN_DOCTYPE_UNKNOWN', undefined, { documentType: type.code });
     return nextNumberInTx(tx, scope.companyId, type.numberSeries, documentDate);
   }
 
@@ -1597,14 +1790,22 @@ export class FinIntakeInTx {
       .from(finDocuments)
       .innerJoin(
         finFiscalPeriods,
-        and(eq(finFiscalPeriods.companyId, finDocuments.companyId), eq(finFiscalPeriods.id, finDocuments.periodId)),
+        and(
+          eq(finFiscalPeriods.companyId, finDocuments.companyId),
+          eq(finFiscalPeriods.id, finDocuments.periodId),
+        ),
       )
       .where(and(eq(finDocuments.companyId, scope.companyId), eq(finDocuments.id, documentId)));
     if (!document) throw new Error('the posted document vanished');
     const [entry] = await tx
       .select({ id: finJournalEntries.id, number: finJournalEntries.number })
       .from(finJournalEntries)
-      .where(and(eq(finJournalEntries.companyId, scope.companyId), eq(finJournalEntries.documentId, documentId)));
+      .where(
+        and(
+          eq(finJournalEntries.companyId, scope.companyId),
+          eq(finJournalEntries.documentId, documentId),
+        ),
+      );
     const lines = entry
       ? await tx
           .select({
@@ -1615,8 +1816,19 @@ export class FinIntakeInTx {
             credit: finJournalLines.credit,
           })
           .from(finJournalLines)
-          .innerJoin(finAccounts, and(eq(finAccounts.companyId, finJournalLines.companyId), eq(finAccounts.id, finJournalLines.accountId)))
-          .where(and(eq(finJournalLines.companyId, scope.companyId), eq(finJournalLines.entryId, entry.id)))
+          .innerJoin(
+            finAccounts,
+            and(
+              eq(finAccounts.companyId, finJournalLines.companyId),
+              eq(finAccounts.id, finJournalLines.accountId),
+            ),
+          )
+          .where(
+            and(
+              eq(finJournalLines.companyId, scope.companyId),
+              eq(finJournalLines.entryId, entry.id),
+            ),
+          )
           .orderBy(asc(finJournalLines.lineNo))
       : [];
     const items = await tx
@@ -1628,8 +1840,16 @@ export class FinIntakeInTx {
         openAmount: finOpenItems.openAmount,
       })
       .from(finOpenItems)
-      .innerJoin(finJournalLines, and(eq(finJournalLines.companyId, finOpenItems.companyId), eq(finJournalLines.id, finOpenItems.journalLineId)))
-      .where(and(eq(finOpenItems.companyId, scope.companyId), eq(finOpenItems.documentId, documentId)))
+      .innerJoin(
+        finJournalLines,
+        and(
+          eq(finJournalLines.companyId, finOpenItems.companyId),
+          eq(finJournalLines.id, finOpenItems.journalLineId),
+        ),
+      )
+      .where(
+        and(eq(finOpenItems.companyId, scope.companyId), eq(finOpenItems.documentId, documentId)),
+      )
       .orderBy(asc(finOpenItems.id));
     const allocations = allocationIds.length
       ? await tx
@@ -1639,13 +1859,23 @@ export class FinIntakeInTx {
             amount: finAllocations.amount,
           })
           .from(finAllocations)
-          .where(and(eq(finAllocations.companyId, scope.companyId), inArray(finAllocations.id, [...allocationIds])))
+          .where(
+            and(
+              eq(finAllocations.companyId, scope.companyId),
+              inArray(finAllocations.id, [...allocationIds]),
+            ),
+          )
           .orderBy(asc(finAllocations.id))
       : [];
     const [reversal] = await tx
       .select({ id: finDocuments.id })
       .from(finDocuments)
-      .where(and(eq(finDocuments.companyId, scope.companyId), eq(finDocuments.reversesDocumentId, documentId)));
+      .where(
+        and(
+          eq(finDocuments.companyId, scope.companyId),
+          eq(finDocuments.reversesDocumentId, documentId),
+        ),
+      );
     return {
       contract: 'fin.intake/1',
       commandId: cmd.commandId,

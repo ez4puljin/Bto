@@ -1,7 +1,7 @@
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { Trash2 } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -23,17 +24,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
 import { formatMnt } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { useFinanceMutations, useGlAccounts } from './api';
+import {
+  type GlAccount,
+  type MoneyAccount,
+  useFinanceMutations,
+  useGlAccounts,
+  useMoneyAccounts,
+} from './api';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 
 interface LineDraft {
   id: number;
   accountId: number | null;
+  /** The cash box or bank account of a line on a cash or bank account (ADR-0090). */
+  moneyAccountId: number | null;
+  /** The customer of a line on the receivables account (role AR, ADR-0090). */
+  customer: PickedCustomer | null;
   debit: string;
   credit: string;
   description: string;
@@ -43,12 +55,19 @@ let nextId = 1;
 const emptyLine = (): LineDraft => ({
   id: nextId++,
   accountId: null,
+  moneyAccountId: null,
+  customer: null,
   debit: '',
   credit: '',
   description: '',
 });
 
-/** «Гараар бичилт» (ADR-0060 #7): a dated, described entry of at least two lines that balance. */
+/**
+ * «Гараар бичилт» (ADR-0060 #7): a dated, described entry of at least two lines that balance. A
+ * line on a cash or bank account names its cash box or bank account (the money accounts that point
+ * at it), a line on the receivables account names its customer (ADR-0090: the core refuses either
+ * without it).
+ */
 export function JournalEntryDialog({
   open,
   onClose,
@@ -60,6 +79,7 @@ export function JournalEntryDialog({
 }) {
   const { t } = useTranslation();
   const accounts = useGlAccounts();
+  const moneyAccounts = useMoneyAccounts();
   const mutations = useFinanceMutations();
   const action = useAction();
   const [key] = useState(randomUuid);
@@ -67,6 +87,32 @@ export function JournalEntryDialog({
   const [description, setDescription] = useState('');
   const [lines, setLines] = useState<LineDraft[]>(() => [emptyLine(), emptyLine()]);
   const [checked, setChecked] = useState(false);
+
+  const accountOf = (id: number | null): GlAccount | undefined =>
+    id === null ? undefined : accounts.data?.find((account) => account.id === id);
+  // Every money account counts for whether a line needs one; only the active ones are offered.
+  const boxesOf = (id: number | null): MoneyAccount[] =>
+    id === null ? [] : (moneyAccounts.data ?? []).filter((box) => box.glAccountId === id);
+  const needsBox = (line: LineDraft) => boxesOf(line.accountId).length > 0;
+  const needsCustomer = (line: LineDraft) => accountOf(line.accountId)?.role === 'AR';
+  const detailsMissing = (line: LineDraft) =>
+    (needsBox(line) && line.moneyAccountId === null) ||
+    (needsCustomer(line) && line.customer === null);
+
+  // Money accounts that arrive after a line's account was chosen still fill a lone choice.
+  useEffect(() => {
+    const boxes = moneyAccounts.data;
+    if (!boxes) return;
+    setLines((previous) =>
+      previous.map((line) => {
+        if (line.accountId === null || line.moneyAccountId !== null) return line;
+        const active = boxes.filter(
+          (box) => box.glAccountId === line.accountId && box.status === 'ACTIVE',
+        );
+        return active.length === 1 ? { ...line, moneyAccountId: active[0]?.id ?? null } : line;
+      }),
+    );
+  }, [moneyAccounts.data]);
 
   const sum = (side: 'debit' | 'credit') =>
     lines.reduce(
@@ -85,11 +131,20 @@ export function JournalEntryDialog({
     setLines((previous) =>
       previous.map((line) => (line.id === id ? { ...line, ...change } : line)),
     );
+  const chooseAccount = (id: number, accountId: number | null) => {
+    const active = boxesOf(accountId).filter((box) => box.status === 'ACTIVE');
+    patch(id, {
+      accountId,
+      // A lone cash box or bank account of the chosen account is chosen already.
+      moneyAccountId: active.length === 1 ? (active[0]?.id ?? null) : null,
+      ...(accountOf(accountId)?.role === 'AR' ? {} : { customer: null }),
+    });
+  };
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
-    if (!description.trim() || !complete || !balanced) return;
+    if (!description.trim() || !complete || !balanced || lines.some(detailsMissing)) return;
     void action.run(async () => {
       const entry = await mutations.postEntry.mutateAsync({
         key,
@@ -100,6 +155,8 @@ export function JournalEntryDialog({
             accountId: line.accountId ?? 0,
             debit: line.debit || '0',
             credit: line.credit || '0',
+            ...(needsBox(line) ? { moneyAccountId: line.moneyAccountId } : {}),
+            ...(needsCustomer(line) ? { customerId: line.customer?.id ?? null } : {}),
             description: line.description.trim() || null,
           })),
         },
@@ -160,28 +217,66 @@ export function JournalEntryDialog({
               <TableBody>
                 {lines.map((line, index) => (
                   <TableRow key={line.id}>
-                    <TableCell>
-                      <NativeSelect
-                        aria-label={`${t('finance.journal.dialog.account')} ${index + 1}`}
-                        value={line.accountId ?? ''}
-                        aria-invalid={checked && line.accountId === null ? true : undefined}
-                        onChange={(event) =>
-                          patch(line.id, {
-                            accountId: Number.parseInt(event.target.value, 10) || null,
-                          })
-                        }
-                      >
-                        <option value="">{t('finance.journal.dialog.chooseAccount')}</option>
-                        {(accounts.data ?? [])
-                          .filter((account) => account.status === 'ACTIVE')
-                          .map((account) => (
-                            <option key={account.id} value={account.id}>
-                              {account.code} · {account.name}
+                    <TableCell className="align-top">
+                      <div className="flex flex-col gap-2">
+                        <NativeSelect
+                          aria-label={`${t('finance.journal.dialog.account')} ${index + 1}`}
+                          value={line.accountId ?? ''}
+                          aria-invalid={checked && line.accountId === null ? true : undefined}
+                          onChange={(event) =>
+                            chooseAccount(line.id, Number.parseInt(event.target.value, 10) || null)
+                          }
+                        >
+                          <option value="">{t('finance.journal.dialog.chooseAccount')}</option>
+                          {(accounts.data ?? [])
+                            .filter((account) => account.status === 'ACTIVE')
+                            .map((account) => (
+                              <option key={account.id} value={account.id}>
+                                {account.code} · {account.name}
+                              </option>
+                            ))}
+                        </NativeSelect>
+                        {needsBox(line) ? (
+                          <NativeSelect
+                            aria-label={`${t('finance.journal.dialog.moneyAccount')} ${index + 1}`}
+                            value={line.moneyAccountId ?? ''}
+                            aria-invalid={
+                              checked && line.moneyAccountId === null ? true : undefined
+                            }
+                            onChange={(event) =>
+                              patch(line.id, {
+                                moneyAccountId: Number.parseInt(event.target.value, 10) || null,
+                              })
+                            }
+                          >
+                            <option value="">
+                              {t('finance.journal.dialog.chooseMoneyAccount')}
                             </option>
-                          ))}
-                      </NativeSelect>
+                            {boxesOf(line.accountId)
+                              .filter((box) => box.status === 'ACTIVE')
+                              .map((box) => (
+                                <option key={box.id} value={box.id}>
+                                  {box.name}
+                                </option>
+                              ))}
+                          </NativeSelect>
+                        ) : null}
+                        {needsCustomer(line) ? (
+                          <div className="flex flex-col gap-1">
+                            <Label htmlFor={`entry-customer-${line.id}`} className="sr-only">
+                              {`${t('finance.journal.dialog.customer')} ${index + 1}`}
+                            </Label>
+                            <CustomerPicker
+                              id={`entry-customer-${line.id}`}
+                              value={line.customer}
+                              onChange={(customer) => patch(line.id, { customer })}
+                              invalid={checked && line.customer === null}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
                         aria-label={`${t('finance.journal.dialog.debit')} ${index + 1}`}
                         inputMode="decimal"
@@ -192,7 +287,7 @@ export function JournalEntryDialog({
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
                         aria-label={`${t('finance.journal.dialog.credit')} ${index + 1}`}
                         inputMode="decimal"
@@ -203,7 +298,7 @@ export function JournalEntryDialog({
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Input
                         aria-label={`${t('finance.journal.dialog.lineDescription')} ${index + 1}`}
                         value={line.description}
@@ -211,7 +306,7 @@ export function JournalEntryDialog({
                         onChange={(event) => patch(line.id, { description: event.target.value })}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <Button
                         type="button"
                         variant="ghost"
@@ -260,6 +355,11 @@ export function JournalEntryDialog({
               </TableBody>
             </Table>
           </div>
+          {checked && lines.some(detailsMissing) ? (
+            <p role="alert" className="text-sm text-destructive">
+              {t('finance.journal.dialog.lineDetailsMissing')}
+            </p>
+          ) : null}
           {checked && !balanced ? (
             <p role="alert" className="text-sm text-destructive">
               {t('finance.journal.dialog.unbalanced')}

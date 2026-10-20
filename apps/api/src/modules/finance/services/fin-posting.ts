@@ -11,7 +11,13 @@ import {
   type FinIntakeResult,
   FinReader,
 } from '../../../finance-core';
-import { BTO_SOURCE, BTO_TENANT, FIN_DOC_TYPES, newCommandId, ROLE_OF_POSTING_KEY } from '../../fin-bridge';
+import {
+  BTO_SOURCE,
+  BTO_TENANT,
+  FIN_DOC_TYPES,
+  newCommandId,
+  ROLE_OF_POSTING_KEY,
+} from '../../fin-bridge';
 import { invoices } from '../schema';
 import { FinBooks } from './fin-books';
 
@@ -88,11 +94,15 @@ export function translated(error: unknown): unknown {
   if (error.code === 'FIN_MAPPING_MISSING') {
     const key = typeof error.params?.key === 'string' ? error.params.key : '';
     const role = ROLE_OF_POSTING_KEY.get(key) ?? key;
-    return new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, { role });
+    return new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, {
+      role,
+    });
   }
   if (error.code === 'FIN_ACCOUNT_INACTIVE' && typeof error.params?.key === 'string') {
     const role = ROLE_OF_POSTING_KEY.get(error.params.key) ?? error.params.key;
-    return new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, { role });
+    return new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, {
+      role,
+    });
   }
   return error;
 }

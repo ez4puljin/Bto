@@ -83,14 +83,18 @@ export class FinConfig {
     const [before] = await tx
       .select({ pattern: finNumberSeries.pattern, digits: finNumberSeries.digits })
       .from(finNumberSeries)
-      .where(and(eq(finNumberSeries.companyId, scope.companyId), eq(finNumberSeries.code, input.code)))
+      .where(
+        and(eq(finNumberSeries.companyId, scope.companyId), eq(finNumberSeries.code, input.code)),
+      )
       .for('update');
     if (!before) throw new FinError('FIN_PAYLOAD_INVALID', undefined, { path: 'code' });
     if (before.pattern === pattern && before.digits === input.digits) return;
     await tx
       .update(finNumberSeries)
       .set({ pattern, digits: input.digits, updatedAt: sql`now()` })
-      .where(and(eq(finNumberSeries.companyId, scope.companyId), eq(finNumberSeries.code, input.code)));
+      .where(
+        and(eq(finNumberSeries.companyId, scope.companyId), eq(finNumberSeries.code, input.code)),
+      );
     await recordFinAudit(tx, ctx, {
       tenantId: scope.tenantId,
       companyId: scope.companyId,
@@ -114,11 +118,20 @@ export class FinConfig {
     });
     await tx
       .insert(finNumberSeries)
-      .values({ companyId: scope.companyId, code: input.code, pattern: input.pattern, digits: input.digits })
+      .values({
+        companyId: scope.companyId,
+        code: input.code,
+        pattern: input.pattern,
+        digits: input.digits,
+      })
       .onConflictDoNothing();
   }
 
-  async upsertDocumentTypeInTx(tx: FinTx, ctx: FinCallContext, input: FinDocumentTypeInput): Promise<void> {
+  async upsertDocumentTypeInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: FinDocumentTypeInput,
+  ): Promise<void> {
     const scope = await resolveCompany(tx, ctx, input.company, {
       source: false,
       userAnyOf: ['finance.config.manage'],
@@ -126,7 +139,9 @@ export class FinConfig {
     const [system] = await tx
       .select({ id: finSourceSystems.id })
       .from(finSourceSystems)
-      .where(and(eq(finSourceSystems.tenantId, scope.tenantId), eq(finSourceSystems.code, input.system)));
+      .where(
+        and(eq(finSourceSystems.tenantId, scope.tenantId), eq(finSourceSystems.code, input.system)),
+      );
     if (!system) throw new FinError('FIN_SOURCE_NOT_GRANTED', undefined, { system: input.system });
     const inserted = await tx
       .insert(finDocumentTypes)

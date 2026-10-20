@@ -52,7 +52,10 @@ describe('finance guards', () => {
     ).toBe('42501');
     expect(
       await sqlStateOf(
-        asApp.query(`DELETE FROM fin.open_items WHERE document_id IN (SELECT d.id FROM fin.documents d WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text)`, [invoiceId]),
+        asApp.query(
+          `DELETE FROM fin.open_items WHERE document_id IN (SELECT d.id FROM fin.documents d WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text)`,
+          [invoiceId],
+        ),
       ),
     ).toBe('42501');
     expect(
@@ -77,7 +80,9 @@ describe('finance guards', () => {
     ).toBe('42501');
     expect(await sqlStateOf(asApp.query('TRUNCATE fin.allocations'))).toBe('42501');
     expect(await sqlStateOf(asApp.query('DELETE FROM fin.documents'))).toBe('42501');
-    expect(await sqlStateOf(asApp.query('UPDATE fin.allocations SET amount = amount'))).toBe('42501');
+    expect(await sqlStateOf(asApp.query('UPDATE fin.allocations SET amount = amount'))).toBe(
+      '42501',
+    );
   });
 
   it('stops even the owner from rewriting the ledger or the journal', async () => {
@@ -102,9 +107,10 @@ describe('finance guards', () => {
     expect(await sqlStateOf(migrator.query('TRUNCATE fin.allocations'))).toBe('23001');
     expect(
       await sqlStateOf(
-        migrator.query('UPDATE fin.documents SET description = description WHERE source_doc_id = $1', [
-          String(invoiceId),
-        ]),
+        migrator.query(
+          'UPDATE fin.documents SET description = description WHERE source_doc_id = $1',
+          [String(invoiceId)],
+        ),
       ),
     ).toBe('23001');
   });

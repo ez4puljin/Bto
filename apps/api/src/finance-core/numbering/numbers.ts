@@ -6,7 +6,11 @@ import { FinError } from '../errors';
 import { finNumberCounters, finNumberSeries } from '../schema';
 
 /** The series every company has: vouchers, journal entries, allocations (ADR-0090). */
-export const FIN_SERIES = { PAYMENT: 'PAYMENT', JOURNAL: 'JOURNAL', ALLOCATION: 'ALLOCATION' } as const;
+export const FIN_SERIES = {
+  PAYMENT: 'PAYMENT',
+  JOURNAL: 'JOURNAL',
+  ALLOCATION: 'ALLOCATION',
+} as const;
 
 export interface FinNumberFormat {
   pattern: string;

@@ -1,5 +1,5 @@
 import { AGING_BUCKETS } from '@tugeel/shared/finance';
-import { Plus } from 'lucide-react';
+import { ArrowLeftRight, Plus } from 'lucide-react';
 import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -23,6 +23,7 @@ import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { useCreateParam } from '@/lib/use-create-param';
 import { cn } from '@/lib/utils';
+import { AllocationDialog } from './allocation-dialog';
 import { DateRangeFilter } from './date-range-filter';
 import {
   type CustomerBalance,
@@ -35,7 +36,8 @@ import { PaymentDialog } from './payment-dialog';
 /**
  * One customer's receivables (ADR-0060 #4): the balance with its aging and credit terms, then the
  * ledger newest first with the balance after each entry; «Төлбөр бүртгэх» starts a payment for
- * this customer (`?new=1`).
+ * this customer (`?new=1`), «Тулгалт хийх» pairs its open credits with its invoices by hand
+ * (`?allocate=1`, ADR-0090).
  */
 export function CustomerLedgerPage() {
   const { t } = useTranslation();
@@ -46,6 +48,7 @@ export function CustomerLedgerPage() {
   const [creating, setCreating] = useCreateParam();
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
+  const allocating = params.get('allocate') === '1';
   const balance = useCustomerBalance(customerId);
   const ledger = useCustomerLedger(customerId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
@@ -88,10 +91,16 @@ export function CustomerLedgerPage() {
         }
         actions={
           canRecord ? (
-            <Button onClick={() => setCreating(true)}>
-              <Plus />
-              {t('finance.actions.record')}
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setParam('allocate', '1')}>
+                <ArrowLeftRight />
+                {t('finance.allocations.action')}
+              </Button>
+              <Button onClick={() => setCreating(true)}>
+                <Plus />
+                {t('finance.actions.record')}
+              </Button>
+            </>
           ) : null
         }
       />
@@ -160,6 +169,11 @@ export function CustomerLedgerPage() {
         customer={{ id: summary.customerId, code: summary.code, name: summary.name }}
         onClose={() => setCreating(false)}
         onRecorded={() => setCreating(false)}
+      />
+      <AllocationDialog
+        open={canRecord && allocating}
+        customerId={summary.customerId}
+        onClose={() => setParam('allocate', null)}
       />
     </div>
   );

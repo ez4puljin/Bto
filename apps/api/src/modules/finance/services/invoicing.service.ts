@@ -300,7 +300,12 @@ export function invoiceEntryLines(totals: InvoiceTotals & { dueDate?: string }):
     lines.push({ role: 'VAT_PAYABLE', debit: zero, credit: totals.vatTotal, taxBase: net });
   }
   if (totals.cityTaxTotal.gt(0)) {
-    lines.push({ role: 'CITY_TAX_PAYABLE', debit: zero, credit: totals.cityTaxTotal, taxBase: net });
+    lines.push({
+      role: 'CITY_TAX_PAYABLE',
+      debit: zero,
+      credit: totals.cityTaxTotal,
+      taxBase: net,
+    });
   }
   return lines;
 }

@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  type ArEntryKind,
-  FINANCE_LIMITS,
-  type FinanceDocKind,
-} from '@tugeel/shared/finance';
+import { type ArEntryKind, FINANCE_LIMITS, type FinanceDocKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { DB } from '../../../common/db/db.tokens';
@@ -161,7 +157,11 @@ export class AllocationsService {
   }
 
   /** Undoes an allocation document: both items' open amounts come back. */
-  async reverse(ctx: AuthContext, id: number, reason: string): Promise<{ id: number; number: string }> {
+  async reverse(
+    ctx: AuthContext,
+    id: number,
+    reason: string,
+  ): Promise<{ id: number; number: string }> {
     const trimmed = reason.trim();
     if (trimmed.length === 0 || trimmed.length > FINANCE_LIMITS.maxReason) {
       throw invalid('reason', 'length', `1 to ${FINANCE_LIMITS.maxReason} characters`);
@@ -185,7 +185,11 @@ export class AllocationsService {
             );
       if (customerId !== undefined) await this.customers.lockForUpdate(tx, customerId);
       await this.posting.submitInTx(tx, this.books.user(ctx), {
-        source: { system: FIN_SOURCE, docType: document.sourceDocType, docId: document.sourceDocId },
+        source: {
+          system: FIN_SOURCE,
+          docType: document.sourceDocType,
+          docId: document.sourceDocId,
+        },
         body: { action: 'REVERSE', accountingDate: businessDate(), reason: trimmed },
       });
       await this.audit.record(tx, ctx, {

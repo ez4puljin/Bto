@@ -152,7 +152,8 @@ const scalar = (value: unknown): string =>
         : '';
 const dec = (value: unknown): Decimal => new Decimal(scalar(value) || 0);
 const int = (value: unknown): number => Number.parseInt(scalar(value), 10);
-const intOrNull = (value: unknown): number | null => (value === null || value === undefined ? null : int(value));
+const intOrNull = (value: unknown): number | null =>
+  value === null || value === undefined ? null : int(value);
 const str = (value: unknown): string => scalar(value);
 const strOrNull = (value: unknown): string | null =>
   value === null || value === undefined ? null : scalar(value);
@@ -213,7 +214,12 @@ export class FinReader {
     const filters: SQL[] = [sql`TRUE`];
     if (query.partyIds) {
       if (query.partyIds.length === 0) return [];
-      filters.push(sql`b.party_id IN (${sql.join(query.partyIds.map((id) => sql`${id}`), sql`, `)})`);
+      filters.push(
+        sql`b.party_id IN (${sql.join(
+          query.partyIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      );
     }
     if (query.overdueOnly) filters.push(sql`b.overdue > 0`);
     if (query.after) {
@@ -250,8 +256,15 @@ export class FinReader {
   }
 
   /** One party's balance on the receivable accounts (zeros when it has none). */
-  async partyBalance(ctx: FinCallContext, query: { company: string; partyId: number }): Promise<FinPartyBalanceRow> {
-    const [row] = await this.partyBalances(ctx, { company: query.company, partyIds: [query.partyId], limit: 1 });
+  async partyBalance(
+    ctx: FinCallContext,
+    query: { company: string; partyId: number },
+  ): Promise<FinPartyBalanceRow> {
+    const [row] = await this.partyBalances(ctx, {
+      company: query.company,
+      partyIds: [query.partyId],
+      limit: 1,
+    });
     return (
       row ?? {
         partyId: query.partyId,
@@ -271,7 +284,14 @@ export class FinReader {
    */
   async partyLedger(
     ctx: FinCallContext,
-    query: { company: string; partyId: number; from?: string; to?: string; beforeLineId?: number; limit: number },
+    query: {
+      company: string;
+      partyId: number;
+      from?: string;
+      to?: string;
+      beforeLineId?: number;
+      limit: number;
+    },
   ): Promise<{ rows: FinPartyLedgerRow[]; opening: Decimal }> {
     const scope = await this.scope(this.db, ctx, query.company);
     const filters: SQL[] = [sql`TRUE`];
@@ -363,7 +383,10 @@ export class FinReader {
       ${this.documentSelect()}
        WHERE d.company_id = ${scope.companyId} AND d.reverses_document_id IS NULL
          AND s.code = ${query.system} AND d.source_doc_type = ${query.docType}
-         AND d.source_doc_id IN (${sql.join(query.docIds.map((id) => sql`${id}`), sql`, `)})`);
+         AND d.source_doc_id IN (${sql.join(
+           query.docIds.map((id) => sql`${id}`),
+           sql`, `,
+         )})`);
     return new Map(result.rows.map((row) => [str(row.source_doc_id), toDocumentRow(row)]));
   }
 
@@ -374,7 +397,10 @@ export class FinReader {
   ): Promise<FinAllocationRow[]> {
     if (query.documentIds.length === 0) return [];
     const scope = await this.scope(this.db, ctx, query.company);
-    const ids = sql.join(query.documentIds.map((id) => sql`${id}`), sql`, `);
+    const ids = sql.join(
+      query.documentIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
     const result = await this.db.execute<Row>(sql`
       SELECT al.id, al.amount, al.created_at, u.created_at AS undone_at,
              own.document_id AS own_document_id,
@@ -479,7 +505,10 @@ export class FinReader {
         JOIN fin.documents d ON d.company_id = i.company_id AND d.id = i.document_id
         JOIN fin.source_systems s ON s.id = d.source_system_id
        WHERE i.company_id = ${scope.companyId}
-         AND i.id IN (${sql.join(query.ids.map((id) => sql`${id}`), sql`, `)})`);
+         AND i.id IN (${sql.join(
+           query.ids.map((id) => sql`${id}`),
+           sql`, `,
+         )})`);
     return result.rows.map((row) => ({
       id: int(row.id),
       documentId: int(row.document_id),
@@ -512,7 +541,9 @@ export class FinReader {
     if (query.from) filters.push(sql`r.document_date >= ${query.from}::date`);
     if (query.to) filters.push(sql`r.document_date <= ${query.to}::date`);
     if (query.after) {
-      filters.push(sql`(r.document_date, r.id) < (${query.after.date}::date, ${query.after.id}::bigint)`);
+      filters.push(
+        sql`(r.document_date, r.id) < (${query.after.date}::date, ${query.after.id}::bigint)`,
+      );
     }
     const running = await this.db.execute<Row>(sql`
       WITH r AS (SELECT d.id, d.document_date,
@@ -547,7 +578,10 @@ export class FinReader {
     executor: FinExecutor = this.db,
   ): Promise<Map<number, Decimal>> {
     const scope = await this.scope(executor, ctx, query.company);
-    const types = sql.join(query.typeCodes.map((code) => sql`${code}`), sql`, `);
+    const types = sql.join(
+      query.typeCodes.map((code) => sql`${code}`),
+      sql`, `,
+    );
     const result = await executor.execute<Row>(sql`
       SELECT d.money_account_id, sum(CASE d.class WHEN 'RECEIPT' THEN d.amount ELSE -d.amount END) AS balance
         FROM fin.documents d
@@ -561,16 +595,26 @@ export class FinReader {
 
   // ---------------------------------------------------------------------------------------------
 
-  private scope(executor: FinExecutor, ctx: FinCallContext, company: string): Promise<CompanyScope> {
+  private scope(
+    executor: FinExecutor,
+    ctx: FinCallContext,
+    company: string,
+  ): Promise<CompanyScope> {
     return resolveCompany(executor, ctx, company, { source: true, userAnyOf: ['finance.read'] });
   }
 
   private async today(executor: FinExecutor, scope: CompanyScope): Promise<string> {
-    const result = await executor.execute<Row>(sql`SELECT timezone FROM fin.companies WHERE id = ${scope.companyId}`);
+    const result = await executor.execute<Row>(
+      sql`SELECT timezone FROM fin.companies WHERE id = ${scope.companyId}`,
+    );
     return businessDateIn(str(result.rows[0]?.timezone ?? 'Asia/Ulaanbaatar'), new Date());
   }
 
-  private async partyOfKey(executor: FinExecutor, scope: CompanyScope, key: FinPartyKey): Promise<number | null> {
+  private async partyOfKey(
+    executor: FinExecutor,
+    scope: CompanyScope,
+    key: FinPartyKey,
+  ): Promise<number | null> {
     const result = await executor.execute<Row>(sql`
       SELECT r.party_id FROM fin.party_refs r
         JOIN fin.source_systems s ON s.id = r.source_system_id AND s.tenant_id = r.tenant_id
@@ -580,7 +624,11 @@ export class FinReader {
     return row ? int(row.party_id) : null;
   }
 
-  private async exposureOf(executor: FinExecutor, scope: CompanyScope, partyId: number): Promise<ExposureV1> {
+  private async exposureOf(
+    executor: FinExecutor,
+    scope: CompanyScope,
+    partyId: number,
+  ): Promise<ExposureV1> {
     const today = await this.today(executor, scope);
     const result = await executor.execute<Row>(sql`
       SELECT coalesce(sum(i.open_amount) FILTER (WHERE i.side = 'DEBIT'), 0) AS receivable,
@@ -624,7 +672,11 @@ export class FinReader {
        WHERE l.company_id = ${companyId} AND l.party_id = ${partyId} AND a.control = 'RECEIVABLE'`;
   }
 
-  private async partyBalanceBefore(companyId: number, partyId: number, from: string): Promise<Decimal> {
+  private async partyBalanceBefore(
+    companyId: number,
+    partyId: number,
+    from: string,
+  ): Promise<Decimal> {
     const result = await this.db.execute<Row>(sql`
       SELECT coalesce(sum(l.debit - l.credit), 0) AS balance
         FROM fin.journal_lines l
@@ -646,12 +698,23 @@ export class FinReader {
     to?: string;
     text?: { pattern: string; partyIds: readonly number[] };
   }): SQL {
-    const list = (values: readonly (string | number)[]) => sql.join(values.map((value) => sql`${value}`), sql`, `);
-    const filters: SQL[] = [query.typeCodes.length ? sql`t.code IN (${list(query.typeCodes)})` : sql`FALSE`];
+    const list = (values: readonly (string | number)[]) =>
+      sql.join(
+        values.map((value) => sql`${value}`),
+        sql`, `,
+      );
+    const filters: SQL[] = [
+      query.typeCodes.length ? sql`t.code IN (${list(query.typeCodes)})` : sql`FALSE`,
+    ];
     if (query.ids) filters.push(query.ids.length ? sql`d.id IN (${list(query.ids)})` : sql`FALSE`);
-    if (query.partyIds) filters.push(query.partyIds.length ? sql`d.party_id IN (${list(query.partyIds)})` : sql`FALSE`);
-    if (query.moneyAccountId !== undefined) filters.push(sql`d.money_account_id = ${query.moneyAccountId}`);
-    if (query.classes) filters.push(query.classes.length ? sql`d.class IN (${list(query.classes)})` : sql`FALSE`);
+    if (query.partyIds)
+      filters.push(
+        query.partyIds.length ? sql`d.party_id IN (${list(query.partyIds)})` : sql`FALSE`,
+      );
+    if (query.moneyAccountId !== undefined)
+      filters.push(sql`d.money_account_id = ${query.moneyAccountId}`);
+    if (query.classes)
+      filters.push(query.classes.length ? sql`d.class IN (${list(query.classes)})` : sql`FALSE`);
     if (query.from) filters.push(sql`d.document_date >= ${query.from}::date`);
     if (query.to) filters.push(sql`d.document_date <= ${query.to}::date`);
     const reversedSql = sql`EXISTS (SELECT 1 FROM fin.documents rv WHERE rv.company_id = d.company_id AND rv.reverses_document_id = d.id)`;
@@ -698,8 +761,15 @@ export class FinReader {
         LEFT JOIN fin.journal_entries re ON re.company_id = r.company_id AND re.document_id = r.id`;
   }
 
-  private liveVoucherSql(companyId: number, moneyAccountId: number, typeCodes: readonly string[]): SQL {
-    const types = sql.join(typeCodes.map((code) => sql`${code}`), sql`, `);
+  private liveVoucherSql(
+    companyId: number,
+    moneyAccountId: number,
+    typeCodes: readonly string[],
+  ): SQL {
+    const types = sql.join(
+      typeCodes.map((code) => sql`${code}`),
+      sql`, `,
+    );
     return sql`
       JOIN fin.document_types t ON t.company_id = d.company_id AND t.id = d.document_type_id
      WHERE d.company_id = ${companyId} AND d.money_account_id = ${moneyAccountId}
@@ -709,13 +779,21 @@ export class FinReader {
 }
 
 function zeroExposure(): ExposureV1 {
-  return { receivableOpen: '0.00', creditsOpen: '0.00', net: '0.00', overdue: '0.00', oldestDueDate: null };
+  return {
+    receivableOpen: '0.00',
+    creditsOpen: '0.00',
+    net: '0.00',
+    overdue: '0.00',
+    oldestDueDate: null,
+  };
 }
 
 function toDocumentRow(row: Row): FinDocumentRow {
   const attributes =
     row.attributes && typeof row.attributes === 'object'
-      ? Object.fromEntries(Object.entries(row.attributes as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
+      ? Object.fromEntries(
+          Object.entries(row.attributes as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+        )
       : {};
   return {
     id: int(row.id),

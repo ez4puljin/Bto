@@ -1,16 +1,13 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Param,
-  ParseIntPipe,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
-import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  type AuthContext,
+  CurrentUser,
+  IdempotencyKey,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import {
   AllocationDto,
   AllocationRequestDto,
@@ -36,9 +33,7 @@ export class AllocationsController {
   @Get('customer-balances/:customerId/open-items')
   @RequirePermission(READ)
   @ApiOkResponse({ type: OpenItemListDto })
-  async openItems(
-    @Param('customerId', ParseIntPipe) customerId: number,
-  ): Promise<OpenItemListDto> {
+  async openItems(@Param('customerId', ParseIntPipe) customerId: number): Promise<OpenItemListDto> {
     const items = await this.allocations.openItems(customerId);
     return {
       data: items.map((item) => ({
@@ -56,7 +51,7 @@ export class AllocationsController {
   async allocate(
     @CurrentUser() ctx: AuthContext,
     @Body() body: AllocationRequestDto,
-    @Headers('idempotency-key') key?: string,
+    @IdempotencyKey() key?: string,
   ): Promise<AllocationDto> {
     const result = await this.allocations.allocate(ctx, {
       customerId: body.customerId,

@@ -268,7 +268,15 @@ export class ArLedgerService {
     const party = await this.partyOf(customerId);
     const zero = new Decimal(0);
     if (party === null) {
-      return { from, to, opening: zero, entries: [], totalDebit: zero, totalCredit: zero, closing: zero };
+      return {
+        from,
+        to,
+        opening: zero,
+        entries: [],
+        totalDebit: zero,
+        totalCredit: zero,
+        closing: zero,
+      };
     }
     const { opening, rows } = await this.reader.partyStatement(this.books.source(), {
       company: await this.books.company(),
@@ -339,7 +347,9 @@ export class ArLedgerService {
     });
     const page = rows.slice(0, limit);
     const last = page.at(-1);
-    const customerOf = await this.parties.customersOfParties(page.map((row) => String(row.partyId)));
+    const customerOf = await this.parties.customersOfParties(
+      page.map((row) => String(row.partyId)),
+    );
     const ids = [...new Set(customerOf.values())];
     const customers = new Map(
       (await this.customers.findByIds(ids)).map((customer) => [customer.id, customer]),

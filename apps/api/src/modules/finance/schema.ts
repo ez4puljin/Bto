@@ -1,7 +1,4 @@
-import {
-  FINANCE_LIMITS,
-  INVOICE_STATUSES,
-} from '@tugeel/shared/finance';
+import { FINANCE_LIMITS, INVOICE_STATUSES } from '@tugeel/shared/finance';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS } from '@tugeel/shared/sales';
 import { type SQL, sql } from 'drizzle-orm';

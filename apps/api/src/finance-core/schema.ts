@@ -904,10 +904,7 @@ export const finIntakeRequests = finSchema.table(
       'fin_intake_requests_status',
       sql`${t.status} IN ('POSTED', 'HELD', 'REJECTED', 'CANCELLED') AND (${t.status} <> 'POSTED' OR ${t.documentId} IS NOT NULL OR ${t.action} = 'REVERSE')`,
     ),
-    check(
-      'fin_intake_requests_via',
-      sql`${t.via} IN ('INPROC', 'JOB', 'HTTP', 'UI', 'MIGRATION')`,
-    ),
+    check('fin_intake_requests_via', sql`${t.via} IN ('INPROC', 'JOB', 'HTTP', 'UI', 'MIGRATION')`),
     check('fin_intake_requests_attempts', sql`${t.attempts} >= 1`),
   ],
 );
@@ -1048,7 +1045,10 @@ export const finDocuments = finSchema.table(
     check('fin_documents_currency', sql`${t.currency} ~ '^[A-Z]{3}$'`),
     check('fin_documents_amount', sql`${t.amount} >= 0`),
     check('fin_documents_description', sql`length(btrim(${t.description})) BETWEEN 1 AND 300`),
-    check('fin_documents_source_doc', sql`${codeShape(t.sourceDocType)} AND length(${t.sourceDocId}) BETWEEN 1 AND 128`),
+    check(
+      'fin_documents_source_doc',
+      sql`${codeShape(t.sourceDocType)} AND length(${t.sourceDocId}) BETWEEN 1 AND 128`,
+    ),
     check(
       'fin_documents_reverse',
       sql`(${t.reversesDocumentId} IS NULL) = (${t.reverseReason} IS NULL) AND (${t.reverseReason} IS NULL OR length(btrim(${t.reverseReason})) BETWEEN 1 AND 500)`,

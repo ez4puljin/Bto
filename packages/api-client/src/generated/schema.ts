@@ -4079,6 +4079,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-balances/{customerId}/open-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Allocations_openItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/allocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Allocations_allocate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/allocations/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Allocations_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -5438,7 +5486,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "bto.company_code";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "credit.overdue_nets_credits" | "bto.company_code";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -9175,7 +9223,7 @@ export interface components {
         InvoiceAllocation: {
             id: number;
             /** @enum {string} */
-            sourceType: "PAYMENT" | "CREDIT_NOTE";
+            sourceType: "PAYMENT" | "CREDIT_NOTE" | "ALLOCATION";
             sourceId: number;
             /** @example Т-20261016-0002 */
             sourceNumber: string;
@@ -9911,6 +9959,67 @@ export interface components {
             PAYMENT: components["schemas"]["FinanceNumberFormatRequest"];
             CREDIT_NOTE: components["schemas"]["FinanceNumberFormatRequest"];
             JOURNAL: components["schemas"]["FinanceNumberFormatRequest"];
+        };
+        OpenItem: {
+            id: number;
+            /** @enum {string} */
+            side: "DEBIT" | "CREDIT";
+            /** @enum {string} */
+            kind: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "REFUND" | "ADJUSTMENT" | "OPENING" | "VOID";
+            /**
+             * @description Where the document opens
+             * @enum {string}
+             */
+            documentType: "INVOICE" | "PAYMENT" | "CREDIT_NOTE" | "JOURNAL";
+            documentId: number;
+            /** @example Н-20261016-0001 */
+            number: string;
+            /** @example 2026-10-16 */
+            itemDate: string;
+            /** @example 2026-11-15 */
+            dueDate: string | null;
+            /** @example 150000.00 */
+            amount: string;
+            /** @example 50000.00 */
+            openAmount: string;
+        };
+        OpenItemList: {
+            data: components["schemas"]["OpenItem"][];
+        };
+        AllocationPairRequest: {
+            debitItemId: number;
+            creditItemId: number;
+            /** @example 12000 */
+            amount: string;
+        };
+        AllocationRequest: {
+            customerId: number;
+            /** @example 2026-11-03 */
+            date?: string | null;
+            description?: string | null;
+            pairs: components["schemas"]["AllocationPairRequest"][];
+        };
+        AllocationPair: {
+            debitItemId: number;
+            creditItemId: number;
+            /** @example 12000.00 */
+            amount: string;
+        };
+        Allocation: {
+            id: number;
+            /** @example Х-20261103-0001 */
+            number: string;
+            /** @example 2026-11-03 */
+            date: string;
+            customerId: number;
+            /** @example 12000.00 */
+            amount: string;
+            pairs: components["schemas"]["AllocationPair"][];
+        };
+        AllocationReversal: {
+            id: number;
+            /** @example Х-20261103-0001 */
+            number: string;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -21596,6 +21705,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinanceNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Allocations_openItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenItemList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Allocations_allocate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AllocationRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Allocation"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Allocations_reverse: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllocationReversal"];
                 };
             };
             /** @description RFC 9457 problem details */

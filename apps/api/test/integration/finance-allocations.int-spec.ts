@@ -69,7 +69,11 @@ describe('finance manual allocation', () => {
     ).body as { data: OpenItemJson[] };
     const credit = items.data.find((item) => item.side === 'CREDIT');
     const debit = items.data.find((item) => item.side === 'DEBIT');
-    expect(credit).toMatchObject({ kind: 'PAYMENT', documentType: 'PAYMENT', openAmount: '8000.00' });
+    expect(credit).toMatchObject({
+      kind: 'PAYMENT',
+      documentType: 'PAYMENT',
+      openAmount: '8000.00',
+    });
     expect(debit).toMatchObject({
       kind: 'INVOICE',
       documentType: 'INVOICE',
@@ -105,7 +109,10 @@ describe('finance manual allocation', () => {
         .send(body)
         .expect(201)
     ).body as { id: number; number: string; amount: string };
-    expect(allocation).toMatchObject({ number: expect.stringMatching(/^Х-\d{8}-\d{4}$/), amount: '5000.00' });
+    expect(allocation).toMatchObject({
+      number: expect.stringMatching(/^Х-\d{8}-\d{4}$/),
+      amount: '5000.00',
+    });
     expect(await finance.invoice(invoice.id)).toMatchObject({
       settlement: 'PAID',
       openAmount: '0.00',

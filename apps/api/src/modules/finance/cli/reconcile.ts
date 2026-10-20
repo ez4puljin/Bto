@@ -24,10 +24,7 @@ export function describeRun(run: FinanceReconcileRun): string[] {
         .join(''),
   );
   if (run.status === 'OK') {
-    return [
-      `Receivables reconciliation OK (run ${run.id}, ${run.checked} invoice(s)).`,
-      ...core,
-    ];
+    return [`Receivables reconciliation OK (run ${run.id}, ${run.checked} invoice(s)).`, ...core];
   }
   return [
     `Receivables reconciliation DRIFT: ${run.drifted} drift(s) (run ${run.id}).`,

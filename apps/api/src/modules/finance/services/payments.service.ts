@@ -317,12 +317,24 @@ export class PaymentsService implements OnModuleInit {
       case 'OTHER_IN':
         lines = [
           { ...money, side: 'DEBIT' },
-          { lineNo: 0, key: 'OTHER_INCOME', side: 'CREDIT', amount, accountCode: other?.code ?? '' },
+          {
+            lineNo: 0,
+            key: 'OTHER_INCOME',
+            side: 'CREDIT',
+            amount,
+            accountCode: other?.code ?? '',
+          },
         ];
         break;
       case 'OTHER_OUT':
         lines = [
-          { lineNo: 0, key: 'OTHER_EXPENSE', side: 'DEBIT', amount, accountCode: other?.code ?? '' },
+          {
+            lineNo: 0,
+            key: 'OTHER_EXPENSE',
+            side: 'DEBIT',
+            amount,
+            accountCode: other?.code ?? '',
+          },
           { ...money, side: 'CREDIT' },
         ];
         break;
@@ -345,7 +357,9 @@ export class PaymentsService implements OnModuleInit {
         documentType: type.code,
         documentDate: input.paidOn,
         currency: 'MNT',
-        ...(customerId !== null ? { party: await this.parties.customerPartyIn(tx, customerId) } : {}),
+        ...(customerId !== null
+          ? { party: await this.parties.customerPartyIn(tx, customerId) }
+          : {}),
         description: who.slice(0, FINANCE_LIMITS.maxDescription),
         controlTotal: amount,
         lines,
@@ -432,7 +446,8 @@ export class PaymentsService implements OnModuleInit {
       const party = (await this.parties.partiesOfCustomers([query.customerId])).get(
         query.customerId,
       );
-      if (party === undefined) return { data: [], nextCursor: null, total: query.cursor ? null : 0 };
+      if (party === undefined)
+        return { data: [], nextCursor: null, total: query.cursor ? null : 0 };
       partyIds = [Number.parseInt(party, 10)];
     }
     let text: { pattern: string; partyIds: number[] } | undefined;
@@ -521,7 +536,11 @@ export class PaymentsService implements OnModuleInit {
         paidOn: row.documentDate,
         invoices: (settled.get(row.id) ?? [])
           .filter((own) => own.voidedAt === null)
-          .map((own) => ({ invoiceId: own.invoiceId, number: own.invoiceNumber, amount: own.amount })),
+          .map((own) => ({
+            invoiceId: own.invoiceId,
+            number: own.invoiceNumber,
+            amount: own.amount,
+          })),
       })),
       nextCursor:
         rows.length > limit && last ? encodeCursor({ date: last.documentDate, id: last.id }) : null,
@@ -672,7 +691,9 @@ export class PaymentsService implements OnModuleInit {
   }
 
   /** The invoices these vouchers settled (live and undone allocations), by voucher id. */
-  private async settledInvoices(ids: readonly number[]): Promise<Map<number, PaymentAllocationView[]>> {
+  private async settledInvoices(
+    ids: readonly number[],
+  ): Promise<Map<number, PaymentAllocationView[]>> {
     const result = new Map<number, PaymentAllocationView[]>();
     if (ids.length === 0) return result;
     const rows = await this.reader.allocationsOf(this.books.source(), {

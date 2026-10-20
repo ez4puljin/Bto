@@ -41,6 +41,9 @@ export type LedgerEntry = Schemas['LedgerEntry'];
 export type FinanceNumbering = Schemas['FinanceNumbering'];
 export type FinanceNumberingRequest = Schemas['FinanceNumberingRequest'];
 export type FinanceAttention = Schemas['FinanceAttention'];
+export type OpenItem = Schemas['OpenItem'];
+export type AllocationRequest = Schemas['AllocationRequest'];
+export type InvoiceAllocation = Schemas['InvoiceAllocation'];
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
@@ -56,6 +59,7 @@ const KEYS = {
   journal: ['finance', 'journal'] as const,
   balances: ['finance', 'balances'] as const,
   ledger: ['finance', 'ledger'] as const,
+  openItems: ['finance', 'open-items'] as const,
   numbering: ['finance', 'numbering'] as const,
 };
 
@@ -351,6 +355,22 @@ export function useCustomerLedger(customerId: number, range: { from?: string; to
   });
 }
 
+/** A customer's open receivable items (ADR-0090): invoices and refunds to settle, credits to use. */
+export function useOpenItems(customerId: number, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.openItems, customerId],
+    enabled: enabled && customerId > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customer-balances/{customerId}/open-items', {
+          params: { path: { customerId } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
 export function useFinanceNumbering() {
   const api = useApiClient();
   return useQuery({
@@ -415,6 +435,26 @@ export function useFinanceMutations() {
       mutationFn: async ({ id, key, reason }: Keyed<{ id: number; reason: string }>) =>
         unwrap(
           await api.POST('/api/v1/payments/{id}/void', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { reason },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    allocate: useMutation({
+      mutationFn: async ({ key, body }: Keyed<{ body: AllocationRequest }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/allocations', {
+            params: { header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    reverseAllocation: useMutation({
+      mutationFn: async ({ id, key, reason }: Keyed<{ id: number; reason: string }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/allocations/{id}/reverse', {
             params: { path: { id }, header: idempotencyKey(key) },
             body: { reason },
           }),

@@ -145,7 +145,9 @@ export async function ensureDefaultCompany(
       .onConflictDoNothing();
   }
   // A type is booked only for a source this installation grants (a spec may grant fewer).
-  const types = (spec.documentTypes ?? []).filter((d) => spec.sources.some((s) => s.code === d.system));
+  const types = (spec.documentTypes ?? []).filter((d) =>
+    spec.sources.some((s) => s.code === d.system),
+  );
   if (types.length) {
     await tx
       .insert(finDocumentTypes)

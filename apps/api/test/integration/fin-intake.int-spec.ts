@@ -56,7 +56,10 @@ describe('Finance Core intake (F2)', () => {
         allocations: [],
       },
     });
-    const exposure = await core.reader.exposure(source(), { company: TEST_COMPANY, party: party() });
+    const exposure = await core.reader.exposure(source(), {
+      company: TEST_COMPANY,
+      party: party(),
+    });
     expect(exposure).toEqual({
       receivableOpen: '110000.00',
       creditsOpen: '0.00',

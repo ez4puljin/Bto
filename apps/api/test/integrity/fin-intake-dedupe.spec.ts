@@ -1,3 +1,4 @@
+import type { PostBody } from '@tugeel/fin-contract';
 import type { Client } from 'pg';
 import { connectAs } from '../harness/apps';
 import {
@@ -75,12 +76,9 @@ describe('Finance Core intake: duplicates and conflicts', () => {
   });
 
   it('(4) refuses the same key for another company, while two sources keep their own keys', async () => {
-    await core.db.transaction(async (tx) => {
-      const { ensureDefaultCompany } = await import('../../src/finance-core');
-      await ensureDefaultCompany(tx, {
-        ...TEST_SPEC,
-        company: { ...TEST_SPEC.company, code: 'TST2', legalName: 'Хоёрдугаар ХХК' },
-      });
+    await StaticCaller.ensure(core.db, {
+      ...TEST_SPEC,
+      company: { ...TEST_SPEC.company, code: 'TST2', legalName: 'Хоёрдугаар ХХК' },
     });
     await core.submit(invoice('d4', '10'));
     const elsewhere = { ...invoice('d4', '10'), company: 'TST2' };
@@ -90,7 +88,7 @@ describe('Finance Core intake: duplicates and conflicts', () => {
     const user = StaticCaller.user({ [TEST_COMPANY]: ['finance.payments.record'] });
     const own = command(
       { system: 'FIN', docType: 'RECEIPT', docId: 'd4' },
-      { ...(receipt('x', '5').body as never), documentType: 'FIN.RECEIPT' },
+      { ...(receipt('x', '5').body as PostBody), documentType: 'FIN.RECEIPT' },
     );
     expect((await core.submit(own, user)).outcome).toBe('POSTED');
   });
@@ -151,7 +149,10 @@ describe('Finance Core intake: duplicates and conflicts', () => {
         effectiveFrom: today(),
       }),
     );
-    const fixed = { ...unmapped, commandId: command({ docType: 'X', docId: 'x' }, unmapped.body).commandId };
+    const fixed = {
+      ...unmapped,
+      commandId: command({ docType: 'X', docId: 'x' }, unmapped.body).commandId,
+    };
     expect((await core.intake.submit(StaticCaller.source(), fixed)).outcome).toBe('POSTED');
     const { rows } = await admin.query<{ status: string; attempts: number; tries: string }>(
       `SELECT r.status, r.attempts,
@@ -182,7 +183,7 @@ describe('Finance Core intake: duplicates and conflicts', () => {
     );
     // A refused document (kept REJECTED by `submit`) is cancelled by its REVERSE, with no entry.
     const refused = invoice('d8b', '10', { party: guest('guest:8', 'Найм') });
-    const bad = { ...refused, body: { ...(refused.body as never as object), currency: 'USD' } };
+    const bad = { ...refused, body: { ...(refused.body as PostBody), currency: 'USD' } };
     expect(await codeOf(core.intake.submit(StaticCaller.source(), bad))).toBe(
       'FIN_CURRENCY_UNSUPPORTED',
     );

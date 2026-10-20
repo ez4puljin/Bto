@@ -31,7 +31,9 @@ export function intakeLines(lines: readonly RoleLine[]): LineV1[] {
       key: POSTING_KEY_OF_ROLE[line.role].code,
       side: debit ? ('DEBIT' as const) : ('CREDIT' as const),
       amount,
-      ...(taxCode && line.taxBase ? { tax: { code: taxCode, base: line.taxBase.toFixed(2), lineCount: 1 } } : {}),
+      ...(taxCode && line.taxBase
+        ? { tax: { code: taxCode, base: line.taxBase.toFixed(2), lineCount: 1 } }
+        : {}),
       ...line.extra,
     };
   });

@@ -265,23 +265,33 @@ export class JournalService {
     checkLines(input.lines);
     const description = checkedDescription(input.description);
     const ids = input.lines.map((line, index) => {
-      if (line.accountId === undefined) throw invalid(`lines[${index}].accountId`, 'required', 'an account');
+      if (line.accountId === undefined)
+        throw invalid(`lines[${index}].accountId`, 'required', 'an account');
       return line.accountId;
     });
     const entryId = await inTransaction(this.db, async (tx) => {
-      const accounts = await this.accounts.activeByIds(ids, (index) => `lines[${index}].accountId`, tx);
+      const accounts = await this.accounts.activeByIds(
+        ids,
+        (index) => `lines[${index}].accountId`,
+        tx,
+      );
       const money = new Map((await this.moneyAccounts.list(tx)).map((row) => [row.id, row]));
       const lines: LineV1[] = [];
       for (const [index, line] of input.lines.entries()) {
         const account = accounts.get(ids[index] ?? 0);
         if (!account) throw invalid(`lines[${index}].accountId`, 'exists', 'an account');
         const debit = line.debit.gt(0);
-        const moneyAccount = line.moneyAccountId == null ? undefined : money.get(line.moneyAccountId);
+        const moneyAccount =
+          line.moneyAccountId == null ? undefined : money.get(line.moneyAccountId);
         if (line.moneyAccountId != null && !moneyAccount) {
           throw invalid(`lines[${index}].moneyAccountId`, 'exists', 'a cash box or bank account');
         }
         if (moneyAccount && moneyAccount.glAccountId !== account.id) {
-          throw invalid(`lines[${index}].moneyAccountId`, 'ofAccount', 'a cash box or bank account of the line\'s account');
+          throw invalid(
+            `lines[${index}].moneyAccountId`,
+            'ofAccount',
+            "a cash box or bank account of the line's account",
+          );
         }
         let party: LineV1['party'];
         if (line.customerId != null) {
@@ -511,9 +521,9 @@ export class JournalService {
     entryId: number,
     number: string,
   ): Promise<void> {
-    const already = (await this.reader.reversals(this.books.source(), { company, ids: [entryId] }, tx)).get(
-      entryId,
-    );
+    const already = (
+      await this.reader.reversals(this.books.source(), { company, ids: [entryId] }, tx)
+    ).get(entryId);
     if (already) {
       throw invalid('entryId', 'notReversed', `entry ${number} is reversed by ${already.number}`);
     }
