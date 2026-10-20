@@ -51,7 +51,7 @@ Schema `ai` holds views owned by `migrator`; `ai_reader` has `USAGE` on the sche
 | `ai.sales_order_lines` | order line: product, unit and quantity, base quantity, home warehouse, reserved and backordered quantities, picked and delivered quantities, totals (0023, 0024) |
 | `ai.invoices` | invoice: number, status, customer, order, branch, dates, payment method, totals and taxes, paid and open amounts, settlement, overdue and days overdue, line count (0026, ADR-0060) |
 | `ai.invoice_lines` | invoice line: product, unit, quantities, prices, discount, total, tax type, rates and amounts, returned base quantity (0026) |
-| `ai.payments` | voucher of the cash and bank books: kind, direction, money account and its branch, customer or journal account, amount, date, reference, who collected and recorded it, void fields (0026) |
+| `ai.payments` | voucher of the cash and bank books: kind, direction, money account and its branch, customer or journal account, amount, date, reference, who collected and recorded it, void fields (0026; since 0033 over the Finance Core's `fin.money_accounts` and `fin.accounts`, same columns, ADR-0089) |
 | `ai.customer_balances` | customer: balance (negative = advance), open invoices, overdue amount, oldest due date, credit limit and hold (0026) |
 
 The views never read `auth_sessions`, `password_resets`, `idempotency_keys`, `files`, `audit_log` or `import_rows`, and from `users` only `id` and `full_name`. `AI_DATASETS` (`semantic/datasets.ts`) describes every view and column in English. The prompt, the guard and the tests all use it. Mongolian names, the glossary and example questions live in `mn.json` (`ai.datasets`, `ai.glossary`, `ai.examples`).

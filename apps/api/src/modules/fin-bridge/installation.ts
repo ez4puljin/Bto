@@ -1,5 +1,10 @@
-import type { GlRole } from '@tugeel/shared/finance';
-import type { FinAccountControl, FinInstallationSpec } from '../../finance-core';
+import { DEFAULT_GL_ACCOUNTS, type GlRole } from '@tugeel/shared/finance';
+import mn from '@tugeel/shared/i18n/mn.json';
+import type {
+  FinAccountControl,
+  FinChartTemplateAccount,
+  FinInstallationSpec,
+} from '../../finance-core';
 import type { Branch } from '../identity';
 
 /** The owner's group (owner, 2026-10-20); one installation books into one of its companies. */
@@ -12,6 +17,12 @@ export const LEGACY_PARTY_REF = 'LEGACY_UNASSIGNED';
 
 /** A customer's ref under source BTO; 0032_fin_foundation backfilled the same refs. */
 export const customerRef = (customerId: number): string => `customer:${customerId}`;
+
+/** The customer id of a `customer:<id>` ref, or null for another kind of ref. */
+export function customerIdOfRef(ref: string): number | null {
+  const match = /^customer:([0-9]+)$/.exec(ref);
+  return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
+}
 
 interface PostingKeySpec {
   code: string;
@@ -49,6 +60,38 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   POS_SALES: key('POS_SALES'),
   CASH_VARIANCE: key('CASH_VARIANCE'),
 };
+
+/** The roles whose accounts reduce income: debit-normal although their kind is INCOME. */
+const CONTRA_INCOME_ROLES: ReadonlySet<GlRole> = new Set(['SALES_RETURN', 'SALES_DISCOUNT']);
+
+/** The role of each posting key (the inverse of POSTING_KEY_OF_ROLE). */
+export const ROLE_OF_POSTING_KEY: ReadonlyMap<string, GlRole> = new Map(
+  (Object.entries(POSTING_KEY_OF_ROLE) as [GlRole, PostingKeySpec][]).map(([role, spec]) => [
+    spec.code,
+    role,
+  ]),
+);
+
+/**
+ * The chart an empty company starts from (ADR-0089; the core never re-seeds a chart with accounts):
+ * today's default accounts named from mn.json, each role's account mapped by its posting key.
+ */
+export function btoChartTemplate(): FinChartTemplateAccount[] {
+  const names: Record<string, string> = mn.finance.seedAccounts;
+  return DEFAULT_GL_ACCOUNTS.map((account) => ({
+    code: account.code,
+    name: names[account.code] ?? account.code,
+    kind: account.kind,
+    normalSide:
+      account.kind === 'ASSET' ||
+      account.kind === 'EXPENSE' ||
+      (account.role !== null && CONTRA_INCOME_ROLES.has(account.role))
+        ? 'DEBIT'
+        : 'CREDIT',
+    control: account.role === null ? 'NONE' : POSTING_KEY_OF_ROLE[account.role].requiredControl,
+    key: account.role === null ? null : POSTING_KEY_OF_ROLE[account.role].code,
+  }));
+}
 
 /**
  * What this installation books into (ADR-0084 #1): company `companyCode` of tenant BUTEN_ORGIL,

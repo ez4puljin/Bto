@@ -15,7 +15,7 @@ import {
   unique,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { jsonValue } from '../common/db/types';
+import { jsonValue, money } from '../common/db/types';
 
 /**
  * The Finance Core's tables (ADR-0069 #4, ADR-0070, ADR-0076; docs/modules/finance-core.md §4): the
@@ -417,5 +417,292 @@ export const finAuditLog = finSchema.table(
     index('fin_audit_log_entity_idx').on(t.tenantId, t.entity, t.entityId, t.id),
     check('fin_audit_log_actor_kind', sql`${t.actorKind} IN ('STAFF', 'SOURCE', 'SYSTEM')`),
     check('fin_audit_log_action', sql`${t.action} ~ '^[A-Z][A-Z_]{0,31}$'`),
+  ],
+);
+
+// ---------------------------------------------------------------------------------------------------
+// The ledger (F1, ADR-0089; docs/modules/finance-core.md §4): the chart, money accounts, posting
+// rules, periods and the journal. Migration 0033_fin_ledger adds by hand: the REVOKEs, the
+// append-only triggers, the deferred balance trigger, and the copy of Bto's chart and money accounts.
+// ---------------------------------------------------------------------------------------------------
+
+export const FIN_ACCOUNT_KINDS = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
+export const FIN_SIDES = ['DEBIT', 'CREDIT'] as const;
+export const FIN_MONEY_ACCOUNT_KINDS = ['CASH', 'BANK', 'CLEARING'] as const;
+export const FIN_PERIOD_STATUSES = ['OPEN', 'CLOSED'] as const;
+
+/**
+ * A company's account (ADR-0072): its kind and normal side, and the control that says what every
+ * line on it must carry once the intake enforces it (F2). Never deleted: deactivated.
+ */
+export const finAccounts = finSchema.table(
+  'accounts',
+  {
+    id: id(),
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: FIN_ACCOUNT_KINDS }).notNull(),
+    normalSide: text('normal_side', { enum: FIN_SIDES }).notNull(),
+    control: text('control', { enum: FIN_ACCOUNT_CONTROLS }).notNull().default('NONE'),
+    status: status(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('fin_accounts_company_id_key').on(t.companyId, t.id),
+    unique('fin_accounts_company_code_key').on(t.companyId, t.code),
+    check('fin_accounts_code', codeShape(t.code)),
+    check('fin_accounts_name', nameShape(t.name)),
+    check(
+      'fin_accounts_kind',
+      sql`${t.kind} IN ('ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE')`,
+    ),
+    check('fin_accounts_normal_side', sql`${t.normalSide} IN ('DEBIT', 'CREDIT')`),
+    check(
+      'fin_accounts_control',
+      sql`${t.control} IN ('NONE', 'RECEIVABLE', 'PAYABLE', 'ADVANCE_RECEIVED', 'ADVANCE_PAID', 'MONEY')`,
+    ),
+    check('fin_accounts_status', statusShape(t.status)),
+  ],
+);
+
+/** A cash box, a bank account or a clearing account, on a branch, booked to an account (ADR-0072). */
+export const finMoneyAccounts = finSchema.table(
+  'money_accounts',
+  {
+    id: id(),
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: FIN_MONEY_ACCOUNT_KINDS }).notNull(),
+    branchId: ref('branch_id'),
+    accountId: ref('account_id').notNull(),
+    bankName: text('bank_name'),
+    bankAccountNo: text('bank_account_no'),
+    /** Listed to the company's customers to pay into (Bto's «Харилцагчид харуулах», ADR-0079 #7). */
+    showToCustomers: boolean('show_to_customers').notNull().default(false),
+    status: status(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('fin_money_accounts_company_id_key').on(t.companyId, t.id),
+    unique('fin_money_accounts_company_code_key').on(t.companyId, t.code),
+    foreignKey({
+      name: 'fin_money_accounts_account_fk',
+      columns: [t.companyId, t.accountId],
+      foreignColumns: [finAccounts.companyId, finAccounts.id],
+    }),
+    foreignKey({
+      name: 'fin_money_accounts_branch_fk',
+      columns: [t.companyId, t.branchId],
+      foreignColumns: [finBranches.companyId, finBranches.id],
+    }),
+    check('fin_money_accounts_code', codeShape(t.code)),
+    check('fin_money_accounts_name', nameShape(t.name)),
+    check('fin_money_accounts_kind', sql`${t.kind} IN ('CASH', 'BANK', 'CLEARING')`),
+    check('fin_money_accounts_shown', sql`NOT ${t.showToCustomers} OR ${t.kind} = 'BANK'`),
+    check(
+      'fin_money_accounts_bank',
+      sql`(${t.bankName} IS NULL OR length(${t.bankName}) BETWEEN 1 AND 120) AND (${t.bankAccountNo} IS NULL OR length(${t.bankAccountNo}) BETWEEN 1 AND 40)`,
+    ),
+    check('fin_money_accounts_status', statusShape(t.status)),
+  ],
+);
+
+/**
+ * Where a posting key lands (ADR-0072 #2): append-only, the newest row effective on the accounting
+ * date wins; a NULL account says "no account from this date" (a missing mapping rejects). F1 has
+ * the company defaults only; document type, branch and source selectors are later columns.
+ */
+export const finPostingRules = finSchema.table(
+  'posting_rules',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    postingKey: text('posting_key').notNull(),
+    accountId: ref('account_id'),
+    effectiveFrom: date('effective_from', { mode: 'string' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('fin_posting_rules_company_id_key').on(t.companyId, t.id),
+    foreignKey({
+      name: 'fin_posting_rules_key_fk',
+      columns: [t.companyId, t.postingKey],
+      foreignColumns: [finPostingKeys.companyId, finPostingKeys.code],
+    }),
+    foreignKey({
+      name: 'fin_posting_rules_account_fk',
+      columns: [t.companyId, t.accountId],
+      foreignColumns: [finAccounts.companyId, finAccounts.id],
+    }),
+    index('fin_posting_rules_key_idx').on(t.companyId, t.postingKey, t.effectiveFrom, t.id),
+  ],
+);
+
+/** A month of a company's books (ADR-0075, F1: OPEN / CLOSED only; closing comes in F5). */
+export const finFiscalPeriods = finSchema.table(
+  'fiscal_periods',
+  {
+    id: id(),
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    /** `YYYY-MM`. */
+    code: text('code').notNull(),
+    startsOn: date('starts_on', { mode: 'string' }).notNull(),
+    endsOn: date('ends_on', { mode: 'string' }).notNull(),
+    status: text('status', { enum: FIN_PERIOD_STATUSES }).notNull().default('OPEN'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('fin_fiscal_periods_company_id_key').on(t.companyId, t.id),
+    unique('fin_fiscal_periods_company_code_key').on(t.companyId, t.code),
+    check('fin_fiscal_periods_code', sql`${t.code} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check('fin_fiscal_periods_dates', sql`${t.endsOn} >= ${t.startsOn}`),
+    check('fin_fiscal_periods_status', sql`${t.status} IN ('OPEN', 'CLOSED')`),
+  ],
+);
+
+/**
+ * A journal entry (ADR-0072): numbered, dated in an open month, from a source document (its source
+ * key) or typed on the core's screens (source FIN); never changed, reversed once by an entry that
+ * names it. The deferred trigger of 0033 keeps it balanced at commit.
+ */
+export const finJournalEntries = finSchema.table(
+  'journal_entries',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    number: text('number').notNull(),
+    entryDate: date('entry_date', { mode: 'string' }).notNull(),
+    periodId: ref('period_id').notNull(),
+    sourceSystemId: ref('source_system_id').notNull(),
+    sourceDocType: text('source_doc_type'),
+    sourceDocId: text('source_doc_id'),
+    reversesId: ref('reverses_id'),
+    description: text('description').notNull(),
+    actorKind: text('actor_kind', { enum: FIN_ACTOR_KINDS }).notNull(),
+    actorRef: text('actor_ref').notNull(),
+    actorLabel: text('actor_label').notNull(),
+    requestId: text('request_id'),
+    postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('fin_journal_entries_company_id_key').on(t.companyId, t.id),
+    unique('fin_journal_entries_company_number_key').on(t.companyId, t.number),
+    unique('fin_journal_entries_company_reverses_key').on(t.companyId, t.reversesId),
+    foreignKey({
+      name: 'fin_journal_entries_period_fk',
+      columns: [t.companyId, t.periodId],
+      foreignColumns: [finFiscalPeriods.companyId, finFiscalPeriods.id],
+    }),
+    foreignKey({
+      name: 'fin_journal_entries_source_fk',
+      columns: [t.companyId, t.sourceSystemId],
+      foreignColumns: [finSourceGrants.companyId, finSourceGrants.sourceSystemId],
+    }),
+    foreignKey({
+      name: 'fin_journal_entries_reverses_fk',
+      columns: [t.companyId, t.reversesId],
+      foreignColumns: [t.companyId, t.id],
+    }),
+    index('fin_journal_entries_date_idx').on(t.companyId, t.entryDate, t.id),
+    index('fin_journal_entries_source_doc_idx').on(
+      t.companyId,
+      t.sourceSystemId,
+      t.sourceDocType,
+      t.sourceDocId,
+    ),
+    check('fin_journal_entries_number', sql`length(${t.number}) BETWEEN 1 AND 64`),
+    check(
+      'fin_journal_entries_source_doc',
+      sql`(${t.sourceDocType} IS NULL) = (${t.sourceDocId} IS NULL) AND (${t.sourceDocType} IS NULL OR (${codeShape(t.sourceDocType)} AND length(${t.sourceDocId}) BETWEEN 1 AND 128))`,
+    ),
+    check(
+      'fin_journal_entries_description',
+      sql`length(btrim(${t.description})) BETWEEN 1 AND 500`,
+    ),
+    check('fin_journal_entries_actor_kind', sql`${t.actorKind} IN ('STAFF', 'SOURCE', 'SYSTEM')`),
+  ],
+);
+
+/** One side of an entry (ADR-0072): its account, and the key and rule that chose it. */
+export const finJournalLines = finSchema.table(
+  'journal_lines',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    entryId: ref('entry_id').notNull(),
+    lineNo: smallint('line_no').notNull(),
+    accountId: ref('account_id').notNull(),
+    debit: money('debit')
+      .notNull()
+      .default(sql`0`),
+    credit: money('credit')
+      .notNull()
+      .default(sql`0`),
+    partyId: ref('party_id'),
+    moneyAccountId: ref('money_account_id'),
+    branchId: ref('branch_id'),
+    postingKey: text('posting_key'),
+    postingRuleId: ref('posting_rule_id'),
+    description: text('description'),
+  },
+  (t) => [
+    unique('fin_journal_lines_company_id_key').on(t.companyId, t.id),
+    unique('fin_journal_lines_entry_line_key').on(t.companyId, t.entryId, t.lineNo),
+    foreignKey({
+      name: 'fin_journal_lines_entry_fk',
+      columns: [t.companyId, t.entryId],
+      foreignColumns: [finJournalEntries.companyId, finJournalEntries.id],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_account_fk',
+      columns: [t.companyId, t.accountId],
+      foreignColumns: [finAccounts.companyId, finAccounts.id],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_party_fk',
+      columns: [t.companyId, t.partyId],
+      foreignColumns: [finPartyCompanies.companyId, finPartyCompanies.partyId],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_money_account_fk',
+      columns: [t.companyId, t.moneyAccountId],
+      foreignColumns: [finMoneyAccounts.companyId, finMoneyAccounts.id],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_branch_fk',
+      columns: [t.companyId, t.branchId],
+      foreignColumns: [finBranches.companyId, finBranches.id],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_key_fk',
+      columns: [t.companyId, t.postingKey],
+      foreignColumns: [finPostingKeys.companyId, finPostingKeys.code],
+    }),
+    foreignKey({
+      name: 'fin_journal_lines_rule_fk',
+      columns: [t.companyId, t.postingRuleId],
+      foreignColumns: [finPostingRules.companyId, finPostingRules.id],
+    }),
+    index('fin_journal_lines_account_idx').on(t.companyId, t.accountId, t.id),
+    index('fin_journal_lines_party_idx').on(t.companyId, t.partyId, t.id),
+    check(
+      'fin_journal_lines_amounts',
+      sql`${t.debit} >= 0 AND ${t.credit} >= 0 AND (${t.debit} = 0 OR ${t.credit} = 0) AND (${t.debit} <> 0 OR ${t.credit} <> 0)`,
+    ),
+    check(
+      'fin_journal_lines_description',
+      sql`${t.description} IS NULL OR length(btrim(${t.description})) BETWEEN 1 AND 500`,
+    ),
   ],
 );

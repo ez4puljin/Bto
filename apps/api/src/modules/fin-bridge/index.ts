@@ -4,11 +4,14 @@ export { FinBridgeHttpModule, FinBridgeModule } from './fin-bridge.module';
 export {
   BTO_SOURCE,
   BTO_TENANT,
+  btoChartTemplate,
   btoInstallationSpec,
+  customerIdOfRef,
   customerRef,
   FIN_SOURCE,
   LEGACY_PARTY_REF,
   POSTING_KEY_OF_ROLE,
+  ROLE_OF_POSTING_KEY,
 } from './installation';
 export { type CompanyEdit, FinCompanyBridge } from './services/company-bridge.service';
 export { FinContexts } from './services/contexts.service';

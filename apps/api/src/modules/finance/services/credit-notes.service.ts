@@ -17,17 +17,9 @@ import {
 } from '../../identity';
 import { BinsService, type Movement, StockPostingService } from '../../inventory';
 import { CustomersService } from '../../partners';
-import {
-  allocations,
-  creditNoteLines,
-  creditNotes,
-  invoiceLines,
-  invoices,
-  journalEntries,
-} from '../schema';
+import { allocations, creditNoteLines, creditNotes, invoiceLines, invoices } from '../schema';
 import { ArLedgerService } from './ar-ledger.service';
 import { FinanceSettingsService } from './finance-settings.service';
-import { GlAccountsService } from './gl-accounts.service';
 import { assertNotFuture, type JournalLineInput, JournalService } from './journal.service';
 
 export interface CreditNoteLineInput {
@@ -130,7 +122,6 @@ export class CreditNotesService {
     private readonly customers: CustomersService,
     private readonly settings: FinanceSettingsService,
     private readonly journal: JournalService,
-    private readonly accounts: GlAccountsService,
     private readonly ledger: ArLedgerService,
   ) {}
 
@@ -305,35 +296,7 @@ export class CreditNotesService {
           .where(eq(invoices.id, invoice.id));
       }
       const zero = new Decimal(0);
-      const entryLines: JournalLineInput[] = [];
-      const net = totals.total.minus(totals.vatTotal).minus(totals.cityTaxTotal);
-      if (net.gt(0)) {
-        entryLines.push({
-          accountId: (await this.accounts.byRole('SALES_RETURN', tx)).id,
-          debit: net,
-          credit: zero,
-        });
-      }
-      if (totals.vatTotal.gt(0)) {
-        entryLines.push({
-          accountId: (await this.accounts.byRole('VAT_PAYABLE', tx)).id,
-          debit: totals.vatTotal,
-          credit: zero,
-        });
-      }
-      if (totals.cityTaxTotal.gt(0)) {
-        entryLines.push({
-          accountId: (await this.accounts.byRole('CITY_TAX_PAYABLE', tx)).id,
-          debit: totals.cityTaxTotal,
-          credit: zero,
-        });
-      }
-      entryLines.push({
-        accountId: (await this.accounts.byRole('AR', tx)).id,
-        debit: zero,
-        credit: totals.total,
-        customerId: invoice.customerId,
-      });
+      const entryLines = creditNoteEntryLines(invoice.customerId, totals);
       const [customer] = await this.customers.getMany([invoice.customerId], tx);
       const entry = await this.journal.post(tx, ctx, {
         entryDate: noteDate,
@@ -392,7 +355,6 @@ export class CreditNotesService {
     const rows = await this.db
       .select(this.summaryColumns())
       .from(creditNotes)
-      .leftJoin(journalEntries, eq(journalEntries.id, creditNotes.journalEntryId))
       .leftJoin(invoices, eq(invoices.id, creditNotes.invoiceId))
       .where(filters.length ? and(...filters) : undefined)
       .orderBy(desc(creditNotes.id))
@@ -405,7 +367,6 @@ export class CreditNotesService {
     const [row] = await this.db
       .select(this.summaryColumns())
       .from(creditNotes)
-      .leftJoin(journalEntries, eq(journalEntries.id, creditNotes.journalEntryId))
       .leftJoin(invoices, eq(invoices.id, creditNotes.invoiceId))
       .where(eq(creditNotes.id, id));
     if (!row) throw notFound('credit_note', id);
@@ -462,7 +423,6 @@ export class CreditNotesService {
     return {
       note: creditNotes,
       invoiceNumber: invoices.number,
-      journalNumber: journalEntries.number,
       lineCount: sql<string>`(SELECT count(*) FROM credit_note_lines l WHERE l.credit_note_id = credit_notes.id)`,
       allocatedAmount: sql<string>`(SELECT coalesce(sum(a.amount), 0) FROM allocations a
         WHERE a.source_type = 'CREDIT_NOTE' AND a.source_id = credit_notes.id AND a.voided_at IS NULL)`,
@@ -473,7 +433,6 @@ export class CreditNotesService {
     rows: {
       note: NoteRow;
       invoiceNumber: string | null;
-      journalNumber: string | null;
       lineCount: string;
       allocatedAmount: string;
     }[],
@@ -491,7 +450,10 @@ export class CreditNotesService {
     const names = await this.names.namesOf(
       rows.flatMap((row) => (row.note.createdBy === null ? [] : [row.note.createdBy])),
     );
-    return rows.map(({ note, invoiceNumber, journalNumber, lineCount, allocatedAmount }) => ({
+    const journalNumbers = await this.journal.numbersOf(
+      rows.flatMap((row) => (row.note.journalEntryId === null ? [] : [row.note.journalEntryId])),
+    );
+    return rows.map(({ note, invoiceNumber, lineCount, allocatedAmount }) => ({
       id: note.id,
       number: note.number,
       invoiceId: note.invoiceId,
@@ -512,10 +474,34 @@ export class CreditNotesService {
       cityTaxTotal: note.cityTaxTotal,
       allocatedAmount: new Decimal(allocatedAmount),
       journalEntryId: note.journalEntryId,
-      journalNumber,
+      journalNumber:
+        note.journalEntryId === null ? null : (journalNumbers.get(note.journalEntryId) ?? null),
       lineCount: Number.parseInt(lineCount, 10),
       createdAt: note.createdAt,
       createdByName: note.createdBy === null ? null : (names.get(note.createdBy) ?? null),
     }));
   }
+}
+
+/**
+ * A credit note's entry (ADR-0060 #6): Dr sales returns net of the taxes, Dr the taxes payable, Cr
+ * receivables (the customer on the line); zero lines skipped. Also used by the development re-post
+ * (`pnpm finance:repost-journal`, ADR-0089).
+ */
+export function creditNoteEntryLines(
+  customerId: number,
+  totals: { total: Decimal; vatTotal: Decimal; cityTaxTotal: Decimal },
+): JournalLineInput[] {
+  const zero = new Decimal(0);
+  const lines: JournalLineInput[] = [];
+  const net = totals.total.minus(totals.vatTotal).minus(totals.cityTaxTotal);
+  if (net.gt(0)) lines.push({ role: 'SALES_RETURN', debit: net, credit: zero });
+  if (totals.vatTotal.gt(0)) {
+    lines.push({ role: 'VAT_PAYABLE', debit: totals.vatTotal, credit: zero });
+  }
+  if (totals.cityTaxTotal.gt(0)) {
+    lines.push({ role: 'CITY_TAX_PAYABLE', debit: totals.cityTaxTotal, credit: zero });
+  }
+  lines.push({ role: 'AR', debit: zero, credit: totals.total, customerId });
+  return lines;
 }

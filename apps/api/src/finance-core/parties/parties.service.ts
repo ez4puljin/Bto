@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { type PartyIn, PartyInSchema } from '@tugeel/fin-contract';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { recordFinAudit } from '../audit/fin-audit';
-import { type CompanyScope, resolveCompany } from '../context/authorize';
+import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/authorize';
 import type { FinCallContext } from '../context/call-context';
 import type { FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
@@ -117,8 +117,55 @@ export class FinPartiesService {
       : { partyId: String(partyId), system: scope.system, ref: query.ref };
   }
 
+  /**
+   * The calling source's refs of these parties (Bto: `customer:<id>`), by party id; a party the
+   * source does not know is left out. Used to show a journal line's counterparty in the source's terms.
+   */
+  async refsOf(
+    executor: FinExecutor,
+    ctx: FinCallContext,
+    query: { company: string; partyIds: readonly string[] },
+  ): Promise<Map<string, string>> {
+    const scope = await this.sourceScope(executor, ctx, query.company);
+    const ids = [...new Set(query.partyIds)].map((id) => Number.parseInt(id, 10));
+    if (ids.length === 0) return new Map();
+    const rows = await executor
+      .select({ partyId: finPartyRefs.partyId, ref: finPartyRefs.externalId })
+      .from(finPartyRefs)
+      .where(
+        and(
+          eq(finPartyRefs.tenantId, scope.tenantId),
+          eq(finPartyRefs.sourceSystemId, scope.sourceSystemId),
+          inArray(finPartyRefs.partyId, ids),
+        ),
+      );
+    return new Map(rows.map((row) => [String(row.partyId), row.ref]));
+  }
+
+  /** The parties of these refs of the calling source, by ref; an unseen ref is left out. */
+  async partiesOf(
+    executor: FinExecutor,
+    ctx: FinCallContext,
+    query: { company: string; refs: readonly string[] },
+  ): Promise<Map<string, string>> {
+    const scope = await this.sourceScope(executor, ctx, query.company);
+    const refs = [...new Set(query.refs)];
+    if (refs.length === 0) return new Map();
+    const rows = await executor
+      .select({ partyId: finPartyRefs.partyId, ref: finPartyRefs.externalId })
+      .from(finPartyRefs)
+      .where(
+        and(
+          eq(finPartyRefs.tenantId, scope.tenantId),
+          eq(finPartyRefs.sourceSystemId, scope.sourceSystemId),
+          inArray(finPartyRefs.externalId, refs),
+        ),
+      );
+    return new Map(rows.map((row) => [row.ref, String(row.partyId)]));
+  }
+
   private async sourceScope(
-    tx: FinTx,
+    tx: FinExecutor,
     ctx: FinCallContext,
     company: string,
   ): Promise<CompanyScope & { sourceSystemId: number; system: string }> {
@@ -138,7 +185,7 @@ export class FinPartiesService {
   }
 
   private async find(
-    tx: FinTx,
+    tx: FinExecutor,
     scope: { tenantId: number; sourceSystemId: number },
     ref: string,
   ): Promise<number | null> {

@@ -15,13 +15,13 @@ import type { SaleSink, SaleSnapshot } from '../../sales';
 import { allocations, creditNotes, invoiceLines, invoices } from '../schema';
 import { ArLedgerService } from './ar-ledger.service';
 import { FinanceSettingsService } from './finance-settings.service';
-import { GlAccountsService } from './gl-accounts.service';
 import { type InvoiceDetail, InvoiceQueryService } from './invoice-query.service';
 import { type JournalLineInput, JournalService } from './journal.service';
 
 type NewLine = Omit<typeof invoiceLines.$inferInsert, 'invoiceId'>;
 
-interface Totals {
+/** An invoice's money totals: what its entry books. */
+export interface InvoiceTotals {
   subtotal: Decimal;
   discountTotal: Decimal;
   total: Decimal;
@@ -45,7 +45,6 @@ export class InvoicingService implements SaleSink {
     private readonly customers: CustomersService,
     private readonly settings: FinanceSettingsService,
     private readonly journal: JournalService,
-    private readonly accounts: GlAccountsService,
     private readonly ledger: ArLedgerService,
     private readonly query: InvoiceQueryService,
   ) {}
@@ -125,7 +124,7 @@ export class InvoicingService implements SaleSink {
         source: 'AUTO_INVOICE',
         sourceType: 'INVOICE',
         sourceId: invoice.id,
-        lines: await this.entryLines(customer.id, totals, tx),
+        lines: invoiceEntryLines(customer.id, totals),
       });
       await tx
         .update(invoices)
@@ -246,53 +245,37 @@ export class InvoicingService implements SaleSink {
     const [customer] = await this.customers.getMany([customerId], tx);
     return customer ? `${number} — ${customer.name}` : number;
   }
-
-  private async entryLines(
-    customerId: number,
-    totals: Totals,
-    tx: Tx,
-  ): Promise<JournalLineInput[]> {
-    const zero = new Decimal(0);
-    const lines: JournalLineInput[] = [];
-    if (totals.total.gt(0)) {
-      lines.push({
-        accountId: (await this.accounts.byRole('AR', tx)).id,
-        debit: totals.total,
-        credit: zero,
-        customerId,
-      });
-    }
-    if (totals.discountTotal.gt(0)) {
-      lines.push({
-        accountId: (await this.accounts.byRole('SALES_DISCOUNT', tx)).id,
-        debit: totals.discountTotal,
-        credit: zero,
-      });
-    }
-    lines.push({
-      accountId: (await this.accounts.byRole('SALES', tx)).id,
-      debit: zero,
-      credit: totals.subtotal.minus(totals.vatTotal).minus(totals.cityTaxTotal),
-    });
-    if (totals.vatTotal.gt(0)) {
-      lines.push({
-        accountId: (await this.accounts.byRole('VAT_PAYABLE', tx)).id,
-        debit: zero,
-        credit: totals.vatTotal,
-      });
-    }
-    if (totals.cityTaxTotal.gt(0)) {
-      lines.push({
-        accountId: (await this.accounts.byRole('CITY_TAX_PAYABLE', tx)).id,
-        debit: zero,
-        credit: totals.cityTaxTotal,
-      });
-    }
-    return lines;
-  }
 }
 
-function totalsOf(lines: readonly NewLine[]): Totals {
+/**
+ * An invoice's entry (ADR-0060 #7): Dr receivables (the customer on the line) and the discount, Cr
+ * sales net of the taxes, Cr the taxes payable; zero lines skipped. Also used by the development
+ * re-post (`pnpm finance:repost-journal`, ADR-0089).
+ */
+export function invoiceEntryLines(customerId: number, totals: InvoiceTotals): JournalLineInput[] {
+  const zero = new Decimal(0);
+  const lines: JournalLineInput[] = [];
+  if (totals.total.gt(0)) {
+    lines.push({ role: 'AR', debit: totals.total, credit: zero, customerId });
+  }
+  if (totals.discountTotal.gt(0)) {
+    lines.push({ role: 'SALES_DISCOUNT', debit: totals.discountTotal, credit: zero });
+  }
+  lines.push({
+    role: 'SALES',
+    debit: zero,
+    credit: totals.subtotal.minus(totals.vatTotal).minus(totals.cityTaxTotal),
+  });
+  if (totals.vatTotal.gt(0)) {
+    lines.push({ role: 'VAT_PAYABLE', debit: zero, credit: totals.vatTotal });
+  }
+  if (totals.cityTaxTotal.gt(0)) {
+    lines.push({ role: 'CITY_TAX_PAYABLE', debit: zero, credit: totals.cityTaxTotal });
+  }
+  return lines;
+}
+
+function totalsOf(lines: readonly NewLine[]): InvoiceTotals {
   const sum = (pick: (line: NewLine) => Decimal) =>
     lines.reduce((acc, line) => acc.plus(pick(line)), new Decimal(0));
   return {

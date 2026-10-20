@@ -33,6 +33,7 @@ export {
   type InvoiceSummary,
 } from './services/invoice-query.service';
 export { InvoicingService } from './services/invoicing.service';
+export { JournalRepostService, type RepostCounts } from './services/journal-repost.service';
 export {
   type JournalEntryDetail,
   type JournalEntryInput,

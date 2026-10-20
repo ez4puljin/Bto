@@ -2,15 +2,21 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { AnyTx } from '../../common/db/any-tx';
 import {
+  finAccounts,
   finAuditLog,
   finBranches,
   finBranchRefs,
   finCompanies,
   finCompanyTaxRegistrations,
+  finFiscalPeriods,
+  finJournalEntries,
+  finJournalLines,
+  finMoneyAccounts,
   finParties,
   finPartyCompanies,
   finPartyRefs,
   finPostingKeys,
+  finPostingRules,
   finSourceGrants,
   finSourceSystems,
   finTenants,
@@ -22,15 +28,21 @@ import {
  * imports.
  */
 const schema = {
+  finAccounts,
   finAuditLog,
   finBranches,
   finBranchRefs,
   finCompanies,
   finCompanyTaxRegistrations,
+  finFiscalPeriods,
+  finJournalEntries,
+  finJournalLines,
+  finMoneyAccounts,
   finParties,
   finPartyCompanies,
   finPartyRefs,
   finPostingKeys,
+  finPostingRules,
   finSourceGrants,
   finSourceSystems,
   finTenants,

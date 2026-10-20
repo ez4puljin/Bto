@@ -37,6 +37,7 @@ const GUARDS = {
   FIN_LEDGER: { ruleId: 'no-restricted-imports', marker: 'fin ledger tables' },
   FIN_INTAKE: { ruleId: 'no-restricted-imports', marker: 'FinIntakeInTx is imported only' },
   FIN_CONTEXT: { ruleId: 'no-restricted-imports', marker: 'builds a FinCallContext' },
+  FIN_POSTING: { ruleId: 'no-restricted-imports', marker: 'posting façade FinJournalPosting' },
   TEST_CODE: { ruleId: 'no-restricted-imports', marker: 'never imports test code' },
   MN: { ruleId: 'no-restricted-imports', marker: '@tugeel/shared/mn imports only' },
 };
@@ -667,6 +668,63 @@ export const x = [createFinCallContext, ensureDefaultCompany];`,
     `import { createFinCallContext } from '../../src/finance-core';
 export const x = createFinCallContext;`,
     true,
+  ],
+  [
+    'pos never seeds a chart',
+    FIN_CONTEXT,
+    `${M}/pos/services/pos-shifts.service.ts`,
+    `import { ensureDefaultChart } from '../../../finance-core';
+export const x = ensureDefaultChart;`,
+    true,
+  ],
+  [
+    'fin-bridge seeds an empty chart',
+    FIN_CONTEXT,
+    `${M}/fin-bridge/fin-bridge.module.ts`,
+    `import { ensureDefaultChart } from '../../finance-core';
+export const x = ensureDefaultChart;`,
+    false,
+  ],
+  // F1's posting façade (ADR-0089): finance only; pos posts through finance's JournalService
+  [
+    'finance posts through the façade',
+    'FIN_POSTING',
+    `${M}/finance/services/journal.service.ts`,
+    `import { FinJournalPosting } from '../../../finance-core';
+export const x = FinJournalPosting;`,
+    false,
+  ],
+  [
+    'pos never posts through the façade itself',
+    'FIN_POSTING',
+    `${M}/pos/services/pos-shifts.service.ts`,
+    `import { FinJournalPosting } from '../../../finance-core';
+export const x = FinJournalPosting;`,
+    true,
+  ],
+  [
+    'fin-bridge never posts through the façade',
+    'FIN_POSTING',
+    `${M}/fin-bridge/services/contexts.service.ts`,
+    `import { FinJournalPosting } from '../../../finance-core';
+export const x = FinJournalPosting;`,
+    true,
+  ],
+  [
+    'another module never posts through the façade',
+    'FIN_POSTING',
+    SALES_SERVICE,
+    `import { FinJournalPosting } from '../../../finance-core';
+export const x = FinJournalPosting;`,
+    true,
+  ],
+  [
+    'the schema aggregators list the ledger tables',
+    FIN_LEDGER,
+    'apps/api/src/finance-core/db/fin-db.ts',
+    `import { finJournalEntries } from '../schema';
+export const x = finJournalEntries;`,
+    false,
   ],
   // StaticCaller and the harness stay in apps/api/test (ADR-0076)
   [

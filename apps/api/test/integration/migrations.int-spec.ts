@@ -38,11 +38,15 @@ describe('database bootstrap (ADR-0024)', () => {
       'assert_unicode_casefold',
       'forbid_update_delete',
     ]);
-    // The Finance Core's own copy (0032_fin_foundation), so `pg_dump -n fin` is self-contained.
+    // The Finance Core's own copies (0032_fin_foundation, the balance check of 0033_fin_ledger), so
+    // `pg_dump -n fin` is self-contained.
     const finFunctions = await migrator.query<{ proname: string }>(
       `SELECT proname FROM pg_proc WHERE pronamespace = 'fin'::regnamespace ORDER BY 1`,
     );
-    expect(finFunctions.rows.map((row) => row.proname)).toEqual(['forbid_update_delete']);
+    expect(finFunctions.rows.map((row) => row.proname)).toEqual([
+      'forbid_update_delete',
+      'journal_entry_balanced',
+    ]);
   });
 
   it('installed the pg-boss schema at the version of the installed package', async () => {

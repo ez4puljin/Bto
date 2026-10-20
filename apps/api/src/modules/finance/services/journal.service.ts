@@ -1,39 +1,48 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   FINANCE_LIMITS,
+  type GlRole,
+  JOURNAL_SOURCE_DOC_TYPES,
   type JournalSource,
   type JournalSourceDocType,
 } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import {
-  type Actor,
-  actorUserId,
-  AuditService,
-  type AuthContext,
-  UserNamesService,
-} from '../../identity';
-import { CustomersService } from '../../partners';
+  type FinCallContext,
+  type FinEntryOrigin,
+  type FinEntrySummary,
+  FinError,
+  FinJournalPosting,
+  FinJournalReader,
+} from '../../../finance-core';
 import {
-  creditNotes,
-  glAccounts,
-  invoices,
-  journalEntries,
-  journalLines,
-  moneyAccounts,
-  payments,
-} from '../schema';
+  BTO_SOURCE,
+  FIN_SOURCE,
+  FinPartiesBridge,
+  POSTING_KEY_OF_ROLE,
+  ROLE_OF_POSTING_KEY,
+} from '../../fin-bridge';
+import { type Actor, AuditService, type AuthContext, UserNamesService } from '../../identity';
+import { CustomersService } from '../../partners';
+import { creditNotes, invoices, payments } from '../schema';
 import { FinanceSettingsService } from './finance-settings.service';
+import { FinBooks, staffContext } from './fin-books';
 import { GlAccountsService } from './gl-accounts.service';
 
+/**
+ * One side of an entry: the account by role (an automatic entry), by id (a manual entry, a
+ * voucher's other account) or through a money account (its account), never two of them.
+ */
 export interface JournalLineInput {
-  accountId: number;
+  role?: GlRole;
+  accountId?: number;
   debit: Decimal;
   credit: Decimal;
   customerId?: number | null;
@@ -47,7 +56,6 @@ export interface JournalEntryInput {
   source: JournalSource;
   sourceType?: JournalSourceDocType | null;
   sourceId?: number | null;
-  reversesId?: number | null;
   lines: readonly JournalLineInput[];
 }
 
@@ -137,12 +145,19 @@ export interface AccountLedgerPage {
 }
 
 const MONEY_SCALE = 2;
+const DOC_SOURCE: Partial<Record<string, JournalSource>> = {
+  INVOICE: 'AUTO_INVOICE',
+  PAYMENT: 'AUTO_PAYMENT',
+  CREDIT_NOTE: 'AUTO_CREDIT_NOTE',
+  POS_SHIFT: 'AUTO_POS_SHIFT',
+};
 
 /**
- * The general journal (ADR-0060 #7): numbered, balanced, append-only entries; the automatic ones
- * from documents, the manual ones from the accountant. An entry is never changed; a correction is
- * a reversing entry that names it. Σ debit = Σ credit is checked here and again by the database
- * at commit (0026, `journal_entry_balanced`).
+ * The general journal (ADR-0060 #7), kept by the Finance Core since F1's ledger (ADR-0089):
+ * numbered, balanced, append-only entries in `fin.journal_*`; the automatic ones from documents
+ * (posted as source BTO), the manual ones from the accountant (posted as the staff member, source
+ * FIN). An entry is never changed; a correction is a reversing entry that names it. Σ debit =
+ * Σ credit is checked here, again by the core and once more by the database at commit.
  */
 @Injectable()
 export class JournalService {
@@ -153,6 +168,10 @@ export class JournalService {
     private readonly accounts: GlAccountsService,
     private readonly customers: CustomersService,
     private readonly names: UserNamesService,
+    private readonly posting: FinJournalPosting,
+    private readonly reader: FinJournalReader,
+    private readonly parties: FinPartiesBridge,
+    private readonly books: FinBooks,
   ) {}
 
   /** Posts an entry inside the caller's transaction; 422 JOURNAL_UNBALANCED when Σ differ. */
@@ -186,43 +205,50 @@ export class JournalService {
         credit: credit.toFixed(MONEY_SCALE),
       });
     }
-    await this.accounts.activeByIds(
-      lines.map((line) => line.accountId),
-      (index) => `lines[${index}].accountId`,
-      tx,
+    const explicit = lines.flatMap((line, index) =>
+      line.accountId === undefined ? [] : [{ id: line.accountId, index }],
     );
-    const description = input.description.trim();
-    if (description.length === 0 || description.length > FINANCE_LIMITS.maxDescription) {
-      throw invalid('description', 'length', `1 to ${FINANCE_LIMITS.maxDescription} characters`);
+    if (explicit.length) {
+      await this.accounts.activeByIds(
+        explicit.map((own) => own.id),
+        (at) => `lines[${explicit[at]?.index ?? at}].accountId`,
+        tx,
+      );
     }
+    const description = checkedDescription(input.description);
     const number = await this.settings.allocateNumber(tx, 'JOURNAL', input.entryDate);
-    const [entry] = await tx
-      .insert(journalEntries)
-      .values({
-        number,
-        entryDate: input.entryDate,
-        description,
-        source: input.source,
-        sourceType: input.sourceType ?? null,
-        sourceId: input.sourceId ?? null,
-        reversesId: input.reversesId ?? null,
-        postedBy: actorUserId(actor),
-      })
-      .returning({ id: journalEntries.id });
-    if (!entry) throw new Error('journal_entries insert returned no row');
-    await tx.insert(journalLines).values(
-      lines.map((line, index) => ({
-        entryId: entry.id,
-        lineNo: index + 1,
-        accountId: line.accountId,
-        debit: line.debit,
-        credit: line.credit,
-        customerId: line.customerId ?? null,
-        moneyAccountId: line.moneyAccountId ?? null,
-        description: line.description?.trim() || null,
-      })),
+    const partyOf = new Map<number, string>();
+    for (const line of lines) {
+      if (line.customerId == null || partyOf.has(line.customerId)) continue;
+      partyOf.set(
+        line.customerId,
+        await this.parties.customerPartyInTx(tx, actor, line.customerId),
+      );
+    }
+    const company = await this.books.company();
+    return this.translated(
+      (index) => lines[index]?.role,
+      () =>
+        this.posting.postEntryInTx(tx, this.contextFor(input.source, actor), {
+          company,
+          number,
+          entryDate: input.entryDate,
+          description,
+          sourceDoc:
+            input.sourceType && input.sourceId != null
+              ? { type: input.sourceType, id: String(input.sourceId) }
+              : null,
+          lines: lines.map((line) => ({
+            key: line.role === undefined ? null : POSTING_KEY_OF_ROLE[line.role].code,
+            accountId: line.accountId ?? null,
+            moneyAccountId: line.moneyAccountId ?? null,
+            partyId: line.customerId == null ? null : (partyOf.get(line.customerId) ?? null),
+            debit: line.debit,
+            credit: line.credit,
+            description: line.description?.trim() || null,
+          })),
+        }),
     );
-    return { id: entry.id, number };
   }
 
   /**
@@ -235,15 +261,12 @@ export class JournalService {
     entryId: number,
     input: { entryDate: string; description: string; source: JournalSource },
   ): Promise<JournalEntryRef> {
-    const [original] = await tx
-      .select({ id: journalEntries.id, number: journalEntries.number })
-      .from(journalEntries)
-      .where(eq(journalEntries.id, entryId));
+    const company = await this.books.company();
+    const original = await this.reader.entry(this.books.source(), { company, id: entryId }, tx);
     if (!original) throw notFound('journal_entry', entryId);
-    const [already] = await tx
-      .select({ number: journalEntries.number })
-      .from(journalEntries)
-      .where(eq(journalEntries.reversesId, entryId));
+    const already = (
+      await this.reader.reversals(this.books.source(), { company, ids: [entryId] }, tx)
+    ).get(entryId);
     if (already) {
       throw invalid(
         'entryId',
@@ -251,23 +274,19 @@ export class JournalService {
         `entry ${original.number} is reversed by ${already.number}`,
       );
     }
-    const lines = await tx
-      .select()
-      .from(journalLines)
-      .where(eq(journalLines.entryId, entryId))
-      .orderBy(asc(journalLines.lineNo));
-    return this.post(tx, actor, {
-      ...input,
-      reversesId: entryId,
-      lines: lines.map((line) => ({
-        accountId: line.accountId,
-        debit: line.credit,
-        credit: line.debit,
-        customerId: line.customerId,
-        moneyAccountId: line.moneyAccountId,
-        description: line.description,
-      })),
-    });
+    const description = checkedDescription(input.description);
+    const number = await this.settings.allocateNumber(tx, 'JOURNAL', input.entryDate);
+    return this.translated(
+      () => undefined,
+      () =>
+        this.posting.reverseEntryInTx(tx, this.contextFor(input.source, actor), {
+          company,
+          entryId,
+          number,
+          entryDate: input.entryDate,
+          description,
+        }),
+    );
   }
 
   /** A manual entry (`finance.journal.manage`), dated today or earlier. */
@@ -304,12 +323,14 @@ export class JournalService {
     input: { description: string },
   ): Promise<JournalEntryDetail> {
     const ref = await inTransaction(this.db, async (tx) => {
-      const [original] = await tx
-        .select({ source: journalEntries.source, number: journalEntries.number })
-        .from(journalEntries)
-        .where(eq(journalEntries.id, entryId));
+      const original = await this.reader.entry(
+        this.books.source(),
+        { company: await this.books.company(), id: entryId },
+        tx,
+      );
       if (!original) throw notFound('journal_entry', entryId);
-      if (original.source !== 'MANUAL' && original.source !== 'OPENING') {
+      const source = sourceOf(original);
+      if (source !== 'MANUAL' && source !== 'OPENING') {
         throw invalid('entryId', 'manual', 'only a manual or opening entry is reversed by hand');
       }
       const reversed = await this.reverse(tx, ctx, entryId, {
@@ -334,87 +355,72 @@ export class JournalService {
   }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
-    const filters: SQL[] = [];
-    if (query.from) filters.push(sql`${journalEntries.entryDate} >= ${query.from}`);
-    if (query.to) filters.push(sql`${journalEntries.entryDate} <= ${query.to}`);
-    if (query.source) filters.push(eq(journalEntries.source, query.source));
-    if (query.accountId) {
-      filters.push(
-        sql`EXISTS (SELECT 1 FROM journal_lines l WHERE l.entry_id = journal_entries.id AND l.account_id = ${query.accountId})`,
-      );
-    }
+    let partyId: string | undefined;
     if (query.customerId) {
-      filters.push(
-        sql`EXISTS (SELECT 1 FROM journal_lines l WHERE l.entry_id = journal_entries.id AND l.customer_id = ${query.customerId})`,
-      );
+      partyId = (await this.parties.partiesOfCustomers([query.customerId])).get(query.customerId);
+      if (partyId === undefined) return { data: [], nextCursor: null };
     }
-    if (typeof after?.date === 'string' && typeof after?.id === 'number') {
-      filters.push(
-        sql`(${journalEntries.entryDate}, ${journalEntries.id}) < (${after.date}::date, ${after.id}::bigint)`,
-      );
-    }
-    const rows = await this.db
-      .select({
-        entry: journalEntries,
-        amount: sql<string>`(SELECT coalesce(sum(l.debit), 0) FROM journal_lines l WHERE l.entry_id = journal_entries.id)`,
-        lineCount: sql<string>`(SELECT count(*) FROM journal_lines l WHERE l.entry_id = journal_entries.id)`,
-      })
-      .from(journalEntries)
-      .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(journalEntries.entryDate), desc(journalEntries.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({
-      date: row.entry.entryDate,
-      id: row.entry.id,
-    }));
+    const rows = await this.reader.entries(this.books.source(), {
+      company: await this.books.company(),
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(query.source ? { origin: originOf(query.source) } : {}),
+      ...(query.accountId ? { accountId: query.accountId } : {}),
+      ...(partyId !== undefined ? { partyId } : {}),
+      ...(typeof after?.date === 'string' && typeof after?.id === 'number'
+        ? { after: { date: after.date, id: after.id } }
+        : {}),
+      limit,
+    });
+    const page = toPage(rows, limit, (row) => ({ date: row.entryDate, id: row.id }));
     return { data: await this.summaries(page.data), nextCursor: page.nextCursor };
   }
 
   async get(id: number): Promise<JournalEntryDetail> {
-    const [row] = await this.db
-      .select({
-        entry: journalEntries,
-        amount: sql<string>`(SELECT coalesce(sum(l.debit), 0) FROM journal_lines l WHERE l.entry_id = journal_entries.id)`,
-        lineCount: sql<string>`(SELECT count(*) FROM journal_lines l WHERE l.entry_id = journal_entries.id)`,
-      })
-      .from(journalEntries)
-      .where(eq(journalEntries.id, id));
-    if (!row) throw notFound('journal_entry', id);
-    const [summary] = await this.summaries([row]);
+    const entry = await this.reader.entry(this.books.source(), {
+      company: await this.books.company(),
+      id,
+    });
+    if (!entry) throw notFound('journal_entry', id);
+    const [summary] = await this.summaries([entry]);
     if (!summary) throw notFound('journal_entry', id);
-    const lines = await this.db
-      .select({
-        line: journalLines,
-        accountCode: glAccounts.code,
-        accountName: glAccounts.name,
-        moneyAccountName: moneyAccounts.name,
-      })
-      .from(journalLines)
-      .innerJoin(glAccounts, eq(glAccounts.id, journalLines.accountId))
-      .leftJoin(moneyAccounts, eq(moneyAccounts.id, journalLines.moneyAccountId))
-      .where(eq(journalLines.entryId, id))
-      .orderBy(asc(journalLines.lineNo));
-    const customerNames = await this.customerNames(
-      lines.flatMap((row) => (row.line.customerId === null ? [] : [row.line.customerId])),
+    const customerOf = await this.parties.customersOfParties(
+      entry.lines.flatMap((line) => (line.partyId === null ? [] : [line.partyId])),
     );
+    const customerNames = await this.customerNames([...customerOf.values()]);
     return {
       ...summary,
-      lines: lines.map(({ line, accountCode, accountName, moneyAccountName }) => ({
-        id: line.id,
-        lineNo: line.lineNo,
-        accountId: line.accountId,
-        accountCode,
-        accountName,
-        debit: line.debit,
-        credit: line.credit,
-        customerId: line.customerId,
-        customerName:
-          line.customerId === null ? null : (customerNames.get(line.customerId) ?? null),
-        moneyAccountId: line.moneyAccountId,
-        moneyAccountName,
-        description: line.description,
-      })),
+      lines: entry.lines.map((line) => {
+        const customerId = line.partyId === null ? null : (customerOf.get(line.partyId) ?? null);
+        return {
+          id: line.id,
+          lineNo: line.lineNo,
+          accountId: line.accountId,
+          accountCode: line.accountCode,
+          accountName: line.accountName,
+          debit: line.debit,
+          credit: line.credit,
+          customerId,
+          customerName: customerId === null ? null : (customerNames.get(customerId) ?? null),
+          moneyAccountId: line.moneyAccountId,
+          moneyAccountName: line.moneyAccountName,
+          description: line.description,
+        };
+      }),
     };
+  }
+
+  /** The numbers of these entries (a document's «Ж-…» fact), by id. */
+  async numbersOf(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, string>> {
+    if (ids.length === 0) return new Map();
+    return this.reader.numbers(
+      this.books.source(),
+      { company: await this.books.company(), ids },
+      this.books.executor(executor),
+    );
   }
 
   /** An account's lines newest first with the balance after each, and the opening balance. */
@@ -422,152 +428,147 @@ export class JournalService {
     await this.accounts.get(accountId);
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
-    const running = this.db
-      .select({
-        id: journalLines.id,
-        entryId: journalLines.entryId,
-        entryNumber: journalEntries.number,
-        entryDate: journalEntries.entryDate,
-        entryDescription: sql<string>`${journalEntries.description}`.as('entry_description'),
-        source: journalEntries.source,
-        lineNo: journalLines.lineNo,
-        debit: journalLines.debit,
-        credit: journalLines.credit,
-        customerId: journalLines.customerId,
-        description: sql<string | null>`${journalLines.description}`.as('line_description'),
-        balanceAfter:
-          sql<string>`sum(${journalLines.debit} - ${journalLines.credit}) OVER (ORDER BY ${journalEntries.entryDate}, ${journalEntries.id}, ${journalLines.lineNo})`.as(
-            'balance_after',
-          ),
-      })
-      .from(journalLines)
-      .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
-      .where(eq(journalLines.accountId, accountId))
-      .as('running');
-    const filters: SQL[] = [];
-    if (query.from) filters.push(sql`${running.entryDate} >= ${query.from}`);
-    if (query.to) filters.push(sql`${running.entryDate} <= ${query.to}`);
-    if (
-      typeof after?.date === 'string' &&
+    const { rows, opening } = await this.reader.accountLedger(this.books.source(), {
+      company: await this.books.company(),
+      accountId,
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(typeof after?.date === 'string' &&
       typeof after?.entryId === 'number' &&
       typeof after?.lineNo === 'number'
-    ) {
-      filters.push(
-        sql`(${running.entryDate}, ${running.entryId}, ${running.lineNo}) < (${after.date}::date, ${after.entryId}::bigint, ${after.lineNo}::smallint)`,
-      );
-    }
-    const rows = await this.db
-      .select()
-      .from(running)
-      .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(running.entryDate), desc(running.entryId), desc(running.lineNo))
-      .limit(limit + 1);
+        ? { after: { date: after.date, entryId: after.entryId, lineNo: after.lineNo } }
+        : {}),
+      limit,
+    });
     const page = toPage(rows, limit, (row) => ({
       date: row.entryDate,
       entryId: row.entryId,
       lineNo: row.lineNo,
     }));
-    let opening = new Decimal(0);
-    if (query.from) {
-      const [before] = await this.db
-        .select({
-          balance: sql<string>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
-        })
-        .from(journalLines)
-        .innerJoin(journalEntries, eq(journalEntries.id, journalLines.entryId))
-        .where(
-          and(
-            eq(journalLines.accountId, accountId),
-            sql`${journalEntries.entryDate} < ${query.from}`,
-          ),
-        );
-      opening = new Decimal(before?.balance ?? 0);
-    }
-    const customerNames = await this.customerNames(
-      page.data.flatMap((row) => (row.customerId === null ? [] : [row.customerId])),
+    const customerOf = await this.parties.customersOfParties(
+      page.data.flatMap((row) => (row.partyId === null ? [] : [row.partyId])),
     );
+    const customerNames = await this.customerNames([...customerOf.values()]);
     return {
-      data: page.data.map((row) => ({
-        ...row,
-        customerName: row.customerId === null ? null : (customerNames.get(row.customerId) ?? null),
-        balanceAfter: new Decimal(row.balanceAfter),
-      })),
+      data: page.data.map((row) => {
+        const customerId = row.partyId === null ? null : (customerOf.get(row.partyId) ?? null);
+        return {
+          id: row.id,
+          entryId: row.entryId,
+          entryNumber: row.entryNumber,
+          entryDate: row.entryDate,
+          entryDescription: row.entryDescription,
+          source: sourceOf(row),
+          lineNo: row.lineNo,
+          debit: row.debit,
+          credit: row.credit,
+          customerId,
+          customerName: customerId === null ? null : (customerNames.get(customerId) ?? null),
+          description: row.description,
+          balanceAfter: row.balanceAfter,
+        };
+      }),
       nextCursor: page.nextCursor,
       opening,
     };
   }
 
-  private async summaries(
-    rows: { entry: typeof journalEntries.$inferSelect; amount: string; lineCount: string }[],
-  ): Promise<JournalEntrySummary[]> {
+  /** Automatic entries post as Bto (source BTO); a manual one as the staff member (source FIN). */
+  private contextFor(source: JournalSource, actor: Actor): FinCallContext {
+    return source === 'MANUAL' || source === 'OPENING'
+      ? this.books.user(staffContext(actor))
+      : this.books.source(actor);
+  }
+
+  /**
+   * Runs a posting with the company filled in and turns the core's refusals back into today's
+   * answers: a role without an active account is 409 ACCOUNT_ROLE_MISSING, an inactive account
+   * named by id a field error.
+   */
+  private async translated<T>(
+    roleAt: (index: number) => GlRole | undefined,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (!(error instanceof FinError)) throw error;
+      if (error.code === 'FIN_MAPPING_MISSING') {
+        const key = typeof error.params?.key === 'string' ? error.params.key : '';
+        const role = ROLE_OF_POSTING_KEY.get(key) ?? key;
+        throw new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, {
+          role,
+        });
+      }
+      if (error.code === 'FIN_ACCOUNT_INACTIVE') {
+        const path = typeof error.params?.path === 'string' ? error.params.path : 'lines';
+        const index = Number.parseInt(/\[(\d+)\]/.exec(path)?.[1] ?? '-1', 10);
+        const role = roleAt(index);
+        if (role !== undefined) {
+          throw new AppError('ACCOUNT_ROLE_MISSING', `no active account holds the role ${role}`, {
+            role,
+          });
+        }
+        throw invalid(path, 'active', 'the account is inactive');
+      }
+      throw error;
+    }
+  }
+
+  private async summaries(rows: readonly FinEntrySummary[]): Promise<JournalEntrySummary[]> {
     if (rows.length === 0) return [];
-    const ids = rows.map((row) => row.entry.id);
-    const reversedBy = new Map(
-      (
-        await this.db
-          .select({
-            reversesId: journalEntries.reversesId,
-            id: journalEntries.id,
-            number: journalEntries.number,
-          })
-          .from(journalEntries)
-          .where(inArray(journalEntries.reversesId, ids))
-      ).map((row) => [row.reversesId, row]),
-    );
-    const reversesIds = rows.flatMap((row) =>
-      row.entry.reversesId === null ? [] : [row.entry.reversesId],
-    );
-    const reverses = new Map(
-      reversesIds.length
-        ? (
-            await this.db
-              .select({ id: journalEntries.id, number: journalEntries.number })
-              .from(journalEntries)
-              .where(inArray(journalEntries.id, reversesIds))
-          ).map((row) => [row.id, row.number])
-        : [],
-    );
-    const sourceNumbers = await this.sourceNumbers(rows.map((row) => row.entry));
-    const names = await this.names.namesOf(
-      rows.flatMap((row) => (row.entry.postedBy === null ? [] : [row.entry.postedBy])),
-    );
-    return rows.map(({ entry, amount, lineCount }) => ({
-      id: entry.id,
-      number: entry.number,
-      entryDate: entry.entryDate,
-      description: entry.description,
-      source: entry.source,
-      sourceType: entry.sourceType,
-      sourceId: entry.sourceId,
-      sourceNumber:
-        entry.sourceType === null || entry.sourceId === null
-          ? null
-          : (sourceNumbers.get(`${entry.sourceType}:${entry.sourceId}`) ?? null),
-      reversesId: entry.reversesId,
-      reversesNumber: entry.reversesId === null ? null : (reverses.get(entry.reversesId) ?? null),
-      reversedById: reversedBy.get(entry.id)?.id ?? null,
-      reversedByNumber: reversedBy.get(entry.id)?.number ?? null,
-      amount: new Decimal(amount),
-      lineCount: Number.parseInt(lineCount, 10),
-      postedByName: entry.postedBy === null ? null : (names.get(entry.postedBy) ?? null),
-      createdAt: entry.createdAt,
-    }));
+    const company = await this.books.company();
+    const ctx = this.books.source();
+    const reversedBy = await this.reader.reversals(ctx, {
+      company,
+      ids: rows.map((row) => row.id),
+    });
+    const reverses = await this.reader.numbers(ctx, {
+      company,
+      ids: rows.flatMap((row) => (row.reversesId === null ? [] : [row.reversesId])),
+    });
+    const docs = rows.map((row) => sourceDocOf(row));
+    const sourceNumbers = await this.sourceNumbers(docs);
+    const userIds = rows.flatMap((row) => {
+      const id = userIdOf(row.actor.ref);
+      return id === null ? [] : [id];
+    });
+    const names = await this.names.namesOf(userIds);
+    return rows.map((row, index) => {
+      const doc = docs[index] ?? null;
+      const userId = userIdOf(row.actor.ref);
+      return {
+        id: row.id,
+        number: row.number,
+        entryDate: row.entryDate,
+        description: row.description,
+        source: sourceOf(row),
+        sourceType: doc?.type ?? null,
+        sourceId: doc?.id ?? null,
+        sourceNumber: doc === null ? null : (sourceNumbers.get(`${doc.type}:${doc.id}`) ?? null),
+        reversesId: row.reversesId,
+        reversesNumber: row.reversesId === null ? null : (reverses.get(row.reversesId) ?? null),
+        reversedById: reversedBy.get(row.id)?.id ?? null,
+        reversedByNumber: reversedBy.get(row.id)?.number ?? null,
+        amount: row.amount,
+        lineCount: row.lineCount,
+        postedByName: userId === null ? null : (names.get(userId) ?? null),
+        createdAt: row.postedAt,
+      };
+    });
   }
 
   /** The numbers of the documents behind automatic entries, by `${type}:${id}`. */
   private async sourceNumbers(
-    entries: readonly { sourceType: JournalSourceDocType | null; sourceId: number | null }[],
+    docs: readonly ({ type: JournalSourceDocType; id: number } | null)[],
   ): Promise<Map<string, string>> {
     const result = new Map<string, string>();
     const idsOf = (type: JournalSourceDocType) =>
-      entries.flatMap((entry) =>
-        entry.sourceType === type && entry.sourceId !== null ? [entry.sourceId] : [],
-      );
+      docs.flatMap((doc) => (doc !== null && doc.type === type ? [doc.id] : []));
     const tables = [
       ['INVOICE', invoices] as const,
       ['PAYMENT', payments] as const,
       ['CREDIT_NOTE', creditNotes] as const,
-      ['JOURNAL', journalEntries] as const,
     ];
     for (const [type, table] of tables) {
       const ids = idsOf(type);
@@ -577,6 +578,9 @@ export class JournalService {
         .from(table)
         .where(inArray(table.id, ids));
       for (const row of rows) result.set(`${type}:${row.id}`, row.number);
+    }
+    for (const [id, number] of await this.numbersOf(idsOf('JOURNAL'))) {
+      result.set(`JOURNAL:${id}`, number);
     }
     return result;
   }
@@ -590,6 +594,61 @@ export class JournalService {
       ]),
     );
   }
+}
+
+/** Today's `source` of an entry, from where the core says it came from (ADR-0089 #3). */
+function sourceOf(row: {
+  system: string;
+  sourceDocType: string | null;
+  reversesId: number | null;
+}): JournalSource {
+  if (row.system === FIN_SOURCE) return row.sourceDocType === 'OPENING' ? 'OPENING' : 'MANUAL';
+  if (row.reversesId !== null) return 'AUTO_VOID';
+  return (row.sourceDocType === null ? undefined : DOC_SOURCE[row.sourceDocType]) ?? 'MANUAL';
+}
+
+/** The core's origin filter of a `source`. */
+function originOf(source: JournalSource): FinEntryOrigin {
+  switch (source) {
+    case 'MANUAL':
+      return { system: FIN_SOURCE };
+    case 'OPENING':
+      return { system: FIN_SOURCE, docType: 'OPENING' };
+    case 'AUTO_VOID':
+      return { system: BTO_SOURCE, reversal: true };
+    case 'AUTO_INVOICE':
+      return { system: BTO_SOURCE, docType: 'INVOICE', reversal: false };
+    case 'AUTO_PAYMENT':
+      return { system: BTO_SOURCE, docType: 'PAYMENT', reversal: false };
+    case 'AUTO_CREDIT_NOTE':
+      return { system: BTO_SOURCE, docType: 'CREDIT_NOTE', reversal: false };
+    case 'AUTO_POS_SHIFT':
+      return { system: BTO_SOURCE, docType: 'POS_SHIFT', reversal: false };
+  }
+}
+
+/** The document behind an automatic entry as today's API names it (none on a reversal). */
+function sourceDocOf(row: FinEntrySummary): { type: JournalSourceDocType; id: number } | null {
+  if (sourceOf(row) === 'AUTO_VOID' || row.sourceDocType === null || row.sourceDocId === null) {
+    return null;
+  }
+  const type = JOURNAL_SOURCE_DOC_TYPES.find((own) => own === row.sourceDocType);
+  if (type === undefined || !/^\d+$/.test(row.sourceDocId)) return null;
+  return { type, id: Number.parseInt(row.sourceDocId, 10) };
+}
+
+/** The users.id of a `user:<id>` actor ref, or null for Bto itself or a job. */
+function userIdOf(ref: string): number | null {
+  const match = /^user:(\d+)$/.exec(ref);
+  return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
+}
+
+function checkedDescription(value: string): string {
+  const description = value.trim();
+  if (description.length === 0 || description.length > FINANCE_LIMITS.maxDescription) {
+    throw invalid('description', 'length', `1 to ${FINANCE_LIMITS.maxDescription} characters`);
+  }
+  return description;
 }
 
 /** A document date is today or earlier (Ulaanbaatar). */

@@ -51,7 +51,8 @@ const MODULE_DEPS = {
   pricing: ['identity', 'catalog', 'partners'],
   sales: ['identity', 'catalog', 'partners', 'pricing', 'inventory', 'ebarimt'],
   // ADR-0060: sales only for its hook tokens and snapshot types; finance never reads a sales table.
-  finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt'],
+  // ADR-0089: fin-bridge for the Finance Core's call contexts and the customers' parties.
+  finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt', 'fin-bridge'],
   ebarimt: ['identity', 'catalog'],
   // ADR-0063: the supermarket POS posts stock through inventory and money through finance.
   pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance'],
@@ -62,7 +63,8 @@ const MODULE_DEPS = {
   // keys and the open invoices the reminders read.
   notifications: ['identity', 'partners', 'catalog', 'sales', 'finance'],
   // ADR-0084: Bto's side of the Finance Core; identity for contexts and branches, partners for its
-  // CUSTOMER_CHANGED hook. Only the composition roots import fin-bridge.
+  // CUSTOMER_CHANGED hook. The composition roots and finance (ADR-0089: its contexts and the
+  // customers' parties) import fin-bridge.
   'fin-bridge': ['identity', 'partners'],
   hr: ['identity'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
@@ -268,9 +270,15 @@ const API_IMPORT_BANS = {
   },
   finCallContext: {
     regex: FINANCE_CORE_INDEX,
-    importNames: ['createFinCallContext', 'ensureDefaultCompany'],
+    importNames: ['createFinCallContext', 'ensureDefaultCompany', 'ensureDefaultChart'],
     message:
-      'Only modules/fin-bridge builds a FinCallContext and runs the installation step ensureDefaultCompany (§3.1 rule 8, ADR-0076, ADR-0084).',
+      'Only modules/fin-bridge builds a FinCallContext and runs the installation steps ensureDefaultCompany and ensureDefaultChart (§3.1 rule 8, ADR-0076, ADR-0084, ADR-0089).',
+  },
+  finJournalPosting: {
+    regex: FINANCE_CORE_INDEX,
+    importNames: ['FinJournalPosting'],
+    message:
+      "F1's posting façade FinJournalPosting is imported only by modules/finance until F2's intake replaces it (ADR-0089); pos posts through finance's JournalService.",
   },
   testCode: {
     regex: '(^|/)test/',
@@ -529,7 +537,14 @@ export default defineConfig([
     name: 'guard/G2-src',
     files: ['apps/api/src/**/*.{ts,mts,cts}'],
     ignores: DRIZZLE_SCHEMA_FILES,
-    rules: importBans('stockLedger', 'finLedger', 'finIntakeInTx', 'finCallContext', 'testCode'),
+    rules: importBans(
+      'stockLedger',
+      'finLedger',
+      'finIntakeInTx',
+      'finCallContext',
+      'finJournalPosting',
+      'testCode',
+    ),
   },
   {
     name: 'guard/G2-stock-posting',
@@ -538,7 +553,13 @@ export default defineConfig([
       'apps/api/src/modules/inventory/**/*.{spec,test}.ts',
       'apps/api/src/modules/inventory/**/__tests__/**',
     ],
-    rules: importBans('finLedger', 'finIntakeInTx', 'finCallContext', 'testCode'),
+    rules: importBans(
+      'finLedger',
+      'finIntakeInTx',
+      'finCallContext',
+      'finJournalPosting',
+      'testCode',
+    ),
   },
   {
     name: 'guard/G2-fin-posting',
@@ -552,9 +573,33 @@ export default defineConfig([
     rules: importBans('stockLedger', 'finLedger', 'finCallContext', 'testCode'),
   },
   {
+    // ADR-0089: pos posts its shift entries through finance's JournalService, not the façade.
+    name: 'guard/G2-fin-intake-pos',
+    files: ['apps/api/src/modules/pos/**/*.{ts,mts,cts}'],
+    rules: importBans(
+      'stockLedger',
+      'finLedger',
+      'finCallContext',
+      'finJournalPosting',
+      'testCode',
+    ),
+  },
+  {
     name: 'guard/G2-fin-bridge',
     files: ['apps/api/src/modules/fin-bridge/**/*.{ts,mts,cts}'],
-    rules: importBans('stockLedger', 'finLedger', 'testCode'),
+    rules: importBans('stockLedger', 'finLedger', 'finJournalPosting', 'testCode'),
+  },
+  {
+    // ADR-0089: the two schema aggregators list the fin ledger tables for Drizzle; they never write.
+    name: 'guard/G2-fin-schema',
+    files: ['apps/api/src/db/schema.ts', 'apps/api/src/finance-core/db/fin-db.ts'],
+    rules: importBans(
+      'stockLedger',
+      'finIntakeInTx',
+      'finCallContext',
+      'finJournalPosting',
+      'testCode',
+    ),
   },
   {
     // ADR-0084 #4: the one test file that builds contexts without any Bto module (the core boots

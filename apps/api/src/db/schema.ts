@@ -95,12 +95,8 @@ export {
   customerBalances,
   financeReconcileRuns,
   financeSettings,
-  glAccounts,
   invoiceLines,
   invoices,
-  journalEntries,
-  journalLines,
-  moneyAccounts,
   payments,
 } from '../modules/finance/schema';
 export {
@@ -126,15 +122,21 @@ export {
 } from '../modules/notifications/schema';
 export { companyContacts, customerFavourites } from '../modules/customer/schema';
 export {
+  finAccounts,
   finAuditLog,
   finBranches,
   finBranchRefs,
   finCompanies,
   finCompanyTaxRegistrations,
+  finFiscalPeriods,
+  finJournalEntries,
+  finJournalLines,
+  finMoneyAccounts,
   finParties,
   finPartyCompanies,
   finPartyRefs,
   finPostingKeys,
+  finPostingRules,
   finSchema,
   finSourceGrants,
   finSourceSystems,

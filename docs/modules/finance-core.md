@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | **P1 built 2026-10-20** (the organisation half of F1, §3.6, ADR-0084): schema `fin` with the tenant, company BO, branches, source systems, posting keys, parties and the core's audit trail; `FinCallContext`, `FinOrgService`, `FinPartiesService`, `ensureDefaultCompany`; Bto's side in `modules/fin-bridge` (`docs/modules/fin-bridge.md`) and «Компани». No ledger yet. **Lean go-live plan 2026-10-20 (ADR-0083, §16.0):** six phases F1–F6, no copy of Finance I's history, fixed assets, the bank import, approvals, isolation, H1 and H2 after go-live. Next F1. P0b built 2026-10-18 (§3.5); P0a decisions 2026-10-18 (ADR-0069 … ADR-0077). Next: the rest of F1, the ledger (§16.0) |
-| ADRs | ADR-0069 (the boundary), ADR-0070 (tenant, company, branch, source system), ADR-0071 (the intake contract), ADR-0072 (posting rules and open items), ADR-0073 (Bto's `billing` owns the commercial documents), ADR-0074 (the Mongolian localisation layer), ADR-0075 (periods, approvals, rights), ADR-0076 (company isolation), ADR-0077 (scope and roadmap), ADR-0083 (the lean go-live plan, which amends ADR-0071 #12, ADR-0073's H1 timing, ADR-0075 #2, #6–#8, ADR-0076 #2–#4, #10 and ADR-0077 #1–#5), ADR-0084 (the organisation, P1: the organisation half of F1). Carved out of ADR-0060 (Finance I, `docs/modules/finance.md`); the replay precedent is ADR-0063, ADR-0064 and ADR-0067 |
+| Status | **F1 done 2026-10-20** — the ledger (§3.7, ADR-0089): the chart, money accounts, append-only posting rules, monthly periods and the journal in schema `fin` (migration `0033_fin_ledger`); Bto's journal writers post through the façade `FinJournalPosting`; `gl_accounts`, `money_accounts`, `journal_entries` / `journal_lines` dropped; the development re-post `pnpm finance:repost-journal`. Next F2 (intake and open items). **P1 built 2026-10-20** (the organisation half of F1, §3.6, ADR-0084): schema `fin` with the tenant, company BO, branches, source systems, posting keys, parties and the core's audit trail; `FinCallContext`, `FinOrgService`, `FinPartiesService`, `ensureDefaultCompany`; Bto's side in `modules/fin-bridge` (`docs/modules/fin-bridge.md`) and «Компани». No ledger yet. **Lean go-live plan 2026-10-20 (ADR-0083, §16.0):** six phases F1–F6, no copy of Finance I's history, fixed assets, the bank import, approvals, isolation, H1 and H2 after go-live. Next F1. P0b built 2026-10-18 (§3.5); P0a decisions 2026-10-18 (ADR-0069 … ADR-0077). Next: the rest of F1, the ledger (§16.0) |
+| ADRs | ADR-0069 (the boundary), ADR-0070 (tenant, company, branch, source system), ADR-0071 (the intake contract), ADR-0072 (posting rules and open items), ADR-0073 (Bto's `billing` owns the commercial documents), ADR-0074 (the Mongolian localisation layer), ADR-0075 (periods, approvals, rights), ADR-0076 (company isolation), ADR-0077 (scope and roadmap), ADR-0083 (the lean go-live plan, which amends ADR-0071 #12, ADR-0073's H1 timing, ADR-0075 #2, #6–#8, ADR-0076 #2–#4, #10 and ADR-0077 #1–#5), ADR-0084 (the organisation, P1: the organisation half of F1), ADR-0088 (each system keeps its own books), ADR-0089 (the ledger, the rest of F1). Carved out of ADR-0060 (Finance I, `docs/modules/finance.md`); the replay precedent is ADR-0063, ADR-0064 and ADR-0067 |
 | Owner's answers | §1 (interview of 2026-10-18, four rounds) |
-| Code | `apps/api/src/finance-core/` (ESLint element `api-finance-core`): `index.ts`, `finance-core.module.ts`, `schema.ts` (schema `fin`), `db/fin-db.ts`, `errors.ts`, `context/` (call context, authorisation, the StaticCaller boot guard), `audit/`, `org/` (`ensureDefaultCompany`, `FinOrgService`), `parties/`; migration `0032_fin_foundation` in the existing stream; `packages/fin-contract` (`@tugeel/fin-contract`); `packages/shared/src/mn` (`@tugeel/shared/mn`); `tools/finance-core/` (the whitelist, `pnpm core:standalone`, the `fin.` SQL scan); the test StaticCaller `apps/api/test/harness/static-caller.ts` |
+| Code | `apps/api/src/finance-core/` (ESLint element `api-finance-core`): `index.ts`, `finance-core.module.ts`, `schema.ts` (schema `fin`), `db/fin-db.ts`, `errors.ts`, `context/` (call context, authorisation, the StaticCaller boot guard), `audit/`, `org/` (`ensureDefaultCompany`, `FinOrgService`), `parties/`, `ledger/` (`FinChartService`, `ensureDefaultChart`, periods), `posting/` (`FinJournalPosting`, `FinJournalReader`); migrations `0032_fin_foundation` and `0033_fin_ledger` in the existing stream; `packages/fin-contract` (`@tugeel/fin-contract`); `packages/shared/src/mn` (`@tugeel/shared/mn`); `tools/finance-core/` (the whitelist, `pnpm core:standalone`, the `fin.` SQL scan); the test StaticCaller `apps/api/test/harness/static-caller.ts` |
 | Depends on | no module: an exact whitelist of `common/**` files, `@tugeel/shared/{money,time}` and `@tugeel/fin-contract` (§3) |
 | Used by | Bto modules through `finance-core/index.ts` only (`billing`, `fin-bridge`, `pos`; later `delivery`, `procurement`, `hr`); the resort's PMS (its own repository, after Bto's go-live) through `@tugeel/fin-contract` over HTTP (A2) |
 
@@ -187,6 +187,87 @@ No ledger table moved; today's finance screens and tests are unchanged.
 
 **What the rest of F1 and F2 inherit.** The organisation and its contexts; `FinPartiesBridge.resolveCustomerParty` for the invoices' party (F2); `LEGACY_UNASSIGNED` for control lines without a counterparty; the posting keys (rules come with the accounts); `fin.audit_log` for the ledger's configuration changes.
 
+### 3.7 What F1's ledger built (2026-10-20, ADR-0089) — F1 done
+
+Today's finance screens and HTTP answers are unchanged. The chart, the money accounts and the journal live in schema `fin`; Bto's `modules/finance` posts and reads them through `finance-core/index.ts`.
+
+**Schema** (`FC/schema.ts`, migration `0033_fin_ledger`). Scope rules as §3.6.
+- `accounts`: code, name, kind, `normal_side`, `control`, status.
+- `money_accounts`: code, name, kind CASH / BANK / CLEARING, an optional branch, `account_id`, bank fields, `show_to_customers`, status.
+- `posting_rules`: company, `posting_key`, `account_id` or NULL = unmapped, `effective_from`. Append-only. The newest rule in force on the date wins.
+- `fiscal_periods`: `YYYY-MM`, OPEN / CLOSED.
+- `journal_entries`: number, date, period, source system, source document type and id, `reverses_id`, description, actor by value. UNIQUE `(company_id, number)` and `(company_id, reverses_id)`.
+- `journal_lines`: account, debit / credit, party (through `party_companies`), money account, branch, posting key and rule.
+- Hand-written:
+  - REVOKE DELETE / TRUNCATE on all six tables, and UPDATE on the rules and the journal;
+  - `fin.forbid_update_delete` triggers on the rules and the journal;
+  - `fin.journal_entry_balanced()`, deferred, at least 2 lines and Σ debit = Σ credit at commit;
+  - `ai.payments` recreated over `fin.money_accounts` / `fin.accounts`.
+- The data section:
+  - the posting keys and the ACTIVE Bto branches, mapped as the boot step does;
+  - `gl_accounts` → `fin.accounts` with ids kept: control from the role's key, contra 520101 / 520201 debit-normal;
+  - each role → a company-default rule from 2000-01-01;
+  - `money_accounts` → `fin.money_accounts` with ids kept;
+  - the documents' journal ids cleared;
+  - a `DO` check of the counts;
+  - a RAISE when a MANUAL or OPENING entry exists (nothing could post it again).
+  Then `gl_accounts`, `money_accounts`, `journal_entries`, `journal_lines`, their FKs and the public `journal_entry_balanced()` are dropped.
+
+**The core.**
+- `ledger/chart.service.ts` `FinChartService`:
+  - accounts: list, by ids, `createAccountInTx`, `updateAccountInTx`; normal side from the kind, a contra account keeps its side;
+  - `rules(on, lock)` and `setRuleInTx`, under a per-company advisory lock;
+  - money accounts: list, `lockMoneyAccountInTx` FOR SHARE, create, update; the branch by a source's ref.
+  - Read by a granted source or `finance.read`. Written by a user with `finance.config.manage`, or today's rights: `finance.journal.manage` for accounts, `finance.settings.manage` for rules and money accounts.
+  - `ensureDefaultChart(tx, scope, template)` fills only an empty chart.
+- `ledger/periods.ts`:
+  - `monthOf` — calendar arithmetic only;
+  - `openPeriodInTx` — the month is created OPEN on demand unless a later or equal month is CLOSED, then share-locked; otherwise `FIN_PERIOD_CLOSED`.
+- `posting/journal-posting.service.ts` `FinJournalPosting` (the F1 façade; G2: `modules/finance` only):
+  - `postEntryInTx` / `reverseEntryInTx`. A line's account is its id, else its money account's, else its key's rule.
+  - Checks: `FIN_UNBALANCED`, `FIN_AMOUNT_PRECISION`, `FIN_MAPPING_MISSING`, `FIN_ACCOUNT_INACTIVE` and the period.
+  - A SOURCE posts as itself; a USER with `finance.journal.manage` posts as source FIN.
+  - The number is the caller's until F2.
+- `posting/journal-reader.service.ts` `FinJournalReader`: entries (dates, origin = system / document type / reversal, account, party, keyset), an entry with lines, numbers, reversals, turnover per account, an account's ledger with a running balance and the opening. The reader lives beside the posting code because only `posting/**` names the journal tables.
+- `FinPartiesService.refsOf` / `partiesOf` (party ↔ the source's ref); `FinOrgService.syncBranchInTx` (P1's branch sync for a branch added after boot).
+
+**Bto's side.**
+- `modules/finance` keeps its public API and DTOs:
+  - `GlAccountsService`: roles = the rules in force today; the role dialog writes rules dated today and unmaps the account's previous role.
+  - `MoneyAccountsService`: the balance is still Σ vouchers.
+  - `JournalService`:
+    - validates as before and allocates `Ж-` numbers;
+    - posts by role (`JournalLineInput.role`) with the customer's party;
+    - turns `FIN_MAPPING_MISSING` back into `ACCOUNT_ROLE_MISSING`;
+    - derives `source` (FIN = MANUAL; a BTO reversal = AUTO_VOID; else the document type).
+  - These go through `FinBooks`, with fin-bridge's `FinContexts` and `FinPartiesBridge.customerPartyInTx` / `partiesOfCustomers` / `customersOfParties`.
+- The line builders are pure exported functions: `invoiceEntryLines`, `creditNoteEntryLines`, `paymentEntryLines`, and pos's `shiftCloseLines`.
+- `JournalRepostService` and `PosShiftsService.repostCloseInTx` serve `pnpm finance:repost-journal` (`apps/api/src/repost-journal.ts`; development only, idempotent).
+- Finance's own chart sync (`reference-data.ts`) is gone; `FinBridgeBootstrap` runs `ensureDefaultChart` with `btoChartTemplate()` after `ensureDefaultCompany`.
+- `MODULE_DEPS.finance` gains `fin-bridge`.
+
+**Tests.**
+- `test/integration/fin-ledger.int-spec.ts` runs the ledger with no Bto module:
+  - the seed runs once;
+  - an entry posts by key and keeps its rule; the month opens;
+  - the four refusals;
+  - a rule follows its date; an unmapped key is refused;
+  - closed and earlier months are refused, a later one opens;
+  - an entry is reversed once, keeping its document;
+  - a user posts as FIN.
+- `test/integrity/finance-guards.spec.ts`, same scenarios and SQLSTATEs on `fin.*`; the unbalanced commit is now tried as app too.
+- `test/integrity/fin-ledger-guards.spec.ts`: two racing manual reversals, exactly one commits; the reversal key by hand → 23505; the rules append-only for app (42501) and migrator (23001).
+- `fin-isolation.spec.ts` covers the new tables through the catalog.
+- Lint cases for `FinJournalPosting` and `ensureDefaultChart`.
+
+**What F2 inherits.**
+- The chart, the rules and their resolution.
+- Party, money-account and branch columns on every line, ready for the controls.
+- The period lock.
+- The source key on every entry, which `fin.documents` / the intake log will carry.
+- The FIN source for the core's own screens.
+- The façade, to be replaced by `submitInTx` (H2 later moves pos).
+
 ## 4. Data model (schema `fin`, ADR-0070 / ADR-0072 / ADR-0076)
 
 Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the contract.
@@ -233,10 +314,10 @@ Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the c
 
 | Table today | Destination |
 |---|---|
-| `gl_accounts` | `fin.accounts` (P2); `role` becomes one company-default row per role in `posting_rules`; the contra-income accounts 520101 and 520201 (kind INCOME, `S:327-349`) get `normal_side = DEBIT` |
-| `money_accounts` | `fin.money_accounts` (P2); kind gains CLEARING |
+| `gl_accounts` | `fin.accounts` (**done in F1**, ids kept, ADR-0089 #1–#2); `role` becomes one company-default row per role in `posting_rules`; the contra-income accounts 520101 and 520201 (kind INCOME, `S:327-349`) get `normal_side = DEBIT` |
+| `money_accounts` | `fin.money_accounts` (**done in F1**, ids kept); kind gains CLEARING |
 | `finance_settings` (`id = 1`) | the PAY / JE patterns → `fin.document_types` + `number_series`; the INV / CN patterns → `billing_settings` (Bto, H1) |
-| `journal_entries`, `journal_lines` | `fin.*` (P2) with ids kept; `customer_id` → `party_id`; `posted_by` → `actor_*` |
+| `journal_entries`, `journal_lines` | `fin.*` (**done in F1**, no copy: dropped and posted again by the development re-post, ADR-0089 #8); `customer_id` → `party_id`; `posted_by` → `actor_*` |
 | `invoices`, `invoice_lines`, `credit_notes`, `credit_note_lines` | stay in `public`, owned by Bto `billing`; the FKs to journal entries are dropped in P2 (`F/schema.ts:249,255,360`); `fin_document_id` and `fin_journal_no` are added as new columns; `open_amount` is read from the core, then dropped (H1) |
 | `payments`, `allocations`, `ar_entries` | backfilled into `fin.documents`, open items and `fin.allocations` (P4), frozen, dropped in H1; the payment FKs into moved tables are dropped in P2 (`F/schema.ts:432,434,441,447`); a voided allocation (`voided_at`, `F/schema.ts:484`) becomes an allocation plus its reversal |
 | `customer_balances` | `fin.party_balances` (P4) |
@@ -704,7 +785,7 @@ Consequences:
 | F5 Close and opening | P5 reduced: close and reopen of the latest month with a reason and an event row, a closed month refusing postings in-process, `periods.close` / `periods.reopen`; §16.2 Chart and opening import | 2 | D16, D27 |
 | F6 Reports | §16.2 Statements, VAT return, closing | 2–3 | D17, D25 |
 
-**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. Left for F1: the ledger half (accounts, money accounts, periods, the journal with its balance guards, the rules, Bto's journal writers switched, the old journal tables dropped, the development re-post).
+**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. The ledger half was built the same day (§3.7, ADR-0089): accounts and money accounts moved with their ids, roles became append-only rules, monthly periods, the journal with its balance guards and the reversal key, Bto's journal writers switched, the old chart, money-account and journal tables dropped, the development re-post. **F1 is done**; next F2.
 
 **Order.**
 - F1 → F2 → F3 and F4 in either order → F5 → F6. About 11–15 sessions, re-planned in STATUS after each phase.

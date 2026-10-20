@@ -232,6 +232,13 @@
       "when": 1792428928211,
       "tag": "0032_fin_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792440007701,
+      "tag": "0033_fin_ledger",
+      "breakpoints": true
     }
   ]
 }

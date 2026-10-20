@@ -17,14 +17,8 @@ import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagina
 import type { VatType } from '../../catalog';
 import { type AuthContext, OrgService, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
-import {
-  allocations,
-  creditNotes,
-  invoiceLines,
-  invoices,
-  journalEntries,
-  payments,
-} from '../schema';
+import { allocations, creditNotes, invoiceLines, invoices, payments } from '../schema';
+import { JournalService } from './journal.service';
 
 export interface InvoiceSummary {
   id: number;
@@ -131,6 +125,7 @@ export class InvoiceQueryService {
     private readonly customers: CustomersService,
     private readonly org: OrgService,
     private readonly names: UserNamesService,
+    private readonly journal: JournalService,
   ) {}
 
   async list(
@@ -190,10 +185,8 @@ export class InvoiceQueryService {
       .select({
         invoice: invoices,
         lineCount: sql<string>`(SELECT count(*) FROM invoice_lines l WHERE l.invoice_id = invoices.id)`,
-        journalNumber: journalEntries.number,
       })
       .from(invoices)
-      .leftJoin(journalEntries, eq(journalEntries.id, invoices.journalEntryId))
       .where(eq(invoices.id, id));
     if (!row) throw notFound('invoice', id);
     const [summary] = await this.summaries([row], businessDate());
@@ -241,7 +234,12 @@ export class InvoiceQueryService {
       ...summary,
       note: row.invoice.note,
       journalEntryId: row.invoice.journalEntryId,
-      journalNumber: row.journalNumber,
+      journalNumber:
+        row.invoice.journalEntryId === null
+          ? null
+          : ((await this.journal.numbersOf([row.invoice.journalEntryId])).get(
+              row.invoice.journalEntryId,
+            ) ?? null),
       voidedAt: row.invoice.voidedAt,
       voidedByName,
       voidReason: row.invoice.voidReason,
