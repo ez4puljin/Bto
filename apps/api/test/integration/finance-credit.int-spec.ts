@@ -1,10 +1,16 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import type { ProductJson } from '../harness/catalog';
-import { financeApi, type ProblemJson, salesFlow } from '../harness/finance';
+import {
+  financeApi,
+  moveInvoiceDue,
+  type ProblemJson,
+  salesFlow,
+  setSetting,
+} from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
 import { type CustomerJson, partnersApi } from '../harness/partners';
 
@@ -107,10 +113,10 @@ describe('finance credit control', () => {
     const next = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
     await flow.confirm(next.id).expect(200);
     // The clock moves past the due date.
-    await sql.query(
-      `UPDATE invoices SET invoice_date = $2::date - 1, due_date = $2::date - 1 WHERE id = $1`,
-      [invoice.id, today],
-    );
+    await moveInvoiceDue(sql, invoice.id, {
+      invoiceDate: addDays(today, -1),
+      dueDate: addDays(today, -1),
+    });
     const blocked = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }], {
       paymentMethod: 'CASH',
     });
@@ -150,5 +156,56 @@ describe('finance credit control', () => {
     });
     await credit(customer.id, { creditHold: false });
     await flow.confirm(draft.id).expect(200);
+  });
+
+  it('lets open credits at least as large as the overdue amount through (ADR-0073 #5)', async () => {
+    const finance = financeApi(app, accountant);
+    const cash = await financeApi(app, admin).cashBox('FC-NETS');
+    const pay = (customerId: number, amount: string) =>
+      finance
+        .payment({
+          kind: 'CUSTOMER_PAYMENT',
+          moneyAccountId: cash.id,
+          customerId,
+          amount,
+          paidOn: today,
+        })
+        .expect(201);
+    const overdueFor = async (name: string, advance: string) => {
+      const customer = await partnersApi(app, admin).customer({ name });
+      // Paid in advance, then sold: nothing applies the credit to the invoice (D7).
+      await pay(customer.id, advance);
+      const sold = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '5' }]);
+      await flow.sell(sold.id);
+      const invoice = await finance.invoiceOfOrder(sold.id);
+      if (!invoice) throw new Error('no invoice');
+      expect(invoice.openAmount).toBe('5000.00');
+      await moveInvoiceDue(sql, invoice.id, {
+        invoiceDate: addDays(today, -1),
+        dueDate: addDays(today, -1),
+      });
+      return customer;
+    };
+    // Overdue 5,000 against an open credit of 6,000: the order passes.
+    const covered = await overdueFor('Урьдчилгаатай', '6000');
+    const passes = await flow.draft(covered.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
+    await flow.confirm(passes.id).expect(200);
+    // Against 4,000: refused, with the open credits named.
+    const short = await overdueFor('Дутуу урьдчилгаатай', '4000');
+    const refused = await flow.draft(short.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
+    expect(await refusal(refused.id)).toMatchObject({
+      code: 'CREDIT_BLOCKED',
+      params: expect.objectContaining({
+        reason: 'OVERDUE',
+        overdueAmount: '5000',
+        creditsOpen: '4000',
+      }),
+    });
+    // With the rule off, any overdue amount refuses again (today's rule, ADR-0060 #2).
+    await setSetting(app, admin, 'credit.overdue_nets_credits', false, today);
+    const strict = await flow.draft(covered.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
+    expect(await refusal(strict.id)).toMatchObject({
+      params: expect.objectContaining({ reason: 'OVERDUE' }),
+    });
   });
 });

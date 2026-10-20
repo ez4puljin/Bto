@@ -8,8 +8,9 @@ import { login, seedUser } from '../harness/identity';
 import { partnersApi } from '../harness/partners';
 
 /**
- * The receivables cache against the ledger (ADR-0060 #4): every document leaves them equal, the
- * reconciliation says so, notices a cache written wrong, records it and repairs it.
+ * The receivables cache against the ledger (ADR-0060 #4; since F2 the Finance Core's party balances
+ * against its open items, ADR-0090): every document leaves them equal, the reconciliation says so,
+ * notices a cache written wrong, records it and repairs it.
  */
 describe('finance ledger reconciliation', () => {
   let app: NestExpressApplication;
@@ -50,26 +51,29 @@ describe('finance ledger reconciliation', () => {
     expect(clean.checked).toBeGreaterThanOrEqual(1);
     expect((await ledger.balanceOf(customerId)).balance.toFixed(2)).toBe('3500.00');
 
+    // The cache moved to the Finance Core (F2, ADR-0090): the party's balance row.
     await migrator.query(
-      'UPDATE customer_balances SET balance = balance + 1, open_invoices = 9 WHERE customer_id = $1',
-      [customerId],
+      `UPDATE fin.party_balances SET open_debit = open_debit + 1
+        WHERE party_id = (SELECT party_id FROM fin.party_refs WHERE external_id = $1)`,
+      [`customer:${customerId}`],
     );
     const drifted = await ledger.reconcile('NIGHTLY');
-    expect(drifted).toMatchObject({ status: 'DRIFT', drifted: 1 });
-    expect(drifted.details).toEqual([
-      {
-        customerId,
-        cachedBalance: '3501.00',
-        ledgerBalance: '3500.00',
-        cachedOpenInvoices: 9,
-        ledgerOpenInvoices: 1,
-      },
+    expect(drifted).toMatchObject({ status: 'DRIFT', drifted: 1, details: [] });
+    const cache = drifted.core.find((run) => run.kind === 'CACHE');
+    expect(cache).toMatchObject({ status: 'DRIFT', drifted: 1 });
+    expect(cache?.details).toEqual([
+      expect.objectContaining({ expected: '3500.00/0.00', found: '3501.00/0.00' }),
     ]);
     const runs = await migrator.query<{ kind: string; status: string; drifted: number }>(
       'SELECT kind, status, drifted FROM finance_reconcile_runs WHERE id = $1',
       [drifted.id],
     );
     expect(runs.rows).toEqual([{ kind: 'NIGHTLY', status: 'DRIFT', drifted: 1 }]);
+    const core = await migrator.query<{ kind: string; status: string; drifted: number }>(
+      'SELECT kind, status, drifted FROM fin.reconcile_runs WHERE id = $1',
+      [cache?.id],
+    );
+    expect(core.rows).toEqual([{ kind: 'CACHE', status: 'DRIFT', drifted: 1 }]);
     // Repaired by the run; the next one is clean again.
     expect((await ledger.balanceOf(customerId)).balance.toFixed(2)).toBe('3500.00');
     expect(await ledger.reconcile('MANUAL')).toMatchObject({ status: 'OK', drifted: 0 });

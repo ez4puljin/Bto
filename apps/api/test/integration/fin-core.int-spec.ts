@@ -69,7 +69,7 @@ describe('Finance Core without Bto (P1 organisation)', () => {
       expect(await count('fin.companies')).toBe(1);
       expect(await count('fin.source_systems')).toBe(2);
       expect(await count('fin.source_grants')).toBe(2);
-      expect(await count('fin.posting_keys')).toBe(2);
+      expect(await count('fin.posting_keys')).toBe(7);
       expect(await count('fin.branches')).toBe(1);
       expect(await count('fin.branch_refs')).toBe(1);
       expect(await count(`fin.party_refs WHERE external_id = 'LEGACY_UNASSIGNED'`)).toBe(1);

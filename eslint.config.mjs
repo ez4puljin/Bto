@@ -609,6 +609,12 @@ export default defineConfig([
     rules: importBans('stockLedger', 'finLedger', 'finIntakeInTx'),
   },
   {
+    // ADR-0090: the harness that drives the core's intake without any Bto module (tests only).
+    name: 'guard/G2-fin-intake-harness',
+    files: ['apps/api/test/harness/fin-intake.ts'],
+    rules: importBans('stockLedger', 'finLedger', 'finCallContext'),
+  },
+  {
     // ADR-0074 #2: the Mongolian layer stands on money, time and taxpayer only.
     name: 'guard/G2-mn',
     files: ['packages/shared/src/mn/**/*.ts'],

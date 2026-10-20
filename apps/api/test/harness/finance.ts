@@ -448,3 +448,26 @@ export async function setSetting(
     .send({ key, value, effectiveFrom })
     .expect(201);
 }
+
+/**
+ * Moves an invoice's due date (the calendar of a test): the invoice and its open item in the
+ * Finance Core (F2, ADR-0090), whose due date only the migrator may correct. `sql` is a migrator
+ * connection.
+ */
+export async function moveInvoiceDue(
+  sql: { query: (text: string, values: unknown[]) => Promise<unknown> },
+  invoiceId: number,
+  dates: { invoiceDate?: string; dueDate: string },
+): Promise<void> {
+  await sql.query(
+    'UPDATE invoices SET invoice_date = coalesce($2::date, invoice_date), due_date = $3::date WHERE id = $1',
+    [invoiceId, dates.invoiceDate ?? null, dates.dueDate],
+  );
+  await sql.query(
+    `UPDATE fin.open_items i SET due_date = $2::date
+       FROM fin.documents d
+      WHERE d.company_id = i.company_id AND d.id = i.document_id AND d.reverses_document_id IS NULL
+        AND d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text AND i.side = 'DEBIT'`,
+    [invoiceId, dates.dueDate],
+  );
+}

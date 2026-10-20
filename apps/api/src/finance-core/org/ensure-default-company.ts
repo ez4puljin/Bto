@@ -3,9 +3,12 @@ import { recordFinAudit } from '../audit/fin-audit';
 import type { FinTx } from '../db/fin-db';
 import {
   FIN_ACCOUNT_CONTROLS,
+  FIN_DOCUMENT_CLASSES,
   finBranches,
   finBranchRefs,
   finCompanies,
+  finDocumentTypes,
+  finNumberSeries,
   finParties,
   finPartyCompanies,
   finPartyRefs,
@@ -19,6 +22,7 @@ export const ENSURE_COMPANY_LOCK = 72_026_130;
 const BOOT = { system: 'boot' };
 
 export type FinAccountControl = (typeof FIN_ACCOUNT_CONTROLS)[number];
+export type FinDocumentClassSpec = (typeof FIN_DOCUMENT_CLASSES)[number];
 
 /** What an installation books into (fin-bridge builds it from Bto's constants and branches). */
 export interface FinInstallationSpec {
@@ -32,6 +36,16 @@ export interface FinInstallationSpec {
   }[];
   /** The party that takes control-account lines without a known counterparty (F1's ledger). */
   legacyParty: { system: string; ref: string; name: string };
+  /** The number series (F2, ADR-0090): created once, then kept as the owner edits them. */
+  numberSeries?: readonly { code: string; pattern: string; digits: number }[];
+  /** The document types the sources post (F2, ADR-0090); insert-only. */
+  documentTypes?: readonly {
+    code: string;
+    system: string;
+    class: FinDocumentClassSpec;
+    numberMode: 'SOURCE' | 'CORE';
+    numberSeries: string | null;
+  }[];
   /** The source's branches; inactive ones are never mapped (ADR-0084 #1). */
   branches: readonly {
     system: string;
@@ -122,6 +136,32 @@ export async function ensureDefaultCompany(
       .insert(finPostingKeys)
       .values(spec.postingKeys.map((k) => ({ companyId, ...k })))
       .onConflictDoNothing();
+  }
+
+  if (spec.numberSeries?.length) {
+    await tx
+      .insert(finNumberSeries)
+      .values(spec.numberSeries.map((s) => ({ companyId, ...s })))
+      .onConflictDoNothing();
+  }
+  // A type is booked only for a source this installation grants (a spec may grant fewer).
+  const types = (spec.documentTypes ?? []).filter((d) =>
+    spec.sources.some((s) => s.code === d.system),
+  );
+  if (types.length) {
+    await tx
+      .insert(finDocumentTypes)
+      .values(
+        types.map((d) => ({
+          companyId,
+          code: d.code,
+          sourceSystemId: sourceId(d.system),
+          class: d.class,
+          numberMode: d.numberMode,
+          numberSeries: d.numberSeries,
+        })),
+      )
+      .onConflictDoNothing({ target: [finDocumentTypes.companyId, finDocumentTypes.code] });
   }
 
   const legacySource = sourceId(spec.legacyParty.system);

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   applyDecorators,
+  createParamDecorator,
   type CallHandler,
   type ExecutionContext,
   Inject,
@@ -59,6 +60,17 @@ function storable(body: unknown, without: readonly string[] = []): unknown {
 }
 
 export { canonicalJson };
+
+/**
+ * The request's Idempotency-Key in a handler of an `@Idempotent()` route (which documents the
+ * header): the Finance Core takes it as a document's id (ADR-0071 #10, ADR-0090). Undefined when absent.
+ */
+export const IdempotencyKey = createParamDecorator(
+  (_: unknown, context: ExecutionContext): string | undefined => {
+    const value = context.switchToHttp().getRequest<Request>().headers['idempotency-key'];
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
+  },
+);
 
 /**
  * Global interceptor that acts only on @Idempotent() routes (ADR-0027 #11): the key row is claimed

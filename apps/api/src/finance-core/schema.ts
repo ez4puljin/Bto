@@ -7,12 +7,14 @@ import {
   date,
   foreignKey,
   index,
+  integer,
   pgSchema,
   primaryKey,
   smallint,
   text,
   timestamp,
   unique,
+  uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { jsonValue, money } from '../common/db/types';
@@ -588,6 +590,8 @@ export const finJournalEntries = finSchema.table(
     sourceDocType: text('source_doc_type'),
     sourceDocId: text('source_doc_id'),
     reversesId: ref('reverses_id'),
+    /** The intake document it books (F2); null for the POS entries of the façade until H2. */
+    documentId: ref('document_id'),
     description: text('description').notNull(),
     actorKind: text('actor_kind', { enum: FIN_ACTOR_KINDS }).notNull(),
     actorRef: text('actor_ref').notNull(),
@@ -599,6 +603,12 @@ export const finJournalEntries = finSchema.table(
     unique('fin_journal_entries_company_id_key').on(t.companyId, t.id),
     unique('fin_journal_entries_company_number_key').on(t.companyId, t.number),
     unique('fin_journal_entries_company_reverses_key').on(t.companyId, t.reversesId),
+    unique('fin_journal_entries_company_document_key').on(t.companyId, t.documentId),
+    foreignKey({
+      name: 'fin_journal_entries_document_fk',
+      columns: [t.companyId, t.documentId],
+      foreignColumns: [finDocuments.companyId, finDocuments.id],
+    }),
     foreignKey({
       name: 'fin_journal_entries_period_fk',
       columns: [t.companyId, t.periodId],
@@ -654,10 +664,15 @@ export const finJournalLines = finSchema.table(
     branchId: ref('branch_id'),
     postingKey: text('posting_key'),
     postingRuleId: ref('posting_rule_id'),
+    /** A tax line's code (`MN.VAT.STD`) and its base, as the sender gave them (F2). */
+    taxCode: text('tax_code'),
+    taxBase: money('tax_base'),
     description: text('description'),
   },
   (t) => [
     unique('fin_journal_lines_company_id_key').on(t.companyId, t.id),
+    /** The target of an open item's key: the item is on this line's party and account. */
+    unique('fin_journal_lines_item_key').on(t.companyId, t.id, t.partyId, t.accountId),
     unique('fin_journal_lines_entry_line_key').on(t.companyId, t.entryId, t.lineNo),
     foreignKey({
       name: 'fin_journal_lines_entry_fk',
@@ -704,5 +719,529 @@ export const finJournalLines = finSchema.table(
       'fin_journal_lines_description',
       sql`${t.description} IS NULL OR length(btrim(${t.description})) BETWEEN 1 AND 500`,
     ),
+    check(
+      'fin_journal_lines_tax',
+      sql`(${t.taxCode} IS NULL) = (${t.taxBase} IS NULL) AND (${t.taxCode} IS NULL OR ${codeShape(t.taxCode)})`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------------------------------
+// The intake and the sub-ledger (F2, ADR-0090; docs/modules/finance-core.md §4, §6): document types and
+// number series, the intake log, documents, open items, allocations, party balances and reconcile
+// runs. Migration 0034_fin_intake adds by hand: the REVOKEs, the append-only triggers, the column
+// grant on `open_items.open_amount`, the one-item-per-control-line trigger and Bto's data.
+// ---------------------------------------------------------------------------------------------------
+
+export const FIN_DOCUMENT_CLASSES = [
+  'AR_INVOICE',
+  'AR_CREDIT',
+  'RECEIPT',
+  'PAYMENT',
+  'ALLOCATION',
+  'SETTLEMENT',
+  'JOURNAL',
+  'OPENING',
+  'AP_BILL',
+  'AP_CREDIT',
+] as const;
+export const FIN_NUMBER_MODES = ['SOURCE', 'CORE'] as const;
+export const FIN_INTAKE_ACTIONS = ['POST', 'REVERSE'] as const;
+export const FIN_INTAKE_STATUSES = ['POSTED', 'HELD', 'REJECTED', 'CANCELLED'] as const;
+export const FIN_INTAKE_VIAS = ['INPROC', 'JOB', 'HTTP', 'UI', 'MIGRATION'] as const;
+export const FIN_RECONCILE_KINDS = ['CACHE', 'ITEMS', 'SUBLEDGER_GL'] as const;
+
+/** A company's number series (ADR-0090): a pattern with `{year}{month}{day}` and the counter's digits. */
+export const finNumberSeries = finSchema.table(
+  'number_series',
+  {
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    code: text('code').notNull(),
+    pattern: text('pattern').notNull(),
+    digits: smallint('digits').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'fin_number_series_pkey', columns: [t.companyId, t.code] }),
+    check('fin_number_series_code', codeShape(t.code)),
+    check(
+      'fin_number_series_pattern',
+      sql`length(${t.pattern}) BETWEEN 1 AND 24 AND ${t.pattern} !~ '[0-9}]$'`,
+    ),
+    check('fin_number_series_digits', sql`${t.digits} BETWEEN 1 AND 8`),
+  ],
+);
+
+/** The gap-free counters of a series: one row per rendered prefix (the day), taken last. */
+export const finNumberCounters = finSchema.table(
+  'number_counters',
+  {
+    companyId: ref('company_id').notNull(),
+    scope: text('scope').notNull(),
+    period: text('period').notNull(),
+    value: bigint('value', { mode: 'number' }).notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'fin_number_counters_pkey', columns: [t.companyId, t.scope, t.period] }),
+    foreignKey({
+      name: 'fin_number_counters_series_fk',
+      columns: [t.companyId, t.scope],
+      foreignColumns: [finNumberSeries.companyId, finNumberSeries.code],
+    }),
+    check('fin_number_counters_value', sql`${t.value} >= 1`),
+  ],
+);
+
+/**
+ * A kind of document a source system sends (ADR-0072 #1): its class, who numbers it (the sender, or
+ * the core from a series), and where an unapplied remainder goes (NULL: stays an open item, D6).
+ */
+export const finDocumentTypes = finSchema.table(
+  'document_types',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    code: text('code').notNull(),
+    sourceSystemId: ref('source_system_id').notNull(),
+    class: text('class', { enum: FIN_DOCUMENT_CLASSES }).notNull(),
+    numberMode: text('number_mode', { enum: FIN_NUMBER_MODES }).notNull(),
+    numberSeries: text('number_series'),
+    unappliedKey: text('unapplied_key'),
+    status: status(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('fin_document_types_company_id_key').on(t.companyId, t.id),
+    unique('fin_document_types_company_code_key').on(t.companyId, t.code),
+    foreignKey({
+      name: 'fin_document_types_source_fk',
+      columns: [t.companyId, t.sourceSystemId],
+      foreignColumns: [finSourceGrants.companyId, finSourceGrants.sourceSystemId],
+    }),
+    foreignKey({
+      name: 'fin_document_types_series_fk',
+      columns: [t.companyId, t.numberSeries],
+      foreignColumns: [finNumberSeries.companyId, finNumberSeries.code],
+    }),
+    foreignKey({
+      name: 'fin_document_types_unapplied_fk',
+      columns: [t.companyId, t.unappliedKey],
+      foreignColumns: [finPostingKeys.companyId, finPostingKeys.code],
+    }),
+    check('fin_document_types_code', codeShape(t.code)),
+    check(
+      'fin_document_types_class',
+      sql`${t.class} IN ('AR_INVOICE', 'AR_CREDIT', 'RECEIPT', 'PAYMENT', 'ALLOCATION', 'SETTLEMENT', 'JOURNAL', 'OPENING', 'AP_BILL', 'AP_CREDIT')`,
+    ),
+    check(
+      'fin_document_types_number',
+      sql`${t.numberMode} IN ('SOURCE', 'CORE') AND (${t.numberMode} = 'SOURCE' OR ${t.numberSeries} IS NOT NULL)`,
+    ),
+    check('fin_document_types_status', statusShape(t.status)),
+  ],
+);
+
+/**
+ * The intake log (ADR-0071 #2, #5): one row per business key — the source's document, its revision
+ * and the action. The company is in the hashed payload, so the same key for another company is a
+ * conflict, never a second booking.
+ */
+export const finIntakeRequests = finSchema.table(
+  'intake_requests',
+  {
+    id: id(),
+    tenantId: ref('tenant_id').notNull(),
+    companyId: ref('company_id').notNull(),
+    sourceSystemId: ref('source_system_id').notNull(),
+    sourceDocType: text('source_doc_type').notNull(),
+    sourceDocId: text('source_doc_id').notNull(),
+    revision: integer('revision').notNull(),
+    action: text('action', { enum: FIN_INTAKE_ACTIONS }).notNull(),
+    sourceDocNo: text('source_doc_no'),
+    contract: text('contract').notNull(),
+    lastCommandId: text('last_command_id').notNull(),
+    payload: jsonValue('payload').notNull(),
+    payloadHash: text('payload_hash').notNull(),
+    status: text('status', { enum: FIN_INTAKE_STATUSES }).notNull(),
+    errorCode: text('error_code'),
+    errorParams: jsonValue('error_params'),
+    attempts: integer('attempts').notNull().default(1),
+    via: text('via', { enum: FIN_INTAKE_VIAS }).notNull(),
+    documentId: ref('document_id'),
+    result: jsonValue('result'),
+    firstAt: timestamp('first_at', { withTimezone: true }).notNull().defaultNow(),
+    lastAt: timestamp('last_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('fin_intake_requests_key').on(
+      t.tenantId,
+      t.sourceSystemId,
+      t.sourceDocType,
+      t.sourceDocId,
+      t.revision,
+      t.action,
+    ),
+    unique('fin_intake_requests_company_id_key').on(t.companyId, t.id),
+    foreignKey({
+      name: 'fin_intake_requests_company_fk',
+      columns: [t.tenantId, t.companyId],
+      foreignColumns: [finCompanies.tenantId, finCompanies.id],
+    }),
+    foreignKey({
+      name: 'fin_intake_requests_source_fk',
+      columns: [t.companyId, t.sourceSystemId],
+      foreignColumns: [finSourceGrants.companyId, finSourceGrants.sourceSystemId],
+    }),
+    index('fin_intake_requests_status_idx').on(t.companyId, t.status, t.id),
+    check('fin_intake_requests_doc_type', codeShape(t.sourceDocType)),
+    check('fin_intake_requests_doc_id', sql`length(${t.sourceDocId}) BETWEEN 1 AND 128`),
+    check('fin_intake_requests_revision', sql`${t.revision} BETWEEN 1 AND 1000000`),
+    check('fin_intake_requests_action', sql`${t.action} IN ('POST', 'REVERSE')`),
+    check(
+      'fin_intake_requests_status',
+      sql`${t.status} IN ('POSTED', 'HELD', 'REJECTED', 'CANCELLED') AND (${t.status} <> 'POSTED' OR ${t.documentId} IS NOT NULL OR ${t.action} = 'REVERSE')`,
+    ),
+    check('fin_intake_requests_via', sql`${t.via} IN ('INPROC', 'JOB', 'HTTP', 'UI', 'MIGRATION')`),
+    check('fin_intake_requests_attempts', sql`${t.attempts} >= 1`),
+  ],
+);
+
+/** Every try at the intake, kept (append-only); a refusal before the company is known has none. */
+export const finIntakeAttempts = finSchema.table(
+  'intake_attempts',
+  {
+    id: id(),
+    tenantId: ref('tenant_id')
+      .notNull()
+      .references(() => finTenants.id),
+    sourceSystemId: ref('source_system_id'),
+    companyId: ref('company_id'),
+    requestId: ref('request_id'),
+    commandId: text('command_id').notNull(),
+    payloadHash: text('payload_hash'),
+    outcome: text('outcome').notNull(),
+    errorCode: text('error_code'),
+    transport: text('transport', { enum: FIN_INTAKE_VIAS }).notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'fin_intake_attempts_request_fk',
+      columns: [t.companyId, t.requestId],
+      foreignColumns: [finIntakeRequests.companyId, finIntakeRequests.id],
+    }),
+    index('fin_intake_attempts_request_idx').on(t.companyId, t.requestId, t.id),
+    check(
+      'fin_intake_attempts_outcome',
+      sql`${t.outcome} IN ('POSTED', 'DUPLICATE', 'CANCELLED', 'HELD', 'REJECTED', 'CONFLICT')`,
+    ),
+  ],
+);
+
+/**
+ * A posted document (ADR-0072): what a source sent, as the core booked it. Append-only; a correction
+ * is a reversal document that names it (once). An ALLOCATION has no journal entry.
+ */
+export const finDocuments = finSchema.table(
+  'documents',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    branchId: ref('branch_id'),
+    documentTypeId: ref('document_type_id').notNull(),
+    class: text('class', { enum: FIN_DOCUMENT_CLASSES }).notNull(),
+    number: text('number').notNull(),
+    documentDate: date('document_date', { mode: 'string' }).notNull(),
+    accountingDate: date('accounting_date', { mode: 'string' }).notNull(),
+    periodId: ref('period_id').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    partyId: ref('party_id'),
+    dueDate: date('due_date', { mode: 'string' }),
+    amount: money('amount').notNull(),
+    description: text('description').notNull(),
+    sourceSystemId: ref('source_system_id').notNull(),
+    sourceDocType: text('source_doc_type').notNull(),
+    sourceDocId: text('source_doc_id').notNull(),
+    sourceRevision: integer('source_revision').notNull(),
+    sourceDocNo: text('source_doc_no'),
+    attributes: jsonValue('attributes')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    /** The money line's account of a RECEIPT or PAYMENT (the cash book reads it). */
+    moneyAccountId: ref('money_account_id'),
+    intakeRequestId: ref('intake_request_id').notNull(),
+    reversesDocumentId: ref('reverses_document_id'),
+    reverseReason: text('reverse_reason'),
+    actorKind: text('actor_kind', { enum: FIN_ACTOR_KINDS }).notNull(),
+    actorRef: text('actor_ref').notNull(),
+    actorLabel: text('actor_label').notNull(),
+    requestId: text('request_id'),
+    postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('fin_documents_company_id_key').on(t.companyId, t.id),
+    unique('fin_documents_company_request_key').on(t.companyId, t.intakeRequestId),
+    unique('fin_documents_company_reverses_key').on(t.companyId, t.reversesDocumentId),
+    uniqueIndex('fin_documents_company_type_number_key')
+      .on(t.companyId, t.documentTypeId, t.number, t.sourceRevision)
+      .where(sql`${t.reversesDocumentId} IS NULL`),
+    foreignKey({
+      name: 'fin_documents_type_fk',
+      columns: [t.companyId, t.documentTypeId],
+      foreignColumns: [finDocumentTypes.companyId, finDocumentTypes.id],
+    }),
+    foreignKey({
+      name: 'fin_documents_period_fk',
+      columns: [t.companyId, t.periodId],
+      foreignColumns: [finFiscalPeriods.companyId, finFiscalPeriods.id],
+    }),
+    foreignKey({
+      name: 'fin_documents_party_fk',
+      columns: [t.companyId, t.partyId],
+      foreignColumns: [finPartyCompanies.companyId, finPartyCompanies.partyId],
+    }),
+    foreignKey({
+      name: 'fin_documents_branch_fk',
+      columns: [t.companyId, t.branchId],
+      foreignColumns: [finBranches.companyId, finBranches.id],
+    }),
+    foreignKey({
+      name: 'fin_documents_money_account_fk',
+      columns: [t.companyId, t.moneyAccountId],
+      foreignColumns: [finMoneyAccounts.companyId, finMoneyAccounts.id],
+    }),
+    foreignKey({
+      name: 'fin_documents_source_fk',
+      columns: [t.companyId, t.sourceSystemId],
+      foreignColumns: [finSourceGrants.companyId, finSourceGrants.sourceSystemId],
+    }),
+    foreignKey({
+      name: 'fin_documents_request_fk',
+      columns: [t.companyId, t.intakeRequestId],
+      foreignColumns: [finIntakeRequests.companyId, finIntakeRequests.id],
+    }),
+    foreignKey({
+      name: 'fin_documents_reverses_fk',
+      columns: [t.companyId, t.reversesDocumentId],
+      foreignColumns: [t.companyId, t.id],
+    }),
+    index('fin_documents_source_idx').on(
+      t.companyId,
+      t.sourceSystemId,
+      t.sourceDocType,
+      t.sourceDocId,
+    ),
+    index('fin_documents_party_idx').on(t.companyId, t.partyId, t.id),
+    index('fin_documents_date_idx').on(t.companyId, t.documentDate, t.id),
+    index('fin_documents_money_idx').on(t.companyId, t.moneyAccountId, t.documentDate, t.id),
+    check(
+      'fin_documents_class',
+      sql`${t.class} IN ('AR_INVOICE', 'AR_CREDIT', 'RECEIPT', 'PAYMENT', 'ALLOCATION', 'SETTLEMENT', 'JOURNAL', 'OPENING', 'AP_BILL', 'AP_CREDIT')`,
+    ),
+    check('fin_documents_number', sql`length(${t.number}) BETWEEN 1 AND 64`),
+    check('fin_documents_currency', sql`${t.currency} ~ '^[A-Z]{3}$'`),
+    check('fin_documents_amount', sql`${t.amount} >= 0`),
+    check('fin_documents_description', sql`length(btrim(${t.description})) BETWEEN 1 AND 300`),
+    check(
+      'fin_documents_source_doc',
+      sql`${codeShape(t.sourceDocType)} AND length(${t.sourceDocId}) BETWEEN 1 AND 128`,
+    ),
+    check(
+      'fin_documents_reverse',
+      sql`(${t.reversesDocumentId} IS NULL) = (${t.reverseReason} IS NULL) AND (${t.reverseReason} IS NULL OR length(btrim(${t.reverseReason})) BETWEEN 1 AND 500)`,
+    ),
+    check('fin_documents_actor_kind', sql`${t.actorKind} IN ('STAFF', 'SOURCE', 'SYSTEM')`),
+  ],
+);
+
+/**
+ * An open item (ADR-0072 #5): every line on a party-control account opens exactly one, on that line's
+ * party and account. Only `open_amount` changes, between 0 and the amount, by allocations.
+ */
+export const finOpenItems = finSchema.table(
+  'open_items',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    partyId: ref('party_id').notNull(),
+    accountId: ref('account_id').notNull(),
+    side: text('side', { enum: FIN_SIDES }).notNull(),
+    documentId: ref('document_id').notNull(),
+    journalLineId: ref('journal_line_id').notNull(),
+    sourceSystemId: ref('source_system_id').notNull(),
+    groupRef: text('group_ref'),
+    itemRef: text('item_ref'),
+    itemDate: date('item_date', { mode: 'string' }).notNull(),
+    dueDate: date('due_date', { mode: 'string' }),
+    amount: money('amount').notNull(),
+    openAmount: money('open_amount').notNull(),
+  },
+  (t) => [
+    unique('fin_open_items_company_id_key').on(t.companyId, t.id),
+    /** The target of an allocation's key: the item is on this party and account. */
+    unique('fin_open_items_allocation_key').on(t.companyId, t.id, t.partyId, t.accountId),
+    unique('fin_open_items_line_key').on(t.companyId, t.journalLineId),
+    foreignKey({
+      name: 'fin_open_items_line_fk',
+      columns: [t.companyId, t.journalLineId, t.partyId, t.accountId],
+      foreignColumns: [
+        finJournalLines.companyId,
+        finJournalLines.id,
+        finJournalLines.partyId,
+        finJournalLines.accountId,
+      ],
+    }),
+    foreignKey({
+      name: 'fin_open_items_document_fk',
+      columns: [t.companyId, t.documentId],
+      foreignColumns: [finDocuments.companyId, finDocuments.id],
+    }),
+    foreignKey({
+      name: 'fin_open_items_party_fk',
+      columns: [t.companyId, t.partyId],
+      foreignColumns: [finPartyCompanies.companyId, finPartyCompanies.partyId],
+    }),
+    index('fin_open_items_open_idx')
+      .on(t.companyId, t.partyId, t.accountId, t.side, t.dueDate, t.id)
+      .where(sql`${t.openAmount} > 0`),
+    index('fin_open_items_document_idx').on(t.companyId, t.documentId),
+    check('fin_open_items_side', sql`${t.side} IN ('DEBIT', 'CREDIT')`),
+    check(
+      'fin_open_items_amounts',
+      sql`${t.amount} > 0 AND ${t.openAmount} >= 0 AND ${t.openAmount} <= ${t.amount}`,
+    ),
+    check(
+      'fin_open_items_refs',
+      sql`(${t.groupRef} IS NULL OR length(${t.groupRef}) BETWEEN 1 AND 128) AND (${t.itemRef} IS NULL OR length(${t.itemRef}) BETWEEN 1 AND 128)`,
+    ),
+  ],
+);
+
+/**
+ * A debit item paired with a credit item of the same party on the same account (ADR-0072 #6):
+ * append-only; undone by an allocation that names it. `mirror` marks the pairing of a reversed
+ * document's item with its reversal's.
+ */
+export const finAllocations = finSchema.table(
+  'allocations',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    partyId: ref('party_id').notNull(),
+    accountId: ref('account_id').notNull(),
+    debitItemId: ref('debit_item_id').notNull(),
+    creditItemId: ref('credit_item_id').notNull(),
+    amount: money('amount').notNull(),
+    documentId: ref('document_id').notNull(),
+    reversesAllocationId: ref('reverses_allocation_id'),
+    mirror: boolean('mirror').notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('fin_allocations_company_id_key').on(t.companyId, t.id),
+    unique('fin_allocations_company_reverses_key').on(t.companyId, t.reversesAllocationId),
+    foreignKey({
+      name: 'fin_allocations_debit_fk',
+      columns: [t.companyId, t.debitItemId, t.partyId, t.accountId],
+      foreignColumns: [
+        finOpenItems.companyId,
+        finOpenItems.id,
+        finOpenItems.partyId,
+        finOpenItems.accountId,
+      ],
+    }),
+    foreignKey({
+      name: 'fin_allocations_credit_fk',
+      columns: [t.companyId, t.creditItemId, t.partyId, t.accountId],
+      foreignColumns: [
+        finOpenItems.companyId,
+        finOpenItems.id,
+        finOpenItems.partyId,
+        finOpenItems.accountId,
+      ],
+    }),
+    foreignKey({
+      name: 'fin_allocations_document_fk',
+      columns: [t.companyId, t.documentId],
+      foreignColumns: [finDocuments.companyId, finDocuments.id],
+    }),
+    foreignKey({
+      name: 'fin_allocations_reverses_fk',
+      columns: [t.companyId, t.reversesAllocationId],
+      foreignColumns: [t.companyId, t.id],
+    }),
+    index('fin_allocations_debit_idx').on(t.companyId, t.debitItemId),
+    index('fin_allocations_credit_idx').on(t.companyId, t.creditItemId),
+    index('fin_allocations_document_idx').on(t.companyId, t.documentId),
+    check('fin_allocations_amount', sql`${t.amount} > 0`),
+    check('fin_allocations_items', sql`${t.debitItemId} <> ${t.creditItemId}`),
+  ],
+);
+
+/** The open amounts per party and account (ADR-0072 #8), rewritten under the party lock. */
+export const finPartyBalances = finSchema.table(
+  'party_balances',
+  {
+    companyId: ref('company_id').notNull(),
+    partyId: ref('party_id').notNull(),
+    accountId: ref('account_id').notNull(),
+    openDebit: money('open_debit')
+      .notNull()
+      .default(sql`0`),
+    openCredit: money('open_credit')
+      .notNull()
+      .default(sql`0`),
+    /** The oldest due date of an open debit item. */
+    oldestDueDate: date('oldest_due_date', { mode: 'string' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'fin_party_balances_pkey',
+      columns: [t.companyId, t.partyId, t.accountId],
+    }),
+    foreignKey({
+      name: 'fin_party_balances_party_fk',
+      columns: [t.companyId, t.partyId],
+      foreignColumns: [finPartyCompanies.companyId, finPartyCompanies.partyId],
+    }),
+    foreignKey({
+      name: 'fin_party_balances_account_fk',
+      columns: [t.companyId, t.accountId],
+      foreignColumns: [finAccounts.companyId, finAccounts.id],
+    }),
+    index('fin_party_balances_account_idx').on(t.companyId, t.accountId),
+    check('fin_party_balances_amounts', sql`${t.openDebit} >= 0 AND ${t.openCredit} >= 0`),
+  ],
+);
+
+/** One check of the sub-ledger (ADR-0072 #8): the cache, the items, the sub-ledger against the GL. */
+export const finReconcileRuns = finSchema.table(
+  'reconcile_runs',
+  {
+    id: id(),
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    kind: text('kind', { enum: FIN_RECONCILE_KINDS }).notNull(),
+    trigger: text('trigger', { enum: ['NIGHTLY', 'MANUAL'] }).notNull(),
+    status: text('status', { enum: ['OK', 'DRIFT'] }).notNull(),
+    checked: integer('checked').notNull(),
+    drifted: integer('drifted').notNull(),
+    details: jsonValue('details')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('fin_reconcile_runs_company_id_key').on(t.companyId, t.id),
+    index('fin_reconcile_runs_company_idx').on(t.companyId, t.kind, t.id),
+    check('fin_reconcile_runs_kind', sql`${t.kind} IN ('CACHE', 'ITEMS', 'SUBLEDGER_GL')`),
+    check('fin_reconcile_runs_trigger', sql`${t.trigger} IN ('NIGHTLY', 'MANUAL')`),
+    check('fin_reconcile_runs_status', sql`${t.status} IN ('OK', 'DRIFT')`),
   ],
 );

@@ -26,9 +26,10 @@ import {
 
 /** Where an entry came from: its source system and document type (null: typed, no document). */
 export interface FinEntryOrigin {
-  system: string;
-  /** undefined: any; null: entries without a source document. */
-  docType?: string | null;
+  /** A source system's code, or any of several. */
+  system: string | readonly string[];
+  /** undefined: any; null: entries without a source document; a list: any of them. */
+  docType?: string | null | readonly string[];
   /** true: reversals only; false: no reversals; undefined: both. */
   reversal?: boolean;
 }
@@ -42,6 +43,8 @@ export interface FinEntrySummary {
   sourceDocType: string | null;
   sourceDocId: string | null;
   reversesId: number | null;
+  /** The intake document the entry books (F2); null for a façade entry (POS until H2). */
+  documentId: number | null;
   actor: { kind: 'STAFF' | 'SOURCE' | 'SYSTEM'; ref: string; label: string };
   postedAt: Date;
   /** Σ debit (= Σ credit). */
@@ -115,17 +118,21 @@ export class FinJournalReader {
     if (query.from) filters.push(sql`${finJournalEntries.entryDate} >= ${query.from}`);
     if (query.to) filters.push(sql`${finJournalEntries.entryDate} <= ${query.to}`);
     if (query.origin) {
-      const [system] = await this.db
+      const codes =
+        typeof query.origin.system === 'string' ? [query.origin.system] : [...query.origin.system];
+      const systems = await this.db
         .select({ id: finSourceSystems.id })
         .from(finSourceSystems)
         .where(
-          and(
-            eq(finSourceSystems.tenantId, scope.tenantId),
-            eq(finSourceSystems.code, query.origin.system),
-          ),
+          and(eq(finSourceSystems.tenantId, scope.tenantId), inArray(finSourceSystems.code, codes)),
         );
-      if (!system) return [];
-      filters.push(...originFilters(system.id, query.origin));
+      if (systems.length === 0) return [];
+      filters.push(
+        ...originFilters(
+          systems.map((system) => system.id),
+          query.origin,
+        ),
+      );
     }
     const lineFilter = (condition: SQL) =>
       exists(
@@ -408,10 +415,12 @@ export class FinJournalReader {
   }
 }
 
-function originFilters(systemId: number, origin: FinEntryOrigin): SQL[] {
-  const filters: SQL[] = [eq(finJournalEntries.sourceSystemId, systemId)];
+function originFilters(systemIds: number[], origin: FinEntryOrigin): SQL[] {
+  const filters: SQL[] = [inArray(finJournalEntries.sourceSystemId, systemIds)];
   if (origin.docType === null) filters.push(isNull(finJournalEntries.sourceDocType));
-  else if (origin.docType !== undefined) {
+  else if (typeof origin.docType === 'object') {
+    filters.push(inArray(finJournalEntries.sourceDocType, [...origin.docType]));
+  } else if (typeof origin.docType === 'string') {
     filters.push(eq(finJournalEntries.sourceDocType, origin.docType));
   }
   if (origin.reversal === true) filters.push(isNotNull(finJournalEntries.reversesId));
@@ -435,6 +444,7 @@ function toSummary(row: {
     sourceDocType: entry.sourceDocType,
     sourceDocId: entry.sourceDocId,
     reversesId: entry.reversesId,
+    documentId: entry.documentId,
     actor: { kind: entry.actorKind, ref: entry.actorRef, label: entry.actorLabel },
     postedAt: entry.postedAt,
     amount: new Decimal(row.amount),

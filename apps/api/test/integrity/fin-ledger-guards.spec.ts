@@ -30,7 +30,8 @@ describe('fin ledger guards', () => {
 
   it('lets exactly one of two simultaneous reversals of an entry commit', async () => {
     const finance = financeApi(app, accountant);
-    const cash = await finance.account('100101');
+    // An expense, not the cash account: a cash line names its cash box since F2 (ADR-0090).
+    const cash = await finance.account('730101');
     const income = await finance.account('511020');
     const entry = (
       await finance

@@ -18,7 +18,7 @@ export {
   RequirePermission,
 } from './decorators/access.decorators';
 export { IdentityHttpModule, IdentityModule, IdentityWorkerModule } from './identity.module';
-export { Idempotent } from './interceptors/idempotency.interceptor';
+export { IdempotencyKey, Idempotent } from './interceptors/idempotency.interceptor';
 export type { CustomerUserStatus } from './schema';
 export { type AuditEntry, AuditService } from './services/audit.service';
 export {

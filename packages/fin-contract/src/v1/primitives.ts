@@ -26,7 +26,7 @@ export const V1_LIMITS = {
   maxPairs: 200,
   maxSettles: 200,
   maxAttributes: 20,
-  maxAttributeValue: 200,
+  maxAttributeValue: 300,
   maxRevision: 1_000_000,
 } as const;
 

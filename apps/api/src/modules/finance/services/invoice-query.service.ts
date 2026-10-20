@@ -17,7 +17,10 @@ import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagina
 import type { VatType } from '../../catalog';
 import { type AuthContext, OrgService, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
-import { allocations, creditNotes, invoiceLines, invoices, payments } from '../schema';
+import { FinReader } from '../../../finance-core';
+import { BTO_SOURCE, FIN_DOC_TYPES } from '../../fin-bridge';
+import { creditNotes, invoiceLines, invoices } from '../schema';
+import { FinBooks } from './fin-books';
 import { JournalService } from './journal.service';
 
 export interface InvoiceSummary {
@@ -126,6 +129,8 @@ export class InvoiceQueryService {
     private readonly org: OrgService,
     private readonly names: UserNamesService,
     private readonly journal: JournalService,
+    private readonly reader: FinReader,
+    private readonly books: FinBooks,
   ) {}
 
   async list(
@@ -197,25 +202,7 @@ export class InvoiceQueryService {
       .from(invoiceLines)
       .where(eq(invoiceLines.invoiceId, id))
       .orderBy(asc(invoiceLines.lineNo));
-    const allocationRows = await this.db
-      .select({
-        allocation: allocations,
-        paymentNumber: payments.number,
-        paymentDate: payments.paidOn,
-        creditNoteNumber: creditNotes.number,
-        creditNoteDate: creditNotes.noteDate,
-      })
-      .from(allocations)
-      .leftJoin(
-        payments,
-        and(eq(allocations.sourceType, 'PAYMENT'), eq(payments.id, allocations.sourceId)),
-      )
-      .leftJoin(
-        creditNotes,
-        and(eq(allocations.sourceType, 'CREDIT_NOTE'), eq(creditNotes.id, allocations.sourceId)),
-      )
-      .where(eq(allocations.invoiceId, id))
-      .orderBy(asc(allocations.id));
+    const allocations = await this.allocationsOf(id);
     const notes = await this.db
       .select({
         id: creditNotes.id,
@@ -249,18 +236,57 @@ export class InvoiceQueryService {
         warehouseName:
           line.warehouseId === null ? null : (warehouses.get(line.warehouseId) ?? null),
       })),
-      allocations: allocationRows.map(({ allocation, ...source }) => ({
-        id: allocation.id,
-        sourceType: allocation.sourceType,
-        sourceId: allocation.sourceId,
-        sourceNumber: source.paymentNumber ?? source.creditNoteNumber ?? '',
-        sourceDate: source.paymentDate ?? source.creditNoteDate ?? '',
-        amount: allocation.amount,
-        createdAt: allocation.createdAt,
-        voidedAt: allocation.voidedAt,
-      })),
+      allocations,
       creditNotes: notes,
     };
+  }
+
+  /**
+   * What settled an invoice (F2, ADR-0090): the allocations on its item in the Finance Core, each
+   * with the document that made it — a voucher, a credit note or the accountant's allocation — and
+   * when it was undone (a voided voucher, a reversed allocation).
+   */
+  private async allocationsOf(invoiceId: number): Promise<InvoiceAllocationView[]> {
+    const company = await this.books.company();
+    const ctx = this.books.source();
+    const document = (
+      await this.reader.documentsOfSource(ctx, {
+        company,
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+        docIds: [String(invoiceId)],
+      })
+    ).get(String(invoiceId));
+    if (!document) return [];
+    const rows = await this.reader.allocationsOf(ctx, { company, documentIds: [document.id] });
+    return rows.flatMap((row) => {
+      const by = row.byDocument;
+      const sourceType: AllocationSource | null =
+        by.typeCode === FIN_DOC_TYPES.SALES_RETURN.code
+          ? 'CREDIT_NOTE'
+          : by.typeCode === FIN_DOC_TYPES.ALLOCATION.code
+            ? 'ALLOCATION'
+            : by.class === 'RECEIPT' || by.class === 'PAYMENT'
+              ? 'PAYMENT'
+              : null;
+      if (sourceType === null) return [];
+      const sourceId =
+        sourceType === 'CREDIT_NOTE' && row.counterpart.documentId === by.id
+          ? Number.parseInt(row.counterpart.sourceDocId, 10)
+          : by.id;
+      return [
+        {
+          id: row.id,
+          sourceType,
+          sourceId,
+          sourceNumber: by.number,
+          sourceDate: by.documentDate,
+          amount: row.amount,
+          createdAt: row.createdAt,
+          voidedAt: row.undoneAt,
+        },
+      ];
+    });
   }
 
   /**

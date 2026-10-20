@@ -17225,6 +17225,171 @@
         ]
       }
     },
+    "/api/v1/customer-balances/{customerId}/open-items": {
+      "get": {
+        "operationId": "Allocations_openItems",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenItemList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/allocations": {
+      "post": {
+        "operationId": "Allocations_allocate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allocation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/allocations/{id}/reverse": {
+      "post": {
+        "operationId": "Allocations_reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocationReversal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/pos/settings": {
       "get": {
         "operationId": "PosSettings_get",
@@ -22072,6 +22237,7 @@
           "auth.staff_session_hours",
           "auth.customer_session_days",
           "credit.payment_term_days",
+          "credit.overdue_nets_credits",
           "bto.company_code"
         ]
       },
@@ -34830,7 +34996,8 @@
           "sourceType": {
             "enum": [
               "PAYMENT",
-              "CREDIT_NOTE"
+              "CREDIT_NOTE",
+              "ALLOCATION"
             ],
             "type": "string"
           },
@@ -37291,6 +37458,219 @@
           "PAYMENT",
           "CREDIT_NOTE",
           "JOURNAL"
+        ]
+      },
+      "OpenItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "side": {
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "REFUND",
+              "ADJUSTMENT",
+              "OPENING",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "documentType": {
+            "enum": [
+              "INVOICE",
+              "PAYMENT",
+              "CREDIT_NOTE",
+              "JOURNAL"
+            ],
+            "type": "string",
+            "description": "Where the document opens"
+          },
+          "documentId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Н-20261016-0001"
+          },
+          "itemDate": {
+            "type": "string",
+            "example": "2026-10-16"
+          },
+          "dueDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-15"
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "50000.00"
+          }
+        },
+        "required": [
+          "id",
+          "side",
+          "kind",
+          "documentType",
+          "documentId",
+          "number",
+          "itemDate",
+          "dueDate",
+          "amount",
+          "openAmount"
+        ]
+      },
+      "OpenItemList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenItem"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AllocationPairRequest": {
+        "type": "object",
+        "properties": {
+          "debitItemId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "creditItemId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000"
+          }
+        },
+        "required": [
+          "debitItemId",
+          "creditItemId",
+          "amount"
+        ]
+      },
+      "AllocationRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-03"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
+          "pairs": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationPairRequest"
+            }
+          }
+        },
+        "required": [
+          "customerId",
+          "pairs"
+        ]
+      },
+      "AllocationPair": {
+        "type": "object",
+        "properties": {
+          "debitItemId": {
+            "type": "number"
+          },
+          "creditItemId": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000.00"
+          }
+        },
+        "required": [
+          "debitItemId",
+          "creditItemId",
+          "amount"
+        ]
+      },
+      "Allocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Х-20261103-0001"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-11-03"
+          },
+          "customerId": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationPair"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "date",
+          "customerId",
+          "amount",
+          "pairs"
+        ]
+      },
+      "AllocationReversal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "Х-20261103-0001"
+          }
+        },
+        "required": [
+          "id",
+          "number"
         ]
       },
       "PosSettings": {

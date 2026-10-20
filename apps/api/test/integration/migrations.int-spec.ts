@@ -44,8 +44,10 @@ describe('database bootstrap (ADR-0024)', () => {
       `SELECT proname FROM pg_proc WHERE pronamespace = 'fin'::regnamespace ORDER BY 1`,
     );
     expect(finFunctions.rows.map((row) => row.proname)).toEqual([
+      'control_line_has_item',
       'forbid_update_delete',
       'journal_entry_balanced',
+      'open_item_guard',
     ]);
   });
 

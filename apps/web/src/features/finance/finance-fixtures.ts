@@ -340,3 +340,73 @@ export const NUMBERING: Schemas['FinanceNumbering'] = {
   JOURNAL: { pattern: 'Ж-{year}{month}{day}-', digits: 4 },
   updatedAt: null,
 };
+
+/** Customer 9's open items (ADR-0090): a payment's and a credit note's remainders, two invoices. */
+export const OPEN_ITEMS: Schemas['OpenItem'][] = [
+  {
+    id: 501,
+    side: 'DEBIT',
+    kind: 'INVOICE',
+    documentType: 'INVOICE',
+    documentId: 11,
+    number: 'Н-20261016-0001',
+    itemDate: '2026-10-16',
+    dueDate: '2026-11-15',
+    amount: '150000.00',
+    openAmount: '100000.00',
+  },
+  {
+    id: 502,
+    side: 'DEBIT',
+    kind: 'INVOICE',
+    documentType: 'INVOICE',
+    documentId: 12,
+    number: 'Н-20261001-0003',
+    itemDate: '2026-10-01',
+    dueDate: '2026-10-31',
+    amount: '30000.00',
+    openAmount: '30000.00',
+  },
+  {
+    id: 503,
+    side: 'CREDIT',
+    kind: 'PAYMENT',
+    documentType: 'PAYMENT',
+    documentId: 22,
+    number: 'Т-20261020-0002',
+    itemDate: '2026-10-20',
+    dueDate: null,
+    amount: '80000.00',
+    openAmount: '80000.00',
+  },
+  {
+    id: 504,
+    side: 'CREDIT',
+    kind: 'CREDIT_NOTE',
+    documentType: 'CREDIT_NOTE',
+    documentId: 41,
+    number: 'К-20261018-0001',
+    itemDate: '2026-10-18',
+    dueDate: null,
+    amount: '20000.00',
+    openAmount: '20000.00',
+  },
+];
+
+/** An invoice settled partly by the accountant's allocation (ADR-0090). */
+export const INVOICE_ALLOCATED: Schemas['InvoiceDetail'] = {
+  ...INVOICE,
+  allocations: [
+    ...INVOICE.allocations,
+    {
+      id: 202,
+      sourceType: 'ALLOCATION',
+      sourceId: 601,
+      sourceNumber: 'Х-20261020-0001',
+      sourceDate: '2026-10-20',
+      amount: '30000.00',
+      createdAt: STAMP,
+      voidedAt: null,
+    },
+  ],
+};

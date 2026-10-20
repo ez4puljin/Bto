@@ -122,7 +122,8 @@ export const AR_ENTRY_KINDS = [
 ] as const;
 export type ArEntryKind = (typeof AR_ENTRY_KINDS)[number];
 
-export const ALLOCATION_SOURCES = ['PAYMENT', 'CREDIT_NOTE'] as const;
+/** What settled an invoice: a voucher, a credit note, or the accountant's allocation (F2, ADR-0090). */
+export const ALLOCATION_SOURCES = ['PAYMENT', 'CREDIT_NOTE', 'ALLOCATION'] as const;
 export type AllocationSource = (typeof ALLOCATION_SOURCES)[number];
 
 export const FINANCE_LIMITS = {

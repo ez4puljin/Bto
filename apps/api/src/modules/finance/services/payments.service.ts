@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import type { LineV1 } from '@tugeel/fin-contract';
 import {
   allocateFifo,
   FINANCE_LIMITS,
@@ -9,22 +11,26 @@ import {
   type PaymentKind,
   type PaymentStatus,
 } from '@tugeel/shared/finance';
+import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, gt, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import { DEFAULT_PAGE_LIMIT, decodeCursor, encodeCursor } from '../../../common/pagination/page';
+import { type FinDocumentRow, FinReader } from '../../../finance-core';
+import { FIN_DOC_TYPES, FIN_SOURCE, FinPartiesBridge } from '../../fin-bridge';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
 import { CustomersService } from '../../partners';
-import { allocations, invoices, payments } from '../schema';
 import { PAYMENT_LISTENER, type PaymentListener } from '../hooks';
-import { ArLedgerService } from './ar-ledger.service';
-import { FinanceSettingsService } from './finance-settings.service';
+import { invoices } from '../schema';
+import { FinBooks } from './fin-books';
+import { FinPosting } from './fin-posting';
 import { GlAccountsService } from './gl-accounts.service';
-import { assertNotFuture, type JournalLineInput, JournalService } from './journal.service';
+import { documentLabel } from './invoicing.service';
+import { assertNotFuture } from './journal.service';
 import { MoneyAccountsService } from './money-accounts.service';
 
 /** An invoice a payment settled, with the amount it took. */
@@ -53,6 +59,11 @@ export interface PaymentInput {
   collectedBy: number | null;
   /** What a customer payment settles; omitted = the open invoices, oldest due first. */
   allocations?: readonly AllocationInput[] | null;
+  /**
+   * The voucher's identity in the Finance Core (its source key, ADR-0071 #10): the request's
+   * Idempotency-Key, so a resend of the same voucher is the same document; a new one when absent.
+   */
+  key?: string | null;
 }
 
 export interface PaymentSummary {
@@ -146,15 +157,41 @@ export interface BookPage {
   opening: Decimal;
 }
 
-type PaymentRow = typeof payments.$inferSelect;
-
 const MONEY_SCALE = 2;
 
+/** Each voucher kind's document type in the Finance Core (ADR-0090). */
+export const VOUCHER_TYPE_OF_KIND = {
+  CUSTOMER_PAYMENT: FIN_DOC_TYPES.CUSTOMER_RECEIPT,
+  CUSTOMER_REFUND: FIN_DOC_TYPES.CUSTOMER_REFUND,
+  OTHER_IN: FIN_DOC_TYPES.OTHER_RECEIPT,
+  OTHER_OUT: FIN_DOC_TYPES.OTHER_PAYMENT,
+} as const satisfies Record<PaymentKind, { code: string; docType: string }>;
+
+export const VOUCHER_TYPE_CODES: readonly string[] = Object.values(VOUCHER_TYPE_OF_KIND).map(
+  (type) => type.code,
+);
+
+const KIND_OF_TYPE = new Map<string, PaymentKind>(
+  (Object.entries(VOUCHER_TYPE_OF_KIND) as [PaymentKind, { code: string }][]).map(
+    ([kind, type]) => [type.code, kind],
+  ),
+);
+
+/** A voucher's own texts and who handed the money in, kept as the document's attributes. */
+const ATTRIBUTE = {
+  memo: 'memo',
+  reference: 'reference',
+  counterparty: 'counterparty',
+  collectedBy: 'collectedBy',
+} as const;
+
 /**
- * The vouchers of the cash and bank books (ADR-0060 #5): a customer's payment settles the open
- * invoices oldest due first unless the accountant chooses, what is left is an advance (the
- * balance goes negative); a refund, an expense or any other income hit a journal account. A
- * voucher is voided by a reversing entry that also undoes its allocations.
+ * The vouchers of the cash and bank books (ADR-0060 #5), kept by the Finance Core since F2
+ * (ADR-0090): a RECEIPT or PAYMENT document of the core's own screens (source FIN), typed by the
+ * accountant and posted as that user. A customer's payment settles the open invoices oldest due
+ * first unless the accountant chooses (Bto picks them, the core books and checks them); what is
+ * left stays the customer's open credit. A refund, an expense or any other income hit a journal
+ * account. A voucher is voided by the core's REVERSE, which also undoes its allocations.
  */
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -165,11 +202,12 @@ export class PaymentsService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly customers: CustomersService,
     private readonly names: UserNamesService,
-    private readonly settings: FinanceSettingsService,
-    private readonly journal: JournalService,
     private readonly accounts: GlAccountsService,
     private readonly moneyAccounts: MoneyAccountsService,
-    private readonly ledger: ArLedgerService,
+    private readonly posting: FinPosting,
+    private readonly reader: FinReader,
+    private readonly books: FinBooks,
+    private readonly parties: FinPartiesBridge,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -189,14 +227,13 @@ export class PaymentsService implements OnModuleInit {
 
   /**
    * Records a voucher inside the caller's transaction (the POS shift hand-over, ADR-0064 #3):
-   * the same checks and postings as `record`; the new payment’s id and number.
+   * the same checks and postings as `record`; the new voucher's id and number.
    */
   async recordInTx(
     tx: Tx,
     ctx: AuthContext,
     input: PaymentInput,
   ): Promise<{ id: number; number: string }> {
-    const direction = PAYMENT_KIND_DIRECTION[input.kind];
     const customerKind = input.kind === 'CUSTOMER_PAYMENT' || input.kind === 'CUSTOMER_REFUND';
     if (!input.amount.gt(0) || input.amount.decimalPlaces() > MONEY_SCALE) {
       throw invalid('amount', 'money', 'a positive amount with 2 decimals');
@@ -216,74 +253,128 @@ export class PaymentsService implements OnModuleInit {
     }
     const account = await this.moneyAccounts.lockActive(tx, input.moneyAccountId);
     const glAccountId = customerKind ? null : input.glAccountId;
-    if (glAccountId !== null) {
-      await this.accounts.activeByIds([glAccountId], () => 'glAccountId', tx);
-    }
+    const other =
+      glAccountId === null
+        ? null
+        : ((await this.accounts.activeByIds([glAccountId], () => 'glAccountId', tx)).get(
+            glAccountId,
+          ) ?? null);
     const customerId = customerKind ? input.customerId : null;
     let customerName: string | null = null;
     if (customerId !== null) {
       await this.customers.lockForUpdate(tx, customerId);
       customerName = (await this.customers.getMany([customerId], tx))[0]?.name ?? null;
+      // The customer's party exists before the core's screens name it (a USER never creates one).
+      await this.parties.customerPartyInTx(tx, ctx, customerId);
     }
-    const number = await this.settings.allocateNumber(tx, 'PAYMENT', input.paidOn);
-    const [payment] = await tx
-      .insert(payments)
-      .values({
-        number,
-        kind: input.kind,
-        direction,
-        moneyAccountId: account.id,
-        customerId,
-        glAccountId,
-        amount: input.amount,
-        paidOn: input.paidOn,
-        description: input.description?.trim() || null,
-        reference: input.reference?.trim() || null,
-        counterpartyName: input.counterpartyName?.trim() || null,
-        collectedBy: input.collectedBy,
-        createdBy: ctx.userId,
-      })
-      .returning({ id: payments.id });
-    if (!payment) throw new Error('payments insert returned no row');
-    let allocated = new Decimal(0);
     let settled: SettledInvoice[] = [];
     if (input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
-      settled = await this.allocate(tx, payment.id, customerId, input);
-      allocated = settled.reduce((sum, own) => sum.plus(own.amount), new Decimal(0));
+      settled = await this.chooseInvoices(tx, customerId, input);
     }
-    const zero = new Decimal(0);
-    const lines = paymentEntryLines({
-      kind: input.kind,
-      amount: input.amount,
-      moneyAccount: { id: account.id, glAccountId: account.glAccountId },
-      customerId,
-      glAccountId,
-    });
-    const entry = await this.journal.post(tx, ctx, {
-      entryDate: input.paidOn,
-      description: label(number, customerName ?? input.counterpartyName ?? input.description),
-      source: 'AUTO_PAYMENT',
-      sourceType: 'PAYMENT',
-      sourceId: payment.id,
-      lines,
-    });
-    await tx.update(payments).set({ journalEntryId: entry.id }).where(eq(payments.id, payment.id));
-    if (customerId !== null) {
-      await this.ledger.record(tx, {
-        customerId,
-        entryDate: input.paidOn,
-        kind: input.kind === 'CUSTOMER_PAYMENT' ? 'PAYMENT' : 'REFUND',
-        docType: 'PAYMENT',
-        docId: payment.id,
-        docNumber: number,
-        debit: input.kind === 'CUSTOMER_REFUND' ? input.amount : zero,
-        credit: input.kind === 'CUSTOMER_PAYMENT' ? input.amount : zero,
-      });
+
+    const type = VOUCHER_TYPE_OF_KIND[input.kind];
+    const moneyKey = account.kind === 'BANK' ? 'BANK' : 'CASH';
+    const money: LineV1 = {
+      lineNo: 0,
+      key: moneyKey,
+      side: 'DEBIT',
+      amount: input.amount.toFixed(2),
+      moneyAccount: account.code,
+    };
+    const amount = input.amount.toFixed(2);
+    let lines: LineV1[];
+    switch (input.kind) {
+      case 'CUSTOMER_PAYMENT':
+        lines = [
+          { ...money, side: 'DEBIT' },
+          {
+            lineNo: 0,
+            key: 'AR',
+            side: 'CREDIT',
+            amount,
+            ...(settled.length
+              ? {
+                  settles: settled.map((own) => ({
+                    target: {
+                      system: 'BTO',
+                      docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+                      docId: String(own.invoiceId),
+                    },
+                    amount: own.amount.toFixed(2),
+                  })),
+                }
+              : {}),
+          },
+        ];
+        break;
+      case 'CUSTOMER_REFUND':
+        // The refund opens a debit item; the accountant pairs it with the credit it paid back (D7).
+        lines = [
+          { lineNo: 0, key: 'AR', side: 'DEBIT', amount },
+          { ...money, side: 'CREDIT' },
+        ];
+        break;
+      case 'OTHER_IN':
+        lines = [
+          { ...money, side: 'DEBIT' },
+          {
+            lineNo: 0,
+            key: 'OTHER_INCOME',
+            side: 'CREDIT',
+            amount,
+            accountCode: other?.code ?? '',
+          },
+        ];
+        break;
+      case 'OTHER_OUT':
+        lines = [
+          {
+            lineNo: 0,
+            key: 'OTHER_EXPENSE',
+            side: 'DEBIT',
+            amount,
+            accountCode: other?.code ?? '',
+          },
+          { ...money, side: 'CREDIT' },
+        ];
+        break;
     }
+    lines = lines.map((line, index) => ({ ...line, lineNo: index + 1 }));
+    const memo = input.description?.trim() || null;
+    const reference = input.reference?.trim() || null;
+    const counterparty = input.counterpartyName?.trim() || null;
+    const attributes: Record<string, string> = {};
+    if (memo) attributes[ATTRIBUTE.memo] = memo;
+    if (reference) attributes[ATTRIBUTE.reference] = reference;
+    if (counterparty) attributes[ATTRIBUTE.counterparty] = counterparty;
+    if (input.collectedBy !== null) attributes[ATTRIBUTE.collectedBy] = String(input.collectedBy);
+    const who =
+      customerName ?? counterparty ?? memo ?? mn.finance.paymentKinds[input.kind] ?? input.kind;
+    const result = await this.posting.submitInTx(tx, this.books.user(ctx), {
+      source: { system: FIN_SOURCE, docType: type.docType, docId: input.key ?? randomUUID() },
+      body: {
+        action: 'POST',
+        documentType: type.code,
+        documentDate: input.paidOn,
+        currency: 'MNT',
+        ...(customerId !== null
+          ? { party: await this.parties.customerPartyIn(tx, customerId) }
+          : {}),
+        description: who.slice(0, FINANCE_LIMITS.maxDescription),
+        controlTotal: amount,
+        lines,
+        ...(Object.keys(attributes).length ? { attributes } : {}),
+      },
+    });
+    const document = result.document;
+    if (!document) throw new Error('the voucher was not posted');
+    const id = Number.parseInt(document.id, 10);
+    const number = document.number;
+    const allocated = settled.reduce((sum, own) => sum.plus(own.amount), new Decimal(0));
     await this.audit.record(tx, ctx, {
       action: 'CREATE',
       entity: 'payments',
-      entityId: payment.id,
+      entityId: id,
       after: {
         number,
         kind: input.kind,
@@ -297,7 +388,7 @@ export class PaymentsService implements OnModuleInit {
     });
     if (this.listener && input.kind === 'CUSTOMER_PAYMENT' && customerId !== null) {
       await this.listener.onPaymentRecorded(tx, {
-        paymentId: payment.id,
+        paymentId: id,
         paymentNumber: number,
         customerId,
         amount: input.amount.toFixed(MONEY_SCALE),
@@ -310,115 +401,35 @@ export class PaymentsService implements OnModuleInit {
         })),
       });
     }
-    return { id: payment.id, number };
+    return { id, number };
   }
 
-  /** Voids a posted voucher: its allocations come back onto the invoices, the entry is reversed. */
+  /** Voids a posted voucher: the core reverses it and gives its allocations back to the invoices. */
   async void(ctx: AuthContext, id: number, reason: string): Promise<PaymentDetail> {
     const trimmed = reason.trim();
     if (trimmed.length === 0 || trimmed.length > FINANCE_LIMITS.maxReason) {
       throw invalid('reason', 'length', `1 to ${FINANCE_LIMITS.maxReason} characters`);
     }
     await inTransaction(this.db, async (tx) => {
-      const [head] = await tx
-        .select({ customerId: payments.customerId })
-        .from(payments)
-        .where(eq(payments.id, id));
-      if (!head) throw notFound('payment', id);
-      if (head.customerId !== null) await this.customers.lockForUpdate(tx, head.customerId);
-      const [payment] = await tx.select().from(payments).where(eq(payments.id, id)).for('update');
-      if (!payment) throw notFound('payment', id);
-      if (payment.status !== 'POSTED') {
-        throw new AppError(
-          'PAYMENT_STATE_INVALID',
-          `payment ${payment.number} is ${payment.status}`,
-          {
-            number: payment.number,
-            status: payment.status,
-          },
-        );
-      }
-      const live = await tx
-        .select()
-        .from(allocations)
-        .where(
-          and(
-            eq(allocations.sourceType, 'PAYMENT'),
-            eq(allocations.sourceId, id),
-            isNull(allocations.voidedAt),
-          ),
-        )
-        .orderBy(asc(allocations.invoiceId));
-      if (live.length > 0) {
-        await tx
-          .select({ id: invoices.id })
-          .from(invoices)
-          .where(
-            inArray(
-              invoices.id,
-              live.map((row) => row.invoiceId),
-            ),
-          )
-          .orderBy(asc(invoices.id))
-          .for('update');
-        for (const row of live) {
-          await tx
-            .update(invoices)
-            .set({ openAmount: sql`${invoices.openAmount} + ${row.amount.toFixed(2)}::numeric` })
-            .where(eq(invoices.id, row.invoiceId));
-        }
-        await tx
-          .update(allocations)
-          .set({ voidedAt: sql`now()` })
-          .where(
-            inArray(
-              allocations.id,
-              live.map((row) => row.id),
-            ),
-          );
-      }
-      const today = businessDate();
-      const customerName =
-        payment.customerId === null
-          ? null
-          : ((await this.customers.getMany([payment.customerId], tx))[0]?.name ?? null);
-      const reversal =
-        payment.journalEntryId === null
-          ? null
-          : await this.journal.reverse(tx, ctx, payment.journalEntryId, {
-              entryDate: today,
-              description: label(payment.number, customerName ?? payment.counterpartyName),
-              source: 'AUTO_VOID',
-            });
-      await tx
-        .update(payments)
-        .set({
+      const voucher = await this.voucher(id);
+      if (voucher.reversal) {
+        throw new AppError('PAYMENT_STATE_INVALID', `payment ${voucher.number} is VOID`, {
+          number: voucher.number,
           status: 'VOID',
-          voidedAt: sql`now()`,
-          voidedBy: ctx.userId,
-          voidReason: trimmed,
-          voidJournalEntryId: reversal?.id ?? null,
-        })
-        .where(eq(payments.id, id));
-      if (payment.customerId !== null) {
-        const zero = new Decimal(0);
-        await this.ledger.record(tx, {
-          customerId: payment.customerId,
-          entryDate: today,
-          kind: 'VOID',
-          docType: 'PAYMENT',
-          docId: id,
-          docNumber: payment.number,
-          debit: payment.kind === 'CUSTOMER_PAYMENT' ? payment.amount : zero,
-          credit: payment.kind === 'CUSTOMER_REFUND' ? payment.amount : zero,
         });
       }
+      const customerId = await this.customerOf(voucher.partyId);
+      if (customerId !== null) await this.customers.lockForUpdate(tx, customerId);
+      const result = await this.posting.submitInTx(tx, this.books.user(ctx), {
+        source: { system: FIN_SOURCE, docType: voucher.sourceDocType, docId: voucher.sourceDocId },
+        body: { action: 'REVERSE', accountingDate: businessDate(), reason: trimmed },
+      });
       await this.audit.record(tx, ctx, {
         action: 'VOID',
         entity: 'payments',
         entityId: id,
         before: { status: 'POSTED' },
-        after: { status: 'VOID', reason: trimmed, reversal: reversal?.number ?? null },
+        after: { status: 'VOID', reason: trimmed, reversal: result.document?.journalNo ?? null },
       });
     });
     return this.get(id);
@@ -429,51 +440,53 @@ export class PaymentsService implements OnModuleInit {
     query: PaymentQuery,
   ): Promise<{ data: PaymentSummary[]; nextCursor: string | null; total: number | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
-    const filters: SQL[] = [];
-    if (query.moneyAccountId) filters.push(eq(payments.moneyAccountId, query.moneyAccountId));
-    if (query.customerId) filters.push(eq(payments.customerId, query.customerId));
-    if (query.kind) filters.push(eq(payments.kind, query.kind));
-    if (query.direction) filters.push(eq(payments.direction, query.direction));
-    if (query.status) filters.push(eq(payments.status, query.status));
-    if (query.from) filters.push(sql`${payments.paidOn} >= ${query.from}`);
-    if (query.to) filters.push(sql`${payments.paidOn} <= ${query.to}`);
+    const company = await this.books.company();
+    let partyIds: number[] | undefined;
+    if (query.customerId) {
+      const party = (await this.parties.partiesOfCustomers([query.customerId])).get(
+        query.customerId,
+      );
+      if (party === undefined)
+        return { data: [], nextCursor: null, total: query.cursor ? null : 0 };
+      partyIds = [Number.parseInt(party, 10)];
+    }
+    let text: { pattern: string; partyIds: number[] } | undefined;
     const q = query.q?.trim();
     if (q) {
       const customerIds = (await this.customers.list(ctx, { q, limit: 200 })).data.map(
         (customer) => customer.id,
       );
-      const pattern = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
-      filters.push(
-        or(
-          sql`${payments.number} ILIKE ${pattern}`,
-          sql`${payments.reference} ILIKE ${pattern}`,
-          sql`${payments.counterpartyName} ILIKE ${pattern}`,
-          sql`${payments.description} ILIKE ${pattern}`,
-          ...(customerIds.length ? [inArray(payments.customerId, customerIds)] : []),
-        ) as SQL,
-      );
+      const parties = await this.parties.partiesOfCustomers(customerIds);
+      text = {
+        pattern: `%${q.replace(/[%_\\]/g, '\\$&')}%`,
+        partyIds: [...parties.values()].map((id) => Number.parseInt(id, 10)),
+      };
     }
     const after = decodeCursor(query.cursor);
-    const paged =
-      typeof after?.date === 'string' && typeof after?.id === 'number'
-        ? [sql`(${payments.paidOn}, ${payments.id}) < (${after.date}::date, ${after.id}::bigint)`]
-        : [];
-    const rows = await this.db
-      .select(this.summaryColumns())
-      .from(payments)
-      .where(and(...filters, ...paged))
-      .orderBy(desc(payments.paidOn), desc(payments.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ date: row.payment.paidOn, id: row.payment.id }));
-    let total: number | null = null;
-    if (!query.cursor) {
-      const [counted] = await this.db
-        .select({ count: sql<string>`count(*)` })
-        .from(payments)
-        .where(and(...filters));
-      total = Number.parseInt(counted?.count ?? '0', 10);
-    }
-    return { data: await this.summaries(page.data), nextCursor: page.nextCursor, total };
+    const { rows, total } = await this.reader.documents(this.books.source(), {
+      company,
+      typeCodes: query.kind ? [VOUCHER_TYPE_OF_KIND[query.kind].code] : VOUCHER_TYPE_CODES,
+      ...(partyIds ? { partyIds } : {}),
+      ...(query.moneyAccountId ? { moneyAccountId: query.moneyAccountId } : {}),
+      ...(query.direction ? { classes: [query.direction === 'IN' ? 'RECEIPT' : 'PAYMENT'] } : {}),
+      ...(query.status ? { reversed: query.status === 'VOID' } : {}),
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(text ? { text } : {}),
+      ...(typeof after?.date === 'string' && typeof after?.id === 'number'
+        ? { after: { date: after.date, id: after.id } }
+        : {}),
+      limit,
+      count: !query.cursor,
+    });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      data: await this.summaries(page),
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ date: last.documentDate, id: last.id }) : null,
+      total,
+    };
   }
 
   /**
@@ -486,124 +499,72 @@ export class PaymentsService implements OnModuleInit {
     query: { cursor?: string; limit?: number } = {},
   ): Promise<{ data: CustomerPayment[]; nextCursor: string | null; total: number | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
-    const scope = and(
-      eq(payments.customerId, customerId),
-      eq(payments.status, 'POSTED'),
-      inArray(payments.kind, ['CUSTOMER_PAYMENT', 'CUSTOMER_REFUND']),
-    );
+    const party = (await this.parties.partiesOfCustomers([customerId])).get(customerId);
+    if (party === undefined) return { data: [], nextCursor: null, total: query.cursor ? null : 0 };
+    const company = await this.books.company();
     const after = decodeCursor(query.cursor);
-    const paged =
-      typeof after?.date === 'string' && typeof after?.id === 'number'
-        ? sql`(${payments.paidOn}, ${payments.id}) < (${after.date}::date, ${after.id}::bigint)`
-        : undefined;
-    const rows = await this.db
-      .select({
-        id: payments.id,
-        number: payments.number,
-        kind: payments.kind,
-        moneyAccountId: payments.moneyAccountId,
-        amount: payments.amount,
-        paidOn: payments.paidOn,
-      })
-      .from(payments)
-      .where(and(scope, paged))
-      .orderBy(desc(payments.paidOn), desc(payments.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ date: row.paidOn, id: row.id }));
+    const { rows, total } = await this.reader.documents(this.books.source(), {
+      company,
+      typeCodes: [
+        VOUCHER_TYPE_OF_KIND.CUSTOMER_PAYMENT.code,
+        VOUCHER_TYPE_OF_KIND.CUSTOMER_REFUND.code,
+      ],
+      partyIds: [Number.parseInt(party, 10)],
+      reversed: false,
+      ...(typeof after?.date === 'string' && typeof after?.id === 'number'
+        ? { after: { date: after.date, id: after.id } }
+        : {}),
+      limit,
+      count: !query.cursor,
+    });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
     const kinds = new Map(
       (await this.moneyAccounts.list()).map((account) => [account.id, account.kind]),
     );
-    const settled =
-      page.data.length === 0
-        ? []
-        : await this.db
-            .select({
-              paymentId: allocations.sourceId,
-              invoiceId: allocations.invoiceId,
-              number: invoices.number,
-              amount: allocations.amount,
-            })
-            .from(allocations)
-            .innerJoin(invoices, eq(invoices.id, allocations.invoiceId))
-            .where(
-              and(
-                eq(allocations.sourceType, 'PAYMENT'),
-                inArray(
-                  allocations.sourceId,
-                  page.data.map((row) => row.id),
-                ),
-                isNull(allocations.voidedAt),
-              ),
-            )
-            .orderBy(asc(invoices.dueDate), asc(invoices.id));
-    let total: number | null = null;
-    if (!query.cursor) {
-      const [counted] = await this.db
-        .select({ count: sql<string>`count(*)` })
-        .from(payments)
-        .where(scope);
-      total = Number.parseInt(counted?.count ?? '0', 10);
-    }
+    const settled = await this.settledInvoices(page.map((row) => row.id));
     return {
-      data: page.data.map((row) => ({
+      data: page.map((row) => ({
         id: row.id,
         number: row.number,
-        kind: row.kind === 'CUSTOMER_REFUND' ? 'CUSTOMER_REFUND' : 'CUSTOMER_PAYMENT',
-        method: kinds.get(row.moneyAccountId) ?? 'CASH',
+        kind:
+          KIND_OF_TYPE.get(row.typeCode) === 'CUSTOMER_REFUND'
+            ? 'CUSTOMER_REFUND'
+            : 'CUSTOMER_PAYMENT',
+        method: (row.moneyAccountId === null ? undefined : kinds.get(row.moneyAccountId)) ?? 'CASH',
         amount: row.amount,
-        paidOn: row.paidOn,
-        invoices: settled
-          .filter((own) => own.paymentId === row.id)
-          .map((own) => ({ invoiceId: own.invoiceId, number: own.number, amount: own.amount })),
+        paidOn: row.documentDate,
+        invoices: (settled.get(row.id) ?? [])
+          .filter((own) => own.voidedAt === null)
+          .map((own) => ({
+            invoiceId: own.invoiceId,
+            number: own.invoiceNumber,
+            amount: own.amount,
+          })),
       })),
-      nextCursor: page.nextCursor,
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ date: last.documentDate, id: last.id }) : null,
       total,
     };
   }
 
   async get(id: number): Promise<PaymentDetail> {
-    const [row] = await this.db
-      .select(this.summaryColumns())
-      .from(payments)
-      .where(eq(payments.id, id));
-    if (!row) throw notFound('payment', id);
-    const [summary] = await this.summaries([row]);
+    const voucher = await this.voucher(id);
+    const [summary] = await this.summaries([voucher]);
     if (!summary) throw notFound('payment', id);
-    const allocationRows = await this.db
-      .select({
-        allocation: allocations,
-        invoiceNumber: invoices.number,
-        invoiceDueDate: invoices.dueDate,
-      })
-      .from(allocations)
-      .innerJoin(invoices, eq(invoices.id, allocations.invoiceId))
-      .where(and(eq(allocations.sourceType, 'PAYMENT'), eq(allocations.sourceId, id)))
-      .orderBy(asc(allocations.id));
-    const voidedByName =
-      row.payment.voidedBy === null
-        ? null
-        : ((await this.names.namesOf([row.payment.voidedBy])).get(row.payment.voidedBy) ?? null);
+    const allocations = (await this.settledInvoices([id])).get(id) ?? [];
+    const reversal = voucher.reversal;
+    const voidedBy = reversal ? userIdOf(reversal.actorRef) : null;
     return {
       ...summary,
-      journalEntryId: row.payment.journalEntryId,
-      journalNumber:
-        row.payment.journalEntryId === null
-          ? null
-          : ((await this.journal.numbersOf([row.payment.journalEntryId])).get(
-              row.payment.journalEntryId,
-            ) ?? null),
-      voidedAt: row.payment.voidedAt,
-      voidedByName,
-      voidReason: row.payment.voidReason,
-      voidJournalEntryId: row.payment.voidJournalEntryId,
-      allocations: allocationRows.map(({ allocation, invoiceNumber, invoiceDueDate }) => ({
-        id: allocation.id,
-        invoiceId: allocation.invoiceId,
-        invoiceNumber,
-        invoiceDueDate,
-        amount: allocation.amount,
-        voidedAt: allocation.voidedAt,
-      })),
+      journalEntryId: voucher.entryId,
+      journalNumber: voucher.journalNo,
+      voidedAt: reversal?.postedAt ?? null,
+      voidedByName:
+        voidedBy === null ? null : ((await this.names.namesOf([voidedBy])).get(voidedBy) ?? null),
+      voidReason: reversal?.reason ?? null,
+      voidJournalEntryId: reversal?.entryId ?? null,
+      allocations: summary.kind === 'CUSTOMER_PAYMENT' ? allocations : [],
     };
   }
 
@@ -612,68 +573,38 @@ export class PaymentsService implements OnModuleInit {
     await this.moneyAccounts.get(moneyAccountId);
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
-    const signed = sql`CASE ${payments.direction} WHEN 'IN' THEN ${payments.amount} ELSE -${payments.amount} END`;
-    const running = this.db
-      .select({
-        id: payments.id,
-        paidOn: payments.paidOn,
-        balanceAfter:
-          sql<string>`sum(${signed}) OVER (ORDER BY ${payments.paidOn}, ${payments.id})`.as(
-            'balance_after',
-          ),
-      })
-      .from(payments)
-      .where(and(eq(payments.moneyAccountId, moneyAccountId), eq(payments.status, 'POSTED')))
-      .as('running');
-    const filters: SQL[] = [];
-    if (query.from) filters.push(sql`${running.paidOn} >= ${query.from}`);
-    if (query.to) filters.push(sql`${running.paidOn} <= ${query.to}`);
-    if (typeof after?.date === 'string' && typeof after?.id === 'number') {
-      filters.push(
-        sql`(${running.paidOn}, ${running.id}) < (${after.date}::date, ${after.id}::bigint)`,
-      );
-    }
-    const rows = await this.db
-      .select({ ...this.summaryColumns(), balanceAfter: running.balanceAfter })
-      .from(running)
-      .innerJoin(payments, eq(payments.id, running.id))
-      .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(running.paidOn), desc(running.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ date: row.payment.paidOn, id: row.payment.id }));
-    let opening = new Decimal(0);
-    if (query.from) {
-      const [before] = await this.db
-        .select({ balance: sql<string>`coalesce(sum(${signed}), 0)` })
-        .from(payments)
-        .where(
-          and(
-            eq(payments.moneyAccountId, moneyAccountId),
-            eq(payments.status, 'POSTED'),
-            sql`${payments.paidOn} < ${query.from}`,
-          ),
-        );
-      opening = new Decimal(before?.balance ?? 0);
-    }
-    const summaries = await this.summaries(page.data);
+    const { rows, opening } = await this.reader.moneyBook(this.books.source(), {
+      company: await this.books.company(),
+      moneyAccountId,
+      typeCodes: VOUCHER_TYPE_CODES,
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(typeof after?.date === 'string' && typeof after?.id === 'number'
+        ? { after: { date: after.date, id: after.id } }
+        : {}),
+      limit,
+    });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    const summaries = await this.summaries(page);
     return {
       data: summaries.map((summary, index) => ({
         ...summary,
-        balanceAfter: new Decimal(page.data[index]?.balanceAfter ?? 0),
+        balanceAfter: page[index]?.balanceAfter ?? new Decimal(0),
       })),
-      nextCursor: page.nextCursor,
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ date: last.documentDate, id: last.id }) : null,
       opening,
     };
   }
 
   /**
-   * Settles the customer's open invoices with a payment: the accountant's allocations when given
-   * (each within the invoice's open amount, together within the payment), else oldest due first.
-   * Returns the invoices it settled; the rest stays an advance.
+   * The open invoices a customer payment settles: the accountant's choice when given (each within
+   * the invoice's open amount, together within the payment), else oldest due first. Locks the
+   * invoices FOR UPDATE (Bto's own rows come first in the lock order, ADR-0071 #6).
    */
-  private async allocate(
+  private async chooseInvoices(
     tx: Tx,
-    paymentId: number,
     customerId: number,
     input: PaymentInput,
   ): Promise<SettledInvoice[]> {
@@ -735,139 +666,138 @@ export class PaymentsService implements OnModuleInit {
       chosen = allocateFifo(input.amount, open);
     }
     const numbers = new Map(open.map((invoice) => [invoice.id, invoice.number]));
-    const settled: SettledInvoice[] = [];
-    for (const allocation of chosen) {
-      await tx.insert(allocations).values({
-        sourceType: 'PAYMENT',
-        sourceId: paymentId,
-        invoiceId: allocation.invoiceId,
-        amount: allocation.amount,
+    return chosen.map((allocation) => ({
+      invoiceId: allocation.invoiceId,
+      number: numbers.get(allocation.invoiceId) ?? '',
+      amount: allocation.amount,
+    }));
+  }
+
+  /** One voucher by its document id, or 404. */
+  private async voucher(id: number): Promise<FinDocumentRow> {
+    const { rows } = await this.reader.documents(this.books.source(), {
+      company: await this.books.company(),
+      typeCodes: VOUCHER_TYPE_CODES,
+      ids: [id],
+    });
+    const [row] = rows;
+    if (!row) throw notFound('payment', id);
+    return row;
+  }
+
+  private async customerOf(partyId: number | null): Promise<number | null> {
+    if (partyId === null) return null;
+    return (await this.parties.customersOfParties([String(partyId)])).get(String(partyId)) ?? null;
+  }
+
+  /** The invoices these vouchers settled (live and undone allocations), by voucher id. */
+  private async settledInvoices(
+    ids: readonly number[],
+  ): Promise<Map<number, PaymentAllocationView[]>> {
+    const result = new Map<number, PaymentAllocationView[]>();
+    if (ids.length === 0) return result;
+    const rows = await this.reader.allocationsOf(this.books.source(), {
+      company: await this.books.company(),
+      documentIds: ids,
+    });
+    for (const row of rows) {
+      if (
+        row.counterpart.sourceDocType !== FIN_DOC_TYPES.SALES_INVOICE.docType ||
+        !/^\d+$/.test(row.counterpart.sourceDocId)
+      ) {
+        continue;
+      }
+      const list = result.get(row.ownDocumentId) ?? [];
+      list.push({
+        id: row.id,
+        invoiceId: Number.parseInt(row.counterpart.sourceDocId, 10),
+        invoiceNumber: row.counterpart.number,
+        invoiceDueDate: row.counterpart.dueDate ?? row.counterpart.documentDate,
+        amount: row.amount,
+        voidedAt: row.undoneAt,
       });
-      await tx
-        .update(invoices)
-        .set({ openAmount: sql`${invoices.openAmount} - ${allocation.amount.toFixed(2)}::numeric` })
-        .where(eq(invoices.id, allocation.invoiceId));
-      settled.push({
-        invoiceId: allocation.invoiceId,
-        number: numbers.get(allocation.invoiceId) ?? '',
-        amount: allocation.amount,
-      });
+      result.set(row.ownDocumentId, list);
     }
-    return settled;
+    return result;
   }
 
-  private summaryColumns() {
-    return {
-      payment: payments,
-      allocatedAmount: sql<string>`(SELECT coalesce(sum(a.amount), 0) FROM allocations a
-        WHERE a.source_type = 'PAYMENT' AND a.source_id = payments.id AND a.voided_at IS NULL)`,
-    };
-  }
-
-  private async summaries(
-    rows: { payment: PaymentRow; allocatedAmount: string }[],
-  ): Promise<PaymentSummary[]> {
+  private async summaries(rows: readonly FinDocumentRow[]): Promise<PaymentSummary[]> {
     if (rows.length === 0) return [];
     const accounts = new Map(
       (await this.moneyAccounts.list()).map((account) => [account.id, account]),
     );
     const gl = new Map((await this.accounts.list()).map((row) => [row.id, row]));
-    const customers = new Map(
-      (
-        await this.customers.getMany(
-          rows.flatMap((row) => (row.payment.customerId === null ? [] : [row.payment.customerId])),
-        )
-      ).map((customer) => [customer.id, customer]),
+    const customerOf = await this.parties.customersOfParties(
+      rows.flatMap((row) => (row.partyId === null ? [] : [String(row.partyId)])),
     );
-    const names = await this.names.namesOf(
-      rows.flatMap((row) => [
-        ...(row.payment.createdBy === null ? [] : [row.payment.createdBy]),
-        ...(row.payment.collectedBy === null ? [] : [row.payment.collectedBy]),
+    const customers = new Map(
+      (await this.customers.getMany([...new Set(customerOf.values())])).map((customer) => [
+        customer.id,
+        customer,
       ]),
     );
-    return rows.map(({ payment, allocatedAmount }) => {
-      const account = accounts.get(payment.moneyAccountId);
-      const customer = payment.customerId === null ? null : customers.get(payment.customerId);
-      const other = payment.glAccountId === null ? null : gl.get(payment.glAccountId);
+    const collected = (row: FinDocumentRow) => {
+      const value = row.attributes[ATTRIBUTE.collectedBy];
+      return value && /^\d+$/.test(value) ? Number.parseInt(value, 10) : null;
+    };
+    const names = await this.names.namesOf(
+      rows.flatMap((row) => {
+        const ids: number[] = [];
+        const creator = userIdOf(row.actorRef);
+        if (creator !== null) ids.push(creator);
+        const collector = collected(row);
+        if (collector !== null) ids.push(collector);
+        return ids;
+      }),
+    );
+    return rows.map((row) => {
+      const kind = KIND_OF_TYPE.get(row.typeCode) ?? 'OTHER_IN';
+      const account = row.moneyAccountId === null ? undefined : accounts.get(row.moneyAccountId);
+      const customerId =
+        row.partyId === null ? null : (customerOf.get(String(row.partyId)) ?? null);
+      const customer = customerId === null ? undefined : customers.get(customerId);
+      const customerKind = kind === 'CUSTOMER_PAYMENT' || kind === 'CUSTOMER_REFUND';
+      const glAccountId = customerKind ? null : row.counterAccountId;
+      const other = glAccountId === null ? undefined : gl.get(glAccountId);
+      const creator = userIdOf(row.actorRef);
+      const collector = collected(row);
       return {
-        id: payment.id,
-        number: payment.number,
-        status: payment.status,
-        kind: payment.kind,
-        direction: payment.direction,
-        moneyAccountId: payment.moneyAccountId,
+        id: row.id,
+        number: row.number,
+        status: row.reversal ? 'VOID' : 'POSTED',
+        kind,
+        direction: PAYMENT_KIND_DIRECTION[kind],
+        moneyAccountId: row.moneyAccountId ?? 0,
         moneyAccountCode: account?.code ?? '',
         moneyAccountName: account?.name ?? '',
-        customerId: payment.customerId,
+        customerId,
         customerCode: customer?.code ?? null,
         customerName: customer?.name ?? null,
-        glAccountId: payment.glAccountId,
+        glAccountId,
         glAccountCode: other?.code ?? null,
         glAccountName: other?.name ?? null,
-        amount: payment.amount,
-        allocatedAmount: new Decimal(allocatedAmount),
-        paidOn: payment.paidOn,
-        description: payment.description,
-        reference: payment.reference,
-        counterpartyName: payment.counterpartyName,
-        collectedBy: payment.collectedBy,
-        collectedByName:
-          payment.collectedBy === null ? null : (names.get(payment.collectedBy) ?? null),
-        createdAt: payment.createdAt,
-        createdByName: payment.createdBy === null ? null : (names.get(payment.createdBy) ?? null),
+        amount: row.amount,
+        allocatedAmount: kind === 'CUSTOMER_PAYMENT' ? row.settled : new Decimal(0),
+        paidOn: row.documentDate,
+        description: row.attributes[ATTRIBUTE.memo] ?? null,
+        reference: row.attributes[ATTRIBUTE.reference] ?? null,
+        counterpartyName: row.attributes[ATTRIBUTE.counterparty] ?? null,
+        collectedBy: collector,
+        collectedByName: collector === null ? null : (names.get(collector) ?? null),
+        createdAt: row.postedAt,
+        createdByName: creator === null ? null : (names.get(creator) ?? null),
       };
     });
   }
 }
 
-/**
- * A voucher's entry (ADR-0060 #5): Dr the cash box or bank (its money account on the line) / Cr
- * receivables for a customer payment, the reverse for a refund; other income Dr cash / Cr the
- * account, an expense Dr the account / Cr cash. Also used by the development re-post
- * (`pnpm finance:repost-journal`, ADR-0089).
- */
-export function paymentEntryLines(input: {
-  kind: PaymentKind;
-  amount: Decimal;
-  moneyAccount: { id: number; glAccountId: number };
-  customerId: number | null;
-  glAccountId: number | null;
-}): JournalLineInput[] {
-  const zero = new Decimal(0);
-  const { amount } = input;
-  const cash = { accountId: input.moneyAccount.glAccountId, moneyAccountId: input.moneyAccount.id };
-  const ar = { role: 'AR' as const, customerId: input.customerId };
-  const other = { accountId: input.glAccountId ?? 0 };
-  switch (input.kind) {
-    case 'CUSTOMER_PAYMENT':
-      return [
-        { ...cash, debit: amount, credit: zero },
-        { ...ar, debit: zero, credit: amount },
-      ];
-    case 'CUSTOMER_REFUND':
-      return [
-        { ...ar, debit: amount, credit: zero },
-        { ...cash, debit: zero, credit: amount },
-      ];
-    case 'OTHER_IN':
-      return [
-        { ...cash, debit: amount, credit: zero },
-        { ...other, debit: zero, credit: amount },
-      ];
-    case 'OTHER_OUT':
-      return [
-        { ...other, debit: amount, credit: zero },
-        { ...cash, debit: zero, credit: amount },
-      ];
-  }
+/** The users.id of a `user:<id>` actor ref, or null for Bto itself or a job. */
+function userIdOf(ref: string): number | null {
+  const match = /^user:(\d+)$/.exec(ref);
+  return match?.[1] === undefined ? null : Number.parseInt(match[1], 10);
 }
 
 /** The automatic entry's description: the voucher's number and whom it concerns. */
 export function paymentLabel(number: string, who: string | null | undefined): string {
-  return label(number, who);
-}
-
-function label(number: string, who: string | null | undefined): string {
-  const name = who?.trim();
-  return name ? `${number} — ${name}`.slice(0, FINANCE_LIMITS.maxDescription) : number;
+  return documentLabel(number, who);
 }

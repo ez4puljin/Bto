@@ -3,7 +3,7 @@ import { FINANCE_LIMITS, invoicePartsFor, taxSplit } from '@tugeel/shared/financ
 import { Decimal } from '@tugeel/shared/money';
 import type { PriceBasis } from '@tugeel/shared/pricing';
 import { addDays, businessDate } from '@tugeel/shared/time';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -12,11 +12,14 @@ import { TaxService } from '../../catalog';
 import { type Actor, AuditService, type AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
 import type { SaleSink, SaleSnapshot } from '../../sales';
-import { allocations, creditNotes, invoiceLines, invoices } from '../schema';
-import { ArLedgerService } from './ar-ledger.service';
+import type { FinIntakeResult } from '../../../finance-core';
+import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
+import { creditNotes, invoiceLines, invoices } from '../schema';
+import { FinBooks } from './fin-books';
+import { FinPosting } from './fin-posting';
 import { FinanceSettingsService } from './finance-settings.service';
+import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
 import { type InvoiceDetail, InvoiceQueryService } from './invoice-query.service';
-import { type JournalLineInput, JournalService } from './journal.service';
 
 type NewLine = Omit<typeof invoiceLines.$inferInsert, 'invoiceId'>;
 
@@ -44,9 +47,10 @@ export class InvoicingService implements SaleSink {
     private readonly tax: TaxService,
     private readonly customers: CustomersService,
     private readonly settings: FinanceSettingsService,
-    private readonly journal: JournalService,
-    private readonly ledger: ArLedgerService,
     private readonly query: InvoiceQueryService,
+    private readonly posting: FinPosting,
+    private readonly books: FinBooks,
+    private readonly parties: FinPartiesBridge,
   ) {}
 
   async onSold(
@@ -118,29 +122,17 @@ export class InvoicingService implements SaleSink {
     if (!invoice) throw new Error('invoices insert returned no row');
     await tx.insert(invoiceLines).values(lines.map((line) => ({ ...line, invoiceId: invoice.id })));
     if (totals.subtotal.gt(0)) {
-      const entry = await this.journal.post(tx, actor, {
-        entryDate: today,
-        description: await this.label(number, customer.id, tx),
-        source: 'AUTO_INVOICE',
-        sourceType: 'INVOICE',
-        sourceId: invoice.id,
-        lines: invoiceEntryLines(customer.id, totals),
+      const entryId = await this.postInvoiceInTx(tx, actor, {
+        id: invoice.id,
+        number,
+        customerId: customer.id,
+        invoiceDate: today,
+        dueDate,
+        orderNumber: snapshot.orderNumber,
+        ...totals,
       });
-      await tx
-        .update(invoices)
-        .set({ journalEntryId: entry.id })
-        .where(eq(invoices.id, invoice.id));
+      await tx.update(invoices).set({ journalEntryId: entryId }).where(eq(invoices.id, invoice.id));
     }
-    await this.ledger.record(tx, {
-      customerId: customer.id,
-      entryDate: today,
-      kind: 'INVOICE',
-      docType: 'INVOICE',
-      docId: invoice.id,
-      docNumber: number,
-      debit: totals.total,
-      credit: new Decimal(0),
-    });
     await this.audit.record(tx, actor, {
       action: 'CREATE',
       entity: 'invoices',
@@ -184,30 +176,22 @@ export class InvoicingService implements SaleSink {
           },
         );
       }
-      const [allocated] = await tx
-        .select({ count: sql<string>`count(*)` })
-        .from(allocations)
-        .where(and(eq(allocations.invoiceId, id), isNull(allocations.voidedAt)));
+      // Anything settled against it (a voucher, a credit note, an allocation) shows on its mirror.
       const [credited] = await tx
         .select({ count: sql<string>`count(*)` })
         .from(creditNotes)
         .where(eq(creditNotes.invoiceId, id));
-      if (allocated?.count !== '0' || credited?.count !== '0') {
+      if (invoice.openAmount.lt(invoice.total) || credited?.count !== '0') {
         throw new AppError(
           'INVOICE_STATE_INVALID',
           `invoice ${invoice.number} has payments or credit notes against it`,
           { number: invoice.number, status: 'ALLOCATED' },
         );
       }
-      const today = businessDate();
       const reversal =
         invoice.journalEntryId === null
           ? null
-          : await this.journal.reverse(tx, ctx, invoice.journalEntryId, {
-              entryDate: today,
-              description: await this.label(invoice.number, invoice.customerId, tx),
-              source: 'AUTO_VOID',
-            });
+          : await this.reverseInvoiceInTx(tx, ctx, id, businessDate(), trimmed);
       await tx
         .update(invoices)
         .set({
@@ -216,63 +200,126 @@ export class InvoicingService implements SaleSink {
           voidedAt: sql`now()`,
           voidedBy: ctx.userId,
           voidReason: trimmed,
-          voidJournalEntryId: reversal?.id ?? null,
+          voidJournalEntryId: reversal?.entryId ?? null,
         })
         .where(eq(invoices.id, id));
-      await this.ledger.record(tx, {
-        customerId: invoice.customerId,
-        entryDate: today,
-        kind: 'VOID',
-        docType: 'INVOICE',
-        docId: id,
-        docNumber: invoice.number,
-        debit: new Decimal(0),
-        credit: invoice.total,
-      });
       await this.audit.record(tx, ctx, {
         action: 'VOID',
         entity: 'invoices',
         entityId: id,
         before: { status: 'ISSUED', openAmount: invoice.openAmount.toFixed(2) },
-        after: { status: 'VOID', reason: trimmed, reversal: reversal?.number ?? null },
+        after: { status: 'VOID', reason: trimmed, reversal: reversal?.journalNo ?? null },
       });
     });
     return this.query.get(id);
   }
 
-  /** The automatic entry's description: the document's number and the customer's name. */
-  private async label(number: string, customerId: number, tx: Tx): Promise<string> {
-    const [customer] = await this.customers.getMany([customerId], tx);
-    return customer ? `${number} — ${customer.name}` : number;
+  /**
+   * Posts an invoice to the Finance Core as an AR_INVOICE of source BTO (ADR-0073 #3, ADR-0090):
+   * the receivable opens an item due on the invoice's due date; the core keeps Bto's number. Also
+   * used by the development re-post. Returns the journal entry's id.
+   */
+  async postInvoiceInTx(
+    tx: Tx,
+    actor: Actor,
+    invoice: InvoiceTotals & {
+      id: number;
+      number: string;
+      customerId: number;
+      invoiceDate: string;
+      dueDate: string;
+      orderNumber: string | null;
+    },
+  ): Promise<number | null> {
+    const party = await this.parties.customerPartyIn(tx, invoice.customerId);
+    const lines = invoiceEntryLines(invoice);
+    const result = await this.posting.submitInTx(tx, this.books.source(actor), {
+      source: {
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+        docId: String(invoice.id),
+        docNo: invoice.number,
+      },
+      body: {
+        action: 'POST',
+        documentType: FIN_DOC_TYPES.SALES_INVOICE.code,
+        documentDate: invoice.invoiceDate,
+        currency: 'MNT',
+        party,
+        dueDate: invoice.dueDate,
+        description: documentLabel(invoice.number, party.name),
+        controlTotal: controlTotal(lines),
+        lines: intakeLines(lines),
+        ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
+      },
+    });
+    return entryIdOf(result);
+  }
+
+  /** Reverses an invoice's posting, dated `day` (the void, ADR-0072 #11). */
+  async reverseInvoiceInTx(
+    tx: Tx,
+    actor: Actor,
+    invoiceId: number,
+    day: string,
+    reason: string,
+  ): Promise<{ entryId: number | null; journalNo: string | null }> {
+    const result = await this.posting.submitInTx(tx, this.books.source(actor), {
+      source: {
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+        docId: String(invoiceId),
+      },
+      body: { action: 'REVERSE', accountingDate: day, reason },
+    });
+    return { entryId: entryIdOf(result), journalNo: result.document?.journalNo ?? null };
   }
 }
 
 /**
- * An invoice's entry (ADR-0060 #7): Dr receivables (the customer on the line) and the discount, Cr
- * sales net of the taxes, Cr the taxes payable; zero lines skipped. Also used by the development
- * re-post (`pnpm finance:repost-journal`, ADR-0089).
+ * An invoice's lines (ADR-0060 #7): Dr receivables (an item due on the due date) and the discount,
+ * Cr sales net of the taxes, Cr the taxes payable with their base; zero lines skipped.
  */
-export function invoiceEntryLines(customerId: number, totals: InvoiceTotals): JournalLineInput[] {
+export function invoiceEntryLines(totals: InvoiceTotals & { dueDate?: string }): RoleLine[] {
   const zero = new Decimal(0);
-  const lines: JournalLineInput[] = [];
+  const lines: RoleLine[] = [];
+  const net = totals.subtotal.minus(totals.vatTotal).minus(totals.cityTaxTotal);
   if (totals.total.gt(0)) {
-    lines.push({ role: 'AR', debit: totals.total, credit: zero, customerId });
+    lines.push({
+      role: 'AR',
+      debit: totals.total,
+      credit: zero,
+      ...(totals.dueDate ? { extra: { openItem: { dueDate: totals.dueDate } } } : {}),
+    });
   }
   if (totals.discountTotal.gt(0)) {
     lines.push({ role: 'SALES_DISCOUNT', debit: totals.discountTotal, credit: zero });
   }
-  lines.push({
-    role: 'SALES',
-    debit: zero,
-    credit: totals.subtotal.minus(totals.vatTotal).minus(totals.cityTaxTotal),
-  });
+  lines.push({ role: 'SALES', debit: zero, credit: net });
   if (totals.vatTotal.gt(0)) {
-    lines.push({ role: 'VAT_PAYABLE', debit: zero, credit: totals.vatTotal });
+    lines.push({ role: 'VAT_PAYABLE', debit: zero, credit: totals.vatTotal, taxBase: net });
   }
   if (totals.cityTaxTotal.gt(0)) {
-    lines.push({ role: 'CITY_TAX_PAYABLE', debit: zero, credit: totals.cityTaxTotal });
+    lines.push({
+      role: 'CITY_TAX_PAYABLE',
+      debit: zero,
+      credit: totals.cityTaxTotal,
+      taxBase: net,
+    });
   }
   return lines;
+}
+
+/** A document's description: its number and whom it concerns (data, not translation). */
+export function documentLabel(number: string, who: string | null | undefined): string {
+  const name = who?.trim();
+  return (name ? `${number} — ${name}` : number).slice(0, FINANCE_LIMITS.maxDescription);
+}
+
+/** The journal entry's id of an intake result (null for a posting without an entry). */
+export function entryIdOf(result: FinIntakeResult): number | null {
+  const id = result.document?.journalEntryId;
+  return id === null || id === undefined ? null : Number.parseInt(id, 10);
 }
 
 function totalsOf(lines: readonly NewLine[]): InvoiceTotals {

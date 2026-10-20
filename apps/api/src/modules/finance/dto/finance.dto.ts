@@ -905,3 +905,77 @@ export class FinanceAttentionDto {
   @ApiProperty({ example: '150000.00' }) openAmount: string;
   @ApiProperty() openInvoices: number;
 }
+
+// ---------------------------------------------------------------- manual allocation (F2, ADR-0090)
+
+@ApiSchema({ name: 'OpenItem' })
+export class OpenItemDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: ['DEBIT', 'CREDIT'] }) side: 'DEBIT' | 'CREDIT';
+  @ApiProperty({ enum: AR_ENTRY_KINDS }) kind: ArEntryKind;
+  @ApiProperty({ enum: FINANCE_DOC_KINDS, description: 'Where the document opens' })
+  documentType: FinanceDocKind;
+  @ApiProperty() documentId: number;
+  @ApiProperty({ example: 'Н-20261016-0001' }) number: string;
+  @ApiProperty({ example: '2026-10-16' }) itemDate: string;
+  @ApiProperty({ type: String, nullable: true, example: '2026-11-15' }) dueDate: string | null;
+  @ApiProperty({ example: '150000.00' }) amount: string;
+  @ApiProperty({ example: '50000.00' }) openAmount: string;
+}
+
+@ApiSchema({ name: 'OpenItemList' })
+export class OpenItemListDto {
+  @ApiProperty({ type: [OpenItemDto] }) data: OpenItemDto[];
+}
+
+@ApiSchema({ name: 'AllocationPairRequest' })
+export class AllocationPairRequestDto {
+  @ApiProperty() @IsInt() @Min(1) debitItemId: number;
+  @ApiProperty() @IsInt() @Min(1) creditItemId: number;
+  @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) amount: string;
+}
+
+@ApiSchema({ name: 'AllocationRequest' })
+export class AllocationRequestDto {
+  @ApiProperty() @IsInt() @Min(1) customerId: number;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '2026-11-03' })
+  @IsOptional()
+  @Matches(DATE)
+  date?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: FINANCE_LIMITS.maxDescription })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(FINANCE_LIMITS.maxDescription)
+  description?: string | null;
+  @ApiProperty({ type: [AllocationPairRequestDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => AllocationPairRequestDto)
+  pairs: AllocationPairRequestDto[];
+}
+
+@ApiSchema({ name: 'AllocationPair' })
+export class AllocationPairDto {
+  @ApiProperty() debitItemId: number;
+  @ApiProperty() creditItemId: number;
+  @ApiProperty({ example: '12000.00' }) amount: string;
+}
+
+@ApiSchema({ name: 'Allocation' })
+export class AllocationDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'Х-20261103-0001' }) number: string;
+  @ApiProperty({ example: '2026-11-03' }) date: string;
+  @ApiProperty() customerId: number;
+  @ApiProperty({ example: '12000.00' }) amount: string;
+  @ApiProperty({ type: [AllocationPairDto] }) pairs: AllocationPairDto[];
+}
+
+@ApiSchema({ name: 'AllocationReversal' })
+export class AllocationReversalDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'Х-20261103-0001' }) number: string;
+}

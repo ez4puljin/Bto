@@ -25,6 +25,12 @@ export const SETTINGS = {
    */
   'credit.payment_term_days': { kind: 'integer', min: 0, max: 365, default: 30 },
   /**
+   * The credit check's overdue rule (ADR-0073 #5): on, an overdue amount blocks only when it exceeds
+   * the customer's open credits (payments and returns the accountant has not applied yet); off, any
+   * overdue amount blocks (ADR-0060 #2).
+   */
+  'credit.overdue_nets_credits': { kind: 'boolean', default: true },
+  /**
    * The Finance Core company this installation books into (ADR-0070 #2): set at installation and
    * never changed through the api (ADR-0084 #3; the PMS or a second Bto books into its own).
    */

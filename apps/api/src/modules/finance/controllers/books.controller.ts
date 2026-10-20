@@ -11,7 +11,13 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
-import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import {
+  type AuthContext,
+  CurrentUser,
+  IdempotencyKey,
+  Idempotent,
+  RequirePermission,
+} from '../../identity';
 import {
   AccountLedgerPageDto,
   CashBookPageDto,
@@ -213,20 +219,25 @@ export class JournalController {
   async post(
     @CurrentUser() ctx: AuthContext,
     @Body() body: JournalEntryRequestDto,
+    @IdempotencyKey() key?: string,
   ): Promise<JournalEntryDetailDto> {
     return journalEntryDetailDto(
-      await this.journal.postManual(ctx, {
-        entryDate: body.entryDate,
-        description: body.description,
-        lines: body.lines.map((line) => ({
-          accountId: line.accountId,
-          debit: new Decimal(line.debit ?? '0'),
-          credit: new Decimal(line.credit ?? '0'),
-          customerId: line.customerId ?? null,
-          moneyAccountId: line.moneyAccountId ?? null,
-          description: line.description ?? null,
-        })),
-      }),
+      await this.journal.postManual(
+        ctx,
+        {
+          entryDate: body.entryDate,
+          description: body.description,
+          lines: body.lines.map((line) => ({
+            accountId: line.accountId,
+            debit: new Decimal(line.debit ?? '0'),
+            credit: new Decimal(line.credit ?? '0'),
+            customerId: line.customerId ?? null,
+            moneyAccountId: line.moneyAccountId ?? null,
+            description: line.description ?? null,
+          })),
+        },
+        key ?? null,
+      ),
     );
   }
 

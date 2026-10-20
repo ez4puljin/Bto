@@ -88,16 +88,12 @@ export {
   salesStages,
 } from '../modules/sales/schema';
 export {
-  allocations,
-  arEntries,
   creditNoteLines,
   creditNotes,
-  customerBalances,
   financeReconcileRuns,
   financeSettings,
   invoiceLines,
   invoices,
-  payments,
 } from '../modules/finance/schema';
 export {
   posCashiers,
@@ -123,6 +119,16 @@ export {
 export { companyContacts, customerFavourites } from '../modules/customer/schema';
 export {
   finAccounts,
+  finAllocations,
+  finDocumentTypes,
+  finDocuments,
+  finIntakeAttempts,
+  finIntakeRequests,
+  finNumberCounters,
+  finNumberSeries,
+  finOpenItems,
+  finPartyBalances,
+  finReconcileRuns,
   finAuditLog,
   finBranches,
   finBranchRefs,

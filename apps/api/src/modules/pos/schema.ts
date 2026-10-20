@@ -26,7 +26,6 @@ import {
 } from 'drizzle-orm/pg-core';
 import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products, VAT_TYPES } from '../catalog/schema';
-import { payments } from '../finance/schema';
 import { users, warehouses } from '../identity/schema';
 import { adjustments } from '../inventory/schema';
 
@@ -263,7 +262,8 @@ export const posShifts = pgTable(
     /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
     journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
-    handoverPaymentId: ref('handover_payment_id').references(() => payments.id),
+    /** The hand-over voucher: a Finance Core document id (ADR-0090), no FK leaves `fin`. */
+    handoverPaymentId: ref('handover_payment_id'),
     handoverNumber: text('handover_number'),
     handedOverAt: timestamp('handed_over_at', { withTimezone: true }),
     handedOverBy: userRef('handed_over_by'),

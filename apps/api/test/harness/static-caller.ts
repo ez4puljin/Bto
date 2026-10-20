@@ -43,6 +43,95 @@ export const TEST_SPEC: FinInstallationSpec = {
   postingKeys: [
     { code: 'AR', requiredControl: 'RECEIVABLE', requiresTaxCode: false },
     { code: 'VAT_OUTPUT', requiredControl: 'NONE', requiresTaxCode: true },
+    { code: 'CLEARING', requiredControl: 'NONE', requiresTaxCode: false },
+    { code: 'CASH', requiredControl: 'MONEY', requiresTaxCode: false },
+    { code: 'SALES', requiredControl: 'NONE', requiresTaxCode: false },
+    { code: 'AP', requiredControl: 'PAYABLE', requiresTaxCode: false },
+    { code: 'MANUAL', requiredControl: 'NONE', requiresTaxCode: false },
+  ],
+  numberSeries: [
+    { code: 'PAYMENT', pattern: 'R-{year}{month}{day}-', digits: 4 },
+    { code: 'JOURNAL', pattern: 'J-{year}{month}{day}-', digits: 4 },
+    { code: 'ALLOCATION', pattern: 'A-{year}{month}{day}-', digits: 4 },
+  ],
+  documentTypes: [
+    {
+      code: 'TEST.INVOICE',
+      system: TEST_SOURCE,
+      class: 'AR_INVOICE',
+      numberMode: 'SOURCE',
+      numberSeries: null,
+    },
+    {
+      code: 'TEST.CREDIT',
+      system: TEST_SOURCE,
+      class: 'AR_CREDIT',
+      numberMode: 'SOURCE',
+      numberSeries: null,
+    },
+    {
+      code: 'TEST.RECEIPT',
+      system: TEST_SOURCE,
+      class: 'RECEIPT',
+      numberMode: 'CORE',
+      numberSeries: 'PAYMENT',
+    },
+    {
+      code: 'TEST.REFUND',
+      system: TEST_SOURCE,
+      class: 'PAYMENT',
+      numberMode: 'CORE',
+      numberSeries: 'PAYMENT',
+    },
+    {
+      code: 'TEST.BILL',
+      system: TEST_SOURCE,
+      class: 'AP_BILL',
+      numberMode: 'SOURCE',
+      numberSeries: null,
+    },
+    {
+      code: 'TEST.BILL_CREDIT',
+      system: TEST_SOURCE,
+      class: 'AP_CREDIT',
+      numberMode: 'SOURCE',
+      numberSeries: null,
+    },
+    {
+      code: 'TEST.SUPPLIER_PAYMENT',
+      system: TEST_SOURCE,
+      class: 'PAYMENT',
+      numberMode: 'CORE',
+      numberSeries: 'PAYMENT',
+    },
+    {
+      code: 'TEST.JOURNAL',
+      system: TEST_SOURCE,
+      class: 'JOURNAL',
+      numberMode: 'CORE',
+      numberSeries: 'JOURNAL',
+    },
+    {
+      code: 'FIN.JOURNAL',
+      system: 'FIN',
+      class: 'JOURNAL',
+      numberMode: 'CORE',
+      numberSeries: 'JOURNAL',
+    },
+    {
+      code: 'FIN.RECEIPT',
+      system: 'FIN',
+      class: 'RECEIPT',
+      numberMode: 'CORE',
+      numberSeries: 'PAYMENT',
+    },
+    {
+      code: 'FIN.ALLOCATION',
+      system: 'FIN',
+      class: 'ALLOCATION',
+      numberMode: 'CORE',
+      numberSeries: 'ALLOCATION',
+    },
   ],
   legacyParty: { system: 'FIN', ref: 'LEGACY_UNASSIGNED', name: 'LEGACY_UNASSIGNED' },
   branches: [{ system: TEST_SOURCE, externalId: '1', code: 'MAIN', name: 'Төв', active: true }],
@@ -82,9 +171,12 @@ export const StaticCaller = {
   },
 };
 
-/** A small chart: a receivable and a tax account mapped by key, a cash and a sales account. */
+/**
+ * A small chart: a cash box, a receivable, a clearing account, a payable and a tax account mapped by
+ * key, and a sales account.
+ */
 export const TEST_CHART: FinChartTemplateAccount[] = [
-  { code: '1001', name: 'Касс', kind: 'ASSET', normalSide: 'DEBIT', control: 'MONEY', key: null },
+  { code: '1001', name: 'Касс', kind: 'ASSET', normalSide: 'DEBIT', control: 'MONEY', key: 'CASH' },
   {
     code: '1201',
     name: 'Авлага',
@@ -92,6 +184,22 @@ export const TEST_CHART: FinChartTemplateAccount[] = [
     normalSide: 'DEBIT',
     control: 'RECEIVABLE',
     key: 'AR',
+  },
+  {
+    code: '1301',
+    name: 'Түр данс',
+    kind: 'ASSET',
+    normalSide: 'DEBIT',
+    control: 'NONE',
+    key: 'CLEARING',
+  },
+  {
+    code: '3101',
+    name: 'Өглөг',
+    kind: 'LIABILITY',
+    normalSide: 'CREDIT',
+    control: 'PAYABLE',
+    key: 'AP',
   },
   {
     code: '3110',
@@ -107,7 +215,7 @@ export const TEST_CHART: FinChartTemplateAccount[] = [
     kind: 'INCOME',
     normalSide: 'CREDIT',
     control: 'NONE',
-    key: null,
+    key: 'SALES',
   },
 ];
 

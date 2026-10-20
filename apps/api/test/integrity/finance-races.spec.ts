@@ -90,7 +90,13 @@ describe('finance races', () => {
       openAmount: '0.00',
     });
     const sum = await sql.query<{ sum: string }>(
-      `SELECT coalesce(sum(amount), 0)::text AS sum FROM allocations WHERE invoice_id = $1 AND voided_at IS NULL`,
+      `SELECT coalesce(sum(a.amount), 0)::text AS sum
+         FROM fin.allocations a
+         JOIN fin.open_items i ON i.id = a.debit_item_id
+         JOIN fin.documents d ON d.id = i.document_id
+        WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text
+          AND a.reverses_allocation_id IS NULL AND a.mirror = false
+          AND NOT EXISTS (SELECT 1 FROM fin.allocations u WHERE u.reverses_allocation_id = a.id)`,
       [invoice.id],
     );
     expect(sum.rows[0]?.sum).toBe('10000.00');

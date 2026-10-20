@@ -30,7 +30,7 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type InvoiceDetail, useFinanceMutations, useInvoice } from './api';
+import { type InvoiceAllocation, type InvoiceDetail, useFinanceMutations, useInvoice } from './api';
 import { SettlementBadge } from './badges';
 import { CreditNoteDialog } from './credit-note-dialog';
 import { FactChips, PanelSection, RecordSheet, TotalsGrid } from './panel';
@@ -263,54 +263,7 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
         </div>
       </PanelSection>
       <PanelSection title={t('finance.invoices.sections.allocations')}>
-        {invoice.allocations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('finance.invoices.noAllocations')}</p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('finance.fields.number')}</TableHead>
-                  <TableHead>{t('finance.fields.date')}</TableHead>
-                  <TableHead>{t('finance.fields.kind')}</TableHead>
-                  <TableHead className="text-right">{t('finance.fields.amount')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoice.allocations.map((allocation) => (
-                  <TableRow
-                    key={allocation.id}
-                    className={
-                      allocation.voidedAt ? 'text-muted-foreground line-through' : undefined
-                    }
-                  >
-                    <TableCell className="font-mono">
-                      {allocation.sourceType === 'PAYMENT' ? (
-                        <Link
-                          className="text-link underline-offset-2 hover:underline"
-                          to={`/finance/payments?payment=${allocation.sourceId}`}
-                        >
-                          {allocation.sourceNumber}
-                        </Link>
-                      ) : (
-                        allocation.sourceNumber
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono">{allocation.sourceDate}</TableCell>
-                    <TableCell>
-                      {allocation.sourceType === 'PAYMENT'
-                        ? t('finance.arKinds.PAYMENT')
-                        : t('finance.arKinds.CREDIT_NOTE')}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatTugrik(allocation.amount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <AllocationsTable allocations={invoice.allocations} />
       </PanelSection>
       <PanelSection title={t('finance.invoices.sections.creditNotes')}>
         {invoice.creditNotes.length === 0 ? (
@@ -332,6 +285,130 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
         <PanelSection title={t('sales.order.note')}>
           <p className="text-sm whitespace-pre-wrap">{invoice.note}</p>
         </PanelSection>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What settled the invoice: payments, credit notes and the accountant's allocations (ADR-0090). A
+ * live allocation can be reversed from its row's «⋯» menu by those who record payments.
+ */
+function AllocationsTable({ allocations }: { allocations: InvoiceAllocation[] }) {
+  const { t } = useTranslation();
+  const canRecord = useHasPermission('finance.payments.record');
+  const mutations = useFinanceMutations();
+  const action = useAction();
+  const [reversing, setReversing] = useState<InvoiceAllocation | null>(null);
+  const [key, setKey] = useState(randomUuid);
+  const reversible = (allocation: InvoiceAllocation) =>
+    canRecord && allocation.sourceType === 'ALLOCATION' && allocation.voidedAt === null;
+  const withMenu = allocations.some(reversible);
+
+  if (allocations.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('finance.invoices.noAllocations')}</p>;
+  }
+
+  const reverse = (reason: string) => {
+    if (!reversing) return;
+    const id = reversing.sourceId;
+    void action
+      .run(async () => {
+        await mutations.reverseAllocation.mutateAsync({ id, key, reason });
+      })
+      .then((ok) => {
+        if (ok) {
+          toast.success(t('finance.allocations.reversed'));
+          setReversing(null);
+        }
+      });
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('finance.fields.number')}</TableHead>
+            <TableHead>{t('finance.fields.date')}</TableHead>
+            <TableHead>{t('finance.fields.kind')}</TableHead>
+            <TableHead className="text-right">{t('finance.fields.amount')}</TableHead>
+            {withMenu ? <TableHead className="w-10" /> : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {allocations.map((allocation) => (
+            <TableRow
+              key={allocation.id}
+              className={allocation.voidedAt ? 'text-muted-foreground line-through' : undefined}
+            >
+              <TableCell className="font-mono">
+                {allocation.sourceType === 'PAYMENT' ? (
+                  <Link
+                    className="text-link underline-offset-2 hover:underline"
+                    to={`/finance/payments?payment=${allocation.sourceId}`}
+                  >
+                    {allocation.sourceNumber}
+                  </Link>
+                ) : (
+                  allocation.sourceNumber
+                )}
+              </TableCell>
+              <TableCell className="font-mono">{allocation.sourceDate}</TableCell>
+              <TableCell>{t(`finance.arKinds.${allocation.sourceType}`)}</TableCell>
+              <TableCell className="text-right font-mono">
+                {formatTugrik(allocation.amount)}
+              </TableCell>
+              {withMenu ? (
+                <TableCell>
+                  {reversible(allocation) ? (
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`${allocation.sourceNumber}: ${t('common.actions')}`}
+                          title={`${allocation.sourceNumber}: ${t('common.actions')}`}
+                        >
+                          <Ellipsis />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => {
+                            setKey(randomUuid());
+                            action.clear();
+                            setReversing(allocation);
+                          }}
+                        >
+                          {t('finance.allocations.reverse')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                </TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {reversing ? (
+        <VoidDialog
+          open
+          title={t('finance.allocations.reverseTitle')}
+          description={t('finance.allocations.reverseDescription', {
+            number: reversing.sourceNumber,
+          })}
+          submitLabel={t('finance.allocations.reverse')}
+          pending={mutations.reverseAllocation.isPending}
+          problem={action.problem}
+          onClose={() => {
+            setReversing(null);
+            action.clear();
+          }}
+          onConfirm={reverse}
+        />
       ) : null}
     </div>
   );
