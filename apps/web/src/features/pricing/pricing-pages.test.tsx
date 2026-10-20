@@ -26,6 +26,7 @@ const CATEGORIES: Schemas['Category'][] = [
     skuTo: null,
     productCount: 1,
     childCount: 0,
+    imageUrl: null,
   },
 ];
 const MASTERS = {

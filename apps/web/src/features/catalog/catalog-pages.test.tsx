@@ -46,6 +46,7 @@ const CATEGORIES: Schemas['Category'][] = [
     skuTo: null,
     productCount: 0,
     childCount: 1,
+    imageUrl: null,
   },
   {
     id: 11,
@@ -56,6 +57,7 @@ const CATEGORIES: Schemas['Category'][] = [
     skuTo: null,
     productCount: 2,
     childCount: 0,
+    imageUrl: null,
   },
   {
     id: 12,
@@ -66,6 +68,7 @@ const CATEGORIES: Schemas['Category'][] = [
     skuTo: null,
     productCount: 1,
     childCount: 0,
+    imageUrl: null,
   },
 ];
 const MASTER_ROUTES = {
@@ -239,6 +242,8 @@ const LIST_SEGMENT: Schemas['Segment'] = {
   name: 'Түмний бараа',
   description: null,
   definition: null,
+  appRank: null,
+  appShownCount: null,
   createdAt: STAMP,
   updatedAt: STAMP,
 };
@@ -384,6 +389,8 @@ describe('products list', () => {
       name: 'Ундааны бараа',
       description: null,
       definition: { match: 'ALL', groups: [] },
+      appRank: null,
+      appShownCount: null,
       createdAt: STAMP,
       updatedAt: STAMP,
     };
@@ -1578,6 +1585,7 @@ describe('category delete', () => {
       skuTo: null,
       productCount: 0,
       childCount: 0,
+      imageUrl: null,
     };
     const fetchMock = signedIn(ADMIN_ME, {
       ...MASTER_ROUTES,

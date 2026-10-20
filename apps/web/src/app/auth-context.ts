@@ -19,3 +19,12 @@ export function useHasPermission(permission: Permission): boolean {
   const state = useAuthState();
   return state.status === 'authenticated' && state.me.permissions.includes(permission);
 }
+
+/** True when the user holds at least one of `permissions`. */
+export function useHasAnyPermission(permissions: Permission | readonly Permission[]): boolean {
+  const state = useAuthState();
+  return (
+    state.status === 'authenticated' &&
+    [permissions].flat().some((permission) => state.me.permissions.includes(permission))
+  );
+}

@@ -154,6 +154,14 @@ export const ROUTES = [
   { area: 'system', name: 'imports', path: '/imports' },
   { area: 'system', name: 'import', path: '/imports/{import}' },
   { area: 'system', name: 'system-status', path: '/system/status' },
+  { area: 'system', name: 'customer-app', path: '/system/customer-app' },
+  { area: 'system', name: 'customer-app-banners', path: '/system/customer-app/banners' },
+  {
+    area: 'system',
+    name: 'customer-app-banners-new',
+    path: '/system/customer-app/banners?new=1',
+    dialog: true,
+  },
   { area: 'system', name: 'account', path: '/account' },
   { area: 'system', name: 'not-found', path: '/no-such-page' },
 ];

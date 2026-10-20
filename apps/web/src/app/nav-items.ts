@@ -66,7 +66,8 @@ export interface NavItem {
   to: string;
   label: NavKey;
   icon: LucideIcon;
-  permission?: Permission;
+  /** Shown to holders of the permission, or of any one of several. */
+  permission?: Permission | readonly Permission[];
   /** Other paths whose pages belong to this entry (the breadcrumb, the recent pages). */
   also?: readonly string[];
   /** Shown in development builds only (the supermarket's test till, ADR-0063 #8). */
@@ -316,7 +317,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/system/customer-app',
         label: 'nav.customerApp',
         icon: Smartphone,
-        permission: 'identity.settings.read',
+        // The contact list's readers and the home's keepers (ADR-0092 #9: banners).
+        permission: ['identity.settings.read', 'customer_app.home.manage'],
       },
     ],
   },
@@ -328,7 +330,8 @@ export function visibleNav(permissions: readonly Permission[]): NavGroup[] {
     ...group,
     items: group.items.filter(
       (item) =>
-        (!item.permission || permissions.includes(item.permission)) &&
+        (!item.permission ||
+          [item.permission].flat().some((permission) => permissions.includes(permission))) &&
         (!item.devOnly || import.meta.env.DEV),
     ),
   })).filter((group) => group.items.length > 0);

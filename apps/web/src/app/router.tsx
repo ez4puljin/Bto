@@ -69,6 +69,7 @@ import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
 import { AiReportsPage } from '@/features/ai/reports-page';
+import { BannersPage } from '@/features/customer-app/banners-page';
 import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
@@ -172,8 +173,19 @@ export const routes: RouteObject[] = [
             path: 'system/customer-app',
             handle: { width: 'reading' },
             element: (
-              <RequirePermission permission="identity.settings.read">
+              <RequirePermission
+                permission={['identity.settings.read', 'customer_app.home.manage']}
+              >
                 <CustomerAppPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'system/customer-app/banners',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="customer_app.home.manage">
+                <BannersPage />
               </RequirePermission>
             ),
           },

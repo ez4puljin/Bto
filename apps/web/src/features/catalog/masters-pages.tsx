@@ -6,15 +6,19 @@ import {
   FolderOpen,
   FolderPlus,
   FolderTree,
+  ImageIcon,
+  ImagePlus,
+  LoaderCircle,
   Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { z } from 'zod';
+import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DialogFormFooter, FormField } from '@/components/form';
@@ -33,7 +37,14 @@ import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -45,8 +56,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CATEGORY_PICTURE_SIZE, cropToJpeg } from '@/lib/image-resize';
 import { formatCount } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
+import { toast } from '@/lib/toast';
+import { uploadFile } from '@/lib/upload';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { useDeleteConfirm } from '@/lib/use-delete-confirm';
@@ -76,6 +90,10 @@ function None() {
 export function CategoriesPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('catalog.products.manage');
+  // «Bto300»'s category grid (ADR-0092 #6): top categories carry a picture.
+  const canPicture = useHasPermission('customer_app.home.manage');
+  const [picturing, setPicturing] = useState<Category | null>(null);
+  const withActions = canManage || canPicture;
   const categories = useCategories();
   const mutations = useCatalogMutations();
   const tree = useMemo(() => categoryTree(categories.data ?? []), [categories.data]);
@@ -108,12 +126,13 @@ export function CategoriesPage() {
               <TableHead>{t('catalog.categories.defaultCode')}</TableHead>
               <TableHead>{t('catalog.categories.skuRange')}</TableHead>
               <TableHead className="text-right">{t('catalog.products.title')}</TableHead>
+              <TableHead>{t('catalog.categories.appPicture')}</TableHead>
               <SpacerHead />
-              {canManage ? <TableHead /> : null}
+              {withActions ? <TableHead /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.isPending ? <SkeletonRows columns={canManage ? 6 : 5} /> : null}
+            {categories.isPending ? <SkeletonRows columns={withActions ? 7 : 6} /> : null}
             {tree.map(({ category, depth }) => {
               const Icon = category.childCount > 0 ? FolderOpen : Folder;
               return (
@@ -162,29 +181,53 @@ export function CategoriesPage() {
                       </span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {category.imageUrl ? (
+                      <img
+                        src={category.imageUrl}
+                        alt={t('catalog.categories.appPictureOf', { name: category.name })}
+                        className="size-8 rounded-md border object-cover"
+                      />
+                    ) : depth === 0 ? (
+                      <None />
+                    ) : null}
+                  </TableCell>
                   <SpacerCell />
-                  {canManage ? (
+                  {withActions ? (
                     <RowActions>
-                      <RowAction
-                        icon={FolderPlus}
-                        label={`${t('catalog.categories.addChild')}: ${category.name}`}
-                        onClick={() => setEditing({ parentId: category.id })}
-                      />
-                      <RowAction
-                        icon={Pencil}
-                        label={t('common.editRecord', { name: category.name })}
-                        onClick={() => setEditing({ category })}
-                      />
-                      {category.childCount === 0 && category.productCount === 0 ? (
+                      {canPicture && depth === 0 ? (
                         <RowAction
-                          icon={Trash2}
-                          label={`${t('common.delete')}: ${category.name}`}
-                          destructive
-                          onClick={() => deletion.ask(category)}
+                          icon={ImageIcon}
+                          label={`${t('catalog.categories.appPicture')}: ${category.name}`}
+                          onClick={() => setPicturing(category)}
                         />
-                      ) : (
+                      ) : canPicture ? (
                         <RowActionSpacer />
-                      )}
+                      ) : null}
+                      {canManage ? (
+                        <>
+                          <RowAction
+                            icon={FolderPlus}
+                            label={`${t('catalog.categories.addChild')}: ${category.name}`}
+                            onClick={() => setEditing({ parentId: category.id })}
+                          />
+                          <RowAction
+                            icon={Pencil}
+                            label={t('common.editRecord', { name: category.name })}
+                            onClick={() => setEditing({ category })}
+                          />
+                          {category.childCount === 0 && category.productCount === 0 ? (
+                            <RowAction
+                              icon={Trash2}
+                              label={`${t('common.delete')}: ${category.name}`}
+                              destructive
+                              onClick={() => deletion.ask(category)}
+                            />
+                          ) : (
+                            <RowActionSpacer />
+                          )}
+                        </>
+                      ) : null}
                     </RowActions>
                   ) : null}
                 </TableRow>
@@ -203,6 +246,14 @@ export function CategoriesPage() {
           onClose={() => (editing ? setEditing(null) : setCreating(false))}
         />
       ) : null}
+      {picturing ? (
+        <CategoryPictureDialog
+          category={
+            (categories.data ?? []).find((category) => category.id === picturing.id) ?? picturing
+          }
+          onClose={() => setPicturing(null)}
+        />
+      ) : null}
       <ConfirmDialog
         open={deletion.target !== null}
         title={t('common.delete')}
@@ -214,6 +265,117 @@ export function CategoriesPage() {
         onConfirm={deletion.confirm}
       />
     </div>
+  );
+}
+
+const ACCEPT = 'image/jpeg,image/png,image/webp';
+
+/**
+ * «Апп-ын зураг» (ADR-0092 #6, customer_app.home.manage): a top category's picture on «Bto300»'s
+ * category grid, cut square (512×512) in the browser and saved at once (the tree then shows it);
+ * «Зураг устгах» takes it away (the app then shows one of the category's products).
+ */
+function CategoryPictureDialog(props: { category: Category; onClose: () => void }) {
+  const { t } = useTranslation();
+  const api = useApiClient();
+  const mutations = useCatalogMutations();
+  const action = useAction();
+  const [uploading, setUploading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const shown = props.category.imageUrl;
+
+  const choose = async (file: File) => {
+    setFailed(false);
+    setUploading(true);
+    try {
+      const blob = await cropToJpeg(file, CATEGORY_PICTURE_SIZE);
+      const imageFileId = await uploadFile(api, 'catalog.category_image', blob);
+      const ok = await action.run(() =>
+        mutations.setCategoryImage.mutateAsync({ id: props.category.id, imageFileId }),
+      );
+      if (ok) {
+        // The tree shows the new picture; the dialog has done its work.
+        toast.success(t('catalog.categories.appPictureSaved'));
+        props.onClose();
+      }
+    } catch {
+      setFailed(true);
+    } finally {
+      setUploading(false);
+    }
+  };
+  const remove = async () => {
+    const ok = await action.run(() => mutations.removeCategoryImage.mutateAsync(props.category.id));
+    if (!ok) return;
+    toast.success(t('catalog.categories.appPictureRemoved'));
+    props.onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} size="sm">
+        <DialogHeader>
+          <DialogTitle>
+            {t('catalog.categories.appPictureTitle', { name: props.category.name })}
+          </DialogTitle>
+          <DialogDescription>{t('catalog.categories.appPictureHint')}</DialogDescription>
+        </DialogHeader>
+        <ProblemAlert problem={action.problem} />
+        {failed ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t('validation.imageUnreadable')}
+          </p>
+        ) : null}
+        <div className="flex items-center gap-4">
+          {shown ? (
+            <img
+              src={shown}
+              alt={t('catalog.categories.appPictureOf', { name: props.category.name })}
+              className="size-28 rounded-lg border object-cover"
+            />
+          ) : (
+            <span className="flex size-28 items-center justify-center rounded-lg border bg-muted text-center text-xs text-muted-foreground">
+              {t('catalog.categories.appPictureNone')}
+            </span>
+          )}
+          <input
+            ref={fileInput}
+            id="category-picture"
+            type="file"
+            accept={ACCEPT}
+            hidden
+            aria-label={t('catalog.categories.appPicture')}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void choose(file);
+            }}
+          />
+        </div>
+        <DialogFooter>
+          {shown && !uploading ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={mutations.removeCategoryImage.isPending}
+              onClick={() => void remove()}
+            >
+              <Trash2 />
+              {t('catalog.categories.appPictureRemove')}
+            </Button>
+          ) : null}
+          <Button type="button" disabled={uploading} onClick={() => fileInput.current?.click()}>
+            {uploading ? <LoaderCircle className="animate-spin" /> : <ImagePlus />}
+            {uploading
+              ? t('catalog.categories.appPictureUploading')
+              : shown
+                ? t('catalog.categories.appPictureReplace')
+                : t('catalog.categories.appPictureChoose')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

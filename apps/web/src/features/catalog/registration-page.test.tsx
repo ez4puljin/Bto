@@ -47,6 +47,7 @@ const category = (
   skuTo: range?.[1] ?? null,
   productCount: 0,
   childCount: 0,
+  imageUrl: null,
 });
 const CATEGORIES = [
   category(12, 'Ундаа', null, ['10000', '19999']),
