@@ -443,9 +443,55 @@ describe('customer app home (ADR-0092)', () => {
       .set(bearer(admin))
       .send({ shown: true })
       .expect(422);
-    // Archived: off the home.
+    // A second one goes after it, then moves up in one swap.
+    const second = (
+      await http()
+        .post('/api/v1/segments/lists')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Өвлийн бараа', productIds: [bread.id] })
+        .expect(201)
+    ).body as { id: number };
+    await http()
+      .put(`/api/v1/segments/${second.id}/app`)
+      .set(bearer(admin))
+      .send({ shown: true })
+      .expect(200);
+    const moved = (
+      await http()
+        .post(`/api/v1/segments/${second.id}/app/move`)
+        .set(bearer(admin))
+        .send({ direction: 'UP' })
+        .expect(200)
+    ).body as { appRank: number | null; appShownCount: number | null };
+    expect(moved).toMatchObject({ appRank: 1, appShownCount: 2 });
+    expect(kinds(await homeOf(store)).filter((key) => key.startsWith('segment-'))).toEqual([
+      `segment-${second.id}`,
+      `segment-${created.id}`,
+    ]);
+    // At the top nothing moves.
+    await http()
+      .post(`/api/v1/segments/${second.id}/app/move`)
+      .set(bearer(admin))
+      .send({ direction: 'UP' })
+      .expect(200);
+    // Archived: off the home; taken off: the same.
     await http().delete(`/api/v1/segments/${created.id}`).set(bearer(admin)).expect(204);
-    expect(kinds(await homeOf(store))).not.toContain(`segment-${created.id}`);
+    await http()
+      .put(`/api/v1/segments/${second.id}/app`)
+      .set(bearer(admin))
+      .send({ shown: false })
+      .expect(200);
+    const after = kinds(await homeOf(store));
+    expect(after).not.toContain(`segment-${created.id}`);
+    expect(after).not.toContain(`segment-${second.id}`);
+    // Without the right.
+    const clerk = await customRoleUser(app, admin, ['segments.manage']);
+    await http()
+      .put(`/api/v1/segments/${second.id}/app`)
+      .set(bearer(clerk))
+      .send({ shown: true })
+      .expect(403);
   });
 
   it('pages a section in the order asked, with its filters and a cursor', async () => {
