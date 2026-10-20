@@ -40,6 +40,25 @@ export function BrandLockup({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
+/** «Bto300»'s home mark (ADR-0092 #1, the Main board): the small logo tile and the app's name. */
+export function BrandMark({ style }: { style?: StyleProp<ViewStyle> }) {
+  const name = useAppName();
+  return (
+    <View style={[styles.mark, style]}>
+      <View
+        style={styles.markLogo}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Image source={LOGO} contentFit="contain" accessible={false} style={styles.markImage} />
+      </View>
+      <Text accessibilityRole="header" style={type.wordmark} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
 /** «⌘ 192.168.0.104:3301 · Сервер солих»: the server in use, a tap goes back to the server screen. */
 export function ServerChip({
   server,
@@ -86,6 +105,9 @@ const styles = StyleSheet.create({
   logo: { width: 48, height: 48, borderRadius: radii.control, boxShadow: shadows.brand },
   image: { width: 48, height: 48, borderRadius: radii.control },
   names: { flexShrink: 1 },
+  mark: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  markLogo: { width: 34, height: 34, borderRadius: radii.control },
+  markImage: { width: 34, height: 34, borderRadius: radii.control },
   chip: {
     alignSelf: 'center',
     height: 36,

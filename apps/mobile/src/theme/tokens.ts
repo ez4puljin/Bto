@@ -28,6 +28,14 @@ export const colors = {
   promoText: '#B4400B',
   destructive: '#D70015',
   destructiveSoft: '#FDE7E8',
+  /** Text on the soft red of a discount's sentence and chip (the Product and Main boards). */
+  destructiveText: '#A3000F',
+  /** «Bto300»'s badges (ADR-0092 #7): a promotion orange with dark text, a discount red, «Шинэ» blue. */
+  dealPromotion: '#FF9500',
+  dealDiscount: '#D70015',
+  newBadge: '#0058B0',
+  /** A ♡ that is on. */
+  heart: '#D70015',
   infoSoft: '#E8F0FB',
   violet: '#4B3FC9',
   violetSoft: '#EFEDFD',

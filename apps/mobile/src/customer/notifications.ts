@@ -15,6 +15,22 @@ export const STORE_TILES: Record<CustomerNotificationKind, { tile: StoreTile; co
   INVOICE_OVERDUE: { tile: 'clock', color: colors.tint.orange },
 };
 
+/**
+ * «Мэдэгдэл»'s two tabs (ADR-0092 #8): «Захиалга» holds the store's own notifications (orders,
+ * payments, invoices), «Урамшуулал» the admin's notices. Each tab counts its unread; the screen
+ * opens on the first tab with something unread, «Захиалга» first.
+ */
+export type NoticeTab = 'orders' | 'promos';
+
+export function noticeTabsOf(
+  notices: readonly { read: boolean }[],
+  notifications: readonly { read: boolean }[],
+): { orders: number; promos: number; first: NoticeTab } {
+  const orders = notifications.filter((notification) => !notification.read).length;
+  const promos = notices.filter((notice) => !notice.read).length;
+  return { orders, promos, first: orders === 0 && promos > 0 ? 'promos' : 'orders' };
+}
+
 /** Where a tap goes: the order, the invoice, «Тооцоо», or nowhere when its record is gone. */
 export function storeTargetOf(notification: {
   kind: CustomerNotificationKind;

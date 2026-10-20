@@ -1,8 +1,16 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Banknote, Bell, Check, Clock, Receipt, X } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { Banknote, Bell, Check, Clock, Megaphone, Receipt, X } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, SectionList, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useStoreMe } from '../../src/api/customer';
 import {
   type StoreNotice,
@@ -14,6 +22,8 @@ import {
 import { problemFrom } from '../../src/api/problem';
 import { feedDayOf, type LinePart, storeLineOf } from '../../src/customer/feed-lines';
 import {
+  type NoticeTab,
+  noticeTabsOf,
   STORE_TILES,
   type StoreTile,
   storeFactsOf,
@@ -21,22 +31,22 @@ import {
 } from '../../src/customer/notifications';
 import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
-import { type FeedItem, feedOf, unreadIds } from '../../src/notifications/feed';
-import { KIND_STYLES, KindIcon } from '../../src/notifications/kinds';
+import { feedOf, unreadIds } from '../../src/notifications/feed';
+import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useCustomer } from '../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { Segmented } from '../../src/ui/controls';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { BarButton, LargeTitle, NavBar, Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
 
-type Item = FeedItem<StoreNotice, StoreNotification>;
-
 /**
- * «Мэдэгдэл» of «Bto300» (the Notifications board, ADR-0079 #8): the running notices for customers
- * and the store's own notifications (an order confirmed, cancelled or sold, a payment, an invoice
- * due) by day, newest first, one white group a day. A tap marks it read and opens its order,
- * invoice or «Тооцоо», a notice its page; «Бүгдийг уншсан» marks what is loaded.
+ * «Мэдэгдэл» of «Bto300» (the Notifications board, ADR-0079 #8, ADR-0092 #8) in two tabs:
+ * «Захиалга» holds the store's own notifications (an order confirmed, cancelled or sold, a payment,
+ * an invoice due) by day, newest first; «Урамшуулал» the admin's notices as picture cards. Each tab
+ * counts its unread and the screen opens on the first with any. A tap marks a notification read and
+ * opens its order, invoice or «Тооцоо», a notice its page; «Бүгдийг уншсан» marks what is loaded.
  */
 export default function CustomerNotificationsScreen() {
   const { t } = useTranslation();
@@ -46,12 +56,22 @@ export default function CustomerNotificationsScreen() {
   const summary = useStoreNotificationSummary();
   const mine = useStoreNotifications();
   const { mutate: markRead, isPending } = useStoreMarkRead();
-  const notices = useMemo(() => summary.data?.notices ?? [], [summary.data]);
+  const notices = useMemo(
+    () =>
+      [...(summary.data?.notices ?? [])].sort((a, b) =>
+        a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
+      ),
+    [summary.data],
+  );
   const rows = useMemo(() => mine.data?.pages.flatMap((page) => page.data) ?? [], [mine.data]);
   const sections = useMemo(
-    () => feedOf(notices, rows).map((section) => ({ day: section.day, data: section.items })),
-    [notices, rows],
+    () => feedOf([], rows).map((section) => ({ day: section.day, data: section.items })),
+    [rows],
   );
+  const tabs = noticeTabsOf(notices, rows);
+  const [chosen, setChosen] = useState<NoticeTab | null>(null);
+  const loaded = summary.data !== undefined && mine.data !== undefined;
+  const tab = chosen ?? (loaded ? tabs.first : 'orders');
   const unread = unreadIds(notices, rows);
   const anyUnread = unread.noticeIds.length + unread.notificationIds.length > 0;
 
@@ -70,18 +90,37 @@ export default function CustomerNotificationsScreen() {
     }
   };
 
-  const open = (item: Item) => {
-    if (item.type === 'notice') {
-      // The notice's page marks it read.
-      router.push(`/notice/${item.notice.id}`);
-      return;
-    }
-    const notification = item.notification;
+  const openNotification = (notification: StoreNotification) => {
     if (!notification.read) markRead({ notificationIds: [notification.id] });
     const target = storeTargetOf(notification);
     if (target === '/account') router.navigate('/account');
     else if (target !== null) router.push(target);
   };
+
+  const tabLabel = (name: NoticeTab, n: number) => {
+    const label = t(`mobile.customer.notifications.tabs.${name}`);
+    return n > 0 ? t('mobile.customer.notifications.tabs.count', { tab: label, n }) : label;
+  };
+
+  const head = (
+    <View>
+      <LargeTitle style={styles.title}>{t('mobile.notifications.title')}</LargeTitle>
+      <View style={styles.tabs}>
+        <Segmented
+          options={[
+            { value: 'orders' as const, label: tabLabel('orders', tabs.orders) },
+            { value: 'promos' as const, label: tabLabel('promos', tabs.promos) },
+          ]}
+          value={tab}
+          onChange={setChosen}
+          label={t('mobile.customer.notifications.tabs.label')}
+        />
+      </View>
+      {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
+      {mine.error && tab === 'orders' ? <ProblemText problem={problemFrom(mine.error)} /> : null}
+    </View>
+  );
+  const loading = <ActivityIndicator style={styles.loading} color={colors.primary} />;
 
   return (
     <Page>
@@ -96,61 +135,85 @@ export default function CustomerNotificationsScreen() {
           />
         }
       />
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={styles.list}
-        stickySectionHeadersEnabled={false}
-        ListHeaderComponent={
-          <View>
-            <LargeTitle style={styles.title}>{t('mobile.notifications.title')}</LargeTitle>
-            {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
-            {mine.error ? <ProblemText problem={problemFrom(mine.error)} /> : null}
-          </View>
-        }
-        renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
-            {dayTitle(section.day)}
-          </Text>
-        )}
-        renderItem={({ item, index, section }) => (
-          <View
-            style={[
-              styles.cell,
-              index === 0 && styles.firstCell,
-              index === section.data.length - 1 && styles.lastCell,
-            ]}
-          >
-            {index > 0 ? <Separator /> : null}
-            <FeedRow item={item} onPress={() => open(item)} />
-          </View>
-        )}
-        ListFooterComponent={
-          mine.isFetchingNextPage ? (
-            <ActivityIndicator style={styles.more} color={colors.primary} />
-          ) : null
-        }
-        onEndReachedThreshold={0.5}
-        onEndReached={() => {
-          if (mine.hasNextPage && !mine.isFetchingNextPage) void mine.fetchNextPage();
-        }}
-        refreshing={summary.isRefetching || mine.isRefetching}
-        onRefresh={() => {
-          void summary.refetch();
-          void mine.refetch();
-        }}
-        ListEmptyComponent={
-          summary.isLoading || mine.isLoading ? (
-            <ActivityIndicator style={styles.loading} color={colors.primary} />
-          ) : (
-            <EmptyState
-              icon={<Bell size={40} strokeWidth={1.5} color={colors.input} />}
-              title={t('mobile.notifications.empty')}
-              hint={t('mobile.customer.notifications.emptyHint')}
-            />
-          )
-        }
-      />
+      {tab === 'orders' ? (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled={false}
+          ListHeaderComponent={head}
+          renderSectionHeader={({ section }) => (
+            <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
+              {dayTitle(section.day)}
+            </Text>
+          )}
+          renderItem={({ item, index, section }) =>
+            item.type === 'notification' ? (
+              <View
+                style={[
+                  styles.cell,
+                  index === 0 && styles.firstCell,
+                  index === section.data.length - 1 && styles.lastCell,
+                ]}
+              >
+                {index > 0 ? <Separator /> : null}
+                <NotificationRow
+                  notification={item.notification}
+                  onPress={() => openNotification(item.notification)}
+                />
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            mine.isFetchingNextPage ? (
+              <ActivityIndicator style={styles.more} color={colors.primary} />
+            ) : null
+          }
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (mine.hasNextPage && !mine.isFetchingNextPage) void mine.fetchNextPage();
+          }}
+          refreshing={summary.isRefetching || mine.isRefetching}
+          onRefresh={() => {
+            void summary.refetch();
+            void mine.refetch();
+          }}
+          ListEmptyComponent={
+            mine.isLoading ? (
+              loading
+            ) : (
+              <EmptyState
+                icon={<Bell size={40} strokeWidth={1.5} color={colors.input} />}
+                title={t('mobile.customer.notifications.ordersEmpty')}
+                hint={t('mobile.customer.notifications.ordersEmptyHint')}
+              />
+            )
+          }
+        />
+      ) : (
+        <FlatList
+          data={notices}
+          keyExtractor={(notice) => String(notice.id)}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={head}
+          renderItem={({ item }) => (
+            <PromoCard notice={item} onPress={() => router.push(`/notice/${item.id}`)} />
+          )}
+          refreshing={summary.isRefetching}
+          onRefresh={() => void summary.refetch()}
+          ListEmptyComponent={
+            summary.isLoading ? (
+              loading
+            ) : (
+              <EmptyState
+                icon={<Megaphone size={40} strokeWidth={1.5} color={colors.input} />}
+                title={t('mobile.customer.notifications.promosEmpty')}
+                hint={t('mobile.customer.notifications.promosEmptyHint')}
+              />
+            )
+          }
+        />
+      )}
     </Page>
   );
 }
@@ -198,46 +261,38 @@ function useLineText() {
       .join(' · ');
 }
 
-function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
+/** «Захиалга батлагдлаа · 20261017_0005 · 200,800₮» with its tile, time and unread dot. */
+function NotificationRow({
+  notification,
+  onPress,
+}: {
+  notification: StoreNotification;
+  onPress: () => void;
+}) {
   const { t } = useTranslation();
   const lineText = useLineText();
-  const read = item.type === 'notice' ? item.notice.read : item.notification.read;
-  const tint =
-    item.type === 'notice'
-      ? KIND_STYLES[item.notice.kind].tint
-      : STORE_TILES[item.notification.kind].color;
-  const title =
-    item.type === 'notice'
-      ? item.notice.title
-      : t(`notifications.customerKinds.${item.notification.kind}`);
-  const text =
-    item.type === 'notice'
-      ? item.notice.body
-      : lineText(
-          storeLineOf(
-            item.notification.kind,
-            storeFactsOf(item.notification.kind, item.notification.payload),
-          ),
-        );
+  const tile = STORE_TILES[notification.kind];
+  const text = lineText(
+    storeLineOf(notification.kind, storeFactsOf(notification.kind, notification.payload)),
+  );
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={[styles.tile, { backgroundColor: tint }]}>
-        {item.type === 'notice' ? (
-          <KindIcon kind={item.notice.kind} size={18} color={colors.primaryForeground} />
-        ) : (
-          <TileIcon tile={STORE_TILES[item.notification.kind].tile} />
-        )}
+      <View style={[styles.tile, { backgroundColor: tile.color }]}>
+        <TileIcon tile={tile.tile} />
       </View>
       <View style={styles.text}>
         <View style={styles.head}>
-          <Text style={[styles.rowTitle, !read && styles.unreadTitle]} numberOfLines={2}>
-            {title}
+          <Text
+            style={[styles.rowTitle, !notification.read && styles.unreadTitle]}
+            numberOfLines={2}
+          >
+            {t(`notifications.customerKinds.${notification.kind}`)}
           </Text>
-          <Text style={type.secondary}>{ubTime(item.at)}</Text>
+          <Text style={type.secondary}>{ubTime(notification.createdAt)}</Text>
         </View>
         {text ? (
           <Text style={styles.body} numberOfLines={3}>
@@ -245,9 +300,60 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
           </Text>
         ) : null}
       </View>
-      {read ? null : (
+      {notification.read ? null : (
         <View style={styles.unread} accessibilityLabel={t('mobile.notifications.unreadDot')} />
       )}
+    </Pressable>
+  );
+}
+
+/**
+ * An admin's notice as a picture card (the Notifications board's «Урамшуулал»): its picture, or its
+ * kind's colour and icon; «Урамшуулал · 10/20 – 10/31»; the title and the text; the unread dot.
+ */
+function PromoCard({ notice, onPress }: { notice: StoreNotice; onPress: () => void }) {
+  const { t } = useTranslation();
+  const { server } = useCustomer();
+  const eyebrow = useNoticeEyebrow();
+  const kind = KIND_STYLES[notice.kind];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
+      <View style={[styles.hero, { backgroundColor: kind.soft }]}>
+        {notice.imageUrl ? (
+          <Image
+            source={{ uri: `${server}${notice.imageUrl}` }}
+            style={styles.heroImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={notice.imageUrl}
+            transition={120}
+          />
+        ) : (
+          <KindIcon kind={notice.kind} size={44} />
+        )}
+      </View>
+      <View style={styles.cardBody}>
+        <View style={styles.head}>
+          <Text style={[styles.eyebrow, { color: kind.strong }]} numberOfLines={1}>
+            {eyebrow(notice)}
+          </Text>
+          {notice.read ? null : (
+            <View style={styles.unread} accessibilityLabel={t('mobile.notifications.unreadDot')} />
+          )}
+        </View>
+        <Text style={[styles.cardTitle, !notice.read && styles.unreadTitle]} numberOfLines={2}>
+          {notice.title}
+        </Text>
+        {notice.body ? (
+          <Text style={styles.body} numberOfLines={3}>
+            {notice.body}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -255,6 +361,7 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
   title: { marginTop: 2, marginHorizontal: spacing.xs },
+  tabs: { marginTop: spacing.md, marginBottom: spacing.xs },
   day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
   cell: { backgroundColor: colors.card },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
@@ -288,4 +395,16 @@ const styles = StyleSheet.create({
   unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
   loading: { marginTop: spacing.xxl },
   more: { marginTop: spacing.lg },
+  card: {
+    marginTop: spacing.md,
+    borderRadius: radii.card,
+    backgroundColor: colors.card,
+    overflow: 'hidden',
+  },
+  cardPressed: { opacity: 0.85 },
+  hero: { height: 150, alignItems: 'center', justifyContent: 'center' },
+  heroImage: { width: '100%', height: '100%' },
+  cardBody: { padding: 14, gap: spacing.xs },
+  eyebrow: { ...type.secondary, fontFamily: fonts.semibold, flex: 1 },
+  cardTitle: { ...type.heading },
 });

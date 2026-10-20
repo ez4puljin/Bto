@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Minus, Package, Plus, Star, TriangleAlert } from 'lucide-react-native';
+import { ChevronLeft, Heart, Minus, Package, Plus, TriangleAlert } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,6 +22,7 @@ import {
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
 import { lineOf } from '../../../src/cart/cart';
+import { DealNote } from '../../../src/customer/deal-note';
 import { StockPill, usePackText } from '../../../src/customer/product-card';
 import { StoreQtyKeypad } from '../../../src/customer/qty-keypad';
 import { priceNoteOf, storeLineOf } from '../../../src/customer/shop';
@@ -44,10 +45,10 @@ const MAX_QTY = 9999;
 const HERO_HEIGHT = 290;
 
 /**
- * One product in «Bto300» (the Product board, ADR-0079 #4): its pictures with back and ★, the code
- * and category, the name, the stock word and the pack, the unit switch, the unit's price, − n +
- * (the keypad on the number), «Зарим нь хойшилж магадгүй…» when the server says so, the line's
- * total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit chosen here. A
+ * One product in «Bto300» (the Product board, ADR-0079 #4, ADR-0092 #7): its pictures with back and
+ * ♡, the code and category, the name, the stock word and the pack, its discount program in words,
+ * the unit switch, the unit's price, − n + (the keypad on the number), «Зарим нь хойшилж
+ * магадгүй…» when the server says so, the line's total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit chosen here. A
  * scanned box opens in boxes (`?unit=`); from the camera (`?from=scan`) the button goes back to it.
  * No stock number anywhere.
  */
@@ -64,7 +65,7 @@ export default function StoreProductScreen() {
   const unitOptions = useUnitOptions();
   const packText = usePackText();
   const categories = useStoreCategories();
-  const star = useToggleFavourite();
+  const favourite = useToggleFavourite();
   // Opened from a list, the page shows what the list holds at once; the server's answer follows.
   const queryClient = useQueryClient();
   const valid = Number.isSafeInteger(productId);
@@ -204,19 +205,21 @@ export default function StoreProductScreen() {
             />
             <CircleButton
               icon={
-                <Star
+                <Heart
                   size={21}
                   strokeWidth={2}
-                  color={product.favourite ? colors.tint.amber : colors.foreground}
-                  fill={product.favourite ? colors.tint.amber : 'none'}
+                  color={product.favourite ? colors.heart : colors.foreground}
+                  fill={product.favourite ? colors.heart : 'none'}
                 />
               }
               label={
                 product.favourite
-                  ? t('mobile.customer.product.starRemove')
-                  : t('mobile.customer.product.starAdd')
+                  ? t('mobile.customer.product.favouriteRemove')
+                  : t('mobile.customer.product.favouriteAdd')
               }
-              onPress={() => star.mutate({ productId: product.id, favourite: !product.favourite })}
+              onPress={() =>
+                favourite.mutate({ productId: product.id, favourite: !product.favourite })
+              }
               style={styles.glass}
             />
           </View>
@@ -235,6 +238,7 @@ export default function StoreProductScreen() {
             <StockPill stock={product.stock} large />
             {pack ? <Text style={[type.secondary, styles.shrink]}>{pack}</Text> : null}
           </View>
+          {product.deal ? <DealNote deal={product.deal} /> : null}
 
           {product.units.length > 1 ? (
             <View style={styles.units}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { creditBarOf, creditWarningOf, debtOf, invoiceDueOf, overdueOf } from './account';
-import { STORE_TILES, storeFactsOf, storeTargetOf } from './notifications';
+import { noticeTabsOf, STORE_TILES, storeFactsOf, storeTargetOf } from './notifications';
 import { backorderedIn, byDay, orderAmount, orderNotes, progressOf, takerOf } from './orders';
 import { reorderPlan } from './reorder';
 import { codeComplete, codeInput, newPasswordIssue, phoneInput, phoneOf } from './sign-in';
@@ -201,6 +201,18 @@ describe('«Bto300»: the sign-in fields (ADR-0079 #3)', () => {
 });
 
 describe('«Bto300»: notifications (ADR-0079 #8)', () => {
+  it('counts each tab’s unread and opens on the first tab with any, «Захиалга» first', () => {
+    const read = { read: true };
+    const unread = { read: false };
+    expect(noticeTabsOf([], [])).toEqual({ orders: 0, promos: 0, first: 'orders' });
+    expect(noticeTabsOf([unread, read], [read])).toEqual({ orders: 0, promos: 1, first: 'promos' });
+    expect(noticeTabsOf([unread], [unread, unread, read])).toEqual({
+      orders: 2,
+      promos: 1,
+      first: 'orders',
+    });
+  });
+
   it('opens the order, the invoice or the account', () => {
     expect(storeTargetOf({ kind: 'ORDER_CONFIRMED', orderId: 5, invoiceId: null })).toBe(
       '/order/5',

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CircleMinus,
   Package,
+  Percent,
   Plus,
   ShoppingCart,
 } from 'lucide-react-native';
@@ -22,6 +23,7 @@ import { problemFrom } from '../../../src/api/problem';
 import { type CartLine, linesOf } from '../../../src/cart/cart';
 import { useCustomerSendOrder } from '../../../src/cart/use-customer-send';
 import { creditWarningOf } from '../../../src/customer/account';
+import { orderDealHintsOf } from '../../../src/customer/deals';
 import {
   lineDetailOf,
   type QuotedLine,
@@ -48,8 +50,9 @@ import { Text } from '../../../src/ui/text';
 /**
  * «Сагс» of «Bto300» (the Cart board, ADR-0079 #5): why the office may not confirm yet (the store
  * may still send), one row per product with its pieces, the server's line total, a stock note and
- * the unit pill that opens the product; «Засах» shows the remove buttons; today's total with its
- * note; «Үргэлжлүүлэх» goes on to the checkout. A send without an answer locks the cart.
+ * the unit pill that opens the product; «Засах» shows the remove buttons; what an order amount
+ * program still needs («500,000₮ хүрвэл 3% хямд · дахиад 120,000₮», ADR-0092 #3); today's total
+ * with its note; «Үргэлжлүүлэх» goes on to the checkout. A send without an answer locks the cart.
  */
 export default function StoreCartScreen() {
   const { t } = useTranslation();
@@ -91,6 +94,7 @@ export default function StoreCartScreen() {
 
   const unpriced = answered !== null && answered.quote.lines.some((line) => !line.priced);
   const discount = answered ? new Decimal(answered.quote.discountTotal) : new Decimal(0);
+  const orderDeals = orderDealHintsOf(answered?.orderDeals ?? []);
 
   return (
     <Page>
@@ -155,6 +159,31 @@ export default function StoreCartScreen() {
             </>
           )}
         </View>
+
+        {orderDeals.length > 0 ? (
+          <View style={styles.orderDeals}>
+            <Percent size={18} strokeWidth={2.2} color={colors.link} />
+            <View style={styles.grow}>
+              {orderDeals.map((hint, index) => (
+                <Text key={index} style={[type.body, styles.orderDealText]}>
+                  {hint.kind === 'next'
+                    ? t(
+                        hint.percent
+                          ? 'mobile.customer.cart.orderDeal.nextPercent'
+                          : 'mobile.customer.cart.orderDeal.nextAmount',
+                        { threshold: hint.threshold, value: hint.value, missing: hint.missing },
+                      )
+                    : t(
+                        hint.percent
+                          ? 'mobile.customer.cart.orderDeal.reachedPercent'
+                          : 'mobile.customer.cart.orderDeal.reachedAmount',
+                        { value: hint.value },
+                      )}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <SectionHeader style={styles.section}>{t('mobile.cart.totals')}</SectionHeader>
         <View style={styles.group}>
@@ -329,6 +358,18 @@ const styles = StyleSheet.create({
   title: { marginTop: 2, marginHorizontal: spacing.xs },
   subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
   credit: { marginTop: 14 },
+  orderDeals: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 14,
+    borderRadius: radii.card,
+    backgroundColor: colors.secondary,
+  },
+  orderDealText: { color: colors.link },
+  grow: { flex: 1, gap: 2 },
   section: { marginTop: 22 },
   group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
   row: {
