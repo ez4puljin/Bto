@@ -93,12 +93,14 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(16);
+    expect(keys).toHaveLength(19);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
+      'VAT_INPUT',
       'VAT_OUTPUT',
     ]);
     expect(keys.find((k) => k.code === 'AR')?.required_control).toBe('RECEIVABLE');
+    expect(keys.find((k) => k.code === 'AP')?.required_control).toBe('PAYABLE');
     expect(await count(`fin.party_refs WHERE external_id = 'LEGACY_UNASSIGNED'`)).toBe(1);
     const { rows: branches } = await admin.query<{ code: string; external_id: string }>(
       `SELECT b.code, r.external_id FROM fin.branches b
@@ -269,6 +271,61 @@ describe('fin-bridge', () => {
       expect(await count('fin.parties')).toBe(customers + 1);
       expect(await count('user_company_roles')).toBe(await count('user_roles'));
       expect(await count('fin.companies')).toBe(1);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it("replays the payables backfill against today's rows (0035_fin_payables data section)", async () => {
+    const partners = partnersApi(app, adminToken);
+    await partners.supplier({ name: 'Нийлүүлэгч А ФБ' });
+    await partners.supplier({ name: 'Нийлүүлэгч Б ФБ', tin: '12345678901' });
+    const file = join(__dirname, '../../src/db/migrations/0035_fin_payables.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(text.indexOf('-- fin_payables:data:begin'), text.indexOf('-- fin_payables:data:end'))
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    const suppliers = await count('suppliers');
+    expect(suppliers).toBeGreaterThanOrEqual(2);
+    // The hook made each supplier's party already, as the boot step made the rest.
+    expect(await count(`fin.party_refs WHERE external_id LIKE 'supplier:%'`)).toBe(suppliers);
+    await admin.query('BEGIN');
+    try {
+      // A database of before F3: no payables keys, rules, document types or supplier parties.
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(
+        `DELETE FROM fin.party_companies pc USING fin.party_refs r
+          WHERE r.party_id = pc.party_id AND r.external_id LIKE 'supplier:%'`,
+      );
+      await admin.query(
+        `DELETE FROM fin.parties p USING fin.party_refs r
+          WHERE r.party_id = p.id AND r.external_id LIKE 'supplier:%'`,
+      );
+      await admin.query(`DELETE FROM fin.party_refs WHERE external_id LIKE 'supplier:%'`);
+      await admin.query(
+        `DELETE FROM fin.posting_rules WHERE posting_key IN ('AP', 'VAT_INPUT', 'INVENTORY')`,
+      );
+      await admin.query(
+        `DELETE FROM fin.posting_keys WHERE code IN ('AP', 'VAT_INPUT', 'INVENTORY')`,
+      );
+      await admin.query(`DELETE FROM fin.accounts WHERE code IN ('310101', '130301', '140101')`);
+      await admin.query(
+        `DELETE FROM fin.document_types WHERE code IN ('BTO.SUPPLIER_BILL',
+           'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN')`,
+      );
+      await admin.query('SET LOCAL session_replication_role = origin');
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.party_refs WHERE external_id LIKE 'supplier:%'`)).toBe(suppliers);
+      expect(
+        await count(`fin.parties WHERE name = 'Нийлүүлэгч Б ФБ' AND tin = '12345678901'`),
+      ).toBe(1);
+      expect(await count(`fin.accounts WHERE code = '310101' AND control = 'PAYABLE'`)).toBe(1);
+      expect(
+        await count(`fin.posting_rules WHERE posting_key IN ('AP', 'VAT_INPUT', 'INVENTORY')`),
+      ).toBe(3);
+      expect(await count('fin.document_types')).toBe(12);
     } finally {
       await admin.query('ROLLBACK');
     }
