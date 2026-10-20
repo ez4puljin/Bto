@@ -59,6 +59,10 @@ import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-pag
 import { CashPage } from '@/features/finance/cash-page';
 import { CustomerBalancesPage } from '@/features/finance/customer-balances-page';
 import { CustomerLedgerPage } from '@/features/finance/customer-ledger-page';
+import {
+  SupplierBalancesPage,
+  SupplierLedgerPage,
+} from '@/features/finance/supplier-payables-pages';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { JournalPage } from '@/features/finance/journal-page';
@@ -519,6 +523,16 @@ function financeRoutes(): RouteObject[] {
       path: 'finance/customers/:id',
       handle: { width: 'wide' },
       element: read(<CustomerLedgerPage />),
+    },
+    {
+      path: 'finance/suppliers',
+      handle: { width: 'wide' },
+      element: read(<SupplierBalancesPage />),
+    },
+    {
+      path: 'finance/suppliers/:id',
+      handle: { width: 'wide' },
+      element: read(<SupplierLedgerPage />),
     },
     { path: 'finance/journal', handle: { width: 'wide' }, element: read(<JournalPage />) },
     { path: 'finance/accounts', handle: { width: 'wide' }, element: read(<AccountsPage />) },

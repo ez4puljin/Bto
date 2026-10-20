@@ -44,6 +44,9 @@ export type FinanceAttention = Schemas['FinanceAttention'];
 export type OpenItem = Schemas['OpenItem'];
 export type AllocationRequest = Schemas['AllocationRequest'];
 export type InvoiceAllocation = Schemas['InvoiceAllocation'];
+export type SupplierBalance = Schemas['SupplierBalance'];
+export type PayableEntry = Schemas['PayableEntry'];
+export type PayableOpenItem = Schemas['PayableOpenItem'];
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
@@ -58,6 +61,7 @@ const KEYS = {
   accountLedger: ['finance', 'account-ledger'] as const,
   journal: ['finance', 'journal'] as const,
   balances: ['finance', 'balances'] as const,
+  supplierBalances: ['finance', 'supplier-balances'] as const,
   ledger: ['finance', 'ledger'] as const,
   openItems: ['finance', 'open-items'] as const,
   numbering: ['finance', 'numbering'] as const,
@@ -365,6 +369,76 @@ export function useOpenItems(customerId: number, enabled = true) {
       unwrap(
         await api.GET('/api/v1/customer-balances/{customerId}/open-items', {
           params: { path: { customerId } },
+          signal,
+        }),
+      ).data,
+  });
+}
+
+/** The suppliers' payables, largest first (F3, ADR-0091). */
+export function useSupplierBalances(filter: { q?: string }) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.supplierBalances, 'list', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/supplier-balances', {
+          params: { query: { q: filter.q || undefined, cursor: pageParam, limit: 50 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useSupplierBalance(supplierId: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.supplierBalances, supplierId],
+    enabled: supplierId > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/supplier-balances/{supplierId}', {
+          params: { path: { supplierId } },
+          signal,
+        }),
+      ),
+  });
+}
+
+export function useSupplierLedger(supplierId: number, range: { from?: string; to?: string }) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...KEYS.supplierBalances, supplierId, 'ledger', range],
+    enabled: supplierId > 0,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/supplier-balances/{supplierId}/ledger', {
+          params: {
+            path: { supplierId },
+            query: { from: range.from, to: range.to, cursor: pageParam, limit: 50 },
+          },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** A supplier's open payable items (F3): bills to pay, payments and returns to pair with them. */
+export function useSupplierOpenItems(supplierId: number, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.supplierBalances, supplierId, 'open-items'],
+    enabled: enabled && supplierId > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/supplier-balances/{supplierId}/open-items', {
+          params: { path: { supplierId } },
           signal,
         }),
       ).data,

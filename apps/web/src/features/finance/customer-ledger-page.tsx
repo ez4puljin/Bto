@@ -172,7 +172,7 @@ export function CustomerLedgerPage() {
       />
       <AllocationDialog
         open={canRecord && allocating}
-        customerId={summary.customerId}
+        party={{ kind: 'customer', id: summary.customerId }}
         onClose={() => setParam('allocate', null)}
       />
     </div>
