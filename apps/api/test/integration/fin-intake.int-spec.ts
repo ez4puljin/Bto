@@ -423,7 +423,7 @@ describe('Finance Core intake (F2)', () => {
         digits: 2,
       }),
     );
-    const paid = await core.submit(receipt('r9', '10', undefined, { party: guest('guest:9', 'Ес') }));
+    const paid = await core.submit(receipt('r9', '10', null, { party: guest('guest:9', 'Ес') }));
     expect(paid.document?.number).toBe(`P${today().slice(0, 4)}-01`);
     expect(
       await codeOf(

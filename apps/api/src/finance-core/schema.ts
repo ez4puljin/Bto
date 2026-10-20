@@ -989,7 +989,7 @@ export const finDocuments = finSchema.table(
     unique('fin_documents_company_request_key').on(t.companyId, t.intakeRequestId),
     unique('fin_documents_company_reverses_key').on(t.companyId, t.reversesDocumentId),
     uniqueIndex('fin_documents_company_type_number_key')
-      .on(t.companyId, t.documentTypeId, t.number)
+      .on(t.companyId, t.documentTypeId, t.number, t.sourceRevision)
       .where(sql`${t.reversesDocumentId} IS NULL`),
     foreignKey({
       name: 'fin_documents_type_fk',

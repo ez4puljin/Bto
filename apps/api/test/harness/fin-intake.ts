@@ -108,7 +108,7 @@ export function invoice(
 export function receipt(
   docId: string,
   amount: string,
-  settles: LineV1['settles'] | undefined = 'FIFO',
+  settles: LineV1['settles'] | null = 'FIFO',
   options: { party?: PartyIn } = {},
 ): IntakeCommandV1 {
   return command(
@@ -123,7 +123,7 @@ export function receipt(
       controlTotal: amount,
       lines: [
         line(1, { key: 'CASH', side: 'DEBIT', amount, moneyAccount: 'BOX' }),
-        line(2, { key: 'AR', side: 'CREDIT', amount, ...(settles ? { settles } : {}) }),
+        line(2, { key: 'AR', side: 'CREDIT', amount, ...(settles === null ? {} : { settles }) }),
       ],
     },
   );

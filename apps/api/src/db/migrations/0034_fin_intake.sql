@@ -243,7 +243,7 @@ ALTER TABLE "fin"."reconcile_runs" ADD CONSTRAINT "reconcile_runs_company_id_com
 CREATE INDEX "fin_allocations_debit_idx" ON "fin"."allocations" USING btree ("company_id","debit_item_id");--> statement-breakpoint
 CREATE INDEX "fin_allocations_credit_idx" ON "fin"."allocations" USING btree ("company_id","credit_item_id");--> statement-breakpoint
 CREATE INDEX "fin_allocations_document_idx" ON "fin"."allocations" USING btree ("company_id","document_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "fin_documents_company_type_number_key" ON "fin"."documents" USING btree ("company_id","document_type_id","number") WHERE "fin"."documents"."reverses_document_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "fin_documents_company_type_number_key" ON "fin"."documents" USING btree ("company_id","document_type_id","number","source_revision") WHERE "fin"."documents"."reverses_document_id" IS NULL;--> statement-breakpoint
 CREATE INDEX "fin_documents_source_idx" ON "fin"."documents" USING btree ("company_id","source_system_id","source_doc_type","source_doc_id");--> statement-breakpoint
 CREATE INDEX "fin_documents_party_idx" ON "fin"."documents" USING btree ("company_id","party_id","id");--> statement-breakpoint
 CREATE INDEX "fin_documents_date_idx" ON "fin"."documents" USING btree ("company_id","document_date","id");--> statement-breakpoint
