@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Banknote, Bell, Check, Clock, Megaphone, Receipt, X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -71,7 +71,12 @@ export default function CustomerNotificationsScreen() {
   const tabs = noticeTabsOf(notices, rows);
   const [chosen, setChosen] = useState<NoticeTab | null>(null);
   const loaded = summary.data !== undefined && mine.data !== undefined;
-  const tab = chosen ?? (loaded ? tabs.first : 'orders');
+  // The tab is picked once, when both lists are in: reading a notice must not flip it.
+  const first = tabs.first;
+  useEffect(() => {
+    if (loaded && chosen === null) setChosen(first);
+  }, [loaded, chosen, first]);
+  const tab = chosen ?? 'orders';
   const unread = unreadIds(notices, rows);
   const anyUnread = unread.noticeIds.length + unread.notificationIds.length > 0;
 
