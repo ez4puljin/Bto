@@ -14,6 +14,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { jsonValue } from '../../common/db/types';
@@ -23,7 +24,9 @@ import { users } from '../identity/schema';
 // The tables owned by the segments module (docs/modules/segments.md, ADR-0049, ADR-0052).
 // Migration 0020_segments adds by hand the REVOKE that keeps segments from being deleted: they are
 // archived, because discounts and messages will refer to them. 0021_segment_lists keeps a list's
-// members from being updated or truncated: they are inserted and deleted.
+// members from being updated or truncated: they are inserted and deleted. 0036_customer_app_home
+// makes `segments_app_position` DEFERRABLE INITIALLY IMMEDIATE by hand (Drizzle cannot say it), so
+// two shown segments swap places in one UPDATE; regenerating that constraint would drop it.
 
 const id = () => bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity();
 const userRef = (name: string) =>
@@ -48,6 +51,11 @@ export const segments = pgTable(
     /** RULES: a `SegmentDefinition` `{ match, groups: [{ match, conditions }] }`; LIST: null. */
     definition: jsonValue('definition'),
     definitionVersion: smallint('definition_version').notNull().default(SEGMENT_DEFINITION_VERSION),
+    /**
+     * A live product segment's place among the home sections of «Bto300» (ADR-0092 #2); null when
+     * the app does not show it. Archiving clears it.
+     */
+    appPosition: smallint('app_position'),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdBy: userRef('created_by'),
     updatedBy: userRef('updated_by'),
@@ -70,6 +78,11 @@ export const segments = pgTable(
       'segments_kind_definition',
       sql`(${t.kind} = 'RULES' AND ${t.definition} IS NOT NULL AND jsonb_typeof(${t.definition}) = 'object')
         OR (${t.kind} = 'LIST' AND ${t.definition} IS NULL AND ${t.entity} = 'PRODUCT')`,
+    ),
+    unique('segments_app_position').on(t.appPosition),
+    check(
+      'segments_app_position_live_product',
+      sql`${t.appPosition} IS NULL OR (${t.appPosition} >= 1 AND ${t.entity} = 'PRODUCT' AND ${t.archivedAt} IS NULL)`,
     ),
   ],
 );

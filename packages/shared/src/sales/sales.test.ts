@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Decimal } from '../money';
 import {
+  homeSectionKey,
+  parseHomeSectionKey,
   CUSTOMER_LOW_STOCK_BASE,
   CUSTOMER_ORDER_MAX_DAYS,
   CUSTOMER_ORDER_STATES,
@@ -190,5 +192,28 @@ describe('the customer app (ADR-0079)', () => {
     expect(isCustomerDeliveryDate('2026-10-18', '2026-10-19')).toBe(false);
     expect(isCustomerDeliveryDate('2026-02-30', '2026-01-19')).toBe(false);
     expect(CUSTOMER_ORDER_MAX_DAYS).toBe(60);
+  });
+});
+
+describe('home section keys (ADR-0092 #1)', () => {
+  it('round-trips every kind and a segment', () => {
+    for (const kind of [
+      'RECENT',
+      'PROMOTIONS',
+      'DISCOUNTS',
+      'NEW',
+      'FAVOURITES',
+      'DEALS',
+    ] as const) {
+      expect(parseHomeSectionKey(homeSectionKey({ kind }))).toEqual({ kind });
+    }
+    expect(homeSectionKey({ kind: 'SEGMENT', segmentId: 12 })).toBe('segment-12');
+    expect(parseHomeSectionKey('segment-12')).toEqual({ kind: 'SEGMENT', segmentId: 12 });
+  });
+
+  it('refuses anything else', () => {
+    for (const key of ['segment', 'SEGMENT-1', 'segment-0', 'segment-x', 'popular', '']) {
+      expect(parseHomeSectionKey(key)).toBeNull();
+    }
   });
 });

@@ -615,6 +615,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/categories/{id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A top category's picture in «Bto300» (ADR-0092 #6), replacing an earlier one. */
+        put: operations["Categories_setImage"];
+        post?: never;
+        delete: operations["Categories_removeImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/categories/{id}": {
         parameters: {
             query?: never;
@@ -3095,6 +3112,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/segments/{id}/app": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** «Апп-д харуулах» (ADR-0092 #2): a product segment shown on «Bto300»'s home, or not. */
+        put: operations["Segments_setShownInApp"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/segments/{id}/app/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Segments_moveInApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/products": {
         parameters: {
             query?: never;
@@ -5118,6 +5168,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-app/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Нүүр»: running banners, the category grid and the sections in their fixed order. */
+        get: operations["CustomerAppHome_homePage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/sections/{key}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A section's full list (`recent`, `promotions`, `segment-<id>`, …), with sorts and filters. */
+        get: operations["CustomerAppHome_section"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-app/categories/{id}/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A category's page: its banners, subcategories, new products and deals of its subtree. */
+        get: operations["CustomerAppHome_categoryPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer/contacts": {
         parameters: {
             query?: never;
@@ -5146,6 +5247,56 @@ export interface paths {
         get: operations["CustomerSettings_attention"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/banners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerBanners_list"];
+        put?: never;
+        post: operations["CustomerBanners_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/banners/{id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One place up or down among the live banners. */
+        post: operations["CustomerBanners_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/banners/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The app stops showing it at once. */
+        post: operations["CustomerBanners_archive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5229,7 +5380,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send" | "customer_app.home.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -5612,7 +5763,7 @@ export interface components {
         };
         FileUploadRequest: {
             /** @enum {string} */
-            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "imports.source";
+            kind: "catalog.product_image" | "catalog.product_thumb" | "notifications.notice_image" | "catalog.category_image" | "customer.banner_image" | "imports.source";
             /** @example image/jpeg */
             contentType: string;
             sizeBytes: number;
@@ -5667,6 +5818,8 @@ export interface components {
             /** @description Products directly in this category */
             productCount: number;
             childCount: number;
+            /** @description A top category’s picture in «Bto300» (ADR-0092 #6) */
+            imageUrl: string | null;
         };
         CategoryList: {
             data: components["schemas"]["Category"][];
@@ -5680,6 +5833,10 @@ export interface components {
             /** @description First code of the block of the category (ADR-0044); both ends or neither */
             skuFrom?: string | null;
             skuTo?: string | null;
+        };
+        CategoryImageRequest: {
+            /** @description An uploaded file of kind catalog.category_image */
+            imageFileId: number;
         };
         CategoryUpdateRequest: {
             /** @description null moves it to the root */
@@ -8337,6 +8494,10 @@ export interface components {
             description: string | null;
             /** @description Null for a LIST segment */
             definition: components["schemas"]["SegmentDefinition"] | null;
+            /** @description Its place among the sections «Bto300» shows (1 first); null when not shown */
+            appRank: number | null;
+            /** @description How many segments «Bto300» shows; null when this one is not shown */
+            appShownCount: number | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -8393,6 +8554,17 @@ export interface components {
             description?: string | null;
             /** @description Required for a RULES segment; a LIST segment takes none (ADR-0052) */
             definition?: components["schemas"]["SegmentDefinition"];
+        };
+        SegmentAppRequest: {
+            /** @description «Апп-д харуулах»: shown on «Bto300»'s home (ADR-0092 #2) */
+            shown: boolean;
+        };
+        SegmentAppMoveRequest: {
+            /**
+             * @description One place up or down among the shown segments
+             * @enum {string}
+             */
+            direction: "UP" | "DOWN";
         };
         ProductExportRequest: {
             /** @description The ticked products (1–20000), without filters */
@@ -11042,6 +11214,40 @@ export interface components {
          * @enum {string}
          */
         StockWord: "IN" | "LOW" | "OUT";
+        CustomerAppDealThreshold: {
+            /** @description A quantity in `unitName` */
+            qty: string | null;
+            /** @description The unit the quantity is in */
+            unitName: string | null;
+            /** @description An amount in MNT (the order’s or a category’s) */
+            amount: string | null;
+        };
+        CustomerAppDeal: {
+            /**
+             * @description PROMOTION: with an end date (orange); DISCOUNT (red)
+             * @enum {string}
+             */
+            kind: "PROMOTION" | "DISCOUNT";
+            /** @description The badge: «10+ ш −5%», «−200₮», «−10% · 10/31» */
+            label: string;
+            programId: number;
+            programName: string;
+            /** @enum {string} */
+            scope: "PRODUCT" | "CATEGORY" | "ORDER";
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            /** @description The first step: a percentage, tugriks off, or a new unit price */
+            value: string;
+            /** @description The first step’s condition; null when it always applies */
+            threshold: components["schemas"]["CustomerAppDealThreshold"] | null;
+            /** @description A pack unit the price or amount is for */
+            perUnitName: string | null;
+            /**
+             * Format: date
+             * @description A promotion’s last day
+             */
+            lastDay: string | null;
+        };
         CustomerAppUnit: {
             id: number;
             uomName: string;
@@ -11072,6 +11278,10 @@ export interface components {
             favourite: boolean;
             /** @description One base unit in whole packs */
             basePrice: string | null;
+            /** @description One base unit in whole packs after an unconditional discount; the card strikes basePrice through (ADR-0093) */
+            dealPrice: string | null;
+            /** @description The badge of its discount program (ADR-0092 #3) */
+            deal: components["schemas"]["CustomerAppDeal"] | null;
             units: components["schemas"]["CustomerAppUnit"][];
         };
         CustomerAppProductPage: {
@@ -11103,11 +11313,29 @@ export interface components {
             /** @description «Зарим нь хойшилж магадгүй»: more than is free now */
             mayBackorder: boolean;
         };
+        CustomerAppOrderDealStep: {
+            /** @description The order amount the step starts at, MNT */
+            threshold: string;
+            /** @description A percentage or tugriks off */
+            value: string;
+            /** @description The next step only: how much the order still needs */
+            missing: string | null;
+        };
+        CustomerAppOrderDeal: {
+            programId: number;
+            name: string;
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            reached: components["schemas"]["CustomerAppOrderDealStep"] | null;
+            next: components["schemas"]["CustomerAppOrderDealStep"] | null;
+        };
         CustomerAppQuote: {
             /** @description The WHOLESALE list today; the app never prices */
             quote: components["schemas"]["Quote"];
             /** @description By line, as asked */
             stock: components["schemas"]["CustomerAppQuoteStock"][];
+            /** @description Order amount programs in force: the cart’s hint «500,000₮ хүрвэл 3%» (ADR-0092 #3) */
+            orderDeals: components["schemas"]["CustomerAppOrderDeal"][];
         };
         CustomerAppOrderLineRequest: {
             productUnitId: number;
@@ -11491,6 +11719,88 @@ export interface components {
         CustomerAppReadResult: {
             unread: number;
         };
+        CustomerAppBannerLink: {
+            /** @enum {string} */
+            kind: "SEGMENT" | "CATEGORY" | "PRODUCT";
+            /** @description A segment (its section `segment-<id>`), a category or a product */
+            id: number;
+        };
+        CustomerAppBanner: {
+            id: number;
+            /** @description Its alt text */
+            title: string;
+            /** @description 2:1 picture */
+            imageUrl: string | null;
+            /** @description What a tap opens; null without a link or when the target is gone */
+            link: components["schemas"]["CustomerAppBannerLink"] | null;
+        };
+        CustomerAppHomeCategory: {
+            id: number;
+            name: string;
+            /** @description Its picture, else a product’s */
+            imageUrl: string | null;
+            /** @description Products «Бараа» sells in it, subcategories included */
+            productCount: number;
+        };
+        CustomerAppHomeSectionRow: {
+            /** @description `recent`, `promotions`, `segment-<id>`, … — its full list’s key */
+            key: string;
+            /** @enum {string} */
+            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            /** @description A segment’s name */
+            title: string | null;
+            /** @description A segment’s description */
+            subtitle: string | null;
+            /**
+             * Format: date
+             * @description «Урамшуулал»: the earliest last day of its promotions
+             */
+            lastDay: string | null;
+            /** @description How many products the full list holds */
+            total: number;
+            /** @description At most 10, «Дууссан» last */
+            products: components["schemas"]["CustomerAppProduct"][];
+        };
+        CustomerAppHome: {
+            /** Format: date */
+            today: string;
+            /** @description Running, in their order */
+            banners: components["schemas"]["CustomerAppBanner"][];
+            /** @description «Ангиллын жагсаалт»: top categories with products, by name */
+            categories: components["schemas"]["CustomerAppHomeCategory"][];
+            /** @description In the fixed order of ADR-0092 #1; an empty one is left out */
+            sections: components["schemas"]["CustomerAppHomeSectionRow"][];
+        };
+        CustomerAppSectionPage: {
+            key: string;
+            /** @enum {string} */
+            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            title: string | null;
+            subtitle: string | null;
+            /** Format: date */
+            lastDay: string | null;
+            data: components["schemas"]["CustomerAppProduct"][];
+            nextCursor: string | null;
+            /** @description On the first page */
+            total: number | null;
+        };
+        CustomerAppCategoryHeader: {
+            id: number;
+            parentId: number | null;
+            name: string;
+            imageUrl: string | null;
+        };
+        CustomerAppCategoryPage: {
+            category: components["schemas"]["CustomerAppCategoryHeader"];
+            /** @description «… бүх бараа · N»: products «Бараа» sells in its subtree */
+            productCount: number;
+            /** @description Running banners linked to it */
+            banners: components["schemas"]["CustomerAppBanner"][];
+            /** @description Its subcategories with products */
+            subcategories: components["schemas"]["CustomerAppHomeCategory"][];
+            /** @description «Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree */
+            sections: components["schemas"]["CustomerAppHomeSectionRow"][];
+        };
         CompanyContactRequest: {
             role: string;
             name: string;
@@ -11510,6 +11820,57 @@ export interface components {
             activeAccounts: number;
             /** @description A stage without an action takes app orders */
             ordersOpen: boolean;
+        };
+        Banner: {
+            id: number;
+            title: string;
+            imageUrl: string | null;
+            /** @enum {string} */
+            linkKind: "NONE" | "SEGMENT" | "CATEGORY" | "PRODUCT";
+            linkId: number | null;
+            /** @description The target’s name */
+            linkName: string | null;
+            /** @description The target is gone: the app shows the banner without its link */
+            linkBroken: boolean;
+            /** Format: date */
+            validFrom: string;
+            /**
+             * Format: date
+             * @description Exclusive
+             */
+            validTo: string | null;
+            position: number;
+            /** @enum {string} */
+            state: "SCHEDULED" | "RUNNING" | "ENDED" | "ARCHIVED";
+            /** Format: date-time */
+            createdAt: string;
+        };
+        BannerList: {
+            data: components["schemas"]["Banner"][];
+            /** @description Always null: every banner */
+            nextCursor: string | null;
+        };
+        BannerCreateRequest: {
+            /** @description An uploaded file of kind customer.banner_image */
+            imageFileId: number;
+            title: string;
+            /** @enum {string} */
+            linkKind: "NONE" | "SEGMENT" | "CATEGORY" | "PRODUCT";
+            linkId?: number | null;
+            /**
+             * Format: date
+             * @description Today or later
+             */
+            validFrom: string;
+            /**
+             * Format: date
+             * @description Exclusive: the day after the last one
+             */
+            validTo?: string | null;
+        };
+        BannerMoveRequest: {
+            /** @enum {string} */
+            direction: "UP" | "DOWN";
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
@@ -13073,6 +13434,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Category"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Categories_setImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryImageRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Categories_removeImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
@@ -19430,6 +19853,74 @@ export interface operations {
             };
         };
     };
+    Segments_setShownInApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentAppRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Segments_moveInApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentAppMoveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Exports_products: {
         parameters: {
             query?: never;
@@ -23425,8 +23916,14 @@ export interface operations {
                 q?: string;
                 /** @description Each with its subcategories (repeated) */
                 categoryIds?: number[];
-                /** @description «★ Дуртай»: only the store’s favourites */
+                /** @description «♡ Дуртай»: only the store’s favourites */
                 favourites?: boolean;
+                /** @description «Хямдралтай»: products of a promotion or a discount */
+                deals?: boolean;
+                /** @description «Шинэ»: sale-ready within the last 14 days */
+                new?: boolean;
+                /** @description «Зөвхөн байгаа бараа» */
+                inStock?: boolean;
                 /** @description NEW when left out */
                 sort?: "NEW" | "PRICE_ASC" | "PRICE_DESC";
             };
@@ -24100,6 +24597,104 @@ export interface operations {
             };
         };
     };
+    CustomerAppHome_homePage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppHome"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppHome_section: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description DEFAULT when left out */
+                sort?: "DEFAULT" | "DEAL" | "NEW" | "PRICE_ASC" | "PRICE_DESC";
+                /** @description Each with its subcategories (repeated) */
+                categoryIds?: number[];
+                /** @description «Зөвхөн байгаа бараа» */
+                inStock?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppSectionPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerAppHome_categoryPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAppCategoryPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     CustomerSettings_list: {
         parameters: {
             query?: never;
@@ -24176,6 +24771,134 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerAppAttention"];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBanners_list: {
+        parameters: {
+            query?: {
+                /** @description The archived banners instead of the live ones */
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BannerList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBanners_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BannerCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Banner"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBanners_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BannerMoveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Banner"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBanners_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {

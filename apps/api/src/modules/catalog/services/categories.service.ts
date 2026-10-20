@@ -6,12 +6,20 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError } from '../../../common/errors/app-error';
-import { type Actor, AuditService } from '../../identity';
+import { type Actor, AuditService, StorageService } from '../../identity';
 import { categories, products } from '../schema';
 import { invalid, notFound } from './support';
 
 export type Category = typeof categories.$inferSelect;
-export type CategoryView = Category & { productCount: number; childCount: number };
+export type CategoryView = Category & {
+  productCount: number;
+  childCount: number;
+  /** The top category's picture in «Bto300» (ADR-0092 #6), or null. */
+  imageUrl: string | null;
+};
+
+/** The file kind of a top category's picture (ADR-0092 #6). */
+export const CATEGORY_IMAGE = 'catalog.category_image';
 
 export interface CategoryInput {
   parentId?: number | null;
@@ -33,13 +41,16 @@ const CATEGORY_TREE_LOCK = 72_026_104;
 /**
  * The category tree (SPEC §5.2): moves never create a cycle; only empty categories are deleted.
  * Code ranges stay laminar (ADR-0044 #1): two ranges that meet are nested, the outer one an
- * ancestor's; a range change or a move is checked against every range under the tree lock.
+ * ancestor's; a range change or a move is checked against every range under the tree lock. A top
+ * category may carry a picture for «Bto300» (ADR-0092 #6); moving it under a parent or deleting it
+ * drops the picture in the same statement and marks the file deleted.
  */
 @Injectable()
 export class CategoriesService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly storage: StorageService,
   ) {}
 
   /** The whole tree as a flat list (a few hundred rows); clients nest it by parentId. */
@@ -53,11 +64,44 @@ export class CategoriesService {
       })
       .from(categories)
       .orderBy(asc(categories.name), asc(categories.id));
+    const images = await this.storage.publicUrls(
+      rows.flatMap((row) => (row.category.imageFileId === null ? [] : [row.category.imageFileId])),
+    );
     return rows.map((row) => ({
       ...row.category,
       productCount: row.productCount,
       childCount: row.childCount,
+      imageUrl:
+        row.category.imageFileId === null ? null : (images.get(row.category.imageFileId) ?? null),
     }));
+  }
+
+  /**
+   * Gives a top category its picture in «Bto300» (ADR-0092 #6), replacing an earlier one (marked
+   * deleted). The upload is checked before the transaction, attached inside it.
+   */
+  async setImage(actor: Actor, id: number, imageFileId: number): Promise<Category> {
+    await this.storage.verifyUploaded(imageFileId, CATEGORY_IMAGE);
+    return inTransaction(this.db, async (tx) => {
+      const before = await this.lockForImage(tx, id);
+      if (before.imageFileId === imageFileId) return before;
+      await this.storage.confirm(tx, imageFileId, CATEGORY_IMAGE);
+      const row = await this.writeImage(tx, id, imageFileId);
+      if (before.imageFileId !== null) await this.storage.markDeleted(tx, before.imageFileId);
+      await this.auditImage(tx, actor, before, row);
+      return row;
+    });
+  }
+
+  /** Takes a top category's picture away (the file marked deleted); nothing to take is fine. */
+  async removeImage(actor: Actor, id: number): Promise<void> {
+    await inTransaction(this.db, async (tx) => {
+      const before = await this.lockForImage(tx, id);
+      if (before.imageFileId === null) return;
+      const row = await this.writeImage(tx, id, null);
+      await this.storage.markDeleted(tx, before.imageFileId);
+      await this.auditImage(tx, actor, before, row);
+    });
   }
 
   async get(id: number, executor: Db | Tx = this.db): Promise<Category> {
@@ -135,11 +179,18 @@ export class CategoriesService {
             ? {}
             : { defaultClassificationCode: patch.defaultClassificationCode }),
           ...(range ? { skuFrom: range.skuFrom, skuTo: range.skuTo } : {}),
+          // Only a top category has a picture (ADR-0092 #6): moving it under a parent drops it.
+          ...(moving && patch.parentId != null && before.imageFileId !== null
+            ? { imageFileId: null }
+            : {}),
           updatedAt: sql`now()`,
         })
         .where(eq(categories.id, id))
         .returning();
       if (!row) throw notFound('category', id);
+      if (before.imageFileId !== null && row.imageFileId === null) {
+        await this.storage.markDeleted(tx, before.imageFileId);
+      }
       if (moving || (range && range.skuFrom !== null)) await this.assertRanges(tx, id);
       await this.audit.record(tx, actor, {
         action: 'UPDATE',
@@ -169,12 +220,43 @@ export class CategoriesService {
         throw new AppError('CATEGORY_NOT_EMPTY', `category ${id} has children or products`, { id });
       }
       await tx.delete(categories).where(eq(categories.id, id));
+      if (before.imageFileId !== null) await this.storage.markDeleted(tx, before.imageFileId);
       await this.audit.record(tx, actor, {
         action: 'DELETE',
         entity: 'categories',
         entityId: id,
         before,
       });
+    });
+  }
+
+  /** The category locked for a picture change; only a top category takes one (422 otherwise). */
+  private async lockForImage(tx: Tx, id: number): Promise<Category> {
+    const [row] = await tx.select().from(categories).where(eq(categories.id, id)).for('update');
+    if (!row) throw notFound('category', id);
+    if (row.parentId !== null) {
+      throw invalid('imageFileId', 'topLevel', 'only a top category has a picture in the app');
+    }
+    return row;
+  }
+
+  private async writeImage(tx: Tx, id: number, imageFileId: number | null): Promise<Category> {
+    const [row] = await tx
+      .update(categories)
+      .set({ imageFileId, updatedAt: sql`now()` })
+      .where(eq(categories.id, id))
+      .returning();
+    if (!row) throw notFound('category', id);
+    return row;
+  }
+
+  private async auditImage(tx: Tx, actor: Actor, before: Category, after: Category) {
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'categories',
+      entityId: before.id,
+      before: { imageFileId: before.imageFileId },
+      after: { imageFileId: after.imageFileId },
     });
   }
 

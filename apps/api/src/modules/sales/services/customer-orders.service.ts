@@ -182,6 +182,24 @@ export class CustomerOrdersService {
     };
   }
 
+  /**
+   * «Сүүлд захиалсан бараа» (ADR-0092 #4, ADR-0093): the products of the store's orders created on
+   * `fromDay` or later (Ulaanbaatar days), every channel, cancelled ones and empty drafts left out;
+   * the product in the most orders first, then the most recently ordered, then the lower id.
+   */
+  async recentProducts(customerId: number, fromDay: string): Promise<number[]> {
+    const result = await this.db.execute<{ product_id: string }>(sql`
+      SELECT l.product_id::text AS product_id
+        FROM sales_order_lines l
+        JOIN sales_orders o ON o.id = l.order_id
+       WHERE o.customer_id = ${customerId}
+         AND o.status <> 'CANCELLED'
+         AND ${onBusinessDays(sql`o.created_at`, { from: fromDay })}
+       GROUP BY l.product_id
+       ORDER BY count(DISTINCT o.id) DESC, max(o.created_at) DESC, l.product_id`);
+    return result.rows.map((row) => Number.parseInt(row.product_id, 10));
+  }
+
   /** The reps who took orders for the store, by name: the order filter's «ХТ» choices. */
   async reps(customerId: number): Promise<{ id: number; name: string }[]> {
     const rows = await this.db

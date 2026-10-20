@@ -1,6 +1,7 @@
 import type { Decimal } from '@tugeel/shared/money';
 import type { CustomerPayment } from '../../finance';
 import type { CustomerNotice, CustomerNotification } from '../../notifications';
+import type { ProductDeal } from '../../pricing';
 import type { CustomerOrderDetail, CustomerOrderRow } from '../../sales';
 import type {
   CustomerAppInvoiceDetailDto,
@@ -13,6 +14,7 @@ import type {
   CustomerAppProductDto,
   CustomerAppStatementDto,
 } from '../dto/customer-app.dto';
+import type { CustomerAppDealDto } from '../dto/customer-home.dto';
 import type {
   CustomerAccount,
   CustomerInvoice,
@@ -39,6 +41,8 @@ export function productDto(product: CustomerProduct): CustomerAppProductDto {
     stock: product.stock,
     favourite: product.favourite,
     basePrice: whole(product.basePrice),
+    dealPrice: whole(product.dealPrice),
+    deal: product.deal === null ? null : dealDto(product.deal),
     units: product.units.map((unit) => ({
       id: unit.id,
       uomName: unit.uomName,
@@ -50,6 +54,26 @@ export function productDto(product: CustomerProduct): CustomerAppProductDto {
       wholesale: whole(unit.wholesale),
       basis: unit.basis,
     })),
+  };
+}
+
+export function dealDto(deal: ProductDeal): CustomerAppDealDto {
+  return {
+    kind: deal.kind,
+    label: deal.label,
+    programId: deal.programId,
+    programName: deal.programName,
+    scope: deal.scope,
+    effect: deal.effect,
+    value: deal.value.toString(),
+    threshold:
+      deal.threshold === null
+        ? null
+        : 'qty' in deal.threshold
+          ? { qty: deal.threshold.qty.toString(), unitName: deal.threshold.unitName, amount: null }
+          : { qty: null, unitName: null, amount: deal.threshold.amount.toFixed(0) },
+    perUnitName: deal.perUnitName,
+    lastDay: deal.lastDay,
   };
 }
 

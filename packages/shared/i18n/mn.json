@@ -217,6 +217,11 @@
     },
     "notifications": {
       "send": "Апп мэдэгдэл илгээх"
+    },
+    "customer_app": {
+      "home": {
+        "manage": "Апп-ын нүүр удирдах"
+      }
     }
   },
   "roles": {
@@ -636,7 +641,8 @@
       "pos_sync_rejections": "Касс серверийн татгалзсан баримт",
       "app_notices": "Апп мэдэгдэл",
       "customer_users": "Харилцагчийн аппын данс",
-      "company_contacts": "Холбоо барих жагсаалт"
+      "company_contacts": "Холбоо барих жагсаалт",
+      "app_banners": "Апп-ын баннер"
     },
     "actions": {
       "CREATE": "Үүсгэсэн",
@@ -678,7 +684,8 @@
       "WITHDRAW": "Буцаасан",
       "PHONE_CHANGE": "Утас солив",
       "DISABLE": "Хаав",
-      "ENABLE": "Нээв"
+      "ENABLE": "Нээв",
+      "MOVE": "Байр сольсон"
     }
   },
   "errors": {

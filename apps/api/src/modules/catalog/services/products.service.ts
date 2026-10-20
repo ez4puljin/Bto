@@ -173,6 +173,13 @@ export interface UnitFlags {
 }
 
 /** Products with their units, barcodes and images (SPEC §5.2, ADR-0008, ADR-0028). */
+/** A product as the shop's index carries it (ADR-0093). */
+export interface ProductIndexRow {
+  id: number;
+  categoryId: number;
+  saleReadyAt: Date | null;
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -409,6 +416,30 @@ export class ProductsService {
       .orderBy(...this.orderOf(query, searched))
       .limit(cap);
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * The filters' products in the list's order with their category and the moment they became
+   * sale-ready, at most `cap` (the customer app's shop index, ADR-0093).
+   */
+  async indexRows(
+    query: ProductQuery,
+    within: readonly number[] | null,
+    cap: number,
+    executor: Db | Tx = this.db,
+  ): Promise<ProductIndexRow[]> {
+    if (within?.length === 0) return [];
+    const { filters, searched } = this.filtersOf(query, within);
+    return executor
+      .select({
+        id: products.id,
+        categoryId: products.categoryId,
+        saleReadyAt: products.saleReadyAt,
+      })
+      .from(products)
+      .where(and(...filters))
+      .orderBy(...this.orderOf(query, searched))
+      .limit(cap);
   }
 
   /**

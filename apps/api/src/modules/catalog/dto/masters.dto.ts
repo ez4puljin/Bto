@@ -94,6 +94,20 @@ export class CategoryDto {
   @ApiProperty({ type: String, nullable: true }) skuTo: string | null;
   @ApiProperty({ description: 'Products directly in this category' }) productCount: number;
   @ApiProperty() childCount: number;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'A top category’s picture in «Bto300» (ADR-0092 #6)',
+  })
+  imageUrl: string | null;
+}
+
+@ApiSchema({ name: 'CategoryImageRequest' })
+export class CategoryImageDto {
+  @ApiProperty({ description: 'An uploaded file of kind catalog.category_image' })
+  @IsInt()
+  @Min(1)
+  imageFileId: number;
 }
 
 @ApiSchema({ name: 'CategoryList' })

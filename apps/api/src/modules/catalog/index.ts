@@ -2,7 +2,10 @@
 // named exports only (ESLint G2 rejects `export *`).
 export { CatalogHttpModule, CatalogModule } from './catalog.module';
 export {
+  PRODUCT_SEGMENT_DIRECTORY,
   PRODUCT_SET_RESOLVER,
+  type ProductSegmentDirectory,
+  type ProductSegmentEntry,
   type ProductSetFilter,
   type ProductSetResolver,
   UNIT_SUPERSEDED_HOOK,
@@ -22,7 +25,7 @@ export {
   type RegisteredProduct,
 } from './services/catalog-registration.service';
 export { CatalogService, type PosCatalogueProduct } from './services/catalog.service';
-export { type Category, CategoriesService } from './services/categories.service';
+export { type Category, CategoriesService, type CategoryView } from './services/categories.service';
 export { type BulkChange, ProductBulkService } from './services/product-bulk.service';
 export { type ImageFiles, MAX_PRODUCT_IMAGES } from './services/product-images.service';
 export { ProductFiltersService } from './services/product-filters.service';
@@ -35,6 +38,7 @@ export type {
   NewUnitInput,
   ProductDetail,
   ProductImageUrls,
+  ProductIndexRow,
   ProductListItem,
   ProductPatch,
   ProductSort,

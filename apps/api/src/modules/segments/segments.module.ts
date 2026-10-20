@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CatalogModule, PRODUCT_SET_RESOLVER } from '../catalog';
+import { CatalogModule, PRODUCT_SEGMENT_DIRECTORY, PRODUCT_SET_RESOLVER } from '../catalog';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PARTNER_SET_RESOLVER, PartnersModule } from '../partners';
@@ -14,7 +14,8 @@ import { SegmentsService } from './services/segments.service';
 /**
  * Segments (ADR-0049): saved conditions, hand-picked product lists (ADR-0052), their evaluator and
  * the product export. It binds the resolver hooks catalog and partners declare, so their lists
- * narrow to a segment without importing this module.
+ * narrow to a segment without importing this module, and catalog's segment directory, through which
+ * the customer app reads the product segments it shows (ADR-0093).
  */
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
@@ -25,6 +26,8 @@ import { SegmentsService } from './services/segments.service';
     ProductExportService,
     { provide: PRODUCT_SET_RESOLVER, useExisting: SegmentEvaluator },
     { provide: PARTNER_SET_RESOLVER, useExisting: SegmentEvaluator },
+    // «Bto300»'s home reads the shown product segments through catalog (ADR-0093).
+    { provide: PRODUCT_SEGMENT_DIRECTORY, useExisting: SegmentsService },
   ],
   exports: [
     SegmentEvaluator,
@@ -33,6 +36,7 @@ import { SegmentsService } from './services/segments.service';
     ProductExportService,
     PRODUCT_SET_RESOLVER,
     PARTNER_SET_RESOLVER,
+    PRODUCT_SEGMENT_DIRECTORY,
   ],
 })
 export class SegmentsModule {}

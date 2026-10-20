@@ -10,13 +10,17 @@ import {
 } from '@tugeel/shared/segments';
 import type { Permission } from '@tugeel/shared/auth';
 import { nameKey } from '@tugeel/shared/text';
-import { and, asc, eq, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
-import { CategoriesService } from '../../catalog';
+import {
+  CategoriesService,
+  type ProductSegmentDirectory,
+  type ProductSegmentEntry,
+} from '../../catalog';
 import { actorUserId, type AuthContext, AuditService, OrgService } from '../../identity';
 import { SuppliersService } from '../../partners';
 import { PriceProfilesService } from '../../pricing';
@@ -24,6 +28,9 @@ import { segments } from '../schema';
 import { checkedDefinition, SegmentEvaluator, type SegmentRow } from './segment-evaluator';
 
 const CUSTOMERS_READ: Permission = 'partners.customers.read';
+
+/** pg_advisory_xact_lock key: «Bto300»'s shown segments change their places one at a time. */
+const APP_POSITION_LOCK = 72_036_001;
 
 export interface SegmentInput {
   name: string;
@@ -40,6 +47,12 @@ export interface Segment {
   description: string | null;
   /** Null for a LIST segment (ADR-0052). */
   definition: SegmentDefinition | null;
+  /**
+   * «Bto300» (ADR-0092 #2): the segment's place among the home's shown segments, 1 first, and how
+   * many are shown; both null when the app does not show it.
+   */
+  appRank: number | null;
+  appShownCount: number | null;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -53,7 +66,7 @@ export interface Segment {
  * changes its members (ADR-0052).
  */
 @Injectable()
-export class SegmentsService {
+export class SegmentsService implements ProductSegmentDirectory {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
@@ -86,11 +99,104 @@ export class SegmentsService {
       .orderBy(asc(segments.name), asc(segments.id))
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ id: row.id }));
-    return { data: page.data.map(toSegment), nextCursor: page.nextCursor };
+    const shown = await this.shownIds();
+    return {
+      data: page.data.map((row) => toSegment(row, shown)),
+      nextCursor: page.nextCursor,
+    };
   }
 
   async get(ctx: AuthContext, id: number): Promise<Segment> {
-    return toSegment(await this.readable(ctx, id));
+    return toSegment(await this.readable(ctx, id), await this.shownIds());
+  }
+
+  /**
+   * The catalog hook's answer (ADR-0093): live product segments by id, or those «Bto300» shows,
+   * in their order.
+   */
+  async productSegments(
+    query: { shownInApp: true } | { ids: readonly number[] },
+  ): Promise<ProductSegmentEntry[]> {
+    const live = and(isNull(segments.archivedAt), eq(segments.entity, 'PRODUCT'));
+    if ('ids' in query && query.ids.length === 0) return [];
+    const rows = await this.db
+      .select({
+        id: segments.id,
+        name: segments.name,
+        description: segments.description,
+        appPosition: segments.appPosition,
+      })
+      .from(segments)
+      .where(
+        'ids' in query
+          ? and(live, inArray(segments.id, [...query.ids]))
+          : and(live, isNotNull(segments.appPosition)),
+      )
+      .orderBy(asc(segments.appPosition), asc(segments.id));
+    return rows;
+  }
+
+  /**
+   * «Апп-д харуулах» (ADR-0092 #2): a live product segment shown on «Bto300»'s home after the
+   * others, or taken off it. Showing it again changes nothing.
+   */
+  async setShownInApp(ctx: AuthContext, id: number, shown: boolean): Promise<Segment> {
+    return inTransaction(this.db, async (tx) => {
+      const before = await this.lockForApp(tx, ctx, id);
+      if (before.entity !== 'PRODUCT') {
+        throw invalid('shown', 'productSegment', 'only product segments show in the app');
+      }
+      if (shown === (before.appPosition !== null)) return before;
+      let position: number | null = null;
+      if (shown) {
+        const [last] = await tx
+          .select({ max: sql<number | null>`max(${segments.appPosition})::int` })
+          .from(segments);
+        position = (last?.max ?? 0) + 1;
+      }
+      const [row] = await tx
+        .update(segments)
+        .set({ appPosition: position, updatedBy: actorUserId(ctx), updatedAt: sql`now()` })
+        .where(eq(segments.id, id))
+        .returning();
+      if (!row) throw notFound('segment', id);
+      await this.auditApp(tx, ctx, before, row.appPosition);
+      return row;
+    }).then(async (row) => toSegment(row, await this.shownIds()));
+  }
+
+  /**
+   * Moves a shown segment one place up or down among the shown ones (ADR-0092 #2): it swaps places
+   * with its neighbour in one statement; at the edge nothing changes.
+   */
+  async moveInApp(ctx: AuthContext, id: number, direction: 'UP' | 'DOWN'): Promise<Segment> {
+    return inTransaction(this.db, async (tx) => {
+      const before = await this.lockForApp(tx, ctx, id);
+      const position = before.appPosition;
+      if (position === null) {
+        throw invalid('direction', 'notShown', 'the app does not show this segment');
+      }
+      const [neighbour] = await tx
+        .select({ id: segments.id, appPosition: segments.appPosition })
+        .from(segments)
+        .where(
+          direction === 'UP'
+            ? lt(segments.appPosition, position)
+            : gt(segments.appPosition, position),
+        )
+        .orderBy(direction === 'UP' ? desc(segments.appPosition) : asc(segments.appPosition))
+        .limit(1);
+      if (!neighbour || neighbour.appPosition === null) return before;
+      await tx
+        .update(segments)
+        .set({
+          appPosition: sql`CASE WHEN ${segments.id} = ${id} THEN ${neighbour.appPosition}::smallint ELSE ${position}::smallint END`,
+          updatedAt: sql`now()`,
+        })
+        .where(inArray(segments.id, [id, neighbour.id]));
+      await this.auditApp(tx, ctx, before, neighbour.appPosition);
+      return { ...before, appPosition: neighbour.appPosition };
+    }).then(async (row) => toSegment(row, await this.shownIds()));
   }
 
   /** How many records each segment keeps; null for one the caller may not count. */
@@ -159,7 +265,8 @@ export class SegmentsService {
         entityId: row.id,
         after: auditView(row),
       });
-      return toSegment(row);
+      // A new segment is never shown in the app yet.
+      return toSegment(row, []);
     });
   }
 
@@ -203,8 +310,8 @@ export class SegmentsService {
         before: auditView(before),
         after: auditView(row),
       });
-      return toSegment(row);
-    });
+      return row;
+    }).then(async (row) => toSegment(row, await this.shownIds()));
   }
 
   /** Archives a segment; an archived one is no longer listed, counted or usable as a filter. */
@@ -214,9 +321,15 @@ export class SegmentsService {
       if (!before) throw notFound('segment', id);
       this.assertEntityReadable(ctx, before.entity);
       if (before.archivedAt) return;
+      // An archived segment leaves «Bto300»'s home in the same statement (the CHECK is per row).
       await tx
         .update(segments)
-        .set({ archivedAt: sql`now()`, updatedBy: actorUserId(ctx), updatedAt: sql`now()` })
+        .set({
+          archivedAt: sql`now()`,
+          appPosition: null,
+          updatedBy: actorUserId(ctx),
+          updatedAt: sql`now()`,
+        })
         .where(eq(segments.id, id));
       await this.audit.record(tx, ctx, {
         action: 'ARCHIVE',
@@ -225,6 +338,40 @@ export class SegmentsService {
         before: auditView(before),
       });
     });
+  }
+
+  /** The segment locked under the app positions' lock; 404 unknown or archived. */
+  private async lockForApp(tx: Tx, ctx: AuthContext, id: number): Promise<SegmentRow> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${APP_POSITION_LOCK})`);
+    const [row] = await tx.select().from(segments).where(eq(segments.id, id)).for('update');
+    if (!row || row.archivedAt) throw notFound('segment', id);
+    this.assertEntityReadable(ctx, row.entity);
+    return row;
+  }
+
+  private async auditApp(
+    tx: Tx,
+    ctx: AuthContext,
+    before: SegmentRow,
+    appPosition: number | null,
+  ): Promise<void> {
+    await this.audit.record(tx, ctx, {
+      action: 'UPDATE',
+      entity: 'segments',
+      entityId: before.id,
+      before: { appPosition: before.appPosition },
+      after: { appPosition },
+    });
+  }
+
+  /** The shown segments' ids in their order (a handful). */
+  private async shownIds(): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: segments.id })
+      .from(segments)
+      .where(isNotNull(segments.appPosition))
+      .orderBy(asc(segments.appPosition));
+    return rows.map((row) => row.id);
   }
 
   /** A live segment of an entity the caller may read. */
@@ -302,7 +449,9 @@ function plain(definition: SegmentDefinition): SegmentDefinition {
   return JSON.parse(JSON.stringify(definition)) as SegmentDefinition;
 }
 
-export function toSegment(row: SegmentRow): Segment {
+/** A segment as the routes show it; `shown` lists the app's shown segments in their order. */
+export function toSegment(row: SegmentRow, shown: readonly number[]): Segment {
+  const rank = shown.indexOf(row.id);
   return {
     id: row.id,
     entity: row.entity,
@@ -310,6 +459,8 @@ export function toSegment(row: SegmentRow): Segment {
     name: row.name,
     description: row.description,
     definition: row.definition === null ? null : (row.definition as SegmentDefinition),
+    appRank: rank < 0 ? null : rank + 1,
+    appShownCount: rank < 0 ? null : shown.length,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -323,6 +474,7 @@ export function auditView(row: SegmentRow) {
     name: row.name,
     description: row.description,
     definition: row.definition,
+    appPosition: row.appPosition,
     archivedAt: row.archivedAt,
   };
 }

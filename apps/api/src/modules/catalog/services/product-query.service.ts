@@ -4,9 +4,17 @@ import { MAX_SELECTED_PRODUCTS } from '@tugeel/shared/catalog';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
-import { PRODUCT_SET_RESOLVER, type ProductSetFilter, type ProductSetResolver } from '../hooks';
+import {
+  PRODUCT_SEGMENT_DIRECTORY,
+  PRODUCT_SET_RESOLVER,
+  type ProductSegmentDirectory,
+  type ProductSegmentEntry,
+  type ProductSetFilter,
+  type ProductSetResolver,
+} from '../hooks';
 import {
   type ProductImageUrls,
+  type ProductIndexRow,
   type ProductListItem,
   type ProductQuery,
   ProductsService,
@@ -30,6 +38,7 @@ export interface ProductListQuery extends ProductQuery, ProductSetFilter {
 @Injectable()
 export class ProductQueryService implements OnModuleInit {
   private resolver: ProductSetResolver | null = null;
+  private directory: ProductSegmentDirectory | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -45,6 +54,26 @@ export class ProductQueryService implements OnModuleInit {
     } catch {
       this.resolver = null;
     }
+    try {
+      this.directory = this.moduleRef.get<ProductSegmentDirectory>(PRODUCT_SEGMENT_DIRECTORY, {
+        strict: false,
+      });
+    } catch {
+      this.directory = null;
+    }
+  }
+
+  /**
+   * Live product segments by id, or those «Bto300» shows on its home in their order (ADR-0093),
+   * from the directory the segments module binds; 503 when none is bound.
+   */
+  productSegments(
+    query: { shownInApp: true } | { ids: readonly number[] },
+  ): Promise<ProductSegmentEntry[]> {
+    if (!this.directory) {
+      throw new AppError('SERVICE_UNAVAILABLE', 'product segments are not available');
+    }
+    return this.directory.productSegments(query);
   }
 
   /**
@@ -92,6 +121,14 @@ export class ProductQueryService implements OnModuleInit {
     const ids = await this.products.orderedIds(query, within, cap + 1, executor);
     if (ids.length <= cap) return { ids, total: ids.length };
     return { ids: ids.slice(0, cap), total: await this.products.countItems(query, within) };
+  }
+
+  /**
+   * Every product the filters keep in the list's order with its category and the moment it became
+   * sale-ready, at most `cap`: «Bto300»'s shop index, read once per request (ADR-0093).
+   */
+  async index(query: ProductListQuery, cap: number): Promise<ProductIndexRow[]> {
+    return this.products.indexRows(query, await this.within(query), cap);
   }
 
   /**

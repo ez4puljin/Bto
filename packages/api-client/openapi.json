@@ -2176,6 +2176,98 @@
         ]
       }
     },
+    "/api/v1/categories/{id}/image": {
+      "put": {
+        "operationId": "Categories_setImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryImageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A top category's picture in «Bto300» (ADR-0092 #6), replacing an earlier one.",
+        "tags": [
+          "catalog"
+        ]
+      },
+      "delete": {
+        "operationId": "Categories_removeImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/categories/{id}": {
       "patch": {
         "operationId": "Categories_update",
@@ -12788,6 +12880,117 @@
         ]
       }
     },
+    "/api/v1/segments/{id}/app": {
+      "put": {
+        "operationId": "Segments_setShownInApp",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentAppRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Апп-д харуулах» (ADR-0092 #2): a product segment shown on «Bto300»'s home, or not.",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/api/v1/segments/{id}/app/move": {
+      "post": {
+        "operationId": "Segments_moveInApp",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentAppMoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "segments"
+        ]
+      }
+    },
     "/api/v1/exports/products": {
       "post": {
         "operationId": "Exports_products",
@@ -19854,7 +20057,34 @@
             "name": "favourites",
             "required": false,
             "in": "query",
-            "description": "«★ Дуртай»: only the store’s favourites",
+            "description": "«♡ Дуртай»: only the store’s favourites",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "deals",
+            "required": false,
+            "in": "query",
+            "description": "«Хямдралтай»: products of a promotion or a discount",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "new",
+            "required": false,
+            "in": "query",
+            "description": "«Шинэ»: sale-ready within the last 14 days",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "«Зөвхөн байгаа бараа»",
             "schema": {
               "type": "boolean"
             }
@@ -20945,6 +21175,194 @@
         ]
       }
     },
+    "/api/v1/customer-app/home": {
+      "get": {
+        "operationId": "CustomerAppHome_homePage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAppHome"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "«Нүүр»: running banners, the category grid and the sections in their fixed order.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/sections/{key}/products": {
+      "get": {
+        "operationId": "CustomerAppHome_section",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "DEFAULT when left out",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEFAULT",
+                "DEAL",
+                "NEW",
+                "PRICE_ASC",
+                "PRICE_DESC"
+              ]
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Each with its subcategories (repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "«Зөвхөн байгаа бараа»",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAppSectionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "A section's full list (`recent`, `promotions`, `segment-<id>`, …), with sorts and filters.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
+    "/api/v1/customer-app/categories/{id}/page": {
+      "get": {
+        "operationId": "CustomerAppHome_categoryPage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAppCategoryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "customer": []
+          }
+        ],
+        "summary": "A category's page: its banners, subcategories, new products and deals of its subtree.",
+        "tags": [
+          "customer-app"
+        ]
+      }
+    },
     "/api/v1/customer/contacts": {
       "get": {
         "operationId": "CustomerSettings_list",
@@ -21064,6 +21482,201 @@
           }
         ],
         "summary": "The home's warning when stores use the app but no stage takes its orders.",
+        "tags": [
+          "customer"
+        ]
+      }
+    },
+    "/api/v1/customer/banners": {
+      "get": {
+        "operationId": "CustomerBanners_list",
+        "parameters": [
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "The archived banners instead of the live ones",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BannerList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "customer"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerBanners_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BannerCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Banner"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "customer"
+        ]
+      }
+    },
+    "/api/v1/customer/banners/{id}/move": {
+      "post": {
+        "operationId": "CustomerBanners_move",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BannerMoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Banner"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One place up or down among the live banners.",
+        "tags": [
+          "customer"
+        ]
+      }
+    },
+    "/api/v1/customer/banners/{id}/archive": {
+      "post": {
+        "operationId": "CustomerBanners_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The app stops showing it at once.",
         "tags": [
           "customer"
         ]
@@ -21368,7 +21981,8 @@
           "pos.manage",
           "pos.till.operate",
           "pos.till.supervise",
-          "notifications.send"
+          "notifications.send",
+          "customer_app.home.manage"
         ]
       },
       "RoleRef": {
@@ -22722,6 +23336,8 @@
               "catalog.product_image",
               "catalog.product_thumb",
               "notifications.notice_image",
+              "catalog.category_image",
+              "customer.banner_image",
               "imports.source"
             ],
             "type": "string"
@@ -22907,6 +23523,11 @@
           },
           "childCount": {
             "type": "number"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "A top category’s picture in «Bto300» (ADR-0092 #6)"
           }
         },
         "required": [
@@ -22917,7 +23538,8 @@
           "skuFrom",
           "skuTo",
           "productCount",
-          "childCount"
+          "childCount",
+          "imageUrl"
         ]
       },
       "CategoryList": {
@@ -22971,6 +23593,19 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "CategoryImageRequest": {
+        "type": "object",
+        "properties": {
+          "imageFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded file of kind catalog.category_image"
+          }
+        },
+        "required": [
+          "imageFileId"
         ]
       },
       "CategoryUpdateRequest": {
@@ -31751,6 +32386,16 @@
               }
             ]
           },
+          "appRank": {
+            "type": "number",
+            "nullable": true,
+            "description": "Its place among the sections «Bto300» shows (1 first); null when not shown"
+          },
+          "appShownCount": {
+            "type": "number",
+            "nullable": true,
+            "description": "How many segments «Bto300» shows; null when this one is not shown"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -31767,6 +32412,8 @@
           "name",
           "description",
           "definition",
+          "appRank",
+          "appShownCount",
           "createdAt",
           "updatedAt"
         ]
@@ -31961,6 +32608,34 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "SegmentAppRequest": {
+        "type": "object",
+        "properties": {
+          "shown": {
+            "type": "boolean",
+            "description": "«Апп-д харуулах»: shown on «Bto300»'s home (ADR-0092 #2)"
+          }
+        },
+        "required": [
+          "shown"
+        ]
+      },
+      "SegmentAppMoveRequest": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "enum": [
+              "UP",
+              "DOWN"
+            ],
+            "type": "string",
+            "description": "One place up or down among the shown segments"
+          }
+        },
+        "required": [
+          "direction"
         ]
       },
       "ProductExportRequest": {
@@ -41141,6 +41816,107 @@
         ],
         "description": "«Байгаа», «Цөөхөн үлдсэн», «Дууссан»; never the number (ADR-0079 #4)"
       },
+      "CustomerAppDealThreshold": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "A quantity in `unitName`"
+          },
+          "unitName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The unit the quantity is in"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "An amount in MNT (the order’s or a category’s)"
+          }
+        },
+        "required": [
+          "qty",
+          "unitName",
+          "amount"
+        ]
+      },
+      "CustomerAppDeal": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "DISCOUNT"
+            ],
+            "type": "string",
+            "description": "PROMOTION: with an end date (orange); DISCOUNT (red)"
+          },
+          "label": {
+            "type": "string",
+            "description": "The badge: «10+ ш −5%», «−200₮», «−10% · 10/31»"
+          },
+          "programId": {
+            "type": "number"
+          },
+          "programName": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "ORDER"
+            ],
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "The first step: a percentage, tugriks off, or a new unit price"
+          },
+          "threshold": {
+            "nullable": true,
+            "description": "The first step’s condition; null when it always applies",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAppDealThreshold"
+              }
+            ]
+          },
+          "perUnitName": {
+            "type": "string",
+            "nullable": true,
+            "description": "A pack unit the price or amount is for"
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "A promotion’s last day"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "programId",
+          "programName",
+          "scope",
+          "effect",
+          "value",
+          "threshold",
+          "perUnitName",
+          "lastDay"
+        ]
+      },
       "CustomerAppUnit": {
         "type": "object",
         "properties": {
@@ -41244,6 +42020,21 @@
             "nullable": true,
             "description": "One base unit in whole packs"
           },
+          "dealPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "One base unit in whole packs after an unconditional discount; the card strikes basePrice through (ADR-0093)"
+          },
+          "deal": {
+            "nullable": true,
+            "description": "The badge of its discount program (ADR-0092 #3)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAppDeal"
+              }
+            ]
+          },
           "units": {
             "type": "array",
             "items": {
@@ -41262,6 +42053,8 @@
           "stock",
           "favourite",
           "basePrice",
+          "dealPrice",
+          "deal",
           "units"
         ]
       },
@@ -41381,6 +42174,73 @@
           "mayBackorder"
         ]
       },
+      "CustomerAppOrderDealStep": {
+        "type": "object",
+        "properties": {
+          "threshold": {
+            "type": "string",
+            "description": "The order amount the step starts at, MNT"
+          },
+          "value": {
+            "type": "string",
+            "description": "A percentage or tugriks off"
+          },
+          "missing": {
+            "type": "string",
+            "nullable": true,
+            "description": "The next step only: how much the order still needs"
+          }
+        },
+        "required": [
+          "threshold",
+          "value",
+          "missing"
+        ]
+      },
+      "CustomerAppOrderDeal": {
+        "type": "object",
+        "properties": {
+          "programId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "reached": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAppOrderDealStep"
+              }
+            ]
+          },
+          "next": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAppOrderDealStep"
+              }
+            ]
+          }
+        },
+        "required": [
+          "programId",
+          "name",
+          "effect",
+          "reached",
+          "next"
+        ]
+      },
       "CustomerAppQuote": {
         "type": "object",
         "properties": {
@@ -41398,11 +42258,19 @@
             "items": {
               "$ref": "#/components/schemas/CustomerAppQuoteStock"
             }
+          },
+          "orderDeals": {
+            "description": "Order amount programs in force: the cart’s hint «500,000₮ хүрвэл 3%» (ADR-0092 #3)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppOrderDeal"
+            }
           }
         },
         "required": [
           "quote",
-          "stock"
+          "stock",
+          "orderDeals"
         ]
       },
       "CustomerAppOrderLineRequest": {
@@ -42720,6 +43588,302 @@
           "unread"
         ]
       },
+      "CustomerAppBannerLink": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "SEGMENT",
+              "CATEGORY",
+              "PRODUCT"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "description": "A segment (its section `segment-<id>`), a category or a product"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ]
+      },
+      "CustomerAppBanner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string",
+            "description": "Its alt text"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "2:1 picture"
+          },
+          "link": {
+            "nullable": true,
+            "description": "What a tap opens; null without a link or when the target is gone",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAppBannerLink"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "imageUrl",
+          "link"
+        ]
+      },
+      "CustomerAppHomeCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Its picture, else a product’s"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "Products «Бараа» sells in it, subcategories included"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "imageUrl",
+          "productCount"
+        ]
+      },
+      "CustomerAppHomeSectionRow": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "`recent`, `promotions`, `segment-<id>`, … — its full list’s key"
+          },
+          "kind": {
+            "enum": [
+              "RECENT",
+              "PROMOTIONS",
+              "SEGMENT",
+              "DISCOUNTS",
+              "NEW",
+              "FAVOURITES",
+              "DEALS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "A segment’s name"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "description": "A segment’s description"
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "«Урамшуулал»: the earliest last day of its promotions"
+          },
+          "total": {
+            "type": "number",
+            "description": "How many products the full list holds"
+          },
+          "products": {
+            "description": "At most 10, «Дууссан» last",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppProduct"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "subtitle",
+          "lastDay",
+          "total",
+          "products"
+        ]
+      },
+      "CustomerAppHome": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "banners": {
+            "description": "Running, in their order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppBanner"
+            }
+          },
+          "categories": {
+            "description": "«Ангиллын жагсаалт»: top categories with products, by name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeCategory"
+            }
+          },
+          "sections": {
+            "description": "In the fixed order of ADR-0092 #1; an empty one is left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeSectionRow"
+            }
+          }
+        },
+        "required": [
+          "today",
+          "banners",
+          "categories",
+          "sections"
+        ]
+      },
+      "CustomerAppSectionPage": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RECENT",
+              "PROMOTIONS",
+              "SEGMENT",
+              "DISCOUNTS",
+              "NEW",
+              "FAVOURITES",
+              "DEALS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "On the first page"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "subtitle",
+          "lastDay",
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "CustomerAppCategoryHeader": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "parentId",
+          "name",
+          "imageUrl"
+        ]
+      },
+      "CustomerAppCategoryPage": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CustomerAppCategoryHeader"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "«… бүх бараа · N»: products «Бараа» sells in its subtree"
+          },
+          "banners": {
+            "description": "Running banners linked to it",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppBanner"
+            }
+          },
+          "subcategories": {
+            "description": "Its subcategories with products",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeCategory"
+            }
+          },
+          "sections": {
+            "description": "«Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeSectionRow"
+            }
+          }
+        },
+        "required": [
+          "category",
+          "productCount",
+          "banners",
+          "subcategories",
+          "sections"
+        ]
+      },
       "CompanyContactRequest": {
         "type": "object",
         "properties": {
@@ -42779,6 +43943,163 @@
         "required": [
           "activeAccounts",
           "ordersOpen"
+        ]
+      },
+      "Banner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "linkKind": {
+            "enum": [
+              "NONE",
+              "SEGMENT",
+              "CATEGORY",
+              "PRODUCT"
+            ],
+            "type": "string"
+          },
+          "linkId": {
+            "type": "number",
+            "nullable": true
+          },
+          "linkName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The target’s name"
+          },
+          "linkBroken": {
+            "type": "boolean",
+            "description": "The target is gone: the app shows the banner without its link"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Exclusive"
+          },
+          "position": {
+            "type": "number"
+          },
+          "state": {
+            "enum": [
+              "SCHEDULED",
+              "RUNNING",
+              "ENDED",
+              "ARCHIVED"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "imageUrl",
+          "linkKind",
+          "linkId",
+          "linkName",
+          "linkBroken",
+          "validFrom",
+          "validTo",
+          "position",
+          "state",
+          "createdAt"
+        ]
+      },
+      "BannerList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Banner"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null: every banner"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "BannerCreateRequest": {
+        "type": "object",
+        "properties": {
+          "imageFileId": {
+            "type": "number",
+            "minimum": 1,
+            "description": "An uploaded file of kind customer.banner_image"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "linkKind": {
+            "enum": [
+              "NONE",
+              "SEGMENT",
+              "CATEGORY",
+              "PRODUCT"
+            ],
+            "type": "string"
+          },
+          "linkId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "Today or later"
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Exclusive: the day after the last one"
+          }
+        },
+        "required": [
+          "imageFileId",
+          "title",
+          "linkKind",
+          "validFrom"
+        ]
+      },
+      "BannerMoveRequest": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "enum": [
+              "UP",
+              "DOWN"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "direction"
         ]
       },
       "ErrorCode": {

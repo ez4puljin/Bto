@@ -221,7 +221,29 @@ export class CustomerAppShopController {
     const quoted = await this.shop.quote(
       body.lines.map((line) => ({ productUnitId: line.productUnitId, qty: new Decimal(line.qty) })),
     );
-    return { quote: toQuoteDto(quoted.quote), stock: quoted.stock };
+    return {
+      quote: toQuoteDto(quoted.quote),
+      stock: quoted.stock,
+      orderDeals: quoted.orderDeals.map((deal) => ({
+        programId: deal.programId,
+        name: deal.name,
+        effect: deal.effect,
+        reached: deal.reached
+          ? {
+              threshold: deal.reached.threshold.toFixed(0),
+              value: deal.reached.value.toString(),
+              missing: null,
+            }
+          : null,
+        next: deal.next
+          ? {
+              threshold: deal.next.threshold.toFixed(0),
+              value: deal.next.value.toString(),
+              missing: deal.next.missing.toFixed(0),
+            }
+          : null,
+      })),
+    };
   }
 }
 

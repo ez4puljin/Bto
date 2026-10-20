@@ -8,11 +8,13 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, Authenticated, CurrentUser, RequirePermission } from '../../identity';
 import {
   CategoryDto,
+  CategoryImageDto,
   CategoryListDto,
   CreateCategoryDto,
   CreateUomDto,
@@ -26,6 +28,8 @@ import { UomsService } from '../services/uoms.service';
 import { toCategoryDto, toUomDto } from './mappers';
 
 const MANAGE = 'catalog.products.manage';
+/** The customer app's home (ADR-0092 #9): banners, shown segments and category pictures. */
+const HOME = 'customer_app.home.manage';
 
 @ApiTags('catalog')
 @Controller('uoms')
@@ -89,7 +93,31 @@ export class CategoriesController {
     @Body() body: CreateCategoryDto,
   ): Promise<CategoryDto> {
     const row = await this.categories.create(ctx, body);
-    return toCategoryDto({ ...row, productCount: 0, childCount: 0 });
+    return toCategoryDto({ ...row, productCount: 0, childCount: 0, imageUrl: null });
+  }
+
+  /** A top category's picture in «Bto300» (ADR-0092 #6), replacing an earlier one. */
+  @Put(':id/image')
+  @RequirePermission(HOME)
+  @ApiOkResponse({ type: CategoryDto })
+  async setImage(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CategoryImageDto,
+  ): Promise<CategoryDto> {
+    await this.categories.setImage(ctx, id, body.imageFileId);
+    return this.view(id);
+  }
+
+  @Delete(':id/image')
+  @HttpCode(204)
+  @RequirePermission(HOME)
+  @ApiNoContentResponse()
+  async removeImage(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    await this.categories.removeImage(ctx, id);
   }
 
   @Patch(':id')
@@ -101,9 +129,7 @@ export class CategoriesController {
     @Body() body: UpdateCategoryDto,
   ): Promise<CategoryDto> {
     await this.categories.update(ctx, id, body);
-    const view = (await this.categories.list()).find((row) => row.id === id);
-    if (!view) throw new Error(`category ${id} vanished`);
-    return toCategoryDto(view);
+    return this.view(id);
   }
 
   @Delete(':id')
@@ -115,5 +141,11 @@ export class CategoriesController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     await this.categories.remove(ctx, id);
+  }
+
+  private async view(id: number): Promise<CategoryDto> {
+    const view = (await this.categories.list()).find((row) => row.id === id);
+    if (!view) throw new Error(`category ${id} vanished`);
+    return toCategoryDto(view);
   }
 }

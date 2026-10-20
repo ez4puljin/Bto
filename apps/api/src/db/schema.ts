@@ -116,7 +116,7 @@ export {
   customerNotifications,
   userNotifications,
 } from '../modules/notifications/schema';
-export { companyContacts, customerFavourites } from '../modules/customer/schema';
+export { appBanners, companyContacts, customerFavourites } from '../modules/customer/schema';
 export {
   finAccounts,
   finAllocations,

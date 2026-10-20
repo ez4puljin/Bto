@@ -16,6 +16,13 @@ export {
   PriceProfilesService,
 } from './services/price-profiles.service';
 export {
+  type DealBook,
+  type OrderDealProgram,
+  type ProductDeal,
+  ProductDealsService,
+} from './services/product-deals.service';
+export {
+  type PackPrice,
   PriceQuoteService,
   type Quote,
   type QuotedLine,

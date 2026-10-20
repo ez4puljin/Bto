@@ -29,3 +29,25 @@ export interface ProductSetResolver {
 }
 
 export const PRODUCT_SET_RESOLVER = Symbol('PRODUCT_SET_RESOLVER');
+
+/** A live product segment as the customer app names it (ADR-0092 #2). */
+export interface ProductSegmentEntry {
+  id: number;
+  name: string;
+  description: string | null;
+  /** Its place among «Bto300»'s home sections; null when the app does not show it. */
+  appPosition: number | null;
+}
+
+/**
+ * The live product segments by id, or those «Bto300» shows on its home in their order (ADR-0092
+ * #2, ADR-0093). Bound by the segments module like PRODUCT_SET_RESOLVER: the customer module reads
+ * segments through catalog and never imports them (ADR-0049 #4).
+ */
+export interface ProductSegmentDirectory {
+  productSegments(
+    query: { shownInApp: true } | { ids: readonly number[] },
+  ): Promise<ProductSegmentEntry[]>;
+}
+
+export const PRODUCT_SEGMENT_DIRECTORY = Symbol('PRODUCT_SEGMENT_DIRECTORY');

@@ -12,12 +12,14 @@ import {
   NOTICE_LIMITS,
   type NoticeKind,
 } from '@tugeel/shared/notifications';
-import { MAX_QUOTE_LINES } from '@tugeel/shared/pricing';
+import { DISCOUNT_EFFECTS, MAX_QUOTE_LINES } from '@tugeel/shared/pricing';
 import {
   CUSTOMER_ORDER_STATES,
   type CustomerOrderState,
   FULFILMENTS,
   type Fulfilment,
+  HOME_SECTION_KINDS,
+  type HomeSectionKind,
   ORDER_CHANNELS,
   ORDER_LIMITS,
   ORDER_STATUSES,
@@ -48,6 +50,12 @@ import {
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { QuoteDto, QuoteLineRequestDto } from '../../pricing';
 import { CONTACT_LIMITS } from '../schema';
+import {
+  CustomerAppBannerDto,
+  CustomerAppDealDto,
+  CustomerAppHomeCategoryDto,
+  CustomerAppHomeSectionDto,
+} from './customer-home.dto';
 
 // The customer app «Bto300» (ADR-0079): only what the store's own screens show. Money goes out as
 // strings (whole MNT for prices and orders, two decimals for finance), quantities as entered.
@@ -144,7 +152,85 @@ export class CustomerAppProductDto {
   @ApiProperty({ description: 'The store starred it' }) favourite: boolean;
   @ApiProperty({ type: String, nullable: true, description: 'One base unit in whole packs' })
   basePrice: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'One base unit in whole packs after an unconditional discount; the card strikes basePrice through (ADR-0093)',
+  })
+  dealPrice: string | null;
+  @ApiProperty({
+    type: CustomerAppDealDto,
+    nullable: true,
+    description: 'The badge of its discount program (ADR-0092 #3)',
+  })
+  deal: CustomerAppDealDto | null;
   @ApiProperty({ type: [CustomerAppUnitDto] }) units: CustomerAppUnitDto[];
+}
+
+// ------------------------------------------------------------------- the home (ADR-0092, ADR-0093)
+
+@ApiSchema({ name: 'CustomerAppHomeSectionRow' })
+export class CustomerAppHomeSectionRowDto extends CustomerAppHomeSectionDto {
+  @ApiProperty({ type: [CustomerAppProductDto], description: 'At most 10, «Дууссан» last' })
+  products: CustomerAppProductDto[];
+}
+
+@ApiSchema({ name: 'CustomerAppHome' })
+export class CustomerAppHomeDto {
+  @ApiProperty({ format: 'date' }) today: string;
+  @ApiProperty({ type: [CustomerAppBannerDto], description: 'Running, in their order' })
+  banners: CustomerAppBannerDto[];
+  @ApiProperty({
+    type: [CustomerAppHomeCategoryDto],
+    description: '«Ангиллын жагсаалт»: top categories with products, by name',
+  })
+  categories: CustomerAppHomeCategoryDto[];
+  @ApiProperty({
+    type: [CustomerAppHomeSectionRowDto],
+    description: 'In the fixed order of ADR-0092 #1; an empty one is left out',
+  })
+  sections: CustomerAppHomeSectionRowDto[];
+}
+
+@ApiSchema({ name: 'CustomerAppSectionPage' })
+export class CustomerAppSectionPageDto {
+  @ApiProperty() key: string;
+  @ApiProperty({ enum: HOME_SECTION_KINDS }) kind: HomeSectionKind;
+  @ApiProperty({ type: String, nullable: true }) title: string | null;
+  @ApiProperty({ type: String, nullable: true }) subtitle: string | null;
+  @ApiProperty({ type: String, format: 'date', nullable: true }) lastDay: string | null;
+  @ApiProperty({ type: [CustomerAppProductDto] }) data: CustomerAppProductDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'On the first page' })
+  total: number | null;
+}
+
+@ApiSchema({ name: 'CustomerAppCategoryHeader' })
+export class CustomerAppCategoryHeaderDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ type: Number, nullable: true }) parentId: number | null;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) imageUrl: string | null;
+}
+
+@ApiSchema({ name: 'CustomerAppCategoryPage' })
+export class CustomerAppCategoryPageDto {
+  @ApiProperty({ type: CustomerAppCategoryHeaderDto }) category: CustomerAppCategoryHeaderDto;
+  @ApiProperty({ description: '«… бүх бараа · N»: products «Бараа» sells in its subtree' })
+  productCount: number;
+  @ApiProperty({ type: [CustomerAppBannerDto], description: 'Running banners linked to it' })
+  banners: CustomerAppBannerDto[];
+  @ApiProperty({
+    type: [CustomerAppHomeCategoryDto],
+    description: 'Its subcategories with products',
+  })
+  subcategories: CustomerAppHomeCategoryDto[];
+  @ApiProperty({
+    type: [CustomerAppHomeSectionRowDto],
+    description: '«Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree',
+  })
+  sections: CustomerAppHomeSectionRowDto[];
 }
 
 @ApiSchema({ name: 'CustomerAppProductPage' })
@@ -180,11 +266,29 @@ export class CustomerAppProductQueryDto extends PageQueryDto {
   @Min(1, { each: true })
   categoryIds?: number[];
 
-  @ApiPropertyOptional({ description: '«★ Дуртай»: only the store’s favourites' })
+  @ApiPropertyOptional({ description: '«♡ Дуртай»: only the store’s favourites' })
   @IsOptional()
   @Transform(queryBoolean)
   @IsBoolean()
   favourites?: boolean;
+
+  @ApiPropertyOptional({ description: '«Хямдралтай»: products of a promotion or a discount' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  deals?: boolean;
+
+  @ApiPropertyOptional({ description: '«Шинэ»: sale-ready within the last 14 days' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  new?: boolean;
+
+  @ApiPropertyOptional({ description: '«Зөвхөн байгаа бараа»' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  inStock?: boolean;
 
   @ApiPropertyOptional({ enum: REP_PRODUCT_SORTS, description: 'NEW when left out' })
   @IsOptional()
@@ -236,12 +340,41 @@ export class CustomerAppQuoteStockDto {
   mayBackorder: boolean;
 }
 
+@ApiSchema({ name: 'CustomerAppOrderDealStep' })
+export class CustomerAppOrderDealStepDto {
+  @ApiProperty({ description: 'The order amount the step starts at, MNT' }) threshold: string;
+  @ApiProperty({ description: 'A percentage or tugriks off' }) value: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The next step only: how much the order still needs',
+  })
+  missing: string | null;
+}
+
+@ApiSchema({ name: 'CustomerAppOrderDeal' })
+export class CustomerAppOrderDealDto {
+  @ApiProperty() programId: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: DISCOUNT_EFFECTS }) effect: (typeof DISCOUNT_EFFECTS)[number];
+  @ApiProperty({ type: CustomerAppOrderDealStepDto, nullable: true })
+  reached: CustomerAppOrderDealStepDto | null;
+  @ApiProperty({ type: CustomerAppOrderDealStepDto, nullable: true })
+  next: CustomerAppOrderDealStepDto | null;
+}
+
 @ApiSchema({ name: 'CustomerAppQuote' })
 export class CustomerAppQuoteDto {
   @ApiProperty({ type: QuoteDto, description: 'The WHOLESALE list today; the app never prices' })
   quote: QuoteDto;
   @ApiProperty({ type: [CustomerAppQuoteStockDto], description: 'By line, as asked' })
   stock: CustomerAppQuoteStockDto[];
+  @ApiProperty({
+    type: [CustomerAppOrderDealDto],
+    description:
+      'Order amount programs in force: the cart’s hint «500,000₮ хүрвэл 3%» (ADR-0092 #3)',
+  })
+  orderDeals: CustomerAppOrderDealDto[];
 }
 
 // --------------------------------------------------------------------------------- the checkout
