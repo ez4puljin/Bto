@@ -24,6 +24,11 @@ export const CHART_ROLES = [
   'CARD_CLEARING',
   'POS_SALES',
   'CASH_VARIANCE',
+  // Payables (F3, ADR-0091): what the company owes its suppliers, the VAT inside its purchases,
+  // and the stock a supplier's bill pays for. The codes are temporary until Erkhet's chart (D16).
+  'AP',
+  'VAT_INPUT',
+  'INVENTORY',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -54,4 +59,8 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   { code: '120301', kind: 'ASSET', role: 'CARD_CLEARING' },
   { code: '510102', kind: 'INCOME', role: 'POS_SALES' },
   { code: '740101', kind: 'EXPENSE', role: 'CASH_VARIANCE' },
+  // Payables (F3, ADR-0091; temporary codes, TODO-VERIFY D16).
+  { code: '130301', kind: 'ASSET', role: 'VAT_INPUT' },
+  { code: '140101', kind: 'ASSET', role: 'INVENTORY' },
+  { code: '310101', kind: 'LIABILITY', role: 'AP' },
 ];

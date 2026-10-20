@@ -1,4 +1,4 @@
-import { allocateFifo } from '@tugeel/shared/finance';
+import { allocateFifo, type ArEntryKind, type PayableEntryKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
@@ -27,32 +27,48 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { type OpenItem, useFinanceMutations, useOpenItems } from './api';
+import { useFinanceMutations, useOpenItems, useSupplierOpenItems } from './api';
+
+/** Whose open items the dialog pairs: a customer's receivables or a supplier's payables (F3). */
+export type AllocationParty = { kind: 'customer' | 'supplier'; id: number };
+
+/** What the dialog needs of an open item, receivable or payable. */
+interface Item {
+  id: number;
+  side: 'DEBIT' | 'CREDIT';
+  kind: ArEntryKind | PayableEntryKind;
+  number: string;
+  itemDate: string;
+  dueDate: string | null;
+  openAmount: string;
+}
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
-const isOpen = (item: OpenItem) => new Decimal(item.openAmount).gt(0);
+const isOpen = (item: Item) => new Decimal(item.openAmount).gt(0);
 /** The date an item falls due: its due date, else the day it was booked. */
-const dueOf = (item: OpenItem) => item.dueDate ?? item.itemDate;
+const dueOf = (item: Item) => item.dueDate ?? item.itemDate;
 
 /**
  * «Тулгалт хийх» (ADR-0090): the accountant pairs one open credit of a customer (a payment's or a
- * credit note's remainder) with open debits (invoices, refunds) by hand. «Хуучнаас нь» fills the
- * amounts oldest due first up to the credit's open amount; nothing is sent before «Тулгах».
+ * credit note's remainder) with open debits (invoices, refunds) by hand. For a supplier (F3,
+ * ADR-0091) the sides turn: one open debit (a payment or a return booked on the payables) with
+ * open bills. «Хуучнаас нь» fills the amounts oldest due first up to the chosen item's open amount;
+ * nothing is sent before «Тулгах».
  */
 export function AllocationDialog({
   open,
-  customerId,
+  party,
   onClose,
 }: {
   open: boolean;
-  customerId: number;
+  party: AllocationParty;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
       {open ? (
-        <AllocationForm customerId={customerId} onClose={onClose} />
+        <AllocationForm party={party} onClose={onClose} />
       ) : (
         <DialogContent closeLabel={t('common.close')} />
       )}
@@ -60,9 +76,35 @@ export function AllocationDialog({
   );
 }
 
-function AllocationForm({ customerId, onClose }: { customerId: number; onClose: () => void }) {
+function AllocationForm({ party, onClose }: { party: AllocationParty; onClose: () => void }) {
   const { t } = useTranslation();
-  const items = useOpenItems(customerId);
+  const supplier = party.kind === 'supplier';
+  const receivables = useOpenItems(party.id, !supplier);
+  const payables = useSupplierOpenItems(party.id, supplier);
+  const items = supplier ? payables : receivables;
+  // A customer's credit pays its debits; a supplier's debit (a payment) pays its bills (credits).
+  const sourceSide = supplier ? 'DEBIT' : 'CREDIT';
+  const kindLabel = (kind: Item['kind']) =>
+    supplier
+      ? t(`finance.apKinds.${kind as PayableEntryKind}`)
+      : t(`finance.arKinds.${kind as ArEntryKind}`);
+  const texts = supplier
+    ? {
+        intro: t('finance.payables.allocation.intro'),
+        credits: t('finance.payables.allocation.credits'),
+        noCredits: t('finance.payables.allocation.noCredits'),
+        debits: t('finance.payables.allocation.debits'),
+        noDebits: t('finance.payables.allocation.noDebits'),
+        chooseCredit: t('finance.payables.allocation.chooseCredit'),
+      }
+    : {
+        intro: t('finance.allocations.intro'),
+        credits: t('finance.allocations.credits'),
+        noCredits: t('finance.allocations.noCredits'),
+        debits: t('finance.allocations.debits'),
+        noDebits: t('finance.allocations.noDebits'),
+        chooseCredit: t('finance.allocations.chooseCredit'),
+      };
   const mutations = useFinanceMutations();
   const action = useAction();
   const [key] = useState(randomUuid);
@@ -72,16 +114,17 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
   const [description, setDescription] = useState('');
   const [checked, setChecked] = useState(false);
 
+  const all: Item[] = useMemo(() => items.data ?? [], [items.data]);
   const credits = useMemo(
-    () => (items.data ?? []).filter((item) => item.side === 'CREDIT' && isOpen(item)),
-    [items.data],
+    () => all.filter((item) => item.side === sourceSide && isOpen(item)),
+    [all, sourceSide],
   );
   const debits = useMemo(
     () =>
-      (items.data ?? [])
-        .filter((item) => item.side === 'DEBIT' && isOpen(item))
+      all
+        .filter((item) => item.side !== sourceSide && isOpen(item))
         .sort((a, b) => dueOf(a).localeCompare(dueOf(b)) || a.id - b.id),
-    [items.data],
+    [all, sourceSide],
   );
   // A lone credit is chosen already.
   useEffect(() => {
@@ -130,12 +173,12 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
       const allocation = await mutations.allocate.mutateAsync({
         key,
         body: {
-          customerId,
+          ...(supplier ? { supplierId: party.id } : { customerId: party.id }),
           date,
           description: description.trim() || null,
           pairs: pairs.map((pair) => ({
-            debitItemId: pair.item.id,
-            creditItemId: credit.id,
+            debitItemId: supplier ? credit.id : pair.item.id,
+            creditItemId: supplier ? pair.item.id : credit.id,
             amount: pair.amount.toFixed(),
           })),
         },
@@ -146,7 +189,7 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
   };
 
   const messages = [
-    ...(checked && credit === null ? [t('finance.allocations.chooseCredit')] : []),
+    ...(checked && credit === null ? [texts.chooseCredit] : []),
     ...(checked && credit !== null && pairs.length === 0 && invalid.length === 0
       ? [t('finance.allocations.nothing')]
       : []),
@@ -163,16 +206,16 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
     <DialogContent closeLabel={t('common.close')} size="lg">
       <DialogHeader>
         <DialogTitle>{t('finance.allocations.title')}</DialogTitle>
-        <DialogDescription>{t('finance.allocations.intro')}</DialogDescription>
+        <DialogDescription>{texts.intro}</DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <ProblemAlert problem={problemFromError(items.error)} />
         <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
-          <legend className="px-1 text-sm font-semibold">{t('finance.allocations.credits')}</legend>
+          <legend className="px-1 text-sm font-semibold">{texts.credits}</legend>
           {items.isPending ? (
             <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
           ) : credits.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('finance.allocations.noCredits')}</p>
+            <p className="text-sm text-muted-foreground">{texts.noCredits}</p>
           ) : (
             <div className="max-h-40 overflow-y-auto rounded-lg border border-border">
               <Table>
@@ -202,7 +245,7 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
                           {item.number}
                         </label>
                       </TableCell>
-                      <TableCell>{t(`finance.arKinds.${item.kind}`)}</TableCell>
+                      <TableCell>{kindLabel(item.kind)}</TableCell>
                       <TableCell className="font-mono">{item.itemDate}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatTugrik(item.openAmount)}
@@ -216,7 +259,7 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
         </fieldset>
         <section className="flex flex-col gap-2 rounded-lg border border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">{t('finance.allocations.debits')}</h3>
+            <h3 className="text-sm font-semibold">{texts.debits}</h3>
             <Button
               type="button"
               variant="outline"
@@ -228,7 +271,7 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
             </Button>
           </div>
           {items.isPending ? null : debits.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('finance.allocations.noDebits')}</p>
+            <p className="text-sm text-muted-foreground">{texts.noDebits}</p>
           ) : (
             // Many open invoices scroll inside the section; the footer stays in reach.
             <div className="max-h-60 overflow-y-auto rounded-lg border border-border">
@@ -251,9 +294,9 @@ function AllocationForm({ customerId, onClose }: { customerId: number; onClose: 
                       <TableRow key={item.id}>
                         <TableCell className="font-mono">
                           {item.number}
-                          {item.kind === 'INVOICE' ? null : (
+                          {item.kind === 'INVOICE' || item.kind === 'BILL' ? null : (
                             <span className="ml-2 font-sans text-xs text-muted-foreground">
-                              {t(`finance.arKinds.${item.kind}`)}
+                              {kindLabel(item.kind)}
                             </span>
                           )}
                         </TableCell>

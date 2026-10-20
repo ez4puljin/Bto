@@ -360,7 +360,7 @@ function EntryBody({ entry }: { entry: JournalEntryDetail }) {
                     {line.accountName}
                   </TableCell>
                   <TableCell>
-                    {[line.customerName, line.moneyAccountName, line.description]
+                    {[line.customerName, line.supplierName, line.moneyAccountName, line.description]
                       .filter(Boolean)
                       .join(' · ')}
                   </TableCell>

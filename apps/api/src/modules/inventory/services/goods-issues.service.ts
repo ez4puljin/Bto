@@ -4,7 +4,7 @@ import {
   MAX_ISSUE_LINES,
   SELLABLE_BIN_TYPES,
 } from '@tugeel/shared/inventory';
-import { Decimal } from '@tugeel/shared/money';
+import { Decimal, toMoney } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { and, desc, eq, ilike, inArray, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -24,11 +24,13 @@ import {
   UserNamesService,
 } from '../../identity';
 import { CustomersService, SuppliersService } from '../../partners';
+import type { SupplierReturnFacts } from '../hooks';
 import { bins, binStock, goodsIssueLines, goodsIssues, ISSUE_STATUSES } from '../schema';
 import { BinsService } from './bins.service';
 import { IssueExpenseTypesService } from './issue-expense-types.service';
 import { ProductLocationsService } from './product-locations.service';
 import { StockPostingService } from './stock-posting.service';
+import { PurchaseBooksService } from './purchase-books.service';
 import { optionalText } from './support';
 
 type IssueRow = typeof goodsIssues.$inferSelect;
@@ -162,6 +164,7 @@ export class GoodsIssuesService {
     private readonly suppliers: SuppliersService,
     private readonly units: UnitConversionService,
     private readonly users: UserNamesService,
+    private readonly purchases: PurchaseBooksService,
   ) {}
 
   async create(ctx: AuthContext, input: IssueInput): Promise<IssueDetail> {
@@ -329,8 +332,71 @@ export class GoodsIssuesService {
         before: header,
         after: { number: result.numbers.get(id), lines },
       });
+      if (header.recipientKind === 'SUPPLIER') {
+        // A supplier return lowers the supplier's payable (F3, ADR-0091; TODO-VERIFY D8).
+        await this.purchases.supplierReturnPostedInTx(
+          tx,
+          ctx,
+          await this.supplierReturnFacts(id, tx),
+        );
+      }
       return this.get(id, tx);
     });
+  }
+
+  /** The posted issues to suppliers, oldest first (the development re-post of their credits, F3). */
+  async postedSupplierReturnIds(): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: goodsIssues.id })
+      .from(goodsIssues)
+      .where(and(eq(goodsIssues.status, 'POSTED'), eq(goodsIssues.recipientKind, 'SUPPLIER')))
+      .orderBy(goodsIssues.id);
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * A posted issue to a supplier as the books see it (F3, ADR-0091): each line at the cost it left
+   * at (two decimals), plus the VAT the supplier's prices carry on the issue's date (the receipt's
+   * rule, ADR-0078 #1).
+   */
+  async supplierReturnFacts(id: number, executor: Db | Tx = this.db): Promise<SupplierReturnFacts> {
+    const [header] = await executor.select().from(goodsIssues).where(eq(goodsIssues.id, id));
+    if (!header) throw notFound('goods issue', id);
+    if (
+      header.status !== 'POSTED' ||
+      header.recipientKind !== 'SUPPLIER' ||
+      header.recipientSupplierId === null ||
+      header.number === null
+    ) {
+      throw new Error(`goods issue ${id} is not a posted supplier return`);
+    }
+    const lines = await this.linesOf(executor, id);
+    const rate = await this.purchases.supplierRate(
+      executor,
+      header.recipientSupplierId,
+      header.issuedOn,
+    );
+    const rates = await this.purchases.lineRates(executor, lines, rate);
+    let cost = new Decimal(0);
+    let vat = new Decimal(0);
+    let vatBase = new Decimal(0);
+    for (const line of lines) {
+      const amount = toMoney((line.unitCost ?? new Decimal(0)).times(line.qtyBase));
+      const lineRate = rates.get(line.id) ?? new Decimal(0);
+      cost = cost.plus(amount);
+      if (lineRate.isZero()) continue;
+      vat = vat.plus(toMoney(amount.times(lineRate).dividedBy(100)));
+      vatBase = vatBase.plus(amount);
+    }
+    return {
+      issueId: id,
+      number: header.number,
+      supplierId: header.recipientSupplierId,
+      date: header.issuedOn,
+      cost,
+      vat,
+      vatBase,
+    };
   }
 
   cancel(ctx: AuthContext, id: number): Promise<IssueDetail> {

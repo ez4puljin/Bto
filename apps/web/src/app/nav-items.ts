@@ -214,6 +214,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        to: '/finance/suppliers',
+        label: 'nav.supplierBalances',
+        icon: Truck,
+        permission: 'finance.read',
+      },
+      {
         to: '/finance/journal',
         label: 'nav.journal',
         icon: BookOpenText,

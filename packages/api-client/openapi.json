@@ -17390,6 +17390,246 @@
         ]
       }
     },
+    "/api/v1/supplier-balances": {
+      "get": {
+        "operationId": "SupplierBalances_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Part of a supplier's name or code",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierBalancesPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/supplier-balances/{supplierId}": {
+      "get": {
+        "operationId": "SupplierBalances_get",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierBalance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/supplier-balances/{supplierId}/ledger": {
+      "get": {
+        "operationId": "SupplierBalances_entries",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierLedgerPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/supplier-balances/{supplierId}/open-items": {
+      "get": {
+        "operationId": "SupplierBalances_openItems",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayableOpenItemList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/pos/settings": {
       "get": {
         "operationId": "PosSettings_get",
@@ -36181,7 +36421,10 @@
               "POS_CASH",
               "CARD_CLEARING",
               "POS_SALES",
-              "CASH_VARIANCE"
+              "CASH_VARIANCE",
+              "AP",
+              "VAT_INPUT",
+              "INVENTORY"
             ],
             "type": "string"
           },
@@ -36306,7 +36549,10 @@
               "POS_CASH",
               "CARD_CLEARING",
               "POS_SALES",
-              "CASH_VARIANCE"
+              "CASH_VARIANCE",
+              "AP",
+              "VAT_INPUT",
+              "INVENTORY"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -36922,6 +37168,14 @@
             "type": "string",
             "nullable": true
           },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "supplierName": {
+            "type": "string",
+            "nullable": true
+          },
           "moneyAccountId": {
             "type": "number",
             "nullable": true
@@ -36945,6 +37199,8 @@
           "credit",
           "customerId",
           "customerName",
+          "supplierId",
+          "supplierName",
           "moneyAccountId",
           "moneyAccountName",
           "description"
@@ -37079,6 +37335,12 @@
             "type": "number",
             "nullable": true,
             "minimum": 1
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The supplier of a line on the payables (F3)"
           },
           "moneyAccountId": {
             "type": "number",
@@ -37574,7 +37836,15 @@
         "properties": {
           "customerId": {
             "type": "number",
-            "minimum": 1
+            "nullable": true,
+            "minimum": 1,
+            "description": "A customer, or…"
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "…a supplier (F3)"
           },
           "date": {
             "type": "string",
@@ -37596,7 +37866,6 @@
           }
         },
         "required": [
-          "customerId",
           "pairs"
         ]
       },
@@ -37635,7 +37904,12 @@
             "example": "2026-11-03"
           },
           "customerId": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
           },
           "amount": {
             "type": "string",
@@ -37653,6 +37927,7 @@
           "number",
           "date",
           "customerId",
+          "supplierId",
           "amount",
           "pairs"
         ]
@@ -37671,6 +37946,247 @@
         "required": [
           "id",
           "number"
+        ]
+      },
+      "SupplierBalance": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "0012"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "balance": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "What the company owes; negative = paid ahead"
+          },
+          "oldestBillDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-20"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "supplierId",
+          "code",
+          "name",
+          "status",
+          "balance",
+          "oldestBillDate",
+          "updatedAt"
+        ]
+      },
+      "SupplierBalancesPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierBalance"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PayableEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "kind": {
+            "enum": [
+              "BILL",
+              "RECOST",
+              "RETURN",
+              "MANUAL",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "docType": {
+            "enum": [
+              "RECEIPT",
+              "ISSUE",
+              "JOURNAL"
+            ],
+            "type": "string",
+            "description": "Where the document opens"
+          },
+          "docId": {
+            "type": "number"
+          },
+          "docNumber": {
+            "type": "string",
+            "example": "GR-20261020-0001"
+          },
+          "debit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "balanceAfter": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "What is owed after this line"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "entryDate",
+          "kind",
+          "docType",
+          "docId",
+          "docNumber",
+          "debit",
+          "credit",
+          "balanceAfter",
+          "createdAt"
+        ]
+      },
+      "SupplierLedgerPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayableEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00",
+            "description": "What was owed before `from`"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "opening"
+        ]
+      },
+      "PayableOpenItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "side": {
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "BILL",
+              "RECOST",
+              "RETURN",
+              "MANUAL",
+              "VOID"
+            ],
+            "type": "string"
+          },
+          "documentType": {
+            "enum": [
+              "RECEIPT",
+              "ISSUE",
+              "JOURNAL"
+            ],
+            "type": "string",
+            "description": "Where the document opens"
+          },
+          "documentId": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "GR-20261020-0001"
+          },
+          "itemDate": {
+            "type": "string",
+            "example": "2026-10-20"
+          },
+          "dueDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-20"
+          },
+          "amount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "50000.00"
+          }
+        },
+        "required": [
+          "id",
+          "side",
+          "kind",
+          "documentType",
+          "documentId",
+          "number",
+          "itemDate",
+          "dueDate",
+          "amount",
+          "openAmount"
+        ]
+      },
+      "PayableOpenItemList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayableOpenItem"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "PosSettings": {

@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CustomerPicker, type PickedCustomer } from '@/features/partners/customer-picker';
+import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { formatMnt } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -46,6 +47,8 @@ interface LineDraft {
   moneyAccountId: number | null;
   /** The customer of a line on the receivables account (role AR, ADR-0090). */
   customer: PickedCustomer | null;
+  /** The supplier of a line on the payables account (role AP, F3 ADR-0091). */
+  supplier: PickedSupplier | null;
   debit: string;
   credit: string;
   description: string;
@@ -57,6 +60,7 @@ const emptyLine = (): LineDraft => ({
   accountId: null,
   moneyAccountId: null,
   customer: null,
+  supplier: null,
   debit: '',
   credit: '',
   description: '',
@@ -66,7 +70,8 @@ const emptyLine = (): LineDraft => ({
  * «Гараар бичилт» (ADR-0060 #7): a dated, described entry of at least two lines that balance. A
  * line on a cash or bank account names its cash box or bank account (the money accounts that point
  * at it), a line on the receivables account names its customer (ADR-0090: the core refuses either
- * without it).
+ * without it), a line on the payables account its supplier (F3, ADR-0091: a supplier's payment or
+ * a service bill is such an entry).
  */
 export function JournalEntryDialog({
   open,
@@ -95,9 +100,11 @@ export function JournalEntryDialog({
     id === null ? [] : (moneyAccounts.data ?? []).filter((box) => box.glAccountId === id);
   const needsBox = (line: LineDraft) => boxesOf(line.accountId).length > 0;
   const needsCustomer = (line: LineDraft) => accountOf(line.accountId)?.role === 'AR';
+  const needsSupplier = (line: LineDraft) => accountOf(line.accountId)?.role === 'AP';
   const detailsMissing = (line: LineDraft) =>
     (needsBox(line) && line.moneyAccountId === null) ||
-    (needsCustomer(line) && line.customer === null);
+    (needsCustomer(line) && line.customer === null) ||
+    (needsSupplier(line) && line.supplier === null);
 
   // Money accounts that arrive after a line's account was chosen still fill a lone choice.
   useEffect(() => {
@@ -138,6 +145,7 @@ export function JournalEntryDialog({
       // A lone cash box or bank account of the chosen account is chosen already.
       moneyAccountId: active.length === 1 ? (active[0]?.id ?? null) : null,
       ...(accountOf(accountId)?.role === 'AR' ? {} : { customer: null }),
+      ...(accountOf(accountId)?.role === 'AP' ? {} : { supplier: null }),
     });
   };
 
@@ -157,6 +165,7 @@ export function JournalEntryDialog({
             credit: line.credit || '0',
             ...(needsBox(line) ? { moneyAccountId: line.moneyAccountId } : {}),
             ...(needsCustomer(line) ? { customerId: line.customer?.id ?? null } : {}),
+            ...(needsSupplier(line) ? { supplierId: line.supplier?.id ?? null } : {}),
             description: line.description.trim() || null,
           })),
         },
@@ -271,6 +280,19 @@ export function JournalEntryDialog({
                               value={line.customer}
                               onChange={(customer) => patch(line.id, { customer })}
                               invalid={checked && line.customer === null}
+                            />
+                          </div>
+                        ) : null}
+                        {needsSupplier(line) ? (
+                          <div className="flex flex-col gap-1">
+                            <Label htmlFor={`entry-supplier-${line.id}`} className="sr-only">
+                              {`${t('finance.journal.dialog.supplier')} ${index + 1}`}
+                            </Label>
+                            <SupplierPicker
+                              id={`entry-supplier-${line.id}`}
+                              value={line.supplier}
+                              onChange={(supplier) => patch(line.id, { supplier })}
+                              invalid={checked && line.supplier === null}
                             />
                           </div>
                         ) : null}

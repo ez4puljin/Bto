@@ -9,6 +9,8 @@ export {
   btoInstallationSpec,
   customerIdOfRef,
   customerRef,
+  supplierIdOfRef,
+  supplierRef,
   ALLOCATION_NUMBER_DEFAULT,
   FIN_DOC_TYPES,
   FIN_SOURCE,

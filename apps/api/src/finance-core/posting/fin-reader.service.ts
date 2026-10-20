@@ -166,6 +166,13 @@ const date = (value: unknown): Date => (value instanceof Date ? value : new Date
  * items, a money account's book and the items a posting touched. Read by a granted source or a
  * user with `finance.read`; it lives in `posting/**` because only that names the ledger tables.
  */
+/** Which party-control accounts a party read covers (F3, ADR-0091): receivables by default. */
+export type FinPartyControl = 'RECEIVABLE' | 'PAYABLE';
+
+/** The side of an item the party owes on these accounts: a receivable's debit, a payable's credit. */
+const owedSide = (control: FinPartyControl): 'DEBIT' | 'CREDIT' =>
+  control === 'PAYABLE' ? 'CREDIT' : 'DEBIT';
+
 @Injectable()
 export class FinReader {
   constructor(@Inject(FIN_DB) private readonly db: FinDb) {}
@@ -196,13 +203,16 @@ export class FinReader {
   }
 
   /**
-   * Party balances on the receivable accounts, largest net first (keyset: net, party), with the
-   * live overdue amount; `overdueOnly` keeps parties with an open debit item past due.
+   * Party balances on the receivable accounts (or the payable ones), largest net first (keyset:
+   * net, party), with the live overdue amount; `overdueOnly` keeps parties with an open owed item
+   * past due. On the payables (F3, ADR-0091) `net` is open credit − open debit (what the company
+   * owes) and `oldestDueDate` the oldest open bill's.
    */
   async partyBalances(
     ctx: FinCallContext,
     query: {
       company: string;
+      control?: FinPartyControl;
       partyIds?: readonly number[];
       overdueOnly?: boolean;
       after?: { net: string; partyId: number };
@@ -211,6 +221,19 @@ export class FinReader {
   ): Promise<FinPartyBalanceRow[]> {
     const scope = await this.scope(this.db, ctx, query.company);
     const today = await this.today(this.db, scope);
+    const control = query.control ?? 'RECEIVABLE';
+    const side = owedSide(control);
+    const net =
+      control === 'PAYABLE'
+        ? sql`sum(pb.open_credit) - sum(pb.open_debit)`
+        : sql`sum(pb.open_debit) - sum(pb.open_credit)`;
+    const oldest =
+      control === 'PAYABLE'
+        ? sql`(SELECT min(coalesce(i.due_date, i.item_date)) FROM fin.open_items i
+                  JOIN fin.accounts ia ON ia.company_id = i.company_id AND ia.id = i.account_id
+                 WHERE i.company_id = ${scope.companyId} AND i.party_id = pb.party_id
+                   AND ia.control = 'PAYABLE' AND i.side = 'CREDIT' AND i.open_amount > 0)::text`
+        : sql`min(pb.oldest_due_date)::text`;
     const filters: SQL[] = [sql`TRUE`];
     if (query.partyIds) {
       if (query.partyIds.length === 0) return [];
@@ -230,16 +253,16 @@ export class FinReader {
     const result = await this.db.execute<Row>(sql`
       WITH b AS (
         SELECT pb.party_id, sum(pb.open_debit) AS open_debit, sum(pb.open_credit) AS open_credit,
-               sum(pb.open_debit) - sum(pb.open_credit) AS net, min(pb.oldest_due_date)::text AS oldest,
+               ${net} AS net, ${oldest} AS oldest,
                max(pb.updated_at) AS updated_at,
                (SELECT coalesce(sum(i.open_amount), 0) FROM fin.open_items i
                   JOIN fin.accounts ia ON ia.company_id = i.company_id AND ia.id = i.account_id
                  WHERE i.company_id = ${scope.companyId} AND i.party_id = pb.party_id
-                   AND ia.control = 'RECEIVABLE' AND i.side = 'DEBIT' AND i.open_amount > 0
+                   AND ia.control = ${control} AND i.side = ${side} AND i.open_amount > 0
                    AND i.due_date < ${today}::date) AS overdue
           FROM fin.party_balances pb
           JOIN fin.accounts a ON a.company_id = pb.company_id AND a.id = pb.account_id
-         WHERE pb.company_id = ${scope.companyId} AND a.control = 'RECEIVABLE'
+         WHERE pb.company_id = ${scope.companyId} AND a.control = ${control}
          GROUP BY pb.party_id)
       SELECT * FROM b WHERE ${sql.join(filters, sql` AND `)}
        ORDER BY b.net DESC, b.party_id
@@ -255,13 +278,14 @@ export class FinReader {
     }));
   }
 
-  /** One party's balance on the receivable accounts (zeros when it has none). */
+  /** One party's balance on the receivable (or payable) accounts (zeros when it has none). */
   async partyBalance(
     ctx: FinCallContext,
-    query: { company: string; partyId: number },
+    query: { company: string; partyId: number; control?: FinPartyControl },
   ): Promise<FinPartyBalanceRow> {
     const [row] = await this.partyBalances(ctx, {
       company: query.company,
+      ...(query.control ? { control: query.control } : {}),
       partyIds: [query.partyId],
       limit: 1,
     });
@@ -287,6 +311,7 @@ export class FinReader {
     query: {
       company: string;
       partyId: number;
+      control?: FinPartyControl;
       from?: string;
       to?: string;
       beforeLineId?: number;
@@ -294,15 +319,16 @@ export class FinReader {
     },
   ): Promise<{ rows: FinPartyLedgerRow[]; opening: Decimal }> {
     const scope = await this.scope(this.db, ctx, query.company);
+    const control = query.control ?? 'RECEIVABLE';
     const filters: SQL[] = [sql`TRUE`];
     if (query.from) filters.push(sql`r.entry_date::date >= ${query.from}::date`);
     if (query.to) filters.push(sql`r.entry_date::date <= ${query.to}::date`);
     if (query.beforeLineId !== undefined) filters.push(sql`r.line_id < ${query.beforeLineId}`);
     const result = await this.db.execute<Row>(sql`
-      WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, sql`l.id`)})
+      WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, sql`l.id`, control)})
       SELECT * FROM r WHERE ${sql.join(filters, sql` AND `)} ORDER BY r.line_id DESC LIMIT ${query.limit + 1}`);
     const opening = query.from
-      ? await this.partyBalanceBefore(scope.companyId, query.partyId, query.from)
+      ? await this.partyBalanceBefore(scope.companyId, query.partyId, query.from, control)
       : new Decimal(0);
     return { rows: result.rows.map(toLedgerRow), opening };
   }
@@ -310,12 +336,25 @@ export class FinReader {
   /** A party's statement: the balance before `from`, the lines dated `from` … `to` by date, the close. */
   async partyStatement(
     ctx: FinCallContext,
-    query: { company: string; partyId: number; from: string; to: string },
+    query: {
+      company: string;
+      partyId: number;
+      from: string;
+      to: string;
+      control?: FinPartyControl;
+    },
   ): Promise<{ opening: Decimal; rows: FinPartyLedgerRow[] }> {
     const scope = await this.scope(this.db, ctx, query.company);
-    const opening = await this.partyBalanceBefore(scope.companyId, query.partyId, query.from);
+    const control = query.control ?? 'RECEIVABLE';
+    const opening = await this.partyBalanceBefore(
+      scope.companyId,
+      query.partyId,
+      query.from,
+      control,
+    );
+    const order = sql`e.entry_date, l.id`;
     const result = await this.db.execute<Row>(sql`
-      WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, sql`e.entry_date, l.id`)})
+      WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, order, control)})
       SELECT * FROM r WHERE r.entry_date::date BETWEEN ${query.from}::date AND ${query.to}::date
        ORDER BY r.entry_date::date, r.line_id`);
     let balance = opening;
@@ -450,11 +489,15 @@ export class FinReader {
     }));
   }
 
-  /** A party's items on the receivable accounts (open ones only by default), oldest due first. */
+  /**
+   * A party's items on the receivable (or payable) accounts (open ones only by default), oldest due
+   * first.
+   */
   async openItems(
     ctx: FinCallContext,
-    query: { company: string; partyId: number; openOnly?: boolean },
+    query: { company: string; partyId: number; openOnly?: boolean; control?: FinPartyControl },
   ): Promise<FinOpenItemRow[]> {
+    const control = query.control ?? 'RECEIVABLE';
     const scope = await this.scope(this.db, ctx, query.company);
     const open = query.openOnly === false ? sql`` : sql` AND i.open_amount > 0`;
     const result = await this.db.execute<Row>(sql`
@@ -469,7 +512,7 @@ export class FinReader {
         JOIN fin.document_types t ON t.company_id = d.company_id AND t.id = d.document_type_id
         JOIN fin.source_systems s ON s.id = d.source_system_id
        WHERE i.company_id = ${scope.companyId} AND i.party_id = ${query.partyId}
-         AND a.control = 'RECEIVABLE'${open}
+         AND a.control = ${control}${open}
        ORDER BY coalesce(i.due_date, i.item_date), i.id`);
     return result.rows.map((row) => ({
       id: int(row.id),
@@ -489,6 +532,38 @@ export class FinReader {
         entryId: intOrNull(row.entry_id),
       },
     }));
+  }
+
+  /**
+   * The open amount of a source's item group on one side, in the caller's transaction (F3: what a
+   * re-costing's credit may still settle of a receipt's bills). Groups are per source system. The
+   * group's parties are locked first (FOR NO KEY UPDATE, §10), so an allocation cannot change the
+   * amount before the caller's posting settles it.
+   */
+  async groupOpenInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    query: { company: string; system: string; groupRef: string; side: 'DEBIT' | 'CREDIT' },
+  ): Promise<Decimal> {
+    const scope = await this.scope(tx, ctx, query.company);
+    const parties = await tx.execute<Row>(sql`
+      SELECT DISTINCT i.party_id
+        FROM fin.open_items i
+        JOIN fin.source_systems s ON s.id = i.source_system_id
+       WHERE i.company_id = ${scope.companyId} AND s.code = ${query.system}
+         AND i.group_ref = ${query.groupRef}`);
+    await lockPartiesInTx(
+      tx,
+      scope.companyId,
+      parties.rows.map((row) => int(row.party_id)),
+    );
+    const result = await tx.execute<Row>(sql`
+      SELECT coalesce(sum(i.open_amount), 0) AS open
+        FROM fin.open_items i
+        JOIN fin.source_systems s ON s.id = i.source_system_id
+       WHERE i.company_id = ${scope.companyId} AND s.code = ${query.system}
+         AND i.group_ref = ${query.groupRef} AND i.side = ${query.side} AND i.open_amount > 0`);
+    return dec(result.rows[0]?.open ?? 0);
   }
 
   /** The source and the open amount of these items (a posting's touched items), in the caller's tx. */
@@ -651,7 +726,12 @@ export class FinReader {
     };
   }
 
-  private partyLinesSql(companyId: number, partyId: number, order: SQL): SQL {
+  private partyLinesSql(
+    companyId: number,
+    partyId: number,
+    order: SQL,
+    control: FinPartyControl,
+  ): SQL {
     return sql`
       SELECT l.id AS line_id, e.id AS entry_id, e.entry_date::text AS entry_date, l.debit, l.credit,
              e.posted_at,
@@ -669,20 +749,21 @@ export class FinReader {
         LEFT JOIN fin.documents o ON o.company_id = d.company_id AND o.id = d.reverses_document_id
         LEFT JOIN fin.document_types ot ON ot.company_id = o.company_id AND ot.id = o.document_type_id
         LEFT JOIN fin.source_systems os ON os.id = o.source_system_id
-       WHERE l.company_id = ${companyId} AND l.party_id = ${partyId} AND a.control = 'RECEIVABLE'`;
+       WHERE l.company_id = ${companyId} AND l.party_id = ${partyId} AND a.control = ${control}`;
   }
 
   private async partyBalanceBefore(
     companyId: number,
     partyId: number,
     from: string,
+    control: FinPartyControl,
   ): Promise<Decimal> {
     const result = await this.db.execute<Row>(sql`
       SELECT coalesce(sum(l.debit - l.credit), 0) AS balance
         FROM fin.journal_lines l
         JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
         JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
-       WHERE l.company_id = ${companyId} AND l.party_id = ${partyId} AND a.control = 'RECEIVABLE'
+       WHERE l.company_id = ${companyId} AND l.party_id = ${partyId} AND a.control = ${control}
          AND e.entry_date < ${from}::date`);
     return dec(result.rows[0]?.balance ?? 0);
   }
