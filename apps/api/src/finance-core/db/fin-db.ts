@@ -3,6 +3,16 @@ import type { Pool } from 'pg';
 import type { AnyTx } from '../../common/db/any-tx';
 import {
   finAccounts,
+  finAllocations,
+  finDocumentTypes,
+  finDocuments,
+  finIntakeAttempts,
+  finIntakeRequests,
+  finNumberCounters,
+  finNumberSeries,
+  finOpenItems,
+  finPartyBalances,
+  finReconcileRuns,
   finAuditLog,
   finBranches,
   finBranchRefs,
@@ -29,6 +39,16 @@ import {
  */
 const schema = {
   finAccounts,
+  finAllocations,
+  finDocumentTypes,
+  finDocuments,
+  finIntakeAttempts,
+  finIntakeRequests,
+  finNumberCounters,
+  finNumberSeries,
+  finOpenItems,
+  finPartyBalances,
+  finReconcileRuns,
   finAuditLog,
   finBranches,
   finBranchRefs,

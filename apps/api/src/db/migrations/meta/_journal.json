@@ -239,6 +239,13 @@
       "when": 1792440007701,
       "tag": "0033_fin_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792471689906,
+      "tag": "0034_fin_intake",
+      "breakpoints": true
     }
   ]
 }

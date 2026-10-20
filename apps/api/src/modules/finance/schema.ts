@@ -1,11 +1,6 @@
 import {
-  ALLOCATION_SOURCES,
-  AR_ENTRY_KINDS,
   FINANCE_LIMITS,
   INVOICE_STATUSES,
-  PAYMENT_DIRECTIONS,
-  PAYMENT_KINDS,
-  PAYMENT_STATUSES,
 } from '@tugeel/shared/finance';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS } from '@tugeel/shared/sales';
@@ -48,7 +43,6 @@ const inList = (column: AnyPgColumn, values: readonly string[]): SQL =>
   )})`;
 /** A limit from the shared package, inlined: a bound parameter would not do in a CHECK. */
 const lim = (value: number): SQL => sql.raw(String(value));
-const DOC_TYPES = ['INVOICE', 'PAYMENT', 'CREDIT_NOTE', 'JOURNAL'] as const;
 /** A number format: as the order format (ADR-0057 #3), never ending in a digit or a token. */
 const patternCheck = (column: AnyPgColumn): SQL =>
   sql`length(${column}) BETWEEN 1 AND 24 AND ${column} !~ '[0-9}]$'`;
@@ -60,24 +54,18 @@ export const financeSettings = pgTable(
     id: smallint('id').primaryKey(),
     invoicePattern: text('invoice_pattern').notNull(),
     invoiceDigits: smallint('invoice_digits').notNull(),
-    paymentPattern: text('payment_pattern').notNull(),
-    paymentDigits: smallint('payment_digits').notNull(),
     creditNotePattern: text('credit_note_pattern').notNull(),
     creditNoteDigits: smallint('credit_note_digits').notNull(),
-    journalPattern: text('journal_pattern').notNull(),
-    journalDigits: smallint('journal_digits').notNull(),
     updatedBy: userRef('updated_by'),
     updatedAt: updatedAt(),
   },
   (t) => [
     check('finance_settings_single', sql`${t.id} = 1`),
     check('finance_settings_invoice', patternCheck(t.invoicePattern)),
-    check('finance_settings_payment', patternCheck(t.paymentPattern)),
     check('finance_settings_credit_note', patternCheck(t.creditNotePattern)),
-    check('finance_settings_journal', patternCheck(t.journalPattern)),
     check(
       'finance_settings_digits',
-      sql`${t.invoiceDigits} BETWEEN 1 AND 8 AND ${t.paymentDigits} BETWEEN 1 AND 8 AND ${t.creditNoteDigits} BETWEEN 1 AND 8 AND ${t.journalDigits} BETWEEN 1 AND 8`,
+      sql`${t.invoiceDigits} BETWEEN 1 AND 8 AND ${t.creditNoteDigits} BETWEEN 1 AND 8`,
     ),
   ],
 );
@@ -276,137 +264,6 @@ export const creditNoteLines = pgTable(
       sql`${t.qty} > 0 AND ${t.factorSnapshot} > 0 AND ${t.qtyBase} > 0`,
     ),
     check('credit_note_lines_money', sql`${t.total} = ${t.subtotal} - ${t.discountAmount}`),
-  ],
-);
-
-/**
- * A voucher of the cash or bank book (ADR-0060 #5): money in or out of a money account; from or
- * to a customer, or against a journal account. Immutable; voided by a reversing entry.
- */
-export const payments = pgTable(
-  'payments',
-  {
-    id: id(),
-    number: text('number').notNull(),
-    status: text('status', { enum: PAYMENT_STATUSES }).notNull().default('POSTED'),
-    kind: text('kind', { enum: PAYMENT_KINDS }).notNull(),
-    direction: text('direction', { enum: PAYMENT_DIRECTIONS }).notNull(),
-    /** `fin.money_accounts` (ADR-0089): a plain id. */
-    moneyAccountId: ref('money_account_id').notNull(),
-    customerId: ref('customer_id').references(() => customers.id),
-    /** `fin.accounts` (ADR-0089): a plain id. */
-    glAccountId: ref('gl_account_id'),
-    amount: money('amount').notNull(),
-    paidOn: date('paid_on').notNull(),
-    description: text('description'),
-    reference: text('reference'),
-    counterpartyName: text('counterparty_name'),
-    collectedBy: userRef('collected_by'),
-    journalEntryId: ref('journal_entry_id'),
-    createdBy: userRef('created_by'),
-    createdAt: createdAt(),
-    voidedAt: timestamp('voided_at', { withTimezone: true }),
-    voidedBy: userRef('voided_by'),
-    voidReason: text('void_reason'),
-    voidJournalEntryId: ref('void_journal_entry_id'),
-  },
-  (t) => [
-    uniqueIndex('payments_number').on(t.number),
-    index('payments_account_idx').on(t.moneyAccountId, t.paidOn, t.id),
-    index('payments_customer_idx').on(t.customerId, t.id),
-    check('payments_status', inList(t.status, PAYMENT_STATUSES)),
-    check('payments_kind', inList(t.kind, PAYMENT_KINDS)),
-    check('payments_direction', inList(t.direction, PAYMENT_DIRECTIONS)),
-    check('payments_amount', sql`${t.amount} > 0`),
-    check(
-      'payments_party',
-      sql`CASE ${t.kind} WHEN 'CUSTOMER_PAYMENT' THEN ${t.customerId} IS NOT NULL AND ${t.glAccountId} IS NULL WHEN 'CUSTOMER_REFUND' THEN ${t.customerId} IS NOT NULL AND ${t.glAccountId} IS NULL ELSE ${t.customerId} IS NULL AND ${t.glAccountId} IS NOT NULL END`,
-    ),
-    check(
-      'payments_texts',
-      sql`(${t.description} IS NULL OR length(${t.description}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxDescription)}) AND (${t.reference} IS NULL OR length(${t.reference}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxReference)}) AND (${t.counterpartyName} IS NULL OR length(${t.counterpartyName}) BETWEEN 1 AND 120)`,
-    ),
-    check(
-      'payments_void',
-      sql`(${t.status} = 'VOID') = (${t.voidedAt} IS NOT NULL) AND (${t.voidedAt} IS NULL) = (${t.voidReason} IS NULL)`,
-    ),
-  ],
-);
-
-/** What a payment or a credit note settles of an invoice; undone (voided) with its source. */
-export const allocations = pgTable(
-  'allocations',
-  {
-    id: id(),
-    sourceType: text('source_type', { enum: ALLOCATION_SOURCES }).notNull(),
-    sourceId: ref('source_id').notNull(),
-    invoiceId: ref('invoice_id')
-      .notNull()
-      .references(() => invoices.id),
-    amount: money('amount').notNull(),
-    createdAt: createdAt(),
-    voidedAt: timestamp('voided_at', { withTimezone: true }),
-  },
-  (t) => [
-    index('allocations_source_idx').on(t.sourceType, t.sourceId),
-    index('allocations_invoice_idx').on(t.invoiceId),
-    check('allocations_source', inList(t.sourceType, ALLOCATION_SOURCES)),
-    check('allocations_amount', sql`${t.amount} > 0`),
-  ],
-);
-
-/** The receivables ledger (ADR-0060 #4): append-only; a customer's balance is Σ debit − Σ credit. */
-export const arEntries = pgTable(
-  'ar_entries',
-  {
-    id: id(),
-    customerId: ref('customer_id')
-      .notNull()
-      .references(() => customers.id),
-    entryDate: date('entry_date').notNull(),
-    kind: text('kind', { enum: AR_ENTRY_KINDS }).notNull(),
-    docType: text('doc_type', { enum: DOC_TYPES }).notNull(),
-    docId: ref('doc_id').notNull(),
-    docNumber: text('doc_number').notNull(),
-    debit: money('debit')
-      .notNull()
-      .default(sql`0`),
-    credit: money('credit')
-      .notNull()
-      .default(sql`0`),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    index('ar_entries_customer_idx').on(t.customerId, t.id),
-    index('ar_entries_doc_idx').on(t.docType, t.docId),
-    check('ar_entries_kind', inList(t.kind, AR_ENTRY_KINDS)),
-    check('ar_entries_doc_type', inList(t.docType, DOC_TYPES)),
-    check(
-      'ar_entries_amounts',
-      sql`${t.debit} >= 0 AND ${t.credit} >= 0 AND (${t.debit} = 0 OR ${t.credit} = 0)`,
-    ),
-  ],
-);
-
-/** The cache of the ledger per customer, rewritten with every entry and checked nightly. */
-export const customerBalances = pgTable(
-  'customer_balances',
-  {
-    customerId: ref('customer_id')
-      .primaryKey()
-      .references(() => customers.id),
-    balance: money('balance')
-      .notNull()
-      .default(sql`0`),
-    openInvoices: integer('open_invoices').notNull().default(0),
-    overdueAmount: money('overdue_amount')
-      .notNull()
-      .default(sql`0`),
-    oldestDueDate: date('oldest_due_date'),
-    updatedAt: updatedAt(),
-  },
-  (t) => [
-    check('customer_balances_counts', sql`${t.openInvoices} >= 0 AND ${t.overdueAmount} >= 0`),
   ],
 );
 

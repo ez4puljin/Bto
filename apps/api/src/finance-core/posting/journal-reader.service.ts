@@ -27,8 +27,8 @@ import {
 /** Where an entry came from: its source system and document type (null: typed, no document). */
 export interface FinEntryOrigin {
   system: string;
-  /** undefined: any; null: entries without a source document. */
-  docType?: string | null;
+  /** undefined: any; null: entries without a source document; a list: any of them. */
+  docType?: string | null | readonly string[];
   /** true: reversals only; false: no reversals; undefined: both. */
   reversal?: boolean;
 }
@@ -42,6 +42,8 @@ export interface FinEntrySummary {
   sourceDocType: string | null;
   sourceDocId: string | null;
   reversesId: number | null;
+  /** The intake document the entry books (F2); null for a façade entry (POS until H2). */
+  documentId: number | null;
   actor: { kind: 'STAFF' | 'SOURCE' | 'SYSTEM'; ref: string; label: string };
   postedAt: Date;
   /** Σ debit (= Σ credit). */
@@ -411,7 +413,9 @@ export class FinJournalReader {
 function originFilters(systemId: number, origin: FinEntryOrigin): SQL[] {
   const filters: SQL[] = [eq(finJournalEntries.sourceSystemId, systemId)];
   if (origin.docType === null) filters.push(isNull(finJournalEntries.sourceDocType));
-  else if (origin.docType !== undefined) {
+  else if (Array.isArray(origin.docType)) {
+    filters.push(inArray(finJournalEntries.sourceDocType, [...origin.docType]));
+  } else if (typeof origin.docType === 'string') {
     filters.push(eq(finJournalEntries.sourceDocType, origin.docType));
   }
   if (origin.reversal === true) filters.push(isNotNull(finJournalEntries.reversesId));
@@ -435,6 +439,7 @@ function toSummary(row: {
     sourceDocType: entry.sourceDocType,
     sourceDocId: entry.sourceDocId,
     reversesId: entry.reversesId,
+    documentId: entry.documentId,
     actor: { kind: entry.actorKind, ref: entry.actorRef, label: entry.actorLabel },
     postedAt: entry.postedAt,
     amount: new Decimal(row.amount),

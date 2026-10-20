@@ -7,6 +7,7 @@ import type { FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
 import { type FinRuleView, rulesOn } from '../ledger/chart.service';
 import { openPeriodInTx } from '../ledger/periods';
+import { FIN_SERIES, nextNumberInTx } from '../numbering/numbers';
 import {
   finAccounts,
   finJournalEntries,
@@ -40,8 +41,8 @@ export interface FinEntryLineIn {
 
 export interface FinEntryIn {
   company: string;
-  /** The entry's number, from the source's series until F2 brings the core's (ADR-0089 #4). */
-  number: string;
+  /** The entry's number; left out, the core's JOURNAL series numbers it (ADR-0090). */
+  number?: string | null;
   /** A business date `YYYY-MM-DD` in the company's timezone. */
   entryDate: string;
   description: string;
@@ -83,7 +84,7 @@ export class FinJournalPosting {
     input: {
       company: string;
       entryId: number;
-      number: string;
+      number?: string | null;
       entryDate: string;
       description: string;
     },
@@ -166,8 +167,6 @@ export class FinJournalPosting {
     input: FinEntryIn,
     reversesId: number | null,
   ): Promise<FinEntryRef> {
-    const number = input.number.trim();
-    if (number.length < 1 || number.length > 64) throw invalid('number');
     const description = input.description.trim();
     if (description.length < 1 || description.length > MAX_TEXT) throw invalid('description');
     if (input.sourceDoc && (input.sourceDoc.type.length === 0 || input.sourceDoc.id.length === 0)) {
@@ -207,6 +206,10 @@ export class FinJournalPosting {
 
     const resolved = await this.accountsOf(tx, scope.companyId, input.entryDate, lines);
     const periodId = await openPeriodInTx(tx, scope.companyId, input.entryDate);
+    const number =
+      input.number?.trim() ||
+      (await nextNumberInTx(tx, scope.companyId, FIN_SERIES.JOURNAL, input.entryDate));
+    if (number.length < 1 || number.length > 64) throw invalid('number');
     const [entry] = await tx
       .insert(finJournalEntries)
       .values({
@@ -293,15 +296,30 @@ export class FinJournalPosting {
     const accounts = new Map(
       (
         await tx
-          .select({ id: finAccounts.id, status: finAccounts.status })
+          .select({ id: finAccounts.id, status: finAccounts.status, control: finAccounts.control })
           .from(finAccounts)
           .where(and(eq(finAccounts.companyId, companyId), inArray(finAccounts.id, accountIds)))
-      ).map((row) => [row.id, row.status]),
+      ).map((row) => [row.id, row]),
     );
     resolved.forEach((row, index) => {
-      const status = accounts.get(row.accountId);
-      if (status === undefined) throw invalid(`lines[${index}].accountId`);
-      if (status !== 'ACTIVE') {
+      const account = accounts.get(row.accountId);
+      if (account === undefined) throw invalid(`lines[${index}].accountId`);
+      // No open item without the intake: a party-control line posts only through submitInTx.
+      if (
+        account.control === 'RECEIVABLE' ||
+        account.control === 'PAYABLE' ||
+        account.control === 'ADVANCE_RECEIVED' ||
+        account.control === 'ADVANCE_PAID'
+      ) {
+        throw new FinError('FIN_CLASS_RULE', undefined, {
+          rule: 'CONTROL_LINE_NEEDS_INTAKE',
+          path: `lines[${index}].accountId`,
+        });
+      }
+      if (account.control === 'MONEY' && lines[index]?.moneyAccountId == null) {
+        throw new FinError('FIN_MONEY_ACCOUNT_REQUIRED', undefined, { path: `lines[${index}]` });
+      }
+      if (account.status !== 'ACTIVE') {
         throw new FinError('FIN_ACCOUNT_INACTIVE', undefined, {
           path: `lines[${index}].accountId`,
           accountId: row.accountId,

@@ -23,7 +23,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { jsonValue } from '../../common/db/types';
 import { products } from '../catalog/schema';
-import { invoices, payments } from '../finance/schema';
+import { invoices } from '../finance/schema';
 import { customerUsers, files, users } from '../identity/schema';
 import { salesOrders } from '../sales/schema';
 
@@ -152,7 +152,8 @@ export const customerNotifications = pgTable(
     kind: text('kind', { enum: CUSTOMER_NOTIFICATION_KINDS }).notNull(),
     orderId: ref('order_id').references(() => salesOrders.id),
     invoiceId: ref('invoice_id').references(() => invoices.id),
-    paymentId: ref('payment_id').references(() => payments.id),
+    /** The voucher: a Finance Core document id (ADR-0090), no FK leaves `fin`. */
+    paymentId: ref('payment_id'),
     payload: jsonValue('payload').notNull(),
     createdAt: createdAt(),
     readAt: timestamp('read_at', { withTimezone: true }),

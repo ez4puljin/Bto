@@ -20,6 +20,7 @@ export {
   ENSURE_COMPANY_LOCK,
   ensureDefaultCompany,
   type FinAccountControl,
+  type FinDocumentClassSpec,
   type FinInstallationSpec,
 } from './org/ensure-default-company';
 export {
@@ -39,6 +40,31 @@ export {
   FIN_RULES_FROM_START,
 } from './ledger/chart.service';
 export { type FinCompanyPatch, type FinCompanyView, FinOrgService } from './org/org.service';
+export {
+  FinConfig,
+  type FinDocumentTypeInput,
+  type FinNumberSeriesView,
+} from './config/fin-config.service';
+export { FIN_SERIES, seriesNumber, seriesPrefix } from './numbering/numbers';
+export {
+  type FinAllocationRow,
+  type FinDocumentRow,
+  type FinItemSource,
+  type FinOpenItemRow,
+  type FinPartyBalanceRow,
+  type FinPartyKey,
+  type FinPartyLedgerRow,
+  FinReader,
+} from './posting/fin-reader.service';
+export { type FinDocumentClass } from './posting/intake-command';
+export { type FinIntakeResult, type FinIntakeVia, FinIntakeInTx } from './posting/intake.service';
+export {
+  type FinReconcileDrift,
+  type FinReconcileKind,
+  type FinReconcileRun,
+  type FinTransactor,
+  reconcileBooks,
+} from './posting/reconcile';
 export { type FinPartyRef, FinPartiesService } from './parties/parties.service';
 export {
   type FinEntryIn,
