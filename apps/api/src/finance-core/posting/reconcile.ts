@@ -31,8 +31,17 @@ export interface FinReconcileRun {
 
 type Row = Record<string, unknown>;
 const MAX_DETAILS = 200;
-const int = (value: unknown): number => Number.parseInt(String(value), 10);
-const dec = (value: unknown): Decimal => new Decimal(String(value ?? 0));
+/** A raw row's value as text (numerics, ids and dates come back as strings or numbers). */
+const scalar = (value: unknown): string =>
+  typeof value === 'string'
+    ? value
+    : typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean'
+      ? value.toString()
+      : value instanceof Date
+        ? value.toISOString()
+        : '';
+const int = (value: unknown): number => Number.parseInt(scalar(value), 10);
+const dec = (value: unknown): Decimal => new Decimal(scalar(value) || 0);
 
 /**
  * The core's reconcile (ADR-0072 #8), per company in one transaction: CACHE (each party balance
@@ -56,6 +65,26 @@ export async function reconcileBooks(
     }
     return runs;
   });
+}
+
+/**
+ * The open amount of each live document of a source key type (a source's completeness and mirror
+ * check, ADR-0071 #12): Σ of its items' open amounts by source doc id, across the companies. Run by
+ * a reconcile inside its own transaction; it reads only.
+ */
+export async function sourceOpenAmounts(
+  tx: FinTx,
+  query: { system: string; docType: string },
+): Promise<Map<string, Decimal>> {
+  const result = await tx.execute<Row>(sql`
+    SELECT d.source_doc_id, sum(i.open_amount) AS open
+      FROM fin.documents d
+      JOIN fin.source_systems s ON s.id = d.source_system_id
+      JOIN fin.open_items i ON i.company_id = d.company_id AND i.document_id = d.id
+     WHERE s.code = ${query.system} AND d.source_doc_type = ${query.docType}
+       AND d.reverses_document_id IS NULL
+     GROUP BY d.source_doc_id`);
+  return new Map(result.rows.map((row) => [String(row.source_doc_id), dec(row.open)]));
 }
 
 async function cacheRun(tx: FinTx, companyId: number, trigger: 'NIGHTLY' | 'MANUAL'): Promise<FinReconcileRun> {

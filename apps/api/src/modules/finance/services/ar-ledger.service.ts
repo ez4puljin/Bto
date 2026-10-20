@@ -7,30 +7,28 @@ import {
 } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gt, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { notFound } from '../../../common/errors/app-error';
-import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
+import { DEFAULT_PAGE_LIMIT, decodeCursor, encodeCursor } from '../../../common/pagination/page';
+import {
+  type FinPartyLedgerRow,
+  FinReader,
+  type FinReconcileRun,
+  reconcileBooks,
+  sourceOpenAmounts,
+} from '../../../finance-core';
+import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import type { AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
-import { arEntries, customerBalances, financeReconcileRuns, invoices } from '../schema';
-
-export interface ArEntryInput {
-  customerId: number;
-  entryDate: string;
-  kind: ArEntryKind;
-  docType: FinanceDocKind;
-  docId: number;
-  docNumber: string;
-  debit: Decimal;
-  credit: Decimal;
-}
+import { financeReconcileRuns, invoices } from '../schema';
+import { FinBooks } from './fin-books';
 
 export interface CustomerBalance {
   customerId: number;
-  /** Σ debit − Σ credit of the ledger; negative = the customer is in advance. */
+  /** Σ debit − Σ credit of the receivable lines; negative = the customer is in advance. */
   balance: Decimal;
   openInvoices: number;
   overdueAmount: Decimal;
@@ -118,12 +116,12 @@ export interface BalancesQuery {
   limit?: number;
 }
 
+/** An invoice whose open amount (the mirror) differs from its item in the Finance Core. */
 export interface ReconcileDrift {
-  customerId: number;
-  cachedBalance: string;
-  ledgerBalance: string;
-  cachedOpenInvoices: number;
-  ledgerOpenInvoices: number;
+  invoiceId: number;
+  number: string;
+  mirrorOpen: string;
+  itemOpen: string;
 }
 
 export interface FinanceReconcileRun {
@@ -133,6 +131,8 @@ export interface FinanceReconcileRun {
   checked: number;
   drifted: number;
   details: ReconcileDrift[];
+  /** The Finance Core's own runs (cache, items, sub-ledger against the journal). */
+  core: FinReconcileRun[];
 }
 
 export interface Attention {
@@ -144,49 +144,62 @@ export interface Attention {
 
 const MAX_DRIFT_DETAILS = 200;
 
+/** A ledger line's document in today's terms (ADR-0060 #4 kinds; F2 reads them from the core). */
+const KIND_OF_TYPE: Readonly<Record<string, { kind: ArEntryKind; docType: FinanceDocKind }>> = {
+  [FIN_DOC_TYPES.SALES_INVOICE.code]: { kind: 'INVOICE', docType: 'INVOICE' },
+  [FIN_DOC_TYPES.SALES_RETURN.code]: { kind: 'CREDIT_NOTE', docType: 'CREDIT_NOTE' },
+  [FIN_DOC_TYPES.CUSTOMER_RECEIPT.code]: { kind: 'PAYMENT', docType: 'PAYMENT' },
+  [FIN_DOC_TYPES.CUSTOMER_REFUND.code]: { kind: 'REFUND', docType: 'PAYMENT' },
+  [FIN_DOC_TYPES.OTHER_RECEIPT.code]: { kind: 'PAYMENT', docType: 'PAYMENT' },
+  [FIN_DOC_TYPES.OTHER_PAYMENT.code]: { kind: 'REFUND', docType: 'PAYMENT' },
+};
+
 /**
- * The receivables ledger (ADR-0060 #4): append-only entries per customer and a cache of each
- * customer's balance, open invoices and overdue amount, rewritten in the transaction of every
- * entry and checked every night. Callers write an entry under the customer lock
- * (`CustomersService.lockForUpdate`), after any stock posting and before locking invoices.
+ * The receivables, read from the Finance Core since F2 (ADR-0090): a customer's balance is the open
+ * items of its party on the receivable accounts, its ledger and statement the receivable lines with
+ * their documents; the open invoices, their aging and the overdue amount of the home tile read the
+ * invoices' open amounts, which the postings keep as a mirror of their items. Nothing is written
+ * here; `reconcile` checks the core and the mirror.
  */
 @Injectable()
 export class ArLedgerService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly customers: CustomersService,
+    private readonly reader: FinReader,
+    private readonly books: FinBooks,
+    private readonly parties: FinPartiesBridge,
   ) {}
 
-  /** Appends an entry and refreshes the customer's cache; the caller holds the customer lock. */
-  async record(tx: Tx, entry: ArEntryInput): Promise<CustomerBalance> {
-    await tx.insert(arEntries).values(entry);
-    return upsertBalance(tx, entry.customerId, businessDate());
-  }
-
-  /** Recomputes a customer's cache from the ledger and the open invoices, as of `today`. */
-  refresh(tx: Tx, customerId: number, today: string = businessDate()): Promise<CustomerBalance> {
-    return upsertBalance(tx, customerId, today);
-  }
-
-  /** The cached balance; zeros for a customer without entries. */
-  async balanceOf(customerId: number, executor: Db | Tx = this.db): Promise<CustomerBalance> {
-    const [row] = await executor
-      .select()
-      .from(customerBalances)
-      .where(eq(customerBalances.customerId, customerId));
-    return (
-      row ?? {
+  /** The customer's balance (zeros for a customer without receivable lines). */
+  async balanceOf(customerId: number): Promise<CustomerBalance> {
+    const party = await this.partyOf(customerId);
+    const open = await this.openInvoiceCounts([customerId]);
+    if (party === null) {
+      return {
         customerId,
         balance: new Decimal(0),
-        openInvoices: 0,
+        openInvoices: open.get(customerId) ?? 0,
         overdueAmount: new Decimal(0),
         oldestDueDate: null,
         updatedAt: null,
-      }
-    );
+      };
+    }
+    const row = await this.reader.partyBalance(this.books.source(), {
+      company: await this.books.company(),
+      partyId: party,
+    });
+    return {
+      customerId,
+      balance: row.net,
+      openInvoices: open.get(customerId) ?? 0,
+      overdueAmount: row.overdue,
+      oldestDueDate: row.oldestDueDate,
+      updatedAt: row.updatedAt,
+    };
   }
 
-  /** The open amount past due as of `today`, read live from the invoices (the credit check). */
+  /** The open amount past due as of `today`, read live from the invoices. */
   async overdueOf(
     customerId: number,
     today: string = businessDate(),
@@ -198,7 +211,7 @@ export class ArLedgerService {
         oldest: sql<string | null>`min(${invoices.dueDate})::text`,
       })
       .from(invoices)
-      .where(and(openInvoiceSql(customerId), lt(invoices.dueDate, today)));
+      .where(and(openInvoiceSql([customerId]), lt(invoices.dueDate, today)));
     return { amount: new Decimal(row?.amount ?? 0), oldestDueDate: row?.oldest ?? null };
   }
 
@@ -222,102 +235,81 @@ export class ArLedgerService {
   /** The customer's entries newest first with the balance after each, and the opening balance. */
   async ledger(customerId: number, query: LedgerQuery): Promise<LedgerPage> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
+    const party = await this.partyOf(customerId);
+    if (party === null) return { data: [], nextCursor: null, opening: new Decimal(0) };
     const after = decodeCursor(query.cursor);
-    const running = this.db
-      .select({
-        id: arEntries.id,
-        entryDate: arEntries.entryDate,
-        kind: arEntries.kind,
-        docType: arEntries.docType,
-        docId: arEntries.docId,
-        docNumber: arEntries.docNumber,
-        debit: arEntries.debit,
-        credit: arEntries.credit,
-        createdAt: arEntries.createdAt,
-        balanceAfter:
-          sql<string>`sum(${arEntries.debit} - ${arEntries.credit}) OVER (ORDER BY ${arEntries.id})`.as(
-            'balance_after',
-          ),
-      })
-      .from(arEntries)
-      .where(eq(arEntries.customerId, customerId))
-      .as('running');
-    const filters: SQL[] = [];
-    if (query.from) filters.push(sql`${running.entryDate} >= ${query.from}`);
-    if (query.to) filters.push(sql`${running.entryDate} <= ${query.to}`);
-    if (typeof after?.id === 'number') filters.push(sql`${running.id} < ${after.id}`);
-    const rows = await this.db
-      .select()
-      .from(running)
-      .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(running.id))
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({ id: row.id }));
-    let opening = new Decimal(0);
-    if (query.from) {
-      const [before] = await this.db
-        .select({
-          balance: sql<string>`coalesce(sum(${arEntries.debit} - ${arEntries.credit}), 0)`,
-        })
-        .from(arEntries)
-        .where(and(eq(arEntries.customerId, customerId), lt(arEntries.entryDate, query.from)));
-      opening = new Decimal(before?.balance ?? 0);
-    }
+    const { rows, opening } = await this.reader.partyLedger(this.books.source(), {
+      company: await this.books.company(),
+      partyId: party,
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(typeof after?.id === 'number' ? { beforeLineId: after.id } : {}),
+      limit,
+    });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
     return {
-      data: page.data.map((row) => ({ ...row, balanceAfter: new Decimal(row.balanceAfter) })),
-      nextCursor: page.nextCursor,
+      data: page.map((row) => ({
+        id: row.lineId,
+        entryDate: row.entryDate,
+        ...documentOf(row),
+        debit: row.debit,
+        credit: row.credit,
+        balanceAfter: row.balanceAfter,
+        createdAt: row.postedAt,
+      })),
+      nextCursor: rows.length > limit && last ? encodeCursor({ id: last.lineId }) : null,
       opening,
     };
   }
 
   /** The customer's statement for `from` … `to` (inclusive business dates, ADR-0086). */
   async statement(customerId: number, from: string, to: string): Promise<CustomerStatement> {
-    const [before] = await this.db
-      .select({
-        balance: sql<string>`coalesce(sum(${arEntries.debit} - ${arEntries.credit}), 0)`,
-      })
-      .from(arEntries)
-      .where(and(eq(arEntries.customerId, customerId), lt(arEntries.entryDate, from)));
-    const rows = await this.db
-      .select({
-        id: arEntries.id,
-        entryDate: arEntries.entryDate,
-        kind: arEntries.kind,
-        docType: arEntries.docType,
-        docId: arEntries.docId,
-        docNumber: arEntries.docNumber,
-        debit: arEntries.debit,
-        credit: arEntries.credit,
-        orderId: invoices.orderId,
-      })
-      .from(arEntries)
-      .leftJoin(invoices, and(eq(arEntries.docType, 'INVOICE'), eq(invoices.id, arEntries.docId)))
-      .where(
-        and(
-          eq(arEntries.customerId, customerId),
-          gte(arEntries.entryDate, from),
-          lte(arEntries.entryDate, to),
-        ),
-      )
-      .orderBy(asc(arEntries.entryDate), asc(arEntries.id));
-    const opening = new Decimal(before?.balance ?? 0);
-    let balance = opening;
-    let totalDebit = new Decimal(0);
-    let totalCredit = new Decimal(0);
-    const entries = rows.map((row) => {
-      const debit = new Decimal(row.debit);
-      const credit = new Decimal(row.credit);
-      totalDebit = totalDebit.plus(debit);
-      totalCredit = totalCredit.plus(credit);
-      balance = balance.plus(debit).minus(credit);
-      return { ...row, debit, credit, balance };
+    const party = await this.partyOf(customerId);
+    const zero = new Decimal(0);
+    if (party === null) {
+      return { from, to, opening: zero, entries: [], totalDebit: zero, totalCredit: zero, closing: zero };
+    }
+    const { opening, rows } = await this.reader.partyStatement(this.books.source(), {
+      company: await this.books.company(),
+      partyId: party,
+      from,
+      to,
     });
-    return { from, to, opening, entries, totalDebit, totalCredit, closing: balance };
+    const mapped = rows.map((row) => ({ row, doc: documentOf(row) }));
+    const invoiceIds = mapped.flatMap(({ doc }) => (doc.docType === 'INVOICE' ? [doc.docId] : []));
+    const orders = new Map(
+      invoiceIds.length === 0
+        ? []
+        : (
+            await this.db
+              .select({ id: invoices.id, orderId: invoices.orderId })
+              .from(invoices)
+              .where(inArray(invoices.id, invoiceIds))
+          ).map((row) => [row.id, row.orderId]),
+    );
+    let totalDebit = zero;
+    let totalCredit = zero;
+    const entries = mapped.map(({ row, doc }) => {
+      totalDebit = totalDebit.plus(row.debit);
+      totalCredit = totalCredit.plus(row.credit);
+      return {
+        id: row.lineId,
+        entryDate: row.entryDate,
+        ...doc,
+        debit: row.debit,
+        credit: row.credit,
+        balance: row.balanceAfter,
+        orderId: doc.docType === 'INVOICE' ? (orders.get(doc.docId) ?? null) : null,
+      };
+    });
+    const closing = opening.plus(totalDebit).minus(totalCredit);
+    return { from, to, opening, entries, totalDebit, totalCredit, closing };
   }
 
   /**
-   * The customers with a ledger, largest balance first, with their credit terms and the aging of
-   * their open invoices as of today.
+   * The customers with receivables, largest balance first, with their credit terms and the aging
+   * of their open invoices as of today.
    */
   async balances(
     ctx: AuthContext,
@@ -325,49 +317,61 @@ export class ArLedgerService {
   ): Promise<{ data: CustomerBalanceRow[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
-    const filters: SQL[] = [];
-    if (query.overdue) filters.push(gt(customerBalances.overdueAmount, new Decimal(0)));
+    let partyIds: number[] | undefined;
     if (query.q?.trim()) {
       const ids = (await this.customers.list(ctx, { q: query.q.trim(), limit: 200 })).data.map(
         (customer) => customer.id,
       );
       if (ids.length === 0) return { data: [], nextCursor: null };
-      filters.push(inArray(customerBalances.customerId, ids));
-    }
-    if (typeof after?.balance === 'string' && typeof after?.id === 'number') {
-      filters.push(
-        sql`(${customerBalances.balance} < ${after.balance}::numeric OR (${customerBalances.balance} = ${after.balance}::numeric AND ${customerBalances.customerId} > ${after.id}))`,
+      partyIds = [...(await this.parties.partiesOfCustomers(ids)).values()].map((id) =>
+        Number.parseInt(id, 10),
       );
+      if (partyIds.length === 0) return { data: [], nextCursor: null };
     }
-    const rows = await this.db
-      .select()
-      .from(customerBalances)
-      .where(filters.length ? and(...filters) : undefined)
-      .orderBy(desc(customerBalances.balance), customerBalances.customerId)
-      .limit(limit + 1);
-    const page = toPage(rows, limit, (row) => ({
-      balance: row.balance.toFixed(2),
-      id: row.customerId,
-    }));
-    const ids = page.data.map((row) => row.customerId);
+    const rows = await this.reader.partyBalances(this.books.source(), {
+      company: await this.books.company(),
+      ...(partyIds ? { partyIds } : {}),
+      ...(query.overdue ? { overdueOnly: true } : {}),
+      ...(typeof after?.balance === 'string' && typeof after?.id === 'number'
+        ? { after: { net: after.balance, partyId: after.id } }
+        : {}),
+      limit,
+    });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    const customerOf = await this.parties.customersOfParties(page.map((row) => String(row.partyId)));
+    const ids = [...new Set(customerOf.values())];
     const customers = new Map(
       (await this.customers.findByIds(ids)).map((customer) => [customer.id, customer]),
     );
     const aging = await this.agingOf(ids, businessDate());
+    const open = await this.openInvoiceCounts(ids);
     return {
-      data: page.data.map((row) => {
-        const customer = customers.get(row.customerId);
-        return {
-          ...row,
-          code: customer?.code ?? '',
-          name: customer?.name ?? '',
-          status: customer?.status ?? 'ACTIVE',
-          creditLimit: customer?.creditLimit ?? null,
-          creditHold: customer?.creditHold ?? false,
-          aging: aging.get(row.customerId) ?? emptyAging(),
-        };
+      data: page.flatMap((row) => {
+        const customerId = customerOf.get(String(row.partyId));
+        if (customerId === undefined) return [];
+        const customer = customers.get(customerId);
+        return [
+          {
+            customerId,
+            balance: row.net,
+            openInvoices: open.get(customerId) ?? 0,
+            overdueAmount: row.overdue,
+            oldestDueDate: row.oldestDueDate,
+            updatedAt: row.updatedAt,
+            code: customer?.code ?? '',
+            name: customer?.name ?? '',
+            status: customer?.status ?? 'ACTIVE',
+            creditLimit: customer?.creditLimit ?? null,
+            creditHold: customer?.creditHold ?? false,
+            aging: aging.get(customerId) ?? emptyAging(),
+          },
+        ];
       }),
-      nextCursor: page.nextCursor,
+      nextCursor:
+        rows.length > limit && last
+          ? encodeCursor({ balance: last.net.toFixed(2), id: last.partyId })
+          : null,
     };
   }
 
@@ -390,9 +394,24 @@ export class ArLedgerService {
     };
   }
 
-  /** The nightly job's and the CLI's check of the cache (`reconcileReceivables`). */
+  /** The nightly job's and the CLI's check (`reconcileReceivables`). */
   reconcile(kind: 'NIGHTLY' | 'MANUAL'): Promise<FinanceReconcileRun> {
     return reconcileReceivables(this.db, kind);
+  }
+
+  private async partyOf(customerId: number): Promise<number | null> {
+    const party = (await this.parties.partiesOfCustomers([customerId])).get(customerId);
+    return party === undefined ? null : Number.parseInt(party, 10);
+  }
+
+  private async openInvoiceCounts(customerIds: readonly number[]): Promise<Map<number, number>> {
+    if (customerIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ customerId: invoices.customerId, count: sql<string>`count(*)` })
+      .from(invoices)
+      .where(openInvoiceSql(customerIds))
+      .groupBy(invoices.customerId);
+    return new Map(rows.map((row) => [row.customerId, Number.parseInt(row.count, 10)]));
   }
 
   /** The open amounts of these customers by days past due, as of `today`. */
@@ -412,13 +431,7 @@ export class ArLedgerService {
         amount: sql<string>`sum(${invoices.openAmount})`,
       })
       .from(invoices)
-      .where(
-        and(
-          inArray(invoices.customerId, [...customerIds]),
-          eq(invoices.status, 'ISSUED'),
-          gt(invoices.openAmount, new Decimal(0)),
-        ),
-      )
+      .where(openInvoiceSql(customerIds))
       .groupBy(invoices.customerId, sql`2`);
     for (const row of rows) {
       const aging = result.get(row.customerId) ?? emptyAging();
@@ -436,115 +449,91 @@ function emptyAging(): Record<AgingBucket, Decimal> {
   >;
 }
 
-function openInvoiceSql(customerId: number): SQL {
+function openInvoiceSql(customerIds: readonly number[]): SQL {
   return and(
-    eq(invoices.customerId, customerId),
+    inArray(invoices.customerId, [...customerIds]),
     eq(invoices.status, 'ISSUED'),
     gt(invoices.openAmount, new Decimal(0)),
   ) as SQL;
 }
 
-/** A customer's balance, open invoices and overdue amount from the ledger and the invoices. */
-export async function computeBalance(
-  executor: Db | Tx,
-  customerId: number,
-  today: string,
-): Promise<Omit<CustomerBalance, 'updatedAt'>> {
-  const [ledger] = await executor
-    .select({
-      balance: sql<string>`coalesce(sum(${arEntries.debit} - ${arEntries.credit}), 0)`,
-    })
-    .from(arEntries)
-    .where(eq(arEntries.customerId, customerId));
-  const [open] = await executor
-    .select({
-      count: sql<string>`count(*)`,
-      overdue: sql<string>`coalesce(sum(${invoices.openAmount}) FILTER (WHERE ${invoices.dueDate} < ${today}), 0)`,
-      oldest: sql<string | null>`min(${invoices.dueDate})::text`,
-    })
-    .from(invoices)
-    .where(openInvoiceSql(customerId));
+/** A receivable line's document as today's ledger names it: kind, type, id and number. */
+function documentOf(row: FinPartyLedgerRow): {
+  kind: ArEntryKind;
+  docType: FinanceDocKind;
+  docId: number;
+  docNumber: string;
+} {
+  const target = row.reverses ?? row.document;
+  if (target === null) {
+    return { kind: 'ADJUSTMENT', docType: 'JOURNAL', docId: row.entryId, docNumber: '' };
+  }
+  const known = KIND_OF_TYPE[target.typeCode];
+  if (!known) {
+    // A manual entry (and its reversal) on the receivables: the journal entry is the document.
+    return {
+      kind: row.reverses ? 'VOID' : 'ADJUSTMENT',
+      docType: 'JOURNAL',
+      docId: row.entryId,
+      docNumber: row.document?.number ?? '',
+    };
+  }
+  const bto = target.sourceSystem === BTO_SOURCE && /^\d+$/.test(target.sourceDocId);
   return {
-    customerId,
-    balance: new Decimal(ledger?.balance ?? 0),
-    openInvoices: Number.parseInt(open?.count ?? '0', 10),
-    overdueAmount: new Decimal(open?.overdue ?? 0),
-    oldestDueDate: open?.oldest ?? null,
+    kind: row.reverses ? 'VOID' : known.kind,
+    docType: known.docType,
+    docId: bto ? Number.parseInt(target.sourceDocId, 10) : target.id,
+    docNumber: target.number,
   };
-}
-
-/** Rewrites a customer's cache row from `computeBalance`. */
-export async function upsertBalance(
-  tx: Tx,
-  customerId: number,
-  today: string,
-): Promise<CustomerBalance> {
-  const computed = await computeBalance(tx, customerId, today);
-  const values = {
-    balance: computed.balance,
-    openInvoices: computed.openInvoices,
-    overdueAmount: computed.overdueAmount,
-    oldestDueDate: computed.oldestDueDate,
-  };
-  const [row] = await tx
-    .insert(customerBalances)
-    .values({ customerId, ...values })
-    .onConflictDoUpdate({
-      target: customerBalances.customerId,
-      set: { ...values, updatedAt: sql`now()` },
-    })
-    .returning();
-  if (!row) throw new Error('customer_balances upsert returned no row');
-  return row;
 }
 
 /**
- * Every cached row against the ledger and the invoices (the nightly job, `pnpm finance:reconcile`):
- * a balance or an open-invoice count the cache got wrong is recorded as drift (the evidence stays
- * in the run), then every row is rewritten, which also moves the overdue amounts along with the
- * calendar. Plain functions so the CLI runs it without the Nest container.
+ * The receivables check (the nightly job, `pnpm finance:reconcile`): the Finance Core's own runs
+ * (each party balance against its items, each item against its allocations, the items against the
+ * receivable lines) and Bto's mirror — every issued invoice's open amount against its item. A drift
+ * of the mirror is recorded with its evidence and the mirror rewritten from the item. Plain
+ * functions so the CLI runs them without the Nest container.
  */
 export async function reconcileReceivables(
   db: Db,
   kind: 'NIGHTLY' | 'MANUAL',
 ): Promise<FinanceReconcileRun> {
-  const today = businessDate();
+  const core = await reconcileBooks(db, kind);
   return inTransaction(db, async (tx) => {
     const startedAt = new Date();
-    const ids = await tx
-      .select({ customerId: sql<number>`customer_id::int` })
-      .from(
-        sql`(SELECT customer_id FROM ar_entries UNION SELECT customer_id FROM customer_balances) ids`,
-      )
-      .orderBy(sql`customer_id`);
+    const items = await sourceOpenAmounts(tx, {
+      system: BTO_SOURCE,
+      docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+    });
+    const issued = await tx
+      .select({ id: invoices.id, number: invoices.number, openAmount: invoices.openAmount })
+      .from(invoices)
+      .where(eq(invoices.status, 'ISSUED'))
+      .orderBy(invoices.id);
     const drifts: ReconcileDrift[] = [];
-    for (const { customerId } of ids) {
-      const [cached] = await tx
-        .select()
-        .from(customerBalances)
-        .where(eq(customerBalances.customerId, customerId));
-      const computed = await computeBalance(tx, customerId, today);
-      const cachedBalance = cached?.balance ?? new Decimal(0);
-      const cachedOpen = cached?.openInvoices ?? 0;
-      if (!cachedBalance.eq(computed.balance) || cachedOpen !== computed.openInvoices) {
+    for (const row of issued) {
+      // An invoice with nothing to post (a zero total) has no item: its mirror is zero.
+      const item = items.get(String(row.id)) ?? new Decimal(0);
+      if (!row.openAmount.eq(item)) {
         drifts.push({
-          customerId,
-          cachedBalance: cachedBalance.toFixed(2),
-          ledgerBalance: computed.balance.toFixed(2),
-          cachedOpenInvoices: cachedOpen,
-          ledgerOpenInvoices: computed.openInvoices,
+          invoiceId: row.id,
+          number: row.number,
+          mirrorOpen: row.openAmount.toFixed(2),
+          itemOpen: item.toFixed(2),
         });
+        await tx.update(invoices).set({ openAmount: item }).where(eq(invoices.id, row.id));
       }
-      await upsertBalance(tx, customerId, today);
     }
-    const status = drifts.length === 0 ? 'OK' : 'DRIFT';
+    const result = { rows: issued };
+    const coreDrifted = core.reduce((sum, run) => sum + run.drifted, 0);
+    const status = drifts.length === 0 && coreDrifted === 0 ? 'OK' : 'DRIFT';
     const [run] = await tx
       .insert(financeReconcileRuns)
       .values({
         kind,
         status,
-        checked: ids.length,
-        drifted: drifts.length,
+        checked: result.rows.length,
+        drifted: drifts.length + coreDrifted,
         details: drifts.slice(0, MAX_DRIFT_DETAILS),
         startedAt,
       })
@@ -554,9 +543,10 @@ export async function reconcileReceivables(
       id: run.id,
       kind,
       status,
-      checked: ids.length,
-      drifted: drifts.length,
+      checked: result.rows.length,
+      drifted: drifts.length + coreDrifted,
       details: drifts,
+      core,
     };
   });
 }

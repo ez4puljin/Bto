@@ -1,10 +1,10 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import type { ProductJson } from '../harness/catalog';
-import { financeApi, type ProblemJson, salesFlow } from '../harness/finance';
+import { financeApi, moveInvoiceDue, type ProblemJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
 import { type CustomerJson, partnersApi } from '../harness/partners';
 
@@ -107,10 +107,10 @@ describe('finance credit control', () => {
     const next = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
     await flow.confirm(next.id).expect(200);
     // The clock moves past the due date.
-    await sql.query(
-      `UPDATE invoices SET invoice_date = $2::date - 1, due_date = $2::date - 1 WHERE id = $1`,
-      [invoice.id, today],
-    );
+    await moveInvoiceDue(sql, invoice.id, {
+      invoiceDate: addDays(today, -1),
+      dueDate: addDays(today, -1),
+    });
     const blocked = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }], {
       paymentMethod: 'CASH',
     });

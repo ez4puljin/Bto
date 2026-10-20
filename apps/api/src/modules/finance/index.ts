@@ -3,7 +3,6 @@
 export { FinanceHttpModule, FinanceModule, FinanceWorkerModule } from './finance.module';
 export { PAYMENT_LISTENER, type PaymentListener, type PaymentRecordedNotice } from './hooks';
 export {
-  type ArEntryInput,
   ArLedgerService,
   type Attention,
   type CustomerBalance,
@@ -14,6 +13,7 @@ export {
   reconcileReceivables,
   type StatementEntry,
 } from './services/ar-ledger.service';
+export { AllocationsService, type OpenItem } from './services/allocations.service';
 export { CreditControlService } from './services/credit-control.service';
 export {
   type CreditNoteDetail,

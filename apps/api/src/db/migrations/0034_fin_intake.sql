@@ -202,6 +202,7 @@ CREATE TABLE "fin"."reconcile_runs" (
 	"details" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"started_at" timestamp with time zone NOT NULL,
 	"finished_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "fin_reconcile_runs_company_id_key" UNIQUE("company_id","id"),
 	CONSTRAINT "fin_reconcile_runs_kind" CHECK ("fin"."reconcile_runs"."kind" IN ('CACHE', 'ITEMS', 'SUBLEDGER_GL')),
 	CONSTRAINT "fin_reconcile_runs_trigger" CHECK ("fin"."reconcile_runs"."trigger" IN ('NIGHTLY', 'MANUAL')),
 	CONSTRAINT "fin_reconcile_runs_status" CHECK ("fin"."reconcile_runs"."status" IN ('OK', 'DRIFT'))
@@ -230,7 +231,7 @@ ALTER TABLE "fin"."documents" ADD CONSTRAINT "fin_documents_reverses_fk" FOREIGN
 ALTER TABLE "fin"."intake_attempts" ADD CONSTRAINT "intake_attempts_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "fin"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fin"."intake_attempts" ADD CONSTRAINT "fin_intake_attempts_request_fk" FOREIGN KEY ("company_id","request_id") REFERENCES "fin"."intake_requests"("company_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fin"."intake_requests" ADD CONSTRAINT "fin_intake_requests_company_fk" FOREIGN KEY ("tenant_id","company_id") REFERENCES "fin"."companies"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fin"."intake_requests" ADD CONSTRAINT "fin_intake_requests_source_fk" FOREIGN KEY ("tenant_id","source_system_id") REFERENCES "fin"."source_systems"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "fin"."intake_requests" ADD CONSTRAINT "fin_intake_requests_source_fk" FOREIGN KEY ("company_id","source_system_id") REFERENCES "fin"."source_grants"("company_id","source_system_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fin"."number_counters" ADD CONSTRAINT "fin_number_counters_series_fk" FOREIGN KEY ("company_id","scope") REFERENCES "fin"."number_series"("company_id","code") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fin"."number_series" ADD CONSTRAINT "number_series_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "fin"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fin"."open_items" ADD CONSTRAINT "fin_open_items_line_fk" FOREIGN KEY ("company_id","journal_line_id","party_id","account_id") REFERENCES "fin"."journal_lines"("company_id","id","party_id","account_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -297,20 +298,21 @@ CREATE TRIGGER reconcile_runs_append_only BEFORE UPDATE OR DELETE ON fin.reconci
 CREATE TRIGGER reconcile_runs_no_truncate BEFORE TRUNCATE ON fin.reconcile_runs
   FOR EACH STATEMENT EXECUTE FUNCTION fin.forbid_update_delete();
 --> statement-breakpoint
--- An open item keeps everything but its open amount, for every role (the migrator included).
+-- An open item keeps everything but its open amount, for every role (the migrator included); only
+-- the migrator may correct a due date (app has no grant on it; tests move the calendar that way).
 CREATE FUNCTION fin.open_item_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    RAISE EXCEPTION 'fin.open_items rows are never deleted' USING ERRCODE = 'integrity_constraint_violation';
+    RAISE EXCEPTION 'fin.open_items rows are never deleted' USING ERRCODE = 'restrict_violation';
   END IF;
   IF (NEW.id, NEW.company_id, NEW.party_id, NEW.account_id, NEW.side, NEW.document_id,
       NEW.journal_line_id, NEW.source_system_id, NEW.group_ref, NEW.item_ref, NEW.item_date,
-      NEW.due_date, NEW.amount)
+      NEW.amount)
      IS DISTINCT FROM
      (OLD.id, OLD.company_id, OLD.party_id, OLD.account_id, OLD.side, OLD.document_id,
       OLD.journal_line_id, OLD.source_system_id, OLD.group_ref, OLD.item_ref, OLD.item_date,
-      OLD.due_date, OLD.amount) THEN
-    RAISE EXCEPTION 'only the open amount of a fin.open_items row changes' USING ERRCODE = 'integrity_constraint_violation';
+      OLD.amount) THEN
+    RAISE EXCEPTION 'only the open amount (and the due date) of a fin.open_items row changes' USING ERRCODE = 'restrict_violation';
   END IF;
   RETURN NEW;
 END $$;
@@ -332,12 +334,12 @@ BEGIN
   IF account_control IN ('RECEIVABLE', 'PAYABLE', 'ADVANCE_RECEIVED', 'ADVANCE_PAID') THEN
     IF NEW.party_id IS NULL THEN
       RAISE EXCEPTION 'journal line % is on a % account without a party', NEW.id, account_control
-        USING ERRCODE = 'integrity_constraint_violation';
+        USING ERRCODE = 'check_violation';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM fin.open_items i
                     WHERE i.company_id = NEW.company_id AND i.journal_line_id = NEW.id) THEN
       RAISE EXCEPTION 'journal line % is on a % account without its open item', NEW.id, account_control
-        USING ERRCODE = 'integrity_constraint_violation';
+        USING ERRCODE = 'check_violation';
     END IF;
   END IF;
   RETURN NULL;
@@ -392,6 +394,11 @@ INSERT INTO fin.number_counters (company_id, scope, period, value)
   ON CONFLICT DO NOTHING;
 --> statement-breakpoint
 DELETE FROM public.number_sequences WHERE scope_key IN ('PAY_NO', 'JE_NO');
+--> statement-breakpoint
+-- The key of a typed journal line (the accountant names the account), as the boot step makes it.
+INSERT INTO fin.posting_keys (company_id, code, required_control, requires_tax_code)
+  SELECT id, 'MANUAL', 'NONE', false FROM fin.companies WHERE code = 'BO'
+  ON CONFLICT DO NOTHING;
 --> statement-breakpoint
 -- Bto's document types, as the api's boot step makes them (ensureDefaultCompany).
 INSERT INTO fin.document_types (company_id, code, source_system_id, class, number_mode, number_series)

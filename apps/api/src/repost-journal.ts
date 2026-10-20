@@ -50,8 +50,7 @@ async function main(): Promise<void> {
     }
     console.log(
       `Re-posted: ${counts.invoices} invoice(s), ${counts.invoiceVoids} invoice void(s), ` +
-        `${counts.creditNotes} credit note(s), ${counts.payments} voucher(s), ` +
-        `${counts.paymentVoids} voucher void(s), ${shiftCount} POS shift close(s).`,
+        `${counts.creditNotes} credit note(s), ${shiftCount} POS shift close(s).`,
     );
   } finally {
     await app.close();

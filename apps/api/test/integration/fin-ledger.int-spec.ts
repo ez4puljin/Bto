@@ -54,7 +54,7 @@ describe('Finance Core without Bto (F1 ledger)', () => {
     }
   };
   const sale = async (amount: string): Promise<FinEntryLineIn[]> => [
-    { key: 'AR', debit: d(amount), credit: d('0') },
+    { key: 'CLEARING', debit: d(amount), credit: d('0') },
     { accountId: await accountId('5101'), debit: d('0'), credit: d(amount) },
   ];
 
@@ -79,6 +79,8 @@ describe('Finance Core without Bto (F1 ledger)', () => {
     expect(accounts.map((account) => [account.code, account.normalSide, account.control])).toEqual([
       ['1001', 'DEBIT', 'MONEY'],
       ['1201', 'DEBIT', 'RECEIVABLE'],
+      ['1301', 'DEBIT', 'NONE'],
+      ['3101', 'CREDIT', 'PAYABLE'],
       ['3110', 'CREDIT', 'NONE'],
       ['5101', 'CREDIT', 'NONE'],
     ]);
@@ -98,7 +100,7 @@ describe('Finance Core without Bto (F1 ledger)', () => {
       lineCount: 2,
     });
     expect(detail?.lines.map((line) => [line.accountCode, line.postingKey])).toEqual([
-      ['1201', 'AR'],
+      ['1301', 'CLEARING'],
       ['5101', null],
     ]);
     const { rows } = await admin.query<{ code: string; status: string; rules: string }>(
@@ -167,12 +169,12 @@ describe('Finance Core without Bto (F1 ledger)', () => {
 
   it('follows a rule from its date, and an unmapping refuses the key from then on', async () => {
     const config = StaticCaller.user({ [TEST_COMPANY]: ['finance.config.manage'] });
-    const cash = await accountId('1001');
+    const tax = await accountId('3110');
     await db.transaction((tx) =>
       chart.setRuleInTx(tx, config, {
         company: TEST_COMPANY,
-        key: 'AR',
-        accountId: cash,
+        key: 'CLEARING',
+        accountId: tax,
         effectiveFrom: '2026-11-01',
       }),
     );
@@ -180,12 +182,12 @@ describe('Finance Core without Bto (F1 ledger)', () => {
     const after = await post(await sale('10'), '2026-11-02');
     const code = async (id: number) =>
       (await reader.entry(source(), { company: TEST_COMPANY, id }))?.lines[0]?.accountCode;
-    expect(await code(before.id)).toBe('1201');
-    expect(await code(after.id)).toBe('1001');
+    expect(await code(before.id)).toBe('1301');
+    expect(await code(after.id)).toBe('3110');
     await db.transaction((tx) =>
       chart.setRuleInTx(tx, config, {
         company: TEST_COMPANY,
-        key: 'AR',
+        key: 'CLEARING',
         accountId: null,
         effectiveFrom: '2026-11-03',
       }),
@@ -228,7 +230,7 @@ describe('Finance Core without Bto (F1 ledger)', () => {
         line.credit.toFixed(2),
       ]),
     ).toEqual([
-      ['1201', '0.00', '300.00'],
+      ['1301', '0.00', '300.00'],
       ['5101', '300.00', '0.00'],
     ]);
     expect(
@@ -276,7 +278,7 @@ describe('Finance Core without Bto (F1 ledger)', () => {
       company: TEST_COMPANY,
       asOf: '2026-10-31',
     });
-    const ar = totals.get(await accountId('1201'));
+    const ar = totals.get(await accountId('1301'));
     expect(ar?.debit.gt(0)).toBe(true);
     const listed = await reader.entries(source(), {
       company: TEST_COMPANY,

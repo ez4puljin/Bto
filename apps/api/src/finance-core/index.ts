@@ -64,6 +64,7 @@ export {
   type FinReconcileRun,
   type FinTransactor,
   reconcileBooks,
+  sourceOpenAmounts,
 } from './posting/reconcile';
 export { type FinPartyRef, FinPartiesService } from './parties/parties.service';
 export {

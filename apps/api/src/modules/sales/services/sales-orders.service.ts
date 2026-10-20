@@ -760,6 +760,7 @@ export class SalesOrdersService implements OnModuleInit {
       excess: decision.excess.toFixed(0),
       overdueAmount: decision.overdueAmount.toFixed(0),
       oldestDueDate: decision.oldestDueDate,
+      ...(decision.creditsOpen ? { creditsOpen: decision.creditsOpen.toFixed(0) } : {}),
     });
   }
 

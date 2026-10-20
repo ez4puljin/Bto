@@ -1,5 +1,6 @@
 // Public API of the fin-bridge module (docs/modules/fin-bridge.md): Bto's side of the Finance Core.
 // Only the composition roots import it; named exports only (ESLint G2 rejects `export *`).
+export { newCommandId } from './command-id';
 export { FinBridgeHttpModule, FinBridgeModule } from './fin-bridge.module';
 export {
   BTO_SOURCE,
@@ -8,8 +9,11 @@ export {
   btoInstallationSpec,
   customerIdOfRef,
   customerRef,
+  ALLOCATION_NUMBER_DEFAULT,
+  FIN_DOC_TYPES,
   FIN_SOURCE,
   LEGACY_PARTY_REF,
+  MANUAL_KEY,
   POSTING_KEY_OF_ROLE,
   ROLE_OF_POSTING_KEY,
 } from './installation';

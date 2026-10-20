@@ -8,7 +8,8 @@ import { partnersApi } from '../harness/partners';
 
 /**
  * The database guards of finance (ADR-0060, migration 0026; the journal and the chart in the Finance
- * Core since F1's ledger, ADR-0089, migration 0033): the receivables ledger and the journal are
+ * Core since F1's ledger, ADR-0089, migration 0033; the receivables as its open items since F2,
+ * ADR-0090, migration 0034): the receivables' items, documents and allocations and the journal are
  * append-only for app and for migrator alike, documents and accounts are never deleted, and an
  * entry that does not balance never commits, whoever writes it.
  */
@@ -43,11 +44,16 @@ describe('finance guards', () => {
   it('lets app neither change nor delete the ledger, the journal or a document', async () => {
     expect(
       await sqlStateOf(
-        asApp.query('UPDATE ar_entries SET debit = debit WHERE doc_id = $1', [invoiceId]),
+        asApp.query(
+          `UPDATE fin.open_items SET amount = amount WHERE document_id IN (SELECT d.id FROM fin.documents d WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text)`,
+          [invoiceId],
+        ),
       ),
     ).toBe('42501');
     expect(
-      await sqlStateOf(asApp.query('DELETE FROM ar_entries WHERE doc_id = $1', [invoiceId])),
+      await sqlStateOf(
+        asApp.query(`DELETE FROM fin.open_items WHERE document_id IN (SELECT d.id FROM fin.documents d WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text)`, [invoiceId]),
+      ),
     ).toBe('42501');
     expect(
       await sqlStateOf(asApp.query('DELETE FROM fin.journal_lines WHERE entry_id = $1', [entryId])),
@@ -69,7 +75,9 @@ describe('finance guards', () => {
     expect(
       await sqlStateOf(asApp.query('DELETE FROM fin.accounts WHERE code = $1', ['120101'])),
     ).toBe('42501');
-    expect(await sqlStateOf(asApp.query('TRUNCATE allocations'))).toBe('42501');
+    expect(await sqlStateOf(asApp.query('TRUNCATE fin.allocations'))).toBe('42501');
+    expect(await sqlStateOf(asApp.query('DELETE FROM fin.documents'))).toBe('42501');
+    expect(await sqlStateOf(asApp.query('UPDATE fin.allocations SET amount = amount'))).toBe('42501');
   });
 
   it('stops even the owner from rewriting the ledger or the journal', async () => {
@@ -85,10 +93,20 @@ describe('finance guards', () => {
     ).toBe('23001');
     expect(
       await sqlStateOf(
-        migrator.query('UPDATE ar_entries SET credit = 1 WHERE doc_id = $1', [invoiceId]),
+        migrator.query(
+          `UPDATE fin.open_items SET amount = amount + 1 WHERE document_id IN (SELECT d.id FROM fin.documents d WHERE d.source_doc_type = 'SALES_INVOICE' AND d.source_doc_id = $1::text)`,
+          [invoiceId],
+        ),
       ),
     ).toBe('23001');
-    expect(await sqlStateOf(migrator.query('TRUNCATE ar_entries'))).toBe('23001');
+    expect(await sqlStateOf(migrator.query('TRUNCATE fin.allocations'))).toBe('23001');
+    expect(
+      await sqlStateOf(
+        migrator.query('UPDATE fin.documents SET description = description WHERE source_doc_id = $1', [
+          String(invoiceId),
+        ]),
+      ),
+    ).toBe('23001');
   });
 
   it('never commits an entry that does not balance or has one line, as app or as migrator', async () => {

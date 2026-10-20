@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { PartyIn } from '@tugeel/fin-contract';
 import type { Tx } from '../../../common/db/db.types';
 import { FIN_DB, type FinDb, type FinPartyRef, FinPartiesService } from '../../../finance-core';
 import { type Actor, systemActor } from '../../identity';
@@ -50,6 +51,19 @@ export class FinPartiesBridge implements CustomerChangedHook {
     const made = await this.resolveCustomerParty(tx, actor, customerId);
     if (!made) throw new Error(`customer ${customerId} has no party`);
     return made.partyId;
+  }
+
+  /** A customer as the intake names its party (F2): the ref and the customer's facts. */
+  async customerPartyIn(tx: Tx, customerId: number): Promise<PartyIn> {
+    const [customer] = await this.customers.getMany([customerId], tx);
+    if (!customer) throw new Error(`customer ${customerId} does not exist`);
+    return {
+      ref: customerRef(customer.id),
+      kind: customer.kind,
+      name: customer.name.trim().slice(0, 200),
+      ...(customer.tin === null ? {} : { tin: customer.tin }),
+      ...(customer.regNo === null ? {} : { registerNo: customer.regNo }),
+    };
   }
 
   /** The parties of these customers that the core knows, by customer id (journal filters). */

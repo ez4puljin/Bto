@@ -4,11 +4,12 @@ import { Decimal, toWholeMnt } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
-import type { Db } from '../../../common/db/db.types';
+import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import {
+  type Actor,
   AuditService,
   type AuthContext,
   OrgService,
@@ -17,10 +18,15 @@ import {
 } from '../../identity';
 import { BinsService, type Movement, StockPostingService } from '../../inventory';
 import { CustomersService } from '../../partners';
-import { allocations, creditNoteLines, creditNotes, invoiceLines, invoices } from '../schema';
-import { ArLedgerService } from './ar-ledger.service';
+import { FinReader } from '../../../finance-core';
+import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
+import { creditNoteLines, creditNotes, invoiceLines, invoices } from '../schema';
+import { FinBooks } from './fin-books';
+import { FinPosting } from './fin-posting';
 import { FinanceSettingsService } from './finance-settings.service';
-import { assertNotFuture, type JournalLineInput, JournalService } from './journal.service';
+import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
+import { documentLabel, entryIdOf } from './invoicing.service';
+import { assertNotFuture } from './journal.service';
 
 export interface CreditNoteLineInput {
   invoiceLineId: number;
@@ -121,8 +127,10 @@ export class CreditNotesService {
     private readonly posting: StockPostingService,
     private readonly customers: CustomersService,
     private readonly settings: FinanceSettingsService,
-    private readonly journal: JournalService,
-    private readonly ledger: ArLedgerService,
+    private readonly intake: FinPosting,
+    private readonly books: FinBooks,
+    private readonly parties: FinPartiesBridge,
+    private readonly reader: FinReader,
   ) {}
 
   async create(ctx: AuthContext, input: CreditNoteInput): Promise<CreditNoteDetail> {
@@ -282,44 +290,21 @@ export class CreditNotesService {
           })
           .where(eq(invoiceLines.id, line.invoiceLineId));
       }
+      // The note settles its own invoice up to what is open; the rest stays the customer's credit.
       const allocated = Decimal.min(totals.total, locked.openAmount);
-      if (allocated.gt(0)) {
-        await tx.insert(allocations).values({
-          sourceType: 'CREDIT_NOTE',
-          sourceId: note.id,
-          invoiceId: invoice.id,
-          amount: allocated,
-        });
-        await tx
-          .update(invoices)
-          .set({ openAmount: sql`${invoices.openAmount} - ${allocated.toFixed(2)}::numeric` })
-          .where(eq(invoices.id, invoice.id));
-      }
-      const zero = new Decimal(0);
-      const entryLines = creditNoteEntryLines(invoice.customerId, totals);
-      const [customer] = await this.customers.getMany([invoice.customerId], tx);
-      const entry = await this.journal.post(tx, ctx, {
-        entryDate: noteDate,
-        description: customer ? `${number} — ${customer.name}` : number,
-        source: 'AUTO_CREDIT_NOTE',
-        sourceType: 'CREDIT_NOTE',
-        sourceId: note.id,
-        lines: entryLines,
+      const entryId = await this.postCreditNoteInTx(tx, ctx, {
+        id: note.id,
+        number,
+        customerId: invoice.customerId,
+        invoiceId: invoice.id,
+        noteDate,
+        settles: allocated,
+        ...totals,
       });
       await tx
         .update(creditNotes)
-        .set({ journalEntryId: entry.id })
+        .set({ journalEntryId: entryId })
         .where(eq(creditNotes.id, note.id));
-      await this.ledger.record(tx, {
-        customerId: invoice.customerId,
-        entryDate: noteDate,
-        kind: 'CREDIT_NOTE',
-        docType: 'CREDIT_NOTE',
-        docId: note.id,
-        docNumber: number,
-        debit: zero,
-        credit: totals.total,
-      });
       await this.audit.record(tx, ctx, {
         action: 'CREATE',
         entity: 'credit_notes',
@@ -424,9 +409,50 @@ export class CreditNotesService {
       note: creditNotes,
       invoiceNumber: invoices.number,
       lineCount: sql<string>`(SELECT count(*) FROM credit_note_lines l WHERE l.credit_note_id = credit_notes.id)`,
-      allocatedAmount: sql<string>`(SELECT coalesce(sum(a.amount), 0) FROM allocations a
-        WHERE a.source_type = 'CREDIT_NOTE' AND a.source_id = credit_notes.id AND a.voided_at IS NULL)`,
     };
+  }
+
+  /**
+   * Posts a credit note to the Finance Core as an AR_CREDIT of source BTO (ADR-0073 #3, ADR-0090):
+   * the receivable's credit settles `settles` of its invoice's item, the rest stays an open credit.
+   * Also used by the development re-post. Returns the journal entry's id.
+   */
+  async postCreditNoteInTx(
+    tx: Tx,
+    actor: Actor,
+    note: {
+      id: number;
+      number: string;
+      customerId: number;
+      invoiceId: number;
+      noteDate: string;
+      settles: Decimal;
+      total: Decimal;
+      vatTotal: Decimal;
+      cityTaxTotal: Decimal;
+    },
+  ): Promise<number | null> {
+    const party = await this.parties.customerPartyIn(tx, note.customerId);
+    const lines = creditNoteEntryLines(note);
+    const result = await this.intake.submitInTx(tx, this.books.source(actor), {
+      source: {
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.SALES_RETURN.docType,
+        docId: String(note.id),
+        docNo: note.number,
+      },
+      body: {
+        action: 'POST',
+        documentType: FIN_DOC_TYPES.SALES_RETURN.code,
+        documentDate: note.noteDate,
+        currency: 'MNT',
+        party,
+        description: documentLabel(note.number, party.name),
+        controlTotal: controlTotal(lines),
+        lines: intakeLines(lines),
+      },
+    });
+    return entryIdOf(result);
   }
 
   private async summaries(
@@ -434,7 +460,6 @@ export class CreditNotesService {
       note: NoteRow;
       invoiceNumber: string | null;
       lineCount: string;
-      allocatedAmount: string;
     }[],
   ): Promise<CreditNoteSummary[]> {
     if (rows.length === 0) return [];
@@ -450,58 +475,87 @@ export class CreditNotesService {
     const names = await this.names.namesOf(
       rows.flatMap((row) => (row.note.createdBy === null ? [] : [row.note.createdBy])),
     );
-    const journalNumbers = await this.journal.numbersOf(
-      rows.flatMap((row) => (row.note.journalEntryId === null ? [] : [row.note.journalEntryId])),
-    );
-    return rows.map(({ note, invoiceNumber, lineCount, allocatedAmount }) => ({
-      id: note.id,
-      number: note.number,
-      invoiceId: note.invoiceId,
-      invoiceNumber: invoiceNumber ?? '',
-      customerId: note.customerId,
-      customerCode: customers.get(note.customerId)?.code ?? '',
-      customerName: customers.get(note.customerId)?.name ?? '',
-      noteDate: note.noteDate,
-      reason: note.reason,
-      warehouseId: note.warehouseId,
-      warehouseName: note.warehouseId === null ? null : (warehouses.get(note.warehouseId) ?? null),
-      binId: note.binId,
-      binCode: note.binId === null ? null : (bins.get(note.binId) ?? null),
-      subtotal: note.subtotal,
-      discountTotal: note.discountTotal,
-      total: note.total,
-      vatTotal: note.vatTotal,
-      cityTaxTotal: note.cityTaxTotal,
-      allocatedAmount: new Decimal(allocatedAmount),
-      journalEntryId: note.journalEntryId,
-      journalNumber:
-        note.journalEntryId === null ? null : (journalNumbers.get(note.journalEntryId) ?? null),
-      lineCount: Number.parseInt(lineCount, 10),
-      createdAt: note.createdAt,
-      createdByName: note.createdBy === null ? null : (names.get(note.createdBy) ?? null),
-    }));
+    const documents = await this.reader.documentsOfSource(this.books.source(), {
+      company: await this.books.company(),
+      system: BTO_SOURCE,
+      docType: FIN_DOC_TYPES.SALES_RETURN.docType,
+      docIds: rows.map((row) => String(row.note.id)),
+    });
+    return rows.map(({ note, invoiceNumber, lineCount }) => {
+      const document = documents.get(String(note.id));
+      return {
+        id: note.id,
+        number: note.number,
+        invoiceId: note.invoiceId,
+        invoiceNumber: invoiceNumber ?? '',
+        customerId: note.customerId,
+        customerCode: customers.get(note.customerId)?.code ?? '',
+        customerName: customers.get(note.customerId)?.name ?? '',
+        noteDate: note.noteDate,
+        reason: note.reason,
+        warehouseId: note.warehouseId,
+        warehouseName:
+          note.warehouseId === null ? null : (warehouses.get(note.warehouseId) ?? null),
+        binId: note.binId,
+        binCode: note.binId === null ? null : (bins.get(note.binId) ?? null),
+        subtotal: note.subtotal,
+        discountTotal: note.discountTotal,
+        total: note.total,
+        vatTotal: note.vatTotal,
+        cityTaxTotal: note.cityTaxTotal,
+        allocatedAmount: document?.settled ?? new Decimal(0),
+        journalEntryId: note.journalEntryId,
+        journalNumber: document?.journalNo ?? null,
+        lineCount: Number.parseInt(lineCount, 10),
+        createdAt: note.createdAt,
+        createdByName: note.createdBy === null ? null : (names.get(note.createdBy) ?? null),
+      };
+    });
   }
 }
 
 /**
- * A credit note's entry (ADR-0060 #6): Dr sales returns net of the taxes, Dr the taxes payable, Cr
- * receivables (the customer on the line); zero lines skipped. Also used by the development re-post
- * (`pnpm finance:repost-journal`, ADR-0089).
+ * A credit note's lines (ADR-0060 #6): Dr sales returns net of the taxes, Dr the taxes payable
+ * with their base, Cr receivables settling its invoice for `settles` (none when nothing is open);
+ * zero lines skipped.
  */
-export function creditNoteEntryLines(
-  customerId: number,
-  totals: { total: Decimal; vatTotal: Decimal; cityTaxTotal: Decimal },
-): JournalLineInput[] {
+export function creditNoteEntryLines(note: {
+  invoiceId: number;
+  settles: Decimal;
+  total: Decimal;
+  vatTotal: Decimal;
+  cityTaxTotal: Decimal;
+}): RoleLine[] {
   const zero = new Decimal(0);
-  const lines: JournalLineInput[] = [];
-  const net = totals.total.minus(totals.vatTotal).minus(totals.cityTaxTotal);
+  const lines: RoleLine[] = [];
+  const net = note.total.minus(note.vatTotal).minus(note.cityTaxTotal);
   if (net.gt(0)) lines.push({ role: 'SALES_RETURN', debit: net, credit: zero });
-  if (totals.vatTotal.gt(0)) {
-    lines.push({ role: 'VAT_PAYABLE', debit: totals.vatTotal, credit: zero });
+  if (note.vatTotal.gt(0)) {
+    lines.push({ role: 'VAT_PAYABLE', debit: note.vatTotal, credit: zero, taxBase: net });
   }
-  if (totals.cityTaxTotal.gt(0)) {
-    lines.push({ role: 'CITY_TAX_PAYABLE', debit: totals.cityTaxTotal, credit: zero });
+  if (note.cityTaxTotal.gt(0)) {
+    lines.push({ role: 'CITY_TAX_PAYABLE', debit: note.cityTaxTotal, credit: zero, taxBase: net });
   }
-  lines.push({ role: 'AR', debit: zero, credit: totals.total, customerId });
+  lines.push({
+    role: 'AR',
+    debit: zero,
+    credit: note.total,
+    ...(note.settles.gt(0)
+      ? {
+          extra: {
+            settles: [
+              {
+                target: {
+                  system: BTO_SOURCE,
+                  docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+                  docId: String(note.invoiceId),
+                },
+                amount: note.settles.toFixed(2),
+              },
+            ],
+          },
+        }
+      : {}),
+  });
   return lines;
 }

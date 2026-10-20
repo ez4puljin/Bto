@@ -36,6 +36,8 @@ export type CreditDecision =
       excess: Decimal;
       overdueAmount: Decimal;
       oldestDueDate: string | null;
+      /** The customer's open credits (unapplied payments and returns), from the Finance Core (ADR-0073 #4). */
+      creditsOpen?: Decimal;
     };
 
 export interface CreditChecker {

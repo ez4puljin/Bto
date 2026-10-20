@@ -126,6 +126,7 @@ export interface FinOpenItemRow {
     sourceSystem: string;
     sourceDocType: string;
     sourceDocId: string;
+    entryId: number | null;
   };
 }
 
@@ -140,12 +141,22 @@ export interface FinItemSource {
 
 type Row = Record<string, unknown>;
 
-const dec = (value: unknown): Decimal => new Decimal(typeof value === 'string' ? value : String(value ?? 0));
-const int = (value: unknown): number => Number.parseInt(String(value), 10);
+/** A raw row's value as text (numerics, ids and dates come back as strings or numbers). */
+const scalar = (value: unknown): string =>
+  typeof value === 'string'
+    ? value
+    : typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean'
+      ? value.toString()
+      : value instanceof Date
+        ? value.toISOString()
+        : '';
+const dec = (value: unknown): Decimal => new Decimal(scalar(value) || 0);
+const int = (value: unknown): number => Number.parseInt(scalar(value), 10);
 const intOrNull = (value: unknown): number | null => (value === null || value === undefined ? null : int(value));
-const str = (value: unknown): string => String(value);
-const strOrNull = (value: unknown): string | null => (value === null || value === undefined ? null : String(value));
-const date = (value: unknown): Date => (value instanceof Date ? value : new Date(String(value)));
+const str = (value: unknown): string => scalar(value);
+const strOrNull = (value: unknown): string | null =>
+  value === null || value === undefined ? null : scalar(value);
+const date = (value: unknown): Date => (value instanceof Date ? value : new Date(scalar(value)));
 
 /**
  * The read port of the sub-ledger (docs/modules/finance-core.md §8), as far as Bto needs it in F2
@@ -264,8 +275,8 @@ export class FinReader {
   ): Promise<{ rows: FinPartyLedgerRow[]; opening: Decimal }> {
     const scope = await this.scope(this.db, ctx, query.company);
     const filters: SQL[] = [sql`TRUE`];
-    if (query.from) filters.push(sql`r.entry_date >= ${query.from}::date`);
-    if (query.to) filters.push(sql`r.entry_date <= ${query.to}::date`);
+    if (query.from) filters.push(sql`r.entry_date::date >= ${query.from}::date`);
+    if (query.to) filters.push(sql`r.entry_date::date <= ${query.to}::date`);
     if (query.beforeLineId !== undefined) filters.push(sql`r.line_id < ${query.beforeLineId}`);
     const result = await this.db.execute<Row>(sql`
       WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, sql`l.id`)})
@@ -285,8 +296,8 @@ export class FinReader {
     const opening = await this.partyBalanceBefore(scope.companyId, query.partyId, query.from);
     const result = await this.db.execute<Row>(sql`
       WITH r AS (${this.partyLinesSql(scope.companyId, query.partyId, sql`e.entry_date, l.id`)})
-      SELECT * FROM r WHERE r.entry_date BETWEEN ${query.from}::date AND ${query.to}::date
-       ORDER BY r.entry_date, r.line_id`);
+      SELECT * FROM r WHERE r.entry_date::date BETWEEN ${query.from}::date AND ${query.to}::date
+       ORDER BY r.entry_date::date, r.line_id`);
     let balance = opening;
     const rows = result.rows.map((row) => {
       const mapped = toLedgerRow(row);
@@ -423,7 +434,9 @@ export class FinReader {
     const result = await this.db.execute<Row>(sql`
       SELECT i.id, i.side, i.item_date::text AS item_date, i.due_date::text AS due_date, i.amount,
              i.open_amount, d.id AS document_id, t.code AS type_code, d.class, d.number,
-             s.code AS system, d.source_doc_type, d.source_doc_id
+             s.code AS system, d.source_doc_type, d.source_doc_id,
+             (SELECT e.id FROM fin.journal_entries e
+               WHERE e.company_id = d.company_id AND e.document_id = d.id) AS entry_id
         FROM fin.open_items i
         JOIN fin.accounts a ON a.company_id = i.company_id AND a.id = i.account_id
         JOIN fin.documents d ON d.company_id = i.company_id AND d.id = i.document_id
@@ -447,6 +460,7 @@ export class FinReader {
         sourceSystem: str(row.system),
         sourceDocType: str(row.source_doc_type),
         sourceDocId: str(row.source_doc_id),
+        entryId: intOrNull(row.entry_id),
       },
     }));
   }

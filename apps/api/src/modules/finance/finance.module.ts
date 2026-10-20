@@ -23,7 +23,10 @@ import {
   FinanceAttentionController,
   FinanceSettingsController,
 } from './controllers/receivables.controller';
+import { AllocationsController } from './controllers/allocations.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
+import { AllocationsService } from './services/allocations.service';
+import { FinPosting } from './services/fin-posting';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
@@ -40,6 +43,8 @@ import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.s
 
 const SERVICES = [
   FinBooks,
+  FinPosting,
+  AllocationsService,
   FinanceSettingsService,
   GlAccountsService,
   JournalService,
@@ -96,6 +101,7 @@ export class FinanceModule {}
     CustomerBalancesController,
     FinanceAttentionController,
     FinanceSettingsController,
+    AllocationsController,
   ],
 })
 export class FinanceHttpModule {}

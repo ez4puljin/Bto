@@ -79,8 +79,10 @@ describe('finance books', () => {
       await finance.createAccount({ code: '999999', name: 'Хаасан', kind: 'EXPENSE' }).expect(201)
     ).body as { id: number };
     await finance.patchAccount(inactive.id, { status: 'INACTIVE' }).expect(200);
+    // A line on the cash account names its cash box (the core's money control, F2, ADR-0090).
+    const box = await financeApi(app, admin).cashBox('FB-MANUAL');
     const lines = [
-      { accountId: cash.id, debit: '5000' },
+      { accountId: cash.id, moneyAccountId: box.id, debit: '5000' },
       { accountId: income.id, credit: '5000', description: 'Бусад орлого' },
     ];
     await financeApi(app, office)
@@ -260,7 +262,7 @@ describe('finance books', () => {
           entryDate: today,
           description: 'Дугаарлалт',
           lines: [
-            { accountId: cash.id, debit: '100' },
+            { accountId: cash.id, moneyAccountId: (await financeApi(app, admin).cashBox('FB-NUMBERS')).id, debit: '100' },
             { accountId: income.id, credit: '100' },
           ],
         })

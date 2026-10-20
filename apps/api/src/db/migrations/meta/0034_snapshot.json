@@ -7269,15 +7269,15 @@
         "fin_intake_requests_source_fk": {
           "name": "fin_intake_requests_source_fk",
           "tableFrom": "intake_requests",
-          "tableTo": "source_systems",
+          "tableTo": "source_grants",
           "schemaTo": "fin",
           "columnsFrom": [
-            "tenant_id",
+            "company_id",
             "source_system_id"
           ],
           "columnsTo": [
-            "tenant_id",
-            "id"
+            "company_id",
+            "source_system_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -9433,7 +9433,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "fin_reconcile_runs_company_id_key": {
+          "name": "fin_reconcile_runs_company_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "fin_reconcile_runs_kind": {

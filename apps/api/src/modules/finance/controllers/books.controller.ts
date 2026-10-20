@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseIntPipe,
@@ -213,9 +214,12 @@ export class JournalController {
   async post(
     @CurrentUser() ctx: AuthContext,
     @Body() body: JournalEntryRequestDto,
+    @Headers('idempotency-key') key?: string,
   ): Promise<JournalEntryDetailDto> {
     return journalEntryDetailDto(
-      await this.journal.postManual(ctx, {
+      await this.journal.postManual(
+        ctx,
+        {
         entryDate: body.entryDate,
         description: body.description,
         lines: body.lines.map((line) => ({
@@ -226,7 +230,9 @@ export class JournalController {
           moneyAccountId: line.moneyAccountId ?? null,
           description: line.description ?? null,
         })),
-      }),
+        },
+        key ?? null,
+      ),
     );
   }
 

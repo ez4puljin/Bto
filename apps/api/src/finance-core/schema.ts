@@ -892,8 +892,8 @@ export const finIntakeRequests = finSchema.table(
     }),
     foreignKey({
       name: 'fin_intake_requests_source_fk',
-      columns: [t.tenantId, t.sourceSystemId],
-      foreignColumns: [finSourceSystems.tenantId, finSourceSystems.id],
+      columns: [t.companyId, t.sourceSystemId],
+      foreignColumns: [finSourceGrants.companyId, finSourceGrants.sourceSystemId],
     }),
     index('fin_intake_requests_status_idx').on(t.companyId, t.status, t.id),
     check('fin_intake_requests_doc_type', codeShape(t.sourceDocType)),
@@ -1238,6 +1238,7 @@ export const finReconcileRuns = finSchema.table(
     finishedAt: timestamp('finished_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    unique('fin_reconcile_runs_company_id_key').on(t.companyId, t.id),
     index('fin_reconcile_runs_company_idx').on(t.companyId, t.kind, t.id),
     check('fin_reconcile_runs_kind', sql`${t.kind} IN ('CACHE', 'ITEMS', 'SUBLEDGER_GL')`),
     check('fin_reconcile_runs_trigger', sql`${t.trigger} IN ('NIGHTLY', 'MANUAL')`),

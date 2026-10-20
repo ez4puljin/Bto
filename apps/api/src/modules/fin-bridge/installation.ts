@@ -1,4 +1,4 @@
-import { DEFAULT_GL_ACCOUNTS, type GlRole } from '@tugeel/shared/finance';
+import { DEFAULT_GL_ACCOUNTS, FINANCE_NUMBER_DEFAULTS, type GlRole } from '@tugeel/shared/finance';
 import mn from '@tugeel/shared/i18n/mn.json';
 import type {
   FinAccountControl,
@@ -14,6 +14,25 @@ export const BTO_SOURCE = 'BTO';
 /** The core's own screens, and the owner of the legacy party (ADR-0070 #8). */
 export const FIN_SOURCE = 'FIN';
 export const LEGACY_PARTY_REF = 'LEGACY_UNASSIGNED';
+
+/**
+ * Bto's document types in the core (F2, ADR-0090; migration 0034 wrote the same rows): the sale's
+ * invoice and the sales return numbered by Bto, the vouchers, manual entries and allocations of the
+ * core's screens (source FIN) numbered by the core.
+ */
+export const FIN_DOC_TYPES = {
+  SALES_INVOICE: { code: 'BTO.SALES_INVOICE', system: BTO_SOURCE, docType: 'SALES_INVOICE' },
+  SALES_RETURN: { code: 'BTO.SALES_RETURN', system: BTO_SOURCE, docType: 'SALES_RETURN' },
+  CUSTOMER_RECEIPT: { code: 'FIN.CUSTOMER_RECEIPT', system: FIN_SOURCE, docType: 'RECEIPT' },
+  CUSTOMER_REFUND: { code: 'FIN.CUSTOMER_REFUND', system: FIN_SOURCE, docType: 'PAYMENT' },
+  OTHER_RECEIPT: { code: 'FIN.OTHER_RECEIPT', system: FIN_SOURCE, docType: 'RECEIPT' },
+  OTHER_PAYMENT: { code: 'FIN.OTHER_PAYMENT', system: FIN_SOURCE, docType: 'PAYMENT' },
+  JOURNAL: { code: 'FIN.JOURNAL', system: FIN_SOURCE, docType: 'JOURNAL' },
+  ALLOCATION: { code: 'FIN.ALLOCATION', system: FIN_SOURCE, docType: 'ALLOCATION' },
+} as const;
+
+/** The allocations' number format until the accountant chooses one (TODO-VERIFY, ADR-0090). */
+export const ALLOCATION_NUMBER_DEFAULT = { pattern: 'Х-{year}{month}{day}-', digits: 4 } as const;
 
 /** A customer's ref under source BTO; 0032_fin_foundation backfilled the same refs. */
 export const customerRef = (customerId: number): string => `customer:${customerId}`;
@@ -60,6 +79,9 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   POS_SALES: key('POS_SALES'),
   CASH_VARIANCE: key('CASH_VARIANCE'),
 };
+
+/** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */
+export const MANUAL_KEY = 'MANUAL';
 
 /** The roles whose accounts reduce income: debit-normal although their kind is INCOME. */
 const CONTRA_INCOME_ROLES: ReadonlySet<GlRole> = new Set(['SALES_RETURN', 'SALES_DISCOUNT']);
@@ -114,8 +136,23 @@ export function btoInstallationSpec(input: {
       { code: BTO_SOURCE, linkTemplate: null },
       { code: FIN_SOURCE, linkTemplate: null },
     ],
-    postingKeys: Object.values(POSTING_KEY_OF_ROLE),
+    postingKeys: [...Object.values(POSTING_KEY_OF_ROLE), key(MANUAL_KEY)],
     legacyParty: { system: FIN_SOURCE, ref: LEGACY_PARTY_REF, name: LEGACY_PARTY_REF },
+    numberSeries: [
+      { code: 'PAYMENT', ...FINANCE_NUMBER_DEFAULTS.PAYMENT },
+      { code: 'JOURNAL', ...FINANCE_NUMBER_DEFAULTS.JOURNAL },
+      { code: 'ALLOCATION', ...ALLOCATION_NUMBER_DEFAULT },
+    ],
+    documentTypes: [
+      { code: FIN_DOC_TYPES.SALES_INVOICE.code, system: BTO_SOURCE, class: 'AR_INVOICE', numberMode: 'SOURCE', numberSeries: null },
+      { code: FIN_DOC_TYPES.SALES_RETURN.code, system: BTO_SOURCE, class: 'AR_CREDIT', numberMode: 'SOURCE', numberSeries: null },
+      { code: FIN_DOC_TYPES.CUSTOMER_RECEIPT.code, system: FIN_SOURCE, class: 'RECEIPT', numberMode: 'CORE', numberSeries: 'PAYMENT' },
+      { code: FIN_DOC_TYPES.CUSTOMER_REFUND.code, system: FIN_SOURCE, class: 'PAYMENT', numberMode: 'CORE', numberSeries: 'PAYMENT' },
+      { code: FIN_DOC_TYPES.OTHER_RECEIPT.code, system: FIN_SOURCE, class: 'RECEIPT', numberMode: 'CORE', numberSeries: 'PAYMENT' },
+      { code: FIN_DOC_TYPES.OTHER_PAYMENT.code, system: FIN_SOURCE, class: 'PAYMENT', numberMode: 'CORE', numberSeries: 'PAYMENT' },
+      { code: FIN_DOC_TYPES.JOURNAL.code, system: FIN_SOURCE, class: 'JOURNAL', numberMode: 'CORE', numberSeries: 'JOURNAL' },
+      { code: FIN_DOC_TYPES.ALLOCATION.code, system: FIN_SOURCE, class: 'ALLOCATION', numberMode: 'CORE', numberSeries: 'ALLOCATION' },
+    ],
     branches: input.branches.map((branch) => ({
       system: BTO_SOURCE,
       externalId: String(branch.id),

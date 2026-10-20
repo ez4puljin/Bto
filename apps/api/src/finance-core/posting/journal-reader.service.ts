@@ -26,7 +26,8 @@ import {
 
 /** Where an entry came from: its source system and document type (null: typed, no document). */
 export interface FinEntryOrigin {
-  system: string;
+  /** A source system's code, or any of several. */
+  system: string | readonly string[];
   /** undefined: any; null: entries without a source document; a list: any of them. */
   docType?: string | null | readonly string[];
   /** true: reversals only; false: no reversals; undefined: both. */
@@ -117,17 +118,15 @@ export class FinJournalReader {
     if (query.from) filters.push(sql`${finJournalEntries.entryDate} >= ${query.from}`);
     if (query.to) filters.push(sql`${finJournalEntries.entryDate} <= ${query.to}`);
     if (query.origin) {
-      const [system] = await this.db
+      const codes = typeof query.origin.system === 'string' ? [query.origin.system] : [...query.origin.system];
+      const systems = await this.db
         .select({ id: finSourceSystems.id })
         .from(finSourceSystems)
         .where(
-          and(
-            eq(finSourceSystems.tenantId, scope.tenantId),
-            eq(finSourceSystems.code, query.origin.system),
-          ),
+          and(eq(finSourceSystems.tenantId, scope.tenantId), inArray(finSourceSystems.code, codes)),
         );
-      if (!system) return [];
-      filters.push(...originFilters(system.id, query.origin));
+      if (systems.length === 0) return [];
+      filters.push(...originFilters(systems.map((system) => system.id), query.origin));
     }
     const lineFilter = (condition: SQL) =>
       exists(
@@ -410,10 +409,10 @@ export class FinJournalReader {
   }
 }
 
-function originFilters(systemId: number, origin: FinEntryOrigin): SQL[] {
-  const filters: SQL[] = [eq(finJournalEntries.sourceSystemId, systemId)];
+function originFilters(systemIds: number[], origin: FinEntryOrigin): SQL[] {
+  const filters: SQL[] = [inArray(finJournalEntries.sourceSystemId, systemIds)];
   if (origin.docType === null) filters.push(isNull(finJournalEntries.sourceDocType));
-  else if (Array.isArray(origin.docType)) {
+  else if (typeof origin.docType === 'object') {
     filters.push(inArray(finJournalEntries.sourceDocType, [...origin.docType]));
   } else if (typeof origin.docType === 'string') {
     filters.push(eq(finJournalEntries.sourceDocType, origin.docType));

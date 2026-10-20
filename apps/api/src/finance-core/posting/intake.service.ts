@@ -511,7 +511,11 @@ export class FinIntakeInTx {
 
     // Numbers last (ADR-0071 #6): the document's (its own series, or the sender's), then the entry's.
     const number = await this.documentNumber(tx, scope, type, cmd, body.documentDate);
-    const journalNo = await nextNumberInTx(tx, scope.companyId, FIN_SERIES.JOURNAL, accountingDate);
+    // A document numbered from the journal's own series (a manual entry) is its entry's number too.
+    const journalNo =
+      type.numberMode === 'CORE' && type.numberSeries === FIN_SERIES.JOURNAL
+        ? number
+        : await nextNumberInTx(tx, scope.companyId, FIN_SERIES.JOURNAL, accountingDate);
     const moneyLine = lines.find((line) => line.control === 'MONEY');
     const [document] = await tx
       .insert(finDocuments)
@@ -553,7 +557,7 @@ export class FinIntakeInTx {
       sourceDocId: cmd.source.docId,
       reversesId: null,
       documentId: document.id,
-      description: entryDescription(type.numberMode, number, body.description),
+      description: entryDescription(type, number, body.description),
     });
     const lineIds = await this.writeLines(tx, scope, entryId, branchId, lines);
 
@@ -1173,7 +1177,11 @@ export class FinIntakeInTx {
       const account = accounts.get(row.accountId);
       if (!account) throw invalid(`${row.path}.accountCode`);
       if (account.status !== 'ACTIVE') {
-        throw new FinError('FIN_ACCOUNT_INACTIVE', undefined, { path: row.path, accountId: account.id });
+        throw new FinError('FIN_ACCOUNT_INACTIVE', undefined, {
+          path: row.path,
+          accountId: account.id,
+          key: row.ruleId === null ? null : row.line.key,
+        });
       }
       const control = account.control;
       let partyId = lineParties.get(row.index) ?? null;
@@ -1232,7 +1240,9 @@ export class FinIntakeInTx {
         if (headerParty === null) throw new FinError('FIN_PARTY_REQUIRED', undefined, { path: 'body.party' });
         const control = documentClass === 'AR_INVOICE' ? 'RECEIVABLE' : 'PAYABLE';
         const side: Side = documentClass === 'AR_INVOICE' ? 'DEBIT' : 'CREDIT';
-        if (onControl(control, side).length !== 1 || controlled.length !== 1) throw rule(`${documentClass}_LINES`);
+        // One receivable (payable) line, or none for a document that amounts to nothing owed.
+        const owed = onControl(control, side).length;
+        if (owed !== controlled.length || owed > 1) throw rule(`${documentClass}_LINES`);
         if (settling.length > 0) throw rule(`${documentClass}_SETTLES`);
         return;
       }
@@ -1676,7 +1686,7 @@ export class FinIntakeInTx {
 
   /** A refusal of `submit` kept on its key with an attempt row (its own short transaction). */
   private async recordRefusal(key: KnownKey, error: FinError, via: FinIntakeVia): Promise<void> {
-    const code = error.code as FinErrorCode;
+    const code: FinErrorCode = error.code;
     const conflict = code === 'FIN_PAYLOAD_CONFLICT' || code === 'FIN_SOURCE_COMPANY_MISMATCH';
     const held = (FIN_HELD_CODES as readonly string[]).includes(code);
     const outcome: IntakeOutcome = conflict ? 'CONFLICT' : held ? 'HELD' : 'REJECTED';
@@ -1782,7 +1792,12 @@ function keyOf(source: SourceKey): SourceKey {
 }
 
 /** A CORE-numbered document's entry is described «number — description»; a source's as it says. */
-export function entryDescription(mode: 'SOURCE' | 'CORE', number: string, description: string): string {
+export function entryDescription(
+  type: { numberMode: 'SOURCE' | 'CORE'; class: FinDocumentClass },
+  number: string,
+  description: string,
+): string {
   const text = description.trim();
-  return mode === 'CORE' ? `${number} — ${text}` : text;
+  // A typed journal entry keeps its own words; its number is the entry's anyway.
+  return type.numberMode === 'CORE' && type.class !== 'JOURNAL' ? `${number} — ${text}` : text;
 }

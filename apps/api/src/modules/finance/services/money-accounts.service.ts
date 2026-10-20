@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { MoneyAccountKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
-import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -11,10 +10,10 @@ import {
   FinChartService,
   type FinMoneyAccountView,
   FinOrgService,
+  FinReader,
 } from '../../../finance-core';
-import { BTO_SOURCE } from '../../fin-bridge';
+import { BTO_SOURCE, FIN_DOC_TYPES } from '../../fin-bridge';
 import { AuditService, type AuthContext, OrgService } from '../../identity';
-import { payments } from '../schema';
 import { FinBooks } from './fin-books';
 import type { AccountStatus } from './gl-accounts.service';
 import { GlAccountsService } from './gl-accounts.service';
@@ -64,11 +63,19 @@ export type MoneyAccountPatch = Partial<Omit<MoneyAccountInput, 'kind'>> & {
   status?: AccountStatus;
 };
 
+/** The vouchers that move a money account (F2, ADR-0090). */
+const VOUCHER_TYPES = [
+  FIN_DOC_TYPES.CUSTOMER_RECEIPT.code,
+  FIN_DOC_TYPES.CUSTOMER_REFUND.code,
+  FIN_DOC_TYPES.OTHER_RECEIPT.code,
+  FIN_DOC_TYPES.OTHER_PAYMENT.code,
+];
+
 /**
  * The cash boxes and bank accounts (ADR-0060 #5), kept by the Finance Core since F1's ledger
  * (`fin.money_accounts`, ADR-0089): one per branch and bank account, each mapped to the journal
  * account its vouchers hit. Never deleted (vouchers point at them); deactivated. The balance is
- * still Σ of Bto's posted vouchers until the receivables move to the core (F2).
+ * Σ of the live vouchers, which are Finance Core documents since F2 (ADR-0090).
  */
 @Injectable()
 export class MoneyAccountsService {
@@ -80,6 +87,7 @@ export class MoneyAccountsService {
     private readonly finOrg: FinOrgService,
     private readonly accounts: GlAccountsService,
     private readonly books: FinBooks,
+    private readonly reader: FinReader,
   ) {}
 
   async list(executor: Db | Tx = this.db): Promise<MoneyAccount[]> {
@@ -237,25 +245,11 @@ export class MoneyAccountsService {
       this.books.executor(executor),
     );
     if (accounts.length === 0) return [];
-    const balances = new Map(
-      (
-        await executor
-          .select({
-            id: payments.moneyAccountId,
-            balance: sql<string>`coalesce(sum(CASE ${payments.direction} WHEN 'IN' THEN ${payments.amount} ELSE -${payments.amount} END), 0)`,
-          })
-          .from(payments)
-          .where(
-            and(
-              eq(payments.status, 'POSTED'),
-              inArray(
-                payments.moneyAccountId,
-                accounts.map((account) => account.id),
-              ),
-            ),
-          )
-          .groupBy(payments.moneyAccountId)
-      ).map((row) => [row.id, new Decimal(row.balance)]),
+    // Σ in − Σ out of the live vouchers (ADR-0060 #5), from the Finance Core's documents (F2).
+    const balances = await this.reader.moneyBalances(
+      this.books.source(),
+      { company: await this.books.company(), typeCodes: VOUCHER_TYPES },
+      this.books.executor(executor),
     );
     const branches = new Map((await this.org.listBranches()).map((branch) => [branch.id, branch]));
     return accounts.map((account) => {
@@ -300,12 +294,3 @@ function shown(kind: MoneyAccountKind, value: boolean): boolean {
   }
   return value;
 }
-
-/** Σ in − Σ out of an account's posted vouchers up to a date, for the book's opening balance. */
-export function bookBalanceSql(moneyAccountId: number, before: string) {
-  return sql<string>`(SELECT coalesce(sum(CASE ${payments.direction} WHEN 'IN' THEN ${payments.amount} ELSE -${payments.amount} END), 0)
-    FROM ${payments} WHERE ${payments.moneyAccountId} = ${moneyAccountId} AND ${payments.status} = 'POSTED' AND ${payments.paidOn} < ${before})`;
-}
-
-export const postedPaymentsOf = (moneyAccountId: number) =>
-  and(eq(payments.moneyAccountId, moneyAccountId), eq(payments.status, 'POSTED'));

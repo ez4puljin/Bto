@@ -10,21 +10,36 @@ import { type FinanceReconcileRun, reconcileReceivables } from '../services/ar-l
 
 const SHOWN = 20;
 
-/** One line per drifted customer, the first SHOWN of them. */
+/** One line per drift, the first SHOWN of them: the core's runs, then the invoices' mirror. */
 export function describeRun(run: FinanceReconcileRun): string[] {
+  const core = run.core.map(
+    (own) =>
+      `  core ${own.kind}: ${own.status} (${own.drifted} of ${own.checked}, run ${own.id})` +
+      own.details
+        .slice(0, SHOWN)
+        .map(
+          (drift) =>
+            `\n    party ${drift.partyId}, account ${drift.accountId}${drift.itemId ? `, item ${drift.itemId}` : ''}: expected ${drift.expected}, found ${drift.found}`,
+        )
+        .join(''),
+  );
   if (run.status === 'OK') {
-    return [`Receivables reconciliation OK (run ${run.id}, ${run.checked} customer(s)).`];
+    return [
+      `Receivables reconciliation OK (run ${run.id}, ${run.checked} invoice(s)).`,
+      ...core,
+    ];
   }
   return [
-    `Receivables reconciliation DRIFT: ${run.drifted} of ${run.checked} customer(s) (run ${run.id}).`,
+    `Receivables reconciliation DRIFT: ${run.drifted} drift(s) (run ${run.id}).`,
+    ...core,
     ...run.details
       .slice(0, SHOWN)
       .map(
         (drift) =>
-          `  customer ${drift.customerId}: cache ${drift.cachedBalance} / ${drift.cachedOpenInvoices} open, ledger ${drift.ledgerBalance} / ${drift.ledgerOpenInvoices} open`,
+          `  invoice ${drift.number}: open ${drift.mirrorOpen} on the invoice, ${drift.itemOpen} in the Finance Core`,
       ),
-    ...(run.drifted > SHOWN ? [`  … and ${run.drifted - SHOWN} more`] : []),
-    'The cache was rewritten from the ledger; find what wrote it wrong (docs/modules/finance.md §7).',
+    ...(run.details.length > SHOWN ? [`  … and ${run.details.length - SHOWN} more`] : []),
+    'The invoices and the cache were rewritten from the items; find what wrote them wrong (docs/modules/finance.md §7).',
   ];
 }
 

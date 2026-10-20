@@ -144,11 +144,13 @@ export async function ensureDefaultCompany(
       .values(spec.numberSeries.map((s) => ({ companyId, ...s })))
       .onConflictDoNothing();
   }
-  if (spec.documentTypes?.length) {
+  // A type is booked only for a source this installation grants (a spec may grant fewer).
+  const types = (spec.documentTypes ?? []).filter((d) => spec.sources.some((s) => s.code === d.system));
+  if (types.length) {
     await tx
       .insert(finDocumentTypes)
       .values(
-        spec.documentTypes.map((d) => ({
+        types.map((d) => ({
           companyId,
           code: d.code,
           sourceSystemId: sourceId(d.system),
