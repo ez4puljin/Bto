@@ -28,11 +28,11 @@ import { StatementPanel } from '../../src/customer/statement-panel';
 import { splitAround } from '../../src/customer/money';
 import { monthDay } from '../../src/dates/calendar';
 import { formatMnt, initialsOf } from '../../src/format/format';
-import { colors, fonts, radii, spacing, tabular, type } from '../../src/theme/tokens';
+import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../src/theme/tokens';
 import { Group, Separator } from '../../src/ui/grouped';
 import { ProblemText } from '../../src/ui/kit';
 import { StoreHeader } from '../../src/customer/store-header';
-import { Page, SectionHeader } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
 import { useToast } from '../../src/ui/toast';
 
@@ -103,14 +103,14 @@ export default function AccountScreen() {
   const adviceStrong = t('mobile.customer.account.adviceMustStrong');
 
   return (
-    <Page edges={[]}>
+    <Page white edges={[]}>
       <StoreHeader title={t('mobile.customer.tabs.account')} onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={[styles.body, { paddingBottom: 40 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
         {me.data ? (
-          <Text style={[type.row, styles.subtitle]} numberOfLines={2}>
+          <Text style={[storeType.sectionSub, styles.subtitle]} numberOfLines={2}>
             {t('mobile.customer.account.asOf', {
               store: me.data.name,
               date: monthDay(me.data.today),
@@ -201,10 +201,10 @@ export default function AccountScreen() {
 
         {accounts.length > 0 ? (
           <>
-            <SectionHeader style={styles.section}>
+            <Text accessibilityRole="header" style={[storeType.sectionTitle, styles.section]}>
               {t('mobile.customer.account.banksHeader')}
-            </SectionHeader>
-            <Group>
+            </Text>
+            <Group style={styles.outlined}>
               {accounts.map((bank) => {
                 const title = [bank.bankName, bank.name].filter(Boolean).join(' · ');
                 const copied = copiedId === bank.id;
@@ -285,33 +285,35 @@ function Emphasis({
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
+  subtitle: { marginTop: 2 },
   grow: { flex: 1 },
   label2: { color: colors.label2 },
   link: { color: colors.primary },
   bold: { fontFamily: fonts.bold },
   debtCard: {
-    marginTop: 14,
+    marginTop: spacing.sm,
     backgroundColor: colors.card,
-    borderRadius: radii.tile,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   cardLoading: { marginVertical: spacing.xl },
   debtHead: {
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
     gap: 2,
   },
-  debtAmount: { ...type.display, ...tabular },
+  debtAmount: { ...type.largeTitle, ...tabular },
   overdue: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
-    borderRadius: 14,
+    borderRadius: 8,
     backgroundColor: colors.destructiveSoft,
   },
   overdueText: { flex: 1, color: colors.cancelled },
@@ -335,7 +337,8 @@ const styles = StyleSheet.create({
   },
   cardEnd: { height: spacing.md },
   hold: { flex: 1, color: colors.blocked },
-  section: { marginTop: 22 },
+  section: { marginTop: spacing.xl, marginBottom: 10, textTransform: 'uppercase' },
+  outlined: { borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   bank: {
     flexDirection: 'row',
     alignItems: 'center',

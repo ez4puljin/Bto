@@ -225,6 +225,12 @@ export const storeType = {
   wideButton: face(fonts.semibold, 14, 18, 0.3, colors.label2),
   /** «Мэдэгдэл»'s two tab buttons. */
   tabButton: face(fonts.medium, 15, 20, 0, colors.primaryForeground),
+  /** «Тооцооны хуулга»'s table: the column heads (upper case), its cells and its strong cells. */
+  tableHead: face(fonts.semibold, 11, 14, 0.2, colors.muted),
+  tableCell: face(fonts.regular, 13, 18),
+  tableCellStrong: face(fonts.semibold, 13, 18),
+  /** «Эцсийн үлдэгдэл» at the table's foot. */
+  tableTotal: face(fonts.bold, 14, 18, 0, colors.primary),
 } as const;
 
 /** Numbers that line up in columns (money, counts). */
