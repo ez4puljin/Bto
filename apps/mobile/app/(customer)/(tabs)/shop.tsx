@@ -1,6 +1,6 @@
 import type { RepProductSort } from '@tugeel/shared/sales';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Heart, PackageSearch, ScanBarcode } from 'lucide-react-native';
+import { Heart, PackageSearch, ScanLine, Search } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import {
+  type StoreProduct,
   useStoreCategories,
   useStoreProductCount,
   useStoreProducts,
@@ -28,14 +29,15 @@ import {
   SortSheet,
 } from '../../../src/customer/list-sheets';
 import { emptyKindOf, type ShopChip, shopRouteParams } from '../../../src/customer/shop';
+import { StoreHeaderBand } from '../../../src/customer/store-header';
+import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
 import { formatCount } from '../../../src/format/format';
 import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, spacing, TOUCH, type } from '../../../src/theme/tokens';
-import { ActiveChip, ChoiceChip, PillButton, SearchField } from '../../../src/ui/controls';
+import { colors, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
+import { ActiveChip, ChoiceChip, PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, Page } from '../../../src/ui/layout';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
-import { Text, type TextInput } from '../../../src/ui/text';
+import { Page } from '../../../src/ui/layout';
+import { Text, TextInput } from '../../../src/ui/text';
 
 const GAP = 10;
 
@@ -50,10 +52,12 @@ export default function StoreShopScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ chip?: string; categoryIds?: string; search?: string }>();
   const { width } = useWindowDimensions();
-  const inset = useTabBarInset();
+  const inset = useStoreTabBarInset();
   const categories = useStoreCategories();
   const actions = useCardActions();
   const search = useRef<TextInput>(null);
+  const list = useRef<FlatList<StoreProduct>>(null);
+  const [scrolled, setScrolled] = useState(false);
   const [text, setText] = useState('');
   const [chip, setChip] = useState<ShopChip>('all');
   const [sort, setSort] = useState<RepProductSort>('NEW');
@@ -126,32 +130,6 @@ export default function StoreShopScreen() {
 
   const header = (
     <View>
-      <View style={styles.titleRow}>
-        <LargeTitle>{t('mobile.tabs.shop')}</LargeTitle>
-        {total !== null ? (
-          <Text style={[type.row, styles.muted]}>
-            {t('mobile.customer.list.count', { n: formatCount(total) })}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.searchRow}>
-        <SearchField
-          inputRef={search}
-          value={text}
-          onChangeText={setText}
-          placeholder={t('mobile.shop.search')}
-          accessibilityLabel={t('mobile.shop.searchLabel')}
-          style={styles.grow}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.scan.title')}
-          onPress={() => router.push('/scan')}
-          style={styles.scan}
-        >
-          <ScanBarcode size={22} strokeWidth={1.9} color={colors.foreground} />
-        </Pressable>
-      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -203,8 +181,46 @@ export default function StoreShopScreen() {
   );
 
   return (
-    <Page white>
+    <Page white edges={[]}>
+      <StoreHeaderBand>
+        <View style={styles.titleRow}>
+          <Text accessibilityRole="header" style={storeType.headerTitle}>
+            {t('mobile.tabs.shop')}
+          </Text>
+          {total !== null ? (
+            <Text style={[storeType.search, styles.count]}>
+              {t('mobile.customer.list.count', { n: formatCount(total) })}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.search}>
+          <Search size={17} strokeWidth={2.2} color={colors.muted} />
+          <TextInput
+            ref={search}
+            value={text}
+            onChangeText={setText}
+            placeholder={t('mobile.shop.search')}
+            placeholderTextColor={colors.muted}
+            accessibilityLabel={t('mobile.shop.searchLabel')}
+            autoCorrect={false}
+            returnKeyType="search"
+            style={[storeType.search, styles.searchInput]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.scan.title')}
+            onPress={() => router.push('/scan')}
+            hitSlop={6}
+            style={styles.searchScan}
+          >
+            <ScanLine size={19} strokeWidth={1.8} color={colors.label2} />
+          </Pressable>
+        </View>
+      </StoreHeaderBand>
       <FlatList
+        ref={list}
+        onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 600)}
+        scrollEventThrottle={200}
         data={rows}
         numColumns={2}
         keyExtractor={(product) => String(product.id)}
@@ -267,6 +283,7 @@ export default function StoreShopScreen() {
       />
       <FloatingPill
         bottom={inset}
+        onTop={scrolled ? () => list.current?.scrollToOffset({ offset: 0, animated: true }) : null}
         active={activeFilters(filters)}
         onSort={() => setSheet('sort')}
         onFilter={() => {
@@ -300,24 +317,28 @@ export default function StoreShopScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  muted: { color: colors.muted },
   list: { paddingHorizontal: spacing.lg },
   titleRow: {
+    height: 40,
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-  },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: 10 },
-  scan: {
-    width: TOUCH,
-    height: TOUCH,
-    borderRadius: TOUCH / 2,
-    backgroundColor: colors.canvas,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
+  count: { color: colors.onPrimaryMuted },
+  search: {
+    height: 34,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 12,
+    borderRadius: 17,
+    backgroundColor: colors.card,
+  },
+  searchInput: { flex: 1, minWidth: 0, height: TOUCH, padding: 0, color: colors.foreground },
+  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
   // Edge to edge: the list pads its content, the chips scroll under the margins.
   chipRow: { marginHorizontal: -spacing.lg },
   chips: {

@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { CircleAlert, Lock } from 'lucide-react-native';
 import { useState } from 'react';
@@ -19,21 +20,21 @@ import {
   useBankAccounts,
   useStoreBalance,
   useStoreMe,
-} from '../../../src/api/customer';
-import { problemFrom } from '../../../src/api/problem';
-import { useCustomer } from '../../../src/state/session';
-import { creditBarOf, debtOf, overdueOf } from '../../../src/customer/account';
-import { StatementPanel } from '../../../src/customer/statement-panel';
-import { splitAround } from '../../../src/customer/money';
-import { monthDay } from '../../../src/dates/calendar';
-import { formatMnt, initialsOf } from '../../../src/format/format';
-import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
-import { Group, Separator } from '../../../src/ui/grouped';
-import { ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
-import { Text } from '../../../src/ui/text';
-import { useToast } from '../../../src/ui/toast';
+} from '../../src/api/customer';
+import { problemFrom } from '../../src/api/problem';
+import { useCustomer } from '../../src/state/session';
+import { creditBarOf, debtOf, overdueOf } from '../../src/customer/account';
+import { StatementPanel } from '../../src/customer/statement-panel';
+import { splitAround } from '../../src/customer/money';
+import { monthDay } from '../../src/dates/calendar';
+import { formatMnt, initialsOf } from '../../src/format/format';
+import { colors, fonts, radii, spacing, tabular, type } from '../../src/theme/tokens';
+import { Group, Separator } from '../../src/ui/grouped';
+import { ProblemText } from '../../src/ui/kit';
+import { StoreHeader } from '../../src/customer/store-header';
+import { Page, SectionHeader } from '../../src/ui/layout';
+import { Text } from '../../src/ui/text';
+import { useToast } from '../../src/ui/toast';
 
 /**
  * «Тооцоо» (the Account board, ADR-0079 #7), read-only from finance's own figures: the debt (or an
@@ -44,7 +45,7 @@ import { useToast } from '../../../src/ui/toast';
  */
 export default function AccountScreen() {
   const { t } = useTranslation();
-  const inset = useTabBarInset();
+  const router = useRouter();
   const toast = useToast();
   const me = useStoreMe();
   const balance = useStoreBalance();
@@ -102,13 +103,12 @@ export default function AccountScreen() {
   const adviceStrong = t('mobile.customer.account.adviceMustStrong');
 
   return (
-    <Page>
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.customer.tabs.account')} onBack={() => router.back()} />
       <ScrollView
-        contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}
+        contentContainerStyle={[styles.body, { paddingBottom: 40 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
-        <View style={styles.bar} />
-        <LargeTitle style={styles.title}>{t('mobile.customer.tabs.account')}</LargeTitle>
         {me.data ? (
           <Text style={[type.row, styles.subtitle]} numberOfLines={2}>
             {t('mobile.customer.account.asOf', {
@@ -284,9 +284,7 @@ function Emphasis({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  bar: { height: 38 },
-  title: { marginHorizontal: spacing.xs },
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
   grow: { flex: 1 },
   label2: { color: colors.label2 },

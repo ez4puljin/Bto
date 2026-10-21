@@ -1,14 +1,15 @@
 import { Tabs } from 'expo-router/js-tabs';
-import { ClipboardList, House, Package, ShoppingCart, Wallet } from 'lucide-react-native';
+import { ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
+import { StoreTabBar } from '../../../src/customer/store-tab-bar';
 import { useShop } from '../../../src/state/shop';
 import { colors } from '../../../src/theme/tokens';
-import { FloatingTabBar } from '../../../src/ui/tab-bar';
 
 /**
- * «Нүүр», «Бараа», «Сагс», «Захиалга», «Тооцоо» on the rep app's floating bar (ADR-0079 #13): the
- * cart's count on «Сагс»; «Профайл» and the bell open from «Нүүр».
+ * «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on «Bto300»'s flat bar (ADR-0095, the E-mart
+ * structure): the barcode camera raised in the middle, the cart's count on «Сагс»; «Профайл» and
+ * the bell open from «Нүүр», «Тооцоо» from «Профайл».
  */
 export default function CustomerTabsLayout() {
   const { t } = useTranslation();
@@ -18,13 +19,13 @@ export default function CustomerTabsLayout() {
     ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
       <Icon
         size={size}
-        color={typeof color === 'string' ? color : colors.label2}
-        strokeWidth={focused ? 2.1 : 1.75}
+        color={typeof color === 'string' ? color : colors.placeholder}
+        strokeWidth={focused ? 2 : 1.6}
       />
     );
   return (
     <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} />}
+      tabBar={(props) => <StoreTabBar {...props} />}
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.canvas } }}
     >
       <Tabs.Screen
@@ -47,10 +48,6 @@ export default function CustomerTabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{ title: t('mobile.tabs.orders'), tabBarIcon: icon(ClipboardList) }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{ title: t('mobile.customer.tabs.account'), tabBarIcon: icon(Wallet) }}
       />
     </Tabs>
   );

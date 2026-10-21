@@ -32,7 +32,8 @@ import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row, Separator } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { StoreHeader } from '../../../src/customer/store-header';
+import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { PaymentDot } from '../../../src/ui/status';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -147,8 +148,8 @@ export default function StoreOrderScreen() {
   const invoice = data?.invoice ?? null;
 
   return (
-    <Page>
-      <NavBar back={t('mobile.tabs.orders')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.tabs.orders')} onBack={() => router.back()} />
       {order.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
       <View style={styles.pad}>
         {order.error ? <ProblemText problem={problemFrom(order.error)} /> : null}

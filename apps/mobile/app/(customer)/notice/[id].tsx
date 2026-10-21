@@ -17,7 +17,8 @@ import { useCustomer } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { Group } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { StoreHeader } from '../../../src/customer/store-header';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { usePriceParts } from '../../../src/ui/product-card';
 import { Text } from '../../../src/ui/text';
 
@@ -46,8 +47,8 @@ export default function CustomerNoticeScreen() {
   const products = inOrderOf(productIds, query.data ?? []);
 
   return (
-    <Page white>
-      <NavBar back={t('common.back')} onBack={() => router.back()} />
+    <Page white edges={[]}>
+      <StoreHeader title={t('mobile.notifications.title')} onBack={() => router.back()} />
       <View style={styles.pad}>
         {summary.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
         {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}

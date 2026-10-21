@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useStoreHome } from '../../src/api/customer';
 import { problemFrom } from '../../src/api/problem';
-import { CartButton, CategoryTile } from '../../src/customer/home-parts';
+import { CategoryTile } from '../../src/customer/home-parts';
+import { StoreHeader } from '../../src/customer/store-header';
 import { colors, spacing } from '../../src/theme/tokens';
 import { ProblemText } from '../../src/ui/kit';
-import { LargeTitle, NavBar, Page } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
 
 /**
  * «Бүх ангилал» (the owner, 2026-10-20): every top category «Нүүр» knows, four a row with their
@@ -20,8 +21,8 @@ export default function AllCategoriesScreen() {
   const cell = (width - spacing.md * 2 - spacing.sm * 3) / 4;
   const categories = home.data?.categories ?? [];
   return (
-    <Page white>
-      <NavBar back={t('mobile.tabs.home')} onBack={() => router.back()} right={<CartButton />} />
+    <Page white edges={[]}>
+      <StoreHeader title={t('mobile.customer.categories.title')} onBack={() => router.back()} />
       <FlatList
         data={categories}
         numColumns={4}
@@ -30,7 +31,6 @@ export default function AllCategoriesScreen() {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.head}>
-            <LargeTitle>{t('mobile.customer.categories.title')}</LargeTitle>
             {home.error ? <ProblemText problem={problemFrom(home.error)} /> : null}
           </View>
         }
@@ -52,7 +52,7 @@ export default function AllCategoriesScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.md, paddingBottom: 40 },
-  head: { paddingTop: 2, paddingBottom: spacing.lg, paddingHorizontal: spacing.xs },
+  head: { paddingTop: spacing.lg, paddingHorizontal: spacing.xs },
   row: { gap: spacing.sm },
   rowGap: { height: 14 },
   loading: { marginTop: spacing.xxl },

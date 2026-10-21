@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Heart, Minus, Package, Plus, TriangleAlert } from 'lucide-react-native';
+import { Minus, Package, Plus, TriangleAlert } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,10 +23,11 @@ import {
 import { problemFrom } from '../../../src/api/problem';
 import { lineOf } from '../../../src/cart/cart';
 import { DealNote } from '../../../src/customer/deal-note';
-import { StockPill, usePackText } from '../../../src/customer/product-card';
+import { FavouriteButton, StockPill, usePackText } from '../../../src/customer/product-card';
 import { StoreQtyKeypad } from '../../../src/customer/qty-keypad';
 import { priceNoteOf, storeLineOf } from '../../../src/customer/shop';
 import { useStoreLineQuote } from '../../../src/customer/shop-quote';
+import { StoreHeader } from '../../../src/customer/store-header';
 import { canOrder } from '../../../src/customer/stock';
 import { formatMnt } from '../../../src/format/format';
 import { heroPictures, pageAt } from '../../../src/images/pictures';
@@ -35,14 +36,14 @@ import { useUnitWords } from '../../../src/shop/unit-words';
 import { defaultUnitOf } from '../../../src/shop/units';
 import { useCustomer } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
-import { CircleButton, PillButton, Segmented } from '../../../src/ui/controls';
+import { colors, fonts, spacing, tabular, type } from '../../../src/theme/tokens';
+import { PillButton, Segmented } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { Text } from '../../../src/ui/text';
 
 const MAX_QTY = 9999;
-const HERO_HEIGHT = 290;
+const HERO_HEIGHT = 250;
 
 /**
  * One product in «Bto300» (the Product board, ADR-0079 #4, ADR-0092 #7): its pictures with back and
@@ -105,15 +106,9 @@ export default function StoreProductScreen() {
 
   if (!product || !unit) {
     return (
-      <Page>
+      <Page edges={[]}>
+        <StoreHeader title="" onBack={back} />
         <View style={styles.missing}>
-          <View style={styles.missingBar}>
-            <CircleButton
-              icon={<ChevronLeft size={24} strokeWidth={2.4} color={colors.foreground} />}
-              label={t('common.back')}
-              onPress={back}
-            />
-          </View>
           {query.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
           {query.error ? <ProblemText problem={problemFrom(query.error)} /> : null}
           {query.isSuccess && !product ? (
@@ -151,9 +146,10 @@ export default function StoreProductScreen() {
   };
 
   return (
-    <Page edges={[]}>
+    <Page white edges={[]}>
+      <StoreHeader title={category ?? ''} onBack={back} />
       <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
-        <View style={[styles.hero, { paddingTop: insets.top }]}>
+        <View style={styles.hero}>
           {images.length > 0 ? (
             <FlatList
               data={images}
@@ -193,25 +189,10 @@ export default function StoreProductScreen() {
               ))}
             </View>
           ) : null}
-          <View
-            style={[styles.floatingBar, { top: insets.top + spacing.sm }]}
-            pointerEvents="box-none"
-          >
-            <CircleButton
-              icon={<ChevronLeft size={24} strokeWidth={2.4} color={colors.foreground} />}
-              label={t('common.back')}
-              onPress={back}
-              style={styles.glass}
-            />
-            <CircleButton
-              icon={
-                <Heart
-                  size={21}
-                  strokeWidth={2}
-                  color={product.favourite ? colors.heart : colors.foreground}
-                  fill={product.favourite ? colors.heart : 'none'}
-                />
-              }
+          <View style={styles.heart}>
+            <FavouriteButton
+              on={product.favourite}
+              size={26}
               label={
                 product.favourite
                   ? t('mobile.customer.product.favouriteRemove')
@@ -220,7 +201,6 @@ export default function StoreProductScreen() {
               onPress={() =>
                 favourite.mutate({ productId: product.id, favourite: !product.favourite })
               }
-              style={styles.glass}
             />
           </View>
         </View>
@@ -366,7 +346,8 @@ export default function StoreProductScreen() {
           }
           disabled={!orderable || locked || quote.unpriced}
           onPress={save}
-          height={54}
+          height={50}
+          style={styles.square}
         />
       </View>
 
@@ -390,16 +371,13 @@ export default function StoreProductScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { backgroundColor: colors.card },
-  noPicture: { alignItems: 'center', justifyContent: 'center' },
-  floatingBar: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  hero: {
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  glass: { backgroundColor: colors.glassFill, boxShadow: shadows.hero },
+  noPicture: { alignItems: 'center', justifyContent: 'center' },
+  heart: { position: 'absolute', top: spacing.xs, right: spacing.xs },
   dots: {
     position: 'absolute',
     left: 0,
@@ -426,7 +404,9 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
-    borderRadius: radii.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.card,
     flexDirection: 'row',
     alignItems: 'center',
@@ -486,10 +466,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: 14,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.sheetBarFill,
+    backgroundColor: colors.card,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
+    borderTopColor: colors.input,
   },
-  missing: { flex: 1, gap: spacing.lg },
-  missingBar: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  missing: { flex: 1, gap: spacing.lg, paddingTop: spacing.xl },
+  square: { borderRadius: 10 },
 });
