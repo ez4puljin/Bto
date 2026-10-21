@@ -95,9 +95,9 @@ export function ProductCard({
 }
 
 /**
- * A grid card of either app (ADR-0068 #3, ADR-0079 #13): the pictures with «Шинэ», a corner of the
- * app's own (the store's ★), the cart's quantity or «+», the name, the code, the base price, then
- * the app's footer (the rep's stock count, the store's stock word and pack).
+ * The rep's grid card (ADR-0068 #3): the pictures with «Шинэ», an optional corner, the cart's
+ * quantity or «+», the name, the code, the base price, then the footer (the stock count).
+ * «Bto300» draws the board's own card since 0.2.0 (`src/customer/product-card.tsx`, ADR-0094).
  */
 export function ProductCardFrame({
   product,

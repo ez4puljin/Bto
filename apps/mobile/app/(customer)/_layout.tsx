@@ -51,6 +51,19 @@ export default function CustomerLayout() {
             name="product/[id]"
             options={{ contentStyle: { backgroundColor: colors.card } }}
           />
+          {/* «Нүүр»'s lists (ADR-0092): a section's products, a category, every category. */}
+          <Stack.Screen
+            name="section/[key]"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
+          <Stack.Screen
+            name="category/[id]"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
+          <Stack.Screen
+            name="categories"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
           <Stack.Screen name="checkout" />
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="invoice/[id]" />

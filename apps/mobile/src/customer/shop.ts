@@ -18,13 +18,62 @@ export function topStoreCategories(
     .map((category) => ({ id: category.id, name: category.name }));
 }
 
-/** The empty shop's words: no ★ yet, or nothing matches the search and the categories. */
+/** «Бараа»'s chips (ADR-0092 #7): «Бүгд · ♡ Дуртай · Хямдралтай · Шинэ», one at a time. */
+export const SHOP_CHIPS = ['all', 'favourites', 'deals', 'new'] as const;
+export type ShopChip = (typeof SHOP_CHIPS)[number];
+
+/** A chip as the shop's query flags (`GET /customer-app/products`, ADR-0093 #10). */
+export function shopChipQuery(chip: ShopChip): {
+  favourites: boolean;
+  deals: boolean;
+  new: boolean;
+} {
+  return { favourites: chip === 'favourites', deals: chip === 'deals', new: chip === 'new' };
+}
+
+/**
+ * What a link into «Бараа» asks for: a chip (`?chip=deals`), categories from a category page
+ * (`?categoryIds=5,7`) and the search field focused from «Нүүр» (`?search=1`). Anything else is
+ * ignored; null leaves the shop as it is.
+ */
+export function shopRouteParams(params: {
+  chip?: string | string[];
+  categoryIds?: string | string[];
+  search?: string | string[];
+}): { chip: ShopChip | null; categoryIds: number[] | null; search: boolean } {
+  const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const chip = one(params.chip);
+  const ids = one(params.categoryIds);
+  const categoryIds = ids
+    ? [
+        ...new Set(
+          ids
+            .split(',')
+            .map((part) => part.trim())
+            .filter((part) => /^\d+$/.test(part))
+            .map((part) => parseInt(part, 10))
+            .filter((id) => id > 0),
+        ),
+      ]
+    : [];
+  return {
+    chip: (SHOP_CHIPS as readonly string[]).includes(chip ?? '') ? (chip as ShopChip) : null,
+    categoryIds: categoryIds.length > 0 ? categoryIds : null,
+    search: one(params.search) === '1',
+  };
+}
+
+/** The empty shop's words: no ♡ yet, or nothing matches the search and the filters. */
 export function emptyKindOf(query: {
   q: string;
   categoryIds: readonly number[];
-  favourites: boolean;
+  chip: ShopChip;
+  inStock: boolean;
 }): 'noFavourites' | 'noMatch' {
-  return query.favourites && query.q === '' && query.categoryIds.length === 0
+  return query.chip === 'favourites' &&
+    query.q === '' &&
+    query.categoryIds.length === 0 &&
+    !query.inStock
     ? 'noFavourites'
     : 'noMatch';
 }

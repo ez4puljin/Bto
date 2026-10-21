@@ -1,11 +1,12 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, LockKeyhole, Phone } from 'lucide-react-native';
+import { Bell, LockKeyhole } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useStoreMe } from '../../src/api/customer';
+import { useContacts, useStoreMe } from '../../src/api/customer';
 import { useStoreNotificationSummary } from '../../src/api/customer-notifications';
+import { Contacts } from '../../src/customer/contacts';
 import { phoneShown } from '../../src/customer/home';
 import { initialsOf } from '../../src/format/format';
 import { useCustomer } from '../../src/state/session';
@@ -17,9 +18,10 @@ import { ActionSheet } from '../../src/ui/sheet';
 import { Text } from '../../src/ui/text';
 
 /**
- * «Профайл» of «Bto300» (the Profile board, ADR-0079 #13): the store, its code and centre, the
- * sign-in phone, the default address and the payment term (the office changes them), the password,
- * the notifications, where the contacts are, and «Гарах» with its question (the cart stays).
+ * «Профайл» of «Bto300» (the Profile board, ADR-0079 #13, ADR-0092 #8): the store, its code and
+ * centre, the sign-in phone, the default address and the payment term (the office changes them),
+ * «Холбоо барих» with direct calls, the password, the notifications, and «Гарах» with its question
+ * (the cart stays).
  */
 export default function CustomerProfileScreen() {
   const { t } = useTranslation();
@@ -27,6 +29,7 @@ export default function CustomerProfileScreen() {
   const { session, me } = useCustomer();
   const store = useStoreMe().data ?? me.store;
   const unread = useStoreNotificationSummary().data?.unread ?? 0;
+  const contacts = useContacts();
   const [leaving, setLeaving] = useState(false);
   const address = store.defaultAddress?.address ?? store.defaultAddress?.label ?? null;
   const codeLine = [
@@ -71,6 +74,8 @@ export default function CustomerProfileScreen() {
         </Group>
         <FootNote>{t('mobile.customer.profile.changeNote')}</FootNote>
 
+        <Contacts contacts={contacts.data} />
+
         <SectionHeader>{t('mobile.customer.profile.settings')}</SectionHeader>
         <Group inset={ICON_INSET}>
           <Row
@@ -98,17 +103,6 @@ export default function CustomerProfileScreen() {
             }
             right={<CountBadge count={unread} ring={colors.card} />}
             onPress={() => router.push('/notifications')}
-          />
-          <Row
-            minHeight={52}
-            icon={
-              <IconTile color={colors.tint.green}>
-                <Phone size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.customer.contacts.title')}
-            value={t('mobile.customer.profile.contactsOnHome')}
-            onPress={() => router.navigate({ pathname: '/', params: { contacts: '1' } })}
           />
         </Group>
 

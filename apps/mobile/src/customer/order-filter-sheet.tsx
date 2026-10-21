@@ -296,7 +296,7 @@ function StoreProductPickSheet({
   const [text, setText] = useState('');
   const q = useDebounced(text.trim(), 350);
   const products = useStoreProducts(
-    { q, categoryIds: [], favourites: false, sort: 'NEW' },
+    { q, categoryIds: [], chip: 'all', inStock: false, sort: 'NEW' },
     visible,
   );
   const rows = useMemo(

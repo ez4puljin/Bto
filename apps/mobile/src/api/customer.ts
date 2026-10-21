@@ -1,6 +1,5 @@
 import type { components } from '@tugeel/api-client';
 import {
-  type InfiniteData,
   keepPreviousData,
   type QueryClient,
   useInfiniteQuery,
@@ -8,9 +7,11 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { RepProductSort } from '@tugeel/shared/sales';
+import type { HomeSectionSort, RepProductSort } from '@tugeel/shared/sales';
 import { canonical } from '../cart/send';
 import type { StoreOrderParams } from '../customer/order-filters';
+import { productsIn, withFavourite } from '../customer/product-cache';
+import { type ShopChip, shopChipQuery } from '../customer/shop';
 import { useCustomer } from '../state/session';
 import { unwrap } from './problem';
 
@@ -23,7 +24,6 @@ export type StoreCreditCheck = components['schemas']['CustomerAppCreditCheck'];
 export type StoreContact = components['schemas']['CompanyContact'];
 export type StoreCategory = components['schemas']['CustomerAppCategory'];
 export type StoreProduct = components['schemas']['CustomerAppProduct'];
-type StoreProductPage = components['schemas']['CustomerAppProductPage'];
 export type StoreUnit = components['schemas']['CustomerAppUnit'];
 export type StockWord = StoreProduct['stock'];
 export type StoreQuote = components['schemas']['CustomerAppQuote'];
@@ -38,6 +38,15 @@ export type StorePayment = components['schemas']['CustomerAppPayment'];
 export type StoreBankAccount = components['schemas']['CustomerAppBankAccount'];
 export type StoreStatement = components['schemas']['CustomerAppStatement'];
 export type StoreStatementEntry = components['schemas']['CustomerAppStatementEntry'];
+export type StoreDeal = components['schemas']['CustomerAppDeal'];
+export type StoreOrderDeal = components['schemas']['CustomerAppOrderDeal'];
+export type StoreHome = components['schemas']['CustomerAppHome'];
+export type StoreBanner = components['schemas']['CustomerAppBanner'];
+export type StoreBannerLink = components['schemas']['CustomerAppBannerLink'];
+export type StoreHomeCategory = components['schemas']['CustomerAppHomeCategory'];
+export type StoreHomeSection = components['schemas']['CustomerAppHomeSectionRow'];
+export type StoreSectionPage = components['schemas']['CustomerAppSectionPage'];
+export type StoreCategoryPage = components['schemas']['CustomerAppCategoryPage'];
 
 /** Every cache key of «Bto300» starts here. */
 export const STORE_KEY = ['customer'] as const;
@@ -101,19 +110,27 @@ export function useStoreCategories() {
   });
 }
 
-/** What «Бараа» asks for: the search, the categories, «★ Дуртай», the order. */
+/**
+ * What «Бараа» asks for (ADR-0092 #7): the search, the categories, a chip («♡ Дуртай»,
+ * «Хямдралтай», «Шинэ»), «Зөвхөн байгаа бараа» and the order.
+ */
 export interface StoreShopQuery {
   q: string;
   categoryIds: readonly number[];
-  favourites: boolean;
+  chip: ShopChip;
+  inStock: boolean;
   sort: RepProductSort;
 }
 
 function shopParams(query: StoreShopQuery) {
+  const chip = shopChipQuery(query.chip);
   return {
     ...(query.q ? { q: query.q } : {}),
     ...(query.categoryIds.length > 0 ? { categoryIds: [...query.categoryIds] } : {}),
-    ...(query.favourites ? { favourites: true } : {}),
+    ...(chip.favourites ? { favourites: true } : {}),
+    ...(chip.deals ? { deals: true } : {}),
+    ...(chip.new ? { new: true } : {}),
+    ...(query.inStock ? { inStock: true } : {}),
     sort: query.sort,
   };
 }
@@ -139,6 +156,104 @@ export function useStoreProducts(query: StoreShopQuery, enabled = true) {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
     enabled,
+  });
+}
+
+/** How many products a draft of the filter sheet would show («N бараа харуулах»). */
+export function useStoreProductCount(query: StoreShopQuery, enabled: boolean) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'products', 'count', shopParams(query)],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/products', {
+          params: { query: { ...shopParams(query), limit: 1 } },
+        }),
+      ).total,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * «Нүүр» (ADR-0092 #1, ADR-0093 #5): the banners, the category grid and the sections in their
+ * fixed order. Kept under `products` so ♡ and a sent order reach its cards.
+ */
+export function useStoreHome() {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'products', 'home'],
+    queryFn: async () => unwrap(await session.client.GET('/api/v1/customer-app/home')),
+  });
+}
+
+/** What a section's full list asks for (ADR-0093 #6). */
+export interface StoreSectionQuery {
+  sort: HomeSectionSort;
+  categoryIds: readonly number[];
+  inStock: boolean;
+}
+
+function sectionParams(query: StoreSectionQuery) {
+  return {
+    ...(query.sort !== 'DEFAULT' ? { sort: query.sort } : {}),
+    ...(query.categoryIds.length > 0 ? { categoryIds: [...query.categoryIds] } : {}),
+    ...(query.inStock ? { inStock: true } : {}),
+  };
+}
+
+/** «Хэсгийн бүх бараа» page by page; the first page holds the total. */
+export function useStoreSection(key: string, query: StoreSectionQuery) {
+  const { session } = useCustomer();
+  return useInfiniteQuery({
+    queryKey: [...STORE_KEY, 'products', 'section', key, sectionParams(query)],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/sections/{key}/products', {
+          params: {
+            path: { key },
+            query: {
+              ...sectionParams(query),
+              ...(pageParam ? { cursor: pageParam } : {}),
+              limit: PAGE,
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many products a section's draft filters would show. */
+export function useStoreSectionCount(key: string, query: StoreSectionQuery, enabled: boolean) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'products', 'section-count', key, sectionParams(query)],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/sections/{key}/products', {
+          params: { path: { key }, query: { ...sectionParams(query), limit: 1 } },
+        }),
+      ).total,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** «Ангиллын хуудас» (ADR-0092 #6): its banners, subcategories, new and discounted products. */
+export function useStoreCategoryPage(id: number | null) {
+  const { session } = useCustomer();
+  return useQuery({
+    queryKey: [...STORE_KEY, 'products', 'category', id],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/customer-app/categories/{id}/page', {
+          params: { path: { id: id ?? 0 } },
+        }),
+      ),
+    enabled: id !== null,
   });
 }
 
@@ -178,55 +293,30 @@ export async function storeProductsOf(
   return found;
 }
 
-function isProductPages(data: unknown): data is InfiniteData<StoreProductPage> {
-  return (
-    typeof data === 'object' && data !== null && Array.isArray((data as { pages?: unknown }).pages)
-  );
-}
-
-/** A product the shop's lists already hold, so its page opens at once. */
+/**
+ * A product the app's lists already hold (the shop, a section, «Нүүр», a category page, a batch),
+ * so its page opens at once.
+ */
 export function cachedStoreProduct(client: QueryClient, id: number): StoreProduct | undefined {
   for (const [, data] of client.getQueriesData<unknown>({
     queryKey: [...STORE_KEY, 'products'],
   })) {
-    const rows = Array.isArray(data)
-      ? (data as StoreProduct[])
-      : isProductPages(data)
-        ? data.pages.flatMap((page) => page.data)
-        : [];
-    const found = rows.find((product) => product.id === id);
+    const found = productsIn<StoreProduct>(data).find((product) => product.id === id);
     if (found) return found;
   }
   return undefined;
 }
 
-/** The store's ★ products, newest first (ids; the tiles read them with `useStoreProductsOf`). */
-export function useFavourites() {
-  const { session } = useCustomer();
-  return useQuery({
-    queryKey: [...STORE_KEY, 'favourites'],
-    queryFn: async () => unwrap(await session.client.GET('/api/v1/customer-app/favourites')),
-  });
-}
-
-/** Sets every cached copy of a product's ★ at once; the server's answer settles it. */
+/** Sets every cached copy of a product's ♡ at once; the server's answer settles it. */
 function markFavourite(client: QueryClient, productId: number, favourite: boolean) {
-  const mark = (product: StoreProduct) =>
-    product.id === productId ? { ...product, favourite } : product;
   for (const [key, data] of client.getQueriesData<unknown>({
     queryKey: [...STORE_KEY, 'products'],
   })) {
-    if (Array.isArray(data)) client.setQueryData(key, (data as StoreProduct[]).map(mark));
-    else if (isProductPages(data)) {
-      client.setQueryData(key, {
-        ...data,
-        pages: data.pages.map((page) => ({ ...page, data: page.data.map(mark) })),
-      });
-    }
+    if (data !== undefined) client.setQueryData(key, withFavourite(data, productId, favourite));
   }
 }
 
-/** ★ on a product (ADR-0079 #4): kept on the server, so a new phone keeps them. */
+/** ♡ on a product (ADR-0079 #4, ADR-0092 #7): kept on the server, so a new phone keeps them. */
 export function useToggleFavourite() {
   const { session } = useCustomer();
   const queryClient = useQueryClient();
@@ -326,18 +416,6 @@ export function useStoreOrderReps(enabled = true) {
     queryFn: async () => unwrap(await session.client.GET('/api/v1/customer-app/orders/reps')).reps,
     enabled,
     staleTime: 5 * 60_000,
-  });
-}
-
-/** «Сүүлийн захиалга» on «Нүүр»: the latest few, any day. */
-export function useRecentStoreOrders(limit = 2) {
-  const { session } = useCustomer();
-  return useQuery({
-    queryKey: [...STORE_KEY, 'orders', 'recent', limit],
-    queryFn: async () =>
-      unwrap(
-        await session.client.GET('/api/v1/customer-app/orders', { params: { query: { limit } } }),
-      ).data,
   });
 }
 
@@ -455,4 +533,6 @@ export async function refreshAfterOrder(client: QueryClient): Promise<void> {
   await client.invalidateQueries({ queryKey: [...STORE_KEY, 'orders'] });
   await client.invalidateQueries({ queryKey: [...STORE_KEY, 'credit-check'] });
   await client.invalidateQueries({ queryKey: [...STORE_KEY, 'statement'] });
+  // «Сүүлд захиалсан бараа» on «Нүүр» changes with every order.
+  await client.invalidateQueries({ queryKey: [...STORE_KEY, 'products', 'home'] });
 }

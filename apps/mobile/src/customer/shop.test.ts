@@ -11,6 +11,8 @@ import {
   quickDays,
   quoteFor,
   quotedLine,
+  shopChipQuery,
+  shopRouteParams,
   storeLineOf,
   topStoreCategories,
 } from './shop';
@@ -80,10 +82,32 @@ describe('«Bto300»: the shop (ADR-0079 #4)', () => {
   });
 
   it('tells an empty ★ list from a search that finds nothing', () => {
-    expect(emptyKindOf({ q: '', categoryIds: [], favourites: true })).toBe('noFavourites');
-    expect(emptyKindOf({ q: 'ус', categoryIds: [], favourites: true })).toBe('noMatch');
-    expect(emptyKindOf({ q: '', categoryIds: [3], favourites: true })).toBe('noMatch');
-    expect(emptyKindOf({ q: '', categoryIds: [], favourites: false })).toBe('noMatch');
+    const query = { q: '', categoryIds: [], chip: 'favourites' as const, inStock: false };
+    expect(emptyKindOf(query)).toBe('noFavourites');
+    expect(emptyKindOf({ ...query, q: 'ус' })).toBe('noMatch');
+    expect(emptyKindOf({ ...query, categoryIds: [3] })).toBe('noMatch');
+    expect(emptyKindOf({ ...query, inStock: true })).toBe('noMatch');
+    expect(emptyKindOf({ ...query, chip: 'all' })).toBe('noMatch');
+    expect(emptyKindOf({ ...query, chip: 'deals' })).toBe('noMatch');
+  });
+
+  it('turns a chip into the shop query flags', () => {
+    expect(shopChipQuery('all')).toEqual({ favourites: false, deals: false, new: false });
+    expect(shopChipQuery('favourites')).toEqual({ favourites: true, deals: false, new: false });
+    expect(shopChipQuery('deals')).toEqual({ favourites: false, deals: true, new: false });
+    expect(shopChipQuery('new')).toEqual({ favourites: false, deals: false, new: true });
+  });
+
+  it('reads a link into the shop', () => {
+    expect(shopRouteParams({})).toEqual({ chip: null, categoryIds: null, search: false });
+    expect(shopRouteParams({ chip: 'deals' }).chip).toBe('deals');
+    expect(shopRouteParams({ chip: 'stars' }).chip).toBeNull();
+    expect(shopRouteParams({ chip: ['new', 'deals'] }).chip).toBe('new');
+    expect(shopRouteParams({ categoryIds: '5' }).categoryIds).toEqual([5]);
+    expect(shopRouteParams({ categoryIds: '5, 7,5,x,-2,0' }).categoryIds).toEqual([5, 7]);
+    expect(shopRouteParams({ categoryIds: 'x' }).categoryIds).toBeNull();
+    expect(shopRouteParams({ search: '1' }).search).toBe(true);
+    expect(shopRouteParams({ search: '0' }).search).toBe(false);
   });
 
   it('makes a cart line of a product in a unit', () => {

@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { AppProblem } from '../api/problem';
 import { feedDayOf, storeLineOf } from './feed-lines';
-import {
-  cartTotalOf,
-  contactInitialsOf,
-  homeFavourites,
-  inOrderOf,
-  orderDayOf,
-  phoneShown,
-  shownContacts,
-} from './home';
+import { contactInitialsOf, inOrderOf, phoneShown, shownContacts } from './home';
 import { storeFactsOf } from './notifications';
 import { minutesOf, signInMessageOf } from './sign-in-problems';
 
-describe('«Bto300» «Нүүр» (ADR-0079 #13, #14)', () => {
+describe('«Bto300» «Холбоо барих» (ADR-0079 #14, ADR-0092 #8)', () => {
   it('draws a contact with the first letters of its role', () => {
     expect(contactInitialsOf('Захиалга, оффис')).toBe('ЗО');
     expect(contactInitialsOf('Борлуулалтын менежер')).toBe('БМ');
@@ -38,29 +30,9 @@ describe('«Bto300» «Нүүр» (ADR-0079 #13, #14)', () => {
     expect(phoneShown('7011-2233')).toBe('7011-2233');
   });
 
-  it('takes the newest three stars and keeps their order', () => {
-    expect(homeFavourites([9, 4, 4, 7, 1])).toEqual([9, 4, 7]);
-    expect(homeFavourites([])).toEqual([]);
+  it('keeps products in the order of their ids, without the missing ones', () => {
     const products = [{ id: 4 }, { id: 9 }];
     expect(inOrderOf([9, 4, 7], products)).toEqual([{ id: 9 }, { id: 4 }]);
-  });
-
-  it('names a recent order’s day against the server’s today', () => {
-    expect(orderDayOf('2026-10-18', '2026-10-18')).toEqual({ kind: 'today' });
-    expect(orderDayOf('2026-10-17', '2026-10-18')).toEqual({ kind: 'yesterday' });
-    expect(orderDayOf('2026-10-15', '2026-10-18')).toEqual({ kind: 'date', date: '10/15' });
-    expect(orderDayOf('2026-10-18', null)).toEqual({ kind: 'date', date: '10/18' });
-  });
-
-  it('gives the unsent cart an amount only when every line is priced', () => {
-    expect(cartTotalOf(undefined)).toBeNull();
-    expect(cartTotalOf({ total: '0.00', lines: [] })).toBeNull();
-    expect(cartTotalOf({ total: '419600.00', lines: [{ priced: true }, { priced: true }] })).toBe(
-      '419600.00',
-    );
-    expect(cartTotalOf({ total: '1000.00', lines: [{ priced: true }, { priced: false }] })).toBe(
-      null,
-    );
   });
 });
 

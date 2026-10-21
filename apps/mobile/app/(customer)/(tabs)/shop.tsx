@@ -1,10 +1,12 @@
+import type { RepProductSort } from '@tugeel/shared/sales';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { PackageSearch, ScanBarcode, SlidersHorizontal, Star } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { Heart, PackageSearch, ScanBarcode } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -12,67 +14,75 @@ import {
 } from 'react-native';
 import {
   useStoreCategories,
+  useStoreProductCount,
   useStoreProducts,
-  useToggleFavourite,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
-import { lineOf } from '../../../src/cart/cart';
-import { CustomerProductCard } from '../../../src/customer/product-card';
-import { emptyKindOf } from '../../../src/customer/shop';
-import { ShopFilterSheet, type StoreShopFilters } from '../../../src/customer/shop-filter-sheet';
-import { useAddOneStore } from '../../../src/customer/use-add';
-import { useCustomer } from '../../../src/state/session';
-import { useShop } from '../../../src/state/shop';
-import { useDebounced } from '../../../src/state/use-debounced';
-import { colors, spacing, type } from '../../../src/theme/tokens';
+import { StoreCard, useCardActions } from '../../../src/customer/home-parts';
 import {
-  ActiveChip,
-  ChoiceChip,
-  CircleButton,
-  MenuChip,
-  PillButton,
-  SearchField,
-} from '../../../src/ui/controls';
+  activeFilters,
+  FloatingPill,
+  type ListFilters,
+  ListFilterSheet,
+  NO_LIST_FILTERS,
+  SortSheet,
+} from '../../../src/customer/list-sheets';
+import { emptyKindOf, type ShopChip, shopRouteParams } from '../../../src/customer/shop';
+import { formatCount } from '../../../src/format/format';
+import { useDebounced } from '../../../src/state/use-debounced';
+import { colors, spacing, TOUCH, type } from '../../../src/theme/tokens';
+import { ActiveChip, ChoiceChip, PillButton, SearchField } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { LargeTitle, Page } from '../../../src/ui/layout';
 import { useTabBarInset } from '../../../src/ui/tab-bar';
-import { Text } from '../../../src/ui/text';
+import { Text, type TextInput } from '../../../src/ui/text';
 
-const GAP = 12;
-const NO_FILTERS: StoreShopFilters = { sort: 'NEW', categoryIds: [] };
+const GAP = 10;
 
 /**
- * «Бараа» of «Bto300» (the Shop board, ADR-0079 #4, #13): the scanner and the filter, the search by
- * name, code or barcode, «Бүгд» / «★ Дуртай N», the categories and the order as chips, the count,
- * and the products two by two with their ★, stock word and pack; «+» adds one of the default
- * unit, a card opens the product. «Нүүр» opens it on ★ with `?favourites=1`.
+ * «Бараа» of «Bto300» (ADR-0092 #7; the Shop board): the count in the title, the search by name,
+ * code or barcode with the scanner, the chips «Бүгд · ♡ Дуртай · Хямдралтай · Шинэ», the chosen
+ * categories, the products two by two, and the floating «Эрэмбэлэх | Шүүлтүүр». Links set a chip
+ * (`?chip=deals`), categories (`?categoryIds=5`) or focus the search (`?search=1`).
  */
 export default function StoreShopScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ favourites?: string }>();
-  const { server } = useCustomer();
-  const { cart, pending } = useShop();
+  const params = useLocalSearchParams<{ chip?: string; categoryIds?: string; search?: string }>();
   const { width } = useWindowDimensions();
   const inset = useTabBarInset();
   const categories = useStoreCategories();
-  const star = useToggleFavourite();
-  const add = useAddOneStore();
+  const actions = useCardActions();
+  const search = useRef<TextInput>(null);
   const [text, setText] = useState('');
-  const [favourites, setFavourites] = useState(params.favourites === '1');
-  const [filters, setFilters] = useState<StoreShopFilters>(NO_FILTERS);
-  const [sheet, setSheet] = useState(false);
+  const [chip, setChip] = useState<ShopChip>('all');
+  const [sort, setSort] = useState<RepProductSort>('NEW');
+  const [filters, setFilters] = useState<ListFilters>(NO_LIST_FILTERS);
+  const [draft, setDraft] = useState<ListFilters>(NO_LIST_FILTERS);
+  const [sheet, setSheet] = useState<'sort' | 'filter' | null>(null);
   const q = useDebounced(text.trim(), 350);
 
-  // «Дуртай» on «Нүүр» opens the shop on ★; the link is spent so a later one works again.
+  // A link into the shop: «Нүүр»'s search, a category page, a chip. The link is spent so a later
+  // one works again.
   useEffect(() => {
-    if (params.favourites !== '1') return;
-    setFavourites(true);
-    router.setParams({ favourites: undefined });
-  }, [params.favourites, router]);
+    const link = shopRouteParams(params);
+    if (!link.chip && !link.categoryIds && !link.search) return;
+    if (link.categoryIds) {
+      setText('');
+      setChip('all');
+      setFilters({ categoryIds: link.categoryIds, inStock: false });
+    }
+    if (link.chip) setChip(link.chip);
+    if (link.search) search.current?.focus();
+    router.setParams({ chip: undefined, categoryIds: undefined, search: undefined });
+  }, [params, router]);
 
-  const query = { q, categoryIds: filters.categoryIds, favourites, sort: filters.sort };
+  const query = { q, categoryIds: filters.categoryIds, chip, inStock: filters.inStock, sort };
   const products = useStoreProducts(query);
+  const draftCount = useStoreProductCount(
+    { ...query, categoryIds: draft.categoryIds, inStock: draft.inStock },
+    sheet === 'filter',
+  );
   const rows = useMemo(
     () => products.data?.pages.flatMap((page) => page.data) ?? [],
     [products.data],
@@ -81,47 +91,66 @@ export default function StoreShopScreen() {
   const total = first?.total ?? null;
   const favouriteCount = first?.favouriteCount ?? null;
   const cardWidth = (width - spacing.lg * 2 - GAP) / 2;
-  const locked = pending !== null;
+  const empty = emptyKindOf(query);
 
+  const sorts = [
+    { value: 'NEW' as const, label: t('mobile.customer.sorts.new') },
+    { value: 'PRICE_ASC' as const, label: t('mobile.customer.sorts.priceAsc') },
+    { value: 'PRICE_DESC' as const, label: t('mobile.customer.sorts.priceDesc') },
+  ];
   const categoryNames = filters.categoryIds.map(
     (id) => categories.data?.find((category) => category.id === id)?.name ?? '',
   );
-  const sortLabel = {
-    NEW: t('mobile.filter.sortNew'),
-    PRICE_ASC: t('mobile.filter.sortPriceAsc'),
-    PRICE_DESC: t('mobile.filter.sortPriceDesc'),
-  }[filters.sort];
-  const sortPhrase = {
-    NEW: t('mobile.shop.sortedNew'),
-    PRICE_ASC: t('mobile.shop.sortedPriceAsc'),
-    PRICE_DESC: t('mobile.shop.sortedPriceDesc'),
-  }[filters.sort];
-  const empty = emptyKindOf(query);
+  const sortLine = [
+    sorts.find((option) => option.value === sort)?.label ?? '',
+    filters.categoryIds.length > 0
+      ? t('mobile.customer.list.categoriesLine', { n: filters.categoryIds.length })
+      : null,
+    filters.inStock ? t('mobile.customer.list.inStockLine') : null,
+  ]
+    .filter((part) => part)
+    .join(' · ');
+
+  const chips: { value: ShopChip; label: string }[] = [
+    { value: 'all', label: t('common.all') },
+    {
+      value: 'favourites',
+      label:
+        favouriteCount === null
+          ? t('mobile.customer.shop.favouritesLabel')
+          : t('mobile.customer.shop.favourites', { n: favouriteCount }),
+    },
+    { value: 'deals', label: t('mobile.customer.shop.chips.deals') },
+    { value: 'new', label: t('mobile.customer.shop.chips.new') },
+  ];
 
   const header = (
     <View>
-      <View style={styles.top}>
-        <CircleButton
-          icon={<ScanBarcode size={22} strokeWidth={1.9} color={colors.foreground} />}
-          label={t('mobile.scan.title')}
-          onPress={() => router.push('/scan')}
-        />
-        <CircleButton
-          icon={<SlidersHorizontal size={22} strokeWidth={1.9} color={colors.foreground} />}
-          label={t('mobile.shop.filterButton', { n: filters.categoryIds.length > 0 ? 1 : 0 })}
-          badge={filters.categoryIds.length > 0 ? 1 : 0}
-          badgeTone="accent"
-          onPress={() => setSheet(true)}
-        />
+      <View style={styles.titleRow}>
+        <LargeTitle>{t('mobile.tabs.shop')}</LargeTitle>
+        {total !== null ? (
+          <Text style={[type.row, styles.muted]}>
+            {t('mobile.customer.list.count', { n: formatCount(total) })}
+          </Text>
+        ) : null}
       </View>
-      <LargeTitle style={styles.title}>{t('mobile.tabs.shop')}</LargeTitle>
-      <View style={styles.search}>
+      <View style={styles.searchRow}>
         <SearchField
+          inputRef={search}
           value={text}
           onChangeText={setText}
           placeholder={t('mobile.shop.search')}
           accessibilityLabel={t('mobile.shop.searchLabel')}
+          style={styles.grow}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.scan.title')}
+          onPress={() => router.push('/scan')}
+          style={styles.scan}
+        >
+          <ScanBarcode size={22} strokeWidth={1.9} color={colors.foreground} />
+        </Pressable>
       </View>
       <ScrollView
         horizontal
@@ -129,33 +158,29 @@ export default function StoreShopScreen() {
         style={styles.chipRow}
         contentContainerStyle={styles.chips}
         keyboardShouldPersistTaps="handled"
+        accessibilityLabel={t('mobile.customer.shop.chips.label')}
       >
-        <ChoiceChip
-          label={t('common.all')}
-          selected={!favourites}
-          onPress={() => setFavourites(false)}
-          onWhite
-          compact
-        />
-        <ChoiceChip
-          label={
-            favouriteCount === null
-              ? t('mobile.customer.shop.favouritesLabel')
-              : t('mobile.customer.shop.favourites', { n: favouriteCount })
-          }
-          icon={
-            <Star
-              size={15}
-              strokeWidth={2}
-              color={favourites ? colors.primaryForeground : colors.tint.amber}
-              fill={favourites ? colors.primaryForeground : colors.tint.amber}
-            />
-          }
-          selected={favourites}
-          onPress={() => setFavourites(true)}
-          onWhite
-          compact
-        />
+        {chips.map((option) => (
+          <ChoiceChip
+            key={option.value}
+            label={option.label}
+            selected={chip === option.value}
+            onPress={() => setChip(option.value)}
+            onWhite
+            compact
+            {...(option.value === 'favourites'
+              ? {
+                  icon: (
+                    <Heart
+                      size={15}
+                      strokeWidth={2.2}
+                      color={chip === 'favourites' ? colors.primaryForeground : colors.heart}
+                    />
+                  ),
+                }
+              : {})}
+          />
+        ))}
         {categoryNames.length > 0 ? (
           <ActiveChip
             label={
@@ -163,18 +188,16 @@ export default function StoreShopScreen() {
                 ? (categoryNames[0] ?? '')
                 : t('mobile.shop.andMore', { name: categoryNames[0], n: categoryNames.length - 1 })
             }
-            onPress={() => setSheet(true)}
+            onPress={() => {
+              setDraft(filters);
+              setSheet('filter');
+            }}
             onRemove={() => setFilters({ ...filters, categoryIds: [] })}
             removeLabel={t('mobile.shop.removeFilter', { name: t('mobile.filter.categories') })}
           />
-        ) : (
-          <MenuChip label={t('mobile.filter.categories')} chevron onPress={() => setSheet(true)} />
-        )}
-        <MenuChip label={sortLabel} chevron onPress={() => setSheet(true)} />
+        ) : null}
       </ScrollView>
-      <Text style={[type.secondary, styles.count]}>
-        {total === null ? ' ' : t('mobile.shop.count', { n: total, sort: sortPhrase })}
-      </Text>
+      <Text style={[type.chip, styles.sortLine]}>{sortLine}</Text>
       {products.error ? <ProblemText problem={problemFrom(products.error)} /> : null}
     </View>
   );
@@ -187,23 +210,11 @@ export default function StoreShopScreen() {
         keyExtractor={(product) => String(product.id)}
         ListHeaderComponent={header}
         columnWrapperStyle={styles.columns}
-        contentContainerStyle={[styles.list, { paddingBottom: inset + spacing.xl }]}
+        contentContainerStyle={[styles.list, { paddingBottom: inset + 48 + spacing.xl }]}
         ItemSeparatorComponent={() => <View style={styles.rowGap} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        renderItem={({ item }) => (
-          <View style={{ width: cardWidth }}>
-            <CustomerProductCard
-              product={item}
-              server={server}
-              line={lineOf(cart, item.id)}
-              locked={locked}
-              onOpen={() => router.push(`/product/${item.id}`)}
-              onAdd={() => add(item)}
-              onStar={() => star.mutate({ productId: item.id, favourite: !item.favourite })}
-            />
-          </View>
-        )}
+        renderItem={({ item }) => <StoreCard product={item} actions={actions} width={cardWidth} />}
         onEndReachedThreshold={0.6}
         onEndReached={() => {
           if (products.hasNextPage && !products.isFetchingNextPage) void products.fetchNextPage();
@@ -216,7 +227,7 @@ export default function StoreShopScreen() {
           ) : products.error ? null : empty === 'noFavourites' ? (
             <View style={styles.empty}>
               <EmptyState
-                icon={<Star size={44} strokeWidth={1.5} color={colors.input} />}
+                icon={<Heart size={44} strokeWidth={1.5} color={colors.input} />}
                 title={t('mobile.customer.shop.noFavourites')}
                 hint={t('mobile.customer.shop.noFavouritesHint')}
               />
@@ -224,7 +235,7 @@ export default function StoreShopScreen() {
                 title={t('common.all')}
                 variant="soft"
                 height={44}
-                onPress={() => setFavourites(false)}
+                onPress={() => setChip('all')}
               />
             </View>
           ) : (
@@ -234,12 +245,15 @@ export default function StoreShopScreen() {
                 title={t('mobile.shop.empty')}
                 hint={t('mobile.shop.emptyHint')}
               />
-              {filters.categoryIds.length > 0 ? (
+              {activeFilters(filters) > 0 || chip !== 'all' ? (
                 <PillButton
                   title={t('mobile.shop.clearFilters')}
                   variant="soft"
                   height={44}
-                  onPress={() => setFilters({ ...filters, categoryIds: [] })}
+                  onPress={() => {
+                    setFilters(NO_LIST_FILTERS);
+                    setChip('all');
+                  }}
                 />
               ) : null}
             </View>
@@ -251,30 +265,59 @@ export default function StoreShopScreen() {
           ) : null
         }
       />
-      <ShopFilterSheet
-        visible={sheet}
-        filters={filters}
-        onApply={(next) => {
-          setFilters(next);
-          setSheet(false);
+      <FloatingPill
+        bottom={inset}
+        active={activeFilters(filters)}
+        onSort={() => setSheet('sort')}
+        onFilter={() => {
+          setDraft(filters);
+          setSheet('filter');
         }}
-        onClose={() => setSheet(false)}
+      />
+      <SortSheet
+        visible={sheet === 'sort'}
+        options={sorts}
+        value={sort}
+        onPick={(value) => {
+          setSort(value);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+      />
+      <ListFilterSheet
+        visible={sheet === 'filter'}
+        draft={draft}
+        count={draftCount.data ?? null}
+        onChange={setDraft}
+        onApply={() => {
+          setFilters(draft);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
       />
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
+  grow: { flex: 1 },
+  muted: { color: colors.muted },
   list: { paddingHorizontal: spacing.lg },
-  top: {
-    height: 44,
+  titleRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: spacing.md,
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    paddingTop: spacing.md,
   },
-  title: { marginTop: 2 },
-  search: { paddingTop: 10 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: 10 },
+  scan: {
+    width: TOUCH,
+    height: TOUCH,
+    borderRadius: TOUCH / 2,
+    backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Edge to edge: the list pads its content, the chips scroll under the margins.
   chipRow: { marginHorizontal: -spacing.lg },
   chips: {
@@ -283,9 +326,9 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
     paddingHorizontal: spacing.lg,
   },
-  count: { paddingTop: 10, paddingBottom: spacing.md },
+  sortLine: { paddingTop: 10, paddingBottom: spacing.md, color: colors.label2 },
   columns: { gap: GAP },
-  rowGap: { height: 22 },
+  rowGap: { height: 12 },
   loading: { marginTop: spacing.xxl },
   more: { marginTop: spacing.lg },
   empty: { alignItems: 'center', gap: spacing.md },
