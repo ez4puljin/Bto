@@ -1,11 +1,13 @@
 import type { ComponentProps, Ref } from 'react';
 import { Text as NativeText, TextInput as NativeTextInput } from 'react-native';
+import { APP } from '../config/app';
+import { fontScaleCap } from '../theme/font-scale';
 
 /**
- * How far the phone's font size setting may enlarge the app's text: the owner found it too big
- * (2026-10-17); 1.15 keeps a larger setting readable without breaking the layouts.
+ * How far the phone's font size setting may enlarge the app's text: 1.15 in the rep app (the owner
+ * found it too big, 2026-10-17), none in «Bto300» (its sizes are E-mart's, ADR-0095).
  */
-export const MAX_FONT_SCALE = 1.15;
+export const MAX_FONT_SCALE = fontScaleCap(APP.variant);
 
 /**
  * React Native's Text with the font scaling capped. React 19 ignores `defaultProps` on function

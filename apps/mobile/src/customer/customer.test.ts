@@ -4,7 +4,7 @@ import { noticeTabsOf, STORE_TILES, storeFactsOf, storeTargetOf } from './notifi
 import { backorderedIn, byDay, orderAmount, orderNotes, progressOf, takerOf } from './orders';
 import { reorderPlan } from './reorder';
 import { codeComplete, codeInput, newPasswordIssue, phoneInput, phoneOf } from './sign-in';
-import { columnAmount, lastMonthRange } from './statement';
+import { columnAmount, lastMonthRange, statementPresetOf, statementRange } from './statement';
 import { canOrder, lineStockNote } from './stock';
 
 describe('«Bto300»: the stock in words (ADR-0079 #4)', () => {
@@ -255,6 +255,43 @@ describe('«Bto300»: the statement (ADR-0086)', () => {
     expect(lastMonthRange('2026-10-20')).toEqual({ from: '2026-09-21', to: '2026-10-20' });
     expect(lastMonthRange('2026-03-31')).toEqual({ from: '2026-03-01', to: '2026-03-31' });
     expect(lastMonthRange('2026-01-15')).toEqual({ from: '2025-12-16', to: '2026-01-15' });
+  });
+
+  it('gives each chip its days', () => {
+    expect(statementRange('lastMonth', '2026-10-21')).toEqual({
+      from: '2026-09-22',
+      to: '2026-10-21',
+    });
+    expect(statementRange('thisMonth', '2026-10-21')).toEqual({
+      from: '2026-10-01',
+      to: '2026-10-21',
+    });
+    expect(statementRange('prevMonth', '2026-10-21')).toEqual({
+      from: '2026-09-01',
+      to: '2026-09-30',
+    });
+    expect(statementRange('prevMonth', '2026-03-05')).toEqual({
+      from: '2026-02-01',
+      to: '2026-02-28',
+    });
+    expect(statementRange('prevMonth', '2026-01-01')).toEqual({
+      from: '2025-12-01',
+      to: '2025-12-31',
+    });
+  });
+
+  it('lights the chip whose days are shown, none for calendar days', () => {
+    expect(statementPresetOf({ from: '2026-09-22', to: '2026-10-21' }, '2026-10-21')).toBe(
+      'lastMonth',
+    );
+    expect(statementPresetOf({ from: '2026-09-01', to: '2026-09-30' }, '2026-10-21')).toBe(
+      'prevMonth',
+    );
+    expect(statementPresetOf({ from: '2026-09-10', to: '2026-10-10' }, '2026-10-21')).toBeNull();
+    // On the last day of a 31-day month the last month is this month: the first chip wins.
+    expect(statementPresetOf({ from: '2026-03-01', to: '2026-03-31' }, '2026-03-31')).toBe(
+      'lastMonth',
+    );
   });
 
   it('leaves a zero out of its column', () => {

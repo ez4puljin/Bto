@@ -90,6 +90,36 @@ export function chipToneOf(kind: HomeSectionKind): ChipTone {
   }
 }
 
+/**
+ * The small icon before a home section's title (the E-mart structure, ADR-0095): recent products
+ * the history, promotions and segments a megaphone (orange, red), discounts a tag, new products a
+ * sparkle, favourites a heart.
+ */
+export type SectionIcon =
+  | { icon: 'history'; tone: 'muted' }
+  | { icon: 'megaphone'; tone: 'promotion' | 'discount' }
+  | { icon: 'tag'; tone: 'discount' }
+  | { icon: 'sparkles'; tone: 'new' }
+  | { icon: 'heart'; tone: 'discount' };
+
+export function sectionIconOf(kind: HomeSectionKind): SectionIcon {
+  switch (kind) {
+    case 'RECENT':
+      return { icon: 'history', tone: 'muted' };
+    case 'PROMOTIONS':
+      return { icon: 'megaphone', tone: 'promotion' };
+    case 'SEGMENT':
+      return { icon: 'megaphone', tone: 'discount' };
+    case 'DISCOUNTS':
+    case 'DEALS':
+      return { icon: 'tag', tone: 'discount' };
+    case 'NEW':
+      return { icon: 'sparkles', tone: 'new' };
+    case 'FAVOURITES':
+      return { icon: 'heart', tone: 'discount' };
+  }
+}
+
 /** A sort's words in mn.json (`mobile.customer.sorts.*`). */
 export type SortName = 'mostOrdered' | 'deal' | 'new' | 'favourited' | 'priceAsc' | 'priceDesc';
 

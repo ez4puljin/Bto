@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { unwrap } from '../../src/api/problem';
 import {
   STORE_SUMMARY_KEY,
@@ -38,6 +39,8 @@ export default function CustomerLayout() {
   return (
     <ShopProvider server={server} userId={accountId}>
       <ToastProvider>
+        {/* White on «Bto300»'s blue header (ADR-0095); the sign-in screens keep the dark one. */}
+        <StatusBar style="light" />
         <StorePopupGate />
         <ThumbKeeperFor
           server={server}
@@ -64,6 +67,7 @@ export default function CustomerLayout() {
             name="categories"
             options={{ contentStyle: { backgroundColor: colors.card } }}
           />
+          <Stack.Screen name="account" />
           <Stack.Screen name="checkout" />
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="invoice/[id]" />

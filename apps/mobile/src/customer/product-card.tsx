@@ -1,4 +1,4 @@
-import { Heart, Plus } from 'lucide-react-native';
+import { Heart, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StockWord, StoreDeal, StoreProduct } from '../api/customer';
@@ -7,7 +7,7 @@ import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
 import { baseUnitOf, defaultUnitOf, packOf } from '../shop/units';
-import { colors, fonts, radii, spacing, tabular, TOUCH, type } from '../theme/tokens';
+import { colors, fonts, spacing, storeType, tabular, type } from '../theme/tokens';
 import { CardPictures } from '../ui/card-pictures';
 import { Text } from '../ui/text';
 import { cardPriceOf, dealToneOf } from './deals';
@@ -64,7 +64,7 @@ export function DealBadge({ deal }: { deal: Pick<StoreDeal, 'kind' | 'label'> })
   return (
     <View style={[styles.badge, promotion ? styles.promotion : styles.discount]}>
       <Text
-        style={[styles.badgeText, promotion ? styles.promotionText : styles.discountText]}
+        style={[storeType.badge, promotion ? styles.promotionText : styles.discountText]}
         numberOfLines={1}
       >
         {deal.label}
@@ -73,12 +73,12 @@ export function DealBadge({ deal }: { deal: Pick<StoreDeal, 'kind' | 'label'> })
   );
 }
 
-/** «Шинэ» in blue. */
+/** «ШИНЭ» in blue. */
 export function NewBadge() {
   const { t } = useTranslation();
   return (
     <View style={[styles.badge, styles.newBadge]}>
-      <Text style={[styles.badgeText, styles.discountText]}>{t('mobile.shop.new')}</Text>
+      <Text style={[storeType.badge, styles.newText]}>{t('mobile.shop.new')}</Text>
     </View>
   );
 }
@@ -101,12 +101,13 @@ export function FavouriteButton({
       accessibilityLabel={label}
       accessibilityState={{ selected: on }}
       onPress={onPress}
+      hitSlop={4}
       style={styles.heart}
     >
       <Heart
         size={size}
-        strokeWidth={1.9}
-        color={on ? colors.heart : colors.muted}
+        strokeWidth={1.6}
+        color={on ? colors.heart : colors.foreground}
         fill={on ? colors.heart : 'none'}
       />
     </Pressable>
@@ -114,11 +115,12 @@ export function FavouriteButton({
 }
 
 /**
- * A product card of «Bto300» everywhere (the Main, SectionList, Category and Shop boards, ADR-0092
- * #7): the picture with ♡ and the badges, the name in two lines, the pack, the price per base unit
- * (the old one struck through under a deal price), the stock word with its dot, and «+» or the
- * cart's quantity. «+» adds one of the default unit; the card opens the product. `width` sets a
- * row's card (152 on the home's rows); a grid's card fills its column.
+ * A product card of «Bto300» everywhere (ADR-0092 #7 in the E-mart structure of ADR-0095): a white
+ * card with a hairline, the whole picture with ♡ in its corner, then the badges (a program's
+ * label, «ШИНЭ»), the name on one line, the pack, the price per base unit (the old one struck
+ * through beside a deal price), the stock word with its dot and the cart or the cart's quantity.
+ * The cart adds one of the default unit; the card opens the product. `width` sets a row's card
+ * (164 on the home's rows); a grid's card fills its column.
  */
 export function CustomerProductCard({
   product,
@@ -129,7 +131,7 @@ export function CustomerProductCard({
   onAdd,
   onFavourite,
   width,
-  pictureHeight = 140,
+  pictureHeight = 164,
 }: {
   product: StoreProduct;
   server: string;
@@ -179,25 +181,31 @@ export function CustomerProductCard({
             onPress={onFavourite}
           />
         </View>
-        {product.deal || product.isNew ? (
-          <View style={styles.badges} pointerEvents="none">
-            {product.deal ? <DealBadge deal={product.deal} /> : null}
-            {product.isNew ? <NewBadge /> : null}
-          </View>
-        ) : null}
       </View>
       <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={2}>
+        <View style={styles.badges}>
+          {product.deal ? <DealBadge deal={product.deal} /> : null}
+          {product.isNew ? <NewBadge /> : null}
+        </View>
+        <Text style={storeType.cardName} numberOfLines={1}>
           {product.name}
         </Text>
-        <Text style={type.secondary} numberOfLines={1}>
+        <Text style={storeType.cardPack} numberOfLines={1}>
           {pack ?? ' '}
         </Text>
-        <View style={styles.bottom}>
-          <View style={styles.grow}>
-            {price?.old ? (
+        {price ? (
+          <View style={styles.priceRow}>
+            <Text style={[storeType.cardPrice, tabular]} numberOfLines={1}>
+              {t('pricing.money', { amount: formatMnt(price.price) })}
+              {base ? (
+                <Text style={storeType.cardOld}>
+                  {` ${t('mobile.shop.per', { unit: words(base).short })}`}
+                </Text>
+              ) : null}
+            </Text>
+            {price.old ? (
               <Text
-                style={styles.old}
+                style={[storeType.cardOld, styles.struck]}
                 numberOfLines={1}
                 accessibilityLabel={t('mobile.customer.card.oldPrice', {
                   price: t('pricing.money', { amount: formatMnt(price.old) }),
@@ -206,26 +214,18 @@ export function CustomerProductCard({
                 {t('pricing.money', { amount: formatMnt(price.old) })}
               </Text>
             ) : null}
-            {price ? (
-              <Text style={styles.price} numberOfLines={1}>
-                {t('pricing.money', { amount: formatMnt(price.price) })}
-                {base ? (
-                  <Text style={styles.per}>
-                    {` ${t('mobile.shop.per', { unit: words(base).short })}`}
-                  </Text>
-                ) : null}
-              </Text>
-            ) : (
-              <Text style={type.secondary} numberOfLines={1}>
-                {t('mobile.shop.noPrice')}
-              </Text>
-            )}
-            <View style={styles.stock}>
-              <View style={[styles.stockDot, { backgroundColor: tone.dot }]} />
-              <Text style={[styles.stockText, { color: tone.text }]} numberOfLines={1}>
-                {t(`sales.stockWords.${product.stock}`)}
-              </Text>
-            </View>
+          </View>
+        ) : (
+          <Text style={storeType.cardPack} numberOfLines={1}>
+            {t('mobile.shop.noPrice')}
+          </Text>
+        )}
+        <View style={styles.bottom}>
+          <View style={styles.stock}>
+            <View style={[styles.stockDot, { backgroundColor: tone.dot }]} />
+            <Text style={[storeType.cardStock, { color: tone.text }]} numberOfLines={1}>
+              {t(`sales.stockWords.${product.stock}`)}
+            </Text>
           </View>
           {locked ? null : line ? (
             <Pressable
@@ -238,7 +238,7 @@ export function CustomerProductCard({
               onPress={onOpen}
               style={styles.qty}
             >
-              <Text style={styles.qtyText} numberOfLines={1}>
+              <Text style={storeType.badge} numberOfLines={1}>
                 {`${line.qty} ${words(line).short}`}
               </Text>
             </Pressable>
@@ -250,7 +250,7 @@ export function CustomerProductCard({
               hitSlop={6}
               style={styles.add}
             >
-              <Plus size={18} strokeWidth={2.6} color={colors.primaryForeground} />
+              <ShoppingCart size={22} strokeWidth={1.6} color={colors.foreground} />
             </Pressable>
           ) : null}
         </View>
@@ -275,74 +275,54 @@ const styles = StyleSheet.create({
   pillText: { ...type.caption, fontFamily: fonts.semibold },
   pillTextLarge: { ...type.chip, fontFamily: fonts.semibold },
   badge: {
-    height: 22,
+    height: 20,
     paddingHorizontal: spacing.sm,
-    borderRadius: 11,
+    borderRadius: 10,
     justifyContent: 'center',
     flexShrink: 1,
   },
-  badgeText: { ...type.secondary, fontFamily: fonts.bold },
   promotion: { backgroundColor: colors.dealPromotion },
   promotionText: { color: colors.foreground },
   discount: { backgroundColor: colors.dealDiscount },
   discountText: { color: colors.primaryForeground },
   newBadge: { backgroundColor: colors.newBadge },
-  heart: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  newText: { textTransform: 'uppercase' },
+  heart: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   card: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.card,
+    borderRadius: 10,
     backgroundColor: colors.card,
     overflow: 'hidden',
   },
   fill: { flex: 1 },
   picture: {
-    backgroundColor: colors.imageFill,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  corner: { position: 'absolute', top: 0, right: 0 },
-  badges: {
-    position: 'absolute',
-    left: spacing.sm,
-    right: spacing.sm,
-    bottom: spacing.sm,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  body: { paddingTop: spacing.sm, paddingHorizontal: 10, paddingBottom: 10, gap: 2 },
-  name: { ...type.bodyStrong, minHeight: 38 },
+  corner: { position: 'absolute', top: 2, right: 2 },
+  body: { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 20 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+  struck: { textDecorationLine: 'line-through', flexShrink: 1 },
   bottom: {
+    minHeight: 32,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 6,
-    marginTop: 6,
   },
-  grow: { flex: 1, minWidth: 0 },
-  old: { ...type.secondary, textDecorationLine: 'line-through' },
-  price: { ...type.heading, fontFamily: fonts.bold, ...tabular },
-  per: { ...type.secondary, fontFamily: fonts.medium },
-  stock: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 1 },
+  stock: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
   stockDot: { width: 6, height: 6, borderRadius: 3 },
-  stockText: { ...type.caption, fontFamily: fonts.semibold },
-  add: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
   qty: {
-    height: 32,
+    height: 24,
     maxWidth: 76,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 12,
     backgroundColor: colors.primary,
     justifyContent: 'center',
   },
-  qtyText: { ...type.chip, fontFamily: fonts.semibold, color: colors.primaryForeground },
 });

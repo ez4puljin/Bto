@@ -10,7 +10,8 @@ import { useCustomer } from '../../src/state/session';
 import { spacing } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { PasswordToggle, TextField } from '../../src/ui/field';
-import { FootNote, LargeTitle, NavBar, Page } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/customer/store-header';
+import { FootNote, Page } from '../../src/ui/layout';
 import type { TextInput } from '../../src/ui/text';
 import { useToast } from '../../src/ui/toast';
 
@@ -84,14 +85,13 @@ export default function CustomerPasswordScreen() {
   );
 
   return (
-    <Page white>
-      <NavBar back={t('mobile.tabs.profile')} onBack={() => router.back()} />
+    <Page white edges={[]}>
+      <StoreHeader title={t('mobile.password.title')} onBack={() => router.back()} right={null} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.grow}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <LargeTitle style={styles.title}>{t('mobile.password.title')}</LargeTitle>
           <TextField
             style={styles.first}
             label={t('mobile.password.current')}
@@ -166,7 +166,6 @@ export default function CustomerPasswordScreen() {
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
   first: { marginTop: 22 },
   field: { marginTop: spacing.lg },
   problem: { marginTop: spacing.lg },

@@ -5,6 +5,7 @@ import {
   HOME_CATEGORY_TILES,
   homeCategoriesOf,
   nextSlide,
+  sectionIconOf,
   sectionRouteOf,
   sectionSortsOf,
   sectionSubtitleOf,
@@ -66,6 +67,18 @@ describe('the home sections (ADR-0092 #1)', () => {
     expect(chipToneOf('SEGMENT')).toBe('plain');
     expect(chipToneOf('RECENT')).toBe('plain');
     expect(chipToneOf('FAVOURITES')).toBe('plain');
+  });
+});
+
+describe("a home section's icon (ADR-0095)", () => {
+  it('marks each kind of section', () => {
+    expect(sectionIconOf('RECENT')).toEqual({ icon: 'history', tone: 'muted' });
+    expect(sectionIconOf('PROMOTIONS')).toEqual({ icon: 'megaphone', tone: 'promotion' });
+    expect(sectionIconOf('SEGMENT')).toEqual({ icon: 'megaphone', tone: 'discount' });
+    expect(sectionIconOf('DISCOUNTS')).toEqual({ icon: 'tag', tone: 'discount' });
+    expect(sectionIconOf('DEALS')).toEqual({ icon: 'tag', tone: 'discount' });
+    expect(sectionIconOf('NEW')).toEqual({ icon: 'sparkles', tone: 'new' });
+    expect(sectionIconOf('FAVOURITES')).toEqual({ icon: 'heart', tone: 'discount' });
   });
 });
 

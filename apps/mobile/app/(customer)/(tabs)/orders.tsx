@@ -31,12 +31,13 @@ import {
 import { shortMoney } from '../../../src/orders/amounts';
 import { DateRangeSheet } from '../../../src/orders/date-range-sheet';
 import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { ActiveChip, ChoiceChip, CircleButton, PillButton } from '../../../src/ui/controls';
+import { ActiveChip, ChoiceChip, PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, Page } from '../../../src/ui/layout';
+import { Page } from '../../../src/ui/layout';
 import { StatRow } from '../../../src/ui/stat-row';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { HeaderIconButton, StoreHeader } from '../../../src/customer/store-header';
+import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /** The days the page offers as chips (the Orders board); the calendar sets any other. */
@@ -57,7 +58,7 @@ type Opened = 'none' | 'filters' | 'dates';
 export default function StoreOrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
+  const inset = useStoreTabBarInset();
   const meta = useOrderMeta();
   const me = useStoreMe();
   const today = me.data?.today ?? null;
@@ -122,18 +123,6 @@ export default function StoreOrdersScreen() {
 
   const header = (
     <View>
-      <View style={styles.bar} />
-      <View style={styles.head}>
-        <LargeTitle style={styles.title}>{t('mobile.tabs.orders')}</LargeTitle>
-        <CircleButton
-          icon={<SlidersHorizontal size={22} strokeWidth={1.9} color={colors.foreground} />}
-          label={t('mobile.orders.filterButton', { n: active.length })}
-          badge={active.length}
-          badgeTone="accent"
-          badgeRing={colors.canvas}
-          onPress={() => setOpened('filters')}
-        />
-      </View>
       <Text style={[type.row, styles.subtitle]}>{t('mobile.customer.orders.subtitle')}</Text>
       <View style={styles.chips}>
         {today
@@ -230,7 +219,20 @@ export default function StoreOrdersScreen() {
   );
 
   return (
-    <Page>
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.tabs.orders')}
+        right={
+          <HeaderIconButton
+            icon={
+              <SlidersHorizontal size={22} strokeWidth={1.9} color={colors.primaryForeground} />
+            }
+            label={t('mobile.orders.filterButton', { n: active.length })}
+            badge={active.length}
+            onPress={() => setOpened('filters')}
+          />
+        }
+      />
       <SectionList
         sections={sections}
         keyExtractor={(order) => String(order.id)}
@@ -323,10 +325,7 @@ export default function StoreOrdersScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
-  bar: { height: 38 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { marginHorizontal: spacing.xs, flexShrink: 1 },
-  subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
+  subtitle: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.muted },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

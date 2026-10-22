@@ -41,10 +41,11 @@ import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme
 import { PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { BarButton, LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { usePendingWords } from '../../../src/customer/pending-words';
 import { PendingSendView } from '../../../src/ui/pending-send';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { HeaderTextButton, StoreHeader } from '../../../src/customer/store-header';
+import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**
@@ -57,7 +58,7 @@ import { Text } from '../../../src/ui/text';
 export default function StoreCartScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
+  const inset = useStoreTabBarInset();
   const { server } = useCustomer();
   const { cart, dispatch, pending } = useShop();
   const sender = useCustomerSendOrder();
@@ -75,7 +76,8 @@ export default function StoreCartScreen() {
 
   if (cart.lines.length === 0 && !locked) {
     return (
-      <Page>
+      <Page edges={[]}>
+        <StoreHeader title={t('mobile.tabs.cart')} right={null} />
         <View style={[styles.empty, { paddingBottom: inset }]}>
           <EmptyState
             icon={<ShoppingCart size={48} strokeWidth={1.5} color={colors.input} />}
@@ -97,18 +99,19 @@ export default function StoreCartScreen() {
   const orderDeals = orderDealHintsOf(answered?.orderDeals ?? []);
 
   return (
-    <Page>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
-        <View style={styles.bar}>
-          {locked ? null : (
-            <BarButton
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.tabs.cart')}
+        right={
+          locked ? null : (
+            <HeaderTextButton
               title={editing ? t('mobile.cart.done') : t('common.edit')}
               onPress={() => setEditing(!editing)}
-              strong={editing}
             />
-          )}
-        </View>
-        <LargeTitle style={styles.title}>{t('mobile.tabs.cart')}</LargeTitle>
+          )
+        }
+      />
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
         <Text style={[type.body, styles.subtitle]}>
           {t('mobile.cart.count', { n: cart.lines.length })}
         </Text>
@@ -353,10 +356,8 @@ function CartRow({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  bar: { height: 44, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  subtitle: { marginHorizontal: spacing.xs, color: colors.muted },
   credit: { marginTop: 14 },
   orderDeals: {
     marginTop: 14,
@@ -435,7 +436,7 @@ const styles = StyleSheet.create({
   green: { color: colors.success },
   note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
   warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  next: { marginTop: 20 },
+  next: { marginTop: 20, borderRadius: 10 },
   empty: {
     flex: 1,
     justifyContent: 'center',

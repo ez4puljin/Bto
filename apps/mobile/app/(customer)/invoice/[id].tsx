@@ -18,7 +18,8 @@ import { formatMnt } from '../../../src/format/format';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row, Separator } from '../../../src/ui/grouped';
-import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { StoreHeader } from '../../../src/customer/store-header';
+import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { ProblemText } from '../../../src/ui/kit';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
@@ -86,8 +87,12 @@ export default function StoreInvoiceScreen() {
   };
 
   return (
-    <Page>
-      <NavBar back={t('mobile.customer.tabs.account')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.customer.invoice.title')}
+        onBack={() => router.back()}
+        right={null}
+      />
       {invoice.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
       <View style={styles.pad}>
         {invoice.error ? <ProblemText problem={problemFrom(invoice.error)} /> : null}

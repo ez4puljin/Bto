@@ -1,4 +1,4 @@
-import { ArrowDownUp, SlidersHorizontal } from 'lucide-react-native';
+import { ArrowDownUp, ChevronUp, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStoreCategories } from '../api/customer';
 import { formatCount } from '../format/format';
 import { toggleId } from '../shop/filters';
-import { colors, fonts, radii, shadows, spacing, type } from '../theme/tokens';
+import { colors, radii, shadows, spacing, storeType } from '../theme/tokens';
 import { ChoiceChip, CountBadge, PillButton, Toggle } from '../ui/controls';
 import { Group, Row } from '../ui/grouped';
 import { BarButton, SectionHeader } from '../ui/layout';
@@ -18,24 +18,38 @@ import { topStoreCategories } from './shop';
 // SectionList boards): the floating pill, the order sheet and the filter sheet.
 
 /**
- * The dark floating pill over a list: «⇅ Эрэмбэлэх | ≡ Шүүлтүүр», with a blue count when filters
- * are on. `bottom` keeps it above the tab bar on «Бараа».
+ * The blue floating pill over a list (the E-mart structure, ADR-0095): «⇅ Эрэмбэлэх ≡ Шүүлтүүр»,
+ * with a white count when filters are on, and the round «дээш» at the right once the list is
+ * scrolled (`onTop`). `bottom` keeps it above the tab bar on «Бараа».
  */
 export function FloatingPill({
   bottom,
   active,
   onSort,
   onFilter,
+  onTop,
 }: {
   bottom: number;
   /** How many filters are on. */
   active: number;
   onSort: () => void;
   onFilter: () => void;
+  /** Back to the top of the list; null hides the button. */
+  onTop?: (() => void) | null;
 }) {
   const { t } = useTranslation();
   return (
     <View pointerEvents="box-none" style={[styles.pillRow, { bottom }]}>
+      {onTop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.customer.list.toTop')}
+          onPress={onTop}
+          style={({ pressed }) => [styles.top, pressed && styles.pressed]}
+        >
+          <ChevronUp size={20} strokeWidth={2.4} color={colors.primaryForeground} />
+        </Pressable>
+      ) : null}
       <View style={styles.pill}>
         <Pressable
           accessibilityRole="button"
@@ -43,9 +57,8 @@ export function FloatingPill({
           style={({ pressed }) => [styles.pillButton, pressed && styles.pressed]}
         >
           <ArrowDownUp size={17} strokeWidth={2.2} color={colors.primaryForeground} />
-          <Text style={styles.pillText}>{t('mobile.filter.sort')}</Text>
+          <Text style={storeType.pill}>{t('mobile.filter.sort')}</Text>
         </Pressable>
-        <View style={styles.pillLine} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('mobile.shop.filterButton', { n: active })}
@@ -53,8 +66,8 @@ export function FloatingPill({
           style={({ pressed }) => [styles.pillButton, pressed && styles.pressed]}
         >
           <SlidersHorizontal size={17} strokeWidth={2.2} color={colors.primaryForeground} />
-          <Text style={styles.pillText}>{t('mobile.filter.title')}</Text>
-          {active > 0 ? <CountBadge count={active} tone="accent" /> : null}
+          <Text style={storeType.pill}>{t('mobile.filter.title')}</Text>
+          {active > 0 ? <CountBadge count={active} ring={colors.primary} /> : null}
         </Pressable>
       </View>
     </View>
@@ -226,25 +239,35 @@ export function ListFilterSheet({
 const styles = StyleSheet.create({
   pillRow: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   pill: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    borderRadius: 24,
-    backgroundColor: colors.foreground,
-    boxShadow: shadows.toast,
-  },
-  pillButton: {
     height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: 14,
+    paddingHorizontal: 6,
     borderRadius: 22,
+    backgroundColor: colors.primary,
+    boxShadow: shadows.bluePill,
   },
-  pressed: { backgroundColor: colors.hairlineStrong },
-  pillText: { ...type.button, fontFamily: fonts.semibold, color: colors.primaryForeground },
-  pillLine: { width: 1, height: 22, backgroundColor: colors.onPrimaryHairline },
+  pillButton: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  pressed: { opacity: 0.7 },
+  top: {
+    position: 'absolute',
+    right: 14,
+    top: 3,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.primary,
+    boxShadow: shadows.bluePill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sortBody: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.xl },
   first: { marginTop: spacing.sm },

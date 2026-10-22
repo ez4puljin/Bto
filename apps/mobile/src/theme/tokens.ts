@@ -193,6 +193,46 @@ export const type = {
   tab: { fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12, includeFontPadding: false },
 } as const;
 
+/**
+ * «Bto300»'s sizes, measured on the owner's E-mart screens (2026-10-21, ADR-0095): the blue
+ * header's title and search, the home's headings (shown upper case), the category tiles, the cards
+ * and the flat tab bar. The app's text does not grow with the phone's setting (`fontScaleCap`).
+ */
+export const storeType = {
+  /** «Bto300» on the home's header. */
+  wordmark: face(fonts.bold, 20, 24, -0.5, colors.primaryForeground),
+  headerTitle: face(fonts.regular, 17, 22, 0, colors.primaryForeground),
+  /** «Бүгдийг уншсан», «Засах» on the header. */
+  headerButton: face(fonts.medium, 15, 20, 0, colors.primaryForeground),
+  /** The home's quick links on the header, upper case. */
+  headerLink: face(fonts.medium, 14, 20, 0.2, colors.primaryForeground),
+  search: face(fonts.regular, 14, 18, 0, colors.muted),
+  /** «АНГИЛЛЫН ЖАГСААЛТ», upper case. */
+  heading: face(fonts.regular, 17, 22, 0.2),
+  /** A section's title, upper case. */
+  sectionTitle: face(fonts.regular, 16, 21, 0.2),
+  sectionSub: face(fonts.regular, 13, 17, 0, colors.muted),
+  tile: face(fonts.regular, 13, 17),
+  cardName: face(fonts.regular, 15, 20),
+  cardPack: face(fonts.regular, 13, 17, 0, colors.muted),
+  cardPrice: face(fonts.medium, 16, 21),
+  cardOld: face(fonts.regular, 12, 16, 0, colors.muted),
+  cardStock: face(fonts.semibold, 12, 16),
+  badge: face(fonts.bold, 12, 16, 0.2, colors.primaryForeground),
+  tab: face(fonts.medium, 11, 13, 0, colors.placeholder),
+  pill: face(fonts.medium, 15, 20, 0, colors.primaryForeground),
+  /** The grey full-width button «АНГИЛЛЫН БҮХ БАРАА · 86», upper case. */
+  wideButton: face(fonts.semibold, 14, 18, 0.3, colors.label2),
+  /** «Мэдэгдэл»'s two tab buttons. */
+  tabButton: face(fonts.medium, 15, 20, 0, colors.primaryForeground),
+  /** «Тооцооны хуулга»'s table: the column heads (upper case), its cells and its strong cells. */
+  tableHead: face(fonts.semibold, 11, 14, 0.2, colors.muted),
+  tableCell: face(fonts.regular, 13, 18),
+  tableCellStrong: face(fonts.semibold, 13, 18),
+  /** «Эцсийн үлдэгдэл» at the table's foot. */
+  tableTotal: face(fonts.bold, 14, 18, 0, colors.primary),
+} as const;
+
 /** Numbers that line up in columns (money, counts). */
 export const tabular = { fontVariant: ['tabular-nums' as const] };
 
@@ -214,6 +254,9 @@ export const shadows = {
   popup: '0 20px 60px rgba(0,0,0,0.25)',
   toast: '0 10px 30px rgba(0,0,0,0.14)',
   key: '0 1px 0 rgba(0,0,0,0.3)',
+  /** «Bto300»'s raised barcode button and floating pill (ADR-0095). */
+  scanButton: '0 4px 12px rgba(0,113,227,0.35)',
+  bluePill: '0 8px 24px rgba(0,113,227,0.3)',
 } as const;
 
 export const TOUCH = 44;
