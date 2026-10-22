@@ -810,7 +810,7 @@ export class StockPostingService implements OnModuleInit {
       variance: string;
       number: string | null;
     }>(sql`
-      SELECT v.doc_id, v.version, min(v.effective_date)::text AS date,
+      SELECT v.doc_id::int AS doc_id, v.version::int AS version, min(v.effective_date)::text AS date,
              sum(v.absorbed)::text AS absorbed, sum(v.variance)::text AS variance, r.number
         FROM stock_valuation_adjustments v
         JOIN goods_receipts r ON r.id = v.doc_id
@@ -824,9 +824,9 @@ export class StockPostingService implements OnModuleInit {
         ? []
         : [
             {
-              receiptId: Number(row.doc_id),
+              receiptId: row.doc_id,
               number: row.number,
-              version: Number(row.version),
+              version: row.version,
               date: row.date,
               absorbed,
               variance,
