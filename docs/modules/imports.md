@@ -100,6 +100,7 @@ Shared (Vitest): `imports` (headers, cells, lists, decimals, kind guess). Api un
 
 ## 12. Open items
 
+- Done 2026-10-22 (ADR-0098): the product master of the old system (Erxes) through SUPPLIERS, PRODUCTS and PRICES into a clean development database, by the scripts of `tools/migration/` (the barcodes one 1,000-character cell cannot hold are added through the api afterwards). The export, the sheets and the reports stay in `tmp/`.
 - The owner's real sheets (products, customers, suppliers, opening stock) are run locally with the owner during the delivery-1 acceptance; they never enter the repository.
 - Done 2026-10-15: the price sheet (ADR-0054). Price lists of the old model were never imported. The price clerk (`pricing.prices.manage`) cannot use it without `imports.manage`. Opening receivables: delivery 3 (`finance`). The TIN lookup through PosAPI for customers: delivery 3.
 - Done 2026-10-13: the housekeeping of old rows and sheets (ADR-0040); the periods (90 days, one year) wait for the owner's review.

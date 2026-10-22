@@ -13,7 +13,7 @@ describe('the scan gate', () => {
     expect(gate.accept(COLA, 2_700)).toBe(COLA);
   });
 
-  it('ignores a misread check digit and a value read too far apart', () => {
+  it('ignores a misread check digit (stored codes may have one, ADR-0098 #6) and a value read too far apart', () => {
     const gate = new ScanGate();
     expect(gate.accept('5449000000997', 0)).toBeNull();
     expect(gate.accept('5449000000997', 100)).toBeNull();

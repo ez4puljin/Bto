@@ -1,4 +1,4 @@
-import { classifyBarcode } from '@tugeel/shared/gtin';
+import { classifyBarcode, isMisreadGtin } from '@tugeel/shared/gtin';
 
 /** The same value read twice within this time counts as a scan (ADR-0006 #4). */
 const CONFIRM_MS = 1_500;
@@ -18,7 +18,7 @@ export class ScanGate {
   accept(raw: string, now: number): string | null {
     if (now < this.restUntil) return null;
     const checked = classifyBarcode(raw);
-    if (!checked.ok) return null;
+    if (!checked.ok || isMisreadGtin(raw)) return null;
     const value = checked.value.code;
     if (this.last && this.last.value === value && now - this.last.at <= CONFIRM_MS) {
       this.last = null;

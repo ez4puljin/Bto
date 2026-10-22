@@ -22,7 +22,7 @@
     "format:check": "prettier --check .",
     "build:packages": "pnpm --filter \"./packages/**\" run --if-present build",
     "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js --config eslint.config.mjs --max-warnings 0 .",
-    "lint:guards": "node --test tools/lint-guards/guards.test.mjs tools/finance-core/standalone.test.mjs tools/finance-core/fin-sql.test.mjs",
+    "lint:guards": "node --test tools/lint-guards/guards.test.mjs tools/finance-core/standalone.test.mjs tools/finance-core/fin-sql.test.mjs tools/migration/erxes-rules.test.mjs",
     "core:standalone": "node tools/finance-core/standalone.mjs",
     "typecheck": "pnpm -r run --if-present typecheck",
     "ui:shots": "node tools/ui-shots/shots.mjs",

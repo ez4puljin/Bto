@@ -718,9 +718,9 @@ export class ProductsService {
    */
   async resolveBarcode(code: string): Promise<BarcodeResolution> {
     const classified = classifyBarcode(code);
-    if (!classified.ok || lookupCandidates(code).length === 0) {
+    if (!classified.ok) {
       throw new AppError('BARCODE_INVALID', 'barcode cannot be read', {
-        problem: classified.ok ? 'CHECK_DIGIT' : classified.problem,
+        problem: classified.problem,
       });
     }
     const hits = await this.barcodes.lookup(code);

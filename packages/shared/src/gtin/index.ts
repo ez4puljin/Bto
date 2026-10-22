@@ -3,6 +3,9 @@
  * 14-digit `gtin14` after the check digit is verified, UPC-E is expanded to UPC-A, and other codes
  * (Code 128 labels, short internal codes) stay as printed, upper-cased. The lookup key of a stored
  * barcode is `gtin14 ?? upper(code)`, so UPC-A "036000291452" and EAN-13 "0036000291452" are one key.
+ * Digits of GTIN length whose check digit is wrong are kept as printed too (ADR-0098 #6: the owner's
+ * old system holds such codes, often printed as Code 128 labels); only the camera still refuses them
+ * as misreads (`isMisreadGtin`).
  */
 
 /** e-Barimt `barCodeType` (PosAPI 3.0). Restricted-circulation GTINs are not global: UNDEFINED. */
@@ -74,7 +77,7 @@ export function cleanBarcode(input: string): string {
   return input.replace(/\s+/g, '');
 }
 
-export type BarcodeProblem = 'EMPTY' | 'TOO_LONG' | 'CHARACTERS' | 'CHECK_DIGIT';
+export type BarcodeProblem = 'EMPTY' | 'TOO_LONG' | 'CHARACTERS';
 
 export interface ClassifiedBarcode {
   /** The code as stored: cleaned input. */
@@ -85,10 +88,29 @@ export interface ClassifiedBarcode {
   lookupKey: string;
 }
 
+/** The valid GTIN-14 of digits of GTIN length (EAN-8 first, then UPC-E), or null. */
+function gtinOf(code: string): string | null {
+  const upcA = code.length === 8 ? expandUpcE(code) : null;
+  return toGtin14(code) ?? (upcA ? toGtin14(upcA) : null);
+}
+
+function hasGtinLength(code: string): boolean {
+  return DIGITS.test(code) && [8, 12, 13, 14].includes(code.length);
+}
+
 /**
- * Validates and classifies a barcode for storage. Numeric codes of GTIN length must carry a valid
- * check digit (a wrong one is a typo: scanners verify it); an 8-digit code is read as EAN-8 first,
- * then as UPC-E.
+ * True for digits of GTIN length with no valid check digit in any reading. Stored codes may be like
+ * that (ADR-0098 #6), but a camera read of one is a misread digit, so the camera ignores it.
+ */
+export function isMisreadGtin(input: string): boolean {
+  const code = cleanBarcode(input);
+  return hasGtinLength(code) && gtinOf(code) === null;
+}
+
+/**
+ * Validates and classifies a barcode for storage. A numeric code of GTIN length with a valid check
+ * digit is a GTIN (an 8-digit code read as EAN-8 first, then as UPC-E); with a wrong one it is kept
+ * as printed, like any other code (ADR-0098 #6).
  */
 export function classifyBarcode(
   input: string,
@@ -97,10 +119,8 @@ export function classifyBarcode(
   if (!code) return { ok: false, problem: 'EMPTY' };
   if (code.length > MAX_BARCODE_LENGTH) return { ok: false, problem: 'TOO_LONG' };
   if (!PRINTABLE.test(code)) return { ok: false, problem: 'CHARACTERS' };
-  if (DIGITS.test(code) && [8, 12, 13, 14].includes(code.length)) {
-    const upcA = code.length === 8 ? expandUpcE(code) : null;
-    const gtin14 = toGtin14(code) ?? (upcA ? toGtin14(upcA) : null);
-    if (!gtin14) return { ok: false, problem: 'CHECK_DIGIT' };
+  const gtin14 = hasGtinLength(code) ? gtinOf(code) : null;
+  if (gtin14) {
     return { ok: true, value: { code, gtin14, barcodeType: typeOf(gtin14), lookupKey: gtin14 } };
   }
   return {
@@ -111,19 +131,20 @@ export function classifyBarcode(
 
 /**
  * Every lookup key a scanned code may be stored under: an 8-digit code can be EAN-8 or UPC-E, so it
- * may yield two keys (the caller reports an ambiguity when both resolve). Empty when the code is invalid.
+ * may yield two keys (the caller reports an ambiguity when both resolve); digits of GTIN length with
+ * no valid reading are looked up as printed (ADR-0098 #6). Empty when the code is invalid.
  */
 export function lookupCandidates(input: string): string[] {
   const code = cleanBarcode(input);
   if (!code || code.length > MAX_BARCODE_LENGTH || !PRINTABLE.test(code)) return [];
-  if (DIGITS.test(code) && [8, 12, 13, 14].includes(code.length)) {
+  if (hasGtinLength(code)) {
     const keys = new Set<string>();
     const direct = toGtin14(code);
     if (direct) keys.add(direct);
     const upcA = code.length === 8 ? expandUpcE(code) : null;
     const expanded = upcA ? toGtin14(upcA) : null;
     if (expanded) keys.add(expanded);
-    return [...keys];
+    return keys.size > 0 ? [...keys] : [code];
   }
   return [code.toUpperCase()];
 }

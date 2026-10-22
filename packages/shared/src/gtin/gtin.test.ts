@@ -4,6 +4,7 @@ import {
   expandUpcE,
   gtinCheckDigit,
   internalEan13,
+  isMisreadGtin,
   lookupCandidates,
   toGtin14,
 } from './index';
@@ -55,18 +56,32 @@ describe('GTIN normalisation (ADR-0028)', () => {
     });
   });
 
-  it('refuses empty, long, non-ASCII and mistyped codes', () => {
+  it('refuses empty, long and non-ASCII codes', () => {
     expect(classifyBarcode('  ')).toEqual({ ok: false, problem: 'EMPTY' });
     expect(classifyBarcode('1'.repeat(49))).toEqual({ ok: false, problem: 'TOO_LONG' });
     expect(classifyBarcode('АВ123')).toEqual({ ok: false, problem: 'CHARACTERS' });
-    expect(classifyBarcode('4006381333932')).toEqual({ ok: false, problem: 'CHECK_DIGIT' });
     expect(classify(' 4006 3813 3393 1 ').code).toBe('4006381333931');
+  });
+
+  it('keeps digits of GTIN length with a wrong check digit as printed (ADR-0098 #6)', () => {
+    expect(classify('4006381333932')).toEqual({
+      code: '4006381333932',
+      gtin14: null,
+      barcodeType: 'UNDEFINED',
+      lookupKey: '4006381333932',
+    });
+    expect(isMisreadGtin('4006381333932')).toBe(true);
+    expect(isMisreadGtin(' 4006 3813 3393 1 ')).toBe(false);
+    expect(isMisreadGtin('00000116')).toBe(false);
+    expect(isMisreadGtin('abc-123')).toBe(false);
+    expect(isMisreadGtin('40063813339')).toBe(false);
   });
 
   it('lists every key an 8-digit scan may be stored under', () => {
     expect(lookupCandidates('00000116')).toEqual(['00000000000116', '00000100000016']);
     expect(lookupCandidates('96385074')).toEqual(['00000096385074']);
-    expect(lookupCandidates('4006381333932')).toEqual([]);
+    expect(lookupCandidates('4006381333932')).toEqual(['4006381333932']);
+    expect(lookupCandidates('АВ123')).toEqual([]);
     expect(lookupCandidates('abc-123')).toEqual(['ABC-123']);
   });
 
