@@ -26,13 +26,16 @@ export const receiptGroupRef = (receiptId: number): string => `receipt:${receipt
  * and posted through the Finance Core's intake inside the receipt's or the issue's transaction, as
  * source BTO with the staff member as the actor (a warehouse user needs no finance right):
  * - a receipt that gets its prices (costing version 1) is the supplier's bill
- *   `BTO/GOODS_RECEIPT/<id>`: Dr stock, Dr input VAT / Cr payable, due on its date;
+ *   `BTO/GOODS_RECEIPT/<id>`: Dr goods received (the clearing the receipt's stock entry credited,
+ *   F4 ADR-0097), Dr input VAT / Cr payable, due on its date;
  * - a later costing books only the difference `BTO/RECEIPT_RECOST/<id>:<version>`: a bill when the
  *   payable grows, a credit settling the receipt's open bill when it shrinks, a journal when only
  *   the stock and the VAT move;
  * - a supplier return `BTO/SUPPLIER_RETURN/<id>`: Dr payable / Cr stock, Cr input VAT, left open
  *   for the accountant to pair (TODO-VERIFY D8).
- * The accounts are the rules of the keys AP, VAT_INPUT and INVENTORY (temporary, TODO-VERIFY D16).
+ * The accounts are the rules of the keys AP, VAT_INPUT, GOODS_RECEIVED and INVENTORY (temporary,
+ * TODO-VERIFY D16). Since F4 the stock itself is booked by the receipt's posting and its costings
+ * (`StockBooksService`); a supplier return still takes it out here.
  */
 @Injectable()
 export class SupplierBillsService implements PurchaseBooks {
@@ -43,7 +46,13 @@ export class SupplierBillsService implements PurchaseBooks {
     private readonly reader: FinReader,
   ) {}
 
-  async receiptCostedInTx(tx: Tx, actor: Actor, facts: ReceiptBookFacts): Promise<void> {
+  /** `revision`: the bill's revision (2 when the development re-post books an F3 bill again, F4). */
+  async receiptCostedInTx(
+    tx: Tx,
+    actor: Actor,
+    facts: ReceiptBookFacts,
+    revision = 1,
+  ): Promise<void> {
     const groupRef = receiptGroupRef(facts.receiptId);
     if (facts.previous === null) {
       const { payable, vat, vatBase, stock } = facts.totals;
@@ -54,8 +63,9 @@ export class SupplierBillsService implements PurchaseBooks {
         docNo: facts.number,
         documentType: FIN_DOC_TYPES.SUPPLIER_BILL.code,
         date: facts.date,
+        revision,
         lines: [
-          { role: 'INVENTORY', debit: stock, credit: ZERO },
+          { role: 'GOODS_RECEIVED', debit: stock, credit: ZERO },
           { role: 'VAT_INPUT', debit: vat, credit: ZERO, taxBase: vatBase },
           {
             role: 'AP',
@@ -110,7 +120,7 @@ export class SupplierBillsService implements PurchaseBooks {
       documentType: type.code,
       date: today,
       lines: [
-        signed('INVENTORY', delta.stock),
+        signed('GOODS_RECEIVED', delta.stock),
         { ...signed('VAT_INPUT', delta.vat), taxBase: delta.vatBase.abs() },
         ...(ap === null ? [] : [ap]),
       ],
@@ -145,6 +155,7 @@ export class SupplierBillsService implements PurchaseBooks {
       docNo: string;
       documentType: string;
       date: string;
+      revision?: number;
       lines: RoleLine[];
     },
   ): Promise<void> {
@@ -163,7 +174,13 @@ export class SupplierBillsService implements PurchaseBooks {
       lines: intakeLines(lines),
     };
     await this.intake.submitInTx(tx, this.books.source(actor), {
-      source: { system: BTO_SOURCE, docType: doc.docType, docId: doc.docId, docNo: doc.docNo },
+      source: {
+        system: BTO_SOURCE,
+        docType: doc.docType,
+        docId: doc.docId,
+        docNo: doc.docNo,
+        ...(doc.revision && doc.revision > 1 ? { revision: doc.revision } : {}),
+      },
       body,
     });
   }

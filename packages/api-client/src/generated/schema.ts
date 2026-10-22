@@ -9805,7 +9805,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -9845,7 +9845,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
         };
         AccountLedgerLine: {
             id: number;

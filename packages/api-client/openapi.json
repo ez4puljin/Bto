@@ -37099,7 +37099,18 @@
               "CASH_VARIANCE",
               "AP",
               "VAT_INPUT",
-              "INVENTORY"
+              "INVENTORY",
+              "GOODS_RECEIVED",
+              "COGS",
+              "STOCK_LOSS",
+              "STOCK_GAIN",
+              "OPENING_STOCK",
+              "ISSUE_INTERNAL",
+              "ISSUE_BONUS",
+              "ISSUE_MARKETING",
+              "ISSUE_WRITE_OFF",
+              "ISSUE_TRANSFER_OUT",
+              "ISSUE_OTHER"
             ],
             "type": "string"
           },
@@ -37227,7 +37238,18 @@
               "CASH_VARIANCE",
               "AP",
               "VAT_INPUT",
-              "INVENTORY"
+              "INVENTORY",
+              "GOODS_RECEIVED",
+              "COGS",
+              "STOCK_LOSS",
+              "STOCK_GAIN",
+              "OPENING_STOCK",
+              "ISSUE_INTERNAL",
+              "ISSUE_BONUS",
+              "ISSUE_MARKETING",
+              "ISSUE_WRITE_OFF",
+              "ISSUE_TRANSFER_OUT",
+              "ISSUE_OTHER"
             ],
             "type": "string",
             "description": "null takes the role away"

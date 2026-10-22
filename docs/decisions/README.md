@@ -111,6 +111,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0096](ADR-0096-customer-app-statement-table.md) | «Тооцоо»'s statement as a four-column table «Огноо, баримт · Дебит · Кредит · Үлдэгдэл», the sum «Эхний үлдэгдэл + Дебит − Кредит = Эцсийн үлдэгдэл», three period chips; amends ADR-0086 #3 | Accepted | 2026-10-21 |
 | [ADR-0095](ADR-0095-customer-app-emart-look.md) | «Bto300» in the E-mart structure and sizes: the blue header, the flat tab bar with the camera in the middle, «Тооцоо» from «Профайл», upper-case headings, the E-mart card, the blue pill, E-mart's measured sizes and no font enlargement, Bto300's blue | Accepted | 2026-10-21 |
 | [ADR-0094](ADR-0094-customer-app-home-screens.md) | The customer app's home screens (CA5): banners moving every 5 s, «Бүх ангилал», subcategories into «Бараа», no «Нэрээр» yet, a section's orders named after it, the board's card, the deal sentence, the cart's order-deal note, the notification tabs, ♡ in every cache | Accepted | 2026-10-20 |
+| [ADR-0097](ADR-0097-finance-core-stock.md) | The Finance Core's stock and cost (F4): every stock posting books its value, unpriced receipts through goods received, each expense type its account | Accepted | 2026-10-22 |
 
 ## Template
 
