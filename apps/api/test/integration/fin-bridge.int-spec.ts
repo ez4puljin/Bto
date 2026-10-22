@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(19);
+    expect(keys).toHaveLength(30);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -313,7 +313,8 @@ describe('fin-bridge', () => {
       await admin.query(`DELETE FROM fin.accounts WHERE code IN ('310101', '130301', '140101')`);
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('BTO.SUPPLIER_BILL',
-           'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN')`,
+           'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN',
+           'BTO.STOCK_VALUE')`,
       );
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
@@ -326,6 +327,51 @@ describe('fin-bridge', () => {
         await count(`fin.posting_rules WHERE posting_key IN ('AP', 'VAT_INPUT', 'INVENTORY')`),
       ).toBe(3);
       expect(await count('fin.document_types')).toBe(12);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it("replays the stock backfill against today's rows (0037_fin_stock data section)", async () => {
+    const file = join(__dirname, '../../src/db/migrations/0037_fin_stock.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(text.indexOf('-- fin_stock:data:begin'), text.indexOf('-- fin_stock:data:end'))
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    const keys = [
+      'GOODS_RECEIVED',
+      'COGS',
+      'STOCK_LOSS',
+      'STOCK_GAIN',
+      'OPENING_STOCK',
+      'ISSUE_INTERNAL',
+      'ISSUE_BONUS',
+      'ISSUE_MARKETING',
+      'ISSUE_WRITE_OFF',
+      'ISSUE_TRANSFER_OUT',
+      'ISSUE_OTHER',
+    ];
+    const list = keys.map((key) => `'${key}'`).join(', ');
+    await admin.query('BEGIN');
+    try {
+      // A database of before F4: no stock keys, rules, accounts, series or document type.
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(`DELETE FROM fin.posting_rules WHERE posting_key IN (${list})`);
+      await admin.query(`DELETE FROM fin.posting_keys WHERE code IN (${list})`);
+      await admin.query(
+        `DELETE FROM fin.accounts WHERE code IN ('310201', '610101', '740201', '511030', '390101',
+           '730201', '730202', '730203', '730204', '730205', '730209')`,
+      );
+      await admin.query(`DELETE FROM fin.document_types WHERE code = 'BTO.STOCK_VALUE'`);
+      await admin.query(`DELETE FROM fin.number_series WHERE code = 'STOCK'`);
+      await admin.query('SET LOCAL session_replication_role = origin');
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.posting_rules WHERE posting_key IN (${list})`)).toBe(11);
+      expect(await count(`fin.accounts WHERE code = '610101' AND kind = 'EXPENSE'`)).toBe(1);
+      expect(await count('fin.document_types')).toBe(13);
+      expect(await count(`fin.number_series WHERE code = 'STOCK'`)).toBe(1);
     } finally {
       await admin.query('ROLLBACK');
     }

@@ -5,7 +5,7 @@ import { FinanceCoreModule } from '../../finance-core';
 import { CatalogModule } from '../catalog';
 import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
-import { InventoryModule, PURCHASE_BOOKS, RECEIPT_MONEY_ACCOUNTS } from '../inventory';
+import { InventoryModule, PURCHASE_BOOKS, RECEIPT_MONEY_ACCOUNTS, STOCK_BOOKS } from '../inventory';
 import { PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
 import {
@@ -42,6 +42,7 @@ import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
 import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.service';
+import { StockBooksService } from './services/stock-books.service';
 import { SupplierBillsService } from './services/supplier-bills.service';
 
 const SERVICES = [
@@ -61,6 +62,7 @@ const SERVICES = [
   CreditNotesService,
   ReceiptMoneyAccountsService,
   SupplierBillsService,
+  StockBooksService,
   JournalRepostService,
 ];
 
@@ -87,8 +89,16 @@ const SERVICES = [
     { provide: SALE_SINK, useExisting: InvoicingService },
     { provide: RECEIPT_MONEY_ACCOUNTS, useExisting: ReceiptMoneyAccountsService },
     { provide: PURCHASE_BOOKS, useExisting: SupplierBillsService },
+    { provide: STOCK_BOOKS, useExisting: StockBooksService },
   ],
-  exports: [...SERVICES, CREDIT_CHECKER, SALE_SINK, RECEIPT_MONEY_ACCOUNTS, PURCHASE_BOOKS],
+  exports: [
+    ...SERVICES,
+    CREDIT_CHECKER,
+    SALE_SINK,
+    RECEIPT_MONEY_ACCOUNTS,
+    PURCHASE_BOOKS,
+    STOCK_BOOKS,
+  ],
 })
 export class FinanceModule {}
 

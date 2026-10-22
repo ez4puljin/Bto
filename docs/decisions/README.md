@@ -109,6 +109,7 @@ This folder holds the decisions that shape Tugeel (Түгээл). Every ADR reco
 | [ADR-0092](ADR-0092-customer-app-home.md) | The customer app's home as a shop window: banners, a category grid, product sections from chosen segments, «Урамшуулал» and «Хямдралтай бараа» from the discount programs, recent / new / favourite products | Accepted | 2026-10-20 |
 | [ADR-0093](ADR-0093-customer-app-home-server.md) | The customer app's home, its server and admin web (CA4): banners, the segments' app flag through a catalog hook, category pictures, deals and badges from pricing, the home, section and category routes | Accepted | 2026-10-20 |
 | [ADR-0094](ADR-0094-customer-app-home-screens.md) | The customer app's home screens (CA5): banners moving every 5 s, «Бүх ангилал», subcategories into «Бараа», no «Нэрээр» yet, a section's orders named after it, the board's card, the deal sentence, the cart's order-deal note, the notification tabs, ♡ in every cache | Accepted | 2026-10-20 |
+| [ADR-0097](ADR-0097-finance-core-stock.md) | The Finance Core's stock and cost (F4): every stock posting books its value, unpriced receipts through goods received, each expense type its account | Accepted | 2026-10-22 |
 
 ## Template
 

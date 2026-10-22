@@ -63,6 +63,8 @@ export {
   type FinReconcileKind,
   type FinReconcileRun,
   type FinTransactor,
+  postingKeyBalances,
+  type FinKeyBalance,
   reconcileBooks,
   sourceOpenAmounts,
 } from './posting/reconcile';

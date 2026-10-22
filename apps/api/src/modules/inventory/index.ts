@@ -9,6 +9,12 @@ export {
   type ReceiptMoneyAccount,
   type ReceiptMoneyAccountKind,
   type ReceiptMoneyAccounts,
+  STOCK_BOOKS,
+  type StockBookKind,
+  type StockBookLine,
+  type StockBooks,
+  type StockPostedFacts,
+  type StockRevaluedFacts,
   type SupplierReturnFacts,
 } from './hooks';
 export { InventoryHttpModule, InventoryModule, InventoryWorkerModule } from './inventory.module';

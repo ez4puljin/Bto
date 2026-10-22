@@ -222,3 +222,36 @@ async function record(
   if (!run) throw new Error('fin reconcile run was not recorded');
   return { id: run.id, companyId, kind, status, checked, drifted: drifts.length, details: drifts };
 }
+
+/** One company's balance on the account a posting key's rule points to today. */
+export interface FinKeyBalance {
+  company: string;
+  accountCode: string | null;
+  /** Σ debit − Σ credit of the account's lines. */
+  balance: Decimal;
+}
+
+/**
+ * The balance of the account each company's rule for `key` points to today (F4, ADR-0097: a
+ * source compares its own figure with it, e.g. the stock's value with INVENTORY). Reads only.
+ */
+export async function postingKeyBalances(db: FinTransactor, key: string): Promise<FinKeyBalance[]> {
+  return db.transaction(async (tx) => {
+    const result = await tx.execute<Row>(sql`
+      SELECT c.code AS company, a.code AS account_code,
+             (SELECT coalesce(sum(l.debit - l.credit), 0) FROM fin.journal_lines l
+               WHERE l.company_id = c.id AND l.account_id = a.id) AS balance
+        FROM fin.companies c
+        LEFT JOIN LATERAL (
+          SELECT r.account_id FROM fin.posting_rules r
+           WHERE r.company_id = c.id AND r.posting_key = ${key} AND r.effective_from <= current_date
+           ORDER BY r.effective_from DESC, r.id DESC LIMIT 1) rule ON true
+        LEFT JOIN fin.accounts a ON a.company_id = c.id AND a.id = rule.account_id
+       ORDER BY c.id`);
+    return result.rows.map((row) => ({
+      company: scalar(row.company),
+      accountCode: row.account_code === null ? null : scalar(row.account_code),
+      balance: dec(row.balance),
+    }));
+  });
+}
