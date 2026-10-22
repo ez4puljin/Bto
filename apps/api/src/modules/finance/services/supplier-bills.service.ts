@@ -27,7 +27,7 @@ export const receiptGroupRef = (receiptId: number): string => `receipt:${receipt
  * source BTO with the staff member as the actor (a warehouse user needs no finance right):
  * - a receipt that gets its prices (costing version 1) is the supplier's bill
  *   `BTO/GOODS_RECEIPT/<id>`: Dr goods received (the clearing the receipt's stock entry credited,
- *   F4 ADR-0095), Dr input VAT / Cr payable, due on its date;
+ *   F4 ADR-0097), Dr input VAT / Cr payable, due on its date;
  * - a later costing books only the difference `BTO/RECEIPT_RECOST/<id>:<version>`: a bill when the
  *   payable grows, a credit settling the receipt's open bill when it shrinks, a journal when only
  *   the stock and the VAT move;

@@ -39,12 +39,12 @@ export const FIN_DOC_TYPES = {
   },
   RECEIPT_RECOST: { code: 'BTO.RECEIPT_RECOST', system: BTO_SOURCE, docType: 'RECEIPT_RECOST' },
   SUPPLIER_RETURN: { code: 'BTO.SUPPLIER_RETURN', system: BTO_SOURCE, docType: 'SUPPLIER_RETURN' },
-  // F4 (ADR-0095): a stock posting's value and a receipt's revaluation, numbered by the core.
+  // F4 (ADR-0097): a stock posting's value and a receipt's revaluation, numbered by the core.
   STOCK_VALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK' },
   STOCK_REVALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK_REVALUE' },
 } as const;
 
-/** The stock value documents' first number format until the accountant chooses one (TODO-VERIFY, ADR-0095). */
+/** The stock value documents' first number format until the accountant chooses one (TODO-VERIFY, ADR-0097). */
 export const STOCK_NUMBER_DEFAULT = { pattern: 'Б-{year}{month}{day}-', digits: 4 } as const;
 
 /** The allocations' number format until the accountant chooses one (TODO-VERIFY, ADR-0090). */
@@ -107,7 +107,7 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   AP: key('AP', 'PAYABLE'),
   VAT_INPUT: key('VAT_INPUT', 'NONE', true),
   INVENTORY: key('INVENTORY'),
-  // Stock and cost (F4, ADR-0095): every stock posting books its value against one of these.
+  // Stock and cost (F4, ADR-0097): every stock posting books its value against one of these.
   GOODS_RECEIVED: key('GOODS_RECEIVED'),
   COGS: key('COGS'),
   STOCK_LOSS: key('STOCK_LOSS'),

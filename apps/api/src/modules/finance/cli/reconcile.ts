@@ -64,7 +64,7 @@ async function main(): Promise<void> {
     const db = createDb(pool);
     const run = await reconcileReceivables(db, 'MANUAL');
     for (const line of describeRun(run)) console.log(line);
-    // The stock's value against the INVENTORY account (F4, ADR-0095): information, never an exit 2;
+    // The stock's value against the INVENTORY account (F4, ADR-0097): information, never an exit 2;
     // the averages' four decimals leave cents.
     const stock = await new StockPostingService(db, new NumberingService()).stockValue();
     for (const books of await postingKeyBalances(db, 'INVENTORY')) {

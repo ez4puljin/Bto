@@ -4,7 +4,7 @@ import { bookKindOf } from './stock-book-kind';
 const out = new Decimal('-700');
 const into = new Decimal('700');
 
-/** What each ledger row books (F4, ADR-0095): the account follows the movement and the reason. */
+/** What each ledger row books (F4, ADR-0097): the account follows the movement and the reason. */
 describe('bookKindOf', () => {
   it('books receipts, sales, returns and issues by their movement', () => {
     expect(bookKindOf('RECEIPT', null, into)).toBe('RECEIPT');

@@ -76,7 +76,7 @@ export interface PurchaseBooks {
 export const PURCHASE_BOOKS = Symbol('PURCHASE_BOOKS');
 
 /**
- * What a stock line does to the books (F4, ADR-0095; TODO-VERIFY D8): goods received (before or
+ * What a stock line does to the books (F4, ADR-0097; TODO-VERIFY D8): goods received (before or
  * with their bill), sold or taken back from a sale, lost or found, the opening stock, issued for an
  * expense type. Value-neutral moves (transfers, picks, bin moves) book only a non-zero remainder.
  */
@@ -123,7 +123,7 @@ export interface StockRevaluedFacts {
 }
 
 /**
- * The stock's value in the books (F4, ADR-0095): every posting and every receipt costing, inside
+ * The stock's value in the books (F4, ADR-0097): every posting and every receipt costing, inside
  * the posting's transaction (a refusal rolls it back). Finance binds it with `useExisting`; nothing
  * is booked when nothing is bound (tests that load inventory alone).
  */

@@ -17,7 +17,7 @@ import { controlTotal, intakeLines, type RoleLine } from './intake-lines';
 
 const ZERO = new Decimal(0);
 
-/** The counter account of each kind of stock line (F4, ADR-0095; TODO-VERIFY D8). */
+/** The counter account of each kind of stock line (F4, ADR-0097; TODO-VERIFY D8). */
 const ROLE_OF_KIND: Readonly<Record<Exclude<StockBookKind, 'ISSUE'>, GlRole>> = {
   RECEIPT: 'GOODS_RECEIVED',
   SALE: 'COGS',
@@ -40,7 +40,7 @@ const ROLE_OF_ISSUE_TYPE: Readonly<Record<string, GlRole>> = {
 const LABELS: Readonly<Record<string, string>> = mn.finance.stockBooks;
 
 /**
- * The stock's value in the books (F4, ADR-0095), bound as inventory's STOCK_BOOKS and posted through
+ * The stock's value in the books (F4, ADR-0097), bound as inventory's STOCK_BOOKS and posted through
  * the Finance Core's intake inside the stock posting's transaction, as source BTO with the staff
  * member as the actor (a refusal rolls the posting back; a till's sale is parked as any refusal):
  * - every posting of a stock document → `BTO/STOCK/<docType>:<docId>:<first ledger row>`, a JOURNAL

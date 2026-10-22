@@ -29,7 +29,7 @@ export const CHART_ROLES = [
   'AP',
   'VAT_INPUT',
   'INVENTORY',
-  // Stock and cost (F4, ADR-0095): the clearing of goods received before their bill, the cost of
+  // Stock and cost (F4, ADR-0097): the clearing of goods received before their bill, the cost of
   // goods sold, shortages and surpluses, the opening stock's offset, and one account per goods-issue
   // expense type. Temporary codes until Erkhet's chart (D16); the rules are TODO-VERIFY D8.
   'GOODS_RECEIVED',
@@ -77,7 +77,7 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   { code: '130301', kind: 'ASSET', role: 'VAT_INPUT' },
   { code: '140101', kind: 'ASSET', role: 'INVENTORY' },
   { code: '310101', kind: 'LIABILITY', role: 'AP' },
-  // Stock and cost (F4, ADR-0095; temporary codes, TODO-VERIFY D8 / D16).
+  // Stock and cost (F4, ADR-0097; temporary codes, TODO-VERIFY D8 / D16).
   { code: '310201', kind: 'LIABILITY', role: 'GOODS_RECEIVED' },
   { code: '610101', kind: 'EXPENSE', role: 'COGS' },
   { code: '740201', kind: 'EXPENSE', role: 'STOCK_LOSS' },

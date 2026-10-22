@@ -2,7 +2,7 @@ import type { Decimal } from '@tugeel/shared/money';
 import type { StockBookKind } from '../hooks';
 
 /**
- * What a ledger row does to the books (F4, ADR-0095; TODO-VERIFY D8); null for a value-neutral move.
+ * What a ledger row does to the books (F4, ADR-0097; TODO-VERIFY D8); null for a value-neutral move.
  * An adjustment's reason decides; a count correction and an unknown reason go by the value's sign.
  */
 export function bookKindOf(

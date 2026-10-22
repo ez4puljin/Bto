@@ -232,7 +232,7 @@ export interface FinKeyBalance {
 }
 
 /**
- * The balance of the account each company's rule for `key` points to today (F4, ADR-0095: a
+ * The balance of the account each company's rule for `key` points to today (F4, ADR-0097: a
  * source compares its own figure with it, e.g. the stock's value with INVENTORY). Reads only.
  */
 export async function postingKeyBalances(db: FinTransactor, key: string): Promise<FinKeyBalance[]> {

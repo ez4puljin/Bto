@@ -11,7 +11,7 @@ import { expectReconciled } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
- * The stock's value in the books (F4, ADR-0095): every stock posting books its value — a surplus,
+ * The stock's value in the books (F4, ADR-0097): every stock posting books its value — a surplus,
  * a sale's cost, a sales return, a goods issue by its expense type, an unpriced receipt against
  * goods received, its costing (what had already left goes to the cost of goods sold) — so the
  * inventory account follows the stock's value and goods received clears with the bill. A goods

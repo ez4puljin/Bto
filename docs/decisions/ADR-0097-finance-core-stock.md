@@ -1,4 +1,4 @@
-# ADR-0095: The Finance Core's stock and cost (F4): every stock posting books its value, unpriced receipts through goods received, each expense type its account
+# ADR-0097: The Finance Core's stock and cost (F4): every stock posting books its value, unpriced receipts through goods received, each expense type its account
 
 | | |
 |---|---|

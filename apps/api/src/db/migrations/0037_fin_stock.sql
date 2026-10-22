@@ -1,4 +1,4 @@
--- Finance Core F4 — stock and cost (ADR-0095). Data only: what the api's boot step and an empty
+-- Finance Core F4 — stock and cost (ADR-0097). Data only: what the api's boot step and an empty
 -- chart's seed give a new database, written here for a database whose company and chart exist.
 -- Nothing happens on an empty database (no company BO yet).
 -- fin_stock:data:begin

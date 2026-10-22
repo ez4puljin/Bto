@@ -25,7 +25,7 @@ export interface RepostCounts {
   /** F3 (ADR-0091): the bills of posted, costed receipts and the credits of supplier returns. */
   supplierBills: number;
   supplierReturns: number;
-  /** F4 (ADR-0095): F3 bills booked again on goods received, stock postings, receipt costings. */
+  /** F4 (ADR-0097): F3 bills booked again on goods received, stock postings, receipt costings. */
   billsRebooked: number;
   stockPostings: number;
   stockRevaluations: number;
@@ -161,7 +161,7 @@ export class JournalRepostService {
       counts.supplierReturns += 1;
     }
 
-    // F4 (ADR-0095): an F3 bill debited the stock itself; the receipt's posting now does, so the
+    // F4 (ADR-0097): an F3 bill debited the stock itself; the receipt's posting now does, so the
     // bill is reversed and booked again (revision 2) on goods received.
     const inventoryCodes = new Set(
       (await this.accounts.list())

@@ -551,7 +551,7 @@ export class StockPostingService implements OnModuleInit {
         postedBy: actorUserId(actor),
       });
     }
-    // 10. The books (F4, ADR-0095): each document's stock value, in this transaction.
+    // 10. The books (F4, ADR-0097): each document's stock value, in this transaction.
     if (this.books && written.length > 0) {
       for (const facts of await this.bookFacts(tx, written, numbers, effectiveDate)) {
         await this.books.stockPostedInTx(tx, actor, facts);
@@ -561,7 +561,7 @@ export class StockPostingService implements OnModuleInit {
   }
 
   /**
-   * The books' view of the rows one posting wrote (F4, ADR-0095; TODO-VERIFY D8): per document,
+   * The books' view of the rows one posting wrote (F4, ADR-0097; TODO-VERIFY D8): per document,
    * the value of its rows (`valueOf(qty, unit cost)`, signed) by what they did — received, sold or
    * returned from a sale, lost or found (an adjustment's reason, a count's sign), the opening stock,
    * issued for an expense type. A goods issue to a supplier is the supplier's credit (F3), never
@@ -758,7 +758,7 @@ export class StockPostingService implements OnModuleInit {
         };
       }),
     );
-    // The books (F4, ADR-0095): what the costing moved in the stock and what had already left.
+    // The books (F4, ADR-0097): what the costing moved in the stock and what had already left.
     if (this.books) {
       const absorbed = results.reduce((sum, result) => sum.plus(result.absorbed), ZERO);
       const variance = results.reduce((sum, result) => sum.plus(result.variance), ZERO);
@@ -782,7 +782,7 @@ export class StockPostingService implements OnModuleInit {
 
   /**
    * The books' view of the whole ledger, one posting at a time (the development re-post of F4,
-   * ADR-0095): the rows of one document written in one transaction share their posting time.
+   * ADR-0097): the rows of one document written in one transaction share their posting time.
    */
   async historyFacts(): Promise<StockPostedFacts[]> {
     const rows = await this.db.select().from(stockLedger).orderBy(stockLedger.id);
@@ -837,7 +837,7 @@ export class StockPostingService implements OnModuleInit {
 
   /**
    * The stock's value: Σ on hand × average per warehouse balance, rounded to the tugrik's cents
-   * (F4, ADR-0095: the books' INVENTORY account follows it).
+   * (F4, ADR-0097: the books' INVENTORY account follows it).
    */
   async stockValue(executor: Db | Tx = this.db): Promise<Decimal> {
     const [row] = await executor
