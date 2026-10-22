@@ -36,7 +36,8 @@ import { MonthCalendar } from '../../src/ui/calendar';
 import { PillButton, Segmented } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { ProblemText } from '../../src/ui/kit';
-import { BarButton, NavBar, Page, SectionHeader } from '../../src/ui/layout';
+import { HeaderTextButton, StoreHeader } from '../../src/customer/store-header';
+import { Page, SectionHeader } from '../../src/ui/layout';
 import { usePendingWords } from '../../src/customer/pending-words';
 import { PendingSendView } from '../../src/ui/pending-send';
 import { Sheet, SheetClose, SheetHeader } from '../../src/ui/sheet';
@@ -178,19 +179,16 @@ export default function StoreCheckoutScreen() {
   const sentAmount = sent ? orderAmount(sent) : null;
 
   return (
-    <Page>
-      {noteFocused ? (
-        <NavBar
-          back={t('mobile.tabs.cart')}
-          onBack={() => router.back()}
-          title={t('mobile.customer.checkout.short')}
-          right={
-            <BarButton title={t('mobile.keypad.done')} onPress={() => Keyboard.dismiss()} strong />
-          }
-        />
-      ) : (
-        <NavBar back={t('mobile.tabs.cart')} onBack={() => router.back()} />
-      )}
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.customer.checkout.title')}
+        onBack={() => router.back()}
+        right={
+          noteFocused ? (
+            <HeaderTextButton title={t('mobile.keypad.done')} onPress={() => Keyboard.dismiss()} />
+          ) : null
+        }
+      />
       <ScrollView
         ref={scroll}
         onScroll={(event) => {

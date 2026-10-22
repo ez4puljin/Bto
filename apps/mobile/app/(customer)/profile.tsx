@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, LockKeyhole } from 'lucide-react-native';
+import { Bell, LockKeyhole, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -8,12 +8,13 @@ import { useContacts, useStoreMe } from '../../src/api/customer';
 import { useStoreNotificationSummary } from '../../src/api/customer-notifications';
 import { Contacts } from '../../src/customer/contacts';
 import { phoneShown } from '../../src/customer/home';
+import { StoreHeader } from '../../src/customer/store-header';
 import { initialsOf } from '../../src/format/format';
 import { useCustomer } from '../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
 import { CountBadge } from '../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
-import { FootNote, LargeTitle, NavBar, Page, SectionHeader } from '../../src/ui/layout';
+import { FootNote, Page, SectionHeader } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
 import { Text } from '../../src/ui/text';
 
@@ -40,11 +41,9 @@ export default function CustomerProfileScreen() {
     .join(' · ');
 
   return (
-    <Page>
-      <NavBar back={t('mobile.tabs.home')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.body}>
-        <LargeTitle style={styles.title}>{t('mobile.tabs.profile')}</LargeTitle>
-
         <View style={styles.store}>
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(store.name)}</Text>
@@ -78,6 +77,16 @@ export default function CustomerProfileScreen() {
 
         <SectionHeader>{t('mobile.customer.profile.settings')}</SectionHeader>
         <Group inset={ICON_INSET}>
+          <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.blue}>
+                <Wallet size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.customer.tabs.account')}
+            onPress={() => router.push('/account')}
+          />
           <Row
             minHeight={52}
             icon={
@@ -144,12 +153,11 @@ export default function CustomerProfileScreen() {
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
   grow: { flex: 1, gap: 2 },
   muted: { color: colors.muted },
   pressed: { backgroundColor: colors.accent },
   store: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',

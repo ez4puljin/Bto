@@ -1,9 +1,24 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { ChevronRight, Package, ShoppingCart } from 'lucide-react-native';
+import {
+  ChevronRight,
+  Heart,
+  History,
+  Megaphone,
+  Package,
+  Sparkles,
+  Tag,
+} from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   type StoreBanner,
   type StoreHomeCategory,
@@ -15,13 +30,14 @@ import { lineOf } from '../cart/cart';
 import { pageAt } from '../images/pictures';
 import { useCustomer } from '../state/session';
 import { useShop } from '../state/shop';
-import { colors, fonts, spacing, TOUCH, type } from '../theme/tokens';
-import { CountBadge } from '../ui/controls';
+import { colors, spacing, storeType, TOUCH, type } from '../theme/tokens';
 import { Text } from '../ui/text';
 import {
   BANNER_SECONDS,
   bannerTargetOf,
   nextSlide,
+  type SectionIcon,
+  sectionIconOf,
   type SectionPlace,
   sectionSubtitleOf,
   sectionTitleOf,
@@ -29,11 +45,11 @@ import {
 import { CustomerProductCard } from './product-card';
 import { useAddOneStore } from './use-add';
 
-// The parts «Нүүр», a section's full list and a category's page share (ADR-0092; the Main,
-// SectionList and Category boards): a product card wired to the cart and ♡, a section's row, the
-// banner carousel, the category tiles and the cart button of a pushed page.
+// The parts «Нүүр», a section's full list and a category's page share (ADR-0092, in the E-mart
+// structure of ADR-0095): a product card wired to the cart and ♡, a section's row, the banner
+// carousel and the category tiles.
 
-/** What a card does: open the product, «+» one of its default unit, ♡. */
+/** What a card does: open the product, add one of its default unit, ♡. */
 export function useCardActions() {
   const router = useRouter();
   const { server } = useCustomer();
@@ -103,12 +119,88 @@ export function useSectionText() {
   };
 }
 
-/** The 152 px cards of a home row (the Main board). */
-export const ROW_CARD_WIDTH = 152;
+const ICON_TONES: Record<SectionIcon['tone'], string> = {
+  muted: colors.muted,
+  promotion: colors.dealPromotion,
+  discount: colors.dealDiscount,
+  new: colors.primary,
+};
+
+function SectionGlyph({ icon }: { icon: SectionIcon }) {
+  const color = ICON_TONES[icon.tone];
+  const props = { size: 18, strokeWidth: 2.2, color };
+  switch (icon.icon) {
+    case 'history':
+      return <History {...props} />;
+    case 'megaphone':
+      return <Megaphone {...props} />;
+    case 'tag':
+      return <Tag {...props} />;
+    case 'sparkles':
+      return <Sparkles {...props} strokeWidth={2} />;
+    case 'heart':
+      return <Heart {...props} fill={color} strokeWidth={2} />;
+  }
+}
 
 /**
- * A section of «Нүүр» or a category page: its title and line, › to its full list, and up to 10
- * cards in a row.
+ * «АНГИЛЛЫН ЖАГСААЛТ ›», «УРАМШУУЛАЛ ›»: an upper-case heading with › that opens its list; on the
+ * home a section's icon before it and its line under it.
+ */
+export function ListHeading({
+  title,
+  subtitle,
+  icon,
+  onPress,
+  label,
+  big = false,
+}: {
+  title: string;
+  subtitle?: string | null;
+  icon?: SectionIcon | null;
+  onPress: () => void;
+  label: string;
+  /** «АНГИЛЛЫН ЖАГСААЛТ» is a size above a section's title. */
+  big?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.heading, pressed && styles.pressed]}
+    >
+      {icon ? (
+        <View style={styles.glyph}>
+          <SectionGlyph icon={icon} />
+        </View>
+      ) : null}
+      <View style={styles.grow}>
+        <Text
+          accessibilityRole="header"
+          style={[big ? storeType.heading : storeType.sectionTitle, styles.upper]}
+          numberOfLines={2}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={storeType.sectionSub} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      <ChevronRight size={22} strokeWidth={1.8} color={colors.foreground} />
+    </Pressable>
+  );
+}
+
+/** A home row's cards (the E-mart screens: 164 wide, a 146 px picture). */
+export const ROW_CARD_WIDTH = 164;
+const ROW_PICTURE = 146;
+
+/**
+ * A section of «Нүүр» or a category page: its heading (with the section's icon on the home) and up
+ * to 10 cards in a row.
  */
 export function SectionRow({
   section,
@@ -126,26 +218,13 @@ export function SectionRow({
   const text = sectionText(section, place);
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHead}>
-        <View style={styles.grow}>
-          <Text accessibilityRole="header" style={type.title3} numberOfLines={2}>
-            {text.title}
-          </Text>
-          {text.subtitle ? (
-            <Text style={[type.body, styles.muted]} numberOfLines={2}>
-              {text.subtitle}
-            </Text>
-          ) : null}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.customer.home.seeAll', { title: text.title })}
-          onPress={onMore}
-          style={styles.more}
-        >
-          <ChevronRight size={22} strokeWidth={2.2} color={colors.foreground} />
-        </Pressable>
-      </View>
+      <ListHeading
+        title={text.title}
+        subtitle={place === 'home' ? text.subtitle : null}
+        icon={place === 'home' ? sectionIconOf(section.kind) : null}
+        label={t('mobile.customer.home.seeAll', { title: text.title })}
+        onPress={onMore}
+      />
       <FlatList
         horizontal
         data={section.products}
@@ -154,7 +233,12 @@ export function SectionRow({
         contentContainerStyle={styles.cards}
         initialNumToRender={3}
         renderItem={({ item }) => (
-          <StoreCard product={item} actions={actions} width={ROW_CARD_WIDTH} pictureHeight={128} />
+          <StoreCard
+            product={item}
+            actions={actions}
+            width={ROW_CARD_WIDTH}
+            pictureHeight={ROW_PICTURE}
+          />
         )}
       />
     </View>
@@ -162,16 +246,16 @@ export function SectionRow({
 }
 
 /**
- * The banners (ADR-0092 #5): 2:1 pictures one at a time, swiped or moved on every five seconds
- * (the owner, 2026-10-20) — never while a finger is on them; the dots below choose one. A tap opens
- * its link: a segment's list, a category's page or a product.
+ * The banners (ADR-0092 #5), the screen's width edge to edge: 2:1 pictures one at a time, swiped or
+ * moved on every five seconds (the owner, 2026-10-20) — never while a finger is on them; the dots
+ * below choose one. A tap opens its link: a segment's list, a category's page or a product.
  */
 export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { server } = useCustomer();
+  const { width } = useWindowDimensions();
   const scroller = useRef<ScrollView>(null);
-  const [width, setWidth] = useState(0);
   const [slide, setSlide] = useState(0);
   const [touching, setTouching] = useState(false);
   const count = banners.length;
@@ -193,55 +277,52 @@ export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] })
   };
 
   return (
-    <View style={styles.banners}>
-      <View style={styles.bannerBox} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-        {width > 0 ? (
-          <ScrollView
-            ref={scroller}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScrollBeginDrag={() => setTouching(true)}
-            onScrollEndDrag={() => setTouching(false)}
-            onMomentumScrollEnd={(event) =>
-              setSlide(pageAt(event.nativeEvent.contentOffset.x, width, count))
-            }
-          >
-            {banners.map((banner) => {
-              const target = bannerTargetOf(banner.link);
-              return (
-                <Pressable
-                  key={banner.id}
-                  accessibilityRole={target ? 'link' : 'image'}
-                  accessibilityLabel={banner.title}
-                  disabled={!target}
-                  onPress={() => {
-                    if (target) router.push(target);
-                  }}
-                  style={{ width, height: width / 2 }}
-                >
-                  {banner.imageUrl ? (
-                    <Image
-                      source={{ uri: `${server}${banner.imageUrl}` }}
-                      style={styles.bannerImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      recyclingKey={banner.imageUrl}
-                      transition={120}
-                    />
-                  ) : (
-                    <View style={styles.bannerFallback}>
-                      <Text style={styles.bannerTitle} numberOfLines={3}>
-                        {banner.title}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        ) : null}
-      </View>
+    <View>
+      <ScrollView
+        ref={scroller}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={() => setTouching(true)}
+        onScrollEndDrag={() => setTouching(false)}
+        onMomentumScrollEnd={(event) =>
+          setSlide(pageAt(event.nativeEvent.contentOffset.x, width, count))
+        }
+        style={[styles.banners, { height: width / 2 }]}
+      >
+        {banners.map((banner) => {
+          const target = bannerTargetOf(banner.link);
+          return (
+            <Pressable
+              key={banner.id}
+              accessibilityRole={target ? 'link' : 'image'}
+              accessibilityLabel={banner.title}
+              disabled={!target}
+              onPress={() => {
+                if (target) router.push(target);
+              }}
+              style={{ width, height: width / 2 }}
+            >
+              {banner.imageUrl ? (
+                <Image
+                  source={{ uri: `${server}${banner.imageUrl}` }}
+                  style={styles.bannerImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={banner.imageUrl}
+                  transition={120}
+                />
+              ) : (
+                <View style={styles.bannerFallback}>
+                  <Text style={styles.bannerTitle} numberOfLines={3}>
+                    {banner.title}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
       {count > 1 ? (
         <View accessibilityLabel={t('mobile.customer.home.banners')} style={styles.dots}>
           {banners.map((banner, index) => (
@@ -251,6 +332,7 @@ export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] })
               accessibilityLabel={t('mobile.customer.home.bannerDot', { n: index + 1 })}
               accessibilityState={{ selected: index === slide }}
               onPress={() => go(index)}
+              hitSlop={6}
               style={styles.dotButton}
             >
               <View style={[styles.dot, index === slide && styles.dotOn]} />
@@ -265,26 +347,28 @@ export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] })
 /** A category's picture: its own, or one of its products', or a box. */
 function CategoryPicture({
   category,
-  size,
+  width,
+  height,
 }: {
   category: Pick<StoreHomeCategory, 'imageUrl'>;
-  size: number;
+  width: number;
+  height: number;
 }) {
   const { server } = useCustomer();
   return category.imageUrl ? (
     <Image
       source={{ uri: `${server}${category.imageUrl}` }}
-      style={{ width: size, height: size }}
-      contentFit="cover"
+      style={{ width, height }}
+      contentFit="contain"
       cachePolicy="memory-disk"
       recyclingKey={category.imageUrl}
     />
   ) : (
-    <Package size={size * 0.45} strokeWidth={1.4} color={colors.input} />
+    <Package size={height * 0.7} strokeWidth={1.3} color={colors.input} />
   );
 }
 
-/** «Ангиллын жагсаалт»'s tile: a rounded square picture and the name under it. */
+/** «Ангиллын жагсаалт»'s tile (the E-mart screens): the picture without a frame, the name under it. */
 export function CategoryTile({
   category,
   onPress,
@@ -293,19 +377,23 @@ export function CategoryTile({
   onPress: () => void;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.tile}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+    >
       <View style={styles.tilePicture}>
-        <CategoryPicture category={category} size={68} />
+        <CategoryPicture category={category} width={56} height={48} />
       </View>
-      <Text style={styles.tileName} numberOfLines={2}>
+      <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}
       </Text>
     </Pressable>
   );
 }
 
-/** A subcategory on a category's page: a round picture and the name. */
-export function RoundCategory({
+/** A subcategory on a category's page: a larger picture and the name. */
+export function SubcategoryTile({
   category,
   onPress,
 }: {
@@ -313,96 +401,53 @@ export function RoundCategory({
   onPress: () => void;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.round}>
-      <View style={styles.roundPicture}>
-        <CategoryPicture category={category} size={64} />
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.sub, pressed && styles.pressed]}
+    >
+      <View style={styles.subPicture}>
+        <CategoryPicture category={category} width={80} height={72} />
       </View>
-      <Text style={styles.tileName} numberOfLines={2}>
+      <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}
       </Text>
     </Pressable>
   );
 }
 
-/** The cart on a pushed page's bar, with its count; it opens «Сагс». */
-export function CartButton() {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const { cart } = useShop();
-  const n = cart.lines.length;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('mobile.customer.list.cart', { n })}
-      onPress={() => router.navigate('/cart')}
-      style={styles.cart}
-    >
-      <ShoppingCart size={23} strokeWidth={1.8} color={colors.foreground} />
-      <CountBadge count={n} style={styles.cartBadge} />
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0 },
-  muted: { color: colors.muted },
-  section: { paddingTop: 22 },
-  sectionHead: {
+  grow: { flex: 1, minWidth: 0, gap: 1 },
+  center: { textAlign: 'center' },
+  upper: { textTransform: 'uppercase' },
+  pressed: { opacity: 0.6 },
+  heading: {
+    minHeight: TOUCH,
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.md,
-    paddingLeft: spacing.lg,
-    paddingRight: 6,
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingLeft: 14,
+    paddingRight: spacing.sm,
     paddingBottom: 10,
   },
-  more: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  cards: { gap: 10, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
-  banners: { paddingTop: spacing.md, paddingHorizontal: spacing.lg },
-  bannerBox: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: colors.imageFill,
-    aspectRatio: 2,
-  },
+  glyph: { alignSelf: 'flex-start', width: 20, height: 21, justifyContent: 'center' },
+  section: { paddingTop: 18 },
+  cards: { gap: 10, paddingHorizontal: 14, paddingBottom: spacing.xs },
+  banners: { backgroundColor: colors.imageFill },
   bannerImage: { width: '100%', height: '100%' },
   bannerFallback: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 18,
-    backgroundColor: colors.primary,
+    paddingHorizontal: 22,
+    backgroundColor: colors.primaryPressed,
   },
   bannerTitle: { ...type.title2, color: colors.primaryForeground },
-  dots: { flexDirection: 'row', justifyContent: 'center', marginTop: 2 },
-  dotButton: { width: 30, height: 28, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.input },
-  dotOn: { width: 22, backgroundColor: colors.primary },
+  dots: { flexDirection: 'row', justifyContent: 'center', paddingTop: spacing.xs },
+  dotButton: { width: 22, height: 20, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.input },
+  dotOn: { backgroundColor: colors.label2 },
   tile: { flex: 1, alignItems: 'center', gap: 6 },
-  tilePicture: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: colors.imageFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileName: {
-    ...type.secondary,
-    fontFamily: fonts.medium,
-    color: colors.foreground,
-    textAlign: 'center',
-    minHeight: 32,
-  },
-  round: { width: 76, alignItems: 'center', gap: 6 },
-  roundPicture: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: colors.imageFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cart: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  cartBadge: { position: 'absolute', top: 2, right: 0 },
+  tilePicture: { width: 64, height: 50, alignItems: 'center', justifyContent: 'center' },
+  sub: { width: 88, alignItems: 'center', gap: 6 },
+  subPicture: { width: 88, height: 76, alignItems: 'center', justifyContent: 'center' },
 });

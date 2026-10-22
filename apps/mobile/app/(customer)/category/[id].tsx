@@ -1,29 +1,22 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, PackageSearch } from 'lucide-react-native';
+import { PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useStoreCategoryPage } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
 import {
   BannerCarousel,
-  CartButton,
-  RoundCategory,
   SectionRow,
+  SubcategoryTile,
   useCardActions,
 } from '../../../src/customer/home-parts';
 import { sectionRouteOf } from '../../../src/customer/home-sections';
+import { StoreHeader } from '../../../src/customer/store-header';
 import { formatCount } from '../../../src/format/format';
-import { colors, fonts, spacing, type } from '../../../src/theme/tokens';
+import { colors, spacing, storeType } from '../../../src/theme/tokens';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, NavBar, Page } from '../../../src/ui/layout';
+import { Page } from '../../../src/ui/layout';
 import { Text } from '../../../src/ui/text';
 
 /**
@@ -57,35 +50,35 @@ export default function CategoryScreen() {
   };
 
   return (
-    <Page white>
-      <NavBar back={t('mobile.tabs.home')} onBack={() => router.back()} right={<CartButton />} />
+    <Page white edges={[]}>
+      <StoreHeader
+        title={
+          data
+            ? t('mobile.customer.list.titleCount', {
+                title: data.category.name,
+                n: formatCount(data.productCount),
+              })
+            : ''
+        }
+        onBack={() => router.back()}
+      />
       <ScrollView
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
         {data ? (
           <>
-            <View style={styles.head}>
-              <LargeTitle>{data.category.name}</LargeTitle>
-              <Text style={[type.body, styles.muted]}>
-                {t('mobile.customer.list.count', { n: formatCount(data.productCount) })}
-              </Text>
-            </View>
-
             <BannerCarousel banners={data.banners} />
 
             {data.subcategories.length > 0 ? (
               <>
-                <Text accessibilityRole="header" style={[type.sectionTitle, styles.subTitle]}>
-                  {t('mobile.customer.category.subcategories')}
-                </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.subs}
                 >
                   {data.subcategories.map((sub) => (
-                    <RoundCategory key={sub.id} category={sub} onPress={() => shop(sub.id)} />
+                    <SubcategoryTile key={sub.id} category={sub} onPress={() => shop(sub.id)} />
                   ))}
                 </ScrollView>
               </>
@@ -106,13 +99,9 @@ export default function CategoryScreen() {
               onPress={() => shop(data.category.id)}
               style={({ pressed }) => [styles.all, pressed && styles.allPressed]}
             >
-              <Text style={styles.allText} numberOfLines={2}>
-                {t('mobile.customer.category.all', {
-                  name: data.category.name,
-                  n: formatCount(data.productCount),
-                })}
+              <Text style={[storeType.wideButton, styles.upper]} numberOfLines={1}>
+                {t('mobile.customer.category.all', { n: formatCount(data.productCount) })}
               </Text>
-              <ChevronRight size={18} strokeWidth={2.4} color={colors.primary} />
             </Pressable>
           </>
         ) : page.isLoading ? (
@@ -132,25 +121,17 @@ export default function CategoryScreen() {
 
 const styles = StyleSheet.create({
   body: { paddingBottom: 40 },
-  head: { paddingTop: 2, paddingHorizontal: spacing.lg, gap: 2 },
-  muted: { color: colors.muted },
-  subTitle: { marginTop: 18, marginBottom: 10, marginHorizontal: spacing.lg },
-  subs: { gap: spacing.md, paddingHorizontal: spacing.lg },
+  upper: { textTransform: 'uppercase' },
+  subs: { gap: spacing.md, paddingTop: 14, paddingHorizontal: 14 },
   all: {
-    minHeight: 52,
+    height: 44,
     marginTop: 22,
-    marginHorizontal: spacing.lg,
-    paddingHorizontal: 20,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    flexDirection: 'row',
+    marginHorizontal: 14,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
   },
-  allPressed: { backgroundColor: colors.secondary },
-  allText: { ...type.button, fontFamily: fonts.semibold, color: colors.primary, flexShrink: 1 },
+  allPressed: { backgroundColor: colors.fill },
   loading: { marginTop: spacing.xxl },
   problem: { marginTop: spacing.lg, marginHorizontal: spacing.lg },
 });

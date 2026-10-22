@@ -1,22 +1,18 @@
 import { type HomeSectionSort, parseHomeSectionKey } from '@tugeel/shared/sales';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PackageSearch } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  type StoreProduct,
   useStoreCategories,
   useStoreSection,
   useStoreSectionCount,
 } from '../../../src/api/customer';
 import { problemFrom } from '../../../src/api/problem';
-import {
-  CartButton,
-  StoreCard,
-  useCardActions,
-  useSectionText,
-} from '../../../src/customer/home-parts';
+import { StoreCard, useCardActions, useSectionText } from '../../../src/customer/home-parts';
 import { sectionSortsOf } from '../../../src/customer/home-sections';
 import {
   activeFilters,
@@ -27,11 +23,12 @@ import {
   SortSheet,
 } from '../../../src/customer/list-sheets';
 import { shopRouteParams } from '../../../src/customer/shop';
+import { StoreHeader } from '../../../src/customer/store-header';
 import { formatCount } from '../../../src/format/format';
-import { colors, spacing, type } from '../../../src/theme/tokens';
+import { colors, spacing, storeType, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, NavBar, Page } from '../../../src/ui/layout';
+import { Page } from '../../../src/ui/layout';
 import { Text } from '../../../src/ui/text';
 
 const GAP = 10;
@@ -46,7 +43,9 @@ export default function SectionListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const cardWidth = (width - spacing.lg * 2 - GAP) / 2;
+  const cardWidth = (width - 14 * 2 - GAP) / 2;
+  const grid = useRef<FlatList<StoreProduct>>(null);
+  const [scrolled, setScrolled] = useState(false);
   const params = useLocalSearchParams<{ key: string; categoryIds?: string; from?: string }>();
   const key = String(params.key ?? '');
   const fromCategory = params.from === 'category';
@@ -93,30 +92,26 @@ export default function SectionListScreen() {
   ]
     .filter((part) => part)
     .join(' · ');
-  const countLine = [
-    text.subtitle,
-    total === null ? null : t('mobile.customer.list.count', { n: formatCount(total) }),
-  ]
-    .filter((part) => part)
-    .join(' · ');
+  const title =
+    total === null
+      ? text.title
+      : t('mobile.customer.list.titleCount', { title: text.title, n: formatCount(total) });
 
   const header = (
     <View style={styles.header}>
-      <LargeTitle>{text.title || ' '}</LargeTitle>
-      {countLine ? <Text style={[type.body, styles.muted]}>{countLine}</Text> : null}
+      {text.subtitle ? <Text style={storeType.sectionSub}>{text.subtitle}</Text> : null}
       <Text style={[type.chip, styles.sortLine]}>{sortLine}</Text>
       {problem && problem.status !== 404 ? <ProblemText problem={problem} /> : null}
     </View>
   );
 
   return (
-    <Page white>
-      <NavBar
-        {...(fromCategory ? {} : { back: t('mobile.tabs.home') })}
-        onBack={() => router.back()}
-        right={<CartButton />}
-      />
+    <Page white edges={[]}>
+      <StoreHeader title={title} onBack={() => router.back()} />
       <FlatList
+        ref={grid}
+        onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 600)}
+        scrollEventThrottle={200}
         data={rows}
         numColumns={2}
         keyExtractor={(product) => String(product.id)}
@@ -168,6 +163,9 @@ export default function SectionListScreen() {
       {problem?.status === 404 ? null : (
         <FloatingPill
           bottom={insets.bottom + 24}
+          onTop={
+            scrolled ? () => grid.current?.scrollToOffset({ offset: 0, animated: true }) : null
+          }
           active={activeFilters(filters)}
           onSort={() => setSheet('sort')}
           onFilter={() => {
@@ -202,12 +200,12 @@ export default function SectionListScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg },
-  header: { paddingTop: 2, paddingBottom: 14, gap: 2 },
+  list: { paddingHorizontal: 14 },
+  header: { paddingTop: 10, paddingBottom: 12, gap: 2 },
   muted: { color: colors.muted },
   sortLine: { marginTop: spacing.xs, color: colors.label2 },
   columns: { gap: GAP },
-  rowGap: { height: 12 },
+  rowGap: { height: 10 },
   loading: { marginTop: spacing.xxl },
   more: { marginTop: spacing.lg },
   empty: { alignItems: 'center', gap: spacing.md },

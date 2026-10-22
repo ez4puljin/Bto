@@ -34,11 +34,11 @@ import { formatMnt } from '../../src/format/format';
 import { feedOf, unreadIds } from '../../src/notifications/feed';
 import { KIND_STYLES, KindIcon, useNoticeEyebrow } from '../../src/notifications/kinds';
 import { useCustomer } from '../../src/state/session';
-import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
-import { Segmented } from '../../src/ui/controls';
+import { colors, fonts, spacing, storeType, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { BarButton, LargeTitle, NavBar, Page } from '../../src/ui/layout';
+import { HeaderTextButton, StoreHeader } from '../../src/customer/store-header';
+import { Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
 
 /**
@@ -109,17 +109,24 @@ export default function CustomerNotificationsScreen() {
 
   const head = (
     <View>
-      <LargeTitle style={styles.title}>{t('mobile.notifications.title')}</LargeTitle>
-      <View style={styles.tabs}>
-        <Segmented
-          options={[
-            { value: 'orders' as const, label: tabLabel('orders', tabs.orders) },
-            { value: 'promos' as const, label: tabLabel('promos', tabs.promos) },
-          ]}
-          value={tab}
-          onChange={setChosen}
-          label={t('mobile.customer.notifications.tabs.label')}
-        />
+      <View
+        accessibilityRole="tablist"
+        accessibilityLabel={t('mobile.customer.notifications.tabs.label')}
+        style={styles.tabs}
+      >
+        {(['orders', 'promos'] as const).map((name) => (
+          <Pressable
+            key={name}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === name }}
+            onPress={() => setChosen(name)}
+            style={[styles.tabButton, tab === name ? styles.tabOn : styles.tabOff]}
+          >
+            <Text style={storeType.tabButton} numberOfLines={1}>
+              {tabLabel(name, name === 'orders' ? tabs.orders : tabs.promos)}
+            </Text>
+          </Pressable>
+        ))}
       </View>
       {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
       {mine.error && tab === 'orders' ? <ProblemText problem={problemFrom(mine.error)} /> : null}
@@ -128,12 +135,12 @@ export default function CustomerNotificationsScreen() {
   const loading = <ActivityIndicator style={styles.loading} color={colors.primary} />;
 
   return (
-    <Page>
-      <NavBar
-        back={t('mobile.tabs.home')}
+    <Page white edges={[]}>
+      <StoreHeader
+        title={t('mobile.notifications.title')}
         onBack={() => router.back()}
         right={
-          <BarButton
+          <HeaderTextButton
             title={t('mobile.notifications.readAll')}
             disabled={!anyUnread || isPending}
             onPress={() => markRead(unread)}
@@ -365,12 +372,25 @@ function PromoCard({ notice, onPress }: { notice: StoreNotice; onPress: () => vo
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  tabs: { marginTop: spacing.md, marginBottom: spacing.xs },
+  tabs: { flexDirection: 'row', gap: spacing.md, marginTop: 14, marginBottom: spacing.xs },
+  tabButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabOn: { backgroundColor: colors.primary },
+  tabOff: { backgroundColor: colors.placeholder },
   day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: { backgroundColor: colors.card },
-  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
-  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
+  cell: {
+    backgroundColor: colors.card,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+  },
+  firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+  lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -402,7 +422,9 @@ const styles = StyleSheet.create({
   more: { marginTop: spacing.lg },
   card: {
     marginTop: spacing.md,
-    borderRadius: radii.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.card,
     overflow: 'hidden',
   },
