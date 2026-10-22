@@ -18,6 +18,7 @@ export {
   MANUAL_KEY,
   POSTING_KEY_OF_ROLE,
   ROLE_OF_POSTING_KEY,
+  STOCK_NUMBER_DEFAULT,
 } from './installation';
 export { type CompanyEdit, FinCompanyBridge } from './services/company-bridge.service';
 export { FinContexts } from './services/contexts.service';

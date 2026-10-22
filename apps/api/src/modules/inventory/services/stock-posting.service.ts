@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import {
   averageAfterWithdrawal,
   formatDocNumber,
@@ -20,11 +21,20 @@ import { AppError, invalid } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type Actor, actorUserId, NumberingService } from '../../identity';
+import {
+  STOCK_BOOKS,
+  type StockBookKind,
+  type StockBookLine,
+  type StockBooks,
+  type StockPostedFacts,
+  type StockRevaluedFacts,
+} from '../hooks';
 import { stockLedger, stockValuationAdjustments } from '../ledger.schema';
 import {
   adjustments,
   binMoves,
   goodsIssues,
+  issueExpenseTypes,
   bins,
   goodsReceipts,
   reconciliationRuns,
@@ -32,6 +42,7 @@ import {
   stocktakes,
   transfers,
 } from '../schema';
+import { bookKindOf } from './stock-book-kind';
 import { advisoryLock, LOCKS } from './support';
 
 /** Inventory's own stock documents; other modules guard their documents themselves (ADR-0034 #5). */
@@ -283,11 +294,23 @@ const CHUNK = 1_000;
  * in this file.
  */
 @Injectable()
-export class StockPostingService {
+export class StockPostingService implements OnModuleInit {
+  private books: StockBooks | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly numbering: NumberingService,
+    // Absent in the CLI tools, which build the service by hand and post nothing.
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    try {
+      this.books = this.moduleRef?.get<StockBooks>(STOCK_BOOKS, { strict: false }) ?? null;
+    } catch {
+      this.books = null;
+    }
+  }
 
   async post(
     tx: Tx,
@@ -319,6 +342,8 @@ export class StockPostingService {
     const effectiveDate = businessDate(postedAt);
     const unitCosts = new Map<string, Decimal>();
     const movements = [...input.movements];
+    // The ledger rows written, with their ids: the books value each document from them (F4).
+    const written: { row: typeof stockLedger.$inferInsert; id: number }[] = [];
     // 1b. The reservations to consume, read without a lock: only the document's own writers touch
     //     them, and every one of them holds the document's header row (ADR-0056 #6).
     const consume = input.reservationConsume;
@@ -459,7 +484,13 @@ export class StockPostingService {
 
       // 7. The ledger; a repeated (document line, movement, leg) is ALREADY_POSTED.
       try {
-        for (const rows of chunks(ledgerRows)) await tx.insert(stockLedger).values(rows);
+        for (const rows of chunks(ledgerRows)) {
+          const ids = await tx.insert(stockLedger).values(rows).returning({ id: stockLedger.id });
+          rows.forEach((row, index) => {
+            const id = ids[index]?.id;
+            if (id !== undefined) written.push({ row, id });
+          });
+        }
       } catch (error) {
         const database = databaseErrorOf(error);
         if (database?.code === '23505' && database.constraint === 'stock_ledger_idem') {
@@ -520,7 +551,105 @@ export class StockPostingService {
         postedBy: actorUserId(actor),
       });
     }
+    // 10. The books (F4, ADR-0095): each document's stock value, in this transaction.
+    if (this.books && written.length > 0) {
+      for (const facts of await this.bookFacts(tx, written, numbers, effectiveDate)) {
+        await this.books.stockPostedInTx(tx, actor, facts);
+      }
+    }
     return { postedAt, effectiveDate, numbers, unitCosts };
+  }
+
+  /**
+   * The books' view of the rows one posting wrote (F4, ADR-0095; TODO-VERIFY D8): per document,
+   * the value of its rows (`valueOf(qty, unit cost)`, signed) by what they did — received, sold or
+   * returned from a sale, lost or found (an adjustment's reason, a count's sign), the opening stock,
+   * issued for an expense type. A goods issue to a supplier is the supplier's credit (F3), never
+   * here; value-neutral moves book only a non-zero remainder.
+   */
+  private async bookFacts(
+    tx: Db | Tx,
+    written: readonly { row: typeof stockLedger.$inferInsert; id: number }[],
+    numbers: ReadonlyMap<number, string>,
+    effectiveDate: string,
+  ): Promise<
+    {
+      docType: string;
+      docId: number;
+      number: string | null;
+      date: string;
+      firstLedgerId: number;
+      lines: StockBookLine[];
+    }[]
+  > {
+    const byDoc = new Map<string, { row: typeof stockLedger.$inferInsert; id: number }[]>();
+    for (const entry of written) {
+      const key = `${entry.row.docType}:${entry.row.docId}`;
+      byDoc.set(key, [...(byDoc.get(key) ?? []), entry]);
+    }
+    const facts = [];
+    for (const entries of byDoc.values()) {
+      const first = entries[0];
+      if (!first) continue;
+      const docType = first.row.docType;
+      const docId = first.row.docId;
+      let reason: string | null = null;
+      let issue: { code: string | null; supplier: boolean } | null = null;
+      if (docType === 'ADJ') {
+        const [row] = await tx
+          .select({ reason: adjustments.reason })
+          .from(adjustments)
+          .where(eq(adjustments.id, docId));
+        reason = row?.reason ?? null;
+      }
+      if (docType === 'GI') {
+        const [row] = await tx
+          .select({ code: issueExpenseTypes.code, recipient: goodsIssues.recipientKind })
+          .from(goodsIssues)
+          .innerJoin(issueExpenseTypes, eq(issueExpenseTypes.id, goodsIssues.expenseTypeId))
+          .where(eq(goodsIssues.id, docId));
+        issue = { code: row?.code ?? null, supplier: row?.recipient === 'SUPPLIER' };
+        // The supplier's AP credit takes the stock out (F3, ADR-0091).
+        if (issue.supplier) continue;
+      }
+      const sums = new Map<string, StockBookLine>();
+      let neutral = ZERO;
+      for (const { row } of entries) {
+        const value = valueOf(
+          new Decimal(row.qtyBase.toString()),
+          new Decimal(row.unitCost.toString()),
+        );
+        const kind = bookKindOf(row.movementType, reason, value);
+        if (kind === null) {
+          neutral = neutral.plus(value);
+          continue;
+        }
+        const code = kind === 'ISSUE' ? (issue?.code ?? null) : null;
+        const key = `${kind}:${code ?? ''}`;
+        const line = sums.get(key);
+        sums.set(key, {
+          kind,
+          ...(kind === 'ISSUE' ? { issueType: code } : {}),
+          value: (line?.value ?? ZERO).plus(value),
+        });
+      }
+      if (!neutral.isZero()) {
+        const kind: StockBookKind = neutral.isNegative() ? 'LOSS' : 'GAIN';
+        const line = sums.get(`${kind}:`);
+        sums.set(`${kind}:`, { kind, value: (line?.value ?? ZERO).plus(neutral) });
+      }
+      const lines = [...sums.values()].filter((line) => !line.value.isZero());
+      if (lines.length === 0) continue;
+      facts.push({
+        docType,
+        docId,
+        number: numbers.get(docId) ?? null,
+        date: effectiveDate,
+        firstLedgerId: Math.min(...entries.map((entry) => entry.id)),
+        lines,
+      });
+    }
+    return facts;
   }
 
   /**
@@ -629,7 +758,94 @@ export class StockPostingService {
         };
       }),
     );
+    // The books (F4, ADR-0095): what the costing moved in the stock and what had already left.
+    if (this.books) {
+      const absorbed = results.reduce((sum, result) => sum.plus(result.absorbed), ZERO);
+      const variance = results.reduce((sum, result) => sum.plus(result.variance), ZERO);
+      if (!absorbed.isZero() || !variance.isZero()) {
+        const [receipt] = await tx
+          .select({ number: goodsReceipts.number })
+          .from(goodsReceipts)
+          .where(eq(goodsReceipts.id, input.docId));
+        await this.books.stockRevaluedInTx(tx, actor, {
+          receiptId: input.docId,
+          number: receipt?.number ?? null,
+          version: input.version,
+          date: effectiveDate,
+          absorbed,
+          variance,
+        });
+      }
+    }
     return results;
+  }
+
+  /**
+   * The books' view of the whole ledger, one posting at a time (the development re-post of F4,
+   * ADR-0095): the rows of one document written in one transaction share their posting time.
+   */
+  async historyFacts(): Promise<StockPostedFacts[]> {
+    const rows = await this.db.select().from(stockLedger).orderBy(stockLedger.id);
+    const groups = new Map<string, { row: typeof stockLedger.$inferInsert; id: number }[]>();
+    for (const row of rows) {
+      const key = `${row.docType}:${row.docId}:${row.postedAt.toISOString()}`;
+      groups.set(key, [...(groups.get(key) ?? []), { row, id: row.id }]);
+    }
+    const facts: StockPostedFacts[] = [];
+    for (const entries of groups.values()) {
+      const date = entries[0]?.row.effectiveDate;
+      if (typeof date !== 'string') continue;
+      facts.push(...(await this.bookFacts(this.db, entries, new Map(), date)));
+    }
+    return facts;
+  }
+
+  /** Every receipt costing's absorbed value and variance (the development re-post, F4). */
+  async revaluationHistory(): Promise<StockRevaluedFacts[]> {
+    const result = await this.db.execute<{
+      doc_id: number;
+      version: number;
+      date: string;
+      absorbed: string;
+      variance: string;
+      number: string | null;
+    }>(sql`
+      SELECT v.doc_id, v.version, min(v.effective_date)::text AS date,
+             sum(v.absorbed)::text AS absorbed, sum(v.variance)::text AS variance, r.number
+        FROM stock_valuation_adjustments v
+        JOIN goods_receipts r ON r.id = v.doc_id
+       WHERE v.doc_type = 'GR'
+       GROUP BY v.doc_id, v.version, r.number
+       ORDER BY v.doc_id, v.version`);
+    return result.rows.flatMap((row) => {
+      const absorbed = new Decimal(row.absorbed);
+      const variance = new Decimal(row.variance);
+      return absorbed.isZero() && variance.isZero()
+        ? []
+        : [
+            {
+              receiptId: Number(row.doc_id),
+              number: row.number,
+              version: Number(row.version),
+              date: row.date,
+              absorbed,
+              variance,
+            },
+          ];
+    });
+  }
+
+  /**
+   * The stock's value: Σ on hand × average per warehouse balance, rounded to the tugrik's cents
+   * (F4, ADR-0095: the books' INVENTORY account follows it).
+   */
+  async stockValue(executor: Db | Tx = this.db): Promise<Decimal> {
+    const [row] = await executor
+      .execute<{ value: string }>(
+        sql`SELECT coalesce(sum(round(on_hand * avg_cost, 2)), 0)::text AS value FROM warehouse_stock`,
+      )
+      .then((result) => result.rows);
+    return new Decimal(row?.value ?? 0);
   }
 
   /** The latest costing of each line of a receipt (none for a receipt not costed yet). */

@@ -6,6 +6,9 @@ import { loadDotEnvIfPresent } from '../../../common/config/dotenv';
 import { parseEnv } from '../../../common/config/env.schema';
 import { createDb } from '../../../common/db/db.module';
 import { configurePgTypeParsers } from '../../../common/db/pg-types';
+import { postingKeyBalances } from '../../../finance-core';
+import { NumberingService } from '../../identity';
+import { StockPostingService } from '../../inventory';
 import { type FinanceReconcileRun, reconcileReceivables } from '../services/ar-ledger.service';
 
 const SHOWN = 20;
@@ -58,8 +61,17 @@ async function main(): Promise<void> {
     application_name: 'tugeel-cli',
   });
   try {
-    const run = await reconcileReceivables(createDb(pool), 'MANUAL');
+    const db = createDb(pool);
+    const run = await reconcileReceivables(db, 'MANUAL');
     for (const line of describeRun(run)) console.log(line);
+    // The stock's value against the INVENTORY account (F4, ADR-0095): information, never an exit 2;
+    // the averages' four decimals leave cents.
+    const stock = await new StockPostingService(db, new NumberingService()).stockValue();
+    for (const books of await postingKeyBalances(db, 'INVENTORY')) {
+      console.log(
+        `Stock value ${stock.toFixed(2)}; ${books.company} ${books.accountCode ?? '—'} ${books.balance.toFixed(2)}; difference ${stock.minus(books.balance).toFixed(2)}.`,
+      );
+    }
     if (run.status === 'DRIFT') process.exitCode = 2;
   } finally {
     await pool.end();

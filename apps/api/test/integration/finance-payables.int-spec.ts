@@ -175,7 +175,7 @@ describe('finance payables', () => {
     expect(posted).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
       '130301': '2400.00',
-      '140101': '24000.00',
+      '310201': '24000.00',
       '310101': '-26400.00',
     });
     expect(await balance(vatSupplier)).toMatchObject({
@@ -218,7 +218,7 @@ describe('finance payables', () => {
     await cost(posted.id, 1, [{ lineId, amount: '12100' }]).expect(200);
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
       '130301': '100.00',
-      '140101': '1000.00',
+      '310201': '1000.00',
       '310101': '-1100.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '12100.00' });
@@ -226,7 +226,7 @@ describe('finance payables', () => {
     await cost(posted.id, 2, [{ lineId, amount: '9900' }]).expect(200);
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
       '130301': '-200.00',
-      '140101': '-2000.00',
+      '310201': '-2000.00',
       '310101': '2200.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '9900.00' });
@@ -243,7 +243,7 @@ describe('finance payables', () => {
     ]);
     // No VAT for a supplier that pays none.
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
-      '140101': '5000.00',
+      '310201': '5000.00',
       '310101': '-5000.00',
     });
     const finance = financeApi(app, accountant);

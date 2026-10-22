@@ -29,6 +29,20 @@ export const CHART_ROLES = [
   'AP',
   'VAT_INPUT',
   'INVENTORY',
+  // Stock and cost (F4, ADR-0095): the clearing of goods received before their bill, the cost of
+  // goods sold, shortages and surpluses, the opening stock's offset, and one account per goods-issue
+  // expense type. Temporary codes until Erkhet's chart (D16); the rules are TODO-VERIFY D8.
+  'GOODS_RECEIVED',
+  'COGS',
+  'STOCK_LOSS',
+  'STOCK_GAIN',
+  'OPENING_STOCK',
+  'ISSUE_INTERNAL',
+  'ISSUE_BONUS',
+  'ISSUE_MARKETING',
+  'ISSUE_WRITE_OFF',
+  'ISSUE_TRANSFER_OUT',
+  'ISSUE_OTHER',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -63,4 +77,16 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   { code: '130301', kind: 'ASSET', role: 'VAT_INPUT' },
   { code: '140101', kind: 'ASSET', role: 'INVENTORY' },
   { code: '310101', kind: 'LIABILITY', role: 'AP' },
+  // Stock and cost (F4, ADR-0095; temporary codes, TODO-VERIFY D8 / D16).
+  { code: '310201', kind: 'LIABILITY', role: 'GOODS_RECEIVED' },
+  { code: '610101', kind: 'EXPENSE', role: 'COGS' },
+  { code: '740201', kind: 'EXPENSE', role: 'STOCK_LOSS' },
+  { code: '511030', kind: 'INCOME', role: 'STOCK_GAIN' },
+  { code: '390101', kind: 'EQUITY', role: 'OPENING_STOCK' },
+  { code: '730201', kind: 'EXPENSE', role: 'ISSUE_INTERNAL' },
+  { code: '730202', kind: 'EXPENSE', role: 'ISSUE_BONUS' },
+  { code: '730203', kind: 'EXPENSE', role: 'ISSUE_MARKETING' },
+  { code: '730204', kind: 'EXPENSE', role: 'ISSUE_WRITE_OFF' },
+  { code: '730205', kind: 'EXPENSE', role: 'ISSUE_TRANSFER_OUT' },
+  { code: '730209', kind: 'EXPENSE', role: 'ISSUE_OTHER' },
 ];

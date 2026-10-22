@@ -39,7 +39,13 @@ export const FIN_DOC_TYPES = {
   },
   RECEIPT_RECOST: { code: 'BTO.RECEIPT_RECOST', system: BTO_SOURCE, docType: 'RECEIPT_RECOST' },
   SUPPLIER_RETURN: { code: 'BTO.SUPPLIER_RETURN', system: BTO_SOURCE, docType: 'SUPPLIER_RETURN' },
+  // F4 (ADR-0095): a stock posting's value and a receipt's revaluation, numbered by the core.
+  STOCK_VALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK' },
+  STOCK_REVALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK_REVALUE' },
 } as const;
+
+/** The stock value documents' first number format until the accountant chooses one (TODO-VERIFY, ADR-0095). */
+export const STOCK_NUMBER_DEFAULT = { pattern: 'Б-{year}{month}{day}-', digits: 4 } as const;
 
 /** The allocations' number format until the accountant chooses one (TODO-VERIFY, ADR-0090). */
 export const ALLOCATION_NUMBER_DEFAULT = { pattern: 'Х-{year}{month}{day}-', digits: 4 } as const;
@@ -101,6 +107,18 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   AP: key('AP', 'PAYABLE'),
   VAT_INPUT: key('VAT_INPUT', 'NONE', true),
   INVENTORY: key('INVENTORY'),
+  // Stock and cost (F4, ADR-0095): every stock posting books its value against one of these.
+  GOODS_RECEIVED: key('GOODS_RECEIVED'),
+  COGS: key('COGS'),
+  STOCK_LOSS: key('STOCK_LOSS'),
+  STOCK_GAIN: key('STOCK_GAIN'),
+  OPENING_STOCK: key('OPENING_STOCK'),
+  ISSUE_INTERNAL: key('ISSUE_INTERNAL'),
+  ISSUE_BONUS: key('ISSUE_BONUS'),
+  ISSUE_MARKETING: key('ISSUE_MARKETING'),
+  ISSUE_WRITE_OFF: key('ISSUE_WRITE_OFF'),
+  ISSUE_TRANSFER_OUT: key('ISSUE_TRANSFER_OUT'),
+  ISSUE_OTHER: key('ISSUE_OTHER'),
 };
 
 /** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */
@@ -165,6 +183,7 @@ export function btoInstallationSpec(input: {
       { code: 'PAYMENT', ...FINANCE_NUMBER_DEFAULTS.PAYMENT },
       { code: 'JOURNAL', ...FINANCE_NUMBER_DEFAULTS.JOURNAL },
       { code: 'ALLOCATION', ...ALLOCATION_NUMBER_DEFAULT },
+      { code: 'STOCK', ...STOCK_NUMBER_DEFAULT },
     ],
     documentTypes: [
       {
@@ -237,6 +256,13 @@ export function btoInstallationSpec(input: {
         numberMode: 'SOURCE' as const,
         numberSeries: null,
       })),
+      {
+        code: FIN_DOC_TYPES.STOCK_VALUE.code,
+        system: BTO_SOURCE,
+        class: 'JOURNAL',
+        numberMode: 'CORE',
+        numberSeries: 'STOCK',
+      },
     ],
     branches: input.branches.map((branch) => ({
       system: BTO_SOURCE,
