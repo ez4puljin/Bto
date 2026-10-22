@@ -63,7 +63,7 @@ The owner's answers of 2026-10-22, in an interview of seven rounds:
 8. **Photos.**
    - **Download.** The `imageUrl` links are downloaded with GET only, at most two at a time with a pause, so the Erxes production server is never strained or changed.
    - **Storage.** They are kept in `tmp/` and attached as each product's photo. The thumbnail is the photo itself when it is at most 512 KB.
-   - **Broken links** are skipped and counted.
+   - **Broken links** are skipped and counted: 7,228 of 7,258 photos came in, and 30 links were broken.
 9. **Left out.**
    - «Үнэ бодох tag», tagIds, «Ачааны ангилал», «Хайрцагны жин», «Барааны индекс», createdAt.
    - The 26 products of «Хархорин Боломж»: Kharkhorin is its own installation (ADR-0084 #1).
