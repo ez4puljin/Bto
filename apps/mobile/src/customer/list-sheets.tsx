@@ -143,25 +143,38 @@ export function activeFilters(filters: ListFilters): number {
  * «N бараа харуулах» counts the draft (`count`, null while asking) and applies it, closing leaves
  * the list as it was. A category chosen elsewhere (a subcategory from a category page) shows too.
  */
-export function ListFilterSheet({
-  visible,
-  draft,
-  count,
-  onChange,
-  onApply,
-  onClose,
-}: {
+export function ListFilterSheet(props: ListFilterSheetProps) {
+  const categories = useStoreCategories();
+  return <CategoryFilterSheet {...props} categories={categories.data} />;
+}
+
+interface ListFilterSheetProps {
   visible: boolean;
   draft: ListFilters;
   count: number | null;
   onChange: (draft: ListFilters) => void;
   onApply: () => void;
   onClose: () => void;
+}
+
+/**
+ * The same sheet on the categories the caller loads: «Bto300»'s store categories, or the rep
+ * app's (ADR-0100 #9) — undefined while they load.
+ */
+export function CategoryFilterSheet({
+  visible,
+  draft,
+  count,
+  onChange,
+  onApply,
+  onClose,
+  categories,
+}: ListFilterSheetProps & {
+  categories: readonly { id: number; parentId: number | null; name: string }[] | undefined;
 }) {
   const { t } = useTranslation();
-  const categories = useStoreCategories();
   const shown = useMemo(() => {
-    const all = categories.data ?? [];
+    const all = categories ?? [];
     const top = topStoreCategories(all);
     const extra = all
       .filter(
@@ -170,7 +183,7 @@ export function ListFilterSheet({
       )
       .map((category) => ({ id: category.id, name: category.name }));
     return [...extra, ...top];
-  }, [categories.data, draft.categoryIds]);
+  }, [categories, draft.categoryIds]);
 
   return (
     <Sheet

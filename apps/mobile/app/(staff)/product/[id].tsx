@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
 import { cachedProduct, useCategories, useProductsOf, useRepContext } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
+import { DealNote } from '../../../src/customer/deal-note';
 import { formatMnt, formatQty } from '../../../src/format/format';
 import { heroPictures, pageAt } from '../../../src/images/pictures';
 import { QtyKeypad } from '../../../src/shop/qty-keypad';
@@ -40,9 +41,10 @@ const HERO_HEIGHT = 250;
 /**
  * One product (the Product board, ADR-0068, in «Bto300»'s structure and sizes since ADR-0100): the
  * blue header with ← and the cart, its pictures edge to edge, the code and category, the name, the
- * free stock and the home warehouse, the unit switch, the unit's price with − n + (the keypad on
- * the number), what goes short, the server's total and «Сагсанд нэмэх». The product keeps one line
- * in the cart, in the unit chosen here; 0 takes it out.
+ * free stock and the home warehouse, its discount program in words as «Bto300» says it (the owner,
+ * 2026-10-23), the unit switch, the unit's price with − n + (the keypad on the number), what goes
+ * short, the server's total and «Сагсанд нэмэх». The product keeps one line in the cart, in the unit
+ * chosen here; 0 takes it out.
  */
 export default function ProductScreen() {
   const { t } = useTranslation();
@@ -235,6 +237,7 @@ export default function ProductScreen() {
               </View>
             ) : null}
           </View>
+          {product.deal ? <DealNote deal={product.deal} /> : null}
 
           {product.units.length > 1 ? (
             <View style={styles.units}>

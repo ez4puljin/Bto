@@ -1,16 +1,16 @@
 import { Heart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { StockWord, StoreDeal, StoreProduct } from '../api/customer';
+import type { StockWord, StoreProduct } from '../api/customer';
 import type { CartLine } from '../cart/cart';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
 import { baseUnitOf, defaultUnitOf, packOf } from '../shop/units';
-import { colors, fonts, spacing, storeType, type } from '../theme/tokens';
-import { CardAdd, CardQty, NewBadge, StoreCardFrame } from '../ui/store-card-frame';
+import { colors, fonts, spacing, type } from '../theme/tokens';
+import { CardAdd, CardQty, DealBadge, NewBadge, StoreCardFrame } from '../ui/store-card-frame';
 import { Text } from '../ui/text';
-import { cardPriceOf, dealToneOf } from './deals';
+import { cardPriceOf } from './deals';
 import { canOrder, STOCK_TONES } from './stock';
 
 /**
@@ -58,20 +58,8 @@ export function usePackText() {
   };
 }
 
-/** A discount program's badge (ADR-0092 #7): a promotion orange, a discount red. */
-export function DealBadge({ deal }: { deal: Pick<StoreDeal, 'kind' | 'label'> }) {
-  const promotion = dealToneOf(deal.kind) === 'promotion';
-  return (
-    <View style={[styles.badge, promotion ? styles.promotion : styles.discount]}>
-      <Text
-        style={[storeType.badge, promotion ? styles.promotionText : styles.discountText]}
-        numberOfLines={1}
-      >
-        {deal.label}
-      </Text>
-    </View>
-  );
-}
+/** A discount program's badge (ADR-0092 #7), drawn by the card frame both apps share. */
+export { DealBadge };
 
 /** ♡ over a picture's top right corner: red and filled when the product is a favourite. */
 export function FavouriteButton({
@@ -221,16 +209,5 @@ const styles = StyleSheet.create({
   dotLarge: { width: 8, height: 8 },
   pillText: { ...type.caption, fontFamily: fonts.semibold },
   pillTextLarge: { ...type.chip, fontFamily: fonts.semibold },
-  badge: {
-    height: 20,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 10,
-    justifyContent: 'center',
-    flexShrink: 1,
-  },
-  promotion: { backgroundColor: colors.dealPromotion },
-  promotionText: { color: colors.foreground },
-  discount: { backgroundColor: colors.dealDiscount },
-  discountText: { color: colors.primaryForeground },
   heart: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 });

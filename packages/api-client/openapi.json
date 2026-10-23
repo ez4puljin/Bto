@@ -44435,16 +44435,14 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "`recent`, `promotions`, `segment-<id>`, … — its full list’s key"
+            "description": "`promotions`, `segment-<id>`, `discounts`, `new`, `deals` — its full list’s key"
           },
           "kind": {
             "enum": [
-              "RECENT",
               "PROMOTIONS",
               "SEGMENT",
               "DISCOUNTS",
               "NEW",
-              "FAVOURITES",
               "DEALS"
             ],
             "type": "string"
@@ -44531,12 +44529,10 @@
           },
           "kind": {
             "enum": [
-              "RECENT",
               "PROMOTIONS",
               "SEGMENT",
               "DISCOUNTS",
               "NEW",
-              "FAVOURITES",
               "DEALS"
             ],
             "type": "string"

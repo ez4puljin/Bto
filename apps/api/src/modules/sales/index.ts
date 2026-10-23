@@ -59,7 +59,7 @@ export {
   SalesRepShopService,
 } from './services/sales-rep-shop.service';
 // The rep product's wire shape, reused by the rep home's routes (customer module, 2026-10-23).
-export { toRepProductDto } from './controllers/rep-mappers';
+export { toRepDealDto, toRepProductDto } from './controllers/rep-mappers';
 export { SalesRepProductDto } from './dto/sales-rep.dto';
 export {
   CUSTOMER_APP_LABEL,

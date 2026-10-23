@@ -1,7 +1,7 @@
 import type { RepProductSort } from '@tugeel/shared/sales';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PackageSearch, ScanLine, Search } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -23,6 +23,7 @@ import {
 } from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
 import { FloatingPill, SortSheet } from '../../../src/customer/list-sheets';
+import { shopRouteParams } from '../../../src/customer/shop';
 import { formatCount } from '../../../src/format/format';
 import { FilterSheet } from '../../../src/shop/filter-sheet';
 import { activeCount, EMPTY_FILTERS, type ShopFilters } from '../../../src/shop/filters';
@@ -45,11 +46,14 @@ const GAP = 10;
  * «Бараа» (the Main board, ADR-0068, in «Bto300»'s look since ADR-0100): the title with the count,
  * the search with the scanner in the blue header, the chosen filters as chips with «Ангилал» and
  * «Нийлүүлэгч», the order, the products two by two and the floating «Эрэмбэлэх | Шүүлтүүр». The
- * cart on a card adds one of a product's default unit, a card opens the product.
+ * cart on a card adds one of a product's default unit, a card opens the product. A link may focus
+ * the search (`?search=1`, «Нүүр»'s search field) or choose categories (`?categoryIds=5`, a
+ * category page's «бүх бараа»).
  */
 export default function ShopScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams<{ categoryIds?: string; search?: string }>();
   const { server } = useSignedIn();
   const { cart, pending } = useShop();
   const { width } = useWindowDimensions();
@@ -58,12 +62,16 @@ export default function ShopScreen() {
   const categories = useCategories();
   const { filters, setFilters } = useShopFilters();
   const list = useRef<FlatList<RepProduct>>(null);
+  const search = useRef<TextInput>(null);
   const [scrolled, setScrolled] = useState(false);
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<'closed' | 'sort' | 'filters' | 'suppliers'>('closed');
   const q = useDebounced(text.trim(), 350);
   const shown = filters ?? EMPTY_FILTERS;
-  const products = useProducts({ ...shown, q }, filters !== null);
+  // The list waits for the stored filters and for a link's categories (`?categoryIds=`) to be
+  // applied, so its first page is asked once, with them.
+  const linkPending = shopRouteParams(params).categoryIds !== null;
+  const products = useProducts({ ...shown, q }, filters !== null && !linkPending);
   const suppliers = useSuppliers(shown.supplierIds.length > 0);
   const rows = useMemo(
     () => products.data?.pages.flatMap((page) => page.data) ?? [],
@@ -77,6 +85,25 @@ export default function ShopScreen() {
     if (filters !== null) setFilters({ ...filters, ...patch });
   };
   const add = useAddOne();
+
+  // A link into the shop is spent once used, so a later one works again. The search is focused at
+  // once; the categories wait for the stored filters, then replace only their categories.
+  useEffect(() => {
+    if (!shopRouteParams(params).search) return;
+    search.current?.focus();
+    router.setParams({ search: undefined });
+  }, [params, router]);
+  useEffect(() => {
+    const categoryIds = shopRouteParams(params).categoryIds;
+    if (!categoryIds || filters === null) return;
+    setText('');
+    // Written once: the next run, before the spent link is gone, finds them already chosen.
+    const same =
+      filters.categoryIds.length === categoryIds.length &&
+      categoryIds.every((id, at) => filters.categoryIds[at] === id);
+    if (!same) setFilters({ ...filters, categoryIds });
+    router.setParams({ categoryIds: undefined });
+  }, [params, filters, setFilters, router]);
 
   const warehouse = context.data?.warehouses.find((entry) => entry.id === shown.warehouseId);
   const categoryNames = shown.categoryIds.map(
@@ -176,6 +203,7 @@ export default function ShopScreen() {
         <View style={styles.search}>
           <Search size={17} strokeWidth={2.2} color={colors.muted} />
           <TextInput
+            ref={search}
             value={text}
             onChangeText={setText}
             placeholder={t('mobile.shop.search')}
@@ -227,7 +255,7 @@ export default function ShopScreen() {
         refreshing={products.isRefetching && !products.isFetchingNextPage}
         onRefresh={() => void products.refetch()}
         ListEmptyComponent={
-          products.isLoading || filters === null ? (
+          products.isLoading || filters === null || linkPending ? (
             <ActivityIndicator style={styles.loading} color={colors.primary} />
           ) : (
             <View style={styles.empty}>

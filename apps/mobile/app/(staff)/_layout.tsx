@@ -28,6 +28,19 @@ export default function StaffLayout() {
             name="product/[id]"
             options={{ contentStyle: { backgroundColor: colors.card } }}
           />
+          {/* «Нүүр»'s lists as in «Bto300» (ADR-0100 #9): a section, a category, every category. */}
+          <Stack.Screen
+            name="section/[key]"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
+          <Stack.Screen
+            name="category/[id]"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
+          <Stack.Screen
+            name="categories"
+            options={{ contentStyle: { backgroundColor: colors.card } }}
+          />
           <Stack.Screen name="checkout" />
           <Stack.Screen name="order/[id]" />
           <Stack.Screen name="profile" />

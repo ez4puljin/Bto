@@ -5,6 +5,7 @@ import request from 'supertest';
 import { createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { type AppStore, appStore } from '../harness/customer-app';
+import { salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
 import { inventoryApi } from '../harness/inventory';
 import { pricingApi } from '../harness/pricing';
@@ -70,6 +71,8 @@ describe('sales rep home (Bto300 shop window)', () => {
   let water: ProductJson;
   let bread: ProductJson;
   let homeless: ProductJson;
+  let juice: ProductJson;
+  let milk: ProductJson;
   let store: AppStore;
   let segmentId: number;
   const today = businessDate();
@@ -158,6 +161,10 @@ describe('sales rep home (Bto300 shop window)', () => {
     water = await make('9752', 'Төлөөлөгч ус', drinks, {});
     bread = await make('9753', 'Төлөөлөгч талх', food, { qty: '30' });
     homeless = await make('9754', 'Төлөөлөгч гэргүй', food, { home: false, qty: '5' });
+    // Their own category, so the counts and sections above stay as they are.
+    const packed = await catalog.category('Төлөөлөгчийн хайрцагтай');
+    juice = await make('9755', 'Төлөөлөгч жүүс', packed, { qty: '24', box: true });
+    milk = await make('9756', 'Төлөөлөгч сүү', packed, { qty: '10' });
     const program = (body: Record<string, unknown>) =>
       http()
         .post('/api/v1/discount-programs')
@@ -185,6 +192,26 @@ describe('sales rep home (Bto300 shop window)', () => {
       validTo: addDays(today, 11),
       steps: [{ threshold: '0', value: '200' }],
     });
+    // An unconditional discount on a product sold by the box of 12: the card's deal price is one
+    // box quoted with it, per piece.
+    await program({
+      name: 'Төлөөлөгч жүүс хямд',
+      scope: 'PRODUCT',
+      measure: 'QTY',
+      effect: 'PERCENT',
+      productId: juice.id,
+      steps: [{ threshold: '0', value: '7' }],
+    });
+    // A program's unit price at the warehouse price: the badge, but nothing lower to strike.
+    await program({
+      name: 'Төлөөлөгч сүү үнэ',
+      scope: 'PRODUCT',
+      measure: 'QTY',
+      effect: 'PRICE',
+      productId: milk.id,
+      productUnitId: unitOf(milk, 'PCS').id,
+      steps: [{ threshold: '0', value: '1000' }],
+    });
     const created = (
       await http()
         .post('/api/v1/segments/lists')
@@ -200,8 +227,11 @@ describe('sales rep home (Bto300 shop window)', () => {
       .send({ shown: true })
       .expect(200);
     store = await appStore(app, office);
-    // The store's own sections exist for the store: a ♡.
+    // The store's own sections exist for the store: a ♡ and an order (RECENT). Water has no stock,
+    // so the draft changes no count below.
     await store.api.put(`/favourites/${cola.id}`).expect(204);
+    const flow = await salesFlow(app, admin, 'RHO');
+    await flow.draft(store.customerId, [{ productUnitId: unitOf(water, 'PCS').id, qty: '2' }]);
   });
   afterAll(async () => {
     await app.close();
@@ -266,6 +296,35 @@ describe('sales rep home (Bto300 shop window)', () => {
     expect(card(batch, water.id)).toMatchObject({ dealPrice: null, deal: null });
   });
 
+  it('prices a boxed product per piece from one box quoted with its program', async () => {
+    const [juiceCard] = await get<RepCardJson[]>(`/products/batch?productIds=${juice.id}`);
+    expect(juiceCard).toMatchObject({
+      deal: { kind: 'DISCOUNT', effect: 'PERCENT', value: '7', threshold: null },
+    });
+    const quote = (
+      await http()
+        .post('/api/v1/pricing/quote')
+        .set(bearer(admin))
+        .send({ lines: [{ productUnitId: unitOf(juice, 'BOX').id, qty: '1' }] })
+        .expect(200)
+    ).body as { lines: { total: string | null }[] };
+    const box = quote.lines[0]?.total;
+    expect(box).toEqual(expect.any(String));
+    // 1 BOX of 12 quoted with the program, divided by 12, rounded half up to whole MNT.
+    const perPiece = new Decimal(box ?? '0').div(12).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+    expect(juiceCard?.dealPrice).toBe(perPiece.toFixed(0));
+    expect(new Decimal(juiceCard?.dealPrice ?? '0').lt(juiceCard?.basePrice ?? '0')).toBe(true);
+  });
+
+  it('keeps the badge but strikes nothing when the program price is not lower', async () => {
+    const [milkCard] = await get<RepCardJson[]>(`/products/batch?productIds=${milk.id}`);
+    expect(milkCard).toMatchObject({
+      basePrice: '1000',
+      dealPrice: null,
+      deal: { kind: 'DISCOUNT', effect: 'PRICE', value: '1000' },
+    });
+  });
+
   it('shows «Bto300»s window without RECENT and FAVOURITES, the same sections as a store', async () => {
     const home = await get<HomeJson>('/home');
     expect(home.today).toBe(today);
@@ -304,6 +363,10 @@ describe('sales rep home (Bto300 shop window)', () => {
     // A store's cards differ (stock words, ♡); only the ids and totals are compared.
     const storeHome = (await store.api.get('/home').expect(200)).body as HomeJson;
     expect(keys(storeHome)).toContain('favourites');
+    // The store really has RECENT (its order of water); the rep's window still has none.
+    expect(section(storeHome, 'recent').products.map((own) => own.id)).toEqual([water.id]);
+    expect(home.sections.map((own) => own.kind)).not.toContain('RECENT');
+    expect(home.sections.map((own) => own.kind)).not.toContain('FAVOURITES');
     expect(keys(storeHome).filter((key) => key !== 'recent' && key !== 'favourites')).toEqual(
       order,
     );
@@ -352,6 +415,39 @@ describe('sales rep home (Bto300 shop window)', () => {
     for (const key of ['recent', 'favourites', 'popular']) {
       await http().get(`/api/v1/sales-rep/sections/${key}/products`).set(bearer(rep)).expect(404);
     }
+  });
+
+  it('refuses a cursor of another section, another sort or another day (422)', async () => {
+    const list = `/api/v1/sales-rep/sections/segment-${segmentId}/products`;
+    const first = await get<SectionPageJson>(`/sections/segment-${segmentId}/products?limit=1`);
+    const cursor = first.nextCursor ?? '';
+    expect(cursor).not.toBe('');
+    const fails = (path: string, query: Record<string, string>) =>
+      http().get(path).query(query).set(bearer(rep)).expect(422);
+    // Another section's key.
+    await fails('/api/v1/sales-rep/sections/discounts/products', { limit: '1', cursor });
+    // A DEFAULT-sort cursor with another sort.
+    await fails(list, { limit: '1', sort: 'DEAL', cursor });
+    // The same cursor with its day changed: a future, an impossible and a too old day.
+    const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(decoded.d).toBe(today);
+    const withDay = (d: string) =>
+      Buffer.from(JSON.stringify({ ...decoded, d }), 'utf8').toString('base64url');
+    for (const day of [addDays(today, 1), '2026-02-30', '2026-13-01', addDays(today, -2)]) {
+      await fails(list, { limit: '1', cursor: withDay(day) });
+    }
+    // A list opened just before midnight keeps its day: the previous business day still pages.
+    const yesterday = (
+      await http()
+        .get(list)
+        .query({ limit: '1', cursor: withDay(addDays(today, -1)) })
+        .set(bearer(rep))
+        .expect(200)
+    ).body as SectionPageJson;
+    expect(yesterday.data.map((own) => own.id)).toEqual([water.id]);
   });
 
   it('opens a category page with the rep card', async () => {

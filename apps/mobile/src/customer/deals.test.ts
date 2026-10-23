@@ -37,6 +37,14 @@ describe('discount programs on the cards (ADR-0092 #3, #7)', () => {
       old: null,
     });
   });
+
+  it('reads a product of an older server, without dealPrice, at its regular price', () => {
+    expect(cardPriceOf({ basePrice: '2100' })).toEqual({ price: '2100', old: null });
+    expect(cardPriceOf({ basePrice: '2100', dealPrice: undefined })).toEqual({
+      price: '2100',
+      old: null,
+    });
+  });
 });
 
 describe('the product page sentence', () => {

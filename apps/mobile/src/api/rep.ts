@@ -1,4 +1,5 @@
 import type { components } from '@tugeel/api-client';
+import type { HomeSectionSort } from '@tugeel/shared/sales';
 import {
   type InfiniteData,
   keepPreviousData,
@@ -10,7 +11,7 @@ import { canonical } from '../cart/send';
 import type { OrderFilterParams } from '../orders/order-filters';
 import type { ShopQuery } from '../shop/filters';
 import { useSignedIn } from '../state/session';
-import { unwrap } from './problem';
+import { ApiProblem, unwrap } from './problem';
 
 export type RepContext = components['schemas']['SalesRepContext'];
 export type RepWarehouse = components['schemas']['SalesRepWarehouse'];
@@ -25,6 +26,9 @@ export type RepOrderSummary = components['schemas']['SalesRepOrderSummary'];
 export type RepStoreOrder = components['schemas']['SalesRepStoreOrder'];
 export type Category = components['schemas']['Category'];
 export type Quote = components['schemas']['Quote'];
+export type RepHome = components['schemas']['SalesRepHome'];
+export type RepHomeSection = components['schemas']['SalesRepHomeSection'];
+export type RepCategoryPage = components['schemas']['SalesRepCategoryPage'];
 
 const PAGE = 30;
 
@@ -143,18 +147,122 @@ function isProductPages(data: unknown): data is InfiniteData<RepProductPage> {
   );
 }
 
-/** A product the shop's lists already hold (a grid page, a batch), so its page opens at once. */
+/** «Нүүр» and a category page hold their products in their sections. */
+function hasSections(data: unknown): data is { sections: RepHomeSection[] } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    Array.isArray((data as { sections?: unknown }).sections)
+  );
+}
+
+/**
+ * A product the shop's lists already hold (a grid page, a batch, a home or category section), so
+ * its page opens at once.
+ */
 export function cachedProduct(client: QueryClient, id: number): RepProduct | undefined {
   for (const [, data] of client.getQueriesData<unknown>({ queryKey: ['rep', 'products'] })) {
     const rows = Array.isArray(data)
       ? (data as RepProduct[])
       : isProductPages(data)
         ? data.pages.flatMap((page) => page.data)
-        : [];
+        : hasSections(data)
+          ? data.sections.flatMap((section) => section.products)
+          : [];
     const found = rows.find((product) => product.id === id);
     if (found) return found;
   }
   return undefined;
+}
+
+/**
+ * «Нүүр»'s shop window (ADR-0100 #9): the banners, the category tiles and the sections
+ * (promotions, the shown segments, discounts, new) with the rep's products. A server older than
+ * the shop window answers 404: the data is then null and «Нүүр» simply has no shop window.
+ */
+export function useRepHome() {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'products', 'home'],
+    queryFn: async (): Promise<RepHome | null> => {
+      try {
+        return unwrap(await session.client.GET('/api/v1/sales-rep/home'));
+      } catch (error) {
+        if (error instanceof ApiProblem && error.problem.status === 404) return null;
+        throw error;
+      }
+    },
+  });
+}
+
+/** What a section's full list asks for (as «Bto300»'s, ADR-0093 #6). */
+export interface RepSectionQuery {
+  sort: HomeSectionSort;
+  categoryIds: readonly number[];
+  inStock: boolean;
+}
+
+function sectionParams(query: RepSectionQuery) {
+  return {
+    ...(query.sort !== 'DEFAULT' ? { sort: query.sort } : {}),
+    ...(query.categoryIds.length > 0 ? { categoryIds: [...query.categoryIds] } : {}),
+    ...(query.inStock ? { inStock: true } : {}),
+  };
+}
+
+/** A section's full list page by page; the first page holds the total. */
+export function useRepSection(key: string, query: RepSectionQuery) {
+  const { session } = useSignedIn();
+  return useInfiniteQuery({
+    queryKey: ['rep', 'products', 'section', key, sectionParams(query)],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/sections/{key}/products', {
+          params: {
+            path: { key },
+            query: {
+              ...sectionParams(query),
+              ...(pageParam ? { cursor: pageParam } : {}),
+              limit: PAGE,
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many products a section's draft filters would show (the sheet's «N бараа харуулах»). */
+export function useRepSectionCount(key: string, query: RepSectionQuery, enabled: boolean) {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'products', 'section-count', key, sectionParams(query)],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/sections/{key}/products', {
+          params: { path: { key }, query: { ...sectionParams(query), limit: 1 } },
+        }),
+      ).total,
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** A category's page (as «Bto300»'s, ADR-0092 #6): its banners, subcategories, new and deals. */
+export function useRepCategoryPage(id: number | null) {
+  const { session } = useSignedIn();
+  return useQuery({
+    queryKey: ['rep', 'products', 'category', id],
+    queryFn: async () =>
+      unwrap(
+        await session.client.GET('/api/v1/sales-rep/categories/{id}/page', {
+          params: { path: { id: id ?? 0 } },
+        }),
+      ),
+    enabled: id !== null,
+  });
 }
 
 /** The main suppliers of the shop's products, the most products first. */

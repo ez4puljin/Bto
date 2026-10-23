@@ -15,13 +15,7 @@ import {
   type ProductIndexRow,
 } from '../../catalog';
 import type { CustomerContext } from '../../identity';
-import {
-  type DealBook,
-  PriceQuoteService,
-  type ProductDeal,
-  ProductDealsService,
-  type Quote,
-} from '../../pricing';
+import { type DealBook, PriceQuoteService, type ProductDeal, type Quote } from '../../pricing';
 import { type RepProduct, type RepShopProduct, SalesRepShopService } from '../../sales';
 import { customerFavourites } from '../schema';
 
@@ -95,12 +89,14 @@ export class CustomerShopService {
     private readonly categories: CategoriesService,
     private readonly barcodes: BarcodeService,
     private readonly quotes: PriceQuoteService,
-    private readonly deals: ProductDealsService,
   ) {}
 
-  /** The WHOLESALE programs in force today and the products they mark (one read per request). */
+  /**
+   * The WHOLESALE programs in force today and the products they mark (one read per request): the
+   * rep shop's book, so both apps' cards read one rule (ADR-0093, ADR-0100 #10).
+   */
   dealBook(today = businessDate()): Promise<DealBook> {
-    return this.deals.book('WHOLESALE', today);
+    return this.shop.dealBook(today);
   }
 
   /** The shop's universe in the NEW order (ADR-0093): every product «Bto300» lists. */

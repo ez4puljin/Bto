@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useStoreHome } from '../../src/api/customer';
+import { useCustomer } from '../../src/state/session';
 import { problemFrom } from '../../src/api/problem';
 import { CategoryTile } from '../../src/customer/home-parts';
 import { StoreHeader } from '../../src/ui/store-header';
@@ -17,6 +18,7 @@ export default function AllCategoriesScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const home = useStoreHome();
+  const { server } = useCustomer();
   const { width } = useWindowDimensions();
   const cell = (width - spacing.md * 2 - spacing.sm * 3) / 4;
   const categories = home.data?.categories ?? [];
@@ -37,7 +39,11 @@ export default function AllCategoriesScreen() {
         ItemSeparatorComponent={() => <View style={styles.rowGap} />}
         renderItem={({ item }) => (
           <View style={{ width: cell }}>
-            <CategoryTile category={item} onPress={() => router.push(`/category/${item.id}`)} />
+            <CategoryTile
+              category={item}
+              server={server}
+              onPress={() => router.push(`/category/${item.id}`)}
+            />
           </View>
         )}
         ListEmptyComponent={

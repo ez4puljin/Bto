@@ -40,7 +40,10 @@ export function toRepProductDto(product: RepShopProduct): SalesRepProductDto {
   };
 }
 
-/** The badge as «Bto300» sends it (the customer module's `dealDto`, which sales cannot import). */
+/**
+ * A program's badge on the wire, for both apps: the customer module's `dealDto` is this one
+ * (`CustomerAppDeal` has the same shape), so the rule lives here, where sales can reach it.
+ */
 export function toRepDealDto(deal: ProductDeal): SalesRepDealDto {
   return {
     kind: deal.kind,

@@ -8,7 +8,7 @@ import {
   type HomeSectionSort,
   RECENT_ORDER_DAYS,
 } from '@tugeel/shared/sales';
-import { addDays, businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
 import { AppError, notFound } from '../../../common/errors/app-error';
 import {
   DEFAULT_PAGE_LIMIT,
@@ -566,7 +566,11 @@ function earliestLastDay(shop: Shop, ids: readonly number[]): string | null {
   return earliest;
 }
 
-/** A section cursor: its key, sort and day, the last product shown and how many came before. */
+/**
+ * A section cursor: its key, sort and day, the last product shown and how many came before. The
+ * day is a real date, today or the Ulaanbaatar business day before it (a list opened just before
+ * midnight keeps its day); any other day, a future one included, is an invalid cursor.
+ */
 function cursorOf(
   cursor: string | undefined,
   key: string,
@@ -574,13 +578,17 @@ function cursorOf(
 ): { d: string; a: number; o: number } | null {
   const after = decodeCursor(cursor);
   if (!after) return null;
+  const today = businessDate();
   if (
     after.k !== key ||
     after.s !== sort ||
     typeof after.d !== 'string' ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(after.d) ||
+    !isIsoDate(after.d) ||
+    (after.d !== today && after.d !== addDays(today, -1)) ||
     typeof after.a !== 'number' ||
+    !Number.isSafeInteger(after.a) ||
     typeof after.o !== 'number' ||
+    !Number.isSafeInteger(after.o) ||
     after.o < 0
   ) {
     throw invalidCursor();

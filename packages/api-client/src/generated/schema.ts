@@ -11962,10 +11962,10 @@ export interface components {
             direction: "UP" | "DOWN";
         };
         SalesRepHomeSection: {
-            /** @description `recent`, `promotions`, `segment-<id>`, … — its full list’s key */
+            /** @description `promotions`, `segment-<id>`, `discounts`, `new`, `deals` — its full list’s key */
             key: string;
             /** @enum {string} */
-            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            kind: "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "DEALS";
             /** @description A segment’s name */
             title: string | null;
             /** @description A segment’s description */
@@ -11993,7 +11993,7 @@ export interface components {
         SalesRepSectionPage: {
             key: string;
             /** @enum {string} */
-            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            kind: "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "DEALS";
             title: string | null;
             subtitle: string | null;
             /** Format: date */

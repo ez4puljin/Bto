@@ -8,6 +8,7 @@ import { problemFrom } from '../../../src/api/problem';
 import {
   BannerCarousel,
   SectionRow,
+  StoreCard,
   SubcategoryTile,
   useCardActions,
 } from '../../../src/customer/home-parts';
@@ -68,7 +69,7 @@ export default function CategoryScreen() {
       >
         {data ? (
           <>
-            <BannerCarousel banners={data.banners} />
+            <BannerCarousel banners={data.banners} server={actions.server} />
 
             {data.subcategories.length > 0 ? (
               <>
@@ -78,7 +79,12 @@ export default function CategoryScreen() {
                   contentContainerStyle={styles.subs}
                 >
                   {data.subcategories.map((sub) => (
-                    <SubcategoryTile key={sub.id} category={sub} onPress={() => shop(sub.id)} />
+                    <SubcategoryTile
+                      key={sub.id}
+                      category={sub}
+                      server={actions.server}
+                      onPress={() => shop(sub.id)}
+                    />
                   ))}
                 </ScrollView>
               </>
@@ -89,7 +95,9 @@ export default function CategoryScreen() {
                 key={section.key}
                 section={section}
                 place="category"
-                actions={actions}
+                renderCard={(product, size) => (
+                  <StoreCard product={product} actions={actions} {...size} />
+                )}
                 onMore={() => router.push(sectionRouteOf(section.key, data.category.id))}
               />
             ))}

@@ -9,7 +9,7 @@ import {
   Sparkles,
   Tag,
 } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FlatList,
@@ -196,21 +196,38 @@ export function ListHeading({
 
 /** A home row's cards (the E-mart screens: 164 wide, a 146 px picture). */
 export const ROW_CARD_WIDTH = 164;
-const ROW_PICTURE = 146;
+export const ROW_PICTURE = 146;
+
+/** A row card's size, handed to the caller's card. */
+export interface RowCardSize {
+  width: number;
+  pictureHeight: number;
+}
+
+const ROW_CARD: RowCardSize = { width: ROW_CARD_WIDTH, pictureHeight: ROW_PICTURE };
+
+/** A section as a row shows it: «Bto300»'s and the rep app's (ADR-0100 #9) share the shape. */
+export interface RowSection<P> extends Pick<
+  StoreHomeSection,
+  'key' | 'kind' | 'title' | 'subtitle' | 'lastDay'
+> {
+  products: readonly P[];
+}
 
 /**
  * A section of «Нүүр» or a category page: its heading (with the section's icon on the home) and up
- * to 10 cards in a row.
+ * to 10 cards in a row. The app draws its own card (`renderCard`): «Bto300»'s with ♡, the rep's
+ * with its stock.
  */
-export function SectionRow({
+export function SectionRow<P extends { id: number }>({
   section,
   place = 'home',
-  actions,
+  renderCard,
   onMore,
 }: {
-  section: StoreHomeSection;
+  section: RowSection<P>;
   place?: SectionPlace;
-  actions: CardActions;
+  renderCard: (product: P, size: RowCardSize) => ReactElement;
   onMore: () => void;
 }) {
   const { t } = useTranslation();
@@ -232,14 +249,7 @@ export function SectionRow({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cards}
         initialNumToRender={3}
-        renderItem={({ item }) => (
-          <StoreCard
-            product={item}
-            actions={actions}
-            width={ROW_CARD_WIDTH}
-            pictureHeight={ROW_PICTURE}
-          />
-        )}
+        renderItem={({ item }) => renderCard(item, ROW_CARD)}
       />
     </View>
   );
@@ -248,12 +258,20 @@ export function SectionRow({
 /**
  * The banners (ADR-0092 #5), the screen's width edge to edge: 2:1 pictures one at a time, swiped or
  * moved on every five seconds (the owner, 2026-10-20) — never while a finger is on them; the dots
- * below choose one. A tap opens its link: a segment's list, a category's page or a product.
+ * below choose one. A tap opens its link (`targetOf`, by default a segment's list, a category's
+ * page or a product: both apps have those routes); `server` serves the pictures.
  */
-export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] }) {
+export function BannerCarousel({
+  banners,
+  server,
+  targetOf = (banner) => bannerTargetOf(banner.link),
+}: {
+  banners: readonly StoreBanner[];
+  server: string;
+  targetOf?: (banner: StoreBanner) => string | null;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { server } = useCustomer();
   const { width } = useWindowDimensions();
   const scroller = useRef<ScrollView>(null);
   const [slide, setSlide] = useState(0);
@@ -291,7 +309,7 @@ export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] })
         style={[styles.banners, { height: width / 2 }]}
       >
         {banners.map((banner) => {
-          const target = bannerTargetOf(banner.link);
+          const target = targetOf(banner);
           return (
             <Pressable
               key={banner.id}
@@ -347,14 +365,15 @@ export function BannerCarousel({ banners }: { banners: readonly StoreBanner[] })
 /** A category's picture: its own, or one of its products', or a box. */
 function CategoryPicture({
   category,
+  server,
   width,
   height,
 }: {
   category: Pick<StoreHomeCategory, 'imageUrl'>;
+  server: string;
   width: number;
   height: number;
 }) {
-  const { server } = useCustomer();
   return category.imageUrl ? (
     <Image
       source={{ uri: `${server}${category.imageUrl}` }}
@@ -371,9 +390,11 @@ function CategoryPicture({
 /** «Ангиллын жагсаалт»'s tile (the E-mart screens): the picture without a frame, the name under it. */
 export function CategoryTile({
   category,
+  server,
   onPress,
 }: {
   category: StoreHomeCategory;
+  server: string;
   onPress: () => void;
 }) {
   return (
@@ -383,7 +404,7 @@ export function CategoryTile({
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
     >
       <View style={styles.tilePicture}>
-        <CategoryPicture category={category} width={56} height={48} />
+        <CategoryPicture category={category} server={server} width={56} height={48} />
       </View>
       <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}
@@ -395,9 +416,11 @@ export function CategoryTile({
 /** A subcategory on a category's page: a larger picture and the name. */
 export function SubcategoryTile({
   category,
+  server,
   onPress,
 }: {
   category: StoreHomeCategory;
+  server: string;
   onPress: () => void;
 }) {
   return (
@@ -407,7 +430,7 @@ export function SubcategoryTile({
       style={({ pressed }) => [styles.sub, pressed && styles.pressed]}
     >
       <View style={styles.subPicture}>
-        <CategoryPicture category={category} width={80} height={72} />
+        <CategoryPicture category={category} server={server} width={80} height={72} />
       </View>
       <Text style={[storeType.tile, styles.center]} numberOfLines={2}>
         {category.name}

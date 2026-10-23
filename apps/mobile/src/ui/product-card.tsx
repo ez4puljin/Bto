@@ -1,9 +1,10 @@
 import { Decimal } from '@tugeel/shared/money';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { CardAdd, CardQty, NewBadge, StoreCardFrame } from './store-card-frame';
+import { CardAdd, CardQty, DealBadge, NewBadge, StoreCardFrame } from './store-card-frame';
 import type { RepProduct } from '../api/rep';
 import type { CartLine } from '../cart/cart';
+import { cardPriceOf } from '../customer/deals';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { type UnitWords, useUnitWords } from '../shop/unit-words';
@@ -69,9 +70,11 @@ export function usePriceParts() {
 
 /**
  * A product of the rep's grid and rows, drawn as «Bto300»'s card (ADR-0100 on ADR-0068 #3): the
- * pictures, «ШИНЭ», the name, the code with the pack, the base price, the stock count (red when
- * nothing is left or it cannot be ordered) and the cart's quantity or the cart. The card opens the
- * product; the cart adds one of its default unit, the quantity opens the product to change it.
+ * pictures, the badges (a program's label, «ШИНЭ»), the name, the code with the pack, the price per
+ * base unit (a deal price with the regular one struck through beside it, as «Bto300»'s card; the
+ * owner, 2026-10-23), the stock count (red when nothing is left or it cannot be ordered) and the
+ * cart's quantity or the cart. The card opens the product; the cart adds one of its default unit,
+ * the quantity opens the product to change it.
  */
 export function ProductCard({
   product,
@@ -97,8 +100,9 @@ export function ProductCard({
 }) {
   const { t } = useTranslation();
   const words = useUnitWords();
-  const priceParts = usePriceParts();
-  const price = priceParts(product);
+  const base = baseUnitOf(product.units);
+  const price = cardPriceOf(product);
+  const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
   const stock = useStockLine()(product);
   const pack = packTextOf(product.units, words, t);
   return (
@@ -111,9 +115,27 @@ export function ProductCard({
       onOpen={onOpen}
       {...(width !== undefined ? { width } : {})}
       {...(pictureHeight !== undefined ? { pictureHeight } : {})}
-      badges={product.isNew ? <NewBadge /> : null}
+      badges={
+        <>
+          {product.deal ? <DealBadge deal={product.deal} /> : null}
+          {product.isNew ? <NewBadge /> : null}
+        </>
+      }
       line={pack ? `${product.sku} · ${pack}` : product.sku}
-      price={price ? { price: price.price, per: price.per } : null}
+      price={
+        price
+          ? {
+              price: money(price.price),
+              per: base ? t('mobile.shop.per', { unit: words(base).short }) : null,
+              old: price.old
+                ? {
+                    text: money(price.old),
+                    label: t('mobile.customer.card.oldPrice', { price: money(price.old) }),
+                  }
+                : null,
+            }
+          : null
+      }
       noPrice={t('mobile.shop.noPrice')}
       stock={{
         text: stock.count,

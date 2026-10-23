@@ -1,11 +1,13 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { parseHomeSectionKey } from '@tugeel/shared/sales';
+import { type HomeSectionKind, parseHomeSectionKey } from '@tugeel/shared/sales';
 import { AppError } from '../../../common/errors/app-error';
 import { RequirePermission } from '../../identity';
 import { type RepShopProduct, toRepProductDto } from '../../sales';
 import { CustomerAppSectionQueryDto } from '../dto/customer-home.dto';
 import {
+  isRepHomeSectionKind,
+  type RepHomeSectionKind,
   SalesRepCategoryPageDto,
   SalesRepHomeDto,
   SalesRepHomeSectionDto,
@@ -16,9 +18,15 @@ import { CustomerHomeService, type HomeSection } from '../services/customer-home
 /** The rep app's right (sales' REP, not exported from sales; packages/shared/src/auth). */
 const REP = 'sales.orders.rep';
 
+/** A rep window's section kind; the service never builds RECENT or FAVOURITES for a rep. */
+function repKindOf(kind: HomeSectionKind): RepHomeSectionKind {
+  if (isRepHomeSectionKind(kind)) return kind;
+  throw new Error(`a store's own section on the rep home: ${kind}`);
+}
+
 const sectionDto = (section: HomeSection<RepShopProduct>): SalesRepHomeSectionDto => ({
   key: section.key,
-  kind: section.kind,
+  kind: repKindOf(section.kind),
   title: section.title,
   subtitle: section.subtitle,
   lastDay: section.lastDay,
@@ -62,7 +70,7 @@ export class SalesRepHomeController {
     const parsed = parseHomeSectionKey(key.slice(0, 40));
     if (!parsed) throw new AppError('NOT_FOUND', 'no such section', { key: key.slice(0, 40) });
     const page = await this.home.repSectionPage(parsed, query);
-    return { ...page, data: page.data.map(toRepProductDto) };
+    return { ...page, kind: repKindOf(page.kind), data: page.data.map(toRepProductDto) };
   }
 
   /** A category's page: its banners, subcategories, new products and deals of its subtree. */

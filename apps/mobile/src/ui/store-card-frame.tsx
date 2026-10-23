@@ -2,6 +2,7 @@ import { ShoppingCart } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { dealToneOf } from '../customer/deals';
 import { colors, spacing, storeType, tabular } from '../theme/tokens';
 import { CardPictures } from './card-pictures';
 import { Text } from './text';
@@ -124,6 +125,24 @@ export function StoreCardFrame({
   );
 }
 
+/**
+ * A discount program's badge under a card's picture (ADR-0092 #7; the rep's cards since ADR-0100):
+ * a promotion orange, a discount red; the server writes the label.
+ */
+export function DealBadge({ deal }: { deal: { kind: 'PROMOTION' | 'DISCOUNT'; label: string } }) {
+  const promotion = dealToneOf(deal.kind) === 'promotion';
+  return (
+    <View style={[styles.dealBadge, promotion ? styles.promotion : styles.discount]}>
+      <Text
+        style={[storeType.badge, promotion ? styles.promotionText : styles.discountText]}
+        numberOfLines={1}
+      >
+        {deal.label}
+      </Text>
+    </View>
+  );
+}
+
 /** «ШИНЭ» in blue under a card's picture. */
 export function NewBadge() {
   const { t } = useTranslation();
@@ -212,6 +231,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.newBadge,
   },
   newText: { textTransform: 'uppercase' },
+  dealBadge: {
+    height: 20,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 10,
+    justifyContent: 'center',
+    flexShrink: 1,
+  },
+  promotion: { backgroundColor: colors.dealPromotion },
+  promotionText: { color: colors.foreground },
+  discount: { backgroundColor: colors.dealDiscount },
+  discountText: { color: colors.primaryForeground },
   add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
   qty: {
     height: 24,

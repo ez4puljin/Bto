@@ -1,26 +1,44 @@
 import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
-import { Bell, ScanBarcode, Send, ShoppingCart, TriangleAlert } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { Bell, ScanLine, Send, ShoppingCart, TriangleAlert } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Text } from '../../../src/ui/text';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
-import { useOrders, useProducts, useRepContext, useRepMap } from '../../../src/api/rep';
+import {
+  type RepHome,
+  useOrders,
+  useRepContext,
+  useRepHome,
+  useRepMap,
+} from '../../../src/api/rep';
 import { lineOf } from '../../../src/cart/cart';
-import { ListHeading, ROW_CARD_WIDTH } from '../../../src/customer/home-parts';
+import {
+  BannerCarousel,
+  CategoryTile,
+  ListHeading,
+  SectionRow,
+  useSectionText,
+} from '../../../src/customer/home-parts';
+import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
 import { presetRange } from '../../../src/dates/calendar';
 import { formatMillions, formatMnt, initialsOf } from '../../../src/format/format';
-import { dateLineOf, givenNameOf, newProductsOf } from '../../../src/home/home';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
-import { EMPTY_FILTERS } from '../../../src/shop/filters';
 import { useAddOne } from '../../../src/shop/use-add';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts, spacing, storeType, tabular, type } from '../../../src/theme/tokens';
+import { colors, fonts, spacing, storeType, tabular, TOUCH, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
@@ -31,16 +49,17 @@ import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header'
 import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
 const RECENT = 3;
-/** A row's card, as on «Bto300»'s home (ADR-0095 #7). */
-const ROW_PICTURE = 146;
-const CARD_GAP = 10;
+
+type HomeCategory = RepHome['categories'][number];
 
 /**
- * «Нүүр» (ADR-0068, in «Bto300»'s look since ADR-0100): the blue header with «Bto», who is signed
- * in and the day, the scanner, the bell and the initials (to «Профайл»); then upper-case sections
- * with ›: this month's orders, the cart when it has lines, the stage new orders land on, the store
- * map, the newest products as a row of cards and the last orders. No search by name or code here
- * (the owner 2026-10-18: «Бараа» searches).
+ * «Нүүр» (ADR-0068; «Bto300»'s shop window on top since ADR-0100 #9): the blue header with «Bto»,
+ * the search field (it opens «Бараа» searching), the scanner, the bell and the initials (to
+ * «Профайл»), and the upper-case links (categories, discounts, new, the map, the orders); the
+ * banners edge to edge; «АНГИЛЛЫН ЖАГСААЛТ ›» with 4×2 pictures; the sections (promotions, the
+ * shown segments, discounts, new) as rows of the rep's cards. Below them the rep's own blocks with
+ * ›: this month's orders, the cart when it has lines, the stage new orders land on, the store map
+ * and the last orders.
  */
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -48,11 +67,13 @@ export default function HomeScreen() {
   const inset = useStoreTabBarInset();
   const { me, server } = useSignedIn();
   const { cart, pending, stageId, setStageId, ready } = useShop();
-  const unread = useNotificationSummary().data?.unread ?? 0;
+  const notifications = useNotificationSummary();
+  const unread = notifications.data?.unread ?? 0;
   const context = useRepContext();
   const today = context.data?.today ?? null;
   const orders = useOrders(today ? { ...presetRange('month', today), q: '' } : null);
-  const products = useProducts({ ...EMPTY_FILTERS, q: '' });
+  const home = useRepHome();
+  const sectionText = useSectionText();
   const add = useAddOne();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -66,19 +87,52 @@ export default function HomeScreen() {
   const firstPage = orders.data?.pages[0];
   const summary = firstPage?.summary ?? null;
   const recent = firstPage?.data.slice(0, RECENT) ?? [];
-  const fresh = useMemo(() => newProductsOf(products.data?.pages[0]?.data ?? []), [products.data]);
   const place = context.data ? placeOf(context.data, stageId) : null;
   const stageKnown = ready && context.data !== undefined;
   const monthLoading = !summary && !orders.error && !context.error;
 
-  const date = today ? dateLineOf(today) : null;
-  const dateLine = date
-    ? t('mobile.home.dateLong', {
-        weekday: t(`mobile.weekdaysLong.${date.weekday}`),
-        month: date.month,
-        day: date.day,
-      })
-    : ' ';
+  // Null when the server is older than the shop window (404): «Нүүр» then has none, quietly.
+  const shopWindow = home.data ?? null;
+  const sections = shopWindow?.sections ?? [];
+  // The links under the search: the categories (once the shop window is there: their page reads
+  // it), the discounts and the new products (when the home has them), the store map and the orders.
+  const deals = sections.find(
+    (section) => section.kind === 'DISCOUNTS' || section.kind === 'DEALS',
+  );
+  const fresh = sections.find((section) => section.kind === 'NEW');
+  const links: { key: string; label: string; onPress: () => void }[] = [
+    ...(shopWindow
+      ? [
+          {
+            key: 'categories',
+            label: t('mobile.filter.categories'),
+            onPress: () => router.push('/categories'),
+          },
+        ]
+      : []),
+    ...[deals, fresh].flatMap((section) =>
+      section
+        ? [
+            {
+              key: section.key,
+              label: sectionText(section).title,
+              onPress: () => router.push(sectionRouteOf(section.key)),
+            },
+          ]
+        : [],
+    ),
+    { key: 'map', label: t('mobile.map.title'), onPress: () => router.push('/map') },
+    { key: 'orders', label: t('mobile.tabs.orders'), onPress: () => router.navigate('/orders') },
+  ];
+
+  // Four tiles a row; the last row keeps its tiles at their place.
+  const categories = homeCategoriesOf(shopWindow?.categories ?? []);
+  const tileRows: (HomeCategory | null)[][] = [];
+  for (let at = 0; at < categories.length; at += 4) {
+    const row: (HomeCategory | null)[] = categories.slice(at, at + 4);
+    while (row.length < 4) row.push(null);
+    tileRows.push(row);
+  }
   const millions = summary ? formatMillions(summary.total) : null;
   const total = summary
     ? millions
@@ -118,9 +172,10 @@ export default function HomeScreen() {
     try {
       await Promise.all([
         context.refetch(),
+        home.refetch(),
         orders.refetch(),
-        products.refetch(),
         storeMap.refetch(),
+        notifications.refetch(),
       ]);
     } finally {
       setRefreshing(false);
@@ -140,14 +195,30 @@ export default function HomeScreen() {
     <Page white edges={[]}>
       <StoreHeaderBand>
         <View style={styles.bar}>
-          <Text accessibilityRole="header" style={[storeType.wordmark, styles.grow]}>
+          <Text accessibilityRole="header" style={storeType.wordmark}>
             {t('app.name')}
           </Text>
-          <HeaderIconButton
-            icon={<ScanBarcode size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
-            label={t('mobile.scan.title')}
-            onPress={() => router.push('/scan')}
-          />
+          <View style={styles.search}>
+            <Pressable
+              accessibilityRole="search"
+              accessibilityLabel={t('mobile.shop.searchLabel')}
+              onPress={() => router.navigate({ pathname: '/shop', params: { search: '1' } })}
+              style={styles.searchText}
+            >
+              <Text style={storeType.search} numberOfLines={1}>
+                {t('mobile.customer.home.search')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.scan.title')}
+              onPress={() => router.push('/scan')}
+              hitSlop={6}
+              style={styles.searchScan}
+            >
+              <ScanLine size={19} strokeWidth={1.8} color={colors.label2} />
+            </Pressable>
+          </View>
           <HeaderIconButton
             icon={<Bell size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
             label={
@@ -168,20 +239,86 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
           </Pressable>
         </View>
-        <View style={styles.hello}>
-          <Text style={storeType.headerTitle} numberOfLines={1}>
-            {t('mobile.home.hello', { name: givenNameOf(me.fullName) || me.username })}
-          </Text>
-          <Text style={[storeType.search, styles.onMuted]} numberOfLines={1}>
-            {dateLine}
-          </Text>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          accessibilityLabel={t('mobile.customer.home.quickLinks')}
+          contentContainerStyle={styles.links}
+        >
+          {links.map((link) => (
+            <Pressable key={link.key} accessibilityRole="link" onPress={link.onPress} hitSlop={8}>
+              <Text style={[storeType.headerLink, styles.upper]} numberOfLines={1}>
+                {link.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </StoreHeaderBand>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: inset + spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
+        {shopWindow ? <BannerCarousel banners={shopWindow.banners} server={server} /> : null}
+
+        {tileRows.length > 0 ? (
+          <>
+            <View style={styles.categoriesHead}>
+              <ListHeading
+                big
+                title={t('mobile.customer.home.categories')}
+                label={t('mobile.customer.home.allCategories')}
+                onPress={() => router.push('/categories')}
+              />
+            </View>
+            <View style={styles.grid}>
+              {tileRows.map((row, index) => (
+                <View key={index} style={styles.gridRow}>
+                  {row.map((category, at) =>
+                    category ? (
+                      <CategoryTile
+                        key={category.id}
+                        category={category}
+                        server={server}
+                        onPress={() => router.push(`/category/${category.id}`)}
+                      />
+                    ) : (
+                      <View key={`empty-${at}`} style={styles.grow} />
+                    ),
+                  )}
+                </View>
+              ))}
+            </View>
+            <View style={styles.divider} />
+          </>
+        ) : null}
+
+        {sections.map((section) => (
+          <SectionRow
+            key={section.key}
+            section={section}
+            renderCard={(product, size) => (
+              <ProductCard
+                product={product}
+                server={server}
+                line={lineOf(cart, product.id)}
+                locked={pending !== null}
+                onOpen={() => router.push(`/product/${product.id}`)}
+                onAdd={() => add(product)}
+                {...size}
+              />
+            )}
+            onMore={() => router.push(sectionRouteOf(section.key))}
+          />
+        ))}
+
+        {home.isLoading ? (
+          <ActivityIndicator style={styles.loading} color={colors.primary} />
+        ) : home.error && !shopWindow ? (
+          <ProblemText problem={problemFrom(home.error)} style={styles.homeProblem} />
+        ) : null}
+        {sections.length > 0 ? <View style={styles.divider} /> : null}
+
         <View style={styles.section}>
           {heading(t('mobile.home.month'), () => router.navigate('/orders'))}
           <Pressable
@@ -302,38 +439,6 @@ export default function HomeScreen() {
           {heading(t('mobile.map.title'), () => router.push('/map'), mapLine)}
         </View>
 
-        {products.isLoading || fresh.length > 0 ? (
-          <View style={styles.section}>
-            <ListHeading
-              title={t('mobile.home.newProducts')}
-              icon={{ icon: 'sparkles', tone: 'new' }}
-              label={t('mobile.customer.home.seeAll', { title: t('mobile.home.newProducts') })}
-              onPress={() => router.navigate('/shop')}
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cards}
-            >
-              {products.isLoading
-                ? [0, 1, 2].map((index) => <View key={index} style={styles.cardSkeleton} />)
-                : fresh.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      server={server}
-                      line={lineOf(cart, product.id)}
-                      locked={pending !== null}
-                      onOpen={() => router.push(`/product/${product.id}`)}
-                      onAdd={() => add(product)}
-                      width={ROW_CARD_WIDTH}
-                      pictureHeight={ROW_PICTURE}
-                    />
-                  ))}
-            </ScrollView>
-          </View>
-        ) : null}
-
         <View style={styles.section}>
           <ListHeading
             title={t('mobile.home.recent')}
@@ -371,27 +476,45 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   center: { textAlign: 'center' },
   mutedText: { color: colors.muted },
+  upper: { textTransform: 'uppercase' },
   pressed: { opacity: 0.7 },
-  onMuted: { color: colors.onPrimaryMuted },
+  // «Bto300»'s header bar and search pill (ADR-0100 #9).
   bar: {
     height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 6,
     paddingLeft: 14,
     paddingRight: spacing.sm,
   },
+  search: {
+    flex: 1,
+    minWidth: 0,
+    height: 34,
+    marginLeft: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 17,
+    backgroundColor: colors.card,
+  },
+  searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
+  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
   avatar: {
     width: 30,
     height: 30,
-    marginLeft: 6,
     borderRadius: 15,
     backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
-  hello: { gap: 1, paddingTop: 2, paddingBottom: 12, paddingHorizontal: 14 },
+  links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
+  categoriesHead: { paddingTop: 12 },
+  grid: { gap: 12, paddingHorizontal: 6 },
+  gridRow: { flexDirection: 'row', gap: spacing.xs },
+  divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
+  loading: { marginTop: spacing.xl },
+  homeProblem: { marginTop: spacing.lg, marginHorizontal: 14 },
   section: { paddingTop: 18 },
   // «Bto300»'s white panel with a hairline and 10 px corners (ADR-0095 #4).
   panel: {
@@ -437,13 +560,6 @@ const styles = StyleSheet.create({
   },
   cartButton: { paddingHorizontal: 14 },
   stageWarning: { backgroundColor: colors.warningSoft },
-  cards: { gap: CARD_GAP, paddingHorizontal: 14, paddingBottom: spacing.xs },
-  cardSkeleton: {
-    width: ROW_CARD_WIDTH,
-    height: ROW_PICTURE + 120,
-    borderRadius: 10,
-    backgroundColor: colors.fill,
-  },
   empty: { padding: 20 },
   problem: { marginTop: 0, marginHorizontal: 14 },
 });
