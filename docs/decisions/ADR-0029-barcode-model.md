@@ -6,6 +6,7 @@
 | Date | 2026-10-11 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0008 #1 (`barcode_type` on `product_units`) |
+| Amended by | ADR-0098 #6 (2026-10-22): a numeric code of GTIN length with a wrong check digit is kept as printed and found by that code; only the phone camera still ignores such a read |
 
 ## Context
 

@@ -143,15 +143,44 @@ describe('products: create, update, list (SPEC §5.2)', () => {
         name: 'Буруу',
         categoryId: drinks,
         baseUomId: pcs,
-        baseBarcodes: ['4006381333932'],
+        baseBarcodes: ['40063 81333 9Ж'],
       })
       .expect(422);
     expect(wrong.body).toMatchObject({
       code: 'BARCODE_INVALID',
-      params: { problem: 'CHECK_DIGIT' },
+      params: { problem: 'CHARACTERS' },
     });
     const { rowCount } = await sql.query(`SELECT 1 FROM products WHERE sku = '20001'`);
     expect(rowCount).toBe(0);
+  });
+
+  it('keeps a code of GTIN length with a wrong check digit as printed (ADR-0098 #6)', async () => {
+    await http()
+      .post('/api/v1/products')
+      .set(bearer(admin))
+      .send({
+        sku: '20002',
+        name: 'Хуучин шошго',
+        categoryId: drinks,
+        baseUomId: pcs,
+        baseBarcodes: ['4006381333932'],
+      })
+      .expect(201);
+    const { rows } = await sql.query(
+      `SELECT b.code, b.gtin14, b.lookup_key, b.barcode_type FROM product_barcodes b
+         JOIN product_units u ON u.id = b.product_unit_id
+         JOIN products p ON p.id = u.product_id WHERE p.sku = '20002'`,
+    );
+    expect(rows).toEqual([
+      {
+        code: '4006381333932',
+        gtin14: null,
+        lookup_key: '4006381333932',
+        barcode_type: 'UNDEFINED',
+      },
+    ]);
+    const found = await http().get('/api/v1/barcodes/4006381333932').set(bearer(admin)).expect(200);
+    expect(found.body).toMatchObject({ product: { sku: '20002' } });
   });
 
   it('keeps conversions exact: whole factors for pieces, three decimals for kilograms', async () => {

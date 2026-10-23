@@ -58,7 +58,7 @@ describe('barcode lookup', () => {
     await resolve('codes/with?odd#chars').expect(404);
   });
 
-  it('answers the new unit after a supersede, 404 for unknown codes and 422 for typos', async () => {
+  it('answers the new unit after a supersede, 404 for unknown codes and 422 for unreadable ones', async () => {
     const product = await api.product({
       sku: '60002',
       name: 'Хайрцаг солигдох',
@@ -78,7 +78,9 @@ describe('barcode lookup', () => {
       factorToBase: '20',
     });
     await resolve('UNKNOWN-1').expect(404);
-    expect((await resolve('4006381333932').expect(422)).body).toMatchObject({
+    // A wrong check digit is an ordinary code since ADR-0098 #6: unknown here, so 404.
+    await resolve('4006381333932').expect(404);
+    expect((await resolve('АВ123').expect(422)).body).toMatchObject({
       code: 'BARCODE_INVALID',
     });
   });

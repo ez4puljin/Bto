@@ -1,0 +1,45 @@
+{
+  "$comment": "The owner's decisions for the Erxes product master (ADR-0098, 2026-10-22). Names only, no product data.",
+  "sheet": "Нэгтгэл",
+  "skipCategories": ["Хархорин Боломж"],
+  "topGroups": {
+    "1": "Шингэн Бүтээгдэхүүн",
+    "2": "Амттан",
+    "3": "Сүүн сүүн бүтээгдэхүүн",
+    "4": "Амтлагч, соус, тос",
+    "5": "Гэр ахуй & Хувийн арчилгаа",
+    "6": "Лаазалсан, чанамал",
+    "7": "Гурил,будаа,гоймон",
+    "8": "Цай Кофе",
+    "9": "Төрөл бүрийн бараа"
+  },
+  "unnumberedInto": {
+    "Хүүхдийн Бүтээгдэхүүн": "9",
+    "Эрэгтэй эмэгтэй бээлий": "9"
+  },
+  "directInTopGroup": "Ангилаагүй",
+  "branch": { "code": "MAIN", "name": "Оргил Бөөний төв" },
+  "warehouses": [
+    { "tag": "Жижиглэн агуулах", "code": "WH1", "name": "Жижиглэн агуулах" },
+    { "tag": "Зааланд ирдэг", "code": "WH2", "name": "Зааланд ирдэг" },
+    { "tag": "Бөөний агуулах", "code": "WH3", "name": "Бөөний агуулах" },
+    { "tag": "Гэрээт компани", "code": "WH4", "name": "Гэрээт компани" },
+    { "tag": "Тоглоом", "code": "WH5", "name": "Тоглоом" },
+    { "tag": "Архи Ус ундаа пиво", "code": "WH6", "name": "Архи Ус ундаа пиво" },
+    { "tag": "Жижиглэн Архи", "code": "WH7", "name": "Жижиглэн Архи" },
+    { "tag": "Хөргүүр (Агуулах)", "code": "WH8", "name": "Хөргүүр (Агуулах)" }
+  ],
+  "store": { "code": "S1", "name": "Супермаркет" },
+  "settings": {
+    "company.vat_payer": true,
+    "company.city_tax_payer": false,
+    "tax.vat_rate_pct": "10"
+  },
+  "priceProfile": {
+    "name": "Үндсэн",
+    "looseMarkupPct": "0",
+    "retailMarkupPct": "0",
+    "rounding": "WHOLE"
+  },
+  "boxUnitName": "хайрцаг"
+}
