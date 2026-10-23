@@ -207,3 +207,132 @@ export const POS_SETTINGS: Schemas['PosSettings'] = {
   supervisorRequired: true,
   updatedAt: STAMP,
 };
+
+/** A void approved by a supervisor (ADR-0104). */
+export const VOID_ROW: Schemas['PosVoid'] = {
+  id: 81,
+  clientId: '7b0c2a9e-4f1d-4b8e-9a51-0d3c6e2f1a77',
+  tillId: 11,
+  tillCode: 'К1',
+  shiftId: 21,
+  shiftNumber: 'К1-261016-Э1',
+  cashierUserId: 7,
+  cashierName: 'Кассчин Болор',
+  approvedBy: 4,
+  approvedByName: 'Ахлах Сүрэн',
+  reason: 'LINE_REMOVED',
+  voidedAt: STAMP,
+  total: '7000.00',
+  lineCount: 1,
+};
+
+export const VOID: Schemas['PosVoidDetail'] = {
+  ...VOID_ROW,
+  lines: [
+    {
+      lineNo: 1,
+      productId: 8,
+      productUnitId: 80,
+      productSku: '10024',
+      productName: 'Спрайт 1.5 л',
+      uomName: 'ш',
+      qty: '2',
+      unitPrice: '3500.00',
+      total: '7000.00',
+    },
+  ],
+};
+
+export const QUICK_GROUPS: Schemas['PosQuickGroup'][] = [
+  {
+    id: 1,
+    name: 'Ундаа',
+    buttons: [
+      {
+        productUnitId: 70,
+        productId: 7,
+        productSku: '10023',
+        productName: 'Кока кола',
+        uomName: 'ш',
+        label: 'Кола',
+        sellable: true,
+      },
+      {
+        productUnitId: 80,
+        productId: 8,
+        productSku: '10024',
+        productName: 'Спрайт 1.5 л',
+        uomName: 'ш',
+        label: null,
+        sellable: false,
+      },
+    ],
+  },
+  { id: 2, name: 'Талх', buttons: [] },
+];
+
+/** A product sold by the piece and by the box of 12: its pick offers both units. */
+export const JUICE: Schemas['ProductDetail'] = {
+  id: 9,
+  sku: '10031',
+  name: 'Жүүс 1 л',
+  categoryId: 12,
+  vatType: 'VAT_ABLE',
+  cityTax: null,
+  classificationCode: null,
+  taxProductCode: null,
+  status: 'ACTIVE',
+  saleReadyAt: STAMP,
+  tracksLots: false,
+  weightKg: null,
+  createdAt: STAMP,
+  updatedAt: STAMP,
+  units: [
+    {
+      id: 90,
+      uomId: 1,
+      uomName: 'ш',
+      uomCode: null,
+      fractional: false,
+      factorToBase: '1',
+      isBase: true,
+      isDefaultSales: true,
+      isDefaultPurchase: false,
+      measureUnit: null,
+      effectiveMeasureUnit: null,
+      supersededBy: null,
+      supersededAt: null,
+      barcodes: [],
+    },
+    {
+      id: 91,
+      uomId: 2,
+      uomName: 'хайрцаг',
+      uomCode: null,
+      fractional: false,
+      factorToBase: '12',
+      isBase: false,
+      isDefaultSales: false,
+      isDefaultPurchase: true,
+      measureUnit: null,
+      effectiveMeasureUnit: null,
+      supersededBy: null,
+      supersededAt: null,
+      barcodes: [],
+    },
+  ],
+  images: [],
+};
+
+export const JUICE_SUMMARY: Schemas['ProductSummary'] = {
+  id: 9,
+  sku: '10031',
+  name: 'Жүүс 1 л',
+  categoryId: 12,
+  status: 'ACTIVE',
+  saleReadyAt: STAMP,
+  vatType: 'VAT_ABLE',
+  cityTax: null,
+  baseUnit: { id: 90, uomId: 1, uomName: 'ш' },
+  thumbUrl: null,
+};

@@ -8,12 +8,17 @@ import { findSidebar, json, renderApp, signedIn } from '@/test/render-app';
 import {
   CASHIER,
   HANDED_OVER,
+  JUICE,
+  JUICE_SUMMARY,
   NODE,
   POS_SETTINGS,
+  QUICK_GROUPS,
   SALE,
   SALE_ROW,
   SHIFT,
   TILL,
+  VOID,
+  VOID_ROW,
 } from './pos-fixtures';
 
 const routes = () => ({
@@ -25,6 +30,10 @@ const routes = () => ({
   'GET /api/v1/pos/shifts/21': () => json(SHIFT),
   'GET /api/v1/pos/sales': () => json({ data: [SALE_ROW], nextCursor: null, total: 1 }),
   'GET /api/v1/pos/sales/51': () => json(SALE),
+  'GET /api/v1/pos/voids': () =>
+    json({ data: [VOID_ROW], nextCursor: null, total: 1, sum: '7000.00' }),
+  'GET /api/v1/pos/voids/81': () => json(VOID),
+  'GET /api/v1/pos/quick-buttons': () => json(QUICK_GROUPS),
   'GET /api/v1/pos/attention': () =>
     json({ openShifts: 0, shiftsToHandOver: 2, openShortfalls: 1, rejections: 0 }),
   'GET /api/v1/money-accounts': () => json([CASH_BOX]),
@@ -45,6 +54,14 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     expect(sidebar.getByRole('link', { name: mn.nav.posShifts })).toHaveAttribute(
       'href',
       '/pos/shifts',
+    );
+    expect(sidebar.getByRole('link', { name: mn.nav.posVoids })).toHaveAttribute(
+      'href',
+      '/pos/voids',
+    );
+    expect(sidebar.getByRole('link', { name: mn.nav.posQuickButtons })).toHaveAttribute(
+      'href',
+      '/pos/quick-buttons',
     );
   });
 
@@ -271,5 +288,108 @@ describe('supermarket pages (ADR-0063 #8)', () => {
       supervisorRequired: true,
     });
     expect(await screen.findByText(mn.pos.settings.saved)).toBeInTheDocument();
+  });
+
+  it('lists the voids with their count and sum and opens one with its lines', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ACCOUNTANT_ME, routes());
+    renderApp('/pos/voids', fetchMock);
+    const row = await screen.findByRole('row', { name: /Ахлах Сүрэн/ });
+    expect(within(row).getByText(mn.pos.voidReasons.LINE_REMOVED)).toBeInTheDocument();
+    expect(within(row).getByText('7,000₮')).toBeInTheDocument();
+    expect(
+      screen.getByText(`${mn.pos.voids.count.replace('{{count}}', '1')} · 7,000₮`),
+    ).toBeInTheDocument();
+    // The time is the row's link to its panel, for the keyboard.
+    const link = within(row).getAllByRole('link')[0]!;
+    expect(link).toHaveAttribute('href', '/pos/voids?void=81');
+    await user.click(link);
+    const panel = within(
+      await screen.findByRole('dialog', {
+        name: mn.pos.voids.panelTitle.replace('{{till}}', 'К1'),
+      }),
+    );
+    expect(panel.getByText('Спрайт 1.5 л')).toBeInTheDocument();
+    expect(panel.getByText('3,500₮')).toBeInTheDocument();
+    expect(panel.getByText('Ахлах Сүрэн')).toBeInTheDocument();
+    expect(panel.getByRole('link', { name: 'К1-261016-Э1' })).toHaveAttribute(
+      'href',
+      '/pos/shifts?shift=21',
+    );
+    await user.keyboard('{Escape}');
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: mn.pos.fields.reason }),
+      'CART_CANCELLED',
+    );
+    await waitFor(() =>
+      expect(
+        new URL(calls(fetchMock, 'GET', '/api/v1/pos/voids').at(-1)!.url).searchParams.get(
+          'reason',
+        ),
+      ).toBe('CART_CANCELLED'),
+    );
+  });
+
+  it('lets a manager reorder, label and add quick buttons and saves the whole set in order', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(undefined, {
+      ...routes(),
+      'GET /api/v1/products': () => list([JUICE_SUMMARY]),
+      'GET /api/v1/products/9': () => json(JUICE),
+      'PUT /api/v1/pos/quick-buttons': () => json(QUICK_GROUPS),
+    });
+    renderApp('/pos/quick-buttons', fetchMock);
+    const drinks = within(await screen.findByRole('region', { name: 'Ундаа' }));
+    // A button the till can no longer sell says so.
+    expect(
+      within(drinks.getByRole('row', { name: /Спрайт/ })).getByText(
+        mn.pos.quickButtons.notSellable,
+      ),
+    ).toBeInTheDocument();
+    await user.click(
+      drinks.getByRole('button', { name: `${mn.pos.quickButtons.moveUp}: Спрайт 1.5 л (ш)` }),
+    );
+    await user.type(
+      drinks.getByRole('textbox', { name: `${mn.pos.fields.buttonLabel}: Спрайт 1.5 л (ш)` }),
+      'Спрайт',
+    );
+    await user.click(screen.getByRole('button', { name: `${mn.pos.quickButtons.moveUp}: Талх` }));
+    // A product with two units asks which one the button sells.
+    const bread = within(screen.getByRole('region', { name: 'Талх' }));
+    await user.type(bread.getByLabelText(`${mn.pos.quickButtons.addProduct}: Талх`), 'Жүүс');
+    await user.click(
+      await screen.findByRole('button', { name: `${mn.pos.quickButtons.addProduct}: Жүүс 1 л` }),
+    );
+    await user.click(await bread.findByRole('button', { name: '1 хайрцаг = 12 ш' }));
+    expect(bread.getByRole('row', { name: /Жүүс 1 л/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/pos/quick-buttons')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/pos/quick-buttons')[0])).toEqual({
+      groups: [
+        { name: 'Талх', buttons: [{ productUnitId: 91, label: null }] },
+        {
+          name: 'Ундаа',
+          buttons: [
+            { productUnitId: 80, label: 'Спрайт' },
+            { productUnitId: 70, label: 'Кола' },
+          ],
+        },
+      ],
+    });
+    expect(await screen.findByText(mn.pos.quickButtons.saved)).toBeInTheDocument();
+  });
+
+  it('shows the quick buttons read-only without pos.manage', async () => {
+    renderApp('/pos/quick-buttons', signedIn(ACCOUNTANT_ME, routes()));
+    const drinks = within(await screen.findByRole('region', { name: 'Ундаа' }));
+    expect(drinks.getByText('Кола')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.common.save })).toBeNull();
+    expect(screen.queryByRole('button', { name: mn.pos.quickButtons.addGroup })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: `${mn.pos.quickButtons.removeGroup}: Ундаа` }),
+    ).toBeNull();
   });
 });

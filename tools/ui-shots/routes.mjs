@@ -27,6 +27,7 @@ export const DISCOVER = {
   entry: ['/api/v1/journal-entries', (row) => row.id],
   shift: ['/api/v1/pos/shifts', (row) => row.id],
   sale: ['/api/v1/pos/sales', (row) => row.id],
+  void: ['/api/v1/pos/voids', (row) => row.id],
 };
 
 /** Captured before the sign-in: the pages outside the shell. */
@@ -131,9 +132,12 @@ export const ROUTES = [
   { area: 'pos', name: 'pos-shift-panel', path: '/pos/shifts?shift={shift}', dialog: true },
   { area: 'pos', name: 'pos-sales', path: '/pos/sales' },
   { area: 'pos', name: 'pos-sale-panel', path: '/pos/sales?sale={sale}', dialog: true },
+  { area: 'pos', name: 'pos-voids', path: '/pos/voids' },
+  { area: 'pos', name: 'pos-void-panel', path: '/pos/voids?void={void}', dialog: true },
   { area: 'pos', name: 'pos-tills', path: '/pos/tills' },
   { area: 'pos', name: 'pos-tills-new', path: '/pos/tills?new=1', dialog: true },
   { area: 'pos', name: 'pos-cashiers', path: '/pos/cashiers' },
+  { area: 'pos', name: 'pos-quick-buttons', path: '/pos/quick-buttons' },
   { area: 'pos', name: 'pos-settings', path: '/pos/settings' },
   { area: 'pos', name: 'pos-test-till', path: '/pos/test-till' },
 

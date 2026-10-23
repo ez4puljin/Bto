@@ -73,12 +73,14 @@ import { AiReportsPage } from '@/features/ai/reports-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
 import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
 import { PosCashiersPage } from '@/features/pos/cashiers-page';
+import { PosQuickButtonsPage } from '@/features/pos/quick-buttons-page';
 import { PosSalesPage } from '@/features/pos/sales-page';
 import { PosSalePrintPage } from '@/features/pos/sale-print-page';
 import { PosSettingsPage } from '@/features/pos/settings-page';
 import { PosShiftsPage } from '@/features/pos/shifts-page';
 import { PosTestTillPage } from '@/features/pos/test-till-page';
 import { PosTillsPage } from '@/features/pos/tills-page';
+import { PosVoidsPage } from '@/features/pos/voids-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
@@ -517,8 +519,14 @@ function posRoutes(): RouteObject[] {
   return [
     { path: 'pos/shifts', handle: { width: 'wide' }, element: read(<PosShiftsPage />) },
     { path: 'pos/sales', handle: { width: 'wide' }, element: read(<PosSalesPage />) },
+    { path: 'pos/voids', handle: { width: 'wide' }, element: read(<PosVoidsPage />) },
     { path: 'pos/tills', handle: { width: 'wide' }, element: read(<PosTillsPage />) },
     { path: 'pos/cashiers', handle: { width: 'wide' }, element: read(<PosCashiersPage />) },
+    {
+      path: 'pos/quick-buttons',
+      handle: { width: 'wide' },
+      element: read(<PosQuickButtonsPage />),
+    },
     { path: 'pos/settings', handle: { width: 'reading' }, element: manage(<PosSettingsPage />) },
     ...(import.meta.env.DEV
       ? [{ path: 'pos/test-till', handle: { width: 'wide' }, element: manage(<PosTestTillPage />) }]
