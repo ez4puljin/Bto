@@ -154,18 +154,23 @@ export class StockBooksService implements StockBooks {
   ): Promise<void> {
     const lines = doc.lines.filter((line) => !(line.debit.isZero() && line.credit.isZero()));
     if (lines.length < 2) return;
-    await this.intake.submitInTx(tx, this.books.source(actor), {
-      source: { system: BTO_SOURCE, docType: doc.docType, docId: doc.docId },
-      body: {
-        action: 'POST',
-        documentType: FIN_DOC_TYPES.STOCK_VALUE.code,
-        documentDate: doc.date,
-        currency: 'MNT',
-        description: doc.description.slice(0, 300),
-        controlTotal: controlTotal(lines),
-        lines: intakeLines(lines),
+    await this.intake.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: { system: BTO_SOURCE, docType: doc.docType, docId: doc.docId },
+        body: {
+          action: 'POST',
+          documentType: FIN_DOC_TYPES.STOCK_VALUE.code,
+          documentDate: doc.date,
+          currency: 'MNT',
+          description: doc.description.slice(0, 300),
+          controlTotal: controlTotal(lines),
+          lines: intakeLines(lines),
+        },
       },
-    }, await this.org.branchOfWarehouses(doc.warehouseIds, tx));
+      await this.org.branchOfWarehouses(doc.warehouseIds, tx),
+    );
   }
 }
 

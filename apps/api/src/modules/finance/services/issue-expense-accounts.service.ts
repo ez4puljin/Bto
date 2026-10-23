@@ -94,7 +94,9 @@ export class IssueExpenseAccountsService {
       const user = this.books.user(ctx);
       const key = issueTypeKey(type.id);
       const today = businessDate();
-      const before = (await this.chart.rules(user, { company, on: today, lock: true }, tx)).get(key);
+      const before = (await this.chart.rules(user, { company, on: today, lock: true }, tx)).get(
+        key,
+      );
       if ((before?.accountId ?? null) === accountId) return;
       await this.chart.defineKeyInTx(tx, user, { company, code: key });
       await this.chart.setRuleInTx(tx, user, { company, key, accountId, effectiveFrom: today });

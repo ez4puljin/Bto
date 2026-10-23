@@ -240,26 +240,31 @@ export class InvoicingService implements SaleSink {
   ): Promise<number | null> {
     const party = await this.parties.customerPartyIn(tx, invoice.customerId);
     const lines = invoiceEntryLines(invoice);
-    const result = await this.posting.submitInTx(tx, this.books.source(actor), {
-      source: {
-        system: BTO_SOURCE,
-        docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
-        docId: String(invoice.id),
-        docNo: invoice.number,
+    const result = await this.posting.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: {
+          system: BTO_SOURCE,
+          docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+          docId: String(invoice.id),
+          docNo: invoice.number,
+        },
+        body: {
+          action: 'POST',
+          documentType: FIN_DOC_TYPES.SALES_INVOICE.code,
+          documentDate: invoice.invoiceDate,
+          currency: 'MNT',
+          party,
+          dueDate: invoice.dueDate,
+          description: documentLabel(invoice.number, party.name),
+          controlTotal: controlTotal(lines),
+          lines: intakeLines(lines),
+          ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
+        },
       },
-      body: {
-        action: 'POST',
-        documentType: FIN_DOC_TYPES.SALES_INVOICE.code,
-        documentDate: invoice.invoiceDate,
-        currency: 'MNT',
-        party,
-        dueDate: invoice.dueDate,
-        description: documentLabel(invoice.number, party.name),
-        controlTotal: controlTotal(lines),
-        lines: intakeLines(lines),
-        ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
-      },
-    }, invoice.branchId);
+      invoice.branchId,
+    );
     return entryIdOf(result);
   }
 

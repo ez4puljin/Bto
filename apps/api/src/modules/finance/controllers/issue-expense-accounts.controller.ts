@@ -1,10 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Put } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
-import {
-  IssueExpenseAccountDto,
-  IssueExpenseAccountRequestDto,
-} from '../dto/finance.dto';
+import { IssueExpenseAccountDto, IssueExpenseAccountRequestDto } from '../dto/finance.dto';
 import { IssueExpenseAccountsService } from '../services/issue-expense-accounts.service';
 
 /** Which account each goods-issue expense type books to (ADR-0106 #3). */

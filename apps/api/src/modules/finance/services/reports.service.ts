@@ -180,12 +180,22 @@ export class ReportsService {
       const customerId = customerOf.get(row.partyId);
       const customer = customerId === undefined ? undefined : customerById.get(customerId);
       if (customer) {
-        return { ...base, partyKind: 'CUSTOMER', partyCode: customer.code, partyName: customer.name };
+        return {
+          ...base,
+          partyKind: 'CUSTOMER',
+          partyCode: customer.code,
+          partyName: customer.name,
+        };
       }
       const supplierId = supplierOf.get(row.partyId);
       const supplier = supplierId === undefined ? undefined : supplierById.get(supplierId);
       if (supplier) {
-        return { ...base, partyKind: 'SUPPLIER', partyCode: supplier.code, partyName: supplier.name };
+        return {
+          ...base,
+          partyKind: 'SUPPLIER',
+          partyCode: supplier.code,
+          partyName: supplier.name,
+        };
       }
       return { ...base, partyKind: 'OTHER', partyCode: null, partyName: row.partyName };
     });

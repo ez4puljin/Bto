@@ -178,16 +178,21 @@ export class SupplierBillsService implements PurchaseBooks {
       controlTotal: controlTotal(lines),
       lines: intakeLines(lines),
     };
-    await this.intake.submitInTx(tx, this.books.source(actor), {
-      source: {
-        system: BTO_SOURCE,
-        docType: doc.docType,
-        docId: doc.docId,
-        docNo: doc.docNo,
-        ...(doc.revision && doc.revision > 1 ? { revision: doc.revision } : {}),
+    await this.intake.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: {
+          system: BTO_SOURCE,
+          docType: doc.docType,
+          docId: doc.docId,
+          docNo: doc.docNo,
+          ...(doc.revision && doc.revision > 1 ? { revision: doc.revision } : {}),
+        },
+        body,
       },
-      body,
-    }, await this.org.branchOfWarehouses(doc.warehouseIds, tx));
+      await this.org.branchOfWarehouses(doc.warehouseIds, tx),
+    );
   }
 }
 

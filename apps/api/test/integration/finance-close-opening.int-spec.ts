@@ -278,7 +278,12 @@ describe('finance close and opening', () => {
     ).body as {
       date: string;
       opening: { number: string; date: string } | null;
-      data: { accountCode: string; partyKind: string | null; partyCode: string | null; balance: string }[];
+      data: {
+        accountCode: string;
+        partyKind: string | null;
+        partyCode: string | null;
+        balance: string;
+      }[];
       debit: string;
       credit: string;
     };

@@ -350,22 +350,27 @@ export class PaymentsService implements OnModuleInit {
     if (input.collectedBy !== null) attributes[ATTRIBUTE.collectedBy] = String(input.collectedBy);
     const who =
       customerName ?? counterparty ?? memo ?? mn.finance.paymentKinds[input.kind] ?? input.kind;
-    const result = await this.posting.submitInTx(tx, this.books.user(ctx), {
-      source: { system: FIN_SOURCE, docType: type.docType, docId: input.key ?? randomUUID() },
-      body: {
-        action: 'POST',
-        documentType: type.code,
-        documentDate: input.paidOn,
-        currency: 'MNT',
-        ...(customerId !== null
-          ? { party: await this.parties.customerPartyIn(tx, customerId) }
-          : {}),
-        description: who.slice(0, FINANCE_LIMITS.maxDescription),
-        controlTotal: amount,
-        lines,
-        ...(Object.keys(attributes).length ? { attributes } : {}),
+    const result = await this.posting.submitInTx(
+      tx,
+      this.books.user(ctx),
+      {
+        source: { system: FIN_SOURCE, docType: type.docType, docId: input.key ?? randomUUID() },
+        body: {
+          action: 'POST',
+          documentType: type.code,
+          documentDate: input.paidOn,
+          currency: 'MNT',
+          ...(customerId !== null
+            ? { party: await this.parties.customerPartyIn(tx, customerId) }
+            : {}),
+          description: who.slice(0, FINANCE_LIMITS.maxDescription),
+          controlTotal: amount,
+          lines,
+          ...(Object.keys(attributes).length ? { attributes } : {}),
+        },
       },
-    }, account.branchId);
+      account.branchId,
+    );
     const document = result.document;
     if (!document) throw new Error('the voucher was not posted');
     const id = Number.parseInt(document.id, 10);

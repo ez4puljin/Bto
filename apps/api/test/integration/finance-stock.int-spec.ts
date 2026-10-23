@@ -320,7 +320,10 @@ describe('finance stock and cost', () => {
 
     const list = async () =>
       (
-        await http().get('/api/v1/finance/issue-expense-accounts').set(bearer(accountant)).expect(200)
+        await http()
+          .get('/api/v1/finance/issue-expense-accounts')
+          .set(bearer(accountant))
+          .expect(200)
       ).body as { typeId: number; seeded: boolean; own: boolean; accountCode: string | null }[];
     expect((await list()).find((row) => row.typeId === type.id)).toMatchObject({
       seeded: false,
