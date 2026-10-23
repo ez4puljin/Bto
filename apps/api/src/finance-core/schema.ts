@@ -434,6 +434,32 @@ export const FIN_MONEY_ACCOUNT_KINDS = ['CASH', 'BANK', 'CLEARING'] as const;
 export const FIN_PERIOD_STATUSES = ['OPEN', 'CLOSED'] as const;
 
 /**
+ * A group of a company's accounts (ADR-0102 #4): Erkhet's chart groups its accounts, and the
+ * statements of F6 read them by group. Never deleted: deactivated.
+ */
+export const finAccountGroups = finSchema.table(
+  'account_groups',
+  {
+    id: id(),
+    companyId: ref('company_id')
+      .notNull()
+      .references(() => finCompanies.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    status: status(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('fin_account_groups_company_id_key').on(t.companyId, t.id),
+    unique('fin_account_groups_company_code_key').on(t.companyId, t.code),
+    check('fin_account_groups_code', codeShape(t.code)),
+    check('fin_account_groups_name', nameShape(t.name)),
+    check('fin_account_groups_status', statusShape(t.status)),
+  ],
+);
+
+/**
  * A company's account (ADR-0072): its kind and normal side, and the control that says what every
  * line on it must carry once the intake enforces it (F2). Never deleted: deactivated.
  */
@@ -449,6 +475,8 @@ export const finAccounts = finSchema.table(
     kind: text('kind', { enum: FIN_ACCOUNT_KINDS }).notNull(),
     normalSide: text('normal_side', { enum: FIN_SIDES }).notNull(),
     control: text('control', { enum: FIN_ACCOUNT_CONTROLS }).notNull().default('NONE'),
+    /** Its group in the chart (ADR-0102 #4); null for an account no import has grouped. */
+    groupId: ref('group_id'),
     status: status(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -456,6 +484,11 @@ export const finAccounts = finSchema.table(
   (t) => [
     unique('fin_accounts_company_id_key').on(t.companyId, t.id),
     unique('fin_accounts_company_code_key').on(t.companyId, t.code),
+    foreignKey({
+      name: 'fin_accounts_group_fk',
+      columns: [t.companyId, t.groupId],
+      foreignColumns: [finAccountGroups.companyId, finAccountGroups.id],
+    }),
     check('fin_accounts_code', codeShape(t.code)),
     check('fin_accounts_name', nameShape(t.name)),
     check(
@@ -548,7 +581,7 @@ export const finPostingRules = finSchema.table(
   ],
 );
 
-/** A month of a company's books (ADR-0075, F1: OPEN / CLOSED only; closing comes in F5). */
+/** A month of a company's books (ADR-0075; OPEN / CLOSED only, closed and reopened since F5, ADR-0102). */
 export const finFiscalPeriods = finSchema.table(
   'fiscal_periods',
   {
@@ -570,6 +603,46 @@ export const finFiscalPeriods = finSchema.table(
     check('fin_fiscal_periods_code', sql`${t.code} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
     check('fin_fiscal_periods_dates', sql`${t.endsOn} >= ${t.startsOn}`),
     check('fin_fiscal_periods_status', sql`${t.status} IN ('OPEN', 'CLOSED')`),
+  ],
+);
+
+export const FIN_PERIOD_ACTIONS = ['CLOSE', 'REOPEN'] as const;
+
+/**
+ * Every close and reopen of a month (ADR-0102 #2, #3), append-only: who, when, the reason of a reopen
+ * and what the close checked. A month's status is its row's; its history is here.
+ */
+export const finPeriodEvents = finSchema.table(
+  'period_events',
+  {
+    id: id(),
+    companyId: ref('company_id').notNull(),
+    periodId: ref('period_id').notNull(),
+    action: text('action', { enum: FIN_PERIOD_ACTIONS }).notNull(),
+    reason: text('reason'),
+    checks: jsonValue('checks')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    actorKind: text('actor_kind', { enum: FIN_ACTOR_KINDS }).notNull(),
+    actorRef: text('actor_ref').notNull(),
+    actorLabel: text('actor_label').notNull(),
+    requestId: text('request_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('fin_period_events_company_id_key').on(t.companyId, t.id),
+    foreignKey({
+      name: 'fin_period_events_period_fk',
+      columns: [t.companyId, t.periodId],
+      foreignColumns: [finFiscalPeriods.companyId, finFiscalPeriods.id],
+    }),
+    index('fin_period_events_period_idx').on(t.companyId, t.periodId, t.id),
+    check('fin_period_events_action', sql`${t.action} IN ('CLOSE', 'REOPEN')`),
+    check(
+      'fin_period_events_reason',
+      sql`(${t.action} = 'CLOSE' AND ${t.reason} IS NULL) OR (${t.action} = 'REOPEN' AND length(btrim(${t.reason})) BETWEEN 1 AND 500)`,
+    ),
+    check('fin_period_events_actor_kind', sql`${t.actorKind} IN ('STAFF', 'SOURCE', 'SYSTEM')`),
   ],
 );
 

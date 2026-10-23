@@ -25,9 +25,12 @@ export {
 } from './org/ensure-default-company';
 export {
   ensureDefaultChart,
+  type FinAccountGroupView,
   type FinAccountKind,
   type FinAccountView,
   type FinBranchRef,
+  type FinChartImportApplied,
+  type FinChartImportRow,
   FinChartService,
   type FinChartTemplateAccount,
   type FinMoneyAccountInput,
@@ -39,6 +42,14 @@ export {
   type FinStatus,
   FIN_RULES_FROM_START,
 } from './ledger/chart.service';
+export {
+  type FinCloseCheck,
+  type FinPeriodAction,
+  type FinPeriodEventView,
+  type FinPeriodStatus,
+  type FinPeriodView,
+  FinPeriodsService,
+} from './ledger/period-close.service';
 export { type FinCompanyPatch, type FinCompanyView, FinOrgService } from './org/org.service';
 export {
   FinConfig,
@@ -57,6 +68,16 @@ export {
   FinReader,
 } from './posting/fin-reader.service';
 export { type FinDocumentClass } from './posting/intake-command';
+export {
+  FinReports,
+  type FinResultBalance,
+  type FinTrialBalance,
+  type FinTrialBalanceRow,
+  type FinVatDocument,
+  type FinVatGroup,
+  type FinVatReport,
+  type FinVatSide,
+} from './posting/report-reader.service';
 export { type FinIntakeResult, type FinIntakeVia, FinIntakeInTx } from './posting/intake.service';
 export {
   type FinReconcileDrift,

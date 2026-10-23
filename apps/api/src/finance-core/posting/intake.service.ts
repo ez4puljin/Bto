@@ -454,9 +454,7 @@ export class FinIntakeInTx {
     if (body.documentDate > today || accountingDate > today) {
       throw new FinError('FIN_FUTURE_DATE', undefined, { path: 'body.documentDate' });
     }
-    if (type.class === 'SETTLEMENT' || type.class === 'OPENING') {
-      throw rule('CLASS_NOT_BUILT', { class: type.class });
-    }
+    if (type.class === 'SETTLEMENT') throw rule('CLASS_NOT_BUILT', { class: type.class });
     const isAllocation = type.class === 'ALLOCATION';
     if (isAllocation !== (body.allocate !== undefined)) throw rule('ALLOCATION_BODY');
     if (
@@ -1406,6 +1404,12 @@ export class FinIntakeInTx {
       }
       case 'JOURNAL':
         if (settling.length > 0) throw rule('JOURNAL_SETTLES');
+        return;
+      // The opening trial balance (ADR-0102 #5), in documents of at most 500 lines: any lines, each
+      // control line its own open item with the original document's ref, date and due date; nothing
+      // settles (the items are the balances). How many a company has is its source's concern.
+      case 'OPENING':
+        if (settling.length > 0) throw rule('OPENING_SETTLES');
         return;
       default:
         throw rule('CLASS_NOT_BUILT', { class: documentClass });

@@ -57,6 +57,13 @@ import {
 import { HomePage } from '@/features/home/home-page';
 import { AiPage } from '@/features/ai/ai-page';
 import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
+import { PeriodsPage } from '@/features/finance/periods-page';
+import {
+  TrialBalancePage,
+  TrialBalancePrintPage,
+  VatPrintPage,
+  VatReportPage,
+} from '@/features/finance/reports-pages';
 import { CashPage } from '@/features/finance/cash-page';
 import { CustomerBalancesPage } from '@/features/finance/customer-balances-page';
 import { CustomerLedgerPage } from '@/features/finance/customer-ledger-page';
@@ -139,6 +146,29 @@ export const routes: RouteObject[] = [
     element: (
       <RequireAuth>
         <ReceiptPrintPage />
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // The trial balance and the VAT report for paper (ADR-0105).
+    path: '/finance/trial-balance/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <TrialBalancePrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/finance/vat/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <VatPrintPage />
+        </RequirePermission>
       </RequireAuth>
     ),
     errorElement: <RouteErrorBoundary />,
@@ -562,6 +592,13 @@ function financeRoutes(): RouteObject[] {
       handle: { width: 'wide' },
       element: read(<AccountLedgerPage />),
     },
+    { path: 'finance/periods', handle: { width: 'wide' }, element: read(<PeriodsPage />) },
+    {
+      path: 'finance/trial-balance',
+      handle: { width: 'wide' },
+      element: read(<TrialBalancePage />),
+    },
+    { path: 'finance/vat', handle: { width: 'wide' }, element: read(<VatReportPage />) },
     {
       path: 'finance/settings',
       handle: { width: 'reading' },

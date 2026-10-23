@@ -8,8 +8,6 @@ import { PERMISSIONS } from './index';
  */
 const NOT_GRANTED_YET = [
   'finance.documents.approve',
-  'finance.periods.close',
-  'finance.periods.reopen',
   'finance.periods.override',
   'finance.intake.replay',
   'finance.config.manage',

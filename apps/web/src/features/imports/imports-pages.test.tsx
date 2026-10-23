@@ -38,6 +38,7 @@ const JOB: Schemas['ImportJob'] = {
   lastError: null,
   receiptOptions: null,
   issueOptions: null,
+  openingOptions: null,
   canRevert: false,
   createdAt: STAMP,
   validatedAt: STAMP,

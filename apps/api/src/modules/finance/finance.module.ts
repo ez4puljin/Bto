@@ -25,10 +25,15 @@ import {
 } from './controllers/receivables.controller';
 import { AllocationsController } from './controllers/allocations.controller';
 import { SupplierBalancesController } from './controllers/payables.controller';
+import { PeriodsController } from './controllers/periods.controller';
+import { ReportsController } from './controllers/reports.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
 import { AllocationsService } from './services/allocations.service';
 import { ApLedgerService } from './services/ap-ledger.service';
 import { FinPosting } from './services/fin-posting';
+import { FinanceImportsService } from './services/finance-imports.service';
+import { PeriodsService } from './services/periods.service';
+import { ReportsService } from './services/reports.service';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
@@ -66,6 +71,9 @@ const SERVICES = [
   SupplierBillsService,
   StockBooksService,
   JournalRepostService,
+  PeriodsService,
+  FinanceImportsService,
+  ReportsService,
 ];
 
 /**
@@ -125,6 +133,8 @@ export class FinanceModule {}
     FinanceSettingsController,
     AllocationsController,
     SupplierBalancesController,
+    PeriodsController,
+    ReportsController,
   ],
 })
 export class FinanceHttpModule {}

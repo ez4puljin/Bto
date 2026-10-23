@@ -57,6 +57,11 @@ function toJobDto(job: ImportJob): ImportJobDto {
       typeof (job.options as { warehouseId?: unknown } | null)?.warehouseId === 'number'
         ? { warehouseId: (job.options as { warehouseId: number }).warehouseId }
         : null,
+    openingOptions:
+      job.kind === 'FIN_OPENING' &&
+      typeof (job.options as { date?: unknown } | null)?.date === 'string'
+        ? { date: (job.options as { date: string }).date }
+        : null,
     canRevert: job.canRevert,
     createdAt: job.createdAt.toISOString(),
     validatedAt: job.validatedAt?.toISOString() ?? null,
