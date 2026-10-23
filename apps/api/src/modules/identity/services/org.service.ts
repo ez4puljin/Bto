@@ -1,6 +1,6 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { and, asc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -134,6 +134,22 @@ export class OrgService implements OnModuleInit {
     const [row] = await executor.select().from(warehouses).where(eq(warehouses.kind, 'TRANSIT'));
     if (!row) throw new Error('the TRANSIT warehouse is missing (synced at api boot)');
     return row;
+  }
+
+  /**
+   * The one branch these warehouses share, else null (none given, several branches, or TRANSIT,
+   * which has none): the branch the books tag a document with (ADR-0106 #4).
+   */
+  async branchOfWarehouses(
+    ids: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<number | null> {
+    if (ids.length === 0) return null;
+    const rows = await executor
+      .selectDistinct({ branchId: warehouses.branchId })
+      .from(warehouses)
+      .where(inArray(warehouses.id, [...ids]));
+    return rows.length === 1 ? (rows[0]?.branchId ?? null) : null;
   }
 
   /** Admin path: only WHOLESALE and STORE warehouses (422 WAREHOUSE_KIND_NOT_ALLOWED otherwise). */

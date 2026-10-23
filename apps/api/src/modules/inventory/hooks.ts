@@ -78,6 +78,8 @@ export interface ReceiptBookFacts {
   version: number;
   totals: ReceiptBookTotals;
   previous: ReceiptBookTotals | null;
+  /** The document's warehouses: the books tag it with their branch when they share one (ADR-0106 #4). */
+  warehouseIds: number[];
 }
 
 /** A goods issue to a supplier (a supplier return, ADR-0081) at the average cost, with its VAT. */
@@ -89,6 +91,8 @@ export interface SupplierReturnFacts {
   cost: Decimal;
   vat: Decimal;
   vatBase: Decimal;
+  /** The document's warehouses: the books tag it with their branch when they share one (ADR-0106 #4). */
+  warehouseIds: number[];
 }
 
 /**
@@ -125,6 +129,8 @@ export interface StockBookLine {
   kind: StockBookKind;
   /** A goods issue's expense type code (null for an admin-added type). */
   issueType?: string | null;
+  /** A goods issue's expense type (its own account when finance maps one, ADR-0106 #3). */
+  issueTypeId?: number | null;
   value: Decimal;
 }
 
@@ -139,6 +145,8 @@ export interface StockPostedFacts {
   /** The first ledger row of this posting: with the document, its durable identity. */
   firstLedgerId: number;
   lines: StockBookLine[];
+  /** The document's warehouses: the books tag it with their branch when they share one (ADR-0106 #4). */
+  warehouseIds: number[];
 }
 
 /** A receipt's costing: what moved the stock's value and what had already left (the variance). */
@@ -149,6 +157,8 @@ export interface StockRevaluedFacts {
   date: string;
   absorbed: Decimal;
   variance: Decimal;
+  /** The document's warehouses: the books tag it with their branch when they share one (ADR-0106 #4). */
+  warehouseIds: number[];
 }
 
 /**

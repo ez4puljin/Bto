@@ -134,6 +134,7 @@ export class InvoicingService implements SaleSink {
         invoiceDate: today,
         dueDate,
         orderNumber: snapshot.orderNumber,
+        branchId: snapshot.branchId,
         ...totals,
       });
       await tx.update(invoices).set({ journalEntryId: entryId }).where(eq(invoices.id, invoice.id));
@@ -234,30 +235,36 @@ export class InvoicingService implements SaleSink {
       invoiceDate: string;
       dueDate: string;
       orderNumber: string | null;
+      branchId: number | null;
     },
   ): Promise<number | null> {
     const party = await this.parties.customerPartyIn(tx, invoice.customerId);
     const lines = invoiceEntryLines(invoice);
-    const result = await this.posting.submitInTx(tx, this.books.source(actor), {
-      source: {
-        system: BTO_SOURCE,
-        docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
-        docId: String(invoice.id),
-        docNo: invoice.number,
+    const result = await this.posting.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: {
+          system: BTO_SOURCE,
+          docType: FIN_DOC_TYPES.SALES_INVOICE.docType,
+          docId: String(invoice.id),
+          docNo: invoice.number,
+        },
+        body: {
+          action: 'POST',
+          documentType: FIN_DOC_TYPES.SALES_INVOICE.code,
+          documentDate: invoice.invoiceDate,
+          currency: 'MNT',
+          party,
+          dueDate: invoice.dueDate,
+          description: documentLabel(invoice.number, party.name),
+          controlTotal: controlTotal(lines),
+          lines: intakeLines(lines),
+          ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
+        },
       },
-      body: {
-        action: 'POST',
-        documentType: FIN_DOC_TYPES.SALES_INVOICE.code,
-        documentDate: invoice.invoiceDate,
-        currency: 'MNT',
-        party,
-        dueDate: invoice.dueDate,
-        description: documentLabel(invoice.number, party.name),
-        controlTotal: controlTotal(lines),
-        lines: intakeLines(lines),
-        ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
-      },
-    });
+      invoice.branchId,
+    );
     return entryIdOf(result);
   }
 

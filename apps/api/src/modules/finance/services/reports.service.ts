@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { LineV1 } from '@tugeel/fin-contract';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import { sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
@@ -13,14 +13,22 @@ import {
   tableWorkbook,
 } from '../../../common/excel/table-workbook';
 import {
+  type FinAccountPartyBalance,
   FinError,
   FinReader,
   FinReports,
   type FinTrialBalance,
   type FinVatReport,
 } from '../../../finance-core';
-import { FIN_DOC_TYPES, FIN_SOURCE, MANUAL_KEY, POSTING_KEY_OF_ROLE } from '../../fin-bridge';
+import {
+  FIN_DOC_TYPES,
+  FIN_SOURCE,
+  FinPartiesBridge,
+  MANUAL_KEY,
+  POSTING_KEY_OF_ROLE,
+} from '../../fin-bridge';
 import type { AuthContext } from '../../identity';
+import { CustomersService, SuppliersService } from '../../partners';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
 
@@ -43,6 +51,28 @@ export interface YearCloseStatus {
   profit: Decimal;
 }
 
+/** One account × party balance of the opening's sign-off, the party as Bto knows it. */
+export interface OpeningCheckRow {
+  accountCode: string;
+  accountName: string;
+  /** null: the account's lines without a party. */
+  partyKind: 'CUSTOMER' | 'SUPPLIER' | 'OTHER' | null;
+  partyCode: string | null;
+  partyName: string | null;
+  /** Debit − credit at the date. */
+  balance: Decimal;
+}
+
+/** The opening's sign-off against Erkhet's closing trial balance (ADR-0106 #5, questionnaire 2.7). */
+export interface OpeningCheck {
+  date: string;
+  /** The live opening (its first document), or null when none stands. */
+  opening: { number: string; date: string } | null;
+  rows: OpeningCheckRow[];
+  debit: Decimal;
+  credit: Decimal;
+}
+
 const money = (value: Decimal): string => value.toFixed(2);
 const yearEnd = (year: number): string => `${year}-12-31`;
 
@@ -60,7 +90,116 @@ export class ReportsService {
     private readonly reports: FinReports,
     private readonly reader: FinReader,
     private readonly posting: FinPosting,
+    private readonly parties: FinPartiesBridge,
+    private readonly customers: CustomersService,
+    private readonly suppliers: SuppliersService,
   ) {}
+
+  /**
+   * Every balance per account × party at `date` — by default the live opening's date, else the last
+   * day of the previous month — for the accountant to compare with Erkhet's closing trial balance
+   * and sign (ADR-0106 #5).
+   */
+  async openingCheck(ctx: AuthContext, date?: string): Promise<OpeningCheck> {
+    const company = await this.books.company();
+    const live = await this.reader.documents(this.books.source(), {
+      company,
+      typeCodes: [FIN_DOC_TYPES.OPENING.code],
+      reversed: false,
+      limit: 1,
+    });
+    const first = live.rows[0];
+    const opening = first ? { number: first.number, date: first.accountingDate } : null;
+    const on = date ?? opening?.date ?? addDays(`${businessDate().slice(0, 7)}-01`, -1);
+    const balances = await this.reports.accountPartyBalances(this.books.user(ctx), {
+      company,
+      date: on,
+    });
+    const rows = await this.withParties(balances);
+    let debit = new Decimal(0);
+    let credit = new Decimal(0);
+    for (const row of rows) {
+      if (row.balance.gt(0)) debit = debit.plus(row.balance);
+      else credit = credit.minus(row.balance);
+    }
+    return { date: on, opening, rows, debit, credit };
+  }
+
+  /** The sign-off as an Excel sheet: account, party, debit, credit, the totals last. */
+  async openingCheckWorkbook(ctx: AuthContext, date?: string): Promise<Buffer> {
+    const report = await this.openingCheck(ctx, date);
+    const labels = mn.finance.reports.openingCheck.columns;
+    const columns: ExcelColumn[] = [
+      { name: labels.accountCode, kind: 'text' },
+      { name: labels.accountName, kind: 'text' },
+      { name: labels.partyCode, kind: 'text' },
+      { name: labels.partyName, kind: 'text' },
+      { name: labels.debit, kind: 'number' },
+      { name: labels.credit, kind: 'number' },
+    ];
+    const rows: ExcelRow[] = report.rows.map((row) => [
+      row.accountCode,
+      row.accountName,
+      row.partyCode,
+      row.partyName,
+      row.balance.gt(0) ? money(row.balance) : '0.00',
+      row.balance.lt(0) ? money(row.balance.negated()) : '0.00',
+    ]);
+    rows.push([null, labels.total, null, null, money(report.debit), money(report.credit)]);
+    return tableWorkbook(
+      `${mn.finance.reports.openingCheck.title} ${report.date}`,
+      { yes: '', no: '' },
+      (sheet) => Promise.resolve(sheet.addRows(columns, rows)),
+    );
+  }
+
+  /** The core's party of each balance as a Bto customer or supplier (code and name). */
+  private async withParties(balances: FinAccountPartyBalance[]): Promise<OpeningCheckRow[]> {
+    const partyIds = [
+      ...new Set(balances.flatMap((row) => (row.partyId === null ? [] : [row.partyId]))),
+    ];
+    const [customerOf, supplierOf] = await Promise.all([
+      this.parties.customersOfParties(partyIds),
+      this.parties.suppliersOfParties(partyIds),
+    ]);
+    const [customers, suppliers] = await Promise.all([
+      this.customers.getMany([...new Set(customerOf.values())]),
+      this.suppliers.getMany([...new Set(supplierOf.values())]),
+    ]);
+    const customerById = new Map(customers.map((row) => [row.id, row]));
+    const supplierById = new Map(suppliers.map((row) => [row.id, row]));
+    return balances.map((row) => {
+      const base = {
+        accountCode: row.code,
+        accountName: row.name,
+        balance: row.balance,
+      };
+      if (row.partyId === null) {
+        return { ...base, partyKind: null, partyCode: null, partyName: null };
+      }
+      const customerId = customerOf.get(row.partyId);
+      const customer = customerId === undefined ? undefined : customerById.get(customerId);
+      if (customer) {
+        return {
+          ...base,
+          partyKind: 'CUSTOMER',
+          partyCode: customer.code,
+          partyName: customer.name,
+        };
+      }
+      const supplierId = supplierOf.get(row.partyId);
+      const supplier = supplierId === undefined ? undefined : supplierById.get(supplierId);
+      if (supplier) {
+        return {
+          ...base,
+          partyKind: 'SUPPLIER',
+          partyCode: supplier.code,
+          partyName: supplier.name,
+        };
+      }
+      return { ...base, partyKind: 'OTHER', partyCode: null, partyName: row.partyName };
+    });
+  }
 
   async trialBalance(
     ctx: AuthContext,

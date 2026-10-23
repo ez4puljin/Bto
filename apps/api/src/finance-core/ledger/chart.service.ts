@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { FinPermission } from '@tugeel/fin-contract';
+import { CODE_PATTERN, type FinPermission } from '@tugeel/fin-contract';
 import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { recordFinAudit } from '../audit/fin-audit';
 import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/authorize';
@@ -319,6 +319,38 @@ export class FinChartService {
       await executor.execute(sql`SELECT pg_advisory_xact_lock(${RULES_LOCK}, ${scope.companyId})`);
     }
     return rulesOn(executor, scope.companyId, query.on);
+  }
+
+  /**
+   * A posting key of the company that wants no control of its account, created when missing (a
+   * source's own key for a record it adds at runtime, e.g. Bto's goods-issue expense type, ADR-0106
+   * #3); its account comes from a rule (`setRuleInTx`). Returns whether it was created.
+   */
+  async defineKeyInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; code: string },
+  ): Promise<boolean> {
+    const scope = await resolveCompany(tx, ctx, input.company, {
+      source: false,
+      userAnyOf: RULE_WRITE,
+    });
+    if (!CODE_PATTERN.test(input.code)) throw invalid('code');
+    const [created] = await tx
+      .insert(finPostingKeys)
+      .values({ companyId: scope.companyId, code: input.code, requiredControl: 'NONE' })
+      .onConflictDoNothing()
+      .returning({ code: finPostingKeys.code });
+    if (!created) return false;
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'CREATE',
+      entity: 'posting_key',
+      entityId: input.code,
+      after: { code: input.code, requiredControl: 'NONE' },
+    });
+    return true;
   }
 
   /** A new company-default rule for `key` from `effectiveFrom` (append-only); `accountId` null unmaps. */

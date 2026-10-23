@@ -3,8 +3,9 @@ import type { GlRole } from '@tugeel/shared/finance';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
 import type { Tx } from '../../../common/db/db.types';
+import { FinChartService } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES } from '../../fin-bridge';
-import type { Actor } from '../../identity';
+import { type Actor, OrgService } from '../../identity';
 import type {
   StockBookKind,
   StockBooks,
@@ -27,7 +28,11 @@ const ROLE_OF_KIND: Readonly<Record<Exclude<StockBookKind, 'ISSUE'>, GlRole>> = 
   OPENING: 'OPENING_STOCK',
 };
 
-/** A goods-issue expense type's account (ADR-0081's seeded codes); an admin-added type: OTHER. */
+/**
+ * A goods-issue expense type's account (ADR-0081's seeded codes). Any other type (admin-added, or a
+ * supplier return to someone who is not a supplier) books on its own key when finance gave it an
+ * account (ADR-0106 #3), else on OTHER.
+ */
 const ROLE_OF_ISSUE_TYPE: Readonly<Record<string, GlRole>> = {
   INTERNAL_USE: 'ISSUE_INTERNAL',
   BONUS: 'ISSUE_BONUS',
@@ -35,6 +40,13 @@ const ROLE_OF_ISSUE_TYPE: Readonly<Record<string, GlRole>> = {
   WRITE_OFF: 'ISSUE_WRITE_OFF',
   TRANSFER_OUT: 'ISSUE_TRANSFER_OUT',
 };
+
+/** The posting key of a goods-issue expense type without a seeded account (ADR-0106 #3). */
+export const issueTypeKey = (typeId: number): string => `ISSUE_TYPE_${typeId}`;
+
+/** The seeded account role of an expense type code, if it has one. */
+export const issueRoleOf = (code: string | null | undefined): GlRole | null =>
+  ROLE_OF_ISSUE_TYPE[code ?? ''] ?? null;
 
 /** What each stock document is called in an entry's description (mn.json). */
 const LABELS: Readonly<Record<string, string>> = mn.finance.stockBooks;
@@ -56,18 +68,30 @@ export class StockBooksService implements StockBooks {
   constructor(
     private readonly intake: FinPosting,
     private readonly books: FinBooks,
+    private readonly org: OrgService,
+    private readonly chart: FinChartService,
   ) {}
 
   async stockPostedInTx(tx: Tx, actor: Actor, facts: StockPostedFacts): Promise<void> {
     const lines: RoleLine[] = [];
     let stock = ZERO;
+    const ownKeys = await this.ownIssueKeys(tx, actor, facts);
     for (const line of facts.lines) {
       stock = stock.plus(line.value);
-      const role =
-        line.kind === 'ISSUE'
-          ? (ROLE_OF_ISSUE_TYPE[line.issueType ?? ''] ?? 'ISSUE_OTHER')
-          : ROLE_OF_KIND[line.kind];
-      lines.push(opposite(role, line.value));
+      if (line.kind !== 'ISSUE') {
+        lines.push(opposite(ROLE_OF_KIND[line.kind], line.value));
+        continue;
+      }
+      const role = issueRoleOf(line.issueType);
+      const key = line.issueTypeId == null ? null : issueTypeKey(line.issueTypeId);
+      lines.push(
+        role !== null
+          ? opposite(role, line.value)
+          : {
+              ...opposite('ISSUE_OTHER', line.value),
+              ...(key !== null && ownKeys.has(key) ? { key } : {}),
+            },
+      );
     }
     lines.unshift(signed('INVENTORY', stock));
     const label = LABELS[facts.docType] ?? facts.docType;
@@ -76,6 +100,7 @@ export class StockBooksService implements StockBooks {
       docId: `${facts.docType}:${facts.docId}:${facts.firstLedgerId}`,
       date: facts.date,
       description: `${label} ${facts.number ?? `#${facts.docId}`}`,
+      warehouseIds: facts.warehouseIds,
       lines,
     });
   }
@@ -86,6 +111,7 @@ export class StockBooksService implements StockBooks {
       docId: `${facts.receiptId}:${facts.version}`,
       date: facts.date,
       description: `${LABELS.revalue ?? 'GR'} ${facts.number ?? `#${facts.receiptId}`}/${facts.version}`,
+      warehouseIds: facts.warehouseIds,
       lines: [
         signed('INVENTORY', facts.absorbed),
         signed('COGS', facts.variance),
@@ -94,25 +120,57 @@ export class StockBooksService implements StockBooks {
     });
   }
 
+  /** The expense-type keys that hold an account on the posting's date (none asked: none read). */
+  private async ownIssueKeys(
+    tx: Tx,
+    actor: Actor,
+    facts: StockPostedFacts,
+  ): Promise<ReadonlySet<string>> {
+    const unseeded = facts.lines.some(
+      (line) => line.kind === 'ISSUE' && issueRoleOf(line.issueType) === null,
+    );
+    if (!unseeded) return new Set();
+    const rules = await this.chart.rules(
+      this.books.source(actor),
+      { company: await this.books.company(), on: facts.date },
+      tx,
+    );
+    return new Set(
+      [...rules.values()].filter((rule) => rule.accountId !== null).map((rule) => rule.key),
+    );
+  }
+
   private async post(
     tx: Tx,
     actor: Actor,
-    doc: { docType: string; docId: string; date: string; description: string; lines: RoleLine[] },
+    doc: {
+      docType: string;
+      docId: string;
+      date: string;
+      description: string;
+      warehouseIds: readonly number[];
+      lines: RoleLine[];
+    },
   ): Promise<void> {
     const lines = doc.lines.filter((line) => !(line.debit.isZero() && line.credit.isZero()));
     if (lines.length < 2) return;
-    await this.intake.submitInTx(tx, this.books.source(actor), {
-      source: { system: BTO_SOURCE, docType: doc.docType, docId: doc.docId },
-      body: {
-        action: 'POST',
-        documentType: FIN_DOC_TYPES.STOCK_VALUE.code,
-        documentDate: doc.date,
-        currency: 'MNT',
-        description: doc.description.slice(0, 300),
-        controlTotal: controlTotal(lines),
-        lines: intakeLines(lines),
+    await this.intake.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: { system: BTO_SOURCE, docType: doc.docType, docId: doc.docId },
+        body: {
+          action: 'POST',
+          documentType: FIN_DOC_TYPES.STOCK_VALUE.code,
+          documentDate: doc.date,
+          currency: 'MNT',
+          description: doc.description.slice(0, 300),
+          controlTotal: controlTotal(lines),
+          lines: intakeLines(lines),
+        },
       },
-    });
+      await this.org.branchOfWarehouses(doc.warehouseIds, tx),
+    );
   }
 }
 

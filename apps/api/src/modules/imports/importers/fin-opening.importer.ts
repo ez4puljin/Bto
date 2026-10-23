@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { FinOpeningImportOptions } from '@tugeel/shared/imports';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate, isIsoDate } from '@tugeel/shared/time';
+import { addDays, businessDate, isIsoDate } from '@tugeel/shared/time';
 import type { Db, Tx } from '../../../common/db/db.types';
 import {
   CUSTOMER_CONTROLS,
@@ -46,8 +46,8 @@ export function openingOptionsOf(job: Pick<ImportJobRow, 'options'>): FinOpening
  * advance paid its supplier by code (each its own open item with the original document's number,
  * date and due date); a cash or bank line its money account. Rows on the account INVENTORY points
  * to go to the opening offset account, which the stock's opening import credited (F4). The whole
- * file balances; it posts as OPENING documents of at most 499 rows dated the import's date
- * (TODO-VERIFY D27). One opening at a time: a second waits until the first is reverted.
+ * file balances; it posts as OPENING documents of at most 499 rows dated the import's date, the last
+ * day of the month before Bto starts (ADR-0106 #5: Bto starts on a month's 1st). One opening at a time: a second waits until the first is reverted.
  */
 @Injectable()
 export class FinOpeningImporter implements Importer<OpeningLine> {
@@ -206,6 +206,7 @@ export class FinOpeningImporter implements Importer<OpeningLine> {
         first.error(null, 'NOT_FOUND', { value: 'OPENING_STOCK' });
       }
       if (date > businessDate()) first.error(null, 'OUT_OF_RANGE', { value: date });
+      if (!addDays(date, 1).endsWith('-01')) first.error(null, 'NOT_MONTH_END', { value: date });
       if (planned.every((entry) => entry.check.ok) && !debitTotal.eq(creditTotal)) {
         first.error(null, 'UNBALANCED', {
           debit: debitTotal.toFixed(2),

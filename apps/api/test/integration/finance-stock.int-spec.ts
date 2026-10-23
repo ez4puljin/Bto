@@ -45,6 +45,19 @@ describe('finance stock and cost', () => {
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
+  /** The Bto branches the lines of a source's documents carry (null: none). */
+  const branchesOf = async (docType: string, docId: string) =>
+    (
+      await sql.query<{ branch: string | null }>(
+        `SELECT DISTINCT r.external_id AS branch
+           FROM fin.documents d
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           LEFT JOIN fin.branch_refs r ON r.company_id = l.company_id AND r.branch_id = l.branch_id
+          WHERE d.source_doc_type = $1 AND d.source_doc_id LIKE $2`,
+        [docType, docId],
+      )
+    ).rows.map((row) => row.branch);
   /** Dr − Cr of an account over the whole journal. */
   const balance = async (code: string) =>
     (
@@ -223,6 +236,125 @@ describe('finance stock and cost', () => {
     expect(Number.parseFloat(costing['610101'] ?? '0')).toBeGreaterThan(0);
     // The bill (F3) debits goods received with the cost: nothing is left on it.
     expect(await balance('310201')).toBe('0.00');
+  });
+
+  it('tags each document with its warehouse’s branch (ADR-0106 #4)', async () => {
+    const branch = String(flow.wh.branchId);
+    const sale = await flow.draft(shop, [{ productUnitId: flow.pcs(flour), qty: '1' }]);
+    await flow.sell(sale.id);
+    expect(await branchesOf('STOCK', `SO:${sale.id}:%`)).toEqual([branch]);
+    const invoice = (await financeApi(app, accountant).invoiceOfOrder(sale.id)) as InvoiceJson;
+    expect(await branchesOf('SALES_INVOICE', String(invoice.id))).toEqual([branch]);
+    const internal = await issue('INTERNAL_USE', { kind: 'OTHER', name: 'Салбар ФС' }, '1');
+    expect(await branchesOf('STOCK', `GI:${internal}:%`)).toEqual([branch]);
+    const returned = await issue(
+      'SUPPLIER_RETURN',
+      { kind: 'SUPPLIER', supplierId: supplier },
+      '1',
+    );
+    expect(await branchesOf('SUPPLIER_RETURN', String(returned))).toEqual([branch]);
+    // A voucher of the core's screens (source FIN) carries its cash box's branch.
+    const finance = financeApi(app, admin);
+    const box = (
+      await finance
+        .createMoneyAccount({
+          code: 'FS-BOX',
+          name: 'Касс ФС',
+          kind: 'CASH',
+          glAccountId: (await finance.account('100101')).id,
+          branchId: flow.wh.branchId,
+        })
+        .expect(201)
+    ).body as { id: number };
+    const voucher = (
+      await financeApi(app, accountant)
+        .payment({
+          kind: 'OTHER_IN',
+          moneyAccountId: box.id,
+          glAccountId: (await finance.account('511020')).id,
+          amount: '100',
+          paidOn: today,
+        })
+        .expect(201)
+    ).body as { id: number };
+    const [document] = (
+      await sql.query<{ source_doc_id: string }>(
+        `SELECT source_doc_id FROM fin.documents WHERE id = $1`,
+        [voucher.id],
+      )
+    ).rows;
+    expect(await branchesOf('RECEIPT', document?.source_doc_id ?? '')).toEqual([branch]);
+  });
+
+  it('books an admin-added expense type on «бусад» until it gets its own account (ADR-0106 #3)', async () => {
+    const type = (
+      await http()
+        .post('/api/v1/issues/expense-types')
+        .set(bearer(admin))
+        .send({ name: 'Дээж ФС' })
+        .expect(201)
+    ).body as { id: number };
+    const sample = await flow.product('8952', 'Дээжийн бараа ФС', '1000', '10');
+    const issueOf = async () => {
+      const draft = (
+        await http()
+          .post('/api/v1/issues')
+          .set(bearer(admin))
+          .set(idempotency())
+          .send({
+            warehouseId: flow.wh.id,
+            expenseTypeId: type.id,
+            recipient: { kind: 'OTHER', name: 'Дээж' },
+            lines: [{ productUnitId: unitOf(sample, 'PCS').id, enteredQty: '1' }],
+          })
+          .expect(201)
+      ).body as { id: number };
+      await http()
+        .post(`/api/v1/issues/${draft.id}/post`)
+        .set(bearer(admin))
+        .set(idempotency())
+        .expect(200);
+      return draft.id;
+    };
+    const first = await issueOf();
+    expect(Object.keys(await stockLines('GI', first))).toEqual(['140101', '730209']);
+
+    const list = async () =>
+      (
+        await http()
+          .get('/api/v1/finance/issue-expense-accounts')
+          .set(bearer(accountant))
+          .expect(200)
+      ).body as { typeId: number; seeded: boolean; own: boolean; accountCode: string | null }[];
+    expect((await list()).find((row) => row.typeId === type.id)).toMatchObject({
+      seeded: false,
+      own: false,
+      accountCode: '730209',
+    });
+    const marketing = await financeApi(app, admin).account('730203');
+    await http()
+      .put(`/api/v1/finance/issue-expense-accounts/${type.id}`)
+      .set(bearer(accountant))
+      .send({ accountId: marketing.id })
+      .expect(403);
+    await http()
+      .put(`/api/v1/finance/issue-expense-accounts/${type.id}`)
+      .set(bearer(admin))
+      .send({ accountId: marketing.id })
+      .expect(200);
+    expect((await list()).find((row) => row.typeId === type.id)).toMatchObject({
+      own: true,
+      accountCode: '730203',
+    });
+    const second = await issueOf();
+    expect(Object.keys(await stockLines('GI', second))).toEqual(['140101', '730203']);
+    // A seeded type keeps F4's account, changed with its role on «Данс».
+    const seeded = (await issueTypes()).find((entry) => entry.code === 'INTERNAL_USE');
+    await http()
+      .put(`/api/v1/finance/issue-expense-accounts/${seeded?.id}`)
+      .set(bearer(admin))
+      .send({ accountId: marketing.id })
+      .expect(422);
   });
 
   it('keeps the inventory account at the stock’s value', async () => {

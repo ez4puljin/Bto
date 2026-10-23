@@ -26,6 +26,7 @@ import {
 import { AllocationsController } from './controllers/allocations.controller';
 import { SupplierBalancesController } from './controllers/payables.controller';
 import { PeriodsController } from './controllers/periods.controller';
+import { IssueExpenseAccountsController } from './controllers/issue-expense-accounts.controller';
 import { ReportsController } from './controllers/reports.controller';
 import { FinanceReconcileJob } from './jobs/reconcile.job';
 import { AllocationsService } from './services/allocations.service';
@@ -42,6 +43,7 @@ import { FinBooks } from './services/fin-books';
 import { FinanceSettingsService } from './services/finance-settings.service';
 import { GlAccountsService } from './services/gl-accounts.service';
 import { InvoiceQueryService } from './services/invoice-query.service';
+import { IssueExpenseAccountsService } from './services/issue-expense-accounts.service';
 import { InvoicingService } from './services/invoicing.service';
 import { JournalRepostService } from './services/journal-repost.service';
 import { JournalService } from './services/journal.service';
@@ -74,6 +76,7 @@ const SERVICES = [
   PeriodsService,
   FinanceImportsService,
   ReportsService,
+  IssueExpenseAccountsService,
 ];
 
 /**
@@ -126,6 +129,7 @@ export class FinanceModule {}
     CreditNotesController,
     PaymentsController,
     GlAccountsController,
+    IssueExpenseAccountsController,
     MoneyAccountsController,
     JournalController,
     CustomerBalancesController,

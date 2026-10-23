@@ -583,6 +583,7 @@ export class StockPostingService implements OnModuleInit {
       date: string;
       firstLedgerId: number;
       lines: StockBookLine[];
+      warehouseIds: number[];
     }[]
   > {
     const byDoc = new Map<string, { row: typeof stockLedger.$inferInsert; id: number }[]>();
@@ -597,7 +598,7 @@ export class StockPostingService implements OnModuleInit {
       const docType = first.row.docType;
       const docId = first.row.docId;
       let reason: string | null = null;
-      let issue: { code: string | null; supplier: boolean } | null = null;
+      let issue: { code: string | null; typeId: number | null; supplier: boolean } | null = null;
       if (docType === 'ADJ') {
         const [row] = await tx
           .select({ reason: adjustments.reason })
@@ -607,11 +608,19 @@ export class StockPostingService implements OnModuleInit {
       }
       if (docType === 'GI') {
         const [row] = await tx
-          .select({ code: issueExpenseTypes.code, recipient: goodsIssues.recipientKind })
+          .select({
+            code: issueExpenseTypes.code,
+            typeId: goodsIssues.expenseTypeId,
+            recipient: goodsIssues.recipientKind,
+          })
           .from(goodsIssues)
           .innerJoin(issueExpenseTypes, eq(issueExpenseTypes.id, goodsIssues.expenseTypeId))
           .where(eq(goodsIssues.id, docId));
-        issue = { code: row?.code ?? null, supplier: row?.recipient === 'SUPPLIER' };
+        issue = {
+          code: row?.code ?? null,
+          typeId: row?.typeId ?? null,
+          supplier: row?.recipient === 'SUPPLIER',
+        };
         // The supplier's AP credit takes the stock out (F3, ADR-0091).
         if (issue.supplier) continue;
       }
@@ -632,7 +641,7 @@ export class StockPostingService implements OnModuleInit {
         const line = sums.get(key);
         sums.set(key, {
           kind,
-          ...(kind === 'ISSUE' ? { issueType: code } : {}),
+          ...(kind === 'ISSUE' ? { issueType: code, issueTypeId: issue?.typeId ?? null } : {}),
           value: (line?.value ?? ZERO).plus(value),
         });
       }
@@ -650,6 +659,7 @@ export class StockPostingService implements OnModuleInit {
         date: effectiveDate,
         firstLedgerId: Math.min(...entries.map((entry) => entry.id)),
         lines,
+        warehouseIds: [...new Set(entries.map((entry) => entry.row.warehouseId))],
       });
     }
     return facts;
@@ -779,6 +789,7 @@ export class StockPostingService implements OnModuleInit {
           date: effectiveDate,
           absorbed,
           variance,
+          warehouseIds: [...new Set(input.lines.map((line) => line.warehouseId))],
         });
       }
     }
@@ -814,9 +825,11 @@ export class StockPostingService implements OnModuleInit {
       absorbed: string;
       variance: string;
       number: string | null;
+      warehouse_ids: string[];
     }>(sql`
       SELECT v.doc_id::int AS doc_id, v.version::int AS version, min(v.effective_date)::text AS date,
-             sum(v.absorbed)::text AS absorbed, sum(v.variance)::text AS variance, r.number
+             sum(v.absorbed)::text AS absorbed, sum(v.variance)::text AS variance, r.number,
+             array_agg(DISTINCT v.warehouse_id::text) AS warehouse_ids
         FROM stock_valuation_adjustments v
         JOIN goods_receipts r ON r.id = v.doc_id
        WHERE v.doc_type = 'GR'
@@ -835,6 +848,7 @@ export class StockPostingService implements OnModuleInit {
               date: row.date,
               absorbed,
               variance,
+              warehouseIds: row.warehouse_ids.map(toId),
             },
           ];
     });

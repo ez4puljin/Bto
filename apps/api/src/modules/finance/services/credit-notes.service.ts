@@ -299,6 +299,7 @@ export class CreditNotesService {
         invoiceId: invoice.id,
         noteDate,
         settles: allocated,
+        branchId: invoice.branchId,
         ...totals,
       });
       await tx
@@ -430,28 +431,34 @@ export class CreditNotesService {
       total: Decimal;
       vatTotal: Decimal;
       cityTaxTotal: Decimal;
+      branchId: number | null;
     },
   ): Promise<number | null> {
     const party = await this.parties.customerPartyIn(tx, note.customerId);
     const lines = creditNoteEntryLines(note);
-    const result = await this.intake.submitInTx(tx, this.books.source(actor), {
-      source: {
-        system: BTO_SOURCE,
-        docType: FIN_DOC_TYPES.SALES_RETURN.docType,
-        docId: String(note.id),
-        docNo: note.number,
+    const result = await this.intake.submitInTx(
+      tx,
+      this.books.source(actor),
+      {
+        source: {
+          system: BTO_SOURCE,
+          docType: FIN_DOC_TYPES.SALES_RETURN.docType,
+          docId: String(note.id),
+          docNo: note.number,
+        },
+        body: {
+          action: 'POST',
+          documentType: FIN_DOC_TYPES.SALES_RETURN.code,
+          documentDate: note.noteDate,
+          currency: 'MNT',
+          party,
+          description: documentLabel(note.number, party.name),
+          controlTotal: controlTotal(lines),
+          lines: intakeLines(lines),
+        },
       },
-      body: {
-        action: 'POST',
-        documentType: FIN_DOC_TYPES.SALES_RETURN.code,
-        documentDate: note.noteDate,
-        currency: 'MNT',
-        party,
-        description: documentLabel(note.number, party.name),
-        controlTotal: controlTotal(lines),
-        lines: intakeLines(lines),
-      },
-    });
+      note.branchId,
+    );
     return entryIdOf(result);
   }
 

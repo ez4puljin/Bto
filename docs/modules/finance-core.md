@@ -410,6 +410,22 @@ The owner's answers (2026-10-23):
 - income tax (manual);
 - a base on the POS shift's VAT line.
 
+### 3.13 What ADR-0106 changed (2026-10-24) — the questionnaire's suggestions adopted
+
+The owner adopted every suggestion of the accountant questionnaire as a decision (§18's Status column). Where a suggestion differs from F3/F4 (1.1 a daily COGS batch, 1.3 cash receipts crediting cash, 1.5 supplier returns at the document's amount), the owner's later F3/F4 decisions are kept. No migration.
+
+**The core.**
+- `posting/journal-posting.service.ts` `branchOfRefInTx`: a branch ref resolves to the caller's own ref, else to the one branch a source of the company knows by that id; the intake's `body.branch` uses it (so source FIN can tag Bto's branch), and `FinEntryIn.branch` gives the façade the same (a reversal keeps each line's branch).
+- `ledger/chart.service.ts` `defineKeyInTx`: a posting key with control NONE, created when missing (the rule right), for a source's runtime record.
+- `posting/report-reader.service.ts` `accountPartyBalances`: every non-zero balance per account × party at a date.
+
+**Bto's side.**
+- `FinPosting.submitInTx(tx, ctx, command, branchId)` tags a POST with a Bto branch, mapping a branch added after boot on the spot (a closed one tags nothing). Invoices, credit notes, vouchers (the money account's branch), supplier bills and returns, stock and revaluation journals (the one branch of their warehouses, else none) and the POS shift close pass it; allocations, manual entries, the opening and the year close stay company-level.
+- An admin-added goods-issue expense type books to `ISSUE_TYPE_<id>` once finance picks its account (`IssueExpenseAccountsService`, `/finance/issue-expense-accounts`), else to ISSUE_OTHER.
+- The opening import refuses a date that is not a month's last day (`NOT_MONTH_END`); `ReportsService.openingCheck` and `/finance/reports/opening-check[.xlsx]` give the sign-off sheet.
+
+**Tests.** `finance-stock.int-spec.ts` (the branch on a sale's stock entry, its invoice, a goods issue, a supplier return and a FIN voucher; the admin type's account), `finance-close-opening.int-spec.ts` (`NOT_MONTH_END`, the opening-check figures and its Excel file).
+
 ## 4. Data model (schema `fin`, ADR-0070 / ADR-0072 / ADR-0076)
 
 Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the contract.
@@ -1031,22 +1047,24 @@ All tests run on real PostgreSQL (ADR-0016). Race cases go in the integrity suit
 
 ## 18. Questions for the accountant (TODO-VERIFY)
 
-| # | Question | What it blocks |
-|---|---|---|
-| D6 | How is an unallocated customer payment presented: on AR as a credit, as a customer-advance liability, or split into advances and refundable overpayments (§11)? Is VAT due on Bto customer advances? | `unapplied_key` on RECEIPT and AR_CREDIT; the statements |
-| D8 | COGS and the inventory postings: per sale or daily; perpetual or periodic; the accounts for receipts, adjustments, stocktakes, transfers and returns; original or current cost on returns; the period of a re-costing variance. The receipt's VAT split is no longer open: ADR-0078 #3, #4 (the main session) fixes it per line, see §16.2 Payables. Also: the GL account of each goods-issue expense type (`issue_expense_types`, ADR-0081) and how a supplier return at average cost corrects the payable | the COGS and inventory work (§16.2) |
-| D9 | Discounts gross with VAT inside (today) or net of VAT? | the revenue and discount lines of every invoice |
-| D12 | Hotel: revenue nightly or at checkout; VAT on a deposit, a forfeit and a refund; city tax at the resort (6331000 / 6313000); nightly VAT through a clearing account? | the PMS posting rules and RES's tax returns |
-| D15 | Are Bto's daily `Н-` numbers acceptable as legal invoice numbers? What applies to the hotel? | numbering before go-live |
-| D16 | Erkhet's chart as it is? Which accounts are receivable, payable, advance, money or clearing (the POS cash and card-clearing accounts included)? Are today's seeded codes the same accounts in Erkhet? After how many days is a clearing balance reported on the DRAIN report, per account? | the chart import; which detail each line must carry; the drain report |
-| D17 | Which statements does the company file (the business СТ1–СТ4, or the NGO forms Erkhet is set up with)? The VAT-return row set? | the statement and VAT-return templates |
-| D24 | Is wholesale revenue earned at the SALE stage or on delivery? | month-end cut-off for goods on the road |
-| D25 | The VAT tax point per document type; how GL VAT is reconciled with e-Barimt each month | tax dates on lines; the monthly compare |
-| D26 | Receivables per branch? Inter-branch lines on cross-branch payments? | balance sheets per branch |
-| D27 | Opening balances: the full trial balance (the owner's default) at which date, and how it is signed off against Erkhet's closing TB per account and per customer | the go-live import |
-| — | Reversal dating: the correction day (today's rule) or the original's date when that month is open? | the REVERSE date rule |
-| — | Write-offs: bad-debt and small-balance policy; an expected-credit-loss allowance? | write-off document types |
-| — | Fixed assets: the depreciation method and rates; the closing entry and income-tax method | the fixed-asset run; the closing entry |
+On 2026-10-24 the owner adopted every suggested answer of the accountant questionnaire (the Claude Doc «Нягтлан бодогчид: Bto санхүүгийн асуулга») as the owner's decisions (ADR-0106). The Status column says which items that settles; the accountant may still correct each, and a correction is a superseding ADR.
+
+| # | Question | What it blocks | Status |
+|---|---|---|---|
+| D6 | How is an unallocated customer payment presented: on AR as a credit, as a customer-advance liability, or split into advances and refundable overpayments (§11)? Is VAT due on Bto customer advances? | `unapplied_key` on RECEIPT and AR_CREDIT; the statements | **Decided by the owner 2026-10-24 (ADR-0106; questionnaire 4.1, 4.2):** a credit on the receivable; no VAT on an advance. Open to the accountant |
+| D8 | COGS and the inventory postings: per sale or daily; perpetual or periodic; the accounts for receipts, adjustments, stocktakes, transfers and returns; original or current cost on returns; the period of a re-costing variance. The receipt's VAT split is no longer open: ADR-0078 #3, #4 (the main session) fixes it per line, see §16.2 Payables. Also: the GL account of each goods-issue expense type (`issue_expense_types`, ADR-0081) and how a supplier return at average cost corrects the payable | the COGS and inventory work (§16.2) | **Decided by the owner 2026-10-24 (ADR-0106; 1.1–1.9):** perpetual; transfers not journaled; returns at the current average; a re-costing in the month corrected; F4's per-document COGS (not the daily batch 1.1 proposed), F3's cash/bank receipt rule (not 1.3's) and F3's supplier return at cost + VAT (not 1.5's) kept as the owner's later decisions; an admin-added expense type gets its own account (1.4); adjustments and stocktakes as F4 (1.6, the owner had no preference). Open to the accountant |
+| D9 | Discounts gross with VAT inside (today) or net of VAT? | the revenue and discount lines of every invoice | **Decided by the owner 2026-10-24 (ADR-0106; 4.3):** VAT inside. Open to the accountant |
+| D12 | Hotel: revenue nightly or at checkout; VAT on a deposit, a forfeit and a refund; city tax at the resort (6331000 / 6313000); nightly VAT through a clearing account? | the PMS posting rules and RES's tax returns | Open (not in the questionnaire) |
+| D15 | Are Bto's daily `Н-` numbers acceptable as legal invoice numbers? What applies to the hotel? | numbering before go-live | **Decided by the owner 2026-10-24 (ADR-0106; 4.4):** the `Н-` numbers stand. Open to the accountant |
+| D16 | Erkhet's chart as it is? Which accounts are receivable, payable, advance, money or clearing (the POS cash and card-clearing accounts included)? Are today's seeded codes the same accounts in Erkhet? After how many days is a clearing balance reported on the DRAIN report, per account? | the chart import; which detail each line must carry; the drain report | **Codes decided by the owner 2026-10-24 (ADR-0106; 2.1–2.4):** Erkhet's chart as it is, 120101 receivable, today's money and seeded codes assumed equal to Erkhet's; the payable account and the drain days still from the accountant |
+| D17 | Which statements does the company file (the business СТ1–СТ4, or the NGO forms Erkhet is set up with)? The VAT-return row set? | the statement and VAT-return templates | Open: the owner chose not to build the statements now (2026-10-24, ADR-0106 #2) |
+| D24 | Is wholesale revenue earned at the SALE stage or on delivery? | month-end cut-off for goods on the road | **Decided by the owner 2026-10-24 (ADR-0106; 4.5):** the «Борлуулалт» stage. Open to the accountant |
+| D25 | The VAT tax point per document type; how GL VAT is reconciled with e-Barimt each month | tax dates on lines; the monthly compare | **Tax point decided by the owner 2026-10-24 (ADR-0106; 3.3):** the document's date; the e-Barimt compare (3.4) comes with the e-Barimt module |
+| D26 | Receivables per branch? Inter-branch lines on cross-branch payments? | balance sheets per branch | **Decided by the owner 2026-10-24 (ADR-0106 #4; 4.6):** company level, the branch on every line; no inter-branch lines. Open to the accountant |
+| D27 | Opening balances: the full trial balance (the owner's default) at which date, and how it is signed off against Erkhet's closing TB per account and per customer | the go-live import | **Decided by the owner 2026-10-24 (ADR-0106 #5; 2.5–2.7):** the full trial balance, Bto starting on a month's 1st (the opening dated the day before), signed per account × party; what Erkhet can export (2.8) still from the accountant |
+| — | Reversal dating: the correction day (today's rule) or the original's date when that month is open? | the REVERSE date rule | **Decided by the owner 2026-10-24 (ADR-0106 #6; 4.7):** the correction day, never before the original. Open to the accountant |
+| — | Write-offs: bad-debt and small-balance policy; an expected-credit-loss allowance? | write-off document types | **Decided by the owner 2026-10-24 (ADR-0106; 4.8):** no automatic write-off until a policy exists. Open to the accountant |
+| — | Fixed assets: the depreciation method and rates; the closing entry and income-tax method | the fixed-asset run; the closing entry | **Partly decided by the owner 2026-10-24 (ADR-0106 #2; 3.5, 3.6, 5.1–5.6):** the closing entry yearly (F6), income tax by manual entry, assets kept by hand after go-live; the classes, lives and method left for later |
 
 ## 19. Not built now, and rejected
 

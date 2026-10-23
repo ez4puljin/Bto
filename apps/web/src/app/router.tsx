@@ -57,6 +57,7 @@ import {
 import { HomePage } from '@/features/home/home-page';
 import { AiPage } from '@/features/ai/ai-page';
 import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
+import { OpeningCheckPage, OpeningCheckPrintPage } from '@/features/finance/opening-check-pages';
 import { PeriodsPage } from '@/features/finance/periods-page';
 import {
   TrialBalancePage,
@@ -159,6 +160,18 @@ export const routes: RouteObject[] = [
       <RequireAuth>
         <RequirePermission permission="finance.read">
           <TrialBalancePrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // The opening's sign-off with its signature lines (ADR-0106 #5).
+    path: '/finance/opening-check/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="finance.read">
+          <OpeningCheckPrintPage />
         </RequirePermission>
       </RequireAuth>
     ),
@@ -607,6 +620,11 @@ function financeRoutes(): RouteObject[] {
       element: read(<TrialBalancePage />),
     },
     { path: 'finance/vat', handle: { width: 'wide' }, element: read(<VatReportPage />) },
+    {
+      path: 'finance/opening-check',
+      handle: { width: 'wide' },
+      element: read(<OpeningCheckPage />),
+    },
     {
       path: 'finance/settings',
       handle: { width: 'reading' },

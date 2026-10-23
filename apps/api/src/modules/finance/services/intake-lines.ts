@@ -6,6 +6,8 @@ import { POSTING_KEY_OF_ROLE } from '../../fin-bridge';
 /** One line of a Bto document's posting, by chart role (ADR-0060 #7), before the intake's shape. */
 export interface RoleLine {
   role: GlRole;
+  /** A key of its own in place of the role's (a goods-issue expense type's, ADR-0106 #3). */
+  key?: string;
   debit: Decimal;
   credit: Decimal;
   /** A tax line's base (the net it was taken from). */
@@ -29,7 +31,7 @@ export function intakeLines(lines: readonly RoleLine[]): LineV1[] {
     const taxCode = TAX_CODE_OF_ROLE[line.role];
     return {
       lineNo: index + 1,
-      key: POSTING_KEY_OF_ROLE[line.role].code,
+      key: line.key ?? POSTING_KEY_OF_ROLE[line.role].code,
       side: debit ? ('DEBIT' as const) : ('CREDIT' as const),
       amount,
       ...(taxCode && line.taxBase
