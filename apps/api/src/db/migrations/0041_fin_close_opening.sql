@@ -37,7 +37,8 @@ ALTER TABLE "fin"."account_groups" ADD CONSTRAINT "account_groups_company_id_com
 ALTER TABLE "fin"."period_events" ADD CONSTRAINT "fin_period_events_period_fk" FOREIGN KEY ("company_id","period_id") REFERENCES "fin"."fiscal_periods"("company_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "fin_period_events_period_idx" ON "fin"."period_events" USING btree ("company_id","period_id","id");--> statement-breakpoint
 ALTER TABLE "fin"."accounts" ADD CONSTRAINT "fin_accounts_group_fk" FOREIGN KEY ("company_id","group_id") REFERENCES "fin"."account_groups"("company_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_kind" CHECK ("import_jobs"."kind" IN ('PRODUCTS', 'CUSTOMERS', 'SUPPLIERS', 'OPENING_STOCK', 'LEVELS', 'PRICES', 'RECEIPTS', 'ISSUES', 'FIN_CHART', 'FIN_OPENING'));--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_kind" CHECK ("import_jobs"."kind" IN ('PRODUCTS', 'CUSTOMERS', 'SUPPLIERS', 'OPENING_STOCK', 'LEVELS', 'PRICES', 'RECEIPTS', 'ISSUES', 'FIN_CHART', 'FIN_OPENING'));
+--> statement-breakpoint
 -- Hand-written (ADR-0102): the month's events are append-only for every role; groups are never
 -- deleted, only deactivated.
 REVOKE DELETE, TRUNCATE ON fin.account_groups, fin.period_events FROM app;

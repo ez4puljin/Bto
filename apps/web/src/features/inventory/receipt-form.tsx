@@ -28,7 +28,7 @@ import {
 import { type PickedSupplier, SupplierPicker } from '@/features/partners/supplier-picker';
 import { useCurrentPricesOf } from '@/features/pricing/api';
 import type { ValidationMessage } from '@/lib/forms';
-import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
+import { formatMnt, formatQty } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -42,16 +42,16 @@ import {
   type ReceiptUpdate,
   useInventoryMutations,
   useReceiptPaymentAccounts,
-  useReceiptSnapshot,
 } from './api';
 import { type CostEntry, parseMoney } from './helpers';
 import { PriceCells, ReceiptTotals } from './receipt-costing';
+import { ReceiptDiscountsCard } from './receipt-discounts';
 import { type PanelLine, ReceiptLinePanel } from './receipt-line-panel';
 import {
   costsChangeable,
-  type DiscountEntry,
-  discountEntryOf,
-  discountRequest,
+  type DiscountDraft,
+  discountsOf,
+  toDiscountRequest,
   entryOfLine,
   focusNextPrice,
   usePostedCosts,
@@ -66,8 +66,6 @@ const FIELD_MESSAGES: Record<string, ValidationMessage> = {
   supplierDocNo: 'validation.tooLong',
   note: 'validation.tooLong',
   moneyAccountId: 'validation.moneyAccountRequired',
-  discountPct: 'validation.discount',
-  discountAmount: 'validation.discount',
 };
 
 const fieldError = (problem: ProblemDetails | null, path: string): ValidationMessage | undefined =>
@@ -129,78 +127,9 @@ function VatNote({ detail }: { detail: ReceiptDetail | null }) {
   );
 }
 
-/** «Хөнгөлөлт»: a percentage or an amount of the delivery note (ADR-0099 #4), saved when left. */
-function DiscountField(props: {
-  id: string;
-  value: DiscountEntry;
-  error?: ValidationMessage;
-  disabled?: boolean;
-  onChange: (value: DiscountEntry) => void;
-  onLeave?: (value: DiscountEntry) => void;
-}) {
-  const { t } = useTranslation();
-  const { value } = props;
-  const kind = useRef<HTMLSelectElement>(null);
-  return (
-    <FormField
-      label={t('inventory.receipt.form.discount')}
-      htmlFor={props.id}
-      error={props.error}
-      hint={t('inventory.receipt.form.discountHint')}
-    >
-      <div className="flex gap-2">
-        <Input
-          id={props.id}
-          inputMode="decimal"
-          autoComplete="off"
-          className="text-right font-mono"
-          disabled={props.disabled}
-          aria-invalid={props.error ? true : undefined}
-          value={value.value}
-          onChange={(event) => props.onChange({ ...value, value: event.target.value })}
-          // Moving to «% / ₮» saves once, with the kind chosen there.
-          onBlur={(event) => {
-            if (event.relatedTarget !== kind.current) props.onLeave?.(value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              props.onLeave?.(value);
-            }
-          }}
-        />
-        <NativeSelect
-          ref={kind}
-          aria-label={t('inventory.receipt.form.discountKind')}
-          className="w-20 shrink-0"
-          disabled={props.disabled}
-          value={value.kind}
-          onChange={(event) => {
-            const next: DiscountEntry = {
-              ...value,
-              kind: event.target.value === 'amount' ? 'amount' : 'pct',
-            };
-            props.onChange(next);
-            props.onLeave?.(next);
-          }}
-        >
-          <option value="pct">%</option>
-          <option value="amount">₮</option>
-        </NativeSelect>
-      </div>
-    </FormField>
-  );
-}
-
-function ReadOnlyHeader({ detail, extra }: { detail: ReceiptDetail; extra?: ReactNode }) {
+function ReadOnlyHeader({ detail }: { detail: ReceiptDetail }) {
   const { t } = useTranslation();
   const none = t('common.none');
-  const canCost = useHasPermission('inventory.costs.manage');
-  const discount = detail.discountPct
-    ? `${new Decimal(detail.discountPct).toString()}%`
-    : detail.discountAmount
-      ? formatTugrik(detail.discountAmount)
-      : none;
   const items: [string, ReactNode][] = [
     [t('inventory.receipt.form.date'), detail.supplierDocDate ?? none],
     [t('inventory.receipts.supplier'), `${detail.supplierName} · ${detail.supplierCode}`],
@@ -222,9 +151,6 @@ function ReadOnlyHeader({ detail, extra }: { detail: ReceiptDetail; extra?: Reac
             ReactNode,
           ],
         ]),
-    ...(canCost && !extra
-      ? [[t('inventory.receipt.form.discount'), discount] as [string, ReactNode]]
-      : []),
   ];
   return (
     <HeaderCard note={<VatNote detail={detail} />}>
@@ -236,7 +162,6 @@ function ReadOnlyHeader({ detail, extra }: { detail: ReceiptDetail; extra?: Reac
           </div>
         ))}
       </dl>
-      {extra}
     </HeaderCard>
   );
 }
@@ -278,6 +203,7 @@ function LinesTable(props: {
           <TableHead>{t('inventory.bin')}</TableHead>
           <TableHead>{t('inventory.unit')}</TableHead>
           <TableHead className="text-right">{t('inventory.qty')}</TableHead>
+          <TableHead className="text-right">{t('inventory.receipt.form.weightColumn')}</TableHead>
           {props.prices ? (
             <>
               <TableHead className="text-right">{t('inventory.receipt.form.unitPrice')}</TableHead>
@@ -328,6 +254,13 @@ function LinesTable(props: {
               <TableCell className="font-mono">{line.binCode}</TableCell>
               <TableCell>{line.unitName}</TableCell>
               <TableCell className="text-right font-mono">{formatQty(line.enteredQty)}</TableCell>
+              <TableCell className="text-right font-mono">
+                {line.weightKg
+                  ? formatQty(
+                      new Decimal(line.weightKg).times(line.qtyBase).toDecimalPlaces(2).toString(),
+                    )
+                  : t('common.none')}
+              </TableCell>
               {props.prices ? cells.prices : null}
               <TableCell className="text-right font-mono">
                 {sale === null ? (
@@ -404,20 +337,7 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
 
   return (
     <>
-      <ReadOnlyHeader
-        detail={detail}
-        extra={
-          changeable ? (
-            <div className={HEADER_GRID}>
-              <DiscountField
-                id="receipt-discount"
-                value={costs.discount}
-                onChange={costs.changeDiscount}
-              />
-            </div>
-          ) : undefined
-        }
-      />
+      <ReadOnlyHeader detail={detail} />
       <Card role="region" aria-labelledby="receipt-lines-title">
         <CardHeader>
           <CardTitle id="receipt-lines-title">{t('inventory.receipt.form.linesTitle')}</CardTitle>
@@ -433,7 +353,7 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
           ) : null}
           <ProblemAlert problem={costs.problem} />
           <LinesTable
-            lines={detail.lines}
+            lines={detail.lines.filter((line) => !line.freeGoods)}
             table={table}
             prices={canCost}
             actions={false}
@@ -458,7 +378,23 @@ function ReceiptView({ detail }: { detail: ReceiptDetail }) {
           {canCost ? <ReceiptTotals detail={detail} /> : null}
         </CardContent>
       </Card>
-      <StickyActions summary={<LinesSummary detail={detail} count={detail.lines.length} />}>
+      {canCost ? (
+        <ReceiptDiscountsCard
+          lines={detail.lines}
+          discounts={changeable ? costs.discounts : discountsOf(detail)}
+          editable={changeable}
+          tooLarge={detail.totals?.discountTooLarge}
+          onChange={costs.changeDiscounts}
+        />
+      ) : null}
+      <StickyActions
+        summary={
+          <LinesSummary
+            detail={detail}
+            count={detail.lines.filter((line) => !line.freeGoods).length}
+          />
+        }
+      >
         <PrintLinks id={detail.id} />
         {changeable ? (
           <>
@@ -503,7 +439,7 @@ function priceBody(entry: CostEntry, before: CostEntry | null): ReceiptLineUpdat
  * is added or «Хадгалах» is pressed: then the draft is created with the header (and that line) and
  * the address becomes the draft's, the page staying as it is. Each header change of a draft is
  * saved at once (selects on change, texts when left). Lines come from the panel (ReceiptLinePanel);
- * a line of the same product and unit adds to it; a line chosen in the table opens in the panel.
+ * every add is a line of its own (ADR-0103); a line chosen in the table opens in the panel.
  * Saves run one after another against the latest copy of the draft.
  */
 function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: number) => void }) {
@@ -512,7 +448,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const navigate = useNavigate();
   const canCost = useHasPermission('inventory.costs.manage');
   const mutations = useInventoryMutations();
-  const snapshot = useReceiptSnapshot();
   const accounts = useReceiptPaymentAccounts();
   const action = useAction();
   const table = useRef<HTMLTableElement>(null);
@@ -526,14 +461,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   const [note, setNote] = useState(detail?.note ?? '');
   const [method, setMethod] = useState<ReceiptPaymentMethod>(detail?.paymentMethod ?? 'CREDIT');
   const [accountId, setAccountId] = useState<number | null>(detail?.moneyAccountId ?? null);
-  const [discount, setDiscount] = useState<DiscountEntry>(() => discountEntryOf(detail));
-  // The field follows the saved discount when it changes (a save, a refusal's undo).
-  const savedDiscount = `${detail?.discountPct ?? ''}|${detail?.discountAmount ?? ''}`;
-  const [shownDiscount, setShownDiscount] = useState(savedDiscount);
-  if (shownDiscount !== savedDiscount) {
-    setShownDiscount(savedDiscount);
-    setDiscount(discountEntryOf(detail));
-  }
   const [headerProblem, setHeaderProblem] = useState<ProblemDetails | null>(null);
   const [required, setRequired] = useState({ supplier: false, account: false });
   const [editing, setEditing] = useState<ReceiptLine | null>(null);
@@ -586,7 +513,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
         ...(note.trim() ? { note: note.trim() } : {}),
         paymentMethod: method,
         ...(method !== 'CREDIT' && accountId !== null ? { moneyAccountId: accountId } : {}),
-        ...(canCost ? discountRequest(discount, true) : {}),
         ...(first ? { lines: [first] } : {}),
       });
       draftId.current = receipt.id;
@@ -604,10 +530,10 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
   };
 
   /**
-   * The panel's line: a new line (with the draft when there is none yet), more of a line of the
-   * same product and unit, or the line being edited. False while the header lacks its supplier.
+   * The panel's line: a new line (with the draft when there is none yet) or the line being edited
+   * (`asNew`: the free goods' panel always adds). False while the header lacks its supplier.
    */
-  const submitLine = (line: PanelLine): Promise<boolean> =>
+  const submitLine = (line: PanelLine, asNew = false): Promise<boolean> =>
     new Promise((resolve) => {
       if (draftId.current === null && supplier === null) {
         setRequired((previous) => ({ ...previous, supplier: true }));
@@ -619,7 +545,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
         action
           .run(async () => {
             const sale = line.salePrice === null ? {} : { salePrice: line.salePrice || null };
-            if (editing) {
+            if (editing && !asNew) {
               await mutations.updateReceiptLine.mutateAsync({
                 id: editing.id,
                 body: {
@@ -643,29 +569,17 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
               });
               return;
             }
-            const receipt = snapshot(id) ?? detail;
-            const same = receipt?.lines.find((row) => row.productUnitId === line.productUnitId);
-            if (same) {
-              await mutations.updateReceiptLine.mutateAsync({
-                id: same.id,
-                body: {
-                  enteredQty: new Decimal(same.enteredQty).plus(line.enteredQty).toString(),
-                  ...prices,
-                  ...(line.salePrice ? { salePrice: line.salePrice } : {}),
-                },
-              });
-            } else {
-              await mutations.addReceiptLine.mutateAsync({
-                id,
-                body: {
-                  productUnitId: line.productUnitId,
-                  enteredQty: line.enteredQty,
-                  ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
-                  ...prices,
-                  ...(line.salePrice ? { salePrice: line.salePrice } : {}),
-                },
-              });
-            }
+            // Every add is a line of its own (owner, 2026-10-23, ADR-0103).
+            await mutations.addReceiptLine.mutateAsync({
+              id,
+              body: {
+                productUnitId: line.productUnitId,
+                enteredQty: line.enteredQty,
+                ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
+                ...prices,
+                ...(line.salePrice ? { salePrice: line.salePrice } : {}),
+              },
+            });
           })
           .then((done) => resolve(done && made))
           .catch(() => resolve(false)),
@@ -742,13 +656,6 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
     const text = value.trim();
     if (text === (detail[field] ?? '')) return;
     patchHeader(field === 'note' ? { note: text || null } : { supplierDocNo: text || null });
-  };
-
-  const leaveDiscount = (value: DiscountEntry) => {
-    if (detail === null) return;
-    const saved = discountEntryOf(detail);
-    if (saved.kind === value.kind && saved.value.trim() === value.value.trim()) return;
-    patchHeader(discountRequest(value, false), () => setDiscount(saved));
   };
 
   const supplierError = required.supplier
@@ -871,22 +778,11 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
               </NativeSelect>
             </FormField>
           )}
-          {canCost ? (
-            <DiscountField
-              id="receipt-discount"
-              value={discount}
-              error={
-                fieldError(headerProblem, 'discountPct') ??
-                fieldError(headerProblem, 'discountAmount')
-              }
-              onChange={setDiscount}
-              onLeave={leaveDiscount}
-            />
-          ) : null}
         </div>
         <ProblemAlert problem={problemFromError(accounts.error)} />
       </HeaderCard>
       <ReceiptLinePanel
+        supplierId={supplier?.id}
         editing={editing}
         pending={mutations.addReceiptLine.isPending || mutations.updateReceiptLine.isPending}
         problem={confirm ? null : <ProblemAlert problem={action.problem} />}
@@ -902,7 +798,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
             <p className="text-sm text-muted-foreground">{t('inventory.receipt.linesEmpty')}</p>
           ) : (
             <LinesTable
-              lines={lines}
+              lines={lines.filter((line) => !line.freeGoods)}
               table={table}
               prices={canCost}
               actions
@@ -946,7 +842,35 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
           ) : null}
         </CardContent>
       </Card>
-      <StickyActions summary={<LinesSummary detail={detail} count={lines.length} />}>
+      {canCost && detail ? (
+        <ReceiptDiscountsCard
+          lines={lines}
+          discounts={discountsOf(detail)}
+          editable
+          pending={mutations.setReceiptDiscounts.isPending}
+          tooLarge={detail.totals?.discountTooLarge}
+          onChange={(next: DiscountDraft[]) =>
+            void action.run(() =>
+              mutations.setReceiptDiscounts.mutateAsync({
+                id: detail.id,
+                discounts: next.map(toDiscountRequest),
+              }),
+            )
+          }
+          free={{
+            supplierId: supplier?.id,
+            pending: mutations.addReceiptLine.isPending,
+            onAdd: (line) => submitLine(line, true),
+            onRemove: (lineId) =>
+              void action.run(() => mutations.removeReceiptLine.mutateAsync(lineId)),
+          }}
+        />
+      ) : null}
+      <StickyActions
+        summary={
+          <LinesSummary detail={detail} count={lines.filter((line) => !line.freeGoods).length} />
+        }
+      >
         {detail === null ? (
           <Button disabled={mutations.createReceipt.isPending} onClick={saveNew}>
             {t('common.save')}

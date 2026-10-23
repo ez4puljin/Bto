@@ -20,6 +20,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -326,10 +327,6 @@ export const goodsReceipts = pgTable(
     moneyAccountId: integer('money_account_id'),
     /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
     vatRatePct: percent('vat_rate_pct').notNull().default(zero),
-    /** The delivery note's discount (ADR-0099 #4): a percentage of its priced total, or an
-     * amount; spread over the priced lines by amount, it lowers the cost and the payable. */
-    discountPct: percent('discount_pct'),
-    discountAmount: money('discount_amount'),
     ...postingColumns(),
   },
   (t) => [
@@ -358,12 +355,6 @@ export const goodsReceipts = pgTable(
       sql`${t.paymentMethod} <> 'CREDIT' OR ${t.moneyAccountId} IS NULL`,
     ),
     check('goods_receipts_vat_rate', sql`${t.vatRatePct} >= 0 AND ${t.vatRatePct} < 100`),
-    check(
-      'goods_receipts_discount',
-      sql`(${t.discountPct} IS NULL OR ${t.discountAmount} IS NULL)
-        AND (${t.discountPct} IS NULL OR (${t.discountPct} > 0 AND ${t.discountPct} <= 100))
-        AND (${t.discountAmount} IS NULL OR ${t.discountAmount} > 0)`,
-    ),
     check(
       'goods_receipts_texts',
       sql`(${t.supplierDocNo} IS NULL OR length(${t.supplierDocNo}) BETWEEN 1 AND 50)
@@ -415,6 +406,58 @@ export const goodsReceiptLines = pgTable(
         AND (${t.docUnitPrice} IS NULL OR (${t.docUnitPrice} >= 0 AND ${t.docAmount} IS NOT NULL))
         AND NOT (${t.freeGoods} AND ${t.docAmount} IS NOT NULL)`,
     ),
+  ],
+);
+
+/** What a receipt's discount applies to (ADR-0103). */
+export const RECEIPT_DISCOUNT_KINDS = ['LINES', 'NOTE'] as const;
+
+/**
+ * A receipt's discounts (ADR-0103): on chosen lines, or on the whole note (at most one), a
+ * percentage or an amount. Line discounts come first, the note's on what remains; the shares land
+ * on each costing version (stock_valuation_adjustments.discount_amount).
+ */
+export const goodsReceiptDiscounts = pgTable(
+  'goods_receipt_discounts',
+  {
+    id: id(),
+    receiptId: ref('receipt_id')
+      .notNull()
+      .references(() => goodsReceipts.id),
+    kind: text('kind', { enum: RECEIPT_DISCOUNT_KINDS }).notNull(),
+    pct: percent('pct'),
+    amount: money('amount'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('goods_receipt_discounts_receipt_idx').on(t.receiptId, t.id),
+    uniqueIndex('goods_receipt_discounts_note_key')
+      .on(t.receiptId)
+      .where(sql`${t.kind} = 'NOTE'`),
+    check('goods_receipt_discounts_kind', inList(t.kind, RECEIPT_DISCOUNT_KINDS)),
+    check(
+      'goods_receipt_discounts_value',
+      sql`(${t.pct} IS NULL) <> (${t.amount} IS NULL)
+        AND (${t.pct} IS NULL OR (${t.pct} > 0 AND ${t.pct} <= 100))
+        AND (${t.amount} IS NULL OR ${t.amount} > 0)`,
+    ),
+  ],
+);
+
+/** The lines a LINES discount applies to; a deleted line leaves its discounts. */
+export const goodsReceiptDiscountLines = pgTable(
+  'goods_receipt_discount_lines',
+  {
+    discountId: ref('discount_id')
+      .notNull()
+      .references(() => goodsReceiptDiscounts.id, { onDelete: 'cascade' }),
+    lineId: ref('line_id')
+      .notNull()
+      .references(() => goodsReceiptLines.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.discountId, t.lineId] }),
+    index('goods_receipt_discount_lines_line_idx').on(t.lineId),
   ],
 );
 

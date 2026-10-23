@@ -278,7 +278,14 @@
     {
       "idx": 39,
       "version": "7",
-      "when": 1792761154196,
+      "when": 1792739377516,
+      "tag": "0042_receipt_discounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792764982838,
       "tag": "0041_fin_close_opening",
       "breakpoints": true
     }

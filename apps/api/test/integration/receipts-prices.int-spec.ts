@@ -38,17 +38,25 @@ interface ReceiptJson {
   vatRatePct: string;
   supplierDocNo: string | null;
   supplierDocDate: string | null;
-  discountPct?: string | null;
-  discountAmount?: string | null;
+  discounts?: DiscountJson[];
   lines: LineJson[];
   totals?: {
     docTotal: string;
     discountTotal: string;
+    discountTooLarge: boolean;
     netTotal: string;
     vatTotal: string;
     costTotal: string;
     pricedLines: number;
   };
+}
+interface DiscountJson {
+  id: number;
+  kind: 'LINES' | 'NOTE';
+  pct: string | null;
+  amount: string | null;
+  lineIds: number[];
+  total: string | null;
 }
 interface SummaryJson {
   id: number;
@@ -100,9 +108,21 @@ describe('receipt prices and payment', () => {
     http().patch(`/api/v1/receipt-lines/${id}`).set(bearer(token)).send(body);
   const post = (token: string, id: number) =>
     http().post(`/api/v1/receipts/${id}/post`).set(bearer(token)).set(idempotency());
-  /** Creates and posts a receipt as the admin. */
-  const posted = async (body: Record<string, unknown>) => {
+  /** Replaces a draft's discounts (ADR-0103). */
+  const setDiscounts = (token: string, id: number, discounts: Record<string, unknown>[]) =>
+    http().put(`/api/v1/receipts/${id}/discounts`).set(bearer(token)).send({ discounts });
+  /** Creates a draft as the admin with its discounts. */
+  const drafted = async (body: Record<string, unknown>, discounts: Record<string, unknown>[]) => {
     const draft = (await create(admin, body).expect(201)).body as ReceiptJson;
+    return (await setDiscounts(admin, draft.id, discounts).expect(200)).body as ReceiptJson;
+  };
+  /** Creates and posts a receipt as the admin, with its discounts if given. */
+  const posted = async (
+    body: Record<string, unknown>,
+    discounts: Record<string, unknown>[] = [],
+  ) => {
+    const draft = (await create(admin, body).expect(201)).body as ReceiptJson;
+    if (discounts.length > 0) await setDiscounts(admin, draft.id, discounts).expect(200);
     return (await post(admin, draft.id).expect(200)).body as ReceiptJson;
   };
   const list = async (token: string, query: Record<string, unknown>) =>
@@ -226,8 +246,7 @@ describe('receipt prices and payment', () => {
       supplierVatPayer: true,
       vatRatePct: '10',
       paymentMethod: 'CREDIT',
-      discountPct: null,
-      discountAmount: null,
+      discounts: [],
     });
     expect(draft.lines[0]).toMatchObject({
       warehouseId: wh.id,
@@ -241,6 +260,7 @@ describe('receipt prices and payment', () => {
     expect(draft.totals).toEqual({
       docTotal: '26400.00',
       discountTotal: '0.00',
+      discountTooLarge: false,
       netTotal: '26400.00',
       vatTotal: '2400.00',
       costTotal: '24000.00',
@@ -318,13 +338,8 @@ describe('receipt prices and payment', () => {
       supplierId: vatSupplier,
       lines: [{ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '1', docAmount: '500' }],
     }).expect(403);
-    // The discount is cost data too.
-    await create(worker, { supplierId: vatSupplier, discountPct: '5' }).expect(403);
-    await http()
-      .patch(`/api/v1/receipts/${draft.id}`)
-      .set(bearer(worker))
-      .send({ discountAmount: '10' })
-      .expect(403);
+    // The discounts are cost data too.
+    await setDiscounts(worker, draft.id, [{ kind: 'NOTE', pct: '5' }]).expect(403);
     // An admin prices the same draft; the warehouse still sees no price after posting.
     await patchLine(admin, line.id, { docAmount: '550' }).expect(200);
     await post(worker, draft.id).expect(200);
@@ -334,20 +349,28 @@ describe('receipt prices and payment', () => {
   });
 
   it('spreads a percentage discount over the priced lines, lowering their cost', async () => {
-    const draft = (
-      await create(admin, {
+    const draft = await drafted(
+      {
         supplierId: vatSupplier,
         supplierDocNo: 'D-10',
         supplierDocDate: today,
-        discountPct: '10',
         lines: [
           { productUnitId: unitOf(water, 'BOX').id, enteredQty: '2', docUnitPrice: '13200' },
           { productUnitId: unitOf(juice, 'PCS').id, enteredQty: '10', docAmount: '5500' },
           { productUnitId: unitOf(juice, 'PCS').id, enteredQty: '2', freeGoods: true },
         ],
-      }).expect(201)
-    ).body as ReceiptJson;
-    expect(draft).toMatchObject({ discountPct: '10', discountAmount: null });
+      },
+      [{ kind: 'NOTE', pct: '10' }],
+    );
+    expect(draft.discounts).toEqual([
+      expect.objectContaining({
+        kind: 'NOTE',
+        pct: '10',
+        amount: null,
+        lineIds: [],
+        total: '3190.00',
+      }),
+    ]);
     // 10 % of 31,900 is 3,190: 2,640 on the water, 550 on the juice, none on the bonus.
     expect(
       draft.lines.map((line) => [line.discountAmount, line.netAmount, line.vatAmount]),
@@ -359,6 +382,7 @@ describe('receipt prices and payment', () => {
     const totals = {
       docTotal: '31900.00',
       discountTotal: '3190.00',
+      discountTooLarge: false,
       netTotal: '28710.00',
       vatTotal: '2610.00',
       costTotal: '26100.00',
@@ -377,8 +401,15 @@ describe('receipt prices and payment', () => {
     ]);
     const costing = (
       await http().get(`/api/v1/receipts/${draft.id}/costing`).set(bearer(admin)).expect(200)
-    ).body as { discountPct: string; total: string; lines: { discountAmount: string | null }[] };
-    expect(costing).toMatchObject({ discountPct: '10', total: '26100.00' });
+    ).body as {
+      discounts: DiscountJson[];
+      total: string;
+      lines: { discountAmount: string | null }[];
+    };
+    expect(costing).toMatchObject({
+      discounts: [expect.objectContaining({ kind: 'NOTE', pct: '10', total: '3190.00' })],
+      total: '26100.00',
+    });
     expect(costing.lines.map((line) => line.discountAmount)).toEqual(['2640.00', '550.00', null]);
     // The list's amount is the payable, for cost holders only.
     const mine = (await list(admin, { q: 'D-10' })).find((row) => row.id === draft.id);
@@ -398,9 +429,9 @@ describe('receipt prices and payment', () => {
       enteredQty: '1',
       docAmount,
     }));
-    const draft = (
-      await create(admin, { supplierId: plainSupplier, discountAmount: '100', lines }).expect(201)
-    ).body as ReceiptJson;
+    const draft = await drafted({ supplierId: plainSupplier, lines }, [
+      { kind: 'NOTE', amount: '100' },
+    ]);
     expect(draft.lines.map((line) => line.discountAmount)).toEqual(['33.34', '33.33', '33.33']);
     expect(draft.totals).toMatchObject({ discountTotal: '100.00', netTotal: '2900.00' });
     await post(admin, draft.id).expect(200);
@@ -411,34 +442,29 @@ describe('receipt prices and payment', () => {
     ]);
 
     // A percentage or an amount, never both; a percentage up to 100.
-    await create(admin, {
-      supplierId: plainSupplier,
-      discountPct: '5',
-      discountAmount: '10',
-    }).expect(422);
-    await create(admin, { supplierId: plainSupplier, discountPct: '150' }).expect(422);
-
-    // Setting one clears the other.
-    const small = (
-      await create(admin, {
+    const small = await drafted(
+      {
         supplierId: plainSupplier,
-        discountPct: '5',
         lines: [{ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '1', docAmount: '150' }],
-      }).expect(201)
-    ).body as ReceiptJson;
+      },
+      [{ kind: 'NOTE', pct: '5' }],
+    );
+    await setDiscounts(admin, small.id, [{ kind: 'NOTE', pct: '5', amount: '10' }]).expect(422);
+    await setDiscounts(admin, small.id, [{ kind: 'NOTE', pct: '150' }]).expect(422);
+
+    // A new list replaces the old one.
     const changed = (
-      await http()
-        .patch(`/api/v1/receipts/${small.id}`)
-        .set(bearer(admin))
-        .send({ discountAmount: '200' })
-        .expect(200)
+      await setDiscounts(admin, small.id, [{ kind: 'NOTE', amount: '200' }]).expect(200)
     ).body as ReceiptJson;
-    expect(changed).toMatchObject({ discountPct: null, discountAmount: '200.00' });
+    expect(changed.discounts).toEqual([
+      expect.objectContaining({ kind: 'NOTE', pct: null, amount: '200.00', total: null }),
+    ]);
+    expect(changed.totals).toMatchObject({ discountTotal: '0.00', discountTooLarge: true });
     // 200 off a note of 150: the posting refuses it and changes nothing.
     const tooLarge = await post(admin, small.id).expect(422);
     expect(tooLarge.body).toMatchObject({
       code: 'RECEIPT_DISCOUNT_TOO_LARGE',
-      params: { discount: '200.00', total: '150.00' },
+      params: { discount: '200.00', total: '150.00', index: 0 },
     });
     expect((await get(admin, small.id)).status).toBe('DRAFT');
     await http().post(`/api/v1/receipts/${small.id}/cancel`).set(bearer(admin)).expect(200);
@@ -455,7 +481,7 @@ describe('receipt prices and payment', () => {
       .set(idempotency())
       .send({
         costingVersion: 0,
-        discountAmount: '500',
+        discounts: [{ kind: 'NOTE', amount: '500' }],
         lines: [{ lineId: pending.lines[0]?.id, amount: '100' }],
       })
       .expect(422);
@@ -468,12 +494,16 @@ describe('receipt prices and payment', () => {
         .set(idempotency())
         .send({
           costingVersion: 0,
-          discountPct: '10',
+          discounts: [{ kind: 'NOTE', pct: '10' }],
           lines: [{ lineId: pending.lines[0]?.id, amount: '100' }],
         })
         .expect(200)
-    ).body as { discountPct: string; total: string; docTotal: string };
-    expect(costed).toMatchObject({ discountPct: '10', total: '90.00', docTotal: '100.00' });
+    ).body as { discounts: DiscountJson[]; total: string; docTotal: string };
+    expect(costed).toMatchObject({
+      discounts: [expect.objectContaining({ kind: 'NOTE', pct: '10', total: '10.00' })],
+      total: '90.00',
+      docTotal: '100.00',
+    });
   });
 
   it('puts a line’s sale price in force from the posting day, set by price holders only', async () => {
@@ -596,12 +626,14 @@ describe('receipt prices and payment', () => {
       lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '10', docAmount: '10000' }],
     });
     // The newest note: per box and per piece, before its discount.
-    const newest = await posted({
-      supplierId: vatSupplier,
-      supplierDocDate: today,
-      discountPct: '10',
-      lines: [{ productUnitId: unitOf(tea, 'BOX').id, enteredQty: '2', docUnitPrice: '12000' }],
-    });
+    const newest = await posted(
+      {
+        supplierId: vatSupplier,
+        supplierDocDate: today,
+        lines: [{ productUnitId: unitOf(tea, 'BOX').id, enteredQty: '2', docUnitPrice: '12000' }],
+      },
+      [{ kind: 'NOTE', pct: '10' }],
+    );
     expect(newest.lines[0]?.warehouseId).toBe(wh2.id);
     // Posted later, but its note is older; a bonus and a draft carry no price.
     const late = await posted({
@@ -614,13 +646,13 @@ describe('receipt prices and payment', () => {
       supplierDocDate: today,
       lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '1', freeGoods: true }],
     });
-    const draft = (
-      await create(admin, {
+    const draft = await drafted(
+      {
         supplierId: plainSupplier,
-        discountAmount: '1',
         lines: [{ productUnitId: unitOf(tea, 'PCS').id, enteredQty: '1', docAmount: '5' }],
-      }).expect(201)
-    ).body as ReceiptJson;
+      },
+      [{ kind: 'NOTE', amount: '1' }],
+    );
     const unknown = await catalogApi(app, admin).product({
       sku: '7709',
       name: 'Ирээгүй бараа РП',

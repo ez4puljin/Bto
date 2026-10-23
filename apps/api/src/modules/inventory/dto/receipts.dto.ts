@@ -14,7 +14,12 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { RECEIPT_PAYMENT_METHODS, type ReceiptPaymentMethod } from '@tugeel/shared/inventory';
+import {
+  RECEIPT_DISCOUNT_KINDS,
+  RECEIPT_PAYMENT_METHODS,
+  type ReceiptDiscountKind,
+  type ReceiptPaymentMethod,
+} from '@tugeel/shared/inventory';
 import { PageQueryDto, queryIds } from '../../../common/pagination/page';
 import { COSTING_STATUSES, RECEIPT_STATUSES } from '../schema';
 import { QTY, queryBoolean, trimmed } from './bins.dto';
@@ -79,11 +84,61 @@ export class ReceiptLineDto {
 @ApiSchema({ name: 'ReceiptTotals' })
 export class ReceiptTotalsDto {
   @ApiProperty({ description: 'Σ delivery-note amounts, VAT in' }) docTotal: string;
-  @ApiProperty({ description: 'The delivery note’s discount' }) discountTotal: string;
+  @ApiProperty({ description: 'The receipt’s discounts' }) discountTotal: string;
+  @ApiProperty({ description: 'A discount exceeds its lines; the posting will refuse it' })
+  discountTooLarge: boolean;
   @ApiProperty({ description: 'The payable: docTotal less the discount' }) netTotal: string;
   @ApiProperty() vatTotal: string;
   @ApiProperty() costTotal: string;
   @ApiProperty({ description: 'Lines priced or free' }) pricedLines: number;
+}
+
+/** A receipt's discount (ADR-0103): on chosen lines or on the whole note. Cost data. */
+@ApiSchema({ name: 'ReceiptDiscount' })
+export class ReceiptDiscountDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: RECEIPT_DISCOUNT_KINDS }) kind: ReceiptDiscountKind;
+  @ApiProperty({ type: String, nullable: true, example: '5' }) pct: string | null;
+  @ApiProperty({ type: String, nullable: true }) amount: string | null;
+  @ApiProperty({ type: [Number], description: 'LINES: the lines it applies to' }) lineIds: number[];
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'In tugriks on the lines priced so far; null while it exceeds them',
+  })
+  total: string | null;
+}
+
+@ApiSchema({ name: 'ReceiptDiscountRequest' })
+export class ReceiptDiscountRequestDto {
+  @ApiProperty({ enum: RECEIPT_DISCOUNT_KINDS })
+  @IsIn(RECEIPT_DISCOUNT_KINDS)
+  kind: ReceiptDiscountKind;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'A percentage, or …' })
+  @IsOptional()
+  @Matches(PERCENT)
+  pct?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: '… an amount' })
+  @IsOptional()
+  @Matches(MONEY)
+  amount?: string | null;
+  @ApiPropertyOptional({ type: [Number], description: 'LINES only' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  lineIds?: number[];
+}
+
+@ApiSchema({ name: 'ReceiptDiscountsRequest' })
+export class ReceiptDiscountsDto {
+  @ApiProperty({ type: [ReceiptDiscountRequestDto], description: 'Replaces the receipt’s list' })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ReceiptDiscountRequestDto)
+  discounts: ReceiptDiscountRequestDto[];
 }
 
 @ApiSchema({ name: 'ReceiptWarehouse' })
@@ -132,10 +187,8 @@ export class ReceiptDetailDto {
   @ApiProperty({ description: 'Σ base qty × weight, kg (lines with a weight)' }) weightKg: string;
   @ApiProperty({ description: 'Lines whose product has no weight' }) weightMissing: number;
   // Cost data: present only for holders of inventory.costs.manage.
-  @ApiPropertyOptional({ type: String, nullable: true, description: 'Discount, % of the note' })
-  discountPct?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true, description: 'Or a discount amount' })
-  discountAmount?: string | null;
+  @ApiPropertyOptional({ type: [ReceiptDiscountDto], description: 'Cost holders only' })
+  discounts?: ReceiptDiscountDto[];
   @ApiPropertyOptional({ type: ReceiptTotalsDto, description: 'Cost holders only' })
   totals?: ReceiptTotalsDto;
 }
@@ -282,24 +335,6 @@ class ReceiptHeaderFieldsDto {
   @IsInt()
   @Min(1)
   moneyAccountId?: number | null;
-
-  @ApiPropertyOptional({
-    type: String,
-    nullable: true,
-    description: 'Discount, % of the priced total (cost holders); clears an amount',
-  })
-  @IsOptional()
-  @Matches(PERCENT)
-  discountPct?: string | null;
-
-  @ApiPropertyOptional({
-    type: String,
-    nullable: true,
-    description: 'Or a discount amount (cost holders); clears a percentage',
-  })
-  @IsOptional()
-  @Matches(MONEY)
-  discountAmount?: string | null;
 }
 
 @ApiSchema({ name: 'ReceiptCreateRequest' })
@@ -367,17 +402,15 @@ export class CostLineRequestDto {
 @ApiSchema({ name: 'ReceiptCostRequest' })
 export class CostReceiptDto {
   @ApiPropertyOptional({
-    type: String,
-    nullable: true,
-    description: 'Discount, %; given (or discountAmount) replaces the receipt’s, null clears it',
+    type: [ReceiptDiscountRequestDto],
+    description: 'Given, replaces the receipt’s discounts (ADR-0103)',
   })
   @IsOptional()
-  @Matches(PERCENT)
-  discountPct?: string | null;
-  @ApiPropertyOptional({ type: String, nullable: true, description: 'Or a discount amount' })
-  @IsOptional()
-  @Matches(MONEY)
-  discountAmount?: string | null;
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ReceiptDiscountRequestDto)
+  discounts?: ReceiptDiscountRequestDto[];
   @ApiProperty({ description: 'The costing version the form was opened at' })
   @IsInt()
   @Min(0)
@@ -422,8 +455,7 @@ export class ReceiptCostingDto {
   @ApiProperty({ type: String, format: 'date', nullable: true }) recostUntil: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) costedAt: string | null;
   @ApiProperty({ example: '10' }) vatRatePct: string;
-  @ApiProperty({ type: String, nullable: true }) discountPct: string | null;
-  @ApiProperty({ type: String, nullable: true }) discountAmount: string | null;
+  @ApiProperty({ type: [ReceiptDiscountDto] }) discounts: ReceiptDiscountDto[];
   @ApiProperty({ type: String, nullable: true, description: 'Σ cost' }) total: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Σ as typed' }) docTotal: string | null;
   @ApiProperty({ type: [CostedReceiptLineDto] }) lines: CostedReceiptLineDto[];
