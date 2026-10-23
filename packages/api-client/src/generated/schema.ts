@@ -4360,6 +4360,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/reports/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/trial-balance.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalanceXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vatXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_yearClose"];
+        put?: never;
+        post: operations["Reports_closeYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Reports_revertYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -10014,7 +10110,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -10054,7 +10150,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -10588,6 +10684,119 @@ export interface components {
         };
         FinancePeriodReopenRequest: {
             reason: string;
+        };
+        TrialBalanceRow: {
+            accountId: number;
+            /** @example 120101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** @example 12 */
+            groupCode: string | null;
+            groupName: string | null;
+            /**
+             * @description debit − credit before `from`
+             * @example 150000.00
+             */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /**
+             * @description debit − credit at `to`
+             * @example 160000.00
+             */
+            closing: string;
+        };
+        TrialBalance: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-31 */
+            to: string;
+            data: components["schemas"]["TrialBalanceRow"][];
+            /** @example 0.00 */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 10000.00 */
+            credit: string;
+            /** @example 0.00 */
+            closing: string;
+        };
+        VatGroup: {
+            /** @enum {string} */
+            side: "OUTPUT" | "INPUT";
+            /** @example BTO */
+            system: string;
+            /** @example SALES_INVOICE */
+            docType: string | null;
+            /** @example 10000.00 */
+            vat: string;
+            /** @example 100000.00 */
+            base: string;
+            /** @description Lines that carry no base */
+            linesWithoutBase: number;
+        };
+        VatDocument: {
+            entryId: number;
+            entryNumber: string;
+            /** @example 2026-10-15 */
+            entryDate: string;
+            system: string;
+            docType: string | null;
+            documentNumber: string | null;
+            reversal: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 0.00 */
+            input: string;
+            /** @example 100000.00 */
+            base: string;
+        };
+        VatReport: {
+            /** @example 2026-10 */
+            period: string;
+            from: string;
+            to: string;
+            groups: components["schemas"]["VatGroup"][];
+            documents: components["schemas"]["VatDocument"][];
+            /** @description More than 2,000 documents: the list is cut */
+            truncated: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 4000.00 */
+            input: string;
+            /**
+             * @description output − input
+             * @example 6000.00
+             */
+            payable: string;
+        };
+        YearCloseDocument: {
+            id: number;
+            number: string;
+            /** @example 2026-12-31 */
+            date: string;
+        };
+        YearCloseStatus: {
+            /** @example 2026 */
+            year: number;
+            /** @description 31 December has passed */
+            ended: boolean;
+            documents: components["schemas"]["YearCloseDocument"][];
+            /** @example 1000000.00 */
+            income: string;
+            /** @example 800000.00 */
+            expense: string;
+            /**
+             * @description income − expense still to close
+             * @example 200000.00
+             */
+            profit: string;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -23059,6 +23268,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinancePeriod"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalanceXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vat: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VatReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vatXlsx: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_yearClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_closeYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_revertYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
                 };
             };
             /** @description RFC 9457 problem details */

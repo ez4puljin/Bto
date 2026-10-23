@@ -18252,6 +18252,379 @@
         ]
       }
     },
+    "/api/v1/finance/reports/trial-balance": {
+      "get": {
+        "operationId": "Reports_trialBalance",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "description": "Also accounts without lines",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBalance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/trial-balance.xlsx": {
+      "get": {
+        "operationId": "Reports_trialBalanceXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "description": "Also accounts without lines",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/vat": {
+      "get": {
+        "operationId": "Reports_vat",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VatReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/vat.xlsx": {
+      "get": {
+        "operationId": "Reports_vatXlsx",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/year-close/{year}": {
+      "get": {
+        "operationId": "Reports_yearClose",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "Reports_closeYear",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/year-close/{year}/revert": {
+      "post": {
+        "operationId": "Reports_revertYear",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/pos/settings": {
       "get": {
         "operationId": "PosSettings_get",
@@ -37815,7 +38188,8 @@
               "ISSUE_MARKETING",
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
-              "ISSUE_OTHER"
+              "ISSUE_OTHER",
+              "RETAINED_EARNINGS"
             ],
             "type": "string"
           },
@@ -37954,7 +38328,8 @@
               "ISSUE_MARKETING",
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
-              "ISSUE_OTHER"
+              "ISSUE_OTHER",
+              "RETAINED_EARNINGS"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -39712,6 +40087,331 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "TrialBalanceRow": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "120101"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "groupCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "12"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit before `from`"
+          },
+          "debit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "160000.00",
+            "description": "debit − credit at `to`"
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name",
+          "kind",
+          "status",
+          "groupCode",
+          "groupName",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "TrialBalance": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-31"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrialBalanceRow"
+            }
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "debit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "data",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "VatGroup": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "enum": [
+              "OUTPUT",
+              "INPUT"
+            ],
+            "type": "string"
+          },
+          "system": {
+            "type": "string",
+            "example": "BTO"
+          },
+          "docType": {
+            "type": "string",
+            "nullable": true,
+            "example": "SALES_INVOICE"
+          },
+          "vat": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "base": {
+            "type": "string",
+            "example": "100000.00"
+          },
+          "linesWithoutBase": {
+            "type": "number",
+            "description": "Lines that carry no base"
+          }
+        },
+        "required": [
+          "side",
+          "system",
+          "docType",
+          "vat",
+          "base",
+          "linesWithoutBase"
+        ]
+      },
+      "VatDocument": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "number"
+          },
+          "entryNumber": {
+            "type": "string"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-15"
+          },
+          "system": {
+            "type": "string"
+          },
+          "docType": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversal": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "input": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "base": {
+            "type": "string",
+            "example": "100000.00"
+          }
+        },
+        "required": [
+          "entryId",
+          "entryNumber",
+          "entryDate",
+          "system",
+          "docType",
+          "documentNumber",
+          "reversal",
+          "output",
+          "input",
+          "base"
+        ]
+      },
+      "VatReport": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatGroup"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatDocument"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More than 2,000 documents: the list is cut"
+          },
+          "output": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "input": {
+            "type": "string",
+            "example": "4000.00"
+          },
+          "payable": {
+            "type": "string",
+            "example": "6000.00",
+            "description": "output − input"
+          }
+        },
+        "required": [
+          "period",
+          "from",
+          "to",
+          "groups",
+          "documents",
+          "truncated",
+          "output",
+          "input",
+          "payable"
+        ]
+      },
+      "YearCloseDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-12-31"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "date"
+        ]
+      },
+      "YearCloseStatus": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "number",
+            "example": 2026
+          },
+          "ended": {
+            "type": "boolean",
+            "description": "31 December has passed"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YearCloseDocument"
+            }
+          },
+          "income": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "expense": {
+            "type": "string",
+            "example": "800000.00"
+          },
+          "profit": {
+            "type": "string",
+            "example": "200000.00",
+            "description": "income − expense still to close"
+          }
+        },
+        "required": [
+          "year",
+          "ended",
+          "documents",
+          "income",
+          "expense",
+          "profit"
         ]
       },
       "PosSettings": {

@@ -376,6 +376,40 @@ D16 and D27 stay TODO-VERIFY.
 - fixed assets in the opening (balances only);
 - a per-account group screen.
 
+### 3.12 What F6 built (2026-10-23, ADR-0105) — reports
+
+The owner's answers (2026-10-23):
+- the trial balance and the VAT report only (СТ-1…СТ-4 after D17);
+- the statements' rows linked to accounts on a screen, later;
+- the year close as one button;
+- screen, Excel and print.
+
+**Configuration** (migration `0044_fin_year_close`, data only): the key and role `RETAINED_EARNINGS` with account 340101 «Хуримтлагдсан ашиг (алдагдал)» (temporary, D16) and its rule; the document type `FIN.YEAR_CLOSE` (JOURNAL, FIN, the journal series).
+
+**The core.** `posting/report-reader.service.ts` `FinReports`:
+- `trialBalance`: per account the balance before `from`, the period's debit and credit and the closing, with its group; accounts without lines with `all`.
+- `vatReport`: the lines of the VAT keys or of their accounts at the month's end, by source document type, with the bases the lines carry and a count of those without; the documents (≤ 2,000); the tax point is the entry's date (TODO-VERIFY D25).
+- `resultBalances`: the INCOME and EXPENSE balances up to a date.
+
+**Bto's side.**
+- finance: `ReportsService` and `ReportsController`:
+  - `GET /finance/reports/trial-balance` (+ `.xlsx`), `GET /finance/reports/vat` (+ `.xlsx`);
+  - `GET /finance/year-close/:year`, `POST …/:year` and `POST …/:year/revert` (`finance.periods.close`).
+  - The year close posts `FIN/YEAR_CLOSE/<year>.<attempt>.<n>` documents of 499 accounts plus one RETAINED_EARNINGS line, dated 31 December, as the staff member.
+- web: «Гүйлгээ баланс» (`/finance/trial-balance`), «НӨАТ-ын тайлан» (`/finance/vat`), their print pages, the «Жил хаах» card on «Сарын хаалт».
+
+**Tests.**
+- `test/integration/fin-reports.int-spec.ts` (the core alone): the trial balance's figures and balance, the VAT with its base and a reversal netted, the result balances.
+- `test/integration/finance-reports.int-spec.ts` (HTTP): both reports and their Excel files; the year close, its refusals, its revert and a second attempt; a year not ended and a closed December.
+- `fin-bridge.int-spec.ts` replays 0044.
+- Vitest `reports-pages.test.tsx`.
+
+**Not built in F6:**
+- the statements СТ-1…СТ-4 and their row mapping (D17);
+- the official VAT-return rows and the e-Barimt compare (D17, D25);
+- income tax (manual);
+- a base on the POS shift's VAT line.
+
 ## 4. Data model (schema `fin`, ADR-0070 / ADR-0072 / ADR-0076)
 
 Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the contract.
@@ -900,7 +934,7 @@ Consequences:
 | F5 Close and opening | P5 reduced: close and reopen of the latest month with a reason and an event row, a closed month refusing postings in-process, `periods.close` / `periods.reopen`; §16.2 Chart and opening import | 2 | D16, D27 |
 | F6 Reports | §16.2 Statements, VAT return, closing | 2–3 | D17, D25 |
 
-**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. The ledger half was built the same day (§3.7, ADR-0089): accounts and money accounts moved with their ids, roles became append-only rules, monthly periods, the journal with its balance guards and the reversal key, Bto's journal writers switched, the old chart, money-account and journal tables dropped, the development re-post. **F1 is done.** F2 was built the same day (§3.8, ADR-0090): the intake with every class but SETTLEMENT and OPENING, open items, allocations, party balances, the core's numbers, exposure and the default overdue rule, the manual allocation, the core reconcile, Bto's receivables on the engine and Finance I's receivables dropped with no copy; next F3 and F4 in either order. F3 was built the same day (§3.9, ADR-0091): suppliers as parties, the goods receipt as the supplier's bill when it gets its prices, each re-costing's difference, supplier returns as AP credits, manual payments paired by hand, «Нийлүүлэгчийн тооцоо»; next F4 (D8) or F5. F4 was built on 2026-10-22 (§3.10, ADR-0097) with the owner's defaults for D8: every stock posting books its value, unpriced receipts through goods received; next F5 (close and opening). F5 was built on 2026-10-23 (§3.11, ADR-0102): the close and reopen of the latest month, Erkhet's chart import with the «Үүрэг» column, the opening import as OPENING documents (fictitious data only; D16, D27 TODO-VERIFY); next F6 (reports).
+**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. The ledger half was built the same day (§3.7, ADR-0089): accounts and money accounts moved with their ids, roles became append-only rules, monthly periods, the journal with its balance guards and the reversal key, Bto's journal writers switched, the old chart, money-account and journal tables dropped, the development re-post. **F1 is done.** F2 was built the same day (§3.8, ADR-0090): the intake with every class but SETTLEMENT and OPENING, open items, allocations, party balances, the core's numbers, exposure and the default overdue rule, the manual allocation, the core reconcile, Bto's receivables on the engine and Finance I's receivables dropped with no copy; next F3 and F4 in either order. F3 was built the same day (§3.9, ADR-0091): suppliers as parties, the goods receipt as the supplier's bill when it gets its prices, each re-costing's difference, supplier returns as AP credits, manual payments paired by hand, «Нийлүүлэгчийн тооцоо»; next F4 (D8) or F5. F4 was built on 2026-10-22 (§3.10, ADR-0097) with the owner's defaults for D8: every stock posting books its value, unpriced receipts through goods received; next F5 (close and opening). F5 was built on 2026-10-23 (§3.11, ADR-0102): the close and reopen of the latest month, Erkhet's chart import with the «Үүрэг» column, the opening import as OPENING documents (fictitious data only; D16, D27 TODO-VERIFY); next F6 (reports). F6 was built on 2026-10-23 (§3.12, ADR-0105): the trial balance, the month's VAT and the year close, with Excel and print; the statements wait for D17. **The lean plan's phases are built**; what remains before go-live is the accountant's answers (D8, D16, D17, D25, D27) and the cut-over.
 
 **Order.**
 - F1 → F2 → F3 and F4 in either order → F5 → F6. About 11–15 sessions, re-planned in STATUS after each phase.

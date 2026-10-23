@@ -288,6 +288,13 @@
       "when": 1792764982838,
       "tag": "0041_fin_close_opening",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792767523334,
+      "tag": "0044_fin_year_close",
+      "breakpoints": true
     }
   ]
 }
