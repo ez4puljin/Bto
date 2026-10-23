@@ -5303,6 +5303,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-rep/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Нүүр»: running banners, the category grid and PROMOTIONS, segments, DISCOUNTS, NEW. */
+        get: operations["SalesRepHome_homePage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/sections/{key}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A section's full list (`promotions`, `segment-<id>`, `discounts`, `new`, `deals`). */
+        get: operations["SalesRepHome_section"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-rep/categories/{id}/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A category's page: its banners, subcategories, new products and deals of its subtree. */
+        get: operations["SalesRepHome_categoryPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -9241,6 +9292,40 @@ export interface components {
             url: string;
             thumbUrl: string | null;
         };
+        SalesRepDealThreshold: {
+            /** @description A quantity in `unitName` */
+            qty: string | null;
+            /** @description The unit the quantity is in */
+            unitName: string | null;
+            /** @description An amount in MNT (the order’s or a category’s) */
+            amount: string | null;
+        };
+        SalesRepDeal: {
+            /**
+             * @description PROMOTION: with an end date (orange); DISCOUNT (red)
+             * @enum {string}
+             */
+            kind: "PROMOTION" | "DISCOUNT";
+            /** @description The badge: «10+ ш −5%», «−200₮», «−10% · 10/31» */
+            label: string;
+            programId: number;
+            programName: string;
+            /** @enum {string} */
+            scope: "PRODUCT" | "CATEGORY" | "ORDER";
+            /** @enum {string} */
+            effect: "PRICE" | "PERCENT" | "AMOUNT";
+            /** @description The first step: a percentage, tugriks off, or a new unit price */
+            value: string;
+            /** @description The first step’s condition; null when it always applies */
+            threshold: components["schemas"]["SalesRepDealThreshold"] | null;
+            /** @description A pack unit the price or amount is for */
+            perUnitName: string | null;
+            /**
+             * Format: date
+             * @description A promotion’s last day
+             */
+            lastDay: string | null;
+        };
         SalesRepProductUnit: {
             /** @description The product unit id an order line takes */
             id: number;
@@ -9277,6 +9362,10 @@ export interface components {
             basePrice: string | null;
             /** @description The base price on `priceBefore`; null without it */
             basePriceBefore: string | null;
+            /** @description MNT, one base unit in whole packs after an unconditional discount, when lower than basePrice; the card strikes basePrice through */
+            dealPrice: string | null;
+            /** @description The badge of its WHOLESALE discount program; null when none marks it */
+            deal: components["schemas"]["SalesRepDeal"] | null;
             units: components["schemas"]["SalesRepProductUnit"][];
         };
         SalesRepProductPage: {
@@ -11871,6 +11960,59 @@ export interface components {
         BannerMoveRequest: {
             /** @enum {string} */
             direction: "UP" | "DOWN";
+        };
+        SalesRepHomeSection: {
+            /** @description `recent`, `promotions`, `segment-<id>`, … — its full list’s key */
+            key: string;
+            /** @enum {string} */
+            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            /** @description A segment’s name */
+            title: string | null;
+            /** @description A segment’s description */
+            subtitle: string | null;
+            /**
+             * Format: date
+             * @description «Урамшуулал»: the earliest last day of its promotions
+             */
+            lastDay: string | null;
+            /** @description How many products the full list holds */
+            total: number;
+            /** @description At most 10, «Дууссан» last */
+            products: components["schemas"]["SalesRepProduct"][];
+        };
+        SalesRepHome: {
+            /** Format: date */
+            today: string;
+            /** @description Running, in their order */
+            banners: components["schemas"]["CustomerAppBanner"][];
+            /** @description «Ангиллын жагсаалт»: top categories with products, by name */
+            categories: components["schemas"]["CustomerAppHomeCategory"][];
+            /** @description PROMOTIONS, the shown segments, DISCOUNTS and NEW in that order; an empty one is left out */
+            sections: components["schemas"]["SalesRepHomeSection"][];
+        };
+        SalesRepSectionPage: {
+            key: string;
+            /** @enum {string} */
+            kind: "RECENT" | "PROMOTIONS" | "SEGMENT" | "DISCOUNTS" | "NEW" | "FAVOURITES" | "DEALS";
+            title: string | null;
+            subtitle: string | null;
+            /** Format: date */
+            lastDay: string | null;
+            data: components["schemas"]["SalesRepProduct"][];
+            nextCursor: string | null;
+            /** @description On the first page */
+            total: number | null;
+        };
+        SalesRepCategoryPage: {
+            category: components["schemas"]["CustomerAppCategoryHeader"];
+            /** @description «… бүх бараа · N»: products «Бараа» sells in its subtree */
+            productCount: number;
+            /** @description Running banners linked to it */
+            banners: components["schemas"]["CustomerAppBanner"][];
+            /** @description Its subcategories with products */
+            subcategories: components["schemas"]["CustomerAppHomeCategory"][];
+            /** @description «Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree */
+            sections: components["schemas"]["SalesRepHomeSection"][];
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
@@ -24899,6 +25041,104 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepHome_homePage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepHome"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepHome_section: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                /** @description DEFAULT when left out */
+                sort?: "DEFAULT" | "DEAL" | "NEW" | "PRICE_ASC" | "PRICE_DESC";
+                /** @description Each with its subcategories (repeated) */
+                categoryIds?: number[];
+                /** @description «Зөвхөн байгаа бараа» */
+                inStock?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepSectionPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SalesRepHome_categoryPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesRepCategoryPage"];
+                };
             };
             /** @description RFC 9457 problem details */
             default: {

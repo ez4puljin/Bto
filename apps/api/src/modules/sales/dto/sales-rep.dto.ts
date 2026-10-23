@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema, OmitType } from '@nestjs/swagger';
+import { DEAL_KINDS, DISCOUNT_EFFECTS, DISCOUNT_SCOPES } from '@tugeel/shared/pricing';
 import {
   FULFILMENTS,
   type Fulfilment,
@@ -408,6 +409,56 @@ export class SalesRepProductImageDto {
   @ApiProperty({ type: String, nullable: true }) thumbUrl: string | null;
 }
 
+@ApiSchema({ name: 'SalesRepDealThreshold' })
+export class SalesRepDealThresholdDto {
+  @ApiProperty({ type: String, nullable: true, description: 'A quantity in `unitName`' })
+  qty: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The unit the quantity is in' })
+  unitName: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'An amount in MNT (the order’s or a category’s)',
+  })
+  amount: string | null;
+}
+
+/** «Bto300»'s badge (CustomerAppDeal, ADR-0092 #3) on the rep's cards (the owner, 2026-10-23). */
+@ApiSchema({ name: 'SalesRepDeal' })
+export class SalesRepDealDto {
+  @ApiProperty({
+    enum: DEAL_KINDS,
+    description: 'PROMOTION: with an end date (orange); DISCOUNT (red)',
+  })
+  kind: (typeof DEAL_KINDS)[number];
+  @ApiProperty({ description: 'The badge: «10+ ш −5%», «−200₮», «−10% · 10/31»' }) label: string;
+  @ApiProperty() programId: number;
+  @ApiProperty() programName: string;
+  @ApiProperty({ enum: DISCOUNT_SCOPES }) scope: (typeof DISCOUNT_SCOPES)[number];
+  @ApiProperty({ enum: DISCOUNT_EFFECTS }) effect: (typeof DISCOUNT_EFFECTS)[number];
+  @ApiProperty({ description: 'The first step: a percentage, tugriks off, or a new unit price' })
+  value: string;
+  @ApiProperty({
+    type: SalesRepDealThresholdDto,
+    nullable: true,
+    description: 'The first step’s condition; null when it always applies',
+  })
+  threshold: SalesRepDealThresholdDto | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'A pack unit the price or amount is for',
+  })
+  perUnitName: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date',
+    nullable: true,
+    description: 'A promotion’s last day',
+  })
+  lastDay: string | null;
+}
+
 @ApiSchema({ name: 'SalesRepProduct' })
 export class SalesRepProductDto {
   @ApiProperty() id: number;
@@ -435,6 +486,19 @@ export class SalesRepProductDto {
     description: 'The base price on `priceBefore`; null without it',
   })
   basePriceBefore: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'MNT, one base unit in whole packs after an unconditional discount, when lower than basePrice; the card strikes basePrice through',
+  })
+  dealPrice: string | null;
+  @ApiProperty({
+    type: SalesRepDealDto,
+    nullable: true,
+    description: 'The badge of its WHOLESALE discount program; null when none marks it',
+  })
+  deal: SalesRepDealDto | null;
   @ApiProperty({ type: [SalesRepProductUnitDto] }) units: SalesRepProductUnitDto[];
 }
 
