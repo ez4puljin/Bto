@@ -7,6 +7,7 @@ import { PricingModule } from '../pricing';
 import {
   PosCashiersController,
   PosEdgeNodesController,
+  PosQuickButtonsController,
   PosSettingsController,
   PosTillsController,
 } from './controllers/pos-admin.controller';
@@ -17,6 +18,7 @@ import {
   PosSalesController,
   PosShiftsController,
   PosShortfallsController,
+  PosVoidsController,
 } from './controllers/pos-records.controller';
 import { PosSyncController } from './controllers/pos-sync.controller';
 import { EdgeTokenGuard } from './guards/edge-token.guard';
@@ -26,11 +28,13 @@ import { PosCashiersService } from './services/pos-cashiers.service';
 import { PosDevService } from './services/pos-dev.service';
 import { PosEdgeNodesService } from './services/pos-edge-nodes.service';
 import { PosQueryService } from './services/pos-query.service';
+import { PosQuickButtonsService } from './services/pos-quick-buttons.service';
 import { PosReplayService } from './services/pos-replay.service';
 import { PosSettingsService } from './services/pos-settings.service';
 import { PosShiftsService } from './services/pos-shifts.service';
 import { PosSnapshotService } from './services/pos-snapshot.service';
 import { PosTillsService } from './services/pos-tills.service';
+import { PosVoidsService } from './services/pos-voids.service';
 
 const SERVICES = [
   PinHasher,
@@ -39,6 +43,8 @@ const SERVICES = [
   PosTillsService,
   PosCashiersService,
   PosShiftsService,
+  PosVoidsService,
+  PosQuickButtonsService,
   PosAcceptService,
   PosReplayService,
   PosQueryService,
@@ -69,6 +75,8 @@ export class PosModule {}
     PosSalesController,
     PosShortfallsController,
     PosRejectionsController,
+    PosVoidsController,
+    PosQuickButtonsController,
     PosAttentionController,
     PosSyncController,
     PosDevController,

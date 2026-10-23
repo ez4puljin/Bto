@@ -8,6 +8,7 @@ import type {
   ShiftOpenDocDto,
   SyncEventDto,
   TillBoundDocDto,
+  VoidDocDto,
 } from '../dto/pos.dto';
 import type {
   EbarimtFacts,
@@ -17,6 +18,7 @@ import type {
   ShiftOpenDoc,
   SyncEvent,
   TillBoundDoc,
+  VoidDoc,
 } from '../sale-doc';
 
 /** The validated bodies as the services take them: money and quantities as `Decimal`. */
@@ -122,6 +124,26 @@ export function toTillBoundDoc(dto: TillBoundDocDto): TillBoundDoc {
   };
 }
 
+export function toVoidDoc(dto: VoidDocDto): VoidDoc {
+  return {
+    clientId: dto.clientId,
+    tillCode: dto.tillCode,
+    shiftClientId: orNull(dto.shiftClientId),
+    cashierUserId: dto.cashierUserId,
+    approvedByUserId: orNull(dto.approvedByUserId),
+    voidedAt: new Date(dto.voidedAt),
+    reason: dto.reason,
+    lines: dto.lines.map((line) => ({
+      productId: line.productId,
+      productUnitId: line.productUnitId,
+      qty: dec(line.qty),
+      unitPrice: dec(line.unitPrice),
+      total: dec(line.total),
+    })),
+    total: dec(dto.total),
+  };
+}
+
 /** The body that matches `kind` must be present and be the only one; its ids must agree. */
 export function toSyncEvent(dto: SyncEventDto, index: number): SyncEvent {
   const path = `events[${index}]`;
@@ -165,5 +187,12 @@ export function toSyncEvent(dto: SyncEventDto, index: number): SyncEvent {
         clientId: dto.clientId,
         payload: toTillBoundDoc(need(dto.tillBound, 'tillBound')),
       };
+    case 'VOID': {
+      const doc = toVoidDoc(need(dto.voided, 'voided'));
+      if (doc.clientId !== dto.clientId) {
+        throw invalid(`${path}.voided.clientId`, 'clientId', 'matches the event');
+      }
+      return { kind: dto.kind, clientId: dto.clientId, payload: doc };
+    }
   }
 }

@@ -281,6 +281,13 @@
       "when": 1792739377516,
       "tag": "0042_receipt_discounts",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792767384529,
+      "tag": "0043_till_screen",
+      "breakpoints": true
     }
   ]
 }

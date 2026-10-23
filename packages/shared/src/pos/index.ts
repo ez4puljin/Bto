@@ -30,12 +30,20 @@ export const POS_EVENT_KINDS = [
   'RETURN',
   'SHIFT_CLOSED',
   'RECEIPT_STATUS',
+  'VOID',
 ] as const;
 export type PosEventKind = (typeof POS_EVENT_KINDS)[number];
 
 export function isPosEventKind(value: unknown): value is PosEventKind {
   return typeof value === 'string' && (POS_EVENT_KINDS as readonly string[]).includes(value);
 }
+
+/**
+ * Why goods left a till's cart before payment (ADR-0104): a line removed, a quantity lowered, the
+ * whole cart (or a parked one) cancelled. Each is approved by a supervisor's PIN and logged.
+ */
+export const VOID_REASONS = ['LINE_REMOVED', 'QTY_REDUCED', 'CART_CANCELLED'] as const;
+export type VoidReason = (typeof VOID_REASONS)[number];
 
 /** What the centre answers for each replayed document. */
 export const SYNC_RESULTS = ['APPLIED', 'DUPLICATE', 'REJECTED'] as const;
@@ -57,6 +65,9 @@ export const POS_LIMITS = {
   maxCardField: 40,
   pinLength: 6,
   maxParked: 20,
+  maxQuickGroups: 12,
+  maxQuickButtons: 60,
+  maxQuickLabel: 40,
   pairingCodeMinutes: 15,
   defaultReturnWindowDays: 14,
   maxReturnWindowDays: 365,

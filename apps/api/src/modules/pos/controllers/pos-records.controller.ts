@@ -18,10 +18,14 @@ import {
   ShortfallListQueryDto,
   ShortfallPageDto,
   SyncOutcomeDto,
+  VoidDetailDto,
+  VoidListQueryDto,
+  VoidPageDto,
 } from '../dto/pos.dto';
 import { PosQueryService } from '../services/pos-query.service';
 import { PosReplayService } from '../services/pos-replay.service';
 import { PosShiftsService } from '../services/pos-shifts.service';
+import { PosVoidsService } from '../services/pos-voids.service';
 import {
   outcomeDto,
   rejectionDto,
@@ -29,6 +33,8 @@ import {
   saleDto,
   shiftDto,
   shortfallDto,
+  voidDetailDto,
+  voidDto,
 } from './mappers';
 
 const READ = 'pos.read';
@@ -168,5 +174,32 @@ export class PosAttentionController {
   @ApiOkResponse({ type: PosAttentionDto })
   attention(): Promise<PosAttentionDto> {
     return this.query.attention();
+  }
+}
+
+/** What tills took off carts before payment, with the approving supervisor (ADR-0104). */
+@ApiTags('pos')
+@Controller('pos/voids')
+export class PosVoidsController {
+  constructor(private readonly voids: PosVoidsService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: VoidPageDto })
+  async list(@Query() query: VoidListQueryDto): Promise<VoidPageDto> {
+    const page = await this.voids.list(query);
+    return {
+      data: page.data.map(voidDto),
+      nextCursor: page.nextCursor,
+      total: page.total,
+      sum: page.sum === null ? null : page.sum.toFixed(2),
+    };
+  }
+
+  @Get(':id')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: VoidDetailDto })
+  async get(@Param('id', ParseIntPipe) id: number): Promise<VoidDetailDto> {
+    return voidDetailDto(await this.voids.get(id));
   }
 }

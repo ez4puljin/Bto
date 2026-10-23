@@ -22,6 +22,8 @@ import {
   PinRequestDto,
   PosSettingsDto,
   PosSettingsPatchDto,
+  QuickButtonsRequestDto,
+  QuickGroupDto,
   TillDto,
   TillPatchDto,
   TillRequestDto,
@@ -29,6 +31,7 @@ import {
 } from '../dto/pos.dto';
 import { PosCashiersService } from '../services/pos-cashiers.service';
 import { PosEdgeNodesService } from '../services/pos-edge-nodes.service';
+import { PosQuickButtonsService } from '../services/pos-quick-buttons.service';
 import { PosSettingsService } from '../services/pos-settings.service';
 import { PosTillsService } from '../services/pos-tills.service';
 import { cashierDto, edgeNodeDto, settingsDto, tillDto } from './mappers';
@@ -203,5 +206,29 @@ export class PosCashiersController {
     @Param('userId', ParseIntPipe) userId: number,
   ): Promise<CashierDto> {
     return cashierDto(await this.cashiers.unlock(ctx, userId));
+  }
+}
+
+/** The till's F7 panel (ADR-0104): groups of products, saved as a whole set. */
+@ApiTags('pos')
+@Controller('pos/quick-buttons')
+export class PosQuickButtonsController {
+  constructor(private readonly quickButtons: PosQuickButtonsService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [QuickGroupDto] })
+  list(): Promise<QuickGroupDto[]> {
+    return this.quickButtons.list();
+  }
+
+  @Put()
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: [QuickGroupDto] })
+  replace(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: QuickButtonsRequestDto,
+  ): Promise<QuickGroupDto[]> {
+    return this.quickButtons.replace(ctx, body);
   }
 }

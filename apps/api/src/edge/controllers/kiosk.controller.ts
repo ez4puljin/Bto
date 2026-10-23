@@ -6,6 +6,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -16,12 +17,18 @@ import type {
   EdgeDeviceInfo,
   EdgeHealth,
   EdgeLoginResponse,
+  EdgeCartLine,
   EdgePairResponse,
+  EdgeParkedBasket,
   EdgeProductHit,
+  EdgeQuickGroup,
   EdgeQuoteResponse,
   EdgeReceipt,
+  EdgeReturnSale,
   EdgeSession,
   EdgeShiftSummary,
+  EdgeSupervisor,
+  EdgeVoidResponse,
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
@@ -29,13 +36,18 @@ import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import {
+  DiscardParkedDto,
   LoginDto,
   PairDto,
+  ParkDto,
   QuoteDto,
+  ReturnDto,
+  ReturnSaleQueryDto,
   SaleDto,
   SearchQueryDto,
   ShiftCloseDto,
   ShiftOpenDto,
+  VoidDto,
 } from '../dto/kiosk.dto';
 import {
   cashierOf,
@@ -49,8 +61,11 @@ import { CheckoutService } from '../services/checkout.service';
 import { DevicesService } from '../services/devices.service';
 import { KioskAuthService } from '../services/kiosk-auth.service';
 import { OutboxService } from '../services/outbox.service';
+import { EdgeParkedService } from '../services/parked.service';
+import { EdgeReturnsService } from '../services/returns.service';
 import { EdgeShiftsService } from '../services/shifts.service';
 import { SnapshotStore } from '../services/snapshot.store';
+import { EdgeVoidsService } from '../services/voids.service';
 
 /** The centre counts as reachable when the last call to it worked within this long. */
 const REACHABLE_MS = 120_000;
@@ -72,6 +87,9 @@ export class KioskController {
     private readonly auth: KioskAuthService,
     private readonly shifts: EdgeShiftsService,
     private readonly checkout: CheckoutService,
+    private readonly voids: EdgeVoidsService,
+    private readonly parked: EdgeParkedService,
+    private readonly returns: EdgeReturnsService,
   ) {}
 
   @Get('health')
@@ -200,5 +218,64 @@ export class KioskController {
   @Get('sales/recent')
   recent(@Kiosk() kiosk: KioskContext): Promise<EdgeReceipt[]> {
     return this.checkout.recent(kiosk.device.tillCode);
+  }
+
+  // ADR-0104: quick buttons, approvals, voids, parked baskets and returns.
+
+  @Get('quick-buttons')
+  quickButtons(): EdgeQuickGroup[] {
+    return this.checkout.quickGroups();
+  }
+
+  @Get('supervisors')
+  supervisors(): EdgeSupervisor[] {
+    return this.auth.supervisors();
+  }
+
+  @Post('voids')
+  @HttpCode(200)
+  void(@Kiosk() kiosk: KioskContext, @Body() body: VoidDto): Promise<EdgeVoidResponse> {
+    return this.voids.record(kiosk.device.tillCode, cashierOf(kiosk), body);
+  }
+
+  @Get('parked')
+  parkedList(@Kiosk() kiosk: KioskContext): Promise<EdgeParkedBasket[]> {
+    return this.parked.list(kiosk.device.tillCode);
+  }
+
+  @Post('parked')
+  @HttpCode(200)
+  park(@Kiosk() kiosk: KioskContext, @Body() body: ParkDto): Promise<EdgeParkedBasket> {
+    return this.parked.park(kiosk.device.tillCode, cashierOf(kiosk), body);
+  }
+
+  @Post('parked/:clientId/resume')
+  @HttpCode(200)
+  resume(
+    @Kiosk() kiosk: KioskContext,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+  ): Promise<EdgeCartLine[]> {
+    return this.parked.resume(kiosk.device.tillCode, clientId);
+  }
+
+  @Post('parked/:clientId/discard')
+  @HttpCode(204)
+  discard(
+    @Kiosk() kiosk: KioskContext,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Body() body: DiscardParkedDto,
+  ): Promise<void> {
+    return this.parked.discard(kiosk.device.tillCode, cashierOf(kiosk), clientId, body.approval);
+  }
+
+  @Get('returns/sale')
+  returnSale(@Query() query: ReturnSaleQueryDto): Promise<EdgeReturnSale> {
+    return this.returns.findSale(query.number);
+  }
+
+  @Post('returns')
+  @HttpCode(200)
+  refund(@Kiosk() kiosk: KioskContext, @Body() body: ReturnDto): Promise<EdgeReceipt> {
+    return this.returns.refund(kiosk.device.tillCode, cashierOf(kiosk), body);
   }
 }

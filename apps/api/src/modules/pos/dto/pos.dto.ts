@@ -17,6 +17,8 @@ import {
   type SyncResult,
   TENDER_KINDS,
   type TenderKind,
+  VOID_REASONS,
+  type VoidReason,
 } from '@tugeel/shared/pos';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
 import { Transform, Type } from 'class-transformer';
@@ -35,6 +37,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
@@ -772,6 +775,41 @@ export class TillBoundDocDto {
   @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() boundAt: string;
 }
 
+@ApiSchema({ name: 'PosVoidDocLine' })
+export class VoidDocLineDto {
+  @ApiProperty() @IsInt() @Min(1) productId: number;
+  @ApiProperty() @IsInt() @Min(1) productUnitId: number;
+  @ApiProperty({ example: '2' }) @IsString() @Matches(QTY) qty: string;
+  @ApiProperty({ example: '3500' }) @IsString() @Matches(MONEY) unitPrice: string;
+  @ApiProperty({ example: '7000' }) @IsString() @Matches(MONEY) total: string;
+}
+
+@ApiSchema({ name: 'PosVoidDoc' })
+export class VoidDocDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
+  @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  shiftClientId?: string | null;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  approvedByUserId?: number | null;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() voidedAt: string;
+  @ApiProperty({ enum: VOID_REASONS }) @IsIn(VOID_REASONS) reason: VoidReason;
+  @ApiProperty({ type: [VoidDocLineDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => VoidDocLineDto)
+  lines: VoidDocLineDto[];
+  @ApiProperty({ example: '7000' }) @IsString() @Matches(MONEY) total: string;
+}
+
 /** One replayed document: `kind` says which of the optional bodies is filled. */
 @ApiSchema({ name: 'PosSyncEvent' })
 export class SyncEventDto {
@@ -804,14 +842,19 @@ export class SyncEventDto {
   @ValidateNested()
   @Type(() => TillBoundDocDto)
   tillBound?: TillBoundDocDto;
+  @ApiPropertyOptional({ type: VoidDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => VoidDocDto)
+  voided?: VoidDocDto;
 }
 
-@ApiSchema({ name: 'PosSyncBatch' })
 /** `GET /pos/sync/snapshot?since=`: the version the edge holds (ADR-0067). */
 export class SnapshotQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) since?: string;
 }
 
+@ApiSchema({ name: 'PosSyncBatch' })
 export class SyncBatchDto {
   @ApiProperty({ type: [SyncEventDto], description: 'In the order they happened' })
   @IsArray()
@@ -949,4 +992,121 @@ export class DevCloseShiftDto {
   @IsString()
   @MaxLength(POS_LIMITS.maxNote)
   note?: string | null;
+}
+
+// ---------------------------------------------------------------- quick buttons and voids (ADR-0104)
+
+@ApiSchema({ name: 'PosQuickButton' })
+export class QuickButtonDto {
+  @ApiProperty() productUnitId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() productSku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ type: String, nullable: true }) label: string | null;
+  @ApiProperty({ description: 'False once the till can no longer sell it' }) sellable: boolean;
+}
+
+@ApiSchema({ name: 'PosQuickGroup' })
+export class QuickGroupDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: [QuickButtonDto] }) buttons: QuickButtonDto[];
+}
+
+@ApiSchema({ name: 'PosQuickButtonInput' })
+export class QuickButtonInputDto {
+  @ApiProperty() @IsInt() @Min(1) productUnitId: number;
+  @ApiProperty({ type: String, nullable: true, maxLength: POS_LIMITS.maxQuickLabel })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() || null : value,
+  )
+  @IsString()
+  @MaxLength(POS_LIMITS.maxQuickLabel)
+  label: string | null;
+}
+
+@ApiSchema({ name: 'PosQuickGroupInput' })
+export class QuickGroupInputDto {
+  @ApiProperty({ maxLength: POS_LIMITS.maxQuickLabel })
+  @Transform(trimmed)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(POS_LIMITS.maxQuickLabel)
+  name: string;
+  @ApiProperty({ type: [QuickButtonInputDto] })
+  @IsArray()
+  @ArrayMaxSize(POS_LIMITS.maxQuickButtons)
+  @ValidateNested({ each: true })
+  @Type(() => QuickButtonInputDto)
+  buttons: QuickButtonInputDto[];
+}
+
+@ApiSchema({ name: 'PosQuickButtonsRequest' })
+export class QuickButtonsRequestDto {
+  @ApiProperty({ type: [QuickGroupInputDto], description: 'The whole set, in order' })
+  @IsArray()
+  @ArrayMaxSize(POS_LIMITS.maxQuickGroups)
+  @ValidateNested({ each: true })
+  @Type(() => QuickGroupInputDto)
+  groups: QuickGroupInputDto[];
+}
+
+@ApiSchema({ name: 'PosVoid' })
+export class VoidDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ format: 'uuid' }) clientId: string;
+  @ApiProperty() tillId: number;
+  @ApiProperty() tillCode: string;
+  @ApiProperty({ type: Number, nullable: true }) shiftId: number | null;
+  @ApiProperty({ type: String, nullable: true }) shiftNumber: string | null;
+  @ApiProperty() cashierUserId: number;
+  @ApiProperty({ type: String, nullable: true }) cashierName: string | null;
+  @ApiProperty({ type: Number, nullable: true }) approvedBy: number | null;
+  @ApiProperty({ type: String, nullable: true }) approvedByName: string | null;
+  @ApiProperty({ enum: VOID_REASONS }) reason: VoidReason;
+  @ApiProperty({ type: String, format: 'date-time' }) voidedAt: string;
+  @ApiProperty({ example: '7000.00' }) total: string;
+  @ApiProperty() lineCount: number;
+}
+
+@ApiSchema({ name: 'PosVoidLine' })
+export class VoidLineDto {
+  @ApiProperty() lineNo: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() productUnitId: number;
+  @ApiProperty() productSku: string;
+  @ApiProperty() productName: string;
+  @ApiProperty() uomName: string;
+  @ApiProperty({ example: '2' }) qty: string;
+  @ApiProperty({ example: '3500.00' }) unitPrice: string;
+  @ApiProperty({ example: '7000.00' }) total: string;
+}
+
+@ApiSchema({ name: 'PosVoidDetail' })
+export class VoidDetailDto extends VoidDto {
+  @ApiProperty({ type: [VoidLineDto] }) lines: VoidLineDto[];
+}
+
+@ApiSchema({ name: 'PosVoidListQuery' })
+export class VoidListQueryDto extends PageQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) cashierUserId?: number;
+  @ApiPropertyOptional({ enum: VOID_REASONS })
+  @IsOptional()
+  @IsIn(VOID_REASONS)
+  reason?: VoidReason;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+}
+
+@ApiSchema({ name: 'PosVoidPage' })
+export class VoidPageDto {
+  @ApiProperty({ type: [VoidDto] }) data: VoidDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'On the first page only' })
+  total: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The voids’ sum, first page only' })
+  sum: string | null;
 }
