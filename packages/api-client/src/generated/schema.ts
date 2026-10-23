@@ -673,7 +673,8 @@ export interface paths {
         };
         /**
          * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
-         *     and barcodes without pictures, at most 30. Declared before `:id`.
+         *     and barcodes without pictures, at most 30; `supplierId` keeps that supplier's products
+         *     (ADR-0101). Declared before `:id`.
          */
         get: operations["Products_lookup"];
         put?: never;
@@ -1821,6 +1822,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["Receipts_update"];
+        trace?: never;
+    };
+    "/api/v1/receipts/{id}/discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A draft's discounts, replaced as a whole (ADR-0101). */
+        put: operations["Receipts_setDiscounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/receipts/{id}/lines": {
@@ -7060,11 +7078,25 @@ export interface components {
             /** @description Net amount less VAT */
             costAmount?: string | null;
         };
+        ReceiptDiscount: {
+            id: number;
+            /** @enum {string} */
+            kind: "LINES" | "NOTE";
+            /** @example 5 */
+            pct: string | null;
+            amount: string | null;
+            /** @description LINES: the lines it applies to */
+            lineIds: number[];
+            /** @description In tugriks on the lines priced so far; null while it exceeds them */
+            total: string | null;
+        };
         ReceiptTotals: {
             /** @description Σ delivery-note amounts, VAT in */
             docTotal: string;
-            /** @description The delivery note’s discount */
+            /** @description The receipt’s discounts */
             discountTotal: string;
+            /** @description A discount exceeds its lines; the posting will refuse it */
+            discountTooLarge: boolean;
             /** @description The payable: docTotal less the discount */
             netTotal: string;
             vatTotal: string;
@@ -7116,10 +7148,8 @@ export interface components {
             weightKg: string;
             /** @description Lines whose product has no weight */
             weightMissing: number;
-            /** @description Discount, % of the note */
-            discountPct?: string | null;
-            /** @description Or a discount amount */
-            discountAmount?: string | null;
+            /** @description Cost holders only */
+            discounts?: components["schemas"]["ReceiptDiscount"][];
             /** @description Cost holders only */
             totals?: components["schemas"]["ReceiptTotals"];
         };
@@ -7153,10 +7183,6 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
-            /** @description Discount, % of the priced total (cost holders); clears an amount */
-            discountPct?: string | null;
-            /** @description Or a discount amount (cost holders); clears a percentage */
-            discountAmount?: string | null;
             supplierId: number;
             lines?: components["schemas"]["ReceiptLineRequest"][];
         };
@@ -7172,11 +7198,21 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
-            /** @description Discount, % of the priced total (cost holders); clears an amount */
-            discountPct?: string | null;
-            /** @description Or a discount amount (cost holders); clears a percentage */
-            discountAmount?: string | null;
             supplierId?: number;
+        };
+        ReceiptDiscountRequest: {
+            /** @enum {string} */
+            kind: "LINES" | "NOTE";
+            /** @description A percentage, or … */
+            pct?: string | null;
+            /** @description … an amount */
+            amount?: string | null;
+            /** @description LINES only */
+            lineIds?: number[];
+        };
+        ReceiptDiscountsRequest: {
+            /** @description Replaces the receipt’s list */
+            discounts: components["schemas"]["ReceiptDiscountRequest"][];
         };
         ReceiptCostingLine: {
             lineId: number;
@@ -7211,8 +7247,7 @@ export interface components {
             costedAt: string | null;
             /** @example 10 */
             vatRatePct: string;
-            discountPct: string | null;
-            discountAmount: string | null;
+            discounts: components["schemas"]["ReceiptDiscount"][];
             /** @description Σ cost */
             total: string | null;
             /** @description Σ as typed */
@@ -7235,10 +7270,8 @@ export interface components {
             freeGoods?: boolean;
         };
         ReceiptCostRequest: {
-            /** @description Discount, %; given (or discountAmount) replaces the receipt’s, null clears it */
-            discountPct?: string | null;
-            /** @description Or a discount amount */
-            discountAmount?: string | null;
+            /** @description Given, replaces the receipt’s discounts (ADR-0101) */
+            discounts?: components["schemas"]["ReceiptDiscountRequest"][];
             /** @description The costing version the form was opened at */
             costingVersion: number;
             lines: components["schemas"]["ReceiptCostLineRequest"][];
@@ -13747,6 +13780,8 @@ export interface operations {
             query: {
                 /** @description Words of the name in either script, a SKU or a barcode */
                 q: string;
+                /** @description Only the products linked to this supplier (ADR-0101); an empty q lists them */
+                supplierId?: number;
                 /** @description At most 30; default 20 */
                 limit?: number;
             };
@@ -16704,6 +16739,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReceiptUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Receipts_setDiscounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptDiscountsRequest"];
             };
         };
         responses: {

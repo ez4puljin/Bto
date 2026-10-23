@@ -391,10 +391,19 @@ export class ProductsService {
   /**
    * A picker's search (ADR-0099 #3: the receipt window's line panel): the list's match and order
    * over active products, at most `limit` rows with their units and barcodes, without pictures.
+   * `within` narrows it to a set (a supplier's products, ADR-0101), which an empty text lists by
+   * name; without a set an empty text finds nothing.
    */
-  async lookup(q: string, limit: number): Promise<ProductListItem[]> {
-    if (!q.trim()) return [];
-    const page = await this.pageRows({ q, status: 'ACTIVE', limit });
+  async lookup(
+    q: string,
+    limit: number,
+    within: readonly number[] | null = null,
+  ): Promise<ProductListItem[]> {
+    if (within?.length === 0 || (within === null && !q.trim())) return [];
+    const page = await this.pageRows(
+      { ...(q.trim() ? { q } : {}), status: 'ACTIVE', limit },
+      within,
+    );
     return this.enrich(page.data, this.db, false);
   }
 

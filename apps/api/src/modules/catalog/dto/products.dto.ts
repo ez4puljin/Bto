@@ -253,6 +253,15 @@ export class ProductLookupQueryDto {
   @MaxLength(100)
   q: string;
 
+  @ApiPropertyOptional({
+    description: 'Only the products linked to this supplier (ADR-0101); an empty q lists them',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  supplierId?: number;
+
   @ApiPropertyOptional({ description: 'At most 30; default 20' })
   @IsOptional()
   @Type(() => Number)

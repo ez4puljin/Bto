@@ -87,13 +87,31 @@ export class ProductsController {
 
   /**
    * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
-   * and barcodes without pictures, at most 30. Declared before `:id`.
+   * and barcodes without pictures, at most 30; `supplierId` keeps that supplier's products
+   * (ADR-0101). Declared before `:id`.
    */
   @Get('lookup')
   @Authenticated()
   @ApiOkResponse({ type: [ProductListItemDto] })
   async lookup(@Query() query: ProductLookupQueryDto): Promise<ProductListItemDto[]> {
-    return (await this.products.lookup(query.q, query.limit ?? 20)).map(toProductListItemDto);
+    // A supplier's products through the segments' resolver (partners owns the links, ADR-0101).
+    const within =
+      query.supplierId === undefined
+        ? null
+        : await this.productQuery.within({
+            where: {
+              match: 'ALL',
+              groups: [
+                {
+                  match: 'ALL',
+                  conditions: [{ field: 'supplier', op: 'IN', ids: [query.supplierId] }],
+                },
+              ],
+            },
+          });
+    return (await this.products.lookup(query.q, query.limit ?? 20, within)).map(
+      toProductListItemDto,
+    );
   }
 
   /**
