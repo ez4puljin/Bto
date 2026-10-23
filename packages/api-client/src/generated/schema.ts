@@ -4007,6 +4007,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/issue-expense-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["IssueExpenseAccounts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/issue-expense-accounts/{typeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** An admin-added type's own account from today; null sends it back to «бусад». */
+        put: operations["IssueExpenseAccounts_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/money-accounts": {
         parameters: {
             query?: never;
@@ -4384,6 +4417,39 @@ export interface paths {
             cookie?: never;
         };
         get: operations["Reports_trialBalanceXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/opening-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Balances per account × party at the opening's date, for the sign-off (ADR-0106 #5). */
+        get: operations["Reports_openingCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/opening-check.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_openingCheckXlsx"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10357,6 +10423,22 @@ export interface components {
              */
             opening: string;
         };
+        IssueExpenseAccount: {
+            typeId: number;
+            name: string;
+            active: boolean;
+            /** @description a seeded type: its account changes with its role on «Данс» */
+            seeded: boolean;
+            /** @description false: the issues book to «бусад» (ISSUE_OTHER) */
+            own: boolean;
+            accountId: number | null;
+            accountCode: string | null;
+            accountName: string | null;
+        };
+        IssueExpenseAccountRequest: {
+            /** @description null: back to «бусад» */
+            accountId: number | null;
+        };
         MoneyAccount: {
             id: number;
             /** @example CASH-1 */
@@ -10903,6 +10985,38 @@ export interface components {
             credit: string;
             /** @example 0.00 */
             closing: string;
+        };
+        OpeningCheckDocument: {
+            number: string;
+            /** @example 2026-12-31 */
+            date: string;
+        };
+        OpeningCheckRow: {
+            /** @example 120101 */
+            accountCode: string;
+            accountName: string;
+            /**
+             * @description null: the account's lines without a party
+             * @enum {string|null}
+             */
+            partyKind: "CUSTOMER" | "SUPPLIER" | "OTHER" | null;
+            partyCode: string | null;
+            partyName: string | null;
+            /**
+             * @description debit − credit at the date
+             * @example 150000.00
+             */
+            balance: string;
+        };
+        OpeningCheck: {
+            /** @example 2026-12-31 */
+            date: string;
+            opening: components["schemas"]["OpeningCheckDocument"] | null;
+            data: components["schemas"]["OpeningCheckRow"][];
+            /** @example 150000.00 */
+            debit: string;
+            /** @example 150000.00 */
+            credit: string;
         };
         VatGroup: {
             /** @enum {string} */
@@ -22842,6 +22956,68 @@ export interface operations {
             };
         };
     };
+    IssueExpenseAccounts_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueExpenseAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueExpenseAccounts_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                typeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueExpenseAccountRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueExpenseAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     MoneyAccounts_list: {
         parameters: {
             query?: never;
@@ -23701,6 +23877,68 @@ export interface operations {
                 to: string;
                 /** @description Also accounts without lines */
                 all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_openingCheck: {
+        parameters: {
+            query?: {
+                /** @description default: the live opening's date, else the previous month's last day */
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningCheck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_openingCheckXlsx: {
+        parameters: {
+            query?: {
+                /** @description default: the live opening's date, else the previous month's last day */
+                date?: string;
             };
             header?: never;
             path?: never;

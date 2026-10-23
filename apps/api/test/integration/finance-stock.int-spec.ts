@@ -294,6 +294,7 @@ describe('finance stock and cost', () => {
         .send({ name: 'Дээж ФС' })
         .expect(201)
     ).body as { id: number };
+    const sample = await flow.product('8952', 'Дээжийн бараа ФС', '1000', '10');
     const issueOf = async () => {
       const draft = (
         await http()
@@ -304,7 +305,7 @@ describe('finance stock and cost', () => {
             warehouseId: flow.wh.id,
             expenseTypeId: type.id,
             recipient: { kind: 'OTHER', name: 'Дээж' },
-            lines: [{ productUnitId: unitOf(flour, 'PCS').id, enteredQty: '1' }],
+            lines: [{ productUnitId: unitOf(sample, 'PCS').id, enteredQty: '1' }],
           })
           .expect(201)
       ).body as { id: number };

@@ -40,27 +40,10 @@ import {
   useYearClose,
   type VatReport,
 } from './api';
+import { DATE, save, sides } from './report-helpers';
 
-export const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const monthStart = (): string => `${businessDate().slice(0, 7)}-01`;
-
-/** A balance (debit − credit) in its debit and credit columns. */
-export function sides(value: string): [string, string] {
-  const amount = new Decimal(value);
-  if (amount.isZero()) return ['', ''];
-  return amount.gt(0) ? [formatMnt(value), ''] : ['', formatMnt(amount.negated().toFixed(2))];
-}
-
-/** Saves a downloaded file under `name`. */
-export function save(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 /** The rows of a trial balance by group, each group followed by its subtotal (ADR-0105 #2). */
 function byGroup(rows: readonly TrialBalanceRow[]) {

@@ -29,7 +29,7 @@ import {
   useOpeningCheck,
   useReportMutations,
 } from './api';
-import { DATE, save, sides } from './reports-pages';
+import { DATE, save, sides } from './report-helpers';
 
 /** The balances by account, each account with its parties and its subtotal (ADR-0106 #5). */
 function byAccount(rows: readonly OpeningCheckRow[]) {

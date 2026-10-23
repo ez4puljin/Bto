@@ -16844,6 +16844,104 @@
         ]
       }
     },
+    "/api/v1/finance/issue-expense-accounts": {
+      "get": {
+        "operationId": "IssueExpenseAccounts_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IssueExpenseAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/issue-expense-accounts/{typeId}": {
+      "put": {
+        "operationId": "IssueExpenseAccounts_set",
+        "parameters": [
+          {
+            "name": "typeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueExpenseAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IssueExpenseAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "An admin-added type's own account from today; null sends it back to «бусад».",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/money-accounts": {
       "get": {
         "operationId": "MoneyAccounts_list",
@@ -18357,6 +18455,102 @@
             "description": "Also accounts without lines",
             "schema": {
               "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/opening-check": {
+      "get": {
+        "operationId": "Reports_openingCheck",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "default: the live opening's date, else the previous month's last day",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpeningCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Balances per account × party at the opening's date, for the sign-off (ADR-0106 #5).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/opening-check.xlsx": {
+      "get": {
+        "operationId": "Reports_openingCheckXlsx",
+        "parameters": [
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "default: the live opening's date, else the previous month's last day",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
             }
           }
         ],
@@ -39100,6 +39294,64 @@
           "opening"
         ]
       },
+      "IssueExpenseAccount": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "seeded": {
+            "type": "boolean",
+            "description": "a seeded type: its account changes with its role on «Данс»"
+          },
+          "own": {
+            "type": "boolean",
+            "description": "false: the issues book to «бусад» (ISSUE_OTHER)"
+          },
+          "accountId": {
+            "type": "number",
+            "nullable": true
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "typeId",
+          "name",
+          "active",
+          "seeded",
+          "own",
+          "accountId",
+          "accountCode",
+          "accountName"
+        ]
+      },
+      "IssueExpenseAccountRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: back to «бусад»"
+          }
+        },
+        "required": [
+          "accountId"
+        ]
+      },
       "MoneyAccount": {
         "type": "object",
         "properties": {
@@ -40871,6 +41123,104 @@
           "debit",
           "credit",
           "closing"
+        ]
+      },
+      "OpeningCheckDocument": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-12-31"
+          }
+        },
+        "required": [
+          "number",
+          "date"
+        ]
+      },
+      "OpeningCheckRow": {
+        "type": "object",
+        "properties": {
+          "accountCode": {
+            "type": "string",
+            "example": "120101"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "partyKind": {
+            "nullable": true,
+            "enum": [
+              "CUSTOMER",
+              "SUPPLIER",
+              "OTHER"
+            ],
+            "type": "string",
+            "description": "null: the account's lines without a party"
+          },
+          "partyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "partyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "balance": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit at the date"
+          }
+        },
+        "required": [
+          "accountCode",
+          "accountName",
+          "partyKind",
+          "partyCode",
+          "partyName",
+          "balance"
+        ]
+      },
+      "OpeningCheck": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "opening": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OpeningCheckDocument"
+              }
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpeningCheckRow"
+            }
+          },
+          "debit": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "150000.00"
+          }
+        },
+        "required": [
+          "date",
+          "opening",
+          "data",
+          "debit",
+          "credit"
         ]
       },
       "VatGroup": {
