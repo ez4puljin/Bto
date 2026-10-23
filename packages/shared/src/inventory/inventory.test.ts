@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Decimal } from '../money';
 import {
   ADJUSTMENT_REASONS,
+  allocateReceiptDiscount,
+  allocateReceiptDiscounts,
   averageAfterWithdrawal,
   BinRangeError,
   binCodeRange,
@@ -11,8 +13,11 @@ import {
   isBinCode,
   isSellableBinType,
   lineAmountOf,
+  markupPct,
   MOVEMENT_TYPES,
   normalizeBinCode,
+  ReceiptDiscountError,
+  receiptDiscountTotal,
   receiptLineCost,
   receiptLineVat,
   reaverage,
@@ -220,5 +225,94 @@ describe('receipt prices (ADR-0078)', () => {
   it('keeps the whole amount as cost when no VAT applies', () => {
     expect(text(receiptLineVat('2500', '0'))).toBe('0');
     expect(text(receiptLineCost('2500', '0'))).toBe('2500');
+  });
+});
+
+describe('receipt discount and markup (ADR-0099)', () => {
+  it('turns a percentage into tugriks on the priced total, or keeps a typed amount', () => {
+    expect(text(receiptDiscountTotal('12345', { pct: '5', amount: null }))).toBe('617.25');
+    expect(text(receiptDiscountTotal('12345', { pct: null, amount: '500' }))).toBe('500');
+    expect(text(receiptDiscountTotal('12345', { pct: null, amount: null }))).toBe('0');
+  });
+
+  it('spreads the discount by amount, the remainder on the largest line, nothing on free lines', () => {
+    // 100 over 1000 / 2000 / free: 33.33 + 66.67 (66.666… → 66.67) = 100.
+    expect(allocateReceiptDiscount(['1000', '2000', null], '100').map(text)).toEqual([
+      '33.33',
+      '66.67',
+      '0',
+    ]);
+    // 0.01 over three equal lines: the shares round to 0, the cent goes to the first largest.
+    expect(allocateReceiptDiscount(['10', '10', '10'], '0.01').map(text)).toEqual([
+      '0.01',
+      '0',
+      '0',
+    ]);
+    // 10 over three equal lines: 3.33 each, the remaining cent on the first.
+    expect(allocateReceiptDiscount(['30', '30', '30'], '10').map(text)).toEqual([
+      '3.34',
+      '3.33',
+      '3.33',
+    ]);
+    expect(allocateReceiptDiscount(['500', null], '0').map(text)).toEqual(['0', '0']);
+  });
+
+  it('refuses a discount above the priced lines', () => {
+    expect(() => allocateReceiptDiscount(['100', null], '100.01')).toThrow(RangeError);
+    expect(() => allocateReceiptDiscount([null], '1')).toThrow(RangeError);
+  });
+
+  it('measures the markup over the receipt price', () => {
+    expect(markupPct('1200', '1000')?.toFixed()).toBe('20');
+    expect(markupPct('1000', '1200')?.toFixed()).toBe('-16.7');
+    expect(markupPct('1000', '0')).toBeNull();
+  });
+});
+
+describe('receipt discounts on lines and the note (ADR-0103)', () => {
+  const lines = [
+    { id: 1, amount: '1000' },
+    { id: 2, amount: '2000' },
+    { id: 3, amount: '3000' },
+    { id: 4, amount: null },
+  ];
+  const shares = (result: { shares: Map<number, Decimal> }) =>
+    [...result.shares].map(([id, share]) => `${id}:${text(share)}`);
+
+  it('takes the line discounts first and the note discount on what remains', () => {
+    const result = allocateReceiptDiscounts(lines, [
+      { kind: 'LINES', pct: '10', amount: null, lineIds: [1, 2] },
+      { kind: 'NOTE', pct: null, amount: '570', lineIds: [] },
+    ]);
+    // Lines 1 and 2 lose 100 and 200; the note's 570 is spread over 900 / 1800 / 3000 (5,700).
+    expect(shares(result)).toEqual(['1:190', '2:380', '3:300', '4:0']);
+    expect(result.totals.map(text)).toEqual(['300', '570']);
+    expect(result.totals.map(text)).toEqual(['300', '570']);
+  });
+
+  it('adds several line discounts on one line and ignores lines of other receipts', () => {
+    const result = allocateReceiptDiscounts(lines, [
+      { kind: 'LINES', pct: null, amount: '300', lineIds: [3] },
+      { kind: 'LINES', pct: null, amount: '150', lineIds: [3, 1, 99] },
+    ]);
+    expect(shares(result)).toEqual(['1:37.5', '2:0', '3:412.5', '4:0']);
+  });
+
+  it('refuses a discount above its lines, naming it', () => {
+    expect(() =>
+      allocateReceiptDiscounts(lines, [
+        { kind: 'LINES', pct: '60', amount: null, lineIds: [1] },
+        { kind: 'LINES', pct: '60', amount: null, lineIds: [1] },
+      ]),
+    ).toThrow(ReceiptDiscountError);
+    try {
+      allocateReceiptDiscounts(lines, [
+        { kind: 'NOTE', pct: null, amount: '6000.01', lineIds: [] },
+      ]);
+    } catch (error) {
+      expect(error).toBeInstanceOf(ReceiptDiscountError);
+      expect((error as ReceiptDiscountError).index).toBe(0);
+      expect(text((error as ReceiptDiscountError).base)).toBe('6000');
+    }
   });
 });

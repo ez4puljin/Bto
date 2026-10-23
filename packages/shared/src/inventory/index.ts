@@ -426,6 +426,154 @@ export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInpu
   return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
 }
 
+/** A delivery note's discount (ADR-0099 #4): a percentage of its total or an amount, never both. */
+export interface ReceiptDiscount {
+  pct: DecimalInput | null;
+  amount: DecimalInput | null;
+}
+
+/**
+ * The discount in tugriks on a delivery note whose priced lines add up to `gross` (VAT included as
+ * printed): the amount as typed, or `gross × pct / 100`, two decimals half up; 0 without one.
+ */
+export function receiptDiscountTotal(gross: DecimalInput, discount: ReceiptDiscount): Decimal {
+  if (discount.amount !== null) return new Decimal(discount.amount);
+  if (discount.pct !== null) {
+    return new Decimal(gross).times(discount.pct).dividedBy(100).toDecimalPlaces(MONEY_SCALE);
+  }
+  return new Decimal(0);
+}
+
+/**
+ * Spreads a delivery note's discount over its priced lines in proportion to their amounts (ADR-0099
+ * #4): each share two decimals half up, the rounding remainder on the largest line (the first of
+ * equal ones). A line without an amount (free goods, not priced yet) takes nothing. The shares add
+ * up to `total`; a discount above the lines' sum is a RangeError.
+ */
+export function allocateReceiptDiscount(
+  amounts: readonly (DecimalInput | null)[],
+  total: DecimalInput,
+): Decimal[] {
+  const discount = new Decimal(total);
+  const values = amounts.map((amount) => (amount === null ? null : new Decimal(amount)));
+  const gross = values.reduce<Decimal>((sum, value) => sum.plus(value ?? 0), new Decimal(0));
+  if (discount.isNegative() || discount.gt(gross)) {
+    throw new RangeError(`a discount of ${discount.toString()} on ${gross.toString()}`);
+  }
+  if (discount.isZero()) return values.map(() => new Decimal(0));
+  const shares = values.map((value) =>
+    value === null ? new Decimal(0) : discount.times(value).dividedBy(gross).toDecimalPlaces(2),
+  );
+  const rest = discount.minus(shares.reduce((sum, share) => sum.plus(share), new Decimal(0)));
+  if (!rest.isZero()) {
+    let largest = -1;
+    values.forEach((value, index) => {
+      const best = largest < 0 ? null : values[largest];
+      if (value !== null && (best === null || best === undefined || value.gt(best))) {
+        largest = index;
+      }
+    });
+    const share = shares[largest];
+    if (share !== undefined) shares[largest] = share.plus(rest);
+  }
+  return shares;
+}
+
+/** The discounts of a receipt (ADR-0103): on chosen lines, or on the whole note (at most one). */
+export const RECEIPT_DISCOUNT_KINDS = ['LINES', 'NOTE'] as const;
+export type ReceiptDiscountKind = (typeof RECEIPT_DISCOUNT_KINDS)[number];
+
+export interface ReceiptDiscountInput extends ReceiptDiscount {
+  kind: ReceiptDiscountKind;
+  /** The chosen lines of a LINES discount; ignored for NOTE. */
+  lineIds: readonly number[];
+}
+
+/** A discount above the lines it applies to: `index` names it in the list given. */
+export class ReceiptDiscountError extends RangeError {
+  readonly index: number;
+  readonly discount: Decimal;
+  readonly base: Decimal;
+
+  constructor(index: number, discount: Decimal, base: Decimal) {
+    super(`discount ${index} of ${discount.toString()} on ${base.toString()}`);
+    this.index = index;
+    this.discount = discount;
+    this.base = base;
+  }
+}
+
+/**
+ * Each line's share of a receipt's discounts (ADR-0103, owner 2026-10-23): every LINES discount
+ * first, on the sum of its chosen priced lines (a percentage of it, or an amount) spread over them
+ * by amount; then the NOTE discount on what the priced lines keep after those, spread by that
+ * remainder. Returns each line's share and each discount in tugriks. Shares are two decimals; a line without an amount (free goods, not priced yet) takes
+ * nothing. ReceiptDiscountError when a discount exceeds its base.
+ */
+export function allocateReceiptDiscounts(
+  lines: readonly { id: number; amount: DecimalInput | null }[],
+  discounts: readonly ReceiptDiscountInput[],
+): { shares: Map<number, Decimal>; totals: Decimal[] } {
+  const totals = discounts.map(() => new Decimal(0));
+  const shares = new Map<number, Decimal>(lines.map((line) => [line.id, new Decimal(0)]));
+  const amountOf = new Map(
+    lines.map((line) => [line.id, line.amount === null ? null : new Decimal(line.amount)]),
+  );
+  const spread = (
+    index: number,
+    ids: readonly number[],
+    bases: (Decimal | null)[],
+    d: ReceiptDiscount,
+  ) => {
+    const base = bases.reduce<Decimal>((sum, value) => sum.plus(value ?? 0), new Decimal(0));
+    const total = receiptDiscountTotal(base, d);
+    if (total.gt(base)) throw new ReceiptDiscountError(index, total, base);
+    totals[index] = total;
+    allocateReceiptDiscount(bases, total).forEach((share, at) => {
+      const id = ids[at];
+      if (id === undefined) return;
+      const sum = (shares.get(id) ?? new Decimal(0)).plus(share);
+      // Two line discounts together may not take a line below zero.
+      if (sum.gt(amountOf.get(id) ?? 0)) throw new ReceiptDiscountError(index, total, base);
+      shares.set(id, sum);
+    });
+  };
+  discounts.forEach((discount, index) => {
+    if (discount.kind !== 'LINES') return;
+    const ids = [...new Set(discount.lineIds)].filter((id) => amountOf.has(id));
+    spread(
+      index,
+      ids,
+      ids.map((id) => amountOf.get(id) ?? null),
+      discount,
+    );
+  });
+  discounts.forEach((discount, index) => {
+    if (discount.kind !== 'NOTE') return;
+    const ids = lines.map((line) => line.id);
+    spread(
+      index,
+      ids,
+      ids.map((id) => {
+        const amount = amountOf.get(id) ?? null;
+        return amount === null ? null : amount.minus(shares.get(id) ?? 0);
+      }),
+      discount,
+    );
+  });
+  return { shares, totals };
+}
+
+/**
+ * The markup of a sale price over a delivery-note price, both per base unit (owner, 2026-10-23:
+ * (sale − receipt) / receipt × 100), one decimal half up; null without a positive receipt price.
+ */
+export function markupPct(salePrice: DecimalInput, receiptPrice: DecimalInput): Decimal | null {
+  const cost = new Decimal(receiptPrice);
+  if (!cost.gt(0)) return null;
+  return new Decimal(salePrice).minus(cost).dividedBy(cost).times(100).toDecimalPlaces(1);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Goods issues (ADR-0081)
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { SettlementGroup } from '@tugeel/shared/finance';
 import { parseCoordinates } from '@tugeel/shared/geo';
 import { guessCustomerKind } from '@tugeel/shared/imports';
 import { Decimal } from '@tugeel/shared/money';
@@ -27,7 +28,7 @@ import {
   RowCheck,
   type SourceRow,
 } from './importer';
-import { decimalCell, integerCell } from './lookups';
+import { decimalCell } from './lookups';
 
 const CODE = /^[0-9]{1,20}$/;
 const CREDIT_MAX = new Decimal('999999999999.99');
@@ -44,7 +45,21 @@ type Fields = Partial<{
 
 interface Credit {
   creditLimit: string | null;
-  paymentTermDays: number | null;
+  settlementGroup: SettlementGroup;
+}
+
+/**
+ * The settlement group cell (ADR-0101): «Мөрөн» (DAY_20) or «Орон нутаг» (MONTH_END), also the
+ * codes themselves; case, spaces and hyphens are ignored.
+ */
+export function settlementGroupCell(text: string): SettlementGroup | null {
+  const word = text
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (['мөрөн', 'морон', 'day20'].includes(word)) return 'DAY_20';
+  if (['ороннутаг', 'monthend'].includes(word)) return 'MONTH_END';
+  return null;
 }
 
 /** What the commit does with one customer row (JSON: stored as the row's plan). */
@@ -52,7 +67,7 @@ export interface CustomerPlan {
   code: string;
   kind: CustomerKind;
   customerId: number | null;
-  create: Required<Omit<Fields, 'status'>> | null;
+  create: (Required<Omit<Fields, 'status'>> & { settlementGroup: SettlementGroup }) | null;
   patch: Fields;
   before: Fields;
   /** A new address (the first one becomes the default). */
@@ -74,7 +89,8 @@ interface CustomerChanges {
 /**
  * Customers (SPEC §5.5, ADR-0036): keyed on the code. The sheet has no company/individual column:
  * the kind is read from the registration number, else the TIN's length, else a company with a
- * warning. Empty cells never clear what a customer already has.
+ * warning. Empty cells never clear what a customer already has; a new customer needs its settlement
+ * group (ADR-0101).
  */
 @Injectable()
 export class CustomersImporter implements Importer<CustomerPlan> {
@@ -165,12 +181,13 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         if (read.ok) creditLimit = read.value;
         else check.error('creditLimit', read.code);
       }
-      const termText = check.text('paymentTermDays');
-      let paymentTermDays: number | undefined;
-      if (termText !== null) {
-        const read = integerCell(termText, 0, 365);
-        if (read.ok) paymentTermDays = read.value;
-        else check.error('paymentTermDays', read.code);
+      const groupText = check.text('settlementGroup');
+      let settlementGroup: SettlementGroup | undefined;
+      if (groupText !== null) {
+        settlementGroup = settlementGroupCell(groupText) ?? undefined;
+        if (settlementGroup === undefined) check.error('settlementGroup', 'FORMAT');
+      } else if (!customer) {
+        check.error('settlementGroup', 'REQUIRED');
       }
 
       const plan: CustomerPlan = {
@@ -186,7 +203,15 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         changed: [],
       };
       if (!customer) {
-        plan.create = { name: name ?? '', regNo, tin, consumerNo, phone, note };
+        plan.create = {
+          name: name ?? '',
+          regNo,
+          tin,
+          consumerNo,
+          phone,
+          note,
+          settlementGroup: settlementGroup ?? 'DAY_20',
+        };
       } else {
         const set = <K extends keyof Fields>(
           key: K,
@@ -225,19 +250,21 @@ export class CustomersImporter implements Importer<CustomerPlan> {
           if (customer) plan.changed.push('address');
         }
       }
-      if (creditLimit !== undefined || paymentTermDays !== undefined) {
+      // A new customer takes its group at creation; the credit step then sets only the limit.
+      if (creditLimit !== undefined || (customer && settlementGroup !== undefined)) {
+        const group = settlementGroup ?? customer?.settlementGroup ?? 'DAY_20';
         const next: Credit = {
           creditLimit: creditLimit?.toFixed(2) ?? customer?.creditLimit?.toFixed(2) ?? null,
-          paymentTermDays: paymentTermDays ?? customer?.paymentTermDays ?? null,
+          settlementGroup: group,
         };
         const current: Credit = {
           creditLimit: customer?.creditLimit?.toFixed(2) ?? null,
-          paymentTermDays: customer?.paymentTermDays ?? null,
+          settlementGroup: customer?.settlementGroup ?? group,
         };
         if (
           !customer ||
           next.creditLimit !== current.creditLimit ||
-          next.paymentTermDays !== current.paymentTermDays
+          next.settlementGroup !== current.settlementGroup
         ) {
           plan.credit = next;
           plan.creditBefore = {
@@ -304,7 +331,7 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         await this.customers.setCreditInTx(tx, actor, customerId, {
           creditLimit:
             plan.credit.creditLimit === null ? null : new Decimal(plan.credit.creditLimit),
-          paymentTermDays: plan.credit.paymentTermDays,
+          settlementGroup: plan.credit.settlementGroup,
           creditHold: plan.creditBefore?.creditHold ?? false,
           creditHoldReason: plan.creditBefore?.creditHoldReason ?? null,
         });
@@ -363,14 +390,14 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         const limit = customer.creditLimit?.toFixed(2) ?? null;
         if (
           limit === entry.credit.creditLimit &&
-          customer.paymentTermDays === entry.credit.paymentTermDays
+          customer.settlementGroup === entry.credit.settlementGroup
         ) {
           await this.customers.setCreditInTx(tx, actor, entry.customerId, {
             creditLimit:
               entry.creditBefore.creditLimit === null
                 ? null
                 : new Decimal(entry.creditBefore.creditLimit),
-            paymentTermDays: entry.creditBefore.paymentTermDays,
+            settlementGroup: entry.creditBefore.settlementGroup,
             creditHold: customer.creditHold,
             creditHoldReason: customer.creditHoldReason,
           });

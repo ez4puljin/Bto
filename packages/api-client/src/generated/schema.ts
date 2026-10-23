@@ -664,6 +664,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
+         *     and barcodes without pictures, at most 30; `supplierId` keeps that supplier's products
+         *     (ADR-0103). Declared before `:id`.
+         */
+        get: operations["Products_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/query": {
         parameters: {
             query?: never;
@@ -1109,7 +1130,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Credit limit, payment term and hold: the accountant's (partners.credit.manage). */
+        /** Credit limit, settlement group and hold: the accountant's (partners.credit.manage). */
         put: operations["Customers_setCredit"];
         post?: never;
         delete?: never;
@@ -1770,6 +1791,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/receipts/last-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Each product's latest delivery-note price, from any supplier (ADR-0099 #3). */
+        get: operations["Receipts_lastPrices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/receipts/{id}": {
         parameters: {
             query?: never;
@@ -1784,6 +1822,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["Receipts_update"];
+        trace?: never;
+    };
+    "/api/v1/receipts/{id}/discounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A draft's discounts, replaced as a whole (ADR-0103). */
+        put: operations["Receipts_setDiscounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/receipts/{id}/lines": {
@@ -4241,6 +4296,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Periods_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/periods/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Periods_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/periods/{code}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Periods_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/periods/{code}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Periods_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/trial-balance.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalanceXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vatXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_yearClose"];
+        put?: never;
+        post: operations["Reports_closeYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Reports_revertYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -5431,7 +5646,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send" | "customer.home.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send" | "customer.home.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -5752,7 +5967,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "credit.overdue_nets_credits" | "bto.company_code";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "bto.company_code";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -6281,13 +6496,14 @@ export interface components {
             taxProductCode: number;
             cityTax: number;
         };
-        PaymentTerm: {
-            days: number | null;
+        CustomerOverdue: {
             /**
-             * @description The customer’s own days, the company setting, or neither yet
-             * @enum {string}
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
              */
-            source: "CUSTOMER" | "DEFAULT" | "UNSET";
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
         };
         GpsPoint: {
             /** @example 47.918540 */
@@ -6336,8 +6552,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /** @enum {string} */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["CustomerOverdue"] | null;
             note: string | null;
             /** @description The point of the default address */
             gps: components["schemas"]["GpsPoint"] | null;
@@ -6419,9 +6638,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            /** @description Own days; null = the company setting */
-            paymentTermDays: number | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
             note: string | null;
             /** Format: date-time */
@@ -6460,6 +6681,11 @@ export interface components {
             /** @enum {string} */
             kind: "COMPANY" | "INDIVIDUAL";
             name: string;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description The first, default address */
             address?: components["schemas"]["CustomerAddressRequest"];
         };
@@ -6486,8 +6712,11 @@ export interface components {
         CustomerCreditRequest: {
             /** @description MNT; null = not decided yet */
             creditLimit: string | null;
-            /** @description null = the company setting */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHold: boolean;
             creditHoldReason: string | null;
         };
@@ -6983,15 +7212,20 @@ export interface components {
         ReceiptSummary: {
             id: number;
             number: string | null;
-            warehouseId: number;
             supplierId: number;
             supplierName: string;
             supplierDocNo: string | null;
+            /** Format: date */
+            supplierDocDate: string | null;
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED";
             /** @enum {string|null} */
             costingStatus: "PENDING" | "COSTED" | null;
+            /** @enum {string} */
+            paymentMethod: "CREDIT" | "CASH" | "BANK";
             lineCount: number;
+            /** @description The payable (cost holders only) */
+            netAmount?: string | null;
             /** Format: date */
             effectiveDate: string | null;
             /** Format: date-time */
@@ -7007,6 +7241,26 @@ export interface components {
             name: string;
             /** @enum {string} */
             kind: "CASH" | "BANK";
+        };
+        LastReceiptPrice: {
+            productId: number;
+            receiptId: number;
+            receiptNumber: string;
+            /**
+             * Format: date
+             * @description The delivery note’s date
+             */
+            date: string;
+            supplierName: string;
+            unitName: string;
+            /** @description Per entered unit, VAT in, before the discount */
+            unitPrice: string;
+            /** @description Per base unit */
+            basePrice: string;
+        };
+        ReceiptWarehouse: {
+            id: number;
+            name: string;
         };
         ReceiptLine: {
             id: number;
@@ -7025,22 +7279,51 @@ export interface components {
              * @example 48
              */
             qtyBase: string;
+            /** @description Its product’s home warehouse (ADR-0099) */
+            warehouseId: number;
+            warehouseName: string;
             binId: number;
             /** @example A-01-03 */
             binCode: string;
             lotId: number | null;
+            /** @description kg per base unit */
+            weightKg: string | null;
+            /** @description New warehouse price per base unit, in force from the posting */
+            salePrice: string | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
             /** @description Delivery-note amount, VAT in */
             docAmount?: string | null;
             freeGoods?: boolean;
+            /** @description Share of the discount */
+            discountAmount?: string | null;
+            /** @description Amount less the discount */
+            netAmount?: string | null;
             vatAmount?: string | null;
-            /** @description Amount less VAT */
+            /** @description Net amount less VAT */
             costAmount?: string | null;
+        };
+        ReceiptDiscount: {
+            id: number;
+            /** @enum {string} */
+            kind: "LINES" | "NOTE";
+            /** @example 5 */
+            pct: string | null;
+            amount: string | null;
+            /** @description LINES: the lines it applies to */
+            lineIds: number[];
+            /** @description In tugriks on the lines priced so far; null while it exceeds them */
+            total: string | null;
         };
         ReceiptTotals: {
             /** @description Σ delivery-note amounts, VAT in */
             docTotal: string;
+            /** @description The receipt’s discounts */
+            discountTotal: string;
+            /** @description A discount exceeds its lines; the posting will refuse it */
+            discountTooLarge: boolean;
+            /** @description The payable: docTotal less the discount */
+            netTotal: string;
             vatTotal: string;
             costTotal: string;
             /** @description Lines priced or free */
@@ -7050,8 +7333,8 @@ export interface components {
             id: number;
             /** @example GR-2026-000001 */
             number: string | null;
-            warehouseId: number;
-            warehouseName: string;
+            /** @description The warehouses of its lines */
+            warehouses: components["schemas"]["ReceiptWarehouse"][];
             supplierId: number;
             supplierCode: string;
             supplierName: string;
@@ -7086,6 +7369,12 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             lines: components["schemas"]["ReceiptLine"][];
+            /** @description Σ base qty × weight, kg (lines with a weight) */
+            weightKg: string;
+            /** @description Lines whose product has no weight */
+            weightMissing: number;
+            /** @description Cost holders only */
+            discounts?: components["schemas"]["ReceiptDiscount"][];
             /** @description Cost holders only */
             totals?: components["schemas"]["ReceiptTotals"];
         };
@@ -7096,14 +7385,16 @@ export interface components {
              * @example 2
              */
             enteredQty: string;
-            /** @description Omitted: the fixed shelf of the product, else the receiving area */
-            binId?: number | null;
+            /** @description Only for a product without a home: the wholesale warehouse, which becomes its home */
+            warehouseId?: number | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
             /** @description Or the line amount, VAT in */
             docAmount?: string | null;
             /** @description Free goods (бонус) */
             freeGoods?: boolean;
+            /** @description New warehouse price per base unit (price holders) */
+            salePrice?: string | null;
         };
         ReceiptCreateRequest: {
             supplierDocNo?: string | null;
@@ -7117,7 +7408,6 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
-            warehouseId: number;
             supplierId: number;
             lines?: components["schemas"]["ReceiptLineRequest"][];
         };
@@ -7135,6 +7425,20 @@ export interface components {
             moneyAccountId?: number | null;
             supplierId?: number;
         };
+        ReceiptDiscountRequest: {
+            /** @enum {string} */
+            kind: "LINES" | "NOTE";
+            /** @description A percentage, or … */
+            pct?: string | null;
+            /** @description … an amount */
+            amount?: string | null;
+            /** @description LINES only */
+            lineIds?: number[];
+        };
+        ReceiptDiscountsRequest: {
+            /** @description Replaces the receipt’s list */
+            discounts: components["schemas"]["ReceiptDiscountRequest"][];
+        };
         ReceiptCostingLine: {
             lineId: number;
             productId: number;
@@ -7148,6 +7452,8 @@ export interface components {
             amount: string | null;
             /** @description As typed, VAT in */
             docAmount: string | null;
+            /** @description Share of the discount */
+            discountAmount: string | null;
             /** @description Per base unit */
             unitCost: string | null;
             freeGoods: boolean;
@@ -7166,6 +7472,7 @@ export interface components {
             costedAt: string | null;
             /** @example 10 */
             vatRatePct: string;
+            discounts: components["schemas"]["ReceiptDiscount"][];
             /** @description Σ cost */
             total: string | null;
             /** @description Σ as typed */
@@ -7188,6 +7495,8 @@ export interface components {
             freeGoods?: boolean;
         };
         ReceiptCostRequest: {
+            /** @description Given, replaces the receipt’s discounts (ADR-0103) */
+            discounts?: components["schemas"]["ReceiptDiscountRequest"][];
             /** @description The costing version the form was opened at */
             costingVersion: number;
             lines: components["schemas"]["ReceiptCostLineRequest"][];
@@ -7195,12 +7504,13 @@ export interface components {
         ReceiptLineUpdateRequest: {
             /** @example 3 */
             enteredQty?: string;
-            binId?: number;
             /** @description null clears the price */
             docUnitPrice?: string | null;
             /** @description null clears the price */
             docAmount?: string | null;
             freeGoods?: boolean;
+            /** @description New warehouse price per base unit; null clears it (price holders) */
+            salePrice?: string | null;
         };
         BinMoveSummary: {
             id: number;
@@ -7958,8 +8268,6 @@ export interface components {
             };
         };
         ReceiptImportOptions: {
-            /** @description A wholesale warehouse */
-            warehouseId: number;
             /** @enum {string} */
             paymentMethod: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
@@ -7969,10 +8277,17 @@ export interface components {
             /** @description A warehouse or store */
             warehouseId: number;
         };
+        FinOpeningImportOptions: {
+            /**
+             * @description The opening date: the day before go-live
+             * @example 2026-12-31
+             */
+            date: string;
+        };
         ImportJob: {
             id: number;
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES" | "FIN_CHART" | "FIN_OPENING";
             fileName: string;
             /** @enum {string} */
             status: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
@@ -7988,6 +8303,8 @@ export interface components {
             receiptOptions: components["schemas"]["ReceiptImportOptions"] | null;
             /** @description ISSUES only */
             issueOptions: components["schemas"]["IssueImportOptions"] | null;
+            /** @description FIN_OPENING only */
+            openingOptions: components["schemas"]["FinOpeningImportOptions"] | null;
             /** @description The most recent committed import: only it can be reverted */
             canRevert: boolean;
             /** Format: date-time */
@@ -8034,7 +8351,7 @@ export interface components {
         };
         ImportCreateRequest: {
             /** @enum {string} */
-            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
+            kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES" | "FIN_CHART" | "FIN_OPENING";
             /** @description An uploaded file of kind imports.source */
             fileId: number;
             /** @example Бараа.xlsx */
@@ -8043,6 +8360,8 @@ export interface components {
             receiptOptions?: components["schemas"]["ReceiptImportOptions"];
             /** @description Required for ISSUES */
             issueOptions?: components["schemas"]["IssueImportOptions"];
+            /** @description Required for FIN_OPENING */
+            openingOptions?: components["schemas"]["FinOpeningImportOptions"];
         };
         PricedUnit: {
             productUnitId: number;
@@ -8635,6 +8954,15 @@ export interface components {
             /** @description The list's visible columns; the file keeps the list's order */
             columns: ("sku" | "name" | "category" | "baseUnit" | "units" | "warehousePrice" | "priceProfile" | "baseBarcodes" | "unitBarcodes" | "weight" | "homeWarehouse" | "fixedBins" | "supplier" | "status")[];
         };
+        SalesCustomerOverdue: {
+            /**
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
+             */
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
+        };
         SalesOrderSummary: {
             id: number;
             number: string | null;
@@ -8645,6 +8973,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** @enum {string} */
@@ -8759,6 +9089,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** Format: date */
@@ -8987,6 +9319,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /**
@@ -9250,6 +9584,8 @@ export interface components {
             creditHold: boolean;
             /** @description Set only while on hold */
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @description The customer address whose point this is */
             addressId: number;
             /** @description The point's address text */
@@ -9391,6 +9727,8 @@ export interface components {
             phone: string | null;
             /** @description The default address */
             address: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         SalesRepCustomerPage: {
             data: components["schemas"]["SalesRepCustomer"][];
@@ -9452,6 +9790,8 @@ export interface components {
             /** @description Active, the default first */
             addresses: components["schemas"]["SalesRepCustomerAddress"][];
             contacts: components["schemas"]["SalesRepCustomerContact"][];
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         Invoice: {
             id: number;
@@ -9894,7 +10234,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -9934,7 +10274,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -10206,6 +10546,11 @@ export interface components {
             creditLimit: string | null;
             creditHold: boolean;
             /**
+             * @description When the invoices fall due (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
+            /**
              * @description Negative = in advance
              * @example 150000.00
              */
@@ -10435,6 +10780,152 @@ export interface components {
         };
         PayableOpenItemList: {
             data: components["schemas"]["PayableOpenItem"][];
+        };
+        FinancePeriodEvent: {
+            id: number;
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            action: "CLOSE" | "REOPEN";
+            reason: string | null;
+            /** @example Нягтлан */
+            actorLabel: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        FinancePeriod: {
+            id: number;
+            /** @example 2026-10 */
+            code: string;
+            /** @example 2026-10-01 */
+            startsOn: string;
+            /** @example 2026-10-31 */
+            endsOn: string;
+            /** @enum {string} */
+            status: "OPEN" | "CLOSED";
+            lastEvent: components["schemas"]["FinancePeriodEvent"] | null;
+        };
+        FinancePeriodList: {
+            data: components["schemas"]["FinancePeriod"][];
+        };
+        FinancePeriodEventList: {
+            data: components["schemas"]["FinancePeriodEvent"][];
+        };
+        FinancePeriodReopenRequest: {
+            reason: string;
+        };
+        TrialBalanceRow: {
+            accountId: number;
+            /** @example 120101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** @example 12 */
+            groupCode: string | null;
+            groupName: string | null;
+            /**
+             * @description debit − credit before `from`
+             * @example 150000.00
+             */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /**
+             * @description debit − credit at `to`
+             * @example 160000.00
+             */
+            closing: string;
+        };
+        TrialBalance: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-31 */
+            to: string;
+            data: components["schemas"]["TrialBalanceRow"][];
+            /** @example 0.00 */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 10000.00 */
+            credit: string;
+            /** @example 0.00 */
+            closing: string;
+        };
+        VatGroup: {
+            /** @enum {string} */
+            side: "OUTPUT" | "INPUT";
+            /** @example BTO */
+            system: string;
+            /** @example SALES_INVOICE */
+            docType: string | null;
+            /** @example 10000.00 */
+            vat: string;
+            /** @example 100000.00 */
+            base: string;
+            /** @description Lines that carry no base */
+            linesWithoutBase: number;
+        };
+        VatDocument: {
+            entryId: number;
+            entryNumber: string;
+            /** @example 2026-10-15 */
+            entryDate: string;
+            system: string;
+            docType: string | null;
+            documentNumber: string | null;
+            reversal: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 0.00 */
+            input: string;
+            /** @example 100000.00 */
+            base: string;
+        };
+        VatReport: {
+            /** @example 2026-10 */
+            period: string;
+            from: string;
+            to: string;
+            groups: components["schemas"]["VatGroup"][];
+            documents: components["schemas"]["VatDocument"][];
+            /** @description More than 2,000 documents: the list is cut */
+            truncated: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 4000.00 */
+            input: string;
+            /**
+             * @description output − input
+             * @example 6000.00
+             */
+            payable: string;
+        };
+        YearCloseDocument: {
+            id: number;
+            number: string;
+            /** @example 2026-12-31 */
+            date: string;
+        };
+        YearCloseStatus: {
+            /** @example 2026 */
+            year: number;
+            /** @description 31 December has passed */
+            ended: boolean;
+            documents: components["schemas"]["YearCloseDocument"][];
+            /** @example 1000000.00 */
+            income: string;
+            /** @example 800000.00 */
+            expense: string;
+            /**
+             * @description income − expense still to close
+             * @example 200000.00
+             */
+            profit: string;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -11237,8 +11728,11 @@ export interface components {
             phone: string;
             centre: components["schemas"]["CustomerAppCentre"] | null;
             defaultAddress: components["schemas"]["CustomerAppAddress"] | null;
-            /** @description Changed only by the office */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description False while no stage takes app orders: the app does not send */
             ordersOpen: boolean;
             /**
@@ -11598,6 +12092,34 @@ export interface components {
             lines: components["schemas"]["CustomerAppReorderLine"][];
             skipped: components["schemas"]["CustomerAppReorderSkip"][];
         };
+        CustomerAppSettlement: {
+            /** @enum {string} */
+            group: "DAY_20" | "MONTH_END";
+            /**
+             * Format: date
+             * @description The current period's first purchase day
+             */
+            periodFrom: string;
+            /**
+             * Format: date
+             * @description The current period's last purchase day
+             */
+            periodTo: string;
+            /**
+             * Format: date
+             * @description «Тооцоо хийх өдөр»; a weekend moves nothing
+             */
+            dueDate: string;
+            /** @description «N хоног үлдлээ»; 0 on the day itself */
+            daysLeft: number;
+            /**
+             * @description «Төлөх дүн»: everything due by the day (the positive balance)
+             * @example 1284600.00
+             */
+            amountDue: string;
+            /** @description The part of amountDue already overdue (shown in red) */
+            overdueAmount: string;
+        };
         CustomerAppBalance: {
             /**
              * @description Negative = an advance
@@ -11613,7 +12135,7 @@ export interface components {
             creditAvailable: string | null;
             /** @description «Зээл хаалттай»; never its internal reason */
             creditHold: boolean;
-            paymentTermDays: number | null;
+            settlement: components["schemas"]["CustomerAppSettlement"];
             /** @description «Нэхэмжлэх (n)» */
             openInvoices: number;
             /** @description «Төлбөр (n)» */
@@ -12015,7 +12537,7 @@ export interface components {
             sections: components["schemas"]["SalesRepHomeSection"][];
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -13783,6 +14305,41 @@ export interface operations {
             };
         };
     };
+    Products_lookup: {
+        parameters: {
+            query: {
+                /** @description Words of the name in either script, a SKU or a barcode */
+                q: string;
+                /** @description Only the products linked to this supplier (ADR-0103); an empty q lists them */
+                supplierId?: number;
+                /** @description At most 30; default 20 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListItem"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Products_query: {
         parameters: {
             query?: never;
@@ -14540,6 +15097,7 @@ export interface operations {
                 kind?: "COMPANY" | "INDIVIDUAL";
                 status?: "ACTIVE" | "INACTIVE";
                 creditHold?: boolean;
+                settlementGroup?: "DAY_20" | "MONTH_END";
                 /** @description Companies without a TIN */
                 tinPending?: boolean;
                 /** @description The default address has no GPS point */
@@ -16536,7 +17094,14 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
+                /** @description Receipts with a line in this warehouse */
                 warehouseId?: number;
+                /** @description Receipts with a line of this product */
+                productId?: number;
+                /** @description Delivery-note date (else the posting date) from */
+                from?: string;
+                /** @description … until (inclusive) */
+                to?: string;
                 status?: "DRAFT" | "POSTED" | "CANCELLED";
                 /** @description Posted receipts waiting for the accountant */
                 costingPending?: boolean;
@@ -16632,6 +17197,37 @@ export interface operations {
             };
         };
     };
+    Receipts_lastPrices: {
+        parameters: {
+            query: {
+                /** @description Repeated: productIds=1&productIds=2 */
+                productIds: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastReceiptPrice"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     Receipts_get: {
         parameters: {
             query?: never;
@@ -16674,6 +17270,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReceiptUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Receipts_setDiscounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptDiscountsRequest"];
             };
         };
         responses: {
@@ -18445,7 +19075,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
+                kind: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES" | "FIN_CHART" | "FIN_OPENING";
             };
             cookie?: never;
         };
@@ -18476,7 +19106,7 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
-                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES";
+                kind?: "PRODUCTS" | "CUSTOMERS" | "SUPPLIERS" | "OPENING_STOCK" | "LEVELS" | "PRICES" | "RECEIPTS" | "ISSUES" | "FIN_CHART" | "FIN_OPENING";
                 status?: "UPLOADED" | "VALIDATING" | "VALIDATED" | "INVALID" | "COMMITTING" | "COMMITTED" | "FAILED" | "REVERTING" | "REVERTED";
             };
             header?: never;
@@ -22724,6 +23354,356 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PayableOpenItemList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Periods_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancePeriodList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Periods_events: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancePeriodEventList"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Periods_close: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancePeriod"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Periods_reopen: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinancePeriodReopenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancePeriod"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalanceXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vat: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VatReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vatXlsx: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_yearClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_closeYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_revertYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
                 };
             };
             /** @description RFC 9457 problem details */

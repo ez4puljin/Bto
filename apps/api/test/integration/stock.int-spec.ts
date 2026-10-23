@@ -35,9 +35,8 @@ describe('stock queries', () => {
   let shelf: number;
   const http = () => request(app.getHttpServer());
 
-  /** Posts a receipt of one line and costs it at `amount`. */
+  /** Posts a receipt of one line (into its product's home shelf) and costs it at `amount`. */
   async function receive(
-    warehouseId: number,
     supplierId: number,
     line: Record<string, unknown>,
     amount: string,
@@ -46,7 +45,7 @@ describe('stock queries', () => {
       .post('/api/v1/receipts')
       .set(bearer(worker))
       .set(idempotency())
-      .send({ warehouseId, supplierId, lines: [line] })
+      .send({ supplierId, lines: [line] })
       .expect(201);
     const body = created.body as { id: number; lines: { id: number }[] };
     await http()
@@ -93,18 +92,10 @@ describe('stock queries', () => {
     });
     await catalog.product({ sku: '12', name: 'Кофе', categoryId: category, baseUomId: pcs });
     const supplierId = (await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' })).id;
-    await receive(
-      wh1.id,
-      supplierId,
-      { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2', binId: shelf },
-      '48000',
-    );
-    await receive(
-      wh2.id,
-      supplierId,
-      { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10', binId: other },
-      '5000',
-    );
+    await inventory.homeShelf(cola.id, wh1.id, shelf);
+    await inventory.homeShelf(rice.id, wh2.id, other);
+    await receive(supplierId, { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }, '48000');
+    await receive(supplierId, { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10' }, '5000');
   });
   afterAll(async () => {
     await expectReconciled(app);

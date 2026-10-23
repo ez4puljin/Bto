@@ -153,23 +153,24 @@ describe('segments and filtered lists', () => {
         .expect(201);
     }
 
-    await inventory.setHome(cola.id, wh1.id);
+    await inventory.homeShelf(cola.id, wh1.id, shelf1);
     await inventory.setHome(still.id, wh1.id);
-    await inventory.setHome(rice.id, wh2.id);
+    await inventory.homeShelf(rice.id, wh2.id, shelf2);
     await http()
       .put('/api/v1/product-locations')
       .set(bearer(admin))
       .send({ warehouseId: wh1.id, productId: still.id, minQty: '5' })
       .expect(200);
-    for (const [warehouseId, line] of [
-      [wh1.id, { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2', binId: shelf1 }],
-      [wh2.id, { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10', binId: shelf2 }],
-    ] as const) {
+    // Each line goes to its product's home and fixed shelf (ADR-0099 #1).
+    for (const line of [
+      { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' },
+      { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10' },
+    ]) {
       const created = await http()
         .post('/api/v1/receipts')
         .set(bearer(admin))
         .set(idempotency())
-        .send({ warehouseId, supplierId: msm, lines: [line] })
+        .send({ supplierId: msm, lines: [line] })
         .expect(201);
       await http()
         .post(`/api/v1/receipts/${(created.body as { id: number }).id}/post`)
@@ -474,7 +475,7 @@ describe('segments and filtered lists', () => {
       .set(bearer(admin))
       .send({
         creditLimit: null,
-        paymentTermDays: null,
+        settlementGroup: 'DAY_20',
         creditHold: true,
         creditHoldReason: 'Хугацаа хэтэрсэн',
       })

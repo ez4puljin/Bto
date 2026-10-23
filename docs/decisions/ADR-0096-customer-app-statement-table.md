@@ -5,6 +5,7 @@
 | Status | Accepted (the owner, 2026-10-21: the redrawn Account board approved with «Тийм. Энэ самбараар «Тооцоо»-ны хуулгыг апп-д хий.») |
 | Date | 2026-10-21 |
 | Deciders | Owner (the request, four answers on settlement days, a look at the board, 2026-10-21), Claude (Claude Code session, CA5 follow-up) |
+| Amended by | ADR-0101 (2026-10-23: #6 — the settlement fields the card waits for now exist on `/customer-app/account`) |
 | Amends | ADR-0086 #3 (the statement's layout) and its rejected alternative «A running-balance column»; ADR-0087 (what «Тооцоо» shows) stands |
 
 ## Context

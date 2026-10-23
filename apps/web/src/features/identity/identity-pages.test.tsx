@@ -322,18 +322,18 @@ describe('settings', () => {
   it('names the allowed range of a whole-number setting', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       'GET /api/v1/settings': () =>
-        list([{ key: 'credit.payment_term_days', current: null, entries: [] }]),
+        list([{ key: 'auth.customer_session_days', current: null, entries: [] }]),
     });
     renderApp('/settings', fetchMock);
     const user = userEvent.setup();
-    const card = cardOf(await screen.findByText(mn.settings.keys.credit.payment_term_days));
+    const card = cardOf(await screen.findByText(mn.settings.keys.auth.customer_session_days));
     await user.click(card.getByRole('button', { name: mn.settings.add }));
     const dialog = within(await screen.findByRole('dialog'));
     await user.type(dialog.getByLabelText(mn.settings.value), '400');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     expect(
       await dialog.findByText(
-        mn.validation.integerRange.replace('{{min}}', '0').replace('{{max}}', '365'),
+        mn.validation.integerRange.replace('{{min}}', '1').replace('{{max}}', '365'),
       ),
     ).toBeInTheDocument();
     expect(calledWith(fetchMock, 'POST', '/api/v1/settings')).toBe(false);

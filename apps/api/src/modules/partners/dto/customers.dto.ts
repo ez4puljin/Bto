@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { SETTLEMENT_GROUPS, type SettlementGroup } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS, type CustomerKind } from '@tugeel/shared/taxpayer';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -9,7 +10,6 @@ import {
   IsOptional,
   IsString,
   Matches,
-  Max,
   MaxLength,
   Min,
   ValidateNested,
@@ -96,14 +96,11 @@ export class AddressDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) archivedAt: string | null;
 }
 
-@ApiSchema({ name: 'PaymentTerm' })
-export class PaymentTermDto {
-  @ApiProperty({ type: Number, nullable: true }) days: number | null;
-  @ApiProperty({
-    enum: ['CUSTOMER', 'DEFAULT', 'UNSET'],
-    description: 'The customer’s own days, the company setting, or neither yet',
-  })
-  source: 'CUSTOMER' | 'DEFAULT' | 'UNSET';
+@ApiSchema({ name: 'CustomerOverdue' })
+export class CustomerOverdueDto {
+  @ApiProperty({ example: '50000', description: 'Open invoices past their due date, whole MNT' })
+  amount: string;
+  @ApiProperty({ type: String, format: 'date', nullable: true }) oldestDueDate: string | null;
 }
 
 @ApiSchema({ name: 'CustomerSummary' })
@@ -143,12 +140,11 @@ export class CustomerDetailDto extends CustomerSummaryDto {
   })
   creditLimit: string | null;
   @ApiProperty({
-    type: Number,
-    nullable: true,
-    description: 'Own days; null = the company setting',
+    enum: SETTLEMENT_GROUPS,
+    description:
+      'DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)',
   })
-  paymentTermDays: number | null;
-  @ApiProperty({ type: PaymentTermDto }) paymentTerm: PaymentTermDto;
+  settlementGroup: SettlementGroup;
   @ApiProperty({ type: String, nullable: true }) creditHoldReason: string | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
@@ -179,8 +175,14 @@ export class CustomerListItemDto extends CustomerSummaryDto {
     description: 'null = not decided',
   })
   creditLimit: string | null;
-  @ApiProperty({ type: PaymentTermDto }) paymentTerm: PaymentTermDto;
+  @ApiProperty({ enum: SETTLEMENT_GROUPS }) settlementGroup: SettlementGroup;
   @ApiProperty({ type: String, nullable: true }) creditHoldReason: string | null;
+  @ApiProperty({
+    type: CustomerOverdueDto,
+    nullable: true,
+    description: 'The overdue receivable: a reminder, never a block (ADR-0101); null when none',
+  })
+  overdue: CustomerOverdueDto | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({
     type: GpsPointDto,
@@ -271,6 +273,14 @@ export class CreateCustomerDto extends CustomerFieldsDto {
   @MaxLength(200)
   name: string;
 
+  @ApiProperty({
+    enum: SETTLEMENT_GROUPS,
+    description:
+      'DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)',
+  })
+  @IsIn(SETTLEMENT_GROUPS)
+  settlementGroup: SettlementGroup;
+
   @ApiPropertyOptional({ type: AddressRequestDto, description: 'The first, default address' })
   @IsOptional()
   @ValidateNested()
@@ -313,12 +323,13 @@ export class CreditDto {
   @Matches(MONEY)
   creditLimit: string | null;
 
-  @ApiProperty({ type: Number, nullable: true, description: 'null = the company setting' })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(365)
-  paymentTermDays: number | null;
+  @ApiProperty({
+    enum: SETTLEMENT_GROUPS,
+    description:
+      'DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)',
+  })
+  @IsIn(SETTLEMENT_GROUPS)
+  settlementGroup: SettlementGroup;
 
   @ApiProperty() @IsBoolean() creditHold: boolean;
 
@@ -350,6 +361,11 @@ export class CustomerListQueryDto extends PageQueryDto {
   status?: PartnerStatus;
 
   @ApiPropertyOptional() @IsOptional() @Transform(queryBoolean) @IsBoolean() creditHold?: boolean;
+
+  @ApiPropertyOptional({ enum: SETTLEMENT_GROUPS })
+  @IsOptional()
+  @IsIn(SETTLEMENT_GROUPS)
+  settlementGroup?: SettlementGroup;
 
   @ApiPropertyOptional({ description: 'Companies without a TIN' })
   @IsOptional()

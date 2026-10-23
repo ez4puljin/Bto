@@ -4,6 +4,8 @@ import {
   type ArEntryKind,
   MONEY_ACCOUNT_KINDS,
   type MoneyAccountKind,
+  SETTLEMENT_GROUPS,
+  type SettlementGroup,
 } from '@tugeel/shared/finance';
 import {
   CUSTOMER_NOTIFICATION_KINDS,
@@ -92,8 +94,12 @@ export class CustomerAppMeDto {
   @ApiProperty({ type: CustomerAppCentreDto, nullable: true }) centre: CustomerAppCentreDto | null;
   @ApiProperty({ type: CustomerAppAddressDto, nullable: true })
   defaultAddress: CustomerAppAddressDto | null;
-  @ApiProperty({ type: Number, nullable: true, description: 'Changed only by the office' })
-  paymentTermDays: number | null;
+  @ApiProperty({
+    enum: SETTLEMENT_GROUPS,
+    description:
+      'DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office',
+  })
+  settlementGroup: SettlementGroup;
   @ApiProperty({ description: 'False while no stage takes app orders: the app does not send' })
   ordersOpen: boolean;
   @ApiProperty({ format: 'date', description: "The server's business date" }) today: string;
@@ -643,6 +649,25 @@ export class CustomerAppReorderDto {
 
 // ---------------------------------------------------------------------------------- the account
 
+@ApiSchema({ name: 'CustomerAppSettlement' })
+export class CustomerAppSettlementDto {
+  @ApiProperty({ enum: SETTLEMENT_GROUPS }) group: SettlementGroup;
+  @ApiProperty({ format: 'date', description: "The current period's first purchase day" })
+  periodFrom: string;
+  @ApiProperty({ format: 'date', description: "The current period's last purchase day" })
+  periodTo: string;
+  @ApiProperty({ format: 'date', description: '«Тооцоо хийх өдөр»; a weekend moves nothing' })
+  dueDate: string;
+  @ApiProperty({ description: '«N хоног үлдлээ»; 0 on the day itself' }) daysLeft: number;
+  @ApiProperty({
+    example: '1284600.00',
+    description: '«Төлөх дүн»: everything due by the day (the positive balance)',
+  })
+  amountDue: string;
+  @ApiProperty({ description: 'The part of amountDue already overdue (shown in red)' })
+  overdueAmount: string;
+}
+
 @ApiSchema({ name: 'CustomerAppBalance' })
 export class CustomerAppBalanceDto {
   @ApiProperty({ example: '125000.00', description: 'Negative = an advance' }) balance: string;
@@ -653,7 +678,7 @@ export class CustomerAppBalanceDto {
   @ApiProperty({ type: String, nullable: true, description: '«үлдсэн боломж»' })
   creditAvailable: string | null;
   @ApiProperty({ description: '«Зээл хаалттай»; never its internal reason' }) creditHold: boolean;
-  @ApiProperty({ type: Number, nullable: true }) paymentTermDays: number | null;
+  @ApiProperty({ type: CustomerAppSettlementDto }) settlement: CustomerAppSettlementDto;
   @ApiProperty({ description: '«Нэхэмжлэх (n)»' }) openInvoices: number;
   @ApiProperty({ description: '«Төлбөр (n)»' }) payments: number;
 }

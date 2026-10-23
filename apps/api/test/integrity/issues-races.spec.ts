@@ -33,6 +33,8 @@ describe('integrity: goods issue races', () => {
       categoryId: await catalog.category('Хүнс'),
       baseUomId: await catalog.uomId('PCS'),
     });
+    // Receipts put the flour on its fixed shelf in its home (ADR-0099 #1).
+    await inventory.homeShelf(product.id, warehouse.id, shelf.id);
     const supplierId = (await partnersApi(app, admin).supplier({ name: 'Нийлүүлэгч' })).id;
     const http = () => request(app.getHttpServer());
     const types = (await http().get('/api/v1/issues/expense-types').set(bearer(worker)).expect(200))
@@ -46,11 +48,7 @@ describe('integrity: goods issue races', () => {
         .post('/api/v1/receipts')
         .set(bearer(admin))
         .set(idempotency())
-        .send({
-          warehouseId: warehouse.id,
-          supplierId,
-          lines: [{ productUnitId: pieces, enteredQty: '1', binId: shelf.id }],
-        })
+        .send({ supplierId, lines: [{ productUnitId: pieces, enteredQty: '1' }] })
         .expect(201);
       await http()
         .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)

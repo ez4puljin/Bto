@@ -17,6 +17,9 @@ export const IMPORT_KINDS = [
   'PRICES',
   'RECEIPTS',
   'ISSUES',
+  // The Finance Core's chart and opening balances (ADR-0102): Erkhet's accounts, then its trial balance.
+  'FIN_CHART',
+  'FIN_OPENING',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -71,7 +74,7 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('address', 'text'),
     column('gps', 'link'),
     column('creditLimit', 'decimal'),
-    column('paymentTermDays', 'decimal'),
+    column('settlementGroup', 'text'),
     column('note', 'text'),
   ],
   SUPPLIERS: [
@@ -142,11 +145,38 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('qty', 'decimal', true),
     column('note', 'text'),
   ],
+  // Erkhet's chart (ADR-0102 #4): an account by its code with its kind, group and control; an
+  // optional posting key moves that key's rule to the account.
+  FIN_CHART: [
+    column('code', 'code', true),
+    column('name', 'text', true),
+    column('kind', 'text', true),
+    column('groupCode', 'code'),
+    column('groupName', 'text'),
+    column('control', 'text'),
+    column('side', 'text'),
+    column('role', 'code'),
+  ],
+  // The opening trial balance (ADR-0102 #5): one line per row; a receivable or payable per party and
+  // original document, a cash or bank balance per money account.
+  FIN_OPENING: [
+    column('account', 'code', true),
+    column('party', 'code'),
+    column('moneyAccount', 'code'),
+    column('debit', 'decimal'),
+    column('credit', 'decimal'),
+    column('ref', 'text'),
+    column('refDate', 'day'),
+    column('dueDate', 'day'),
+    column('description', 'text'),
+  ],
 };
 
-/** What a receipts import is told in its dialog (ADR-0078): the warehouse and how the notes are paid. */
+/**
+ * What a receipts import is told in its dialog (ADR-0078, ADR-0099 #7): how the notes are paid; each
+ * row goes to its product's home warehouse.
+ */
 export interface ReceiptImportOptions {
-  warehouseId: number;
   paymentMethod: ReceiptPaymentMethod;
   moneyAccountId: number | null;
 }
@@ -156,6 +186,14 @@ export const RECEIPT_IMPORT_PAYMENT_METHODS = RECEIPT_PAYMENT_METHODS;
 /** What an issues import is told in its dialog (ADR-0081 #7): the warehouse the goods leave. */
 export interface IssueImportOptions {
   warehouseId: number;
+}
+
+/**
+ * What an opening import is told in its dialog (ADR-0102 #5): the date of the opening document, the
+ * day before go-live by default (TODO-VERIFY D27).
+ */
+export interface FinOpeningImportOptions {
+  date: string;
 }
 
 /** Lines of one delivery note in a receipts import (one draft receipt). */
@@ -202,6 +240,14 @@ export const ROW_ERROR_CODES = [
   'NO_PROFILE_VALUES',
   'NO_PACKS',
   'TOO_MANY_LINES',
+  'NO_HOME',
+  // ADR-0102: an opening that does not balance (on its first row, with the totals); an account
+  // whose kind or control cannot change because it holds postings; a row with both or no side;
+  // an opening while another stands.
+  'UNBALANCED',
+  'IN_USE',
+  'ONE_SIDE',
+  'OPENING_EXISTS',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 
@@ -214,6 +260,8 @@ export const ROW_WARNING_CODES = [
   'NOT_SELLABLE',
   'REACTIVATED',
   'PRICE_IGNORED',
+  // ADR-0102 #6: an opening inventory line goes to the opening offset the stock import credited.
+  'TO_OPENING_STOCK',
 ] as const;
 export type RowWarningCode = (typeof ROW_WARNING_CODES)[number];
 

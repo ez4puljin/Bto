@@ -1,4 +1,5 @@
-import { AGING_BUCKETS } from '@tugeel/shared/finance';
+import { AGING_BUCKETS, settlementSummary } from '@tugeel/shared/finance';
+import { businessDate } from '@tugeel/shared/time';
 import { ArrowLeftRight, Plus } from 'lucide-react';
 import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -197,6 +198,11 @@ export function BalanceCard({
 }) {
   const { t } = useTranslation();
   const titleId = useId();
+  // «Тооцоо хийх өдөр» (ADR-0101): the current period's day and everything due by it.
+  const settlement = settlementSummary(balance.settlementGroup, businessDate(), {
+    net: balance.balance,
+    overdue: balance.overdueAmount,
+  });
   const tiles: { label: string; value: string; hint?: string; danger?: boolean }[] = [
     {
       label: t('finance.fields.balance'),
@@ -211,6 +217,15 @@ export function BalanceCard({
       ...(balance.oldestDueDate
         ? { hint: `${t('finance.balances.oldestDue')}: ${balance.oldestDueDate}` }
         : {}),
+    },
+    {
+      label: t('partners.settlement.day'),
+      value: settlement.dueDate,
+      hint: t('partners.settlement.dayHint', {
+        group: t(`partners.settlement.groups.${balance.settlementGroup}`),
+        amount: formatTugrik(settlement.amountDue.toFixed(2)),
+        n: settlement.daysLeft,
+      }),
     },
     ...(compact
       ? []

@@ -31,9 +31,8 @@ const IMPORTS = 'imports.manage';
 /** The options a receipts job stored, without the internal price flag. */
 function receiptOptionsDto(job: ImportJob): ImportJobDto['receiptOptions'] {
   const options = job.options as Partial<ImportJobDto['receiptOptions'] & object> | null;
-  if (job.kind !== 'RECEIPTS' || !options || typeof options.warehouseId !== 'number') return null;
+  if (job.kind !== 'RECEIPTS' || !options) return null;
   return {
-    warehouseId: options.warehouseId,
     paymentMethod: options.paymentMethod ?? 'CREDIT',
     moneyAccountId: options.moneyAccountId ?? null,
   };
@@ -57,6 +56,11 @@ function toJobDto(job: ImportJob): ImportJobDto {
       job.kind === 'ISSUES' &&
       typeof (job.options as { warehouseId?: unknown } | null)?.warehouseId === 'number'
         ? { warehouseId: (job.options as { warehouseId: number }).warehouseId }
+        : null,
+    openingOptions:
+      job.kind === 'FIN_OPENING' &&
+      typeof (job.options as { date?: unknown } | null)?.date === 'string'
+        ? { date: (job.options as { date: string }).date }
         : null,
     canRevert: job.canRevert,
     createdAt: job.createdAt.toISOString(),

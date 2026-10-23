@@ -592,3 +592,171 @@ export function useFinanceMutations() {
     }),
   };
 }
+
+export type FinancePeriod = Schemas['FinancePeriod'];
+export type FinancePeriodEvent = Schemas['FinancePeriodEvent'];
+
+const PERIOD_KEYS = {
+  periods: ['finance', 'periods'] as const,
+  events: ['finance', 'period-events'] as const,
+};
+
+/** The company's months with their status (ADR-0102), the newest first. */
+export function useFinancePeriods() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: PERIOD_KEYS.periods,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/periods', { signal })).data,
+  });
+}
+
+/** Every close and reopen, the newest first. */
+export function useFinancePeriodEvents() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: PERIOD_KEYS.events,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/periods/events', { signal })).data,
+  });
+}
+
+export function usePeriodMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: ['finance'] });
+  return {
+    close: useMutation({
+      mutationFn: async ({ code, key }: Keyed<{ code: string }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/periods/{code}/close', {
+            params: { path: { code }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    reopen: useMutation({
+      mutationFn: async ({ code, key, reason }: Keyed<{ code: string; reason: string }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/periods/{code}/reopen', {
+            params: { path: { code }, header: idempotencyKey(key) },
+            body: { reason },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+  };
+}
+
+export type TrialBalance = Schemas['TrialBalance'];
+export type TrialBalanceRow = Schemas['TrialBalanceRow'];
+export type VatReport = Schemas['VatReport'];
+export type YearCloseStatus = Schemas['YearCloseStatus'];
+
+const REPORT_KEYS = {
+  trialBalance: ['finance', 'trial-balance'] as const,
+  vat: ['finance', 'vat'] as const,
+  yearClose: ['finance', 'year-close'] as const,
+};
+
+/** The trial balance of a date range (ADR-0105). */
+export function useTrialBalance(range: { from: string; to: string; all: boolean } | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORT_KEYS.trialBalance, range],
+    enabled: range !== null,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/reports/trial-balance', {
+          params: {
+            query: {
+              from: range?.from ?? '',
+              to: range?.to ?? '',
+              ...(range?.all ? { all: true } : {}),
+            },
+          },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** The month's VAT by document type and its documents (ADR-0105). */
+export function useVatReport(period: string | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORT_KEYS.vat, period],
+    enabled: period !== null,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/reports/vat', {
+          params: { query: { period: period ?? '' } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** What the year close of `year` would close, or did. */
+export function useYearClose(year: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORT_KEYS.yearClose, year],
+    enabled: year !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/year-close/{year}', {
+          params: { path: { year: year ?? 0 } },
+          signal,
+        }),
+      ),
+  });
+}
+
+export function useReportMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: ['finance'] });
+  return {
+    closeYear: useMutation({
+      mutationFn: async ({ year, key }: Keyed<{ year: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/year-close/{year}', {
+            params: { path: { year }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    revertYear: useMutation({
+      mutationFn: async ({ year, key }: Keyed<{ year: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/year-close/{year}/revert', {
+            params: { path: { year }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    trialBalanceXlsx: useMutation({
+      mutationFn: async (range: { from: string; to: string; all: boolean }): Promise<Blob> =>
+        unwrap(
+          await api.GET('/api/v1/finance/reports/trial-balance.xlsx', {
+            params: {
+              query: { from: range.from, to: range.to, ...(range.all ? { all: true } : {}) },
+            },
+            parseAs: 'blob',
+          }),
+        ),
+    }),
+    vatXlsx: useMutation({
+      mutationFn: async (period: string): Promise<Blob> =>
+        unwrap(
+          await api.GET('/api/v1/finance/reports/vat.xlsx', {
+            params: { query: { period } },
+            parseAs: 'blob',
+          }),
+        ),
+    }),
+  };
+}

@@ -140,17 +140,15 @@ describe('nightly jobs', () => {
       baseUomId: await catalog.uomId('PCS'),
       units: [{ uomId: await catalog.uomId('BOX'), factorToBase: '24' }],
     });
+    await inventory.homeShelf(cola.id, wh.id, binId('A-01-01'));
     const supplierId = (await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' })).id;
     const receipt = await http()
       .post('/api/v1/receipts')
       .set(bearer(admin))
       .set(idempotency())
       .send({
-        warehouseId: wh.id,
         supplierId,
-        lines: [
-          { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2', binId: binId('A-01-01') },
-        ],
+        lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }],
       })
       .expect(201);
     await http()

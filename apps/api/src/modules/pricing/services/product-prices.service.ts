@@ -419,10 +419,27 @@ export class ProductPricesService {
    * one counted as whole. Terms equal to those in force that day change nothing.
    */
   async set(actor: Actor, input: SetTermsInput): Promise<ProductPriceView> {
+    await this.assertTerms(input, this.db);
+    await inTransaction(this.db, (tx) => this.writeTermsInTx(tx, actor, input));
+    return this.view(input.productId);
+  }
+
+  /**
+   * `set` inside the caller's transaction (ADR-0099 #5: a goods receipt's posting puts its lines'
+   * sale prices in force). The same checks and the same lock order.
+   */
+  async setInTx(tx: Tx, actor: Actor, input: SetTermsInput): Promise<void> {
+    await this.assertTerms(input, tx);
+    await this.writeTermsInTx(tx, actor, input);
+  }
+
+  /** A day not in the past, a known product and, for a product with packs, its whole pack. */
+  private async assertTerms(input: SetTermsInput, executor: Db | Tx): Promise<void> {
     assertNotPast('validFrom', input.validFrom);
-    const [product] = await this.catalog.getMany([input.productId]);
+    const [product] = await this.catalog.getMany([input.productId], executor);
     if (!product) throw notFound('product', input.productId);
-    const units = (await this.units.currentUnits([input.productId])).get(input.productId) ?? [];
+    const units =
+      (await this.units.currentUnits([input.productId], executor)).get(input.productId) ?? [];
     const problem = wholeUnitProblem(packUnitsOf(units), input.wholeUomId);
     if (problem === 'NOT_CHOSEN') {
       throw invalid('wholeUomId', 'required', 'choose the pack counted as whole');
@@ -430,56 +447,56 @@ export class ProductPricesService {
     if (problem === 'GONE') {
       throw invalid('wholeUomId', 'packUnit', "not one of the product's pack units");
     }
-    await inTransaction(this.db, async (tx) => {
-      // One lock order everywhere: the product's advisory lock, then its profile (ADR-0048 #2).
-      await advisoryLock(tx, LOCKS.productPrices, input.productId);
-      const profile = await this.profiles.lockForPricesInTx(tx, input.profileId);
-      assertLive(profile);
-      if (profile.firstFrom === null || profile.firstFrom > input.validFrom) {
-        throw invalid('profileId', 'inForce', 'the price profile has no values on that day');
-      }
-      const rows = await tx
-        .select()
-        .from(productPrices)
-        .where(eq(productPrices.productId, input.productId));
-      const plan = planChange(
-        rows,
-        input.validFrom,
-        (row) =>
-          row.warehousePrice.eq(input.warehousePrice) &&
-          row.profileId === input.profileId &&
-          row.wholeUomId === input.wholeUomId,
-      );
-      if (!plan) return;
-      if (plan.close) {
-        await tx
-          .update(productPrices)
-          .set({ validTo: input.validFrom })
-          .where(eq(productPrices.id, plan.close.id));
-      }
-      await tx.insert(productPrices).values({
-        productId: input.productId,
-        warehousePrice: input.warehousePrice,
+  }
+
+  private async writeTermsInTx(tx: Tx, actor: Actor, input: SetTermsInput): Promise<void> {
+    // One lock order everywhere: the product's advisory lock, then its profile (ADR-0048 #2).
+    await advisoryLock(tx, LOCKS.productPrices, input.productId);
+    const profile = await this.profiles.lockForPricesInTx(tx, input.profileId);
+    assertLive(profile);
+    if (profile.firstFrom === null || profile.firstFrom > input.validFrom) {
+      throw invalid('profileId', 'inForce', 'the price profile has no values on that day');
+    }
+    const rows = await tx
+      .select()
+      .from(productPrices)
+      .where(eq(productPrices.productId, input.productId));
+    const plan = planChange(
+      rows,
+      input.validFrom,
+      (row) =>
+        row.warehousePrice.eq(input.warehousePrice) &&
+        row.profileId === input.profileId &&
+        row.wholeUomId === input.wholeUomId,
+    );
+    if (!plan) return;
+    if (plan.close) {
+      await tx
+        .update(productPrices)
+        .set({ validTo: input.validFrom })
+        .where(eq(productPrices.id, plan.close.id));
+    }
+    await tx.insert(productPrices).values({
+      productId: input.productId,
+      warehousePrice: input.warehousePrice,
+      profileId: input.profileId,
+      wholeUomId: input.wholeUomId,
+      validFrom: input.validFrom,
+      validTo: plan.validTo,
+      createdBy: actorUserId(actor),
+    });
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'product_prices',
+      entityId: input.productId,
+      before: plan.close ? termsAudit(plan.close) : null,
+      after: {
+        validFrom: input.validFrom,
+        warehousePrice: input.warehousePrice.toFixed(0),
         profileId: input.profileId,
         wholeUomId: input.wholeUomId,
-        validFrom: input.validFrom,
-        validTo: plan.validTo,
-        createdBy: actorUserId(actor),
-      });
-      await this.audit.record(tx, actor, {
-        action: 'UPDATE',
-        entity: 'product_prices',
-        entityId: input.productId,
-        before: plan.close ? termsAudit(plan.close) : null,
-        after: {
-          validFrom: input.validFrom,
-          warehousePrice: input.warehousePrice.toFixed(0),
-          profileId: input.profileId,
-          wholeUomId: input.wholeUomId,
-        },
-      });
+      },
     });
-    return this.view(input.productId);
   }
 
   /**

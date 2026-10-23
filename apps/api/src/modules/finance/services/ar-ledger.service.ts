@@ -4,6 +4,7 @@ import {
   type AgingBucket,
   type ArEntryKind,
   type FinanceDocKind,
+  type SettlementGroup,
 } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
@@ -105,6 +106,8 @@ export interface CustomerBalanceRow extends CustomerBalance {
   status: string;
   creditLimit: Decimal | null;
   creditHold: boolean;
+  /** The due dates follow it (ADR-0101); the card shows the settlement day from it. */
+  settlementGroup: SettlementGroup;
   aging: Record<AgingBucket, Decimal>;
 }
 
@@ -228,6 +231,7 @@ export class ArLedgerService {
       status: customer.status,
       creditLimit: customer.creditLimit,
       creditHold: customer.creditHold,
+      settlementGroup: customer.settlementGroup,
       aging: aging.get(customerId) ?? emptyAging(),
     };
   }
@@ -374,6 +378,7 @@ export class ArLedgerService {
             status: customer?.status ?? 'ACTIVE',
             creditLimit: customer?.creditLimit ?? null,
             creditHold: customer?.creditHold ?? false,
+            settlementGroup: customer?.settlementGroup ?? 'DAY_20',
             aging: aging.get(customerId) ?? emptyAging(),
           },
         ];

@@ -80,6 +80,8 @@ export interface ProductSummary {
   cityTax: boolean | null;
   baseUnit: { id: number; uomId: number; uomName: string };
   thumbUrl: string | null;
+  /** Net weight of one base unit in kilograms; NULL when not recorded. */
+  weightKg: Decimal | null;
 }
 
 /** A current unit on the product list: base first, then by factor. */
@@ -386,6 +388,25 @@ export class ProductsService {
     return { data: await this.enrich(page.data), nextCursor: page.nextCursor };
   }
 
+  /**
+   * A picker's search (ADR-0099 #3: the receipt window's line panel): the list's match and order
+   * over active products, at most `limit` rows with their units and barcodes, without pictures.
+   * `within` narrows it to a set (a supplier's products, ADR-0103), which an empty text lists by
+   * name; without a set an empty text finds nothing.
+   */
+  async lookup(
+    q: string,
+    limit: number,
+    within: readonly number[] | null = null,
+  ): Promise<ProductListItem[]> {
+    if (within?.length === 0 || (within === null && !q.trim())) return [];
+    const page = await this.pageRows(
+      { ...(q.trim() ? { q } : {}), status: 'ACTIVE', limit },
+      within,
+    );
+    return this.enrich(page.data, this.db, false);
+  }
+
   /** How many products the list's filters keep (the list's total, ADR-0049 #4). */
   async countItems(query: ProductQuery, within: readonly number[] | null = null): Promise<number> {
     if (within?.length === 0) return 0;
@@ -540,8 +561,12 @@ export class ProductsService {
   }
 
   /** Rows with their summary, units and barcodes: one statement each for all of them. */
-  private async enrich(rows: Product[], executor: Db | Tx = this.db): Promise<ProductListItem[]> {
-    const summaries = await this.summaries(rows, executor);
+  private async enrich(
+    rows: Product[],
+    executor: Db | Tx = this.db,
+    images = true,
+  ): Promise<ProductListItem[]> {
+    const summaries = await this.summaries(rows, executor, images);
     const ids = rows.map((row) => row.id);
     const units =
       ids.length === 0
@@ -749,7 +774,12 @@ export class ProductsService {
     return { product: summary, unit, barcode: hit.barcode };
   }
 
-  async summaries(rows: Product[], executor: Db | Tx = this.db): Promise<ProductSummary[]> {
+  /** `images: false` leaves `thumbUrl` null without reading the pictures (a quick lookup). */
+  async summaries(
+    rows: Product[],
+    executor: Db | Tx = this.db,
+    images = true,
+  ): Promise<ProductSummary[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);
     const bases = await executor
@@ -762,10 +792,12 @@ export class ProductsService {
       .from(productUnits)
       .innerJoin(uoms, eq(uoms.id, productUnits.uomId))
       .where(and(inArray(productUnits.productId, ids), eq(productUnits.isBase, true)));
-    const primaries = await executor
-      .select({ productId: productImages.productId, fileId: productImages.thumbFileId })
-      .from(productImages)
-      .where(and(inArray(productImages.productId, ids), eq(productImages.isPrimary, true)));
+    const primaries = images
+      ? await executor
+          .select({ productId: productImages.productId, fileId: productImages.thumbFileId })
+          .from(productImages)
+          .where(and(inArray(productImages.productId, ids), eq(productImages.isPrimary, true)))
+      : [];
     const urls = await this.storage.publicUrls(
       primaries.map((image) => image.fileId),
       executor,
@@ -787,6 +819,7 @@ export class ProductsService {
         cityTax: row.cityTax,
         baseUnit: { id: base.id, uomId: base.uomId, uomName: base.uomName },
         thumbUrl: thumb ? (urls.get(thumb.fileId) ?? null) : null,
+        weightKg: row.weightKg,
       };
     });
   }

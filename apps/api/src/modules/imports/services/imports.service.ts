@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type {
+  FinOpeningImportOptions,
   ImportKind,
   IssueImportOptions,
   ReceiptImportOptions,
   RowIssue,
 } from '@tugeel/shared/imports';
+import { businessDate, isIsoDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, gt, inArray, lt, ne, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -101,14 +103,25 @@ export class ImportsService {
       fileName: string;
       receiptOptions?: ReceiptImportOptions | null;
       issueOptions?: IssueImportOptions | null;
+      openingOptions?: FinOpeningImportOptions | null;
     },
   ): Promise<ImportJob> {
+    if (
+      (input.kind === 'FIN_CHART' || input.kind === 'FIN_OPENING') &&
+      !ctx.permissions.has('finance.journal.manage')
+    ) {
+      throw new AppError('FORBIDDEN', 'the chart and the opening need finance.journal.manage', {
+        permission: 'finance.journal.manage',
+      });
+    }
     const options =
       input.kind === 'RECEIPTS'
         ? await this.receiptOptions(ctx, input.receiptOptions)
         : input.kind === 'ISSUES'
           ? await this.issueOptions(ctx, input.issueOptions)
-          : null;
+          : input.kind === 'FIN_OPENING'
+            ? openingOptions(input.openingOptions)
+            : null;
     await this.storage.verifyUploaded(input.fileId, 'imports.source');
     return inTransaction(this.db, async (tx) => {
       await this.storage.confirm(tx, input.fileId, 'imports.source');
@@ -135,25 +148,16 @@ export class ImportsService {
   }
 
   /**
-   * A receipts import's options (ADR-0078 #7): a wholesale warehouse the user writes for, how the
-   * notes are paid, and whether the sheet's prices are taken (cost holders only).
+   * A receipts import's options (ADR-0078 #7, ADR-0099 #7): how the notes are paid, and whether the
+   * sheet's prices are taken (cost holders only); each row goes to its product's home warehouse.
    */
   private async receiptOptions(
     ctx: AuthContext,
     options: ReceiptImportOptions | null | undefined,
   ): Promise<StoredReceiptOptions> {
     if (!options) {
-      throw invalid('receiptOptions', 'required', 'a receipts import names its warehouse');
+      throw invalid('receiptOptions', 'required', 'a receipts import names how it is paid');
     }
-    const warehouse = await this.org.getWarehouse(options.warehouseId);
-    if (warehouse.kind !== 'WHOLESALE') {
-      throw new AppError(
-        'WAREHOUSE_KIND_NOT_ALLOWED',
-        'goods are received into wholesale warehouses',
-        { kind: warehouse.kind },
-      );
-    }
-    this.scope.assertCanWriteWarehouse(ctx, warehouse.id);
     if (options.paymentMethod === 'CREDIT' && options.moneyAccountId) {
       throw invalid(
         'receiptOptions.moneyAccountId',
@@ -173,7 +177,6 @@ export class ImportsService {
       }
     }
     return {
-      warehouseId: warehouse.id,
       paymentMethod: options.paymentMethod,
       moneyAccountId: accountId,
       withPrices: ctx.permissions.has('inventory.costs.manage'),
@@ -413,4 +416,17 @@ function changedOf(plan: unknown): string[] {
   return Array.isArray(changed)
     ? changed.filter((entry): entry is string => typeof entry === 'string')
     : [];
+}
+
+/** An opening import's date (ADR-0102 #5): a day not after today; the day before go-live (D27). */
+function openingOptions(
+  options: FinOpeningImportOptions | null | undefined,
+): FinOpeningImportOptions {
+  if (!options || !isIsoDate(options.date)) {
+    throw invalid('openingOptions.date', 'required', 'an opening import names its date');
+  }
+  if (options.date > businessDate()) {
+    throw invalid('openingOptions.date', 'notFuture', 'the opening is dated today or earlier');
+  }
+  return { date: options.date };
 }

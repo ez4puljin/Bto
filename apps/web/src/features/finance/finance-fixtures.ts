@@ -303,6 +303,7 @@ export const BALANCE: Schemas['CustomerBalance'] = {
   name: 'Номин дэлгүүр',
   status: 'ACTIVE',
   creditLimit: '5000000.00',
+  settlementGroup: 'MONTH_END',
   creditHold: false,
   balance: '100000.00',
   openInvoices: 1,

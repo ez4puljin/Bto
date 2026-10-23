@@ -37,7 +37,6 @@ describe('payables races', () => {
         .set(bearer(admin))
         .set(idempotency())
         .send({
-          warehouseId: wh.id,
           supplierId,
           supplierDocDate: today,
           lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1', docAmount: amount }],
@@ -104,6 +103,8 @@ describe('payables races', () => {
       categoryId: await catalog.category('Будаа УР'),
       baseUomId: await catalog.uomId('PCS'),
     });
+    // A receipt's lines go to their product's home (ADR-0099 #1).
+    await inventoryApi(app, admin).setHome(rice.id, wh.id);
     cash = await financeApi(app, admin).cashBox('PR-CASH');
   });
   afterAll(async () => {

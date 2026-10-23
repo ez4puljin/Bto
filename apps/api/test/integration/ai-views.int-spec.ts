@@ -124,12 +124,13 @@ describe('AI views (ADR-0045)', () => {
       address: { address: 'Мөрөн, 3-р баг', lat: '49.6342', lng: '100.1625' },
     });
 
-    const receive = async (warehouseId: number, line: Record<string, unknown>, amount: string) => {
+    // Each line goes to its product's home and fixed shelf there (ADR-0099 #1).
+    const receive = async (line: Record<string, unknown>, amount: string) => {
       const created = await http()
         .post('/api/v1/receipts')
         .set(bearer(worker))
         .set(idempotency())
-        .send({ warehouseId, supplierId: supplier.id, lines: [line] });
+        .send({ supplierId: supplier.id, lines: [line] });
       if (created.status !== 201) {
         throw new Error(`receipt ${created.status}: ${JSON.stringify(created.body)}`);
       }
@@ -146,17 +147,10 @@ describe('AI views (ADR-0045)', () => {
         .send({ costingVersion: 0, lines: [{ lineId: body.lines[0]?.id, amount }] })
         .expect(200);
     };
-    await inventory.setHome(cola.id, wholesale.id);
-    await receive(
-      wholesale.id,
-      { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2', binId: shelf },
-      '48000',
-    );
-    await receive(
-      second.id,
-      { productUnitId: unitOf(juice, 'PCS').id, enteredQty: '10', binId: other },
-      '5000',
-    );
+    await inventory.homeShelf(cola.id, wholesale.id, shelf);
+    await inventory.homeShelf(juice.id, second.id, other);
+    await receive({ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }, '48000');
+    await receive({ productUnitId: unitOf(juice, 'PCS').id, enteredQty: '10' }, '5000');
     await http()
       .put('/api/v1/product-locations')
       .set(bearer(worker))
@@ -373,7 +367,7 @@ describe('AI views (ADR-0045)', () => {
       stock_value: '48000.00',
       min_qty: '50.000',
       is_home_warehouse: true,
-      fixed_bin_code: null,
+      fixed_bin_code: 'A-01-01',
     });
   });
 
@@ -444,11 +438,53 @@ describe('AI views (ADR-0045)', () => {
         amount: '5000.00',
         unit_cost: '500.0000',
         free_goods: false,
+        warehouse_id: String(second.id),
+        doc_amount: '5000.00',
+        discount_amount: '0.00',
       }),
     ]);
     const documents = await rowsOf('stock_documents', "doc_type = 'GR'");
     expect(documents).toHaveLength(2);
     expect(documents[0]).toMatchObject({ status: 'POSTED', costing_status: 'COSTED' });
+    // A receipt's row names its warehouse while all its lines lie in one (ADR-0099 #1).
+    expect(
+      documents
+        .map((row) => [row.warehouse_id, row.warehouse_name])
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1]))),
+    ).toEqual([
+      [String(wholesale.id), wholesale.name],
+      [String(second.id), second.name],
+    ]);
+  });
+
+  it('names every warehouse of a receipt whose lines lie in several', async () => {
+    const supplierId = (await partnersApi(app, admin).supplier({ name: 'Хоёр агуулах ХХК' })).id;
+    const created = await http()
+      .post('/api/v1/receipts')
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({
+        supplierId,
+        lines: [
+          { productUnitId: unitOf(cola, 'PCS').id, enteredQty: '1' },
+          { productUnitId: unitOf(juice, 'PCS').id, enteredQty: '1' },
+        ],
+      })
+      .expect(201);
+    const id = (created.body as { id: number }).id;
+    expect(await rowsOf('stock_documents', "doc_type = 'GR' AND id = $1", [id])).toEqual([
+      expect.objectContaining({
+        status: 'DRAFT',
+        warehouse_id: null,
+        warehouse_name: [wholesale.name, second.name].sort().join(', '),
+      }),
+    ]);
+    expect(
+      (await rowsOf('receipt_lines', 'receipt_id = $1', [id]))
+        .map((row) => row.warehouse_id)
+        .sort(),
+    ).toEqual([String(wholesale.id), String(second.id)].sort());
+    await http().post(`/api/v1/receipts/${id}/cancel`).set(bearer(admin)).expect(200);
   });
 
   it('gives discount programs the status the pricing service gives them', async () => {
@@ -483,8 +519,10 @@ describe('AI views (ADR-0045)', () => {
     expect(await rowsOf('customer_addresses')).toEqual([
       expect.objectContaining({ lat: '49.634200', is_default: true, archived: false }),
     ]);
+    // The juice received from the supplier is linked to it by the posting (ADR-0103).
     expect(await rowsOf('product_suppliers')).toEqual([
       expect.objectContaining({ sku: '10', supplier_name: 'МСМ ХХК', is_main: true }),
+      expect.objectContaining({ sku: '11', supplier_name: 'МСМ ХХК', is_main: true }),
     ]);
   });
 });

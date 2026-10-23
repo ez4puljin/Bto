@@ -1,3 +1,4 @@
+import type { Decimal } from '@tugeel/shared/money';
 import type { CustomerKind } from '@tugeel/shared/taxpayer';
 import type { Tx } from '../../common/db/db.types';
 import type { Actor, AuthContext } from '../identity';
@@ -56,3 +57,21 @@ export interface SupplierChangedHook {
 }
 
 export const SUPPLIER_CHANGED_HOOK = Symbol('SUPPLIER_CHANGED_HOOK');
+
+/** A customer's receivable past its due date (ADR-0101): the red reminder, never a block. */
+export interface CustomerOverdue {
+  /** Open invoices past their due date, MNT. */
+  amount: Decimal;
+  oldestDueDate: string | null;
+}
+
+/**
+ * Reads the overdue receivables of customers for the reminders on staff screens and in the apps
+ * (ADR-0101 #7). finance binds it over the Finance Core's open items; partners may not import
+ * finance. Customers without an overdue amount are left out of the map.
+ */
+export interface CustomerDebtReader {
+  overdueOf(customerIds: readonly number[]): Promise<Map<number, CustomerOverdue>>;
+}
+
+export const CUSTOMER_DEBT_READER = Symbol('CUSTOMER_DEBT_READER');

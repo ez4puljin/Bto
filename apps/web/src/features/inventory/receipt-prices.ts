@@ -8,16 +8,18 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
   type ReceiptDetail,
+  type ReceiptDiscountRequest,
   type ReceiptLine,
   useInventoryMutations,
   usePendingReceipts,
 } from './api';
-import { type CostEntry, entryAmount, parseMoney, useCanWrite } from './helpers';
+import { type CostEntry, entryAmount, parseMoney } from './helpers';
 
 /*
- * A receipt's delivery-note prices (ADR-0033, ADR-0078): typed on the receipt itself by holders of
- * inventory.costs.manage, VAT included as on the note; the server takes the VAT out. On a draft each
- * field is saved as it is left; on a posted receipt the whole costing is saved at once.
+ * A receipt's delivery-note prices (ADR-0033, ADR-0078, ADR-0099): typed on the receipt itself by
+ * holders of inventory.costs.manage, VAT included as on the note, with the receipt's discounts
+ * (ADR-0103); the server spreads them and takes the VAT out. On a draft each line is saved from the line
+ * panel; on a posted receipt the whole costing is saved at once.
  */
 
 /** The two price fields of a line. */
@@ -60,6 +62,28 @@ export function focusNextPrice(
   else from.blur();
 }
 
+/** A discount as the card holds it: a saved one keeps its id and tugriks (ADR-0103). */
+export interface DiscountDraft extends ReceiptDiscountRequest {
+  id?: number;
+  total?: string | null;
+}
+
+/** A discount as the API takes it. */
+export const toDiscountRequest = (discount: DiscountDraft): ReceiptDiscountRequest => ({
+  kind: discount.kind,
+  pct: discount.pct ?? null,
+  amount: discount.amount ?? null,
+  lineIds: discount.kind === 'LINES' ? (discount.lineIds ?? []) : [],
+});
+
+/** A receipt's discounts as the card holds them (ADR-0103). */
+export function discountsOf(detail: Pick<ReceiptDetail, 'discounts'> | null): DiscountDraft[] {
+  return (detail?.discounts ?? []).map((discount) => ({ ...discount }));
+}
+
+const discountsKey = (discounts: readonly DiscountDraft[]) =>
+  JSON.stringify(discounts.map(toDiscountRequest));
+
 /** Whether a posted receipt's costs may still be changed (PENDING, or until `recostUntil`). */
 export function costsChangeable(detail: ReceiptDetail): boolean {
   return (
@@ -81,7 +105,6 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const mutations = useInventoryMutations();
   const action = useAction();
   const pendingReceipts = usePendingReceipts(enabled);
-  const canWrite = useCanWrite();
   const costed = detail.costingStatus === 'COSTED';
   const stamp = `${detail.status}:${detail.costingVersion}`;
   const initial = useMemo(
@@ -93,9 +116,12 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const [saved, setSaved] = useState(false);
   const [key, setKey] = useState(randomUuid);
   const [goTo, setGoTo] = useState<number | null>(null);
+  const savedDiscounts = discountsOf(detail);
+  const [discounts, setDiscounts] = useState<DiscountDraft[]>(savedDiscounts);
   if (shownStamp !== stamp) {
     setShownStamp(stamp);
     setEntries({});
+    setDiscounts(savedDiscounts);
     setSaved(false);
   }
 
@@ -103,9 +129,10 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const amounts = detail.lines.map((line) => entryAmount(entry(line.id), line.enteredQty));
   const complete = detail.lines.length > 0 && amounts.every((amount) => amount !== null);
   const total = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
-  const dirty = detail.lines.some(
-    (line) => !sameEntry(entry(line.id), initial[line.id] ?? EMPTY_ENTRY),
-  );
+  const discountChanged = discountsKey(discounts) !== discountsKey(savedDiscounts);
+  const dirty =
+    discountChanged ||
+    detail.lines.some((line) => !sameEntry(entry(line.id), initial[line.id] ?? EMPTY_ENTRY));
 
   // Navigate once the save has rendered, so the leave question no longer applies.
   useEffect(() => {
@@ -117,9 +144,7 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
 
   /** The next receipt waiting for its costs, down the list and back to its top. */
   const nextPending = () => {
-    const rows = (pendingReceipts.data ?? []).filter(
-      (row) => row.id !== detail.id && canWrite(row.warehouseId),
-    );
+    const rows = (pendingReceipts.data ?? []).filter((row) => row.id !== detail.id);
     return (rows.find((row) => row.id < detail.id) ?? rows[0])?.id ?? null;
   };
 
@@ -130,6 +155,7 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
         key,
         body: {
           costingVersion: detail.costingVersion,
+          ...(discountChanged ? { discounts: discounts.map(toDiscountRequest) } : {}),
           lines: detail.lines.map((line) => {
             const value = entry(line.id);
             if (value.free) return { lineId: line.id, freeGoods: true };
@@ -152,6 +178,8 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   return {
     entry,
     change,
+    discounts,
+    changeDiscounts: setDiscounts,
     complete,
     dirty,
     saved,

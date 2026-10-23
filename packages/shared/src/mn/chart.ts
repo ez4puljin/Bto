@@ -43,6 +43,8 @@ export const CHART_ROLES = [
   'ISSUE_WRITE_OFF',
   'ISSUE_TRANSFER_OUT',
   'ISSUE_OTHER',
+  // The year close (F6, ADR-0105): income and expense closed into it. Temporary code until D16.
+  'RETAINED_EARNINGS',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -89,4 +91,6 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   { code: '730204', kind: 'EXPENSE', role: 'ISSUE_WRITE_OFF' },
   { code: '730205', kind: 'EXPENSE', role: 'ISSUE_TRANSFER_OUT' },
   { code: '730209', kind: 'EXPENSE', role: 'ISSUE_OTHER' },
+  // The year close (F6, ADR-0105; a temporary code, TODO-VERIFY D16).
+  { code: '340101', kind: 'EQUITY', role: 'RETAINED_EARNINGS' },
 ];

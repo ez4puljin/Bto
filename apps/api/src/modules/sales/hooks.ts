@@ -27,17 +27,16 @@ export type CreditDecision =
   | { ok: true }
   | {
       ok: false;
-      /** The customer is on hold, has an overdue invoice, or would pass the limit. */
-      reason: 'HOLD' | 'OVERDUE' | 'LIMIT';
+      /** The customer is on hold or would pass the limit; an overdue debt never refuses (ADR-0101). */
+      reason: 'HOLD' | 'LIMIT';
       /** Balance + open orders + this order. */
       exposure: Decimal;
       limit: Decimal | null;
       /** How far the exposure passes the limit (0 unless LIMIT). */
       excess: Decimal;
+      /** The overdue receivable, for the message only. */
       overdueAmount: Decimal;
       oldestDueDate: string | null;
-      /** The customer's open credits (unapplied payments and returns), from the Finance Core (ADR-0073 #4). */
-      creditsOpen?: Decimal;
     };
 
 export interface CreditChecker {

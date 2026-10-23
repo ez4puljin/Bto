@@ -322,6 +322,94 @@ The owner's defaults (2026-10-22; the accountant's D8 not answered, every rule T
 
 **Not built in F4:** inventory per branch or warehouse, a daily batch, a per-type mapping screen for admin-added expense types (they share ISSUE_OTHER), the opening import (F5).
 
+### 3.11 What F5 built (2026-10-23, ADR-0102) — close and opening
+
+The owner's answers (2026-10-23, one round, all defaults):
+- ADMIN and the accountant close and reopen.
+- A close needs the month ended, the earlier months closed and a clean reconcile.
+- Erkhet's chart export comes later (fictitious data until then).
+- The chart sheet's «Үүрэг» column re-points a key.
+
+D16 and D27 stay TODO-VERIFY.
+
+**Schema** (migration `0041_fin_close_opening`):
+- `period_events`: CLOSE / REOPEN, the reason (required on a reopen), the close's `checks`, the actor by value. Append-only for every role.
+- `account_groups` (code, name, status) and `accounts.group_id`.
+- The document type `FIN.OPENING` (class OPENING, source FIN, numbered from the journal series).
+- The import kinds `FIN_CHART` and `FIN_OPENING`.
+
+**The core.**
+- `ledger/periods.ts`: `openPeriodInTx` takes the company's period lock shared (`PERIOD_LOCK` 72_026_133) before it reads or creates a month.
+- `ledger/period-close.service.ts` `FinPeriodsService`:
+  - `periods` and `events` (`finance.read` or either period right).
+  - `close`:
+    - refused with `FIN_PERIOD_NOT_ENDED` before the month's last day has passed (company timezone);
+    - refused with `FIN_PERIOD_ORDER` while an earlier row is OPEN;
+    - refused with `FIN_CHECKLIST_FAILED` on an ITEMS or SUBLEDGER_GL drift of `reconcileBooks`, run first (a CACHE drift is rewritten by the run and recorded);
+    - then the lock exclusive, the row FOR UPDATE (created CLOSED if missing), an event and an audit row;
+    - closing a closed month changes nothing.
+  - `reopen`: the latest CLOSED month only, a reason of 1–500 characters.
+- The intake builds class **OPENING**: any lines, each party-control line its own item with `openItem` (ref, date, due date), no `settles`. How many a company has is its source's concern.
+- `FinChartService`:
+  - `importChartInTx`: groups by code, accounts by code; a used account keeps kind, side and control (`FIN_ACCOUNT_IN_USE`); a key re-pointed by a rule from `on`; its required control checked.
+  - `revertChartInTx`, `groups`, `postingKeys`.
+  - `FinJournalReader.accountsInUse` (and `accountsWithLines` for the chart service).
+- `FIN_ACCOUNT_IN_USE` (409) joins the contract's codes.
+
+**Bto's side.**
+- finance:
+  - `PeriodsService` and `PeriodsController`: `GET /finance/periods`, `GET /finance/periods/events`, `POST /finance/periods/:code/close` (`finance.periods.close`), `POST /finance/periods/:code/reopen {reason}` (`finance.periods.reopen`).
+  - `FinanceImportsService`: the facts the importers check against; the chart's import and revert; the opening posted as documents of 499 rows (the offset line on OPENING_STOCK's account when a chunk does not balance) and reversed on its own date. The committing staff member's rights are read in the worker through `PermissionHoldersService.companyPermissionsOf` and `FinContexts.forStaff`.
+- imports: `FinChartImporter` and `FinOpeningImporter` (`docs/modules/imports.md` §6); MODULE_DEPS imports → finance.
+- web: «Санхүү → Сарын хаалт» (`/finance/periods`); the imports page's two cards (for holders of `finance.journal.manage`), the opening's date field.
+
+**Tests.**
+- `test/integration/fin-periods.int-spec.ts` (the core alone): not ended, the right, the order, closed and earlier months refused, a later one open, the reopen's rules, the events append-only, a drift blocks, an OPENING with its items and its reversal, the chart import and its revert.
+- `test/integrity/fin-period-races.spec.ts`: a close waits for a posting that creates an earlier month and is then refused; postings after a close are refused; a close waits for a posting into the month.
+- `test/integration/finance-close-opening.int-spec.ts`: HTTP rights and refusals, the chart import (in use, errors, roles, revert), a fictitious opening per party with due dates, the inventory redirect, the second opening refused, the revert, 600 rows in two documents, the journal right.
+- `fin-bridge.int-spec.ts` replays 0041's data section.
+- Vitest `periods-page.test.tsx`.
+
+**Not built in F5** (after go-live, ADR-0083 #4):
+- soft close, override, the pending list and HELD, drafts and approval;
+- a checklist beyond the reconcile;
+- fixed assets in the opening (balances only);
+- a per-account group screen.
+
+### 3.12 What F6 built (2026-10-23, ADR-0105) — reports
+
+The owner's answers (2026-10-23):
+- the trial balance and the VAT report only (СТ-1…СТ-4 after D17);
+- the statements' rows linked to accounts on a screen, later;
+- the year close as one button;
+- screen, Excel and print.
+
+**Configuration** (migration `0044_fin_year_close`, data only): the key and role `RETAINED_EARNINGS` with account 340101 «Хуримтлагдсан ашиг (алдагдал)» (temporary, D16) and its rule; the document type `FIN.YEAR_CLOSE` (JOURNAL, FIN, the journal series).
+
+**The core.** `posting/report-reader.service.ts` `FinReports`:
+- `trialBalance`: per account the balance before `from`, the period's debit and credit and the closing, with its group; accounts without lines with `all`.
+- `vatReport`: the lines of the VAT keys or of their accounts at the month's end, by source document type, with the bases the lines carry and a count of those without; the documents (≤ 2,000); the tax point is the entry's date (TODO-VERIFY D25).
+- `resultBalances`: the INCOME and EXPENSE balances up to a date.
+
+**Bto's side.**
+- finance: `ReportsService` and `ReportsController`:
+  - `GET /finance/reports/trial-balance` (+ `.xlsx`), `GET /finance/reports/vat` (+ `.xlsx`);
+  - `GET /finance/year-close/:year`, `POST …/:year` and `POST …/:year/revert` (`finance.periods.close`).
+  - The year close posts `FIN/YEAR_CLOSE/<year>.<attempt>.<n>` documents of 499 accounts plus one RETAINED_EARNINGS line, dated 31 December, as the staff member.
+- web: «Гүйлгээ баланс» (`/finance/trial-balance`), «НӨАТ-ын тайлан» (`/finance/vat`), their print pages, the «Жил хаах» card on «Сарын хаалт».
+
+**Tests.**
+- `test/integration/fin-reports.int-spec.ts` (the core alone): the trial balance's figures and balance, the VAT with its base and a reversal netted, the result balances.
+- `test/integration/finance-reports.int-spec.ts` (HTTP): both reports and their Excel files; the year close, its refusals, its revert and a second attempt; a year not ended and a closed December.
+- `fin-bridge.int-spec.ts` replays 0044.
+- Vitest `reports-pages.test.tsx`.
+
+**Not built in F6:**
+- the statements СТ-1…СТ-4 and their row mapping (D17);
+- the official VAT-return rows and the e-Barimt compare (D17, D25);
+- income tax (manual);
+- a base on the POS shift's VAT line.
+
 ## 4. Data model (schema `fin`, ADR-0070 / ADR-0072 / ADR-0076)
 
 Conventions: money `NUMERIC(14,2)`, bigint identity ids, ids as strings in the contract.
@@ -613,6 +701,8 @@ export interface FinConfig {  // contract 'fin.config/1'; idempotent on natural 
 
 ## 10. Credit control (ADR-0073)
 
+**Since 2026-10-23 (ADR-0101): the OVERDUE row below is superseded.** An overdue amount never refuses an order; it only reminds in red (the owner, 2026-10-21). The policy is HOLD → LIMIT; `credit.overdue_nets_credits` and the refusal's `creditsOpen` are gone, and `overdueAmount` / `oldestDueDate` stay in the 409 for the message. `exposureInTx` still reports `overdue` and `creditsOpen` (the core reads; Bto's policy decides). The due dates the core's open items carry come from the customer's settlement group (`settlementDueDate`, «Мөрөн» on the 20th, «Орон нутаг» at month end) instead of the invoice date + 30 days.
+
 **Now (one database).**
 1. Confirmation or re-price: `customers.lockForUpdate` (`apps/api/src/modules/partners/services/customers.service.ts:517-531`); sales sums the open orders (`apps/api/src/modules/sales/services/sales-orders.service.ts:679-711`); `billing`'s credit policy calls `exposureInTx`, which takes `party_companies` `FOR NO KEY UPDATE`; then HOLD → OVERDUE → LIMIT.
 2. The sale: order → stock → customer → `submitInTx` (intake → period → party → items → counters). The order flips to INVOICED in the same transaction (`sales-orders.service.ts:808-817`), so it is never counted twice or not at all.
@@ -679,6 +769,13 @@ The accountant chooses among three options (TODO-VERIFY D6, with whether VAT is 
 **The control system (later).** Role `fin_control` with SELECT on `fin_ctl.*` only, hardened like `ai_reader` (CONNECTION LIMIT, `default_transaction_read_only`, `search_path`; `apps/api/src/db/provisioning.ts:96-99`), re-granted by a migrate step like `grantAiSchema`. A company is shown only after approval with `finance.control.approve` and an audit row. The views expose aggregates, not party names or TINs; `fin_ctl.freshness` gives the last `posted_at` per company × source. The HTTP `FinReader` is preferred over a database login from outside. It never writes. Consolidated statements with intercompany elimination are a separate later requirement.
 
 ## 13. Periods, approvals and rights (ADR-0075)
+
+**As built in F5 (ADR-0102, §3.11).** OPEN / CLOSED only. The close checks:
+- the end date;
+- the order of months;
+- the core reconcile (ITEMS and SUBLEDGER_GL block).
+
+A reopen needs a reason. The rights are `finance.periods.close` and `.reopen`. SOFT_CLOSED, override, HELD, the pending list and approvals below wait for after go-live (ADR-0083 #4).
 
 **Periods** are monthly per company: OPEN → SOFT_CLOSED → CLOSED.
 - **Rows.** A period row is created on demand only for a month later than the company's latest SOFT_CLOSED or CLOSED month; a document dated in an earlier month that has no row is refused with `FIN_PERIOD_CLOSED` (it goes to the pending list like any closed-month document), so a back-dated posting never opens a month older than a closed one. P2 creates every month from the first entry's month to the current one.
@@ -839,7 +936,7 @@ Consequences:
 | F5 Close and opening | P5 reduced: close and reopen of the latest month with a reason and an event row, a closed month refusing postings in-process, `periods.close` / `periods.reopen`; §16.2 Chart and opening import | 2 | D16, D27 |
 | F6 Reports | §16.2 Statements, VAT return, closing | 2–3 | D17, D25 |
 
-**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. The ledger half was built the same day (§3.7, ADR-0089): accounts and money accounts moved with their ids, roles became append-only rules, monthly periods, the journal with its balance guards and the reversal key, Bto's journal writers switched, the old chart, money-account and journal tables dropped, the development re-post. **F1 is done.** F2 was built the same day (§3.8, ADR-0090): the intake with every class but SETTLEMENT and OPENING, open items, allocations, party balances, the core's numbers, exposure and the default overdue rule, the manual allocation, the core reconcile, Bto's receivables on the engine and Finance I's receivables dropped with no copy; next F3 and F4 in either order. F3 was built the same day (§3.9, ADR-0091): suppliers as parties, the goods receipt as the supplier's bill when it gets its prices, each re-costing's difference, supplier returns as AP credits, manual payments paired by hand, «Нийлүүлэгчийн тооцоо»; next F4 (D8) or F5. F4 was built on 2026-10-22 (§3.10, ADR-0097) with the owner's defaults for D8: every stock posting books its value, unpriced receipts through goods received; next F5 (close and opening).
+**F1 progress.** P1 (2026-10-20, ADR-0084, §3.6) built F1's organisation half: schema `fin`, grants, the guard function, the harness truncation, tenant `BUTEN_ORGIL`, company BO with its tax registrations, branches, the sources BTO and FIN with grants, the 15 posting keys, parties from customers plus `LEGACY_UNASSIGNED`, `fin.audit_log`, `bto.company_code`, `modules/fin-bridge` and `ensureDefaultCompany`. It also built two items this plan defers, which the owner kept (2026-10-20) because they are built, tested and grant exactly today's permissions: `identity.user_company_roles` (mirrored from `user_roles`, read into `AuthContext.companyPermissions`) and the per-company checks of `resolveCompany` with the test StaticCaller. The ledger half was built the same day (§3.7, ADR-0089): accounts and money accounts moved with their ids, roles became append-only rules, monthly periods, the journal with its balance guards and the reversal key, Bto's journal writers switched, the old chart, money-account and journal tables dropped, the development re-post. **F1 is done.** F2 was built the same day (§3.8, ADR-0090): the intake with every class but SETTLEMENT and OPENING, open items, allocations, party balances, the core's numbers, exposure and the default overdue rule, the manual allocation, the core reconcile, Bto's receivables on the engine and Finance I's receivables dropped with no copy; next F3 and F4 in either order. F3 was built the same day (§3.9, ADR-0091): suppliers as parties, the goods receipt as the supplier's bill when it gets its prices, each re-costing's difference, supplier returns as AP credits, manual payments paired by hand, «Нийлүүлэгчийн тооцоо»; next F4 (D8) or F5. F4 was built on 2026-10-22 (§3.10, ADR-0097) with the owner's defaults for D8: every stock posting books its value, unpriced receipts through goods received; next F5 (close and opening). F5 was built on 2026-10-23 (§3.11, ADR-0102): the close and reopen of the latest month, Erkhet's chart import with the «Үүрэг» column, the opening import as OPENING documents (fictitious data only; D16, D27 TODO-VERIFY); next F6 (reports). F6 was built on 2026-10-23 (§3.12, ADR-0105): the trial balance, the month's VAT and the year close, with Excel and print; the statements wait for D17. **The lean plan's phases are built**; what remains before go-live is the accountant's answers (D8, D16, D17, D25, D27) and the cut-over.
 
 **Order.**
 - F1 → F2 → F3 and F4 in either order → F5 → F6. About 11–15 sessions, re-planned in STATUS after each phase.

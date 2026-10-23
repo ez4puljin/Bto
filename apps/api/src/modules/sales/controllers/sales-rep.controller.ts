@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
+import { overdueDto } from '../overdue';
 import {
   SalesRepContextDto,
   SalesRepCustomerDetailDto,
@@ -177,6 +178,7 @@ export class SalesRepController {
         phone: store.phone,
         creditHold: store.creditHold,
         creditHoldReason: store.creditHoldReason,
+        overdue: overdueDto(store.overdue),
         addressId: store.addressId,
         address: store.address,
         lat: store.lat.toFixed(6),

@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
   ValidateNested,
@@ -244,6 +245,30 @@ export class ProductListQueryDto extends PageQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   saleReady?: boolean;
+}
+
+export class ProductLookupQueryDto {
+  @ApiProperty({ description: 'Words of the name in either script, a SKU or a barcode' })
+  @IsString()
+  @MaxLength(100)
+  q: string;
+
+  @ApiPropertyOptional({
+    description: 'Only the products linked to this supplier (ADR-0103); an empty q lists them',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  supplierId?: number;
+
+  @ApiPropertyOptional({ description: 'At most 30; default 20' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  limit?: number;
 }
 
 @ApiSchema({ name: 'UnitUpdateRequest' })

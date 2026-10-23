@@ -86,6 +86,9 @@ export function CustomerBalancesPage() {
                 {t('finance.balances.agingGroup')}
               </TableHead>
               <TableHead rowSpan={2} className={WRAPPING_HEAD}>
+                {t('partners.settlement.group')}
+              </TableHead>
+              <TableHead rowSpan={2} className={WRAPPING_HEAD}>
                 {t('finance.balances.creditLimit')}
               </TableHead>
               <TableHead aria-hidden rowSpan={2} className="w-9 pl-0" />
@@ -100,7 +103,7 @@ export function CustomerBalancesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {balances.isPending ? <SkeletonRows columns={AGING_BUCKETS.length + 6} /> : null}
+            {balances.isPending ? <SkeletonRows columns={AGING_BUCKETS.length + 7} /> : null}
             {rows.map((row) => (
               <LinkRow key={row.customerId} to={`/finance/customers/${row.customerId}`}>
                 <TruncateCell text={`${row.name} · ${row.code}`} fill className="min-w-44">
@@ -119,7 +122,8 @@ export function CustomerBalancesPage() {
                 </TruncateCell>
                 <TableCell className="text-right font-mono">{formatTugrik(row.balance)}</TableCell>
                 <TableCell className="text-right font-mono">{row.openInvoices}</TableCell>
-                <TableCell className="text-right font-mono">
+                {/* An overdue debt only reminds, in red (ADR-0101). */}
+                <TableCell className="text-right font-mono font-medium text-destructive">
                   {row.overdueAmount === '0.00' ? '' : formatTugrik(row.overdueAmount)}
                 </TableCell>
                 {AGING_BUCKETS.map((bucket) => (
@@ -127,6 +131,9 @@ export function CustomerBalancesPage() {
                     {row.aging[bucket] === '0.00' ? '' : formatMnt(row.aging[bucket])}
                   </TableCell>
                 ))}
+                <TableCell className="whitespace-nowrap">
+                  {t(`partners.settlement.groups.${row.settlementGroup}`)}
+                </TableCell>
                 <TableCell className="text-right font-mono">
                   {row.creditLimit === null
                     ? t('finance.balances.noLimit')

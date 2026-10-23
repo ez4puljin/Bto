@@ -27,6 +27,7 @@ import {
   SalesOrderProductInfoQueryDto,
   SalesOrderRequestDto,
 } from '../dto/sales-orders.dto';
+import { overdueDto } from '../overdue';
 import { type OrderDetail, SalesOrderQueryService } from '../services/sales-order-query.service';
 import { type OrderInput, SalesOrdersService } from '../services/sales-orders.service';
 
@@ -70,6 +71,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     customerId: order.customerId,
     customerCode: order.customerCode,
     customerName: order.customerName,
+    customerOverdue: overdueDto(order.customerOverdue),
     fulfilment: order.fulfilment,
     deliveryDate: order.deliveryDate,
     addressId: order.addressId,
@@ -193,6 +195,7 @@ export class SalesOrdersController {
       data: page.data.map((row) => ({
         ...row,
         total: money(row.total),
+        customerOverdue: overdueDto(row.customerOverdue),
         archivedAt: iso(row.archivedAt),
         createdAt: row.createdAt.toISOString(),
       })),

@@ -21,6 +21,8 @@ export const FIN_ERROR_CODES = [
   // Mapping
   'FIN_MAPPING_MISSING',
   'FIN_ACCOUNT_INACTIVE',
+  // An account whose kind or control would change while it holds postings (ADR-0102 #4)
+  'FIN_ACCOUNT_IN_USE',
   'FIN_PARTY_REQUIRED',
   'FIN_MONEY_ACCOUNT_REQUIRED',
   'FIN_TAX_CODE_UNKNOWN',
@@ -34,7 +36,7 @@ export const FIN_ERROR_CODES = [
   // Identity of a document
   'FIN_PAYLOAD_CONFLICT',
   'FIN_SOURCE_COMPANY_MISMATCH',
-  // Periods and approvals (all but the first from P5)
+  // Periods and approvals (the close and its order and checks from F5, ADR-0102)
   'FIN_PERIOD_CLOSED',
   'FIN_PERIOD_NOT_ENDED',
   'FIN_PERIOD_ORDER',

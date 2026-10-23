@@ -49,6 +49,8 @@ export {
   binStock,
   goodsIssueLines,
   goodsIssues,
+  goodsReceiptDiscountLines,
+  goodsReceiptDiscounts,
   goodsReceiptLines,
   goodsReceipts,
   issueExpenseTypes,
@@ -118,6 +120,7 @@ export {
 } from '../modules/notifications/schema';
 export { appBanners, companyContacts, customerFavourites } from '../modules/customer/schema';
 export {
+  finAccountGroups,
   finAccounts,
   finAllocations,
   finDocumentTypes,
@@ -141,6 +144,7 @@ export {
   finParties,
   finPartyCompanies,
   finPartyRefs,
+  finPeriodEvents,
   finPostingKeys,
   finPostingRules,
   finSchema,

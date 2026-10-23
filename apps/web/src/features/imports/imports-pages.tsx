@@ -1,9 +1,11 @@
 import { IMPORT_COLUMNS, IMPORT_KINDS, type ImportKind } from '@tugeel/shared/imports';
+import { addDays, businessDate } from '@tugeel/shared/time';
 import { Download, FileSpreadsheet, ListChecks, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FormField } from '@/components/form';
 import {
   ChevronHead,
   EmptyState,
@@ -21,6 +23,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -29,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useHasPermission } from '@/app/auth-context';
 import { useWarehouses } from '@/features/identity/api';
 import { WarehouseSelect } from '@/features/inventory/shared';
 import { formatUbDateTime } from '@/lib/dayjs';
@@ -80,12 +84,17 @@ export function ImportsPage() {
   const { t } = useTranslation();
   const imports = useImports();
   const rows = imports.data?.pages.flatMap((page) => page.data) ?? [];
+  // The chart and the opening are the accountant's books (ADR-0102 #4, #5).
+  const journal = useHasPermission('finance.journal.manage');
+  const kinds = IMPORT_KINDS.filter(
+    (kind) => journal || (kind !== 'FIN_CHART' && kind !== 'FIN_OPENING'),
+  );
 
   return (
     <div>
       <PageHeader title={t('imports.title')} description={t('imports.intro')} />
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {IMPORT_KINDS.map((kind) => (
+        {kinds.map((kind) => (
           <ImportKindCard key={kind} kind={kind} />
         ))}
       </div>
@@ -146,18 +155,17 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const input = useRef<HTMLInputElement>(null);
   const [key, setKey] = useState(randomUuid);
   const [wrongType, setWrongType] = useState(false);
-  // A receipts import names its warehouse and payment before the file (ADR-0078 #7).
+  // A receipts import names its payment before the file (ADR-0078 #7); each row goes to its
+  // product's home warehouse (ADR-0099 #7).
   const [options, setOptions] = useState<Partial<ReceiptImportOptions>>({
     paymentMethod: 'CREDIT',
     moneyAccountId: null,
   });
   const receiptOptions =
     kind === 'RECEIPTS' &&
-    options.warehouseId !== undefined &&
     options.paymentMethod !== undefined &&
     (options.paymentMethod === 'CREDIT' || options.moneyAccountId)
       ? {
-          warehouseId: options.warehouseId,
           paymentMethod: options.paymentMethod,
           moneyAccountId:
             options.paymentMethod === 'CREDIT' ? null : (options.moneyAccountId ?? null),
@@ -167,9 +175,14 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
   const issueOptions =
     kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
+  // An opening import is dated before the file: the day before go-live (TODO-VERIFY D27).
+  const [openingDate, setOpeningDate] = useState(() => addDays(businessDate(), -1));
+  const openingOptions =
+    kind === 'FIN_OPENING' && openingDate !== '' ? { date: openingDate } : undefined;
   const ready =
     (kind !== 'RECEIPTS' || receiptOptions !== undefined) &&
-    (kind !== 'ISSUES' || issueOptions !== undefined);
+    (kind !== 'ISSUES' || issueOptions !== undefined) &&
+    (kind !== 'FIN_OPENING' || openingOptions !== undefined);
 
   const download = () =>
     void action.run(async () => {
@@ -196,6 +209,7 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         key,
         receiptOptions,
         issueOptions,
+        openingOptions,
       });
       setKey(randomUuid());
       await navigate(`/imports/${job.id}`);
@@ -212,6 +226,22 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         {kind === 'RECEIPTS' ? <ReceiptImportFields value={options} onChange={setOptions} /> : null}
         {kind === 'ISSUES' ? (
           <IssueImportFields value={issueWarehouse} onChange={setIssueWarehouse} />
+        ) : null}
+        {kind === 'FIN_OPENING' ? (
+          <FormField
+            label={t('imports.openingOptions.date')}
+            htmlFor="opening-date"
+            hint={t('imports.openingOptions.dateHint')}
+          >
+            <Input
+              id="opening-date"
+              type="date"
+              max={businessDate()}
+              className="sm:w-44"
+              value={openingDate}
+              onChange={(event) => setOpeningDate(event.target.value)}
+            />
+          </FormField>
         ) : null}
         {wrongType ? (
           <p role="alert" className="text-[13px] text-destructive">
@@ -257,27 +287,18 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   );
 }
 
-/** The warehouse and the payment of the delivery notes a receipts import brings (ADR-0078 #7). */
+/** The payment of the delivery notes a receipts import brings (ADR-0078 #7, ADR-0099 #7). */
 function ReceiptImportFields(props: {
   value: Partial<ReceiptImportOptions>;
   onChange: (value: Partial<ReceiptImportOptions>) => void;
 }) {
   const { t } = useTranslation();
-  const warehouses = (useWarehouses().data ?? []).filter(
-    (warehouse) => warehouse.kind === 'WHOLESALE' && warehouse.status === 'ACTIVE',
-  );
   const method = props.value.paymentMethod ?? 'CREDIT';
   const accounts = useReceiptPaymentAccounts(method !== 'CREDIT');
   const choices = (accounts.data ?? []).filter((account) => account.kind === method);
   return (
     <div className="grid gap-2">
-      <WarehouseSelect
-        label={t('imports.receiptOptions.warehouse')}
-        options={warehouses}
-        value={props.value.warehouseId}
-        emptyLabel={t('imports.receiptOptions.pickWarehouse')}
-        onChange={(warehouseId) => props.onChange({ ...props.value, warehouseId })}
-      />
+      <p className="text-[13px] text-muted-foreground">{t('imports.receiptOptions.homeHint')}</p>
       <NativeSelect
         aria-label={t('imports.receiptOptions.payment')}
         value={method}

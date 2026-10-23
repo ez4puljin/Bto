@@ -47,8 +47,10 @@ const MODULE_DEPS = {
   catalog: ['identity'],
   partners: ['identity', 'catalog'], // ADR-0032: product_suppliers
   inventory: ['identity', 'catalog', 'partners'],
-  imports: ['identity', 'catalog', 'partners', 'inventory', 'pricing'],
-  pricing: ['identity', 'catalog', 'partners'],
+  // ADR-0102: the Finance Core's chart and opening imports post through finance's index.ts.
+  imports: ['identity', 'catalog', 'partners', 'inventory', 'pricing', 'finance'],
+  // ADR-0099 #5: pricing binds inventory's RECEIPT_SALE_PRICES (a receipt's new sale prices).
+  pricing: ['identity', 'catalog', 'partners', 'inventory'],
   sales: ['identity', 'catalog', 'partners', 'pricing', 'inventory', 'ebarimt'],
   // ADR-0060: sales only for its hook tokens and snapshot types; finance never reads a sales table.
   // ADR-0089: fin-bridge for the Finance Core's call contexts and the customers' parties.

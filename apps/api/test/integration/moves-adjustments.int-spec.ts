@@ -131,7 +131,6 @@ describe('bin moves and adjustments', () => {
       .set(bearer(worker))
       .set(idempotency())
       .send({
-        warehouseId: wh1.id,
         supplierId,
         lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }],
       })

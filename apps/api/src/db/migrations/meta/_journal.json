@@ -267,6 +267,41 @@
       "when": 1792652249423,
       "tag": "0037_fin_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792729101067,
+      "tag": "0038_receipt_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792739377516,
+      "tag": "0042_receipt_discounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792764982838,
+      "tag": "0041_fin_close_opening",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792767523334,
+      "tag": "0044_fin_year_close",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792770057730,
+      "tag": "0040_settlement_days",
+      "breakpoints": true
     }
   ]
 }

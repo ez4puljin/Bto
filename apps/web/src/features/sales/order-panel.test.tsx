@@ -116,6 +116,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   customerId: 9,
   customerCode: '1001',
   customerName: 'Номин дэлгүүр',
+  customerOverdue: null,
   fulfilment: 'PICKUP',
   deliveryDate: '2099-10-16',
   addressId: null,
@@ -255,6 +256,36 @@ describe('order panel (ADR-0059)', () => {
       await screen.findByRole('dialog', { name: mn.sales.order.cancelTitle }),
     ).toBeInTheDocument();
     expect(calls(fetchMock, 'POST', '/api/v1/sales-orders/5/move')).toHaveLength(1);
+  });
+
+  it('reminds of the customer’s overdue debt in red and still confirms (ADR-0101)', async () => {
+    const customerOverdue = { amount: '120000', oldestDueDate: '2026-09-20' };
+    const draft = { ...ORDER, stageId: 1, status: 'SUBMITTED' as const, customerOverdue };
+    const fetchMock = signedIn(
+      OFFICE_ME,
+      routes({
+        'GET /api/v1/sales-orders/5': () => json(draft),
+        'POST /api/v1/sales-orders/5/move': () =>
+          json({ order: { ...ORDER, customerOverdue }, print: [] }),
+      }),
+    );
+    renderApp('/sales/boards?order=5', fetchMock);
+    const user = userEvent.setup();
+    const panel = await screen.findByRole('dialog', { name: '20261015_0005' });
+    expect(
+      await within(panel).findByText(
+        mn.sales.overdue.since.replace('{{amount}}', '120,000₮').replace('{{date}}', '2026-09-20'),
+      ),
+    ).toBeInTheDocument();
+    const steps = await within(panel).findByRole('region', { name: mn.sales.panel.stageSteps });
+    await user.click(
+      within(steps).getByRole('button', {
+        name: mn.sales.panel.moveTo.replace('{{name}}', 'Нярав Хяналт'),
+      }),
+    );
+    expect(
+      await screen.findByText(mn.sales.overdue.confirmed.replace('{{amount}}', '120,000₮')),
+    ).toBeInTheDocument();
   });
 
   it('names who did what in the activity, newest first', async () => {

@@ -1,3 +1,4 @@
+import { SETTLEMENT_GROUPS, type SettlementGroup } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS } from '@tugeel/shared/taxpayer';
 import { Plus, Store } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
@@ -49,10 +50,12 @@ const isStatus = (value: string | null): value is PartnerStatus =>
   PARTNER_STATUSES.some((status) => status === value);
 const isAppFilter = (value: string | null): value is AppAccountFilter =>
   APP_FILTERS.some((entry) => entry === value);
+const isGroup = (value: string | null): value is SettlementGroup =>
+  SETTLEMENT_GROUPS.some((group) => group === value);
 
 /**
  * Customers: search by name in either script, code, phone, TIN or registration number; filter by
- * kind, status and the customer app account (ADR-0079 #11), and find the rows that still miss a
+ * kind, status, settlement group (ADR-0101) and the customer app account (ADR-0079 #11), and find the rows that still miss a
  * TIN or a GPS point, or are on credit hold (SPEC §5.3). Filters live in the URL so "back" keeps them. A user who never chose sees the
  * columns that fit a 1366px screen (ADR-0066).
  */
@@ -69,6 +72,8 @@ export function CustomersPage() {
   const status = isStatus(statusParam) ? statusParam : undefined;
   const appParam = params.get('app');
   const app = isAppFilter(appParam) ? appParam : undefined;
+  const groupParam = params.get('group');
+  const settlementGroup = isGroup(groupParam) ? groupParam : undefined;
   const flag = (name: Flag) => (params.get(name) === '1' ? true : undefined);
   const segmentId = segmentParam(params);
   const customers = useCustomers({
@@ -77,6 +82,7 @@ export function CustomersPage() {
     status,
     segmentId,
     app,
+    settlementGroup,
     tinPending: flag('tinPending'),
     gpsMissing: flag('gpsMissing'),
     creditHold: flag('creditHold'),
@@ -94,7 +100,13 @@ export function CustomersPage() {
     [hidden],
   );
   const filtered = Boolean(
-    q || kind || status || app || segmentId || FLAGS.some((name) => flag(name) === true),
+    q ||
+    kind ||
+    status ||
+    app ||
+    settlementGroup ||
+    segmentId ||
+    FLAGS.some((name) => flag(name) === true),
   );
   const clearFilters = () => {
     setSearch('');
@@ -161,6 +173,19 @@ export function CustomersPage() {
           {PARTNER_STATUSES.map((value) => (
             <option key={value} value={value}>
               {t(`partners.status.${value}`)}
+            </option>
+          ))}
+        </NativeSelect>
+        <NativeSelect
+          variant="filter"
+          aria-label={t('partners.settlement.group')}
+          value={settlementGroup ?? ''}
+          onChange={(event) => setParam('group', event.target.value)}
+        >
+          <option value="">{t('partners.settlement.allGroups')}</option>
+          {SETTLEMENT_GROUPS.map((value) => (
+            <option key={value} value={value}>
+              {t(`partners.settlement.groups.${value}`)}
             </option>
           ))}
         </NativeSelect>

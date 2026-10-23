@@ -249,6 +249,13 @@ export class SalesOrderFiltersQueryDto {
   @ApiPropertyOptional({ format: 'date' }) @IsOptional() @Matches(DATE) deliveryTo?: string;
 }
 
+@ApiSchema({ name: 'SalesCustomerOverdue' })
+export class SalesCustomerOverdueDto {
+  @ApiProperty({ example: '50000', description: 'Open invoices past their due date, whole MNT' })
+  amount: string;
+  @ApiProperty({ type: String, format: 'date', nullable: true }) oldestDueDate: string | null;
+}
+
 @ApiSchema({ name: 'SalesOrderCard' })
 export class SalesOrderCardDto {
   @ApiProperty() id: number;
@@ -258,6 +265,12 @@ export class SalesOrderCardDto {
   @ApiProperty() customerId: number;
   @ApiProperty() customerCode: string;
   @ApiProperty() customerName: string;
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+  })
+  customerOverdue: SalesCustomerOverdueDto | null;
   @ApiProperty({ enum: FULFILMENTS }) fulfilment: Fulfilment;
   @ApiProperty({ enum: PAYMENT_METHODS, description: "The card's label (ADR-0058)" })
   paymentMethod: PaymentMethod;

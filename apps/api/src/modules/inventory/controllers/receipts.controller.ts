@@ -23,8 +23,12 @@ import {
 import {
   CostReceiptDto,
   CreateReceiptDto,
+  LastReceiptPriceDto,
+  LastReceiptPricesQueryDto,
   ReceiptCostingDto,
   ReceiptDetailDto,
+  ReceiptDiscountRequestDto,
+  ReceiptDiscountsDto,
   ReceiptLineRequestDto,
   ReceiptListQueryDto,
   ReceiptPageDto,
@@ -44,19 +48,30 @@ const money = (value: string | null | undefined) =>
 const lineInput = (line: ReceiptLineRequestDto) => ({
   productUnitId: line.productUnitId,
   enteredQty: new Decimal(line.enteredQty),
-  ...(line.binId === undefined ? {} : { binId: line.binId }),
+  ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
   ...(line.docUnitPrice === undefined ? {} : { docUnitPrice: money(line.docUnitPrice) }),
   ...(line.docAmount === undefined ? {} : { docAmount: money(line.docAmount) }),
   ...(line.freeGoods === undefined ? {} : { freeGoods: line.freeGoods }),
+  ...(line.salePrice === undefined ? {} : { salePrice: money(line.salePrice) }),
 });
+
+/** Discounts as typed, as decimals (ADR-0103). */
+const discountsInput = (discounts: readonly ReceiptDiscountRequestDto[]) =>
+  discounts.map((discount) => ({
+    kind: discount.kind,
+    pct: money(discount.pct) ?? null,
+    amount: money(discount.amount) ?? null,
+    lineIds: discount.lineIds ?? [],
+  }));
 
 /** Prices and totals only for cost holders (ADR-0033 #8, ADR-0078 #2). */
 const detail = (ctx: AuthContext) => (receipt: Parameters<typeof toReceiptDetailDto>[0]) =>
   toReceiptDetailDto(receipt, ctx.permissions.has(COSTS));
 
 /**
- * Goods receipts (ADR-0033): warehouse staff count and post them; every user reads them without
- * costs; the costs live behind inventory.costs.manage.
+ * Goods receipts (ADR-0033, ADR-0099): holders of the receipt right count and post them, whatever
+ * their warehouse scope; every user reads them without costs; the costs and the discount live
+ * behind inventory.costs.manage, a line's new sale price behind pricing.prices.manage.
  */
 @ApiTags('inventory')
 @Controller('receipts')
@@ -66,9 +81,16 @@ export class ReceiptsController {
   @Get()
   @Authenticated()
   @ApiOkResponse({ type: ReceiptPageDto })
-  async list(@Query() query: ReceiptListQueryDto): Promise<ReceiptPageDto> {
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ReceiptListQueryDto,
+  ): Promise<ReceiptPageDto> {
     const page = await this.receipts.list(query);
-    return { data: page.data.map(toReceiptSummaryDto), nextCursor: page.nextCursor };
+    const withCosts = ctx.permissions.has(COSTS);
+    return {
+      data: page.data.map((summary) => toReceiptSummaryDto(summary, withCosts)),
+      nextCursor: page.nextCursor,
+    };
   }
 
   /** The cash boxes and bank accounts a receipt may name (ADR-0078 #5). */
@@ -77,6 +99,18 @@ export class ReceiptsController {
   @ApiOkResponse({ type: [ReceiptPaymentAccountDto] })
   async paymentAccounts(): Promise<ReceiptPaymentAccountDto[]> {
     return this.receipts.paymentAccounts();
+  }
+
+  /** Each product's latest delivery-note price, from any supplier (ADR-0099 #3). */
+  @Get('last-prices')
+  @RequirePermission(COSTS)
+  @ApiOkResponse({ type: [LastReceiptPriceDto] })
+  async lastPrices(@Query() query: LastReceiptPricesQueryDto): Promise<LastReceiptPriceDto[]> {
+    return (await this.receipts.lastPrices(query.productIds)).map((price) => ({
+      ...price,
+      unitPrice: price.unitPrice.toFixed(2),
+      basePrice: price.basePrice.toFixed(2),
+    }));
   }
 
   @Get(':id')
@@ -99,7 +133,6 @@ export class ReceiptsController {
   ): Promise<ReceiptDetailDto> {
     return detail(ctx)(
       await this.receipts.create(ctx, {
-        warehouseId: body.warehouseId,
         supplierId: body.supplierId,
         ...(body.supplierDocNo === undefined ? {} : { supplierDocNo: body.supplierDocNo }),
         ...(body.supplierDocDate === undefined ? {} : { supplierDocDate: body.supplierDocDate }),
@@ -120,6 +153,18 @@ export class ReceiptsController {
     @Body() body: UpdateReceiptDto,
   ): Promise<ReceiptDetailDto> {
     return detail(ctx)(await this.receipts.update(ctx, id, body));
+  }
+
+  /** A draft's discounts, replaced as a whole (ADR-0103). */
+  @Put(':id/discounts')
+  @RequirePermission(COSTS)
+  @ApiOkResponse({ type: ReceiptDetailDto })
+  async setDiscounts(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ReceiptDiscountsDto,
+  ): Promise<ReceiptDetailDto> {
+    return detail(ctx)(await this.receipts.setDiscounts(ctx, id, discountsInput(body.discounts)));
   }
 
   @Post(':id/lines')
@@ -176,6 +221,7 @@ export class ReceiptsController {
     return toReceiptCostingDto(
       await this.receipts.cost(ctx, id, {
         costingVersion: body.costingVersion,
+        ...(body.discounts === undefined ? {} : { discounts: discountsInput(body.discounts) }),
         lines: body.lines.map((line) => ({
           lineId: line.lineId,
           ...(line.amount === undefined ? {} : { amount: new Decimal(line.amount) }),
@@ -203,10 +249,10 @@ export class ReceiptLinesController {
     return detail(ctx)(
       await this.receipts.updateLine(ctx, id, {
         ...(body.enteredQty === undefined ? {} : { enteredQty: new Decimal(body.enteredQty) }),
-        ...(body.binId === undefined ? {} : { binId: body.binId }),
         ...(body.docUnitPrice === undefined ? {} : { docUnitPrice: money(body.docUnitPrice) }),
         ...(body.docAmount === undefined ? {} : { docAmount: money(body.docAmount) }),
         ...(body.freeGoods === undefined ? {} : { freeGoods: body.freeGoods }),
+        ...(body.salePrice === undefined ? {} : { salePrice: money(body.salePrice) }),
       }),
     );
   }
