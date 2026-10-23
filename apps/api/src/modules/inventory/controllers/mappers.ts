@@ -16,6 +16,7 @@ import type {
 import type {
   ReceiptCostingDto,
   ReceiptDetailDto,
+  ReceiptDiscountDto,
   ReceiptLineDto,
   ReceiptSummaryDto,
 } from '../dto/receipts.dto';
@@ -43,6 +44,7 @@ import type {
 import type {
   ReceiptCosting,
   ReceiptDetail,
+  ReceiptDiscountView,
   ReceiptLine,
   ReceiptSummary,
 } from '../services/receipts.service';
@@ -145,11 +147,11 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
     weightMissing: receipt.totals.weightMissing,
     ...(withCosts
       ? {
-          discountPct: receipt.discountPct?.toFixed() ?? null,
-          discountAmount: receipt.discountAmount?.toFixed(2) ?? null,
+          discounts: receipt.discounts.map(toReceiptDiscountDto),
           totals: {
             docTotal: receipt.totals.docTotal.toFixed(2),
             discountTotal: receipt.totals.discountTotal.toFixed(2),
+            discountTooLarge: receipt.totals.discountTooLarge,
             netTotal: receipt.totals.netTotal.toFixed(2),
             vatTotal: receipt.totals.vatTotal.toFixed(2),
             costTotal: receipt.totals.costTotal.toFixed(2),
@@ -179,6 +181,17 @@ export function toReceiptSummaryDto(summary: ReceiptSummary, withCosts = false):
   };
 }
 
+export function toReceiptDiscountDto(discount: ReceiptDiscountView): ReceiptDiscountDto {
+  return {
+    id: discount.id,
+    kind: discount.kind,
+    pct: discount.pct?.toFixed() ?? null,
+    amount: discount.amount?.toFixed(2) ?? null,
+    lineIds: [...discount.lineIds],
+    total: discount.total?.toFixed(2) ?? null,
+  };
+}
+
 export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto {
   return {
     receiptId: costing.receiptId,
@@ -189,8 +202,7 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
     recostUntil: costing.recostUntil,
     costedAt: costing.costedAt?.toISOString() ?? null,
     vatRatePct: costing.vatRatePct.toFixed(),
-    discountPct: costing.discountPct?.toFixed() ?? null,
-    discountAmount: costing.discountAmount?.toFixed(2) ?? null,
+    discounts: costing.discounts.map(toReceiptDiscountDto),
     total: costing.total?.toFixed(2) ?? null,
     docTotal: costing.docTotal?.toFixed(2) ?? null,
     lines: costing.lines.map((line) => ({

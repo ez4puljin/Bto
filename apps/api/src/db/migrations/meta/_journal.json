@@ -274,6 +274,13 @@
       "when": 1792729101067,
       "tag": "0038_receipt_window",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792739377516,
+      "tag": "0042_receipt_discounts",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,8 @@ export {
   binStock,
   goodsIssueLines,
   goodsIssues,
+  goodsReceiptDiscountLines,
+  goodsReceiptDiscounts,
   goodsReceiptLines,
   goodsReceipts,
   issueExpenseTypes,
