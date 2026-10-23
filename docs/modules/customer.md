@@ -1,5 +1,7 @@
 # Module `customer` — contract
 
+**Settlement days (2026-10-23, ADR-0101).** `/me` and `/account` carry the settlement group and the current period's settlement (above); the cart's OVERDUE warning stays a warning and the app now says the order is not held. «Bto300»'s full «Тооцоо хийх өдөр» card (Account board v28) is the app chat's next session; this one only shows the day in place of the term in days.
+
 Status: **CA2 built 2026-10-19** (the server of the customer app «Bto300», ADR-0079, ADR-0082). The app's screens (CA3, the `customer` variant of `apps/mobile`, ADR-0085) were built the same day: `docs/modules/mobile.md` §1a. **CA4 built 2026-10-20** (the home as a shop window, ADR-0092, ADR-0093): banners, the home, a section's list, a category's page, deals on every card; the app's new screens are CA5. Code: `apps/api/src/modules/customer/`; the office's «Апп» card lives in partners, the accounts and sign-in in identity (`docs/modules/identity.md` §2a), the hooks in sales, finance and notifications.
 
 `customer` is a leaf: it depends on identity, catalog, partners, pricing, inventory, sales, finance and notifications through their `index.ts` and nobody imports it (ESLint `MODULE_DEPS.customer`, ADR-0082 #4). It reads segments only through catalog's `PRODUCT_SEGMENT_DIRECTORY` and `PRODUCT_SET_RESOLVER` hooks (ADR-0093 #3). It owns the routes a customer token reaches, the admins' banners and three small tables.
@@ -26,7 +28,7 @@ Every `/customer-app/*` route is `@CustomerRoute()`: only a customer token reach
 
 | Route | What |
 |---|---|
-| `GET /customer-app/me` | the store: id, code, name, the sign-in phone, the centre (the branch of the active wholesale warehouses and their names), the default address, the payment term, `ordersOpen` (a stage takes app orders), `today` |
+| `GET /customer-app/me` | the store: id, code, name, the sign-in phone, the centre (the branch of the active wholesale warehouses and their names), the default address, `settlementGroup` (DAY_20 «Мөрөн» / MONTH_END «Орон нутаг», ADR-0101; replaced `paymentTermDays`), `ordersOpen` (a stage takes app orders), `today` |
 | `GET /customer-app/checkout` | `today`, `lastDay` (today + 60), the live addresses (the default first), the pickup centre, `ordersOpen` |
 | `GET /customer-app/credit-check?amount=` | the cart's warning for its quoted total: `warnings` HOLD / OVERDUE / LIMIT, the overdue amount and oldest due date, the limit, what remains, the `excess`; never the hold's reason; the store may still send |
 | `GET /customer-app/contacts` | the shown company contacts in order |
@@ -44,7 +46,7 @@ Every `/customer-app/*` route is `@CustomerRoute()`: only a customer token reach
 | `GET /customer-app/orders?from&to&cursor&limit` | every order of the store with lines, from every channel, archived included, newest first; each with the status in the customer's words (`state`), the rep's name for a SALES_REP order, the frozen total or a pending order's estimate, backordered lines, the cancel reason; the first page's summary (count, confirmed total, pending) |
 | `GET /customer-app/orders/:id` | one order: lines with backordered base quantities, the progress stamps, the invoice once sold |
 | `GET /customer-app/orders/:id/reorder` | «Дахин захиалах»: the lines for the cart, and the products left out (UNAVAILABLE, OUT_OF_STOCK, UNIT_CHANGED) |
-| `GET /customer-app/account` | «Тооцоо»: balance (negative = an advance), the overdue amount and oldest due date, the limit and what remains (only with a limit), «Зээл хаалттай», the payment term, the tab counts |
+| `GET /customer-app/account` | «Тооцоо»: balance (negative = an advance), the overdue amount and oldest due date, the limit and what remains (only with a limit), «Зээл хаалттай», `settlement` {`group`, `periodFrom`, `periodTo`, `dueDate` «Тооцоо хийх өдөр», `daysLeft`, `amountDue` «Төлөх дүн» = the positive balance, `overdueAmount` its overdue part} from `settlementSummary` (ADR-0101; replaced `paymentTermDays`), the tab counts |
 | `GET /customer-app/invoices`, `GET /customer-app/invoices/:id` | the open invoices oldest due first with the days overdue or left; one invoice with its lines, discount, VAT, paid and credited amounts |
 | `GET /customer-app/payments?cursor&limit` | the store's posted payments and refunds with their method (CASH / BANK) and the invoices each settled; `total` on the first page |
 | `GET /customer-app/statement?from&to` | «Тооцооны хуулга» (ADR-0086, 2026-10-20): the balance before `from`, every ledger entry of `from` … `to` oldest first with its debit, credit, kind, number, invoice and the balance after it, a purchase's order and who took it (`orderId`, `orderNumber`, `orderChannel`, `orderTakerName`, ADR-0087), the totals and the closing balance; `to` today at the latest, at most 366 days (422 otherwise) |
