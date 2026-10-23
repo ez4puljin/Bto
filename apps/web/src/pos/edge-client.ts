@@ -2,21 +2,31 @@ import {
   EDGE_API_PREFIX,
   EDGE_DEVICE_HEADER,
   type EdgeBarcodeHit,
+  type EdgeCartLine,
   type EdgeDeviceInfo,
+  type EdgeDiscardParkedRequest,
   type EdgeHealth,
   type EdgeLoginRequest,
   type EdgeLoginResponse,
   type EdgePairRequest,
   type EdgePairResponse,
+  type EdgeParkedBasket,
+  type EdgeParkRequest,
   type EdgeProductHit,
+  type EdgeQuickGroup,
   type EdgeQuoteRequest,
   type EdgeQuoteResponse,
   type EdgeReceipt,
+  type EdgeReturnRequest,
+  type EdgeReturnSale,
   type EdgeSaleRequest,
   type EdgeSession,
   type EdgeShiftCloseRequest,
   type EdgeShiftOpenRequest,
   type EdgeShiftSummary,
+  type EdgeSupervisor,
+  type EdgeVoidRequest,
+  type EdgeVoidResponse,
 } from '@tugeel/shared/pos';
 
 /** The bound browser's credential (ADR-0067): kept across restarts of the till PC. */
@@ -255,6 +265,43 @@ export class EdgeClient {
 
   recentSales(signal?: AbortSignal) {
     return this.request<EdgeReceipt[]>('GET', '/sales/recent', { signal });
+  }
+
+  quickButtons(signal?: AbortSignal) {
+    return this.request<EdgeQuickGroup[]>('GET', '/quick-buttons', { signal });
+  }
+
+  supervisors(signal?: AbortSignal) {
+    return this.request<EdgeSupervisor[]>('GET', '/supervisors', { signal });
+  }
+
+  void(body: EdgeVoidRequest) {
+    return this.request<EdgeVoidResponse>('POST', '/voids', { body });
+  }
+
+  parked(signal?: AbortSignal) {
+    return this.request<EdgeParkedBasket[]>('GET', '/parked', { signal });
+  }
+
+  park(body: EdgeParkRequest) {
+    return this.request<EdgeParkedBasket>('POST', '/parked', { body });
+  }
+
+  resumeParked(clientId: string) {
+    return this.request<EdgeCartLine[]>('POST', `/parked/${clientId}/resume`);
+  }
+
+  discardParked(clientId: string, body: EdgeDiscardParkedRequest) {
+    return this.request<undefined>('POST', `/parked/${clientId}/discard`, { body });
+  }
+
+  returnSale(number: string) {
+    const query = new URLSearchParams({ number }).toString();
+    return this.request<EdgeReturnSale>('GET', `/returns/sale?${query}`);
+  }
+
+  refund(body: EdgeReturnRequest) {
+    return this.request<EdgeReceipt>('POST', '/returns', { body });
   }
 
   private async request<T>(method: string, path: string, options: RequestOptions = {}) {

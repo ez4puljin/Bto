@@ -10,6 +10,8 @@ import type {
   ShortfallDto,
   SyncOutcomeDto,
   TillDto,
+  VoidDetailDto,
+  VoidDto,
 } from '../dto/pos.dto';
 import type { SyncOutcome } from '../sale-doc';
 import type { Cashier } from '../services/pos-cashiers.service';
@@ -23,6 +25,7 @@ import type {
 } from '../services/pos-query.service';
 import type { PosSettings } from '../services/pos-settings.service';
 import type { Till } from '../services/pos-tills.service';
+import type { VoidDetail, VoidSummary } from '../services/pos-voids.service';
 
 /** Money with its two decimals, quantities as entered, instants in ISO 8601. */
 export const money = (value: Decimal): string => value.toFixed(2);
@@ -143,3 +146,19 @@ export const rejectionDto = (rejection: RejectionView): RejectionDto => ({
 });
 
 export const outcomeDto = (outcome: SyncOutcome): SyncOutcomeDto => ({ ...outcome });
+
+export const voidDto = (row: VoidSummary): VoidDto => ({
+  ...row,
+  voidedAt: iso(row.voidedAt),
+  total: money(row.total),
+});
+
+export const voidDetailDto = (row: VoidDetail): VoidDetailDto => ({
+  ...voidDto(row),
+  lines: row.lines.map((line) => ({
+    ...line,
+    qty: qty(line.qty),
+    unitPrice: money(line.unitPrice),
+    total: money(line.total),
+  })),
+});

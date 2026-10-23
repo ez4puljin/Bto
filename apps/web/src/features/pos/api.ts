@@ -33,6 +33,12 @@ export type HandoverRequest = Schemas['PosHandoverRequest'];
 export type DevSaleRequest = Schemas['PosDevSaleRequest'];
 export type DevOpenShiftRequest = Schemas['PosDevOpenShiftRequest'];
 export type DevCloseShiftRequest = Schemas['PosDevCloseShiftRequest'];
+export type QuickGroup = Schemas['PosQuickGroup'];
+export type QuickButton = Schemas['PosQuickButton'];
+export type QuickButtonsRequest = Schemas['PosQuickButtonsRequest'];
+export type Void = Schemas['PosVoid'];
+export type VoidDetail = Schemas['PosVoidDetail'];
+export type VoidReason = Void['reason'];
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
@@ -46,6 +52,8 @@ export const POS_KEYS = {
   sales: ['pos', 'sales'] as const,
   shortfalls: ['pos', 'shortfalls'] as const,
   rejections: ['pos', 'rejections'] as const,
+  quickButtons: ['pos', 'quick-buttons'] as const,
+  voids: ['pos', 'voids'] as const,
 };
 
 export function usePosSettings(options: { enabled?: boolean } = {}) {
@@ -179,6 +187,52 @@ export function useShortfalls(filter: { productId?: number; resolved?: boolean }
   });
 }
 
+/** The till's F7 panel (ADR-0104): the groups and their buttons, in order. */
+export function useQuickButtons() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: POS_KEYS.quickButtons,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/pos/quick-buttons', { signal })),
+  });
+}
+
+export interface VoidFilter {
+  tillId?: number;
+  cashierUserId?: number;
+  reason?: VoidReason;
+  from?: string;
+  to?: string;
+}
+
+export function useVoids(filter: VoidFilter) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: [...POS_KEYS.voids, 'list', filter],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/pos/voids', {
+          params: { query: { ...filter, cursor: pageParam, limit: 50 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useVoid(id: number | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...POS_KEYS.voids, 'detail', id],
+    enabled: id !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/pos/voids/{id}', { params: { path: { id: id ?? 0 } }, signal }),
+      ),
+  });
+}
+
 export function usePosAttention(enabled: boolean) {
   const api = useApiClient();
   return useQuery({
@@ -279,6 +333,12 @@ export function usePosMutations() {
           }),
         ),
       onSuccess: () => refresh(POS_KEYS.shortfalls, POS_KEYS.sales, ATTENTION_KEY),
+    }),
+    saveQuickButtons: useMutation({
+      mutationFn: async (body: QuickButtonsRequest) =>
+        unwrap(await api.PUT('/api/v1/pos/quick-buttons', { body })),
+      // The answer is the whole saved set: the page shows it at once, without a second read.
+      onSuccess: (groups) => queryClient.setQueryData(POS_KEYS.quickButtons, groups),
     }),
     devOpenShift: useMutation({
       mutationFn: async ({ key, ...body }: Keyed<DevOpenShiftRequest>) =>

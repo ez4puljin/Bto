@@ -17,6 +17,7 @@ import type {
   SaleKind,
   SyncResult,
   TenderKind,
+  VoidReason,
 } from './index';
 
 /*
@@ -113,9 +114,32 @@ export interface TillBoundDocWire {
   boundAt: string;
 }
 
+export interface VoidLineWire {
+  productId: number;
+  productUnitId: number;
+  qty: string;
+  unitPrice: string;
+  total: string;
+}
+
+/** Goods taken off a cart before payment, with the supervisor who approved it (ADR-0104). */
+export interface VoidDocWire {
+  clientId: string;
+  tillCode: string;
+  /** Null when no shift was open on the till (a parked basket cancelled between shifts). */
+  shiftClientId: string | null;
+  cashierUserId: number;
+  approvedByUserId: number | null;
+  voidedAt: string;
+  reason: VoidReason;
+  lines: VoidLineWire[];
+  total: string;
+}
+
 /** One document of `POST /api/v1/pos/sync/events`, in the shape of the centre's SyncEventDto. */
 export type SyncEventWire =
   | { kind: 'SALE' | 'RETURN'; clientId: string; sale: SaleDocWire }
+  | { kind: 'VOID'; clientId: string; voided: VoidDocWire }
   | { kind: 'SHIFT_OPENED'; clientId: string; shiftOpened: ShiftOpenDocWire }
   | { kind: 'SHIFT_CLOSED'; clientId: string; shiftClosed: ShiftCloseDocWire }
   | { kind: 'TILL_BOUND'; clientId: string; tillBound: TillBoundDocWire };
@@ -152,6 +176,8 @@ export interface SnapshotUnit {
   isBase: boolean;
   /** Barcode lookup keys (`classify(code).lookupKey` of @tugeel/shared/gtin). */
   barcodes: string[];
+  /** The barcodes as printed, for the till's search rows and price check (ADR-0104); absent in older snapshots. */
+  codes?: string[];
 }
 
 export interface SnapshotProduct {
@@ -208,6 +234,19 @@ export interface SnapshotCashier {
   supervisor: boolean;
 }
 
+/** A quick button: a product unit the admin put on the till's F7 panel (ADR-0104). */
+export interface SnapshotQuickButton {
+  productId: number;
+  unitId: number;
+  label: string | null;
+}
+
+export interface SnapshotQuickGroup {
+  id: number;
+  name: string;
+  buttons: SnapshotQuickButton[];
+}
+
 export interface PosSnapshot {
   version: string;
   generatedAt: string;
@@ -220,6 +259,8 @@ export interface PosSnapshot {
   products: SnapshotProduct[];
   profiles: SnapshotProfile[];
   programs: SnapshotProgram[];
+  /** The F7 panel's groups in order; absent in a snapshot taken before ADR-0104. */
+  quickGroups?: SnapshotQuickGroup[];
 }
 
 /** `GET /api/v1/pos/snapshot?since=`: the whole snapshot, or only its version when unchanged. */
@@ -380,8 +421,12 @@ export interface EdgeShiftSummary {
   salesCount: number;
   cashSales: string;
   cardSales: string;
+  /** The sales' total and VAT, returns not netted. */
   total: string;
   vatTotal: string;
+  returnsCount: number;
+  /** Returns are refunded in cash only (owner 2026-10-23, ADR-0104). */
+  cashRefunds: string;
   expectedCash: string;
   closedAt: string | null;
   countedCash: string | null;
@@ -395,6 +440,8 @@ export interface EdgeSession {
   shift: EdgeShiftSummary | null;
   businessDate: string;
   companyName: string | null;
+  /** Whether a void or a return needs a supervisor's PIN (the store's settings, ADR-0104). */
+  approvalRequired?: boolean;
 }
 
 export interface EdgeShiftOpenRequest {
@@ -414,6 +461,8 @@ export interface EdgeProductUnitHit {
   isBase: boolean;
   /** RETAIL price of one unit today; null when the product cannot be sold yet. */
   price: string | null;
+  /** Its barcodes as printed. */
+  barcodes: string[];
 }
 
 export interface EdgeProductHit {
@@ -421,6 +470,19 @@ export interface EdgeProductHit {
   sku: string;
   name: string;
   units: EdgeProductUnitHit[];
+}
+
+/** One F7 button as the till shows it: the product with today's prices, the unit it adds. */
+export interface EdgeQuickButton {
+  label: string | null;
+  unitId: number;
+  product: EdgeProductHit;
+}
+
+export interface EdgeQuickGroup {
+  id: number;
+  name: string;
+  buttons: EdgeQuickButton[];
 }
 
 /** A barcode resolves to a product and the unit the code is printed on. */
@@ -476,6 +538,93 @@ export interface EdgeSaleRequest {
   tenders: EdgeTenderInput[];
 }
 
+/** A supervisor's PIN typed at the till for a void or a return (ADR-0104). */
+export interface EdgeApproval {
+  supervisorUserId: number;
+  pin: string;
+}
+
+export interface EdgeSupervisor {
+  userId: number;
+  fullName: string;
+}
+
+export interface EdgeVoidRequest {
+  clientId: string;
+  reason: VoidReason;
+  /** What leaves the cart: the removed line, or the part a lower quantity takes off. */
+  lines: EdgeCartLine[];
+  /** Required while the store's settings ask for a supervisor. */
+  approval: EdgeApproval | null;
+}
+
+export interface EdgeVoidResponse {
+  clientId: string;
+  approvedByName: string | null;
+}
+
+/** A cart set aside on its till (ADR-0104): resumed there, at that day's prices. */
+export interface EdgeParkedBasket {
+  clientId: string;
+  tillCode: string;
+  cashierName: string;
+  parkedAt: string;
+  lines: EdgeCartLine[];
+  itemCount: number;
+  /** What the cart came to when it was parked; the resume prices it again. */
+  total: string;
+  /** The first products' names, to tell the baskets apart. */
+  preview: string;
+}
+
+export interface EdgeParkRequest {
+  clientId: string;
+  lines: EdgeCartLine[];
+}
+
+export interface EdgeDiscardParkedRequest {
+  approval: EdgeApproval | null;
+}
+
+export interface EdgeReturnableLine {
+  lineNo: number;
+  productId: number;
+  productUnitId: number;
+  name: string;
+  uomName: string;
+  qty: string;
+  unitPrice: string;
+  total: string;
+  /** What is left to take back after earlier returns of this sale. */
+  returnable: string;
+}
+
+/** A sale found by its receipt number for a return at the till. */
+export interface EdgeReturnSale {
+  clientId: string;
+  number: string;
+  soldAt: string;
+  soldDay: string;
+  tillCode: string;
+  total: string;
+  windowDays: number;
+  withinWindow: boolean;
+  lines: EdgeReturnableLine[];
+}
+
+export interface EdgeReturnLineInput {
+  refundsLineNo: number;
+  qty: string;
+  damaged: boolean;
+}
+
+export interface EdgeReturnRequest {
+  clientId: string;
+  refundsSaleClientId: string;
+  lines: EdgeReturnLineInput[];
+  approval: EdgeApproval | null;
+}
+
 export interface EdgeReceiptLine {
   name: string;
   uomName: string;
@@ -486,6 +635,10 @@ export interface EdgeReceiptLine {
 
 export interface EdgeReceipt {
   clientId: string;
+  /** A RETURN pays the total back in cash. Absent on receipts stored before ADR-0104. */
+  kind?: SaleKind;
+  /** The sale a return takes goods back from. */
+  refundsNumber?: string | null;
   number: string;
   soldAt: string;
   tillCode: string;

@@ -6,6 +6,7 @@ import type {
   SaleKind,
   SyncResult,
   TenderKind,
+  VoidReason,
 } from '@tugeel/shared/pos';
 import type { PriceBasis } from '@tugeel/shared/pricing';
 import type { ProblemParams } from '../../common/errors/app-error';
@@ -109,8 +110,30 @@ export interface TillBoundDoc {
   boundAt: Date;
 }
 
+export interface VoidDocLine {
+  productId: number;
+  productUnitId: number;
+  qty: Decimal;
+  unitPrice: Decimal;
+  total: Decimal;
+}
+
+/** Goods taken off a till's cart before payment, approved by a supervisor (ADR-0104). */
+export interface VoidDoc {
+  clientId: string;
+  tillCode: string;
+  shiftClientId: string | null;
+  cashierUserId: number;
+  approvedByUserId: number | null;
+  voidedAt: Date;
+  reason: VoidReason;
+  lines: VoidDocLine[];
+  total: Decimal;
+}
+
 export type SyncEvent =
   | { kind: 'SALE' | 'RETURN'; clientId: string; payload: SaleDoc }
+  | { kind: 'VOID'; clientId: string; payload: VoidDoc }
   | { kind: 'SHIFT_OPENED'; clientId: string; payload: ShiftOpenDoc }
   | { kind: 'SHIFT_CLOSED'; clientId: string; payload: ShiftCloseDoc }
   | { kind: 'RECEIPT_STATUS'; clientId: string; payload: ReceiptStatusDoc }

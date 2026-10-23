@@ -302,6 +302,13 @@
       "when": 1792770057730,
       "tag": "0040_settlement_days",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792771504412,
+      "tag": "0043_till_screen",
+      "breakpoints": true
     }
   ]
 }

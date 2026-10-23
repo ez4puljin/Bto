@@ -5,7 +5,8 @@ import { posActors, posStore, saleDoc, saleEvent } from '../harness/pos';
 
 /**
  * The database guards of the POS (ADR-0063, migration 0027): documents are never deleted, the
- * tenders are never changed by app or by the owner, and a lottery or a QR has no column to land in.
+ * tenders and the void log (ADR-0104) are never changed by app or by the owner, and a lottery or a
+ * QR has no column to land in.
  */
 describe('pos guards', () => {
   let app: NestExpressApplication;
@@ -71,6 +72,28 @@ describe('pos guards', () => {
     expect(
       await sqlStateOf(migrator.query('DELETE FROM pos_tenders WHERE sale_id = $1', [saleId])),
     ).toBe('23001');
+  });
+
+  it('keeps the void log append-only for app and owner (ADR-0104, migration 0043)', async () => {
+    for (const table of ['pos_voids', 'pos_void_lines']) {
+      expect(await sqlStateOf(asApp.query(`DELETE FROM ${table}`))).toBe('42501');
+      expect(await sqlStateOf(asApp.query(`UPDATE ${table} SET total = total`))).toBe('42501');
+      expect(await sqlStateOf(asApp.query(`TRUNCATE ${table}`))).toBe('42501');
+    }
+    expect(await sqlStateOf(asApp.query('TRUNCATE pos_quick_groups CASCADE'))).toBe('42501');
+    const [tenderTriggers, voidTriggers] = await Promise.all(
+      ['pos_tenders', 'pos_voids'].map(
+        async (table) =>
+          (
+            await migrator.query<{ count: string }>(
+              `SELECT count(*)::text AS count FROM pg_trigger
+              WHERE tgrelid = $1::regclass AND NOT tgisinternal`,
+              [table],
+            )
+          ).rows[0]?.count,
+      ),
+    );
+    expect(voidTriggers).toBe(tenderTriggers);
   });
 
   it('has no column for a lottery or a QR', async () => {

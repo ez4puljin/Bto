@@ -325,7 +325,8 @@ export class PosShiftsService {
     };
   }
 
-  private async byClientId(tx: Tx, nodeId: number, clientId: string): Promise<ShiftRow | null> {
+  /** A shift by the uuid its till gave it, in any state. */
+  async byClientId(tx: Tx, nodeId: number, clientId: string): Promise<ShiftRow | null> {
     const [row] = await tx
       .select()
       .from(posShifts)

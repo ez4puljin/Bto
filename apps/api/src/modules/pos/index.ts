@@ -13,6 +13,8 @@ export type {
   SyncEvent,
   SyncOutcome,
   TillBoundDoc,
+  VoidDoc,
+  VoidDocLine,
 } from './sale-doc';
 export { PosAcceptService } from './services/pos-accept.service';
 export { type Cashier, PosCashiersService } from './services/pos-cashiers.service';
@@ -30,6 +32,19 @@ export {
   type ShiftSummary,
   type ShortfallView,
 } from './services/pos-query.service';
+export {
+  PosQuickButtonsService,
+  type QuickButton,
+  type QuickButtonsInput,
+  type QuickGroup,
+} from './services/pos-quick-buttons.service';
 export { type PosSettings, PosSettingsService } from './services/pos-settings.service';
 export { PosShiftsService, type ShiftTotals } from './services/pos-shifts.service';
 export { PosTillsService, type Till, type TillInput } from './services/pos-tills.service';
+export {
+  type VoidDetail,
+  type VoidLineView,
+  type VoidQuery,
+  PosVoidsService,
+  type VoidSummary,
+} from './services/pos-voids.service';

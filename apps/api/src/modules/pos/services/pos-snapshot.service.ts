@@ -10,6 +10,7 @@ import { UserNamesService } from '../../identity';
 import { DiscountProgramsService, PriceProfilesService, ProductPricesService } from '../../pricing';
 import { posCashiers, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
+import { PosQuickButtonsService } from './pos-quick-buttons.service';
 import { PosSettingsService } from './pos-settings.service';
 
 /**
@@ -32,6 +33,7 @@ export class PosSnapshotService {
     private readonly programs: DiscountProgramsService,
     private readonly names: UserNamesService,
     private readonly settings: PosSettingsService,
+    private readonly quickButtons: PosQuickButtonsService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -132,6 +134,7 @@ export class PosSnapshotService {
             factor: unit.factor.toString(),
             isBase: unit.isBase,
             barcodes: unit.barcodes,
+            codes: unit.codes,
           })),
           terms:
             own && values.has(own.profileId)
@@ -154,6 +157,7 @@ export class PosSnapshotService {
           rounding: profile.rounding,
         })),
       programs,
+      quickGroups: await this.quickButtons.forSnapshot(),
     };
     const version = createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 20);
     return { version, generatedAt: new Date().toISOString(), ...body };

@@ -54,6 +54,7 @@ import {
   Tags,
   Timer,
   Truck,
+  Undo2,
   Users,
   Warehouse,
   Percent,
@@ -266,8 +267,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/pos/shifts', label: 'nav.posShifts', icon: Timer, permission: 'pos.read' },
       { to: '/pos/sales', label: 'nav.posSales', icon: ShoppingBasket, permission: 'pos.read' },
+      { to: '/pos/voids', label: 'nav.posVoids', icon: Undo2, permission: 'pos.read' },
       { to: '/pos/tills', label: 'nav.posTills', icon: Monitor, permission: 'pos.read' },
       { to: '/pos/cashiers', label: 'nav.posCashiers', icon: KeyRound, permission: 'pos.read' },
+      {
+        to: '/pos/quick-buttons',
+        label: 'nav.posQuickButtons',
+        icon: LayoutGrid,
+        permission: 'pos.read',
+      },
       {
         to: '/pos/settings',
         label: 'nav.posSettings',

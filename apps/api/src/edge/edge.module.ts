@@ -13,9 +13,12 @@ import { CheckoutService } from './services/checkout.service';
 import { DevicesService } from './services/devices.service';
 import { KioskAuthService } from './services/kiosk-auth.service';
 import { OutboxService } from './services/outbox.service';
+import { EdgeParkedService } from './services/parked.service';
+import { EdgeReturnsService } from './services/returns.service';
 import { EdgeShiftsService } from './services/shifts.service';
 import { SnapshotStore } from './services/snapshot.store';
 import { SyncRunner } from './services/sync.runner';
+import { EdgeVoidsService } from './services/voids.service';
 
 /** Typed access to the edge's environment for every provider. */
 @Global()
@@ -70,6 +73,9 @@ export class EdgeModule {
         KioskAuthService,
         EdgeShiftsService,
         CheckoutService,
+        EdgeVoidsService,
+        EdgeParkedService,
+        EdgeReturnsService,
         KioskGuard,
       ],
     };

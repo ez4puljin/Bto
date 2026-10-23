@@ -25,7 +25,7 @@ import { KioskAlert } from '../components/layout';
 import { useCredentials, useKiosk } from '../kiosk-context';
 import { typeDigits } from '../keys';
 import { useProblemText } from '../messages';
-import { kioskKeys } from '../queries';
+import { kioskKeys, useParked } from '../queries';
 
 function Figure(props: { label: string; value: ReactNode; strong?: boolean }) {
   return (
@@ -90,6 +90,7 @@ export function ShiftCloseScreen(props: {
   const queryClient = useQueryClient();
   const problemText = useProblemText();
   const { shift } = props;
+  const parked = useParked();
   const [counted, setCounted] = useState('');
   const [floatKept, setFloatKept] = useState(() => fieldMoney(shift.openingFloat));
   const [note, setNote] = useState('');
@@ -147,6 +148,11 @@ export function ShiftCloseScreen(props: {
               {t('posKiosk.shiftClose.cartNotEmpty', { count: props.cartCount })}
             </KioskAlert>
           ) : null}
+          {parked.data?.length ? (
+            <KioskAlert tone="info">
+              {t('posKiosk.shiftClose.parkedWaiting', { count: parked.data.length })}
+            </KioskAlert>
+          ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
             <section
               aria-labelledby="close-expected"
@@ -164,6 +170,12 @@ export function ShiftCloseScreen(props: {
                 <Figure label={t('pos.fields.cashSales')} value={formatTugrik(shift.cashSales)} />
                 <Figure label={t('pos.fields.cardSales')} value={formatTugrik(shift.cardSales)} />
                 <Figure label={t('pos.fields.salesTotal')} value={formatTugrik(shift.total)} />
+                {shift.returnsCount ? (
+                  <Figure
+                    label={t('posKiosk.z.returns', { count: shift.returnsCount })}
+                    value={`−${formatTugrik(shift.cashRefunds)}`}
+                  />
+                ) : null}
                 <Figure
                   strong
                   label={t('pos.fields.expectedCash')}
@@ -319,6 +331,12 @@ export function ShiftSummaryScreen(props: {
             <Figure label={t('pos.fields.cardSales')} value={formatTugrik(summary.cardSales)} />
             <Figure label={t('pos.fields.salesTotal')} value={formatTugrik(summary.total)} />
             <Figure label={t('pos.fields.salesVat')} value={formatTugrik(summary.vatTotal)} />
+            {summary.returnsCount ? (
+              <Figure
+                label={t('posKiosk.z.returns', { count: summary.returnsCount })}
+                value={`−${formatTugrik(summary.cashRefunds)}`}
+              />
+            ) : null}
             <Figure
               label={t('pos.fields.openingFloat')}
               value={formatTugrik(summary.openingFloat)}

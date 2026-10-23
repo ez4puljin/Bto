@@ -54,6 +54,7 @@ import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosSettingsService } from './pos-settings.service';
 import { PosShiftsService } from './pos-shifts.service';
 import { PosTillsService } from './pos-tills.service';
+import { PosVoidsService } from './pos-voids.service';
 
 type SaleRow = typeof posSales.$inferSelect;
 type LineRow = typeof posSaleLines.$inferSelect;
@@ -87,6 +88,7 @@ export class PosAcceptService {
     private readonly cashiers: PosCashiersService,
     private readonly shifts: PosShiftsService,
     private readonly settings: PosSettingsService,
+    private readonly voids: PosVoidsService,
   ) {}
 
   /**
@@ -145,6 +147,8 @@ export class PosAcceptService {
         return this.recordReceiptStatus(tx, node, event.payload);
       case 'TILL_BOUND':
         return this.recordTillBound(tx, actor, node, event.payload);
+      case 'VOID':
+        return this.voids.acceptVoid(tx, actor, node, event.payload);
     }
   }
 
