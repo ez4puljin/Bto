@@ -144,7 +144,7 @@ export class EdgeReturnsService {
         const before = taken.get(sold.lineNo) ?? { qty: new Decimal(0), discount: new Decimal(0) };
         const left = new Decimal(sold.qty).minus(before.qty);
         if (qty.lte(0) || qty.gt(left)) {
-          throw new AppError('POS_RETURN_EXCEEDS', `line ${sold.lineNo}: ${left} left`, {
+          throw new AppError('POS_RETURN_EXCEEDS', `line ${sold.lineNo}: ${left.toString()} left`, {
             lineNo: sold.lineNo,
             remaining: left.toString(),
           });

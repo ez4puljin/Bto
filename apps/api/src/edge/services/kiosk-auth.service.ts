@@ -67,7 +67,7 @@ export class KioskAuthService {
 
   /**
    * The approver of a void or a return: a supervisor whose PIN is right (the signed-in cashier
-   * may approve himself when he is one). Without an approval: null when the store's settings do
+   * may approve their own action when they are one). Without an approval: null when the store's settings do
    * not ask for one, else `POS_SUPERVISOR_REQUIRED`.
    */
   async approve(approval: EdgeApproval | null): Promise<SnapshotCashier | null> {

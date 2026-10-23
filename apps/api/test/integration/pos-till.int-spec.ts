@@ -112,8 +112,7 @@ describe('pos till tools', () => {
     kiosk.setSession(login.token);
     const session = (await kiosk.get('/session').expect(200)).body as EdgeSession;
     expect(session.approvalRequired).toBe(true);
-    (await kiosk.post('/shifts/open', { openingFloat: '20000' }).expect(200))
-      .body as EdgeShiftSummary;
+    await kiosk.post('/shifts/open', { openingFloat: '20000' }).expect(200);
 
     const groups = (await kiosk.get('/quick-buttons').expect(200)).body as EdgeQuickGroup[];
     expect(groups.map((group) => group.name)).toEqual(['Ундаа', 'Ус']);
