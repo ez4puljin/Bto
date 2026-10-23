@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { CircleAlert, Lock } from 'lucide-react-native';
+import { CalendarDays, Lock } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,7 +23,7 @@ import {
 } from '../../src/api/customer';
 import { problemFrom } from '../../src/api/problem';
 import { useCustomer } from '../../src/state/session';
-import { creditBarOf, debtOf, overdueOf } from '../../src/customer/account';
+import { creditBarOf, debtOf, settlementCardOf } from '../../src/customer/account';
 import { StatementPanel } from '../../src/customer/statement-panel';
 import { splitAround } from '../../src/customer/money';
 import { monthDay } from '../../src/dates/calendar';
@@ -38,10 +38,10 @@ import { useToast } from '../../src/ui/toast';
 
 /**
  * «Тооцоо» (the Account board, ADR-0079 #7), read-only from finance's own figures: the debt (or an
- * advance), the overdue amount and its oldest due date, what remains of the credit limit (only
- * when one is set), a credit hold (never its reason) and the payment term; the open invoices,
- * oldest due first, and the payments, newest first; the company's accounts to pay into, each
- * number copied with one press, and the advice to write the invoice number.
+ * advance), «Тооцоо хийх өдөр» with the amount due by then and its overdue part (ADR-0101 #6), what
+ * remains of the credit limit (only when one is set) and a credit hold (never its reason); the
+ * statement; the company's accounts to pay into, each number copied with one press, and the
+ * advice to write the invoice number.
  */
 export default function AccountScreen() {
   const { t } = useTranslation();
@@ -87,18 +87,20 @@ export default function AccountScreen() {
   };
 
   const debt = account ? debtOf(account.balance) : null;
-  const overdue = account ? overdueOf(account) : null;
   const credit = account ? creditBarOf(account) : null;
-  const overdueText = overdue
-    ? overdue.since
-      ? t('mobile.customer.account.overdueSince', {
-          amount: money(overdue.amount),
-          date: monthDay(overdue.since),
-        })
-      : t('mobile.customer.account.overdue', { amount: money(overdue.amount) })
-    : null;
-  // «Тооцоо хийх өдөр» (ADR-0101); the board's full card comes with the app's own session.
+  // «Тооцоо хийх өдөр» under the debt (ADR-0101 #6, the Account board): blue while nothing is
+  // overdue, red once something is, the overdue part in red under «Төлөх дүн».
   const settlement = account?.settlement ?? null;
+  const card = settlement ? settlementCardOf(settlement) : null;
+  const ink = card?.tone === 'overdue' ? colors.destructiveText : colors.newBadge;
+  const purchases = card
+    ? card.purchases.kind === 'month'
+      ? t('mobile.customer.account.purchasesMonth', { month: card.purchases.month })
+      : t('mobile.customer.account.purchasesRange', {
+          from: monthDay(card.purchases.from),
+          to: monthDay(card.purchases.to),
+        })
+    : null;
   // The owner (2026-10-20): the copied invoice number must go in the transfer's description.
   const advice = t('mobile.customer.account.adviceMust');
   const adviceStrong = t('mobile.customer.account.adviceMustStrong');
@@ -132,15 +134,59 @@ export default function AccountScreen() {
                   {debt.kind === 'clear' ? t('mobile.customer.account.clear') : money(debt.amount)}
                 </Text>
               </View>
-              {overdueText && overdue ? (
-                <View style={styles.overdue}>
-                  <CircleAlert size={18} strokeWidth={2.2} color={colors.cancelled} />
-                  <Emphasis
-                    text={overdueText}
-                    strong={money(overdue.amount)}
-                    style={[type.body, styles.overdueText]}
-                    strongStyle={styles.bold}
-                  />
+              {card && settlement ? (
+                <View
+                  style={[
+                    styles.settle,
+                    card.tone === 'overdue' ? styles.settleOverdue : styles.settleDue,
+                  ]}
+                >
+                  <View style={styles.settleTop}>
+                    <View style={styles.settleHalf}>
+                      <View style={styles.settleLabel}>
+                        <CalendarDays size={14} strokeWidth={2.2} color={ink} />
+                        <Text style={styles.settleCaption}>
+                          {t('mobile.customer.account.term')}
+                        </Text>
+                      </View>
+                      <Text style={[styles.settleValue, { color: ink }]}>
+                        {monthDay(card.dueDate)}
+                      </Text>
+                      <Text style={[styles.settleNote, styles.semibold, { color: ink }]}>
+                        {card.days.kind === 'left'
+                          ? t('mobile.customer.account.dueLeft', { n: card.days.days })
+                          : t('mobile.customer.account.settleToday')}
+                      </Text>
+                    </View>
+                    <View style={[styles.settleHalf, styles.settleEnd]}>
+                      <Text style={styles.settleCaption}>
+                        {t('mobile.customer.account.amountDue')}
+                      </Text>
+                      <Text
+                        style={[styles.settleValue, { color: ink }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                      >
+                        {money(card.amountDue)}
+                      </Text>
+                      <Text style={[styles.settleNote, styles.settleRight]}>{purchases}</Text>
+                      {card.overdue ? (
+                        <Text style={[styles.settleNote, styles.settleRight, styles.overdueNote]}>
+                          {t('mobile.customer.account.overdueOfDue', {
+                            amount: money(card.overdue),
+                          })}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.settleRule,
+                      card.tone === 'overdue' ? styles.settleRuleOverdue : styles.settleRuleDue,
+                    ]}
+                  >
+                    {t(`mobile.customer.account.settleRule.${settlement.group}`)}
+                  </Text>
                 </View>
               ) : null}
               {credit ? (
@@ -161,35 +207,15 @@ export default function AccountScreen() {
                   </View>
                 </View>
               ) : null}
-              {account.creditHold || settlement !== null ? (
+              {account.creditHold ? (
                 <View style={styles.cardRows}>
-                  {account.creditHold ? (
-                    <>
-                      <Separator />
-                      <View style={styles.cardRow}>
-                        <Lock size={16} strokeWidth={2.2} color={colors.blocked} />
-                        <Text style={[type.bodyStrong, styles.hold]}>
-                          {t('mobile.customer.account.creditHold')}
-                        </Text>
-                      </View>
-                    </>
-                  ) : null}
-                  {settlement !== null ? (
-                    <>
-                      <Separator />
-                      <View style={styles.cardRow}>
-                        <Text style={[type.row, styles.grow, styles.label2]}>
-                          {t('mobile.customer.account.term')}
-                        </Text>
-                        <Text style={type.row}>
-                          {t('mobile.customer.account.settleDay', {
-                            date: monthDay(settlement.dueDate),
-                            amount: money(settlement.amountDue),
-                          })}
-                        </Text>
-                      </View>
-                    </>
-                  ) : null}
+                  <Separator />
+                  <View style={styles.cardRow}>
+                    <Lock size={16} strokeWidth={2.2} color={colors.blocked} />
+                    <Text style={[type.bodyStrong, styles.hold]}>
+                      {t('mobile.customer.account.creditHold')}
+                    </Text>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.cardEnd} />
@@ -293,7 +319,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   label2: { color: colors.label2 },
   link: { color: colors.primary },
-  bold: { fontFamily: fonts.bold },
   debtCard: {
     marginTop: spacing.sm,
     backgroundColor: colors.card,
@@ -310,17 +335,35 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   debtAmount: { ...type.largeTitle, ...tabular },
-  overdue: {
-    marginHorizontal: 10,
+  settle: { marginHorizontal: 10, borderRadius: 8, overflow: 'hidden' },
+  settleDue: { backgroundColor: colors.infoSoft },
+  settleOverdue: { backgroundColor: colors.destructiveSoft },
+  settleTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
+    paddingTop: 10,
     paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    backgroundColor: colors.destructiveSoft,
+    paddingBottom: spacing.sm,
   },
-  overdueText: { flex: 1, color: colors.cancelled },
+  settleHalf: { flex: 1, minWidth: 0, gap: 1 },
+  settleEnd: { alignItems: 'flex-end' },
+  settleLabel: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  settleCaption: { ...type.secondary, color: colors.label2 },
+  settleValue: { ...type.title3, ...tabular },
+  settleNote: { ...type.secondary, color: colors.label2 },
+  settleRight: { textAlign: 'right' },
+  semibold: { fontFamily: fonts.semibold },
+  overdueNote: { fontFamily: fonts.semibold, color: colors.destructiveText },
+  settleRule: {
+    ...type.secondary,
+    color: colors.label2,
+    paddingTop: 7,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  settleRuleDue: { borderTopColor: colors.newBadge },
+  settleRuleOverdue: { borderTopColor: colors.destructiveText },
   credit: {
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
