@@ -21,7 +21,7 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type AuthContext, OrgService, UserNamesService } from '../../identity';
-import { CustomersService } from '../../partners';
+import { type CustomerOverdue, CustomersService } from '../../partners';
 import { PriceQuoteService, type Quote } from '../../pricing';
 import { salesBoards, salesChannelDefaults, salesOrderLines, salesOrders } from '../schema';
 import { repMayPlace } from './rep-access';
@@ -133,6 +133,8 @@ export interface RepMapStore {
   /** The customer's manual credit hold (partners) and its reason; drawn black on the map. */
   creditHold: boolean;
   creditHoldReason: string | null;
+  /** The overdue receivable (ADR-0101): a red mark on the map, never a block. */
+  overdue: CustomerOverdue | null;
   /** The address whose point is shown (`CustomersService.located`). */
   addressId: number;
   address: string | null;
@@ -460,6 +462,7 @@ export class SalesRepOrdersService {
           phone: store.phone,
           creditHold: store.creditHold,
           creditHoldReason: store.creditHoldReason,
+          overdue: store.overdue,
           addressId: store.addressId,
           address: store.address,
           lat: store.lat,

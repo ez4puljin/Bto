@@ -36,7 +36,7 @@ describe('finance races', () => {
       .set(bearer(accountant))
       .send({
         creditLimit: '10000',
-        paymentTermDays: null,
+        settlementGroup: 'DAY_20',
         creditHold: false,
         creditHoldReason: null,
       })

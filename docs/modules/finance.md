@@ -1,5 +1,7 @@
 # Module `finance` — contract
 
+**Status note (2026-10-23, settlement days, ADR-0101).** An invoice falls due on its customer's settlement day (`settlementDueDate(customer.settlementGroup, invoice date)`: «Мөрөн» the 20th for the 21st–20th, «Орон нутаг» the month's last day), cash sales too; posted invoices keep theirs. `CreditControlService` refuses HOLD and LIMIT only: an overdue amount never refuses (the OVERDUE reason, `credit.overdue_nets_credits` and the param `creditsOpen` are gone; `overdueAmount` / `oldestDueDate` stay in the 409). `CustomerDebtsService` binds partners' `CUSTOMER_DEBT_READER`: the overdue open amounts of a page of customers in one statement over `invoices.open_amount`, for the red reminders. `GET /customer-balances…` rows carry `settlementGroup`; the «Тооцоо» card shows «Тооцоо хийх өдөр» with «Төлөх дүн», and `/finance/customers` a group column with the overdue amount in red. The setting `credit.payment_term_days` is gone; the rules below that name it or OVERDUE describe the state before this note.
+
 **Status note (2026-10-23, F6 done, ADR-0105).** Reports:
 - «Санхүү → Гүйлгээ баланс» (`/finance/trial-balance`) and «НӨАТ-ын тайлан» (`/finance/vat`): on screen, in Excel and in print, behind `finance.read`.
 - The «Жил хаах» card on «Сарын хаалт» closes a year's income and expense into retained earnings 340101 on 31 December and reverts it (`finance.periods.close`).

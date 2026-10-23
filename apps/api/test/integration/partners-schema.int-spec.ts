@@ -28,6 +28,7 @@ describe('partners schema constraints', () => {
       search_text: ' дэлгүүр',
       search_phonetic: ' delguur',
       search_version: 1,
+      settlement_group: 'DAY_20',
       ...columns,
     };
     const names = Object.keys(values);
@@ -101,7 +102,9 @@ describe('partners schema constraints', () => {
     });
     expect(await sqlStateOf(customer({ tax_status_source: 'MANUAL' }))).toBe(CHECK);
     expect(await sqlStateOf(customer({ credit_limit: '-1' }))).toBe(CHECK);
-    expect(await sqlStateOf(customer({ payment_term_days: 400 }))).toBe(CHECK);
+    expect(await sqlStateOf(customer({ settlement_group: 'DAY_30' }))).toBe(CHECK);
+    expect(await sqlStateOf(customer({ settlement_group: null }))).toBe('23502');
+    await customer({ settlement_group: 'MONTH_END' });
     expect(await sqlStateOf(customer({ credit_hold_reason: 'Өртэй' }))).toBe(CHECK);
     await customer({ credit_hold: true, credit_hold_reason: 'Өртэй', credit_limit: null });
   });

@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProblemDetails } from '@tugeel/api-client';
+import { SETTLEMENT_GROUPS } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS, regNoShape } from '@tugeel/shared/taxpayer';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -115,6 +116,27 @@ export function CustomerForm(props: {
             {...form.register('phone')}
           />
         </FormRow>
+        {mode === 'create' ? (
+          <FormRow
+            label={t('partners.settlement.group')}
+            htmlFor="customer-settlement-group"
+            hint={t('partners.settlement.groupHint')}
+            error={errors.settlementGroup?.message}
+          >
+            <NativeSelect
+              id="customer-settlement-group"
+              className="sm:w-56"
+              {...form.register('settlementGroup')}
+            >
+              <option value="">{t('partners.settlement.choose')}</option>
+              {SETTLEMENT_GROUPS.map((value) => (
+                <option key={value} value={value}>
+                  {t(`partners.settlement.groups.${value}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormRow>
+        ) : null}
         {mode === 'edit' ? (
           <FormRow label={t('partners.customer.status')} htmlFor="customer-status" align="center">
             <Controller

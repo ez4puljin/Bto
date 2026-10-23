@@ -4,6 +4,7 @@ import { formatCount, formatMnt, plainDecimal } from '@/lib/money';
 import {
   creditBody,
   customerCreateBody,
+  customerSchema,
   customerUpdateBody,
   customerValues,
   emptyCustomer,
@@ -31,8 +32,7 @@ const CUSTOMER: components['schemas']['CustomerDetail'] = {
   taxStatusSource: null,
   taxStatusCheckedAt: null,
   creditLimit: '5000000.00',
-  paymentTermDays: null,
-  paymentTerm: { days: null, source: 'UNSET' },
+  settlementGroup: 'MONTH_END',
   creditHoldReason: null,
   note: null,
   createdAt: '2026-10-01T02:00:00.000Z',
@@ -70,7 +70,12 @@ describe('money and numbers for reading', () => {
 
 describe('customer bodies', () => {
   it('leaves the suggested code, the payer check and a company consumer number out', () => {
-    const values = { ...emptyCustomer('1002'), name: 'Тэмүүжин', consumerNo: '12345678' };
+    const values = {
+      ...emptyCustomer('1002'),
+      name: 'Тэмүүжин',
+      consumerNo: '12345678',
+      settlementGroup: 'DAY_20' as const,
+    };
     expect(customerCreateBody(values, '1002')).toEqual({
       kind: 'COMPANY',
       name: 'Тэмүүжин',
@@ -79,6 +84,7 @@ describe('customer bodies', () => {
       consumerNo: null,
       phone: null,
       note: null,
+      settlementGroup: 'DAY_20',
     });
     const typed = { ...values, code: '0500', vatPayer: true };
     expect(customerCreateBody(typed, '1002')).toMatchObject({
@@ -86,6 +92,15 @@ describe('customer bodies', () => {
       vatPayer: true,
       cityPayer: false,
     });
+  });
+
+  it('requires a settlement group on a new customer and never sends it on update (ADR-0101)', () => {
+    const empty = customerSchema.safeParse({ ...emptyCustomer('1002'), name: 'Бүлэггүй' });
+    expect(empty.success).toBe(false);
+    expect(empty.error?.issues.map((issue) => issue.path.join('.'))).toEqual(['settlementGroup']);
+    expect(customerUpdateBody(customerValues(CUSTOMER), CUSTOMER)).not.toHaveProperty(
+      'settlementGroup',
+    );
   });
 
   it('sends the payer flags on update only when they changed', () => {
@@ -101,13 +116,13 @@ describe('customer bodies', () => {
     expect(
       creditBody({
         creditLimit: '5 000,000',
-        paymentTermDays: '',
+        settlementGroup: 'MONTH_END',
         creditHold: false,
         creditHoldReason: 'хуучин',
       }),
     ).toEqual({
       creditLimit: '5000000',
-      paymentTermDays: null,
+      settlementGroup: 'MONTH_END',
       creditHold: false,
       creditHoldReason: null,
     });

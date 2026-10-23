@@ -33,7 +33,7 @@ export const GLOSSARY = {
   unit: 'product_units (uom_code PCS piece, BOX box, BLOCK block, KG kilogram)',
   customer: 'customers (shops and individuals) and customer_addresses',
   supplier: 'suppliers and product_suppliers',
-  credit: 'customers.credit_limit, credit_hold and payment_term_days',
+  credit: 'customers.credit_limit, credit_hold and settlement_group',
   discount: 'discount_programs',
   warehouse: "warehouses; kind 'STORE' is the supermarket",
   sales:

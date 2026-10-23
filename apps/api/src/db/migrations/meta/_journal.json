@@ -295,6 +295,13 @@
       "when": 1792767523334,
       "tag": "0044_fin_year_close",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792770057730,
+      "tag": "0040_settlement_days",
+      "breakpoints": true
     }
   ]
 }

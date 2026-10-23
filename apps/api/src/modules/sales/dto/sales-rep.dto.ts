@@ -31,6 +31,7 @@ import {
   Min,
 } from 'class-validator';
 import { MAX_PAGE_LIMIT, PageQueryDto, queryIds } from '../../../common/pagination/page';
+import { SalesCustomerOverdueDto } from './sales-boards.dto';
 import { SalesOrderRequestDto } from './sales-orders.dto';
 
 // The sales-rep app's API (ADR-0061 #5, ADR-0068): only what the phone shows, never another rep's
@@ -468,6 +469,12 @@ export class SalesRepCustomerDto {
   @ApiProperty({ type: String, nullable: true }) phone: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'The default address' })
   address: string | null;
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: 'The overdue receivable: a red reminder, never a block (ADR-0101); null when none',
+  })
+  overdue: SalesCustomerOverdueDto | null;
 }
 
 @ApiSchema({ name: 'SalesRepCustomerPage' })
@@ -501,6 +508,12 @@ export class SalesRepMapStoreDto {
   creditHold: boolean;
   @ApiProperty({ type: String, nullable: true, description: 'Set only while on hold' })
   creditHoldReason: string | null;
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: 'The overdue receivable: a red reminder, never a block (ADR-0101); null when none',
+  })
+  overdue: SalesCustomerOverdueDto | null;
   @ApiProperty({ description: 'The customer address whose point this is' }) addressId: number;
   @ApiProperty({ type: String, nullable: true, description: "The point's address text" })
   address: string | null;
@@ -610,4 +623,10 @@ export class SalesRepCustomerDetailDto {
   @ApiProperty({ type: [SalesRepCustomerAddressDto], description: 'Active, the default first' })
   addresses: SalesRepCustomerAddressDto[];
   @ApiProperty({ type: [SalesRepCustomerContactDto] }) contacts: SalesRepCustomerContactDto[];
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: 'The overdue receivable: a red reminder, never a block (ADR-0101); null when none',
+  })
+  overdue: SalesCustomerOverdueDto | null;
 }

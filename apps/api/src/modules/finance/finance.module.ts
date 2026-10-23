@@ -6,7 +6,7 @@ import { CatalogModule } from '../catalog';
 import { FinBridgeModule } from '../fin-bridge';
 import { IdentityModule } from '../identity';
 import { InventoryModule, PURCHASE_BOOKS, RECEIPT_MONEY_ACCOUNTS, STOCK_BOOKS } from '../inventory';
-import { PartnersModule } from '../partners';
+import { CUSTOMER_DEBT_READER, PartnersModule } from '../partners';
 import { CREDIT_CHECKER, SALE_SINK } from '../sales';
 import {
   GlAccountsController,
@@ -37,6 +37,7 @@ import { ReportsService } from './services/reports.service';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
+import { CustomerDebtsService } from './services/customer-debts.service';
 import { FinBooks } from './services/fin-books';
 import { FinanceSettingsService } from './services/finance-settings.service';
 import { GlAccountsService } from './services/gl-accounts.service';
@@ -60,6 +61,7 @@ const SERVICES = [
   ArLedgerService,
   ApLedgerService,
   CreditControlService,
+  CustomerDebtsService,
   InvoiceQueryService,
   InvoicingService,
   MoneyAccountsService,
@@ -80,7 +82,8 @@ const SERVICES = [
  * accounts and the journal kept by the Finance Core since F1's ledger (ADR-0089), reached through
  * fin-bridge's contexts. It answers the two hooks of sales (`CREDIT_CHECKER`, `SALE_SINK`) and
  * inventory's `RECEIPT_MONEY_ACCOUNTS` and `PURCHASE_BOOKS` (the suppliers' payables, F3,
- * ADR-0091); those modules find them through `ModuleRef` and never import this module.
+ * ADR-0091), and partners' `CUSTOMER_DEBT_READER` (the overdue reminders, ADR-0101); those modules
+ * find them through `ModuleRef` and never import this module.
  */
 @Module({
   imports: [
@@ -98,6 +101,7 @@ const SERVICES = [
     { provide: RECEIPT_MONEY_ACCOUNTS, useExisting: ReceiptMoneyAccountsService },
     { provide: PURCHASE_BOOKS, useExisting: SupplierBillsService },
     { provide: STOCK_BOOKS, useExisting: StockBooksService },
+    { provide: CUSTOMER_DEBT_READER, useExisting: CustomerDebtsService },
   ],
   exports: [
     ...SERVICES,
@@ -106,6 +110,7 @@ const SERVICES = [
     RECEIPT_MONEY_ACCOUNTS,
     PURCHASE_BOOKS,
     STOCK_BOOKS,
+    CUSTOMER_DEBT_READER,
   ],
 })
 export class FinanceModule {}

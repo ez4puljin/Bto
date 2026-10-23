@@ -49,7 +49,10 @@ export function CreditNote({
     variant === 'cart'
       ? warning.kind === 'hold'
         ? t('mobile.customer.cart.credit.maySendHold')
-        : t('mobile.customer.cart.credit.maySend')
+        : // An overdue debt only reminds (ADR-0101): the office confirms as usual.
+          warning.kind === 'overdue'
+          ? t('mobile.customer.cart.credit.maySendOverdue')
+          : t('mobile.customer.cart.credit.maySend')
       : null;
   return (
     <View accessibilityRole="alert" style={styles.box}>

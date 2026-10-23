@@ -21,6 +21,7 @@ import {
   SalesStageCardsDto,
   SalesStageSortRequestDto,
 } from '../dto/sales-boards.dto';
+import { overdueDto } from '../overdue';
 import { READ } from '../services/sales-access.service';
 import { SalesOrderQueryService } from '../services/sales-order-query.service';
 import { SalesOrdersService } from '../services/sales-orders.service';
@@ -117,6 +118,7 @@ export class SalesPipelinesController {
       cards: stage.cards.map((card) => ({
         ...card,
         total: card.total?.toFixed(0) ?? null,
+        customerOverdue: overdueDto(card.customerOverdue),
         stageEnteredAt: card.stageEnteredAt.toISOString(),
       })),
     }));

@@ -3829,6 +3829,18 @@
             }
           },
           {
+            "name": "settlementGroup",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_20",
+                "MONTH_END"
+              ]
+            }
+          },
+          {
             "name": "tinPending",
             "required": false,
             "in": "query",
@@ -4194,7 +4206,7 @@
             "bearer": []
           }
         ],
-        "summary": "Credit limit, payment term and hold: the accountant's (partners.credit.manage).",
+        "summary": "Credit limit, settlement group and hold: the accountant's (partners.credit.manage).",
         "tags": [
           "partners"
         ]
@@ -23884,8 +23896,6 @@
           "company.city_tax_payer",
           "auth.staff_session_hours",
           "auth.customer_session_days",
-          "credit.payment_term_days",
-          "credit.overdue_nets_credits",
           "bto.company_code"
         ]
       },
@@ -25695,26 +25705,23 @@
           "cityTax"
         ]
       },
-      "PaymentTerm": {
+      "CustomerOverdue": {
         "type": "object",
         "properties": {
-          "days": {
-            "type": "number",
-            "nullable": true
-          },
-          "source": {
-            "enum": [
-              "CUSTOMER",
-              "DEFAULT",
-              "UNSET"
-            ],
+          "amount": {
             "type": "string",
-            "description": "The customer’s own days, the company setting, or neither yet"
+            "example": "50000",
+            "description": "Open invoices past their due date, whole MNT"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
           }
         },
         "required": [
-          "days",
-          "source"
+          "amount",
+          "oldestDueDate"
         ]
       },
       "GpsPoint": {
@@ -25839,12 +25846,26 @@
             "example": "5000000.00",
             "description": "null = not decided"
           },
-          "paymentTerm": {
-            "$ref": "#/components/schemas/PaymentTerm"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
           },
           "creditHoldReason": {
             "type": "string",
             "nullable": true
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerOverdue"
+              }
+            ]
           },
           "note": {
             "type": "string",
@@ -25898,8 +25919,9 @@
           "cityPayer",
           "taxStatusSource",
           "creditLimit",
-          "paymentTerm",
+          "settlementGroup",
           "creditHoldReason",
+          "overdue",
           "note",
           "gps",
           "contact",
@@ -26143,13 +26165,13 @@
             "example": "5000000.00",
             "description": "null = not decided"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "description": "Own days; null = the company setting"
-          },
-          "paymentTerm": {
-            "$ref": "#/components/schemas/PaymentTerm"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
           },
           "creditHoldReason": {
             "type": "string",
@@ -26201,8 +26223,7 @@
           "taxStatusSource",
           "taxStatusCheckedAt",
           "creditLimit",
-          "paymentTermDays",
-          "paymentTerm",
+          "settlementGroup",
           "creditHoldReason",
           "note",
           "createdAt",
@@ -26299,6 +26320,14 @@
             "type": "string",
             "maxLength": 200
           },
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
+          },
           "address": {
             "description": "The first, default address",
             "allOf": [
@@ -26310,7 +26339,8 @@
         },
         "required": [
           "kind",
-          "name"
+          "name",
+          "settlementGroup"
         ]
       },
       "CustomerUpdateRequest": {
@@ -26385,12 +26415,13 @@
             "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
             "description": "MNT; null = not decided yet"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 0,
-            "maximum": 365,
-            "description": "null = the company setting"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
           },
           "creditHold": {
             "type": "boolean"
@@ -26403,7 +26434,7 @@
         },
         "required": [
           "creditLimit",
-          "paymentTermDays",
+          "settlementGroup",
           "creditHold",
           "creditHoldReason"
         ]
@@ -33792,6 +33823,25 @@
           "columns"
         ]
       },
+      "SalesCustomerOverdue": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "example": "50000",
+            "description": "Open invoices past their due date, whole MNT"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          }
+        },
+        "required": [
+          "amount",
+          "oldestDueDate"
+        ]
+      },
       "SalesOrderSummary": {
         "type": "object",
         "properties": {
@@ -33836,6 +33886,16 @@
           },
           "customerName": {
             "type": "string"
+          },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           },
           "fulfilment": {
             "enum": [
@@ -33901,6 +33961,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "paymentMethod",
           "deliveryDate",
@@ -34306,6 +34367,16 @@
           "customerName": {
             "type": "string"
           },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "fulfilment": {
             "enum": [
               "PICKUP",
@@ -34476,6 +34547,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "deliveryDate",
           "addressId",
@@ -35153,6 +35225,16 @@
           "customerName": {
             "type": "string"
           },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "fulfilment": {
             "enum": [
               "PICKUP",
@@ -35197,6 +35279,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "paymentMethod",
           "deliveryDate",
@@ -36151,6 +36234,16 @@
             "nullable": true,
             "description": "Set only while on hold"
           },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "addressId": {
             "type": "number",
             "description": "The customer address whose point this is"
@@ -36198,6 +36291,7 @@
           "phone",
           "creditHold",
           "creditHoldReason",
+          "overdue",
           "addressId",
           "address",
           "lat",
@@ -36465,6 +36559,16 @@
             "type": "string",
             "nullable": true,
             "description": "The default address"
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           }
         },
         "required": [
@@ -36472,7 +36576,8 @@
           "code",
           "name",
           "phone",
-          "address"
+          "address",
+          "overdue"
         ]
       },
       "SalesRepCustomerPage": {
@@ -36674,6 +36779,16 @@
             "items": {
               "$ref": "#/components/schemas/SalesRepCustomerContact"
             }
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           }
         },
         "required": [
@@ -36682,7 +36797,8 @@
           "name",
           "phone",
           "addresses",
-          "contacts"
+          "contacts",
+          "overdue"
         ]
       },
       "Invoice": {
@@ -39231,6 +39347,14 @@
           "creditHold": {
             "type": "boolean"
           },
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "When the invoices fall due (ADR-0101)"
+          },
           "balance": {
             "type": "string",
             "example": "150000.00",
@@ -39264,6 +39388,7 @@
           "status",
           "creditLimit",
           "creditHold",
+          "settlementGroup",
           "balance",
           "openInvoices",
           "overdueAmount",
@@ -43152,10 +43277,13 @@
               }
             ]
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "description": "Changed only by the office"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office"
           },
           "ordersOpen": {
             "type": "boolean",
@@ -43174,7 +43302,7 @@
           "phone",
           "centre",
           "defaultAddress",
-          "paymentTermDays",
+          "settlementGroup",
           "ordersOpen",
           "today"
         ]
@@ -44435,6 +44563,55 @@
           "skipped"
         ]
       },
+      "CustomerAppSettlement": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
+          },
+          "periodFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The current period's first purchase day"
+          },
+          "periodTo": {
+            "type": "string",
+            "format": "date",
+            "description": "The current period's last purchase day"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "«Тооцоо хийх өдөр»; a weekend moves nothing"
+          },
+          "daysLeft": {
+            "type": "number",
+            "description": "«N хоног үлдлээ»; 0 on the day itself"
+          },
+          "amountDue": {
+            "type": "string",
+            "example": "1284600.00",
+            "description": "«Төлөх дүн»: everything due by the day (the positive balance)"
+          },
+          "overdueAmount": {
+            "type": "string",
+            "description": "The part of amountDue already overdue (shown in red)"
+          }
+        },
+        "required": [
+          "group",
+          "periodFrom",
+          "periodTo",
+          "dueDate",
+          "daysLeft",
+          "amountDue",
+          "overdueAmount"
+        ]
+      },
       "CustomerAppBalance": {
         "type": "object",
         "properties": {
@@ -44465,9 +44642,8 @@
             "type": "boolean",
             "description": "«Зээл хаалттай»; never its internal reason"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true
+          "settlement": {
+            "$ref": "#/components/schemas/CustomerAppSettlement"
           },
           "openInvoices": {
             "type": "number",
@@ -44485,7 +44661,7 @@
           "creditLimit",
           "creditAvailable",
           "creditHold",
-          "paymentTermDays",
+          "settlement",
           "openInvoices",
           "payments"
         ]

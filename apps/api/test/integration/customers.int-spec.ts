@@ -57,7 +57,7 @@ describe('customers', () => {
       phone: '+97699112233',
       tinPending: false,
       creditLimit: null,
-      paymentTerm: { days: 30, source: 'DEFAULT' },
+      settlementGroup: 'DAY_20',
     });
     expect(first.addresses).toEqual([
       expect.objectContaining({ isDefault: true, gpsSource: 'OFFICE', lat: UB.lat, lng: UB.lng }),
@@ -72,7 +72,7 @@ describe('customers', () => {
       .post('/api/v1/customers')
       .set(bearer(admin))
       .set(idempotency())
-      .send({ kind: 'COMPANY', code: '0099', name: 'Давхар' })
+      .send({ kind: 'COMPANY', code: '0099', name: 'Давхар', settlementGroup: 'DAY_20' })
       .expect(409);
     expect(taken.body).toMatchObject({
       code: 'DUPLICATE_VALUE',
@@ -86,10 +86,13 @@ describe('customers', () => {
         .post('/api/v1/customers')
         .set(bearer(admin))
         .set(idempotency())
-        .send({ name: 'Шалгах', ...body })
+        .send({ name: 'Шалгах', settlementGroup: 'MONTH_END', ...body })
         .expect(422);
       expect(res.body.errors).toEqual([expect.objectContaining({ path })]);
     };
+    // The settlement group is required, with no default (owner 2026-10-23, ADR-0101).
+    await refused({ kind: 'COMPANY', settlementGroup: undefined }, 'settlementGroup');
+    await refused({ kind: 'COMPANY', settlementGroup: 'DAY_30' }, 'settlementGroup');
     await refused({ kind: 'COMPANY', tin: '123456789012' }, 'tin');
     await refused({ kind: 'INDIVIDUAL', tin: '12345678901' }, 'tin');
     await refused({ kind: 'COMPANY', consumerNo: '11234567' }, 'consumerNo');
@@ -112,20 +115,21 @@ describe('customers', () => {
     await http()
       .post('/api/v1/customers')
       .set(bearer(admin))
-      .send({ kind: 'COMPANY', name: 'Түлхүүргүй' })
+      .send({ kind: 'COMPANY', name: 'Түлхүүргүй', settlementGroup: 'DAY_20' })
       .expect(400);
     const key = idempotency();
     const once = await http()
       .post('/api/v1/customers')
       .set(bearer(admin))
       .set(key)
-      .send({ kind: 'COMPANY', name: 'Давтан' })
+      .send({ kind: 'COMPANY', name: 'Давтан', settlementGroup: 'MONTH_END' })
       .expect(201);
+    expect(once.body.settlementGroup).toBe('MONTH_END');
     const twice = await http()
       .post('/api/v1/customers')
       .set(bearer(admin))
       .set(key)
-      .send({ kind: 'COMPANY', name: 'Давтан' })
+      .send({ kind: 'COMPANY', name: 'Давтан', settlementGroup: 'MONTH_END' })
       .expect(201);
     expect(twice.body.id).toBe(once.body.id);
   });
@@ -141,7 +145,7 @@ describe('customers', () => {
       .expect(200);
     const credit = {
       creditLimit: '5000000',
-      paymentTermDays: null,
+      settlementGroup: 'MONTH_END',
       creditHold: false,
       creditHoldReason: null,
     };
@@ -150,11 +154,12 @@ describe('customers', () => {
       .set(bearer(office))
       .send(credit)
       .expect(403);
+    // The days setting is gone with the settlement days (ADR-0101).
     await http()
       .post('/api/v1/settings')
       .set(bearer(admin))
       .send({ key: 'credit.payment_term_days', value: 14, effectiveFrom: businessDate() })
-      .expect(201);
+      .expect(422);
     const set = await http()
       .put(`/api/v1/customers/${shop.id}/credit`)
       .set(bearer(accountant))
@@ -165,7 +170,7 @@ describe('customers', () => {
       vatPayer: true,
       taxStatusSource: 'MANUAL',
       creditLimit: '5000000.00',
-      paymentTerm: { days: 14, source: 'DEFAULT' },
+      settlementGroup: 'MONTH_END',
     });
     const reason = await http()
       .put(`/api/v1/customers/${shop.id}/credit`)
@@ -178,7 +183,7 @@ describe('customers', () => {
       .set(bearer(accountant))
       .send({
         creditLimit: null,
-        paymentTermDays: 30,
+        settlementGroup: 'DAY_20',
         creditHold: true,
         creditHoldReason: 'Өр хэтэрсэн',
       })
@@ -186,7 +191,7 @@ describe('customers', () => {
     expect(held.body).toMatchObject({
       creditLimit: null,
       creditHold: true,
-      paymentTerm: { days: 30, source: 'CUSTOMER' },
+      settlementGroup: 'DAY_20',
     });
     const audit = await sql.query<{ action: string }>(
       `SELECT action FROM audit_log WHERE entity = 'customers' AND entity_id = $1 ORDER BY id`,
@@ -222,9 +227,13 @@ describe('customers', () => {
     expect(coca.code).toBe('5501');
   });
 
-  it('filters by pending TIN, missing GPS and credit hold, a page at a time', async () => {
+  it('filters by pending TIN, missing GPS, credit hold and settlement group, a page at a time', async () => {
     for (let index = 0; index < 3; index += 1) {
-      await api.customer({ code: `770${index}`, name: `Шүүлт ${index}` });
+      await api.customer({
+        code: `770${index}`,
+        name: `Шүүлт ${index}`,
+        ...(index === 1 ? { settlementGroup: 'MONTH_END' } : {}),
+      });
     }
     await api.customer({
       code: '7710',
@@ -241,6 +250,8 @@ describe('customers', () => {
     expect(pending.data.map((row) => row.code)).toEqual(['7700', '7701', '7702']);
     const noGps = await list({ q: 'Шүүлт', gpsMissing: 'true' });
     expect(noGps.data).toHaveLength(3);
+    const countryside = await list({ q: 'Шүүлт', settlementGroup: 'MONTH_END' });
+    expect(countryside.data.map((row) => row.code)).toEqual(['7701']);
     const first = await list({ q: 'Шүүлт', limit: '2' });
     expect(first.data).toHaveLength(2);
     const rest = await list({ q: 'Шүүлт', limit: '2', cursor: first.nextCursor ?? '' });
@@ -321,8 +332,9 @@ describe('customers', () => {
       'CUSTOMER_INACTIVE',
     );
     const terms = await customers.creditTerms(shop.id);
-    expect(terms).toMatchObject({ creditLimit: null, creditHold: false });
-    expect(terms.paymentTerm.source).toBe('DEFAULT');
+    expect(terms).toEqual({ creditLimit: null, creditHold: false, settlementGroup: 'DAY_20' });
+    // Without an invoice nothing is overdue.
+    expect(await customers.overdueOf([shop.id])).toEqual(new Map());
   });
 
   it('gives each list row every field, the point of its default address and its first contact', async () => {
@@ -332,7 +344,8 @@ describe('customers', () => {
       vatPayer: boolean;
       taxStatusSource: string | null;
       creditLimit: string | null;
-      paymentTerm: { days: number | null; source: string };
+      settlementGroup: string;
+      overdue: { amount: string; oldestDueDate: string | null } | null;
       creditHold: boolean;
       creditHoldReason: string | null;
       note: string | null;
@@ -359,7 +372,7 @@ describe('customers', () => {
       .set(bearer(accountant))
       .send({
         creditLimit: '2500000',
-        paymentTermDays: 30,
+        settlementGroup: 'MONTH_END',
         creditHold: true,
         creditHoldReason: 'Өр төлөөгүй',
       })
@@ -377,14 +390,15 @@ describe('customers', () => {
       vatPayer: false,
       taxStatusSource: null,
       creditLimit: null,
-      paymentTerm: { days: 14, source: 'DEFAULT' },
+      settlementGroup: 'DAY_20',
+      overdue: null,
       note: 'Өглөө хүргэнэ',
       gps: UB,
       contact: null,
     });
     expect(rows.find((row) => row.id === shop.id)).toMatchObject({
       creditLimit: '2500000.00',
-      paymentTerm: { days: 30, source: 'CUSTOMER' },
+      settlementGroup: 'MONTH_END',
       creditHold: true,
       creditHoldReason: 'Өр төлөөгүй',
       gps: null,

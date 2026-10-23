@@ -475,7 +475,7 @@ describe('segments and filtered lists', () => {
       .set(bearer(admin))
       .send({
         creditLimit: null,
-        paymentTermDays: null,
+        settlementGroup: 'DAY_20',
         creditHold: true,
         creditHoldReason: 'Хугацаа хэтэрсэн',
       })

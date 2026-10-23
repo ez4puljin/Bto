@@ -1,5 +1,6 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import type { SettlementGroup } from '@tugeel/shared/finance';
 import type { Decimal } from '@tugeel/shared/money';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import {
@@ -25,9 +26,15 @@ import {
   AuditService,
   CustomerAccountsService,
   type CustomerUserStatus,
-  SettingsService,
 } from '../../identity';
-import { CUSTOMER_CHANGED_HOOK, type CustomerChangedHook, type CustomerPartyFacts } from '../hooks';
+import {
+  CUSTOMER_CHANGED_HOOK,
+  CUSTOMER_DEBT_READER,
+  type CustomerChangedHook,
+  type CustomerDebtReader,
+  type CustomerOverdue,
+  type CustomerPartyFacts,
+} from '../hooks';
 import { customerAddresses, customerContacts, customers, type PARTNER_STATUSES } from '../schema';
 import { type AddressInput, CustomerAddressesService } from './customer-addresses.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
@@ -49,30 +56,28 @@ export interface CustomerInput {
   vatPayer?: boolean;
   cityPayer?: boolean;
   note?: string | null;
+  /** When its invoices fall due (ADR-0101): chosen at creation, then changed only with the credit. */
+  settlementGroup: SettlementGroup;
   /** The first delivery address, created as the default one. */
   address?: AddressInput | null;
 }
 
-export type CustomerPatch = Partial<Omit<CustomerInput, 'address'>> & { status?: PartnerStatus };
+export type CustomerPatch = Partial<Omit<CustomerInput, 'address' | 'settlementGroup'>> & {
+  status?: PartnerStatus;
+};
 
 export interface CreditInput {
   /** null = not decided yet (owner answer 2026-10-11). */
   creditLimit: Decimal | null;
-  /** null = the company setting credit.payment_term_days. */
-  paymentTermDays: number | null;
+  settlementGroup: SettlementGroup;
   creditHold: boolean;
   creditHoldReason: string | null;
 }
 
-/** Where the payment term of a customer comes from (the setting is effective-dated). */
-export interface PaymentTerm {
-  days: number | null;
-  source: 'CUSTOMER' | 'DEFAULT' | 'UNSET';
-}
-
 export interface CreditTerms {
   creditLimit: Decimal | null;
-  paymentTerm: PaymentTerm;
+  /** The invoices' due dates follow it (ADR-0101; `settlementDueDate` of @tugeel/shared/finance). */
+  settlementGroup: SettlementGroup;
   creditHold: boolean;
 }
 
@@ -81,7 +86,7 @@ export interface LockedCustomer {
   id: number;
   status: PartnerStatus;
   creditLimit: Decimal | null;
-  paymentTermDays: number | null;
+  settlementGroup: SettlementGroup;
   creditHold: boolean;
 }
 
@@ -90,6 +95,7 @@ export interface CustomerQuery {
   kind?: CustomerKind;
   status?: PartnerStatus;
   creditHold?: boolean;
+  settlementGroup?: SettlementGroup;
   /** Companies without a TIN: receipts wait for it (SPEC §6.10). */
   tinPending?: boolean;
   /** No GPS point on the default address. */
@@ -124,6 +130,8 @@ export interface LocatedCustomer {
   /** The manual credit hold (no new orders) and its reason, set only while on hold. */
   creditHold: boolean;
   creditHoldReason: string | null;
+  /** The overdue receivable (ADR-0101: a reminder, never a block); null when nothing is overdue. */
+  overdue: CustomerOverdue | null;
   /** The address whose point this is: the default one, else the oldest active one with a point. */
   addressId: number;
   address: string | null;
@@ -145,8 +153,10 @@ export interface CustomerListItem extends CustomerSummary {
   /** null = the payer flags were never checked. */
   taxStatusSource: CustomerRow['taxStatusSource'];
   creditLimit: Decimal | null;
-  paymentTerm: PaymentTerm;
+  settlementGroup: SettlementGroup;
   creditHoldReason: string | null;
+  /** The overdue receivable (ADR-0101: a reminder, never a block); null when nothing is overdue. */
+  overdue: CustomerOverdue | null;
   note: string | null;
   /** The point of the default address. */
   gps: { lat: Decimal; lng: Decimal } | null;
@@ -160,7 +170,6 @@ export interface CustomerDetail extends Omit<
   'searchText' | 'searchPhonetic' | 'searchVersion'
 > {
   tinPending: boolean;
-  paymentTerm: PaymentTerm;
   addresses: AddressRow[];
   contacts: ContactRow[];
 }
@@ -176,16 +185,17 @@ export function customerAuditView(row: CustomerRow) {
  * Credit fields change only through setCredit (partners.credit.manage); reads go through
  * `visibleTo`, the single place that will scope sales reps to their zones in delivery 7. A new
  * customer, or a change of its kind, name, TIN or register number, reaches its Finance Core party
- * through CUSTOMER_CHANGED_HOOK in the same transaction (ADR-0084).
+ * through CUSTOMER_CHANGED_HOOK in the same transaction (ADR-0084). Overdue amounts come from
+ * finance through CUSTOMER_DEBT_READER (ADR-0101).
  */
 @Injectable()
 export class CustomersService implements OnModuleInit {
   private changedHook: CustomerChangedHook | null = null;
+  private debtReader: CustomerDebtReader | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
-    private readonly settings: SettingsService,
     private readonly addresses: CustomerAddressesService,
     private readonly appAccounts: CustomerAccountsService,
     private readonly moduleRef: ModuleRef,
@@ -199,6 +209,22 @@ export class CustomersService implements OnModuleInit {
     } catch {
       this.changedHook = null;
     }
+    try {
+      this.debtReader = this.moduleRef.get<CustomerDebtReader>(CUSTOMER_DEBT_READER, {
+        strict: false,
+      });
+    } catch {
+      this.debtReader = null;
+    }
+  }
+
+  /**
+   * The overdue receivables of these customers (ADR-0101 #7: shown in red, never a block); empty
+   * while finance is not loaded (the worker, tests of partners alone).
+   */
+  async overdueOf(ids: readonly number[]): Promise<Map<number, CustomerOverdue>> {
+    if (!this.debtReader || ids.length === 0) return new Map();
+    return this.debtReader.overdueOf([...new Set(ids)]);
   }
 
   /** The rows a user may read; every customer until sales reps arrive (delivery 7). */
@@ -248,6 +274,7 @@ export class CustomersService implements OnModuleInit {
         cityPayer: input.cityPayer ?? false,
         taxStatusSource: payerChecked ? 'MANUAL' : null,
         taxStatusCheckedAt: payerChecked ? sql`now()` : null,
+        settlementGroup: input.settlementGroup,
         note: optionalText(input.note) ?? null,
       })
       .returning();
@@ -343,7 +370,7 @@ export class CustomersService implements OnModuleInit {
     });
   }
 
-  /** Credit limit, payment term and credit hold (partners.credit.manage; delivery 3 enforces them). */
+  /** Credit limit, settlement group and credit hold (partners.credit.manage, ADR-0101 #8). */
   async setCreditInTx(tx: Tx, actor: Actor, id: number, input: CreditInput): Promise<void> {
     const reason = optionalText(input.creditHoldReason) ?? null;
     if (reason !== null && !input.creditHold) {
@@ -354,7 +381,7 @@ export class CustomersService implements OnModuleInit {
       .update(customers)
       .set({
         creditLimit: input.creditLimit,
-        paymentTermDays: input.paymentTermDays,
+        settlementGroup: input.settlementGroup,
         creditHold: input.creditHold,
         creditHoldReason: reason,
         updatedAt: sql`now()`,
@@ -364,7 +391,7 @@ export class CustomersService implements OnModuleInit {
     if (!after) throw notFound('customer', id);
     const credit = (row: CustomerRow) => ({
       creditLimit: row.creditLimit?.toFixed(2) ?? null,
-      paymentTermDays: row.paymentTermDays,
+      settlementGroup: row.settlementGroup,
       creditHold: row.creditHold,
       creditHoldReason: row.creditHoldReason,
     });
@@ -387,11 +414,9 @@ export class CustomersService implements OnModuleInit {
       .from(customerContacts)
       .where(eq(customerContacts.customerId, id))
       .orderBy(asc(customerContacts.id));
-    const paymentTerm = await this.paymentTerm(row.paymentTermDays, businessDate(), executor);
     return {
       ...customerAuditView(row),
       tinPending: isTinPending(row),
-      paymentTerm,
       addresses,
       contacts,
     };
@@ -450,12 +475,8 @@ export class CustomersService implements OnModuleInit {
       .from(customerContacts)
       .where(inArray(customerContacts.customerId, ids))
       .orderBy(asc(customerContacts.customerId), asc(customerContacts.id));
-    const defaultDays = await this.settings.find(
-      'credit.payment_term_days',
-      businessDate(),
-      this.db,
-    );
     const appOf = await this.appAccounts.statusOf(ids);
+    const overdueOf = await this.overdueOf(ids);
     const pointOf = new Map(points.map((point) => [point.customerId, point]));
     const contactOf = new Map(contacts.map((contact) => [contact.customerId, contact]));
     return {
@@ -469,8 +490,9 @@ export class CustomersService implements OnModuleInit {
           cityPayer: row.cityPayer,
           taxStatusSource: row.taxStatusSource,
           creditLimit: row.creditLimit,
-          paymentTerm: termOf(row.paymentTermDays, defaultDays),
+          settlementGroup: row.settlementGroup,
           creditHoldReason: row.creditHoldReason,
+          overdue: overdueOf.get(row.id) ?? null,
           note: row.note,
           gps: point?.lat && point.lng ? { lat: point.lat, lng: point.lng } : null,
           contact: contact ? { name: contact.name, phone: contact.phone } : null,
@@ -512,6 +534,7 @@ export class CustomersService implements OnModuleInit {
         ),
       )
       .orderBy(asc(customers.id), desc(customerAddresses.isDefault), asc(customerAddresses.id));
+    const overdueOf = await this.overdueOf(rows.map((row) => row.id));
     return rows
       .flatMap((row) =>
         row.lat && row.lng
@@ -523,6 +546,7 @@ export class CustomersService implements OnModuleInit {
                 phone: row.phone,
                 creditHold: row.creditHold,
                 creditHoldReason: row.creditHoldReason,
+                overdue: overdueOf.get(row.id) ?? null,
                 addressId: row.addressId,
                 address: row.address,
                 lat: row.lat,
@@ -583,6 +607,7 @@ export class CustomersService implements OnModuleInit {
     if (query.kind) filters.push(eq(customers.kind, query.kind));
     if (query.status) filters.push(eq(customers.status, query.status));
     if (query.creditHold !== undefined) filters.push(eq(customers.creditHold, query.creditHold));
+    if (query.settlementGroup) filters.push(eq(customers.settlementGroup, query.settlementGroup));
     if (query.tinPending)
       filters.push(sql`${customers.kind} = 'COMPANY' AND ${customers.tin} IS NULL`);
     if (query.gpsMissing) {
@@ -614,7 +639,7 @@ export class CustomersService implements OnModuleInit {
         cityPayer: customers.cityPayer,
         taxStatusSource: customers.taxStatusSource,
         creditLimit: customers.creditLimit,
-        paymentTermDays: customers.paymentTermDays,
+        settlementGroup: customers.settlementGroup,
         creditHoldReason: customers.creditHoldReason,
         note: customers.note,
         rank: sql<number>`${rank}`,
@@ -649,7 +674,7 @@ export class CustomersService implements OnModuleInit {
         id: customers.id,
         status: customers.status,
         creditLimit: customers.creditLimit,
-        paymentTermDays: customers.paymentTermDays,
+        settlementGroup: customers.settlementGroup,
         creditHold: customers.creditHold,
       })
       .from(customers)
@@ -659,26 +684,18 @@ export class CustomersService implements OnModuleInit {
     return row;
   }
 
-  /** Credit terms on an Ulaanbaatar business date (the payment-term setting is effective-dated). */
-  async creditTerms(
-    id: number,
-    onDate: string = businessDate(),
-    executor: Db | Tx = this.db,
-  ): Promise<CreditTerms> {
+  /** The credit terms: limit, hold and the settlement group the due dates follow (ADR-0101). */
+  async creditTerms(id: number, executor: Db | Tx = this.db): Promise<CreditTerms> {
     const [row] = await executor
       .select({
         creditLimit: customers.creditLimit,
-        paymentTermDays: customers.paymentTermDays,
+        settlementGroup: customers.settlementGroup,
         creditHold: customers.creditHold,
       })
       .from(customers)
       .where(eq(customers.id, id));
     if (!row) throw notFound('customer', id);
-    return {
-      creditLimit: row.creditLimit,
-      creditHold: row.creditHold,
-      paymentTerm: await this.paymentTerm(row.paymentTermDays, onDate, executor),
-    };
+    return row;
   }
 
   /** Customers by id with every field (an import revert compares what it changed). */
@@ -714,15 +731,6 @@ export class CustomersService implements OnModuleInit {
       .from(customers)
       .where(inArray(customers.code, [...codes]));
     return rows.map(customerAuditView);
-  }
-
-  private async paymentTerm(
-    own: number | null,
-    onDate: string,
-    executor: Db | Tx,
-  ): Promise<PaymentTerm> {
-    if (own !== null) return termOf(own, undefined);
-    return termOf(null, await this.settings.find('credit.payment_term_days', onDate, executor));
   }
 
   private async lockRow(tx: Tx, id: number): Promise<CustomerRow> {
@@ -791,14 +799,6 @@ export class CustomersService implements OnModuleInit {
 /** What a customer's Finance Core party follows (CUSTOMER_CHANGED_HOOK). */
 function partyFacts(row: CustomerRow): CustomerPartyFacts {
   return { id: row.id, kind: row.kind, name: row.name, tin: row.tin, regNo: row.regNo };
-}
-
-/** A customer's own days, else the company setting's, else unset. */
-function termOf(own: number | null, setting: number | undefined): PaymentTerm {
-  if (own !== null) return { days: own, source: 'CUSTOMER' };
-  return setting === undefined
-    ? { days: null, source: 'UNSET' }
-    : { days: setting, source: 'DEFAULT' };
 }
 
 function isTinPending(row: { kind: CustomerKind; tin: string | null }): boolean {

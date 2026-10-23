@@ -1,3 +1,4 @@
+import { SETTLEMENT_GROUPS } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS } from '@tugeel/shared/taxpayer';
 import { sql } from 'drizzle-orm';
 import {
@@ -69,8 +70,8 @@ export const customers = pgTable(
     taxStatusCheckedAt: timestamp('tax_status_checked_at', { withTimezone: true }),
     /** NULL = not decided yet (owner answer 2026-10-11); credit control comes in delivery 3. */
     creditLimit: money('credit_limit'),
-    /** NULL = the company setting credit.payment_term_days. */
-    paymentTermDays: integer('payment_term_days'),
+    /** When the invoices fall due (ADR-0101): DAY_20 «Мөрөн» on the 20th, MONTH_END «Орон нутаг». */
+    settlementGroup: text('settlement_group', { enum: SETTLEMENT_GROUPS }).notNull(),
     creditHold: boolean('credit_hold').notNull().default(false),
     creditHoldReason: text('credit_hold_reason'),
     note: text('note'),
@@ -107,10 +108,7 @@ export const customers = pgTable(
         AND (${t.taxStatusSource} IS NOT NULL OR NOT (${t.vatPayer} OR ${t.cityPayer}))`,
     ),
     check('customers_credit_limit', sql`${t.creditLimit} IS NULL OR ${t.creditLimit} >= 0`),
-    check(
-      'customers_payment_term',
-      sql`${t.paymentTermDays} IS NULL OR ${t.paymentTermDays} BETWEEN 0 AND 365`,
-    ),
+    check('customers_settlement_group', sql`${t.settlementGroup} IN ('DAY_20', 'MONTH_END')`),
     check(
       'customers_credit_hold_reason',
       sql`${t.creditHoldReason} IS NULL OR (${t.creditHold} AND length(${t.creditHoldReason}) BETWEEN 1 AND 300)`,

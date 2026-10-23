@@ -64,8 +64,11 @@ export function toCustomerListItemDto(row: CustomerListItem): CustomerListItemDt
     cityPayer: row.cityPayer,
     taxStatusSource: row.taxStatusSource,
     creditLimit: row.creditLimit?.toFixed(2) ?? null,
-    paymentTerm: row.paymentTerm,
+    settlementGroup: row.settlementGroup,
     creditHoldReason: row.creditHoldReason,
+    overdue: row.overdue
+      ? { amount: row.overdue.amount.toFixed(0), oldestDueDate: row.overdue.oldestDueDate }
+      : null,
     note: row.note,
     gps: row.gps ? { lat: row.gps.lat.toFixed(6), lng: row.gps.lng.toFixed(6) } : null,
     contact: row.contact,
@@ -95,8 +98,7 @@ export function toCustomerDetailDto(detail: CustomerDetail): CustomerDetailDto {
     taxStatusSource: detail.taxStatusSource,
     taxStatusCheckedAt: iso(detail.taxStatusCheckedAt),
     creditLimit: detail.creditLimit?.toFixed(2) ?? null,
-    paymentTermDays: detail.paymentTermDays,
-    paymentTerm: detail.paymentTerm,
+    settlementGroup: detail.settlementGroup,
     creditHoldReason: detail.creditHoldReason,
     note: detail.note,
     createdAt: detail.createdAt.toISOString(),

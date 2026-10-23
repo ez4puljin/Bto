@@ -127,7 +127,7 @@ export class CustomersController {
     return toCustomerDetailDto(await this.customers.update(ctx, id, body));
   }
 
-  /** Credit limit, payment term and hold: the accountant's (partners.credit.manage). */
+  /** Credit limit, settlement group and hold: the accountant's (partners.credit.manage). */
   @Put(':id/credit')
   @RequirePermission(CREDIT)
   @ApiOkResponse({ type: CustomerDetailDto })
@@ -138,7 +138,7 @@ export class CustomersController {
   ): Promise<CustomerDetailDto> {
     const updated = await this.customers.setCredit(ctx, id, {
       creditLimit: body.creditLimit ? new Decimal(body.creditLimit) : null,
-      paymentTermDays: body.paymentTermDays ?? null,
+      settlementGroup: body.settlementGroup,
       creditHold: body.creditHold,
       creditHoldReason: body.creditHoldReason ?? null,
     });

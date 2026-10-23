@@ -1130,7 +1130,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Credit limit, payment term and hold: the accountant's (partners.credit.manage). */
+        /** Credit limit, settlement group and hold: the accountant's (partners.credit.manage). */
         put: operations["Customers_setCredit"];
         post?: never;
         delete?: never;
@@ -5916,7 +5916,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "credit.overdue_nets_credits" | "bto.company_code";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "bto.company_code";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -6445,13 +6445,14 @@ export interface components {
             taxProductCode: number;
             cityTax: number;
         };
-        PaymentTerm: {
-            days: number | null;
+        CustomerOverdue: {
             /**
-             * @description The customer’s own days, the company setting, or neither yet
-             * @enum {string}
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
              */
-            source: "CUSTOMER" | "DEFAULT" | "UNSET";
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
         };
         GpsPoint: {
             /** @example 47.918540 */
@@ -6500,8 +6501,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /** @enum {string} */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["CustomerOverdue"] | null;
             note: string | null;
             /** @description The point of the default address */
             gps: components["schemas"]["GpsPoint"] | null;
@@ -6583,9 +6587,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            /** @description Own days; null = the company setting */
-            paymentTermDays: number | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
             note: string | null;
             /** Format: date-time */
@@ -6624,6 +6630,11 @@ export interface components {
             /** @enum {string} */
             kind: "COMPANY" | "INDIVIDUAL";
             name: string;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description The first, default address */
             address?: components["schemas"]["CustomerAddressRequest"];
         };
@@ -6650,8 +6661,11 @@ export interface components {
         CustomerCreditRequest: {
             /** @description MNT; null = not decided yet */
             creditLimit: string | null;
-            /** @description null = the company setting */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHold: boolean;
             creditHoldReason: string | null;
         };
@@ -8889,6 +8903,15 @@ export interface components {
             /** @description The list's visible columns; the file keeps the list's order */
             columns: ("sku" | "name" | "category" | "baseUnit" | "units" | "warehousePrice" | "priceProfile" | "baseBarcodes" | "unitBarcodes" | "weight" | "homeWarehouse" | "fixedBins" | "supplier" | "status")[];
         };
+        SalesCustomerOverdue: {
+            /**
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
+             */
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
+        };
         SalesOrderSummary: {
             id: number;
             number: string | null;
@@ -8899,6 +8922,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** @enum {string} */
@@ -9013,6 +9038,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** Format: date */
@@ -9241,6 +9268,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /**
@@ -9504,6 +9533,8 @@ export interface components {
             creditHold: boolean;
             /** @description Set only while on hold */
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @description The customer address whose point this is */
             addressId: number;
             /** @description The point's address text */
@@ -9607,6 +9638,8 @@ export interface components {
             phone: string | null;
             /** @description The default address */
             address: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         SalesRepCustomerPage: {
             data: components["schemas"]["SalesRepCustomer"][];
@@ -9668,6 +9701,8 @@ export interface components {
             /** @description Active, the default first */
             addresses: components["schemas"]["SalesRepCustomerAddress"][];
             contacts: components["schemas"]["SalesRepCustomerContact"][];
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         Invoice: {
             id: number;
@@ -10421,6 +10456,11 @@ export interface components {
             /** @example 5000000.00 */
             creditLimit: string | null;
             creditHold: boolean;
+            /**
+             * @description When the invoices fall due (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /**
              * @description Negative = in advance
              * @example 150000.00
@@ -11599,8 +11639,11 @@ export interface components {
             phone: string;
             centre: components["schemas"]["CustomerAppCentre"] | null;
             defaultAddress: components["schemas"]["CustomerAppAddress"] | null;
-            /** @description Changed only by the office */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description False while no stage takes app orders: the app does not send */
             ordersOpen: boolean;
             /**
@@ -11960,6 +12003,34 @@ export interface components {
             lines: components["schemas"]["CustomerAppReorderLine"][];
             skipped: components["schemas"]["CustomerAppReorderSkip"][];
         };
+        CustomerAppSettlement: {
+            /** @enum {string} */
+            group: "DAY_20" | "MONTH_END";
+            /**
+             * Format: date
+             * @description The current period's first purchase day
+             */
+            periodFrom: string;
+            /**
+             * Format: date
+             * @description The current period's last purchase day
+             */
+            periodTo: string;
+            /**
+             * Format: date
+             * @description «Тооцоо хийх өдөр»; a weekend moves nothing
+             */
+            dueDate: string;
+            /** @description «N хоног үлдлээ»; 0 on the day itself */
+            daysLeft: number;
+            /**
+             * @description «Төлөх дүн»: everything due by the day (the positive balance)
+             * @example 1284600.00
+             */
+            amountDue: string;
+            /** @description The part of amountDue already overdue (shown in red) */
+            overdueAmount: string;
+        };
         CustomerAppBalance: {
             /**
              * @description Negative = an advance
@@ -11975,7 +12046,7 @@ export interface components {
             creditAvailable: string | null;
             /** @description «Зээл хаалттай»; never its internal reason */
             creditHold: boolean;
-            paymentTermDays: number | null;
+            settlement: components["schemas"]["CustomerAppSettlement"];
             /** @description «Нэхэмжлэх (n)» */
             openInvoices: number;
             /** @description «Төлбөр (n)» */
@@ -14884,6 +14955,7 @@ export interface operations {
                 kind?: "COMPANY" | "INDIVIDUAL";
                 status?: "ACTIVE" | "INACTIVE";
                 creditHold?: boolean;
+                settlementGroup?: "DAY_20" | "MONTH_END";
                 /** @description Companies without a TIN */
                 tinPending?: boolean;
                 /** @description The default address has no GPS point */

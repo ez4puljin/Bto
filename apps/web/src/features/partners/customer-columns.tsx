@@ -8,6 +8,13 @@ import { MapLink } from './gps-field';
 import { contactCell, none, text } from './list-cells';
 import { localPhone } from './phone';
 
+/** «Хугацаа хэтэрсэн · MM/DD-оос»: the oldest due date of the overdue debt. */
+function overdueTitle(overdue: NonNullable<CustomerListItem['overdue']>, t: TFunction): string {
+  return overdue.oldestDueDate
+    ? t('partners.settlement.overdueSince', { date: overdue.oldestDueDate })
+    : t('partners.settlement.overdue');
+}
+
 /** Every column of the customer list (ADR-0037). */
 export const CUSTOMER_COLUMN_KEYS = [
   'code',
@@ -23,7 +30,8 @@ export const CUSTOMER_COLUMN_KEYS = [
   'gps',
   'contact',
   'creditLimit',
-  'paymentTerm',
+  'settlementGroup',
+  'overdue',
   'creditHold',
   'note',
   'app',
@@ -35,8 +43,8 @@ export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
 export const LOCKED_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = ['code', 'name'];
 
 /**
- * What a user who never chose sees hidden (ADR-0066): code, name, kind, phone, TIN, credit status
- * and status fit a 1366px screen; every column stays in «Баганууд».
+ * What a user who never chose sees hidden (ADR-0066): code, name, kind, phone, TIN, the overdue debt
+ * (ADR-0101), credit status and status fit a 1366px screen; every column stays in «Баганууд».
  */
 export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
   'regNo',
@@ -47,7 +55,7 @@ export const DEFAULT_HIDDEN_CUSTOMER_COLUMNS: readonly CustomerColumnKey[] = [
   'gps',
   'contact',
   'creditLimit',
-  'paymentTerm',
+  'settlementGroup',
   'note',
   'app',
 ];
@@ -137,14 +145,20 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
       ),
   },
   {
-    key: 'paymentTerm',
+    key: 'settlementGroup',
+    cell: (row, t) => t(`partners.settlement.groups.${row.settlementGroup}`),
+  },
+  {
+    // ADR-0101: an overdue debt only reminds, in red; it never blocks an order.
+    key: 'overdue',
+    numeric: true,
     cell: (row, t) =>
-      row.paymentTerm.source === 'CUSTOMER' ? (
-        t('partners.credit.termCustomer', { days: row.paymentTerm.days })
-      ) : row.paymentTerm.source === 'DEFAULT' ? (
-        t('partners.credit.termDefault', { days: row.paymentTerm.days })
+      row.overdue === null ? (
+        <span className="font-sans">{none(t)}</span>
       ) : (
-        <span className="text-muted-foreground">{t('partners.credit.termUnset')}</span>
+        <span className="font-medium text-destructive" title={overdueTitle(row.overdue, t)}>
+          {formatTugrik(row.overdue.amount)}
+        </span>
       ),
   },
   {

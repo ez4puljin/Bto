@@ -20,6 +20,7 @@ const order = (id: number, fields: Partial<Schemas['SalesOrderDetail']> = {}) =>
     customerId: 9,
     customerCode: '1001',
     customerName: 'Номин дэлгүүр',
+    customerOverdue: null,
     fulfilment: 'PICKUP',
     deliveryDate: '2026-10-16',
     addressId: null,

@@ -156,7 +156,15 @@ export function accountDto(account: CustomerAccount) {
     creditLimit: centsOrNull(account.creditLimit),
     creditAvailable: centsOrNull(account.creditAvailable),
     creditHold: account.creditHold,
-    paymentTermDays: account.paymentTermDays,
+    settlement: {
+      group: account.settlement.group,
+      periodFrom: account.settlement.periodFrom,
+      periodTo: account.settlement.periodTo,
+      dueDate: account.settlement.dueDate,
+      daysLeft: account.settlement.daysLeft,
+      amountDue: cents(account.settlement.amountDue),
+      overdueAmount: cents(account.settlement.overdueAmount),
+    },
     openInvoices: account.openInvoices,
     payments: account.payments,
   };

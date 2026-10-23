@@ -701,6 +701,8 @@ export interface FinConfig {  // contract 'fin.config/1'; idempotent on natural 
 
 ## 10. Credit control (ADR-0073)
 
+**Since 2026-10-23 (ADR-0101): the OVERDUE row below is superseded.** An overdue amount never refuses an order; it only reminds in red (the owner, 2026-10-21). The policy is HOLD → LIMIT; `credit.overdue_nets_credits` and the refusal's `creditsOpen` are gone, and `overdueAmount` / `oldestDueDate` stay in the 409 for the message. `exposureInTx` still reports `overdue` and `creditsOpen` (the core reads; Bto's policy decides). The due dates the core's open items carry come from the customer's settlement group (`settlementDueDate`, «Мөрөн» on the 20th, «Орон нутаг» at month end) instead of the invoice date + 30 days.
+
 **Now (one database).**
 1. Confirmation or re-price: `customers.lockForUpdate` (`apps/api/src/modules/partners/services/customers.service.ts:517-531`); sales sums the open orders (`apps/api/src/modules/sales/services/sales-orders.service.ts:679-711`); `billing`'s credit policy calls `exposureInTx`, which takes `party_companies` `FOR NO KEY UPDATE`; then HOLD → OVERDUE → LIMIT.
 2. The sale: order → stock → customer → `submitInTx` (intake → period → party → items → counters). The order flips to INVOICED in the same transaction (`sales-orders.service.ts:808-817`), so it is never counted twice or not at all.
