@@ -146,18 +146,17 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const input = useRef<HTMLInputElement>(null);
   const [key, setKey] = useState(randomUuid);
   const [wrongType, setWrongType] = useState(false);
-  // A receipts import names its warehouse and payment before the file (ADR-0078 #7).
+  // A receipts import names its payment before the file (ADR-0078 #7); each row goes to its
+  // product's home warehouse (ADR-0099 #7).
   const [options, setOptions] = useState<Partial<ReceiptImportOptions>>({
     paymentMethod: 'CREDIT',
     moneyAccountId: null,
   });
   const receiptOptions =
     kind === 'RECEIPTS' &&
-    options.warehouseId !== undefined &&
     options.paymentMethod !== undefined &&
     (options.paymentMethod === 'CREDIT' || options.moneyAccountId)
       ? {
-          warehouseId: options.warehouseId,
           paymentMethod: options.paymentMethod,
           moneyAccountId:
             options.paymentMethod === 'CREDIT' ? null : (options.moneyAccountId ?? null),
@@ -257,27 +256,18 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   );
 }
 
-/** The warehouse and the payment of the delivery notes a receipts import brings (ADR-0078 #7). */
+/** The payment of the delivery notes a receipts import brings (ADR-0078 #7, ADR-0099 #7). */
 function ReceiptImportFields(props: {
   value: Partial<ReceiptImportOptions>;
   onChange: (value: Partial<ReceiptImportOptions>) => void;
 }) {
   const { t } = useTranslation();
-  const warehouses = (useWarehouses().data ?? []).filter(
-    (warehouse) => warehouse.kind === 'WHOLESALE' && warehouse.status === 'ACTIVE',
-  );
   const method = props.value.paymentMethod ?? 'CREDIT';
   const accounts = useReceiptPaymentAccounts(method !== 'CREDIT');
   const choices = (accounts.data ?? []).filter((account) => account.kind === method);
   return (
     <div className="grid gap-2">
-      <WarehouseSelect
-        label={t('imports.receiptOptions.warehouse')}
-        options={warehouses}
-        value={props.value.warehouseId}
-        emptyLabel={t('imports.receiptOptions.pickWarehouse')}
-        onChange={(warehouseId) => props.onChange({ ...props.value, warehouseId })}
-      />
+      <p className="text-[13px] text-muted-foreground">{t('imports.receiptOptions.homeHint')}</p>
       <NativeSelect
         aria-label={t('imports.receiptOptions.payment')}
         value={method}

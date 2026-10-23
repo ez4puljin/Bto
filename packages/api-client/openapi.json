@@ -2501,6 +2501,68 @@
         ]
       }
     },
+    "/api/v1/products/lookup": {
+      "get": {
+        "operationId": "Products_lookup",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Words of the name in either script, a SKU or a barcode",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "At most 30; default 20",
+            "schema": {
+              "minimum": 1,
+              "maximum": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductListItem"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units\nand barcodes without pictures, at most 30. Declared before `:id`.",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/products/query": {
       "post": {
         "operationId": "Products_query",
@@ -7020,9 +7082,40 @@
             "name": "warehouseId",
             "required": false,
             "in": "query",
+            "description": "Receipts with a line in this warehouse",
             "schema": {
               "minimum": 1,
               "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Receipts with a line of this product",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Delivery-note date (else the posting date) from",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "… until (inclusive)",
+            "schema": {
+              "format": "date",
+              "type": "string"
             }
           },
           {
@@ -7188,6 +7281,62 @@
           }
         ],
         "summary": "The cash boxes and bank accounts a receipt may name (ADR-0078 #5).",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/last-prices": {
+      "get": {
+        "operationId": "Receipts_lastPrices",
+        "parameters": [
+          {
+            "name": "productIds",
+            "required": true,
+            "in": "query",
+            "description": "Repeated: productIds=1&productIds=2",
+            "schema": {
+              "minItems": 1,
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LastReceiptPrice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Each product's latest delivery-note price, from any supplier (ADR-0099 #3).",
         "tags": [
           "inventory"
         ]
@@ -27376,9 +27525,6 @@
             "type": "string",
             "nullable": true
           },
-          "warehouseId": {
-            "type": "number"
-          },
           "supplierId": {
             "type": "number"
           },
@@ -27388,6 +27534,11 @@
           "supplierDocNo": {
             "type": "string",
             "nullable": true
+          },
+          "supplierDocDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
           },
           "status": {
             "enum": [
@@ -27405,8 +27556,21 @@
             ],
             "type": "string"
           },
+          "paymentMethod": {
+            "enum": [
+              "CREDIT",
+              "CASH",
+              "BANK"
+            ],
+            "type": "string"
+          },
           "lineCount": {
             "type": "number"
+          },
+          "netAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The payable (cost holders only)"
           },
           "effectiveDate": {
             "type": "string",
@@ -27421,12 +27585,13 @@
         "required": [
           "id",
           "number",
-          "warehouseId",
           "supplierId",
           "supplierName",
           "supplierDocNo",
+          "supplierDocDate",
           "status",
           "costingStatus",
+          "paymentMethod",
           "lineCount",
           "effectiveDate",
           "createdAt"
@@ -27478,6 +27643,64 @@
           "kind"
         ]
       },
+      "LastReceiptPrice": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "receiptId": {
+            "type": "number"
+          },
+          "receiptNumber": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "The delivery note’s date"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string",
+            "description": "Per entered unit, VAT in, before the discount"
+          },
+          "basePrice": {
+            "type": "string",
+            "description": "Per base unit"
+          }
+        },
+        "required": [
+          "productId",
+          "receiptId",
+          "receiptNumber",
+          "date",
+          "supplierName",
+          "unitName",
+          "unitPrice",
+          "basePrice"
+        ]
+      },
+      "ReceiptWarehouse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "ReceiptLine": {
         "type": "object",
         "properties": {
@@ -27513,6 +27736,13 @@
             "example": "48",
             "description": "Base units"
           },
+          "warehouseId": {
+            "type": "number",
+            "description": "Its product’s home warehouse (ADR-0099)"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
           "binId": {
             "type": "number"
           },
@@ -27523,6 +27753,16 @@
           "lotId": {
             "type": "number",
             "nullable": true
+          },
+          "weightKg": {
+            "type": "string",
+            "nullable": true,
+            "description": "kg per base unit"
+          },
+          "salePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "New warehouse price per base unit, in force from the posting"
           },
           "docUnitPrice": {
             "type": "string",
@@ -27537,6 +27777,16 @@
           "freeGoods": {
             "type": "boolean"
           },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Share of the discount"
+          },
+          "netAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Amount less the discount"
+          },
           "vatAmount": {
             "type": "string",
             "nullable": true
@@ -27544,7 +27794,7 @@
           "costAmount": {
             "type": "string",
             "nullable": true,
-            "description": "Amount less VAT"
+            "description": "Net amount less VAT"
           }
         },
         "required": [
@@ -27557,9 +27807,13 @@
           "enteredQty",
           "factorSnapshot",
           "qtyBase",
+          "warehouseId",
+          "warehouseName",
           "binId",
           "binCode",
-          "lotId"
+          "lotId",
+          "weightKg",
+          "salePrice"
         ]
       },
       "ReceiptTotals": {
@@ -27568,6 +27822,14 @@
           "docTotal": {
             "type": "string",
             "description": "Σ delivery-note amounts, VAT in"
+          },
+          "discountTotal": {
+            "type": "string",
+            "description": "The delivery note’s discount"
+          },
+          "netTotal": {
+            "type": "string",
+            "description": "The payable: docTotal less the discount"
           },
           "vatTotal": {
             "type": "string"
@@ -27582,6 +27844,8 @@
         },
         "required": [
           "docTotal",
+          "discountTotal",
+          "netTotal",
           "vatTotal",
           "costTotal",
           "pricedLines"
@@ -27598,11 +27862,12 @@
             "nullable": true,
             "example": "GR-2026-000001"
           },
-          "warehouseId": {
-            "type": "number"
-          },
-          "warehouseName": {
-            "type": "string"
+          "warehouses": {
+            "description": "The warehouses of its lines",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptWarehouse"
+            }
           },
           "supplierId": {
             "type": "number"
@@ -27699,6 +27964,24 @@
               "$ref": "#/components/schemas/ReceiptLine"
             }
           },
+          "weightKg": {
+            "type": "string",
+            "description": "Σ base qty × weight, kg (lines with a weight)"
+          },
+          "weightMissing": {
+            "type": "number",
+            "description": "Lines whose product has no weight"
+          },
+          "discountPct": {
+            "type": "string",
+            "nullable": true,
+            "description": "Discount, % of the note"
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Or a discount amount"
+          },
           "totals": {
             "description": "Cost holders only",
             "allOf": [
@@ -27711,8 +27994,7 @@
         "required": [
           "id",
           "number",
-          "warehouseId",
-          "warehouseName",
+          "warehouses",
           "supplierId",
           "supplierCode",
           "supplierName",
@@ -27732,7 +28014,9 @@
           "postedAt",
           "createdAt",
           "updatedAt",
-          "lines"
+          "lines",
+          "weightKg",
+          "weightMissing"
         ]
       },
       "ReceiptLineRequest": {
@@ -27747,11 +28031,11 @@
             "example": "2",
             "description": "In the product unit"
           },
-          "binId": {
+          "warehouseId": {
             "type": "number",
             "nullable": true,
             "minimum": 1,
-            "description": "Omitted: the fixed shelf of the product, else the receiving area"
+            "description": "Only for a product without a home: the wholesale warehouse, which becomes its home"
           },
           "docUnitPrice": {
             "type": "string",
@@ -27766,6 +28050,11 @@
           "freeGoods": {
             "type": "boolean",
             "description": "Free goods (бонус)"
+          },
+          "salePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "New warehouse price per base unit (price holders)"
           }
         },
         "required": [
@@ -27806,9 +28095,15 @@
             "minimum": 1,
             "description": "Cash box or bank account"
           },
-          "warehouseId": {
-            "type": "number",
-            "minimum": 1
+          "discountPct": {
+            "type": "string",
+            "nullable": true,
+            "description": "Discount, % of the priced total (cost holders); clears an amount"
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Or a discount amount (cost holders); clears a percentage"
           },
           "supplierId": {
             "type": "number",
@@ -27823,7 +28118,6 @@
           }
         },
         "required": [
-          "warehouseId",
           "supplierId"
         ]
       },
@@ -27859,6 +28153,16 @@
             "nullable": true,
             "minimum": 1,
             "description": "Cash box or bank account"
+          },
+          "discountPct": {
+            "type": "string",
+            "nullable": true,
+            "description": "Discount, % of the priced total (cost holders); clears an amount"
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Or a discount amount (cost holders); clears a percentage"
           },
           "supplierId": {
             "type": "number",
@@ -27901,6 +28205,11 @@
             "nullable": true,
             "description": "As typed, VAT in"
           },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Share of the discount"
+          },
           "unitCost": {
             "type": "string",
             "nullable": true,
@@ -27920,6 +28229,7 @@
           "provisionalUnitCost",
           "amount",
           "docAmount",
+          "discountAmount",
           "unitCost",
           "freeGoods"
         ]
@@ -27967,6 +28277,14 @@
             "type": "string",
             "example": "10"
           },
+          "discountPct": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true
+          },
           "total": {
             "type": "string",
             "nullable": true,
@@ -27993,6 +28311,8 @@
           "recostUntil",
           "costedAt",
           "vatRatePct",
+          "discountPct",
+          "discountAmount",
           "total",
           "docTotal",
           "lines"
@@ -28027,6 +28347,16 @@
       "ReceiptCostRequest": {
         "type": "object",
         "properties": {
+          "discountPct": {
+            "type": "string",
+            "nullable": true,
+            "description": "Discount, %; given (or discountAmount) replaces the receipt’s, null clears it"
+          },
+          "discountAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Or a discount amount"
+          },
           "costingVersion": {
             "type": "number",
             "minimum": 0,
@@ -28052,10 +28382,6 @@
             "type": "string",
             "example": "3"
           },
-          "binId": {
-            "type": "number",
-            "minimum": 1
-          },
           "docUnitPrice": {
             "type": "string",
             "nullable": true,
@@ -28068,6 +28394,11 @@
           },
           "freeGoods": {
             "type": "boolean"
+          },
+          "salePrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "New warehouse price per base unit; null clears it (price holders)"
           }
         }
       },
@@ -30369,11 +30700,6 @@
       "ReceiptImportOptions": {
         "type": "object",
         "properties": {
-          "warehouseId": {
-            "type": "number",
-            "minimum": 1,
-            "description": "A wholesale warehouse"
-          },
           "paymentMethod": {
             "enum": [
               "CREDIT",
@@ -30390,7 +30716,6 @@
           }
         },
         "required": [
-          "warehouseId",
           "paymentMethod",
           "moneyAccountId"
         ]
@@ -44193,6 +44518,8 @@
           "ORDER_NUMBER_TAKEN",
           "CUSTOMER_APP_CLOSED",
           "COSTING_CLOSED",
+          "RECEIPT_DISCOUNT_TOO_LARGE",
+          "SALE_PRICE_NO_TERMS",
           "TRANSFER_NOTHING_SHIPPED",
           "STOCKTAKE_BINS_UNFINISHED",
           "IMPORT_FILE_INVALID",

@@ -93,6 +93,18 @@ export function inventoryApi(app: NestExpressApplication, token: string) {
         .send({ productId, warehouseId })
         .expect(200);
     },
+    /**
+     * Makes `warehouseId` the product's home and `binId` its fixed shelf there: where a goods
+     * receipt puts the product's lines (ADR-0099 #1; a receipt no longer names a shelf).
+     */
+    async homeShelf(productId: number, warehouseId: number, binId: number): Promise<void> {
+      await this.setHome(productId, warehouseId);
+      await http()
+        .put('/api/v1/product-locations')
+        .set(auth)
+        .send({ warehouseId, productId, defaultBinId: binId })
+        .expect(200);
+    },
   };
 }
 

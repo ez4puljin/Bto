@@ -31,6 +31,7 @@ describe('integrity: receipt races', () => {
       categoryId: await catalog.category('Хүнс'),
       baseUomId: await catalog.uomId('PCS'),
     });
+    await inventory.setHome(product.id, warehouse.id);
     const supplierId = (await partnersApi(app, admin).supplier({ name: 'МСМ' })).id;
     const unit = unitOf(product, 'PCS').id;
     const http = () => request(app.getHttpServer());
@@ -40,11 +41,7 @@ describe('integrity: receipt races', () => {
         .post('/api/v1/receipts')
         .set(bearer(worker))
         .set(idempotency())
-        .send({
-          warehouseId: warehouse.id,
-          supplierId,
-          lines: [{ productUnitId: unit, enteredQty: '1' }],
-        })
+        .send({ supplierId, lines: [{ productUnitId: unit, enteredQty: '1' }] })
         .expect(201);
       const id = (created.body as { id: number }).id;
       const [posted, added] = await Promise.all([

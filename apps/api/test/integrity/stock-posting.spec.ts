@@ -60,9 +60,10 @@ describe('integrity: stock posting', () => {
     const [status] = STATUSES[docType];
     switch (docType) {
       case 'GR':
+        // A receipt's warehouses live on its lines (ADR-0099 #1); the movements name theirs.
         return one(
-          `INSERT INTO goods_receipts (warehouse_id, supplier_id, status) VALUES ($1, $2, $3) RETURNING id`,
-          [warehouseId, supplierId, status],
+          `INSERT INTO goods_receipts (supplier_id, status) VALUES ($1, $2) RETURNING id`,
+          [supplierId, status],
         );
       case 'BM':
         return one(`INSERT INTO bin_moves (warehouse_id, status) VALUES ($1, $2) RETURNING id`, [

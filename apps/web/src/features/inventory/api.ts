@@ -38,6 +38,7 @@ export type ReceiptCostRequest = Schemas['ReceiptCostRequest'];
 export type ReceiptStatus = ReceiptDetail['status'];
 export type ReceiptPaymentMethod = ReceiptDetail['paymentMethod'];
 export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
+export type LastReceiptPrice = Schemas['LastReceiptPrice'];
 export type BinMoveSummary = Schemas['BinMoveSummary'];
 export type BinMoveDetail = Schemas['BinMoveDetail'];
 export type BinMoveCreate = Schemas['BinMoveCreateRequest'];
@@ -225,10 +226,11 @@ export function useBinLookup() {
   });
 }
 
-export function useProductLocations(productId: number) {
+export function useProductLocations(productId: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.locations, productId],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/product-locations', {
@@ -259,10 +261,17 @@ export function useProductLocationsOf(productIds: readonly number[], enabled: bo
 }
 
 export interface ReceiptFilter {
+  /** Receipts with a line in this warehouse (ADR-0099). */
   warehouseId?: number;
   status?: ReceiptStatus;
   costingPending?: boolean;
   q?: string;
+  supplierId?: number;
+  /** Receipts with a line of this product. */
+  productId?: number;
+  /** The delivery note's date range (inclusive). */
+  from?: string;
+  to?: string;
 }
 
 export function useReceipts(filter: ReceiptFilter) {
@@ -279,6 +288,10 @@ export function useReceipts(filter: ReceiptFilter) {
               status: filter.status,
               costingPending: filter.costingPending,
               q: filter.q || undefined,
+              supplierId: filter.supplierId,
+              productId: filter.productId,
+              from: filter.from || undefined,
+              to: filter.to || undefined,
               cursor: pageParam,
               limit: 50,
             },
@@ -328,6 +341,26 @@ export function usePendingReceipts(enabled = true) {
           signal,
         }),
       ).data,
+  });
+}
+
+/**
+ * The latest delivery-note price of these products, from any supplier (ADR-0099 #3; cost holders
+ * only): none while `enabled` is false.
+ */
+export function useLastReceiptPrices(productIds: readonly number[], enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.receipts, 'last-prices', productIds],
+    enabled: enabled && productIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/receipts/last-prices', {
+          params: { query: { productIds: [...productIds] } },
+          signal,
+        }),
+      ),
   });
 }
 

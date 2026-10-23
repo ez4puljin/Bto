@@ -54,6 +54,9 @@ const COSTS = 'inventory.costs.manage';
 /** A receipt line's new sale price is a price change (ADR-0099 #5). */
 const PRICES = 'pricing.prices.manage';
 
+/** Shelves a receipt line may go to besides the receiving area (ADR-0033 #1). */
+const SHELF_TYPES = ['STORAGE', 'PICKING'];
+
 export interface ReceiptLineInput {
   productUnitId: number;
   enteredQty: Decimal;
@@ -1178,9 +1181,15 @@ export class ReceiptsService implements OnModuleInit {
       await this.locations.setHomeInTx(tx, actor, productId, line.warehouseId);
       warehouseId = line.warehouseId;
     }
+    // The fixed shelf while it can take goods (not archived, a shelf), else the receiving area.
+    const fixedId = (await this.locations.defaultBinOf(warehouseId, [productId], tx)).get(
+      productId,
+    );
+    const fixed = fixedId === undefined ? undefined : await this.bins.get(fixedId, tx);
     const binId =
-      (await this.locations.defaultBinOf(warehouseId, [productId], tx)).get(productId) ??
-      (await this.bins.systemBin(warehouseId, 'RECEIVING', tx)).id;
+      fixed && !fixed.archivedAt && SHELF_TYPES.includes(fixed.type)
+        ? fixed.id
+        : (await this.bins.systemBin(warehouseId, 'RECEIVING', tx)).id;
     const salePrice = line.salePrice ?? null;
     if (salePrice !== null) assertSalePrice(salePrice);
     await tx.insert(goodsReceiptLines).values({

@@ -69,16 +69,14 @@ describe('integrity: stocktake races', () => {
     });
     productId = product.id;
     unitId = unitOf(product, 'PCS').id;
+    // The receipt puts the flour on its fixed shelf in its home (ADR-0099 #1).
+    await inventory.homeShelf(productId, warehouseId, shelf);
     const supplierId = (await partnersApi(app, adminToken).supplier({ name: 'МСМ' })).id;
     const receipt = await http()
       .post('/api/v1/receipts')
       .set(bearer(workerToken))
       .set(idempotency())
-      .send({
-        warehouseId,
-        supplierId,
-        lines: [{ productUnitId: unitId, enteredQty: '100', binId: shelf }],
-      })
+      .send({ supplierId, lines: [{ productUnitId: unitId, enteredQty: '100' }] })
       .expect(201);
     await http()
       .post(`/api/v1/receipts/${(receipt.body as { id: number }).id}/post`)

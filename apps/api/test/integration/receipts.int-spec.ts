@@ -14,6 +14,8 @@ interface LineJson {
   unitName: string;
   enteredQty: string;
   qtyBase: string;
+  warehouseId: number;
+  warehouseName: string;
   binCode: string;
 }
 interface ReceiptJson {
@@ -21,6 +23,7 @@ interface ReceiptJson {
   number: string | null;
   status: string;
   costingStatus: string | null;
+  warehouses: { id: number; name: string }[];
   lines: LineJson[];
 }
 
@@ -32,9 +35,14 @@ function keysOf(value: unknown): string[] {
   }
   return [];
 }
-const COST_KEYS = /^(unitCost|provisionalUnitCost|amount|total|avgCost|value.*|absorbed|variance)$/;
+const COST_KEYS =
+  /^(unitCost|provisionalUnitCost|amount|total|avgCost|value.*|absorbed|variance|doc.*|discount.*|net.*|totals)$/;
 
-/** Goods receipts and the accountant's costing (SPEC §5.4, ADR-0033). */
+/**
+ * Goods receipts and the accountant's costing (SPEC §5.4, ADR-0033): each line goes to its
+ * product's home warehouse and fixed shelf there, so one receipt may fill several wholesale
+ * warehouses, written by any holder of the receipt right whatever their scope (ADR-0099 #1–#2).
+ */
 describe('goods receipts', () => {
   let app: NestExpressApplication;
   let sql: Client;
@@ -60,6 +68,23 @@ describe('goods receipts', () => {
     );
     return rows[0];
   };
+  const homeOf = async (productId: number) =>
+    (
+      await sql.query<{ warehouse_id: string }>(
+        `SELECT warehouse_id::text FROM product_locations WHERE product_id = $1 AND is_home`,
+        [productId],
+      )
+    ).rows.map((row) => Number.parseInt(row.warehouse_id, 10));
+  const shelf = (code: string) => {
+    const id = shelves[code];
+    if (id === undefined) throw new Error(`no shelf ${code}`);
+    return id;
+  };
+  let food: number;
+  const product = async (sku: string, name: string) => {
+    const catalog = catalogApi(app, admin);
+    return catalog.product({ sku, name, categoryId: food, baseUomId: await catalog.uomId('PCS') });
+  };
 
   beforeAll(async () => {
     app = await createHttpApp();
@@ -74,9 +99,11 @@ describe('goods receipts', () => {
     wh2 = await inventory.warehouse('WH2');
     for (const code of ['A-01-01', 'A-01-02'])
       shelves[code] = (await inventory.bin(wh1.id, code)).id;
+    shelves['B-01-01'] = (await inventory.bin(wh2.id, 'B-01-01')).id;
     supplierId = (await partnersApi(app, admin).supplier({ name: 'МСМ ХХК' })).id;
     const catalog = catalogApi(app, admin);
     const category = await catalog.category('Ундаа');
+    food = await catalog.category('Хүнс');
     const pcs = await catalog.uomId('PCS');
     const box = await catalog.uomId('BOX');
     cola = await catalog.product({
@@ -92,12 +119,9 @@ describe('goods receipts', () => {
       categoryId: category,
       baseUomId: pcs,
     });
-    await inventory.setHome(cola.id, wh1.id);
-    await http()
-      .put('/api/v1/product-locations')
-      .set(bearer(admin))
-      .send({ warehouseId: wh1.id, productId: cola.id, defaultBinId: shelves['A-01-01'] })
-      .expect(200);
+    await inventory.homeShelf(cola.id, wh1.id, shelf('A-01-01'));
+    // Rice lives in WH1 without a fixed shelf there.
+    await inventory.setHome(rice.id, wh1.id);
   });
   afterAll(async () => {
     await expectReconciled(app);
@@ -107,7 +131,6 @@ describe('goods receipts', () => {
 
   it('receives counted goods onto their shelf and numbers the receipt', async () => {
     const created = await create(worker, {
-      warehouseId: wh1.id,
       supplierId,
       supplierDocNo: 'П-123',
       lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' }],
@@ -119,22 +142,31 @@ describe('goods receipts', () => {
         unitName: 'хайрцаг',
         enteredQty: '2',
         qtyBase: '48',
+        warehouseId: wh1.id,
+        warehouseName: wh1.name,
         binCode: 'A-01-01',
       }),
     ]);
-    // Rice has no fixed shelf: it lands in the receiving area unless a shelf is scanned.
+    expect(draft.warehouses).toEqual([{ id: wh1.id, name: wh1.name }]);
+    // Rice has no fixed shelf: it lands in its home's receiving area.
     const withRice = await http()
       .post(`/api/v1/receipts/${draft.id}/lines`)
       .set(bearer(worker))
       .send({ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '5' })
       .expect(201);
     const riceLine = (withRice.body as ReceiptJson).lines[1];
-    expect(riceLine?.binCode).toBe('RECEIVING');
+    expect(riceLine).toMatchObject({ warehouseId: wh1.id, binCode: 'RECEIVING' });
     await http()
       .patch(`/api/v1/receipt-lines/${riceLine?.id}`)
       .set(bearer(worker))
-      .send({ enteredQty: '6', binId: shelves['A-01-02'] })
+      .send({ enteredQty: '6' })
       .expect(200);
+    // The shelf is no longer chosen on the line.
+    await http()
+      .patch(`/api/v1/receipt-lines/${riceLine?.id}`)
+      .set(bearer(worker))
+      .send({ binId: shelf('A-01-02') })
+      .expect(422);
     const colaLine = draft.lines[0];
     await http()
       .patch(`/api/v1/receipt-lines/${colaLine?.id}`)
@@ -167,45 +199,46 @@ describe('goods receipts', () => {
   });
 
   it('refuses receipts outside the rules', async () => {
-    const store = await inventoryApi(app, admin).warehouse('STORE1', 'STORE');
-    expect(
-      (await create(worker, { warehouseId: store.id, supplierId }).expect(422)).body.code,
-    ).toBe('WAREHOUSE_KIND_NOT_ALLOWED');
-    const elsewhere = await create(worker, {
-      warehouseId: wh2.id,
+    // The warehouse and the shelf follow the product: a request names neither (ADR-0099 #1).
+    await create(worker, { warehouseId: wh1.id, supplierId }).expect(422);
+    await create(worker, {
       supplierId,
-      lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '1' }],
-    }).expect(409);
-    expect(elsewhere.body).toMatchObject({
-      code: 'PRODUCT_NOT_IN_WAREHOUSE',
-      params: { warehouse: wh1.name },
-    });
-    const draft = (await create(worker, { warehouseId: wh1.id, supplierId }).expect(201))
-      .body as ReceiptJson;
+      lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1', binId: shelf('A-01-02') }],
+    }).expect(422);
+    // A home-less product is received into a wholesale warehouse only.
+    const store = await inventoryApi(app, admin).warehouse('STORE1', 'STORE');
+    const loose = await product('13', 'Давс');
+    const kind = await create(worker, {
+      supplierId,
+      lines: [{ productUnitId: unitOf(loose, 'PCS').id, enteredQty: '1', warehouseId: store.id }],
+    }).expect(422);
+    expect(kind.body.code).toBe('WAREHOUSE_KIND_NOT_ALLOWED');
+    expect(await homeOf(loose.id)).toEqual([]);
+    const draft = (await create(worker, { supplierId }).expect(201)).body as ReceiptJson;
+    expect(draft.warehouses).toEqual([]);
     expect((await postReceipt(worker, draft.id).expect(422)).body.code).toBe('VALIDATION_FAILED');
-    const damaged = await inventoryApi(app, admin).systemBin(wh1.id, 'DAMAGED');
-    await http()
-      .post(`/api/v1/receipts/${draft.id}/lines`)
-      .set(bearer(worker))
-      .send({ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1', binId: damaged.id })
-      .expect(422);
-    const foreignBin = (await inventoryApi(app, admin).bin(wh2.id, 'Z-01-01')).id;
-    await http()
-      .post(`/api/v1/receipts/${draft.id}/lines`)
-      .set(bearer(worker))
-      .send({ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1', binId: foreignBin })
-      .expect(422);
-    await create(accountant, { warehouseId: wh1.id, supplierId }).expect(403);
-    const scoped = (
-      await login(app, await seedUser(app, { roles: ['WAREHOUSE'], warehouseIds: [wh2.id] }))
-    ).accessToken;
-    await create(scoped, { warehouseId: wh1.id, supplierId }).expect(403);
+    await create(accountant, { supplierId }).expect(403);
+
+    // A home moved after the line was entered stops the posting.
+    const moved = await product('14', 'Шилжсэн бараа');
+    await inventoryApi(app, admin).setHome(moved.id, wh1.id);
+    const stale = (
+      await create(worker, {
+        supplierId,
+        lines: [{ productUnitId: unitOf(moved, 'PCS').id, enteredQty: '1' }],
+      }).expect(201)
+    ).body as ReceiptJson;
+    await inventoryApi(app, admin).setHome(moved.id, wh2.id);
+    expect((await postReceipt(worker, stale.id).expect(409)).body).toMatchObject({
+      code: 'PRODUCT_NOT_IN_WAREHOUSE',
+      params: { warehouse: wh2.name },
+    });
+    await http().post(`/api/v1/receipts/${stale.id}/cancel`).set(bearer(worker)).expect(200);
 
     // A supplier deactivated after the draft stops the posting.
     const old = (await partnersApi(app, admin).supplier({ name: 'Хуучин' })).id;
     const late = (
       await create(worker, {
-        warehouseId: wh1.id,
         supplierId: old,
         lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '1' }],
       }).expect(201)
@@ -223,25 +256,33 @@ describe('goods receipts', () => {
     const tea = await catalogApi(app, admin).product({
       sku: '12',
       name: 'Цай',
-      categoryId: await catalogApi(app, admin).category('Хүнс'),
+      categoryId: food,
       baseUomId: await catalogApi(app, admin).uomId('PCS'),
       units: [{ uomId: await catalogApi(app, admin).uomId('BOX'), factorToBase: '24' }],
     });
+    await inventoryApi(app, admin).homeShelf(tea.id, wh1.id, shelf('A-01-02'));
     const receipt = (
       await create(worker, {
-        warehouseId: wh1.id,
         supplierId,
         lines: [
-          { productUnitId: unitOf(tea, 'BOX').id, enteredQty: '2', binId: shelves['A-01-02'] },
-          { productUnitId: unitOf(tea, 'BOX').id, enteredQty: '1', binId: shelves['A-01-02'] },
+          { productUnitId: unitOf(tea, 'BOX').id, enteredQty: '2' },
+          { productUnitId: unitOf(tea, 'BOX').id, enteredQty: '1' },
         ],
       }).expect(201)
     ).body as ReceiptJson;
+    expect(receipt.lines.map((line) => line.binCode)).toEqual(['A-01-02', 'A-01-02']);
     await postReceipt(worker, receipt.id).expect(200);
 
     const seen = await http().get(`/api/v1/receipts/${receipt.id}`).set(bearer(worker)).expect(200);
     expect(keysOf(seen.body).filter((key) => COST_KEYS.test(key))).toEqual([]);
     await http().get(`/api/v1/receipts/${receipt.id}/costing`).set(bearer(worker)).expect(403);
+    // The list's payable is cost data too.
+    const listed = await http()
+      .get('/api/v1/receipts')
+      .query({ productId: tea.id })
+      .set(bearer(worker))
+      .expect(200);
+    expect(keysOf(listed.body).filter((key) => COST_KEYS.test(key))).toEqual([]);
 
     const before = await http()
       .get(`/api/v1/receipts/${receipt.id}/costing`)
@@ -311,7 +352,6 @@ describe('goods receipts', () => {
   it('refuses a posting when a unit was superseded after drafting', async () => {
     const draft = (
       await create(worker, {
-        warehouseId: wh1.id,
         supplierId,
         lines: [{ productUnitId: unitOf(cola, 'BOX').id, enteredQty: '1' }],
       }).expect(201)
@@ -327,7 +367,6 @@ describe('goods receipts', () => {
 
   it('corrects the delivery note of a draft, never of a posted receipt (ADR-0047 #1)', async () => {
     interface HeaderJson extends ReceiptJson {
-      warehouseId: number;
       supplierId: number;
       supplierDocNo: string | null;
       supplierDocDate: string | null;
@@ -335,7 +374,6 @@ describe('goods receipts', () => {
     }
     const draft = (
       await create(worker, {
-        warehouseId: wh1.id,
         supplierId,
         supplierDocNo: 'П-1',
         note: 'Анхны',
@@ -354,7 +392,6 @@ describe('goods receipts', () => {
       }).expect(200)
     ).body as HeaderJson;
     expect(corrected).toMatchObject({
-      warehouseId: wh1.id,
       supplierId: nomin,
       supplierDocNo: 'П-2',
       supplierDocDate: '2026-10-12',
@@ -374,10 +411,13 @@ describe('goods receipts', () => {
     expect((await patch(worker, { supplierId: closed }).expect(409)).body.code).toBe(
       'SUPPLIER_INACTIVE',
     );
+    // Any holder of the receipt right corrects it, whatever their warehouse scope (ADR-0099 #2).
     const elsewhere = (
       await login(app, await seedUser(app, { roles: ['WAREHOUSE'], warehouseIds: [wh2.id] }))
     ).accessToken;
-    await patch(elsewhere, { note: 'Өөр агуулах' }).expect(403);
+    expect((await patch(elsewhere, { note: 'Өөр агуулах' }).expect(200)).body).toMatchObject({
+      note: 'Өөр агуулах',
+    });
     await patch(accountant, { note: 'Нягтлан' }).expect(403);
 
     await http()
@@ -389,5 +429,103 @@ describe('goods receipts', () => {
     expect((await patch(worker, { note: 'Хожуу' }).expect(409)).body.code).toBe(
       'DOC_ALREADY_POSTED',
     );
+  });
+
+  it('receives one note into the home of each product, whoever posts it (ADR-0099 #1–#2)', async () => {
+    const inventory = inventoryApi(app, admin);
+    const flour = await product('20', 'Гурил');
+    await inventory.homeShelf(flour.id, wh2.id, shelf('B-01-01'));
+    const salt = await product('21', 'Давс 1кг');
+    // A clerk who writes only WH2 still receives the whole note.
+    const scoped = (
+      await login(app, await seedUser(app, { roles: ['WAREHOUSE'], warehouseIds: [wh2.id] }))
+    ).accessToken;
+
+    // A product without a home needs the warehouse it is received into.
+    const homeless = await create(scoped, {
+      supplierId,
+      lines: [{ productUnitId: unitOf(salt, 'PCS').id, enteredQty: '3' }],
+    }).expect(409);
+    expect(homeless.body).toMatchObject({
+      code: 'PRODUCT_NO_HOME',
+      params: { productId: salt.id },
+    });
+    expect(await homeOf(salt.id)).toEqual([]);
+
+    const draft = (
+      await create(scoped, {
+        supplierId,
+        supplierDocNo: 'ХА-1',
+        lines: [
+          { productUnitId: unitOf(cola, 'PCS').id, enteredQty: '12' },
+          { productUnitId: unitOf(flour, 'PCS').id, enteredQty: '5' },
+          { productUnitId: unitOf(salt, 'PCS').id, enteredQty: '3', warehouseId: wh2.id },
+        ],
+      }).expect(201)
+    ).body as ReceiptJson;
+    // The named warehouse became the salt's home.
+    expect(await homeOf(salt.id)).toEqual([wh2.id]);
+    // A product with a home goes there, whatever warehouse the line names.
+    const withMore = (
+      await http()
+        .post(`/api/v1/receipts/${draft.id}/lines`)
+        .set(bearer(scoped))
+        .send({ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '1', warehouseId: wh2.id })
+        .expect(201)
+    ).body as ReceiptJson;
+    expect(withMore.lines.map((line) => [line.productId, line.warehouseId, line.binCode])).toEqual([
+      [cola.id, wh1.id, 'A-01-01'],
+      [flour.id, wh2.id, 'B-01-01'],
+      [salt.id, wh2.id, 'RECEIVING'],
+      [cola.id, wh1.id, 'A-01-01'],
+    ]);
+    expect(withMore.warehouses).toEqual([
+      { id: wh1.id, name: wh1.name },
+      { id: wh2.id, name: wh2.name },
+    ]);
+    const colaBefore = await stock(cola.id);
+
+    const posted = (await postReceipt(scoped, draft.id).expect(200)).body as ReceiptJson;
+    expect(posted.number).toMatch(new RegExp(`^GR-${businessYear()}-\\d{6}$`));
+    const ledger = await sql.query<{ warehouse_id: string; product_id: string; qty_base: string }>(
+      `SELECT warehouse_id::text, product_id::text, qty_base::text FROM stock_ledger
+        WHERE doc_type = 'GR' AND doc_id = $1 ORDER BY doc_line_id`,
+      [draft.id],
+    );
+    expect(ledger.rows).toEqual([
+      { warehouse_id: String(wh1.id), product_id: String(cola.id), qty_base: '12.000' },
+      { warehouse_id: String(wh2.id), product_id: String(flour.id), qty_base: '5.000' },
+      { warehouse_id: String(wh2.id), product_id: String(salt.id), qty_base: '3.000' },
+      { warehouse_id: String(wh1.id), product_id: String(cola.id), qty_base: '1.000' },
+    ]);
+    const balances = await sql.query<{ warehouse_id: string; product_id: string; on_hand: string }>(
+      `SELECT warehouse_id::text, product_id::text, on_hand::text FROM warehouse_stock
+        WHERE product_id = ANY($1::bigint[]) ORDER BY product_id, warehouse_id`,
+      [[flour.id, salt.id]],
+    );
+    expect(balances.rows).toEqual([
+      { warehouse_id: String(wh2.id), product_id: String(flour.id), on_hand: '5.000' },
+      { warehouse_id: String(wh2.id), product_id: String(salt.id), on_hand: '3.000' },
+    ]);
+    const colaAfter = await stock(cola.id);
+    expect(Number.parseFloat(colaAfter?.on_hand ?? '0')).toBe(
+      Number.parseFloat(colaBefore?.on_hand ?? '0') + 13,
+    );
+
+    // The warehouse filter finds the receipt from each of its warehouses, never from another.
+    const listed = async (warehouseId: number) =>
+      (
+        (
+          await http()
+            .get('/api/v1/receipts')
+            .query({ warehouseId, limit: 100 })
+            .set(bearer(worker))
+            .expect(200)
+        ).body as { data: { id: number }[] }
+      ).data.map((row) => row.id);
+    expect(await listed(wh1.id)).toContain(draft.id);
+    expect(await listed(wh2.id)).toContain(draft.id);
+    const empty = await inventory.warehouse('WH3');
+    expect(await listed(empty.id)).toEqual([]);
   });
 });

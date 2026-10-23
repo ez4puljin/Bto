@@ -213,10 +213,11 @@ export function useSuppliersByIds(ids: readonly number[]) {
   });
 }
 
-export function useSupplier(id: number) {
+export function useSupplier(id: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.suppliers, id],
+    enabled,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/v1/suppliers/{id}', { params: { path: { id } }, signal })),
   });

@@ -138,17 +138,19 @@ describe('stocktakes', () => {
       categoryId: category,
       baseUomId: pcs,
     });
+    // The receipt puts each line on its product's fixed shelf in its home (ADR-0099 #1).
+    await inventory.homeShelf(cola.id, wh1.id, shelf('A-01-01'));
+    await inventory.homeShelf(rice.id, wh1.id, shelf('A-01-02'));
     const supplierId = (await partnersApi(app, adminToken).supplier({ name: 'МСМ ХХК' })).id;
     const receipt = await http()
       .post('/api/v1/receipts')
       .set(bearer(workerToken))
       .set(idempotency())
       .send({
-        warehouseId: wh1.id,
         supplierId,
         lines: [
-          { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2', binId: shelf('A-01-01') },
-          { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10', binId: shelf('A-01-02') },
+          { productUnitId: unitOf(cola, 'BOX').id, enteredQty: '2' },
+          { productUnitId: unitOf(rice, 'PCS').id, enteredQty: '10' },
         ],
       })
       .expect(201);

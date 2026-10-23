@@ -102,9 +102,9 @@ describe('attention counts', () => {
       .set(bearer(admin))
       .set(idempotency())
       .send({
-        warehouseId: wh1.id,
         supplierId,
-        lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '5' }],
+        // Rice has no home yet: WH1 becomes its home (ADR-0099 #1).
+        lines: [{ productUnitId: unitOf(rice, 'PCS').id, enteredQty: '5', warehouseId: wh1.id }],
       })
       .expect(201);
     await http()

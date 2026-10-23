@@ -95,33 +95,21 @@ describe('goods issues', () => {
       baseUomId: await catalog.uomId('PCS'),
       units: [{ uomId: await catalog.uomId('BOX'), factorToBase: '12' }],
     });
+    await inventory.setHome(cola.id, wh.id);
     await http()
       .put('/api/v1/product-locations')
       .set(bearer(admin))
       .send({ warehouseId: wh.id, productId: cola.id, defaultBinId: shelfA })
       .expect(200);
-    // 10 pieces on the fixed shelf A and 30 on B, costed at 1,000 a piece.
+    // 10 pieces on the fixed shelf A and 30 on B, costed at 1,000 a piece: the receipt brings all
+    // 40 onto the fixed shelf (ADR-0099 #1), a bin move takes 30 on to B.
     const receipt = await http()
       .post('/api/v1/receipts')
       .set(bearer(admin))
       .set(idempotency())
       .send({
-        warehouseId: wh.id,
         supplierId,
-        lines: [
-          {
-            productUnitId: unitOf(cola, 'PCS').id,
-            enteredQty: '10',
-            binId: shelfA,
-            docAmount: '10000',
-          },
-          {
-            productUnitId: unitOf(cola, 'PCS').id,
-            enteredQty: '30',
-            binId: shelfB,
-            docAmount: '30000',
-          },
-        ],
+        lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '40', docAmount: '40000' }],
       })
       .expect(201);
     await http()
@@ -129,6 +117,22 @@ describe('goods issues', () => {
       .set(bearer(admin))
       .set(idempotency())
       .expect(200);
+    await http()
+      .post('/api/v1/bin-moves')
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({
+        warehouseId: wh.id,
+        lines: [
+          {
+            productUnitId: unitOf(cola, 'PCS').id,
+            enteredQty: '30',
+            fromBinId: shelfA,
+            toBinId: shelfB,
+          },
+        ],
+      })
+      .expect(201);
     types = (await http().get('/api/v1/issues/expense-types').set(bearer(worker)).expect(200))
       .body as TypeJson[];
   });

@@ -247,9 +247,9 @@ describe('bulk product edits', () => {
       .set(bearer(admin))
       .set(idempotency())
       .send({
-        warehouseId: wh1.id,
         supplierId: apu,
-        lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '3', binId: shelf.id }],
+        // Cola's home is WH1: the line goes onto its fixed shelf there (ADR-0099 #1).
+        lines: [{ productUnitId: unitOf(cola, 'PCS').id, enteredQty: '3' }],
       })
       .expect(201);
     await http()

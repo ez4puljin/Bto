@@ -73,7 +73,7 @@ describe('finance payables', () => {
         .post('/api/v1/receipts')
         .set(bearer(admin))
         .set(idempotency())
-        .send({ warehouseId: wh.id, supplierId, supplierDocDate: today, lines, ...extra })
+        .send({ supplierId, supplierDocDate: today, lines, ...extra })
         .expect(201)
     ).body as ReceiptJson;
     // The warehouse posts it: the bill books as Bto itself, no finance right needed.
@@ -133,6 +133,23 @@ describe('finance payables', () => {
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
+  /** Dr − Cr on goods received (310201) over every Bto document of one receipt (F3 + F4). */
+  const goodsReceivedOf = async (receiptId: number) =>
+    (
+      await sql.query<{ amount: string }>(
+        `SELECT coalesce(sum(l.debit) - sum(l.credit), 0)::text AS amount
+           FROM fin.documents d
+           JOIN fin.source_systems s ON s.id = d.source_system_id AND s.code = 'BTO'
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+          WHERE a.code = '310201'
+            AND ((d.source_doc_type = 'STOCK' AND d.source_doc_id LIKE $1)
+              OR (d.source_doc_type IN ('STOCK_REVALUE', 'RECEIPT_RECOST') AND d.source_doc_id LIKE $2)
+              OR (d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $3))`,
+        [`GR:${receiptId}:%`, `${receiptId}:%`, String(receiptId)],
+      )
+    ).rows[0]?.amount;
   const supplier = async (name: string, vatPayer = false) =>
     (await partnersApi(app, admin).supplier({ name, vatPayer })).id;
 
@@ -157,6 +174,8 @@ describe('finance payables', () => {
       baseUomId: await catalog.uomId('PCS'),
       units: [{ uomId: await catalog.uomId('BOX'), factorToBase: '12' }],
     });
+    // A receipt's lines go to their product's home (ADR-0099 #1).
+    await inventoryApi(app, admin).setHome(water.id, wh.id);
     cashBox = await financeApi(app, admin).cashBox('AP-CASH');
   });
   afterAll(async () => {
@@ -234,6 +253,53 @@ describe('finance payables', () => {
     expect(open.every((item) => item.side === 'CREDIT')).toBe(true);
     expect(open.reduce((sum, item) => sum + Number.parseFloat(item.openAmount), 0)).toBe(9900);
     expect((await ledger(shop)).map((entry) => entry.kind)).toEqual(['RECOST', 'RECOST', 'BILL']);
+  });
+
+  it('books a discounted receipt at its net, and a re-costing’s new discount as the difference', async () => {
+    const shop = await supplier('Хөнгөлөлт АП', true);
+    const posted = await receipt(
+      shop,
+      [{ productUnitId: unitOf(water, 'BOX').id, enteredQty: '2', docUnitPrice: '13200' }],
+      { discountPct: '10' },
+    );
+    expect(posted).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
+    // 26,400 less 10 %: 23,760 owed, 2,160 of it input VAT, 21,600 into the stock.
+    expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
+      '130301': '2160.00',
+      '310201': '21600.00',
+      '310101': '-23760.00',
+    });
+    expect(await balance(shop)).toMatchObject({ balance: '23760.00' });
+    expect(await goodsReceivedOf(posted.id)).toBe('0.00');
+    const recost = (version: number, discount: Record<string, unknown>) =>
+      http()
+        .put(`/api/v1/receipts/${posted.id}/costs`)
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          costingVersion: version,
+          ...discount,
+          lines: [{ lineId: posted.lines[0]?.id, amount: '26400' }],
+        })
+        .expect(200);
+    // The discount dropped: the difference is billed.
+    await recost(1, { discountPct: null });
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
+      '130301': '240.00',
+      '310201': '2400.00',
+      '310101': '-2640.00',
+    });
+    expect(await balance(shop)).toMatchObject({ balance: '26400.00' });
+    // An amount instead: a credit of the difference.
+    await recost(2, { discountAmount: '1100' });
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
+      '130301': '-100.00',
+      '310201': '-1000.00',
+      '310101': '1100.00',
+    });
+    expect(await balance(shop)).toMatchObject({ balance: '25300.00' });
+    // Goods received clears with each bill.
+    expect(await goodsReceivedOf(posted.id)).toBe('0.00');
   });
 
   it('pays a supplier by a manual entry and lets the accountant pair it with the bill', async () => {
