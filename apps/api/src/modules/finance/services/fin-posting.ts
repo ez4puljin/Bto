@@ -9,6 +9,7 @@ import {
   FinError,
   FinIntakeInTx,
   type FinIntakeResult,
+  FinOrgService,
   FinReader,
 } from '../../../finance-core';
 import {
@@ -18,6 +19,7 @@ import {
   newCommandId,
   ROLE_OF_POSTING_KEY,
 } from '../../fin-bridge';
+import { OrgService } from '../../identity';
 import { invoices } from '../schema';
 import { FinBooks } from './fin-books';
 
@@ -36,10 +38,27 @@ export class FinPosting {
     private readonly intake: FinIntakeInTx,
     private readonly reader: FinReader,
     private readonly books: FinBooks,
+    private readonly org: OrgService,
+    private readonly finOrg: FinOrgService,
   ) {}
 
-  async submitInTx(tx: Tx, ctx: FinCallContext, command: BtoCommand): Promise<FinIntakeResult> {
+  /**
+   * Posts a command; `branchId` (a Bto branch) tags a POST and every line it writes with that
+   * branch (ADR-0106 #4, D26: receivables stay at company level, the branch is a line's dimension).
+   */
+  async submitInTx(
+    tx: Tx,
+    ctx: FinCallContext,
+    command: BtoCommand,
+    branchId: number | null = null,
+  ): Promise<FinIntakeResult> {
     const company = await this.books.company();
+    const branch =
+      command.body.action === 'POST' ? await this.branchRefInTx(tx, company, branchId) : null;
+    const body =
+      command.body.action === 'POST' && branch !== null
+        ? { ...command.body, branch }
+        : command.body;
     let result: FinIntakeResult;
     try {
       result = await this.intake.submitInTx(tx, ctx, {
@@ -48,13 +67,39 @@ export class FinPosting {
         tenant: BTO_TENANT,
         company,
         actor: { ...ctx.actor },
-        ...command,
+        source: command.source,
+        body,
       });
     } catch (error) {
       throw translated(error);
     }
     await this.syncInvoices(tx, result);
     return result;
+  }
+
+  /** The ref of the one branch these warehouses share (none when they span several). */
+  async branchRefOfWarehousesInTx(tx: Tx, warehouseIds: readonly number[]): Promise<string | null> {
+    const branchId = await this.org.branchOfWarehouses(warehouseIds, tx);
+    return this.branchRefInTx(tx, await this.books.company(), branchId);
+  }
+
+  /**
+   * The core's ref of a Bto branch, mapped now when it was added after the last boot (a read when
+   * nothing changed); a closed branch tags nothing, since the core never maps one (ADR-0084 #1).
+   */
+  private async branchRefInTx(
+    tx: Tx,
+    company: string,
+    branchId: number | null,
+  ): Promise<string | null> {
+    if (branchId === null) return null;
+    const branch = await this.org.getBranch(branchId, tx);
+    if (branch.status !== 'ACTIVE') return null;
+    await this.finOrg.syncBranchInTx(tx, this.books.source(), {
+      company,
+      branch: { externalId: String(branch.id), code: branch.code, name: branch.name, active: true },
+    });
+    return String(branch.id);
   }
 
   /** Rewrites the open amount of every invoice whose item this posting touched. */

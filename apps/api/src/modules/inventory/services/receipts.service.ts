@@ -1188,6 +1188,7 @@ export class ReceiptsService implements OnModuleInit {
       version: header.costingVersion,
       totals,
       previous,
+      warehouseIds: [...new Set(rows.map((row) => row.warehouseId))],
     };
   }
 

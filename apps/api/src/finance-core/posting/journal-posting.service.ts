@@ -10,6 +10,7 @@ import { openPeriodInTx } from '../ledger/periods';
 import { FIN_SERIES, nextNumberInTx } from '../numbering/numbers';
 import {
   finAccounts,
+  finBranchRefs,
   finJournalEntries,
   finJournalLines,
   finMoneyAccounts,
@@ -37,6 +38,8 @@ export interface FinEntryLineIn {
   debit: Decimal;
   credit: Decimal;
   description?: string | null;
+  /** The core's branch of a reversed line (a reversal keeps the original's). */
+  branchId?: number | null;
 }
 
 export interface FinEntryIn {
@@ -48,6 +51,8 @@ export interface FinEntryIn {
   description: string;
   /** The source document (`INVOICE` / `<id>`); none for an entry typed on the core's screens. */
   sourceDoc?: { type: string; id: string } | null;
+  /** A source's branch (its ref's external id): every line's branch (ADR-0106 #4). */
+  branch?: string | null;
   lines: readonly FinEntryLineIn[];
 }
 
@@ -58,6 +63,29 @@ export interface FinEntryRef {
 
 function invalid(path: string): FinError {
   return new FinError('FIN_PAYLOAD_INVALID', undefined, { path });
+}
+
+/**
+ * The company's branch of a ref: the source's own ref, else the branch exactly one source of the
+ * company knows by that external id (the core's screens); refused otherwise (ADR-0106 #4).
+ */
+export async function branchOfRefInTx(
+  tx: FinTx,
+  scope: { companyId: number; sourceSystemId: number },
+  external: string,
+  path: string,
+): Promise<number> {
+  const rows = await tx
+    .select({ branchId: finBranchRefs.branchId, sourceSystemId: finBranchRefs.sourceSystemId })
+    .from(finBranchRefs)
+    .where(
+      and(eq(finBranchRefs.companyId, scope.companyId), eq(finBranchRefs.externalId, external)),
+    );
+  const own = rows.find((row) => row.sourceSystemId === scope.sourceSystemId);
+  if (own) return own.branchId;
+  const distinct = [...new Set(rows.map((row) => row.branchId))];
+  if (distinct.length !== 1 || distinct[0] === undefined) throw invalid(path);
+  return distinct[0];
 }
 
 /**
@@ -135,6 +163,7 @@ export class FinJournalPosting {
           debit: line.credit,
           credit: line.debit,
           description: line.description,
+          branchId: line.branchId,
         })),
       },
       original.id,
@@ -204,6 +233,15 @@ export class FinJournalPosting {
       });
     }
 
+    const branchId =
+      input.branch == null || scope.sourceSystemId === null
+        ? null
+        : await branchOfRefInTx(
+            tx,
+            { companyId: scope.companyId, sourceSystemId: scope.sourceSystemId },
+            input.branch,
+            'branch',
+          );
     const resolved = await this.accountsOf(tx, scope.companyId, input.entryDate, lines);
     const periodId = await openPeriodInTx(tx, scope.companyId, input.entryDate);
     const number =
@@ -242,6 +280,7 @@ export class FinJournalPosting {
         postingKey: line.key ?? null,
         postingRuleId: resolved[index]?.ruleId ?? null,
         description: line.description?.trim() || null,
+        branchId: line.branchId ?? branchId,
       })),
     );
     return { id: entry.id, number };

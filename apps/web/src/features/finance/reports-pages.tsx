@@ -41,19 +41,19 @@ import {
   type VatReport,
 } from './api';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+export const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const monthStart = (): string => `${businessDate().slice(0, 7)}-01`;
 
 /** A balance (debit − credit) in its debit and credit columns. */
-function sides(value: string): [string, string] {
+export function sides(value: string): [string, string] {
   const amount = new Decimal(value);
   if (amount.isZero()) return ['', ''];
   return amount.gt(0) ? [formatMnt(value), ''] : ['', formatMnt(amount.negated().toFixed(2))];
 }
 
 /** Saves a downloaded file under `name`. */
-function save(blob: Blob, name: string) {
+export function save(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

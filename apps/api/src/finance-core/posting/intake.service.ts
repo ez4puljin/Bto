@@ -31,7 +31,6 @@ import {
   FIN_INTAKE_VIAS,
   finAccounts,
   finAllocations,
-  finBranchRefs,
   finCompanies,
   finDocuments,
   finDocumentTypes,
@@ -54,7 +53,7 @@ import {
   POSTING_RIGHTS,
   RIGHT_OF_CLASS,
 } from './intake-command';
-import { FIN_OWN_SOURCE } from './journal-posting.service';
+import { branchOfRefInTx, FIN_OWN_SOURCE } from './journal-posting.service';
 import { lockPartiesInTx, refreshPartyBalancesInTx, writeAllocationInTx } from './sub-ledger';
 
 type Control = (typeof FIN_ACCOUNT_CONTROLS)[number];
@@ -1140,19 +1139,9 @@ export class FinIntakeInTx {
     return row;
   }
 
-  private async branchOf(tx: FinTx, scope: Scope, external: string): Promise<number> {
-    const [row] = await tx
-      .select({ branchId: finBranchRefs.branchId })
-      .from(finBranchRefs)
-      .where(
-        and(
-          eq(finBranchRefs.companyId, scope.companyId),
-          eq(finBranchRefs.sourceSystemId, scope.sourceSystemId),
-          eq(finBranchRefs.externalId, external),
-        ),
-      );
-    if (!row) throw invalid('body.branch');
-    return row.branchId;
+  /** The branch of a ref (ADR-0106 #4: the core's screens use the one a source knows by it). */
+  private branchOf(tx: FinTx, scope: Scope, external: string): Promise<number> {
+    return branchOfRefInTx(tx, scope, external, 'body.branch');
   }
 
   /**

@@ -652,12 +652,59 @@ export type TrialBalance = Schemas['TrialBalance'];
 export type TrialBalanceRow = Schemas['TrialBalanceRow'];
 export type VatReport = Schemas['VatReport'];
 export type YearCloseStatus = Schemas['YearCloseStatus'];
+export type OpeningCheck = Schemas['OpeningCheck'];
+export type OpeningCheckRow = Schemas['OpeningCheckRow'];
+export type IssueExpenseAccount = Schemas['IssueExpenseAccount'];
 
 const REPORT_KEYS = {
   trialBalance: ['finance', 'trial-balance'] as const,
   vat: ['finance', 'vat'] as const,
   yearClose: ['finance', 'year-close'] as const,
+  openingCheck: ['finance', 'opening-check'] as const,
+  issueExpenseAccounts: ['finance', 'issue-expense-accounts'] as const,
 };
+
+/** Balances per account × party at a date (default: the opening's), for the sign-off (ADR-0106). */
+export function useOpeningCheck(date: string | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORT_KEYS.openingCheck, date],
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/reports/opening-check', {
+          params: { query: date ? { date } : {} },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** Which account each goods-issue expense type books to (ADR-0106 #3). */
+export function useIssueExpenseAccounts(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: REPORT_KEYS.issueExpenseAccounts,
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/issue-expense-accounts', { signal })),
+  });
+}
+
+export function useIssueExpenseAccountMutation() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ typeId, accountId }: { typeId: number; accountId: number | null }) =>
+      unwrap(
+        await api.PUT('/api/v1/finance/issue-expense-accounts/{typeId}', {
+          params: { path: { typeId } },
+          body: { accountId },
+        }),
+      ),
+    onSuccess: (rows) => queryClient.setQueryData(REPORT_KEYS.issueExpenseAccounts, rows),
+  });
+}
 
 /** The trial balance of a date range (ADR-0105). */
 export function useTrialBalance(range: { from: string; to: string; all: boolean } | null) {
@@ -745,6 +792,15 @@ export function useReportMutations() {
             params: {
               query: { from: range.from, to: range.to, ...(range.all ? { all: true } : {}) },
             },
+            parseAs: 'blob',
+          }),
+        ),
+    }),
+    openingCheckXlsx: useMutation({
+      mutationFn: async (date: string): Promise<Blob> =>
+        unwrap(
+          await api.GET('/api/v1/finance/reports/opening-check.xlsx', {
+            params: { query: { date } },
             parseAs: 'blob',
           }),
         ),

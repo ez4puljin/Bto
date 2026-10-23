@@ -117,6 +117,8 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `GET /finance/reports/trial-balance?from&to[&all]`, `GET /finance/reports/trial-balance.xlsx`, `GET /finance/reports/vat?period`, `GET /finance/reports/vat.xlsx` [read] | the trial balance and the month's VAT (ADR-0105) |
 | `GET /finance/year-close/:year` [read], `POST /finance/year-close/:year`, `POST /finance/year-close/:year/revert` [`finance.periods.close`, idempotent] | what the year still has to close, its closing and the revert (`FIN_PERIOD_NOT_ENDED`, `FIN_PERIOD_CLOSED` 409; `FIN_CLASS_RULE` YEAR_CLOSED / NOTHING_TO_CLOSE / YEAR_NOT_CLOSED 422) |
 | `GET /finance/periods`, `GET /finance/periods/events` [read], `POST /finance/periods/:code/close` [`finance.periods.close`], `POST /finance/periods/:code/reopen` [`finance.periods.reopen`] (idempotent) | the months with their status and last event; every close and reopen; close a month that has ended (`FIN_PERIOD_NOT_ENDED`, `FIN_PERIOD_ORDER`, `FIN_CHECKLIST_FAILED`, all 409); reopen the latest closed month with `{reason}` (a blank one 422 `FIN_PAYLOAD_INVALID`) (ADR-0102) |
+| `GET /finance/reports/opening-check[?date]`, `GET /finance/reports/opening-check.xlsx` [read] | every balance per account × party at the opening's date for the sign-off (ADR-0106 #5) |
+| `GET /finance/issue-expense-accounts` [read], `PUT /finance/issue-expense-accounts/:typeId {accountId}` [`finance.settings.manage`] | each goods-issue expense type's account; an admin-added type's own key `ISSUE_TYPE_<id>` (ADR-0106 #3) |
 
 Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'10'`), instants in ISO 8601, business dates as `YYYY-MM-DD`.
 
@@ -167,8 +169,10 @@ Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'1
 | `/finance/cash` (+ `?account=`) | the money accounts as cards with balances, the chosen one's book newest first with the balance after each voucher and the opening before `from` |
 | `/finance/customers`, `/finance/customers/:id` (+ `?new=1`) | who owes what with aging and credit terms; one customer's balance card and ledger with «Төлбөр бүртгэх» for that customer; `CustomerBalanceCard` («Тооцоо») on `/partners/customers/:id` |
 | `/finance/journal` (+ `?new=1`, `?entry=`), `/finance/accounts`, `/finance/accounts/:id` | the journal with «Гараар бичилт» (lines that must balance before sending) and the entry panel (a manual entry's «Эсрэг бичилт»); the chart with turnover and balances, account dialogs, the role dialog (`finance.settings.manage`), an account's ledger |
+| `/finance/accounts` → «Зарлагын төрлийн данс» | each goods-issue expense type's account: a seeded type shows F4's (changed with its role), an admin-added type picks its own or stays on «Бусад» (ADR-0106 #3) |
 | `/finance/periods` | «Сарын хаалт»: the months with their status and last close or reopen, «Сарыг хаах» (a month field, a confirmation), «Дахин нээх» with a reason on the latest closed month, the history (ADR-0102) |
 | `/finance/settings` (`finance.settings.manage`) | the four number formats with today's example; the money accounts, a bank account's «Харилцагчид харуулах» switch (the customer app lists it with the advice to name the invoice) and its «Апп-д харагдана» badge |
+| `/finance/opening-check` (+ `/print`) | «Эхний үлдэгдлийн тулгалт»: the balances per account × party at a date (the opening's by default), account subtotals, Excel; the printed sheet carries the accountant's and the owner's signature lines (ADR-0106 #5) |
 
 Also: the home tile «Хугацаа хэтэрсэн авлагатай харилцагч» (`GET /finance/attention`, opens the balances filtered to overdue), the order panel's «Нэхэмжлэх» fact with the settlement badge, and `ProblemAlert` rendering `CREDIT_BLOCKED` as one line per reason with the formatted amounts.
 

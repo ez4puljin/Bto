@@ -248,6 +248,8 @@ export const ROW_ERROR_CODES = [
   'IN_USE',
   'ONE_SIDE',
   'OPENING_EXISTS',
+  // ADR-0106: the opening is dated a month's last day (Bto starts on the next month's 1st).
+  'NOT_MONTH_END',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 

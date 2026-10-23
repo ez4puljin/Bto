@@ -63,6 +63,8 @@ export interface JournalEntryInput {
   source: JournalSource;
   sourceType?: JournalSourceDocType | null;
   sourceId?: number | null;
+  /** The document's warehouses: every line carries their branch when they share one (ADR-0106 #4). */
+  warehouseIds?: readonly number[];
   lines: readonly JournalLineInput[];
 }
 
@@ -214,6 +216,7 @@ export class JournalService {
           input.sourceType && input.sourceId != null
             ? { type: input.sourceType, id: String(input.sourceId) }
             : null,
+        branch: await this.intake.branchRefOfWarehousesInTx(tx, input.warehouseIds ?? []),
         lines: input.lines.map((line) => ({
           key: line.role === undefined ? null : POSTING_KEY_OF_ROLE[line.role].code,
           accountId: line.accountId ?? null,

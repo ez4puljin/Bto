@@ -27,6 +27,8 @@ describe('finance close and opening', () => {
   let office: string;
   const today = businessDate();
   const lastMonth = addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7);
+  /** Bto starts on a month's 1st; the opening is dated the day before (ADR-0106 #5). */
+  const openingDay = addDays(`${today.slice(0, 7)}-01`, -1);
   const http = () => request(app.getHttpServer());
   const close = (token: string, code: string) =>
     http().post(`/api/v1/finance/periods/${code}/close`).set(bearer(token)).set(idempotency());
@@ -186,8 +188,21 @@ describe('finance close and opening', () => {
     const supplier = await partners.supplier({ code: '9901', name: 'Эхний нийлүүлэгч' });
     const box = await financeApi(app, admin).cashBox('OP-BOX');
     const imports = importsApi(app, admin);
-    const date = addDays(today, -1);
-    const options = { openingOptions: { date } };
+    const imports0 = importsApi(app, admin);
+    const midMonth = await imports0.check(
+      'FIN_OPENING',
+      [
+        { account: '730101', debit: '1' },
+        { account: '511020', credit: '1' },
+      ],
+      { openingOptions: { date: addDays(openingDay, -1) } },
+    );
+    expect(
+      (await imports0.rows(midMonth.id, 'ERRORS')).flatMap((row) =>
+        row.errors.map((issue) => issue.code),
+      ),
+    ).toEqual(['NOT_MONTH_END']);
+    const options = { openingOptions: { date: openingDay } };
 
     const unbalanced = await imports.check(
       'FIN_OPENING',
@@ -257,6 +272,41 @@ describe('finance close and opening', () => {
     ]);
     expect(supplier.id).toBeGreaterThan(0);
 
+    // The sign-off per account × party at the opening's date (ADR-0106 #5).
+    const check = (
+      await http().get('/api/v1/finance/reports/opening-check').set(bearer(accountant)).expect(200)
+    ).body as {
+      date: string;
+      opening: { number: string; date: string } | null;
+      data: { accountCode: string; partyKind: string | null; partyCode: string | null; balance: string }[];
+      debit: string;
+      credit: string;
+    };
+    expect(check.date).toBe(openingDay);
+    expect(check.opening?.date).toBe(openingDay);
+    expect(check.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountCode: '120101',
+          partyKind: 'CUSTOMER',
+          partyCode: '7701',
+          balance: '1000.00',
+        }),
+        expect.objectContaining({
+          accountCode: '310101',
+          partyKind: 'SUPPLIER',
+          partyCode: '9901',
+          balance: '-400.00',
+        }),
+      ]),
+    );
+    expect(check.debit).toBe(check.credit);
+    await http()
+      .get(`/api/v1/finance/reports/opening-check.xlsx?date=${openingDay}`)
+      .set(bearer(accountant))
+      .expect(200)
+      .expect('Content-Type', /spreadsheetml/);
+
     const second = await imports.check('FIN_OPENING', rows, options);
     expect(
       (await imports.rows(second.id, 'ERRORS')).flatMap((row) =>
@@ -284,7 +334,7 @@ describe('finance close and opening', () => {
     }));
     rows.push({ account: '511020', credit: '599' });
     const job = await imports.check('FIN_OPENING', rows, {
-      openingOptions: { date: addDays(today, -1) },
+      openingOptions: { date: openingDay },
     });
     expect(job).toMatchObject({ status: 'VALIDATED', errorRows: 0 });
     const done = await imports.commit(job.id);

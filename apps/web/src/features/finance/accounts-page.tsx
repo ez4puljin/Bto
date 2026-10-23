@@ -59,6 +59,7 @@ import {
   useGlAccounts,
 } from './api';
 import { SourceBadge } from './badges';
+import { IssueAccountsDialog } from './issue-accounts-dialog';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const isKind = (value: string): value is GlAccountKind =>
@@ -76,6 +77,7 @@ export function AccountsPage() {
   const [creating, setCreating] = useCreateParam();
   const [editing, setEditing] = useState<GlAccount | null>(null);
   const [roling, setRoling] = useState<GlAccount | null>(null);
+  const [issueAccounts, setIssueAccounts] = useState(false);
   const accounts = useGlAccounts();
   const rows = accounts.data ?? [];
 
@@ -84,13 +86,23 @@ export function AccountsPage() {
       <PageHeader
         title={t('finance.accounts.title')}
         actions={
-          canEdit ? (
-            <Button onClick={() => setCreating(true)}>
-              <Plus />
-              {t('finance.actions.newAccount')}
+          <>
+            <Button variant="outline" onClick={() => setIssueAccounts(true)}>
+              {t('finance.accounts.issueAccounts.open')}
             </Button>
-          ) : null
+            {canEdit ? (
+              <Button onClick={() => setCreating(true)}>
+                <Plus />
+                {t('finance.actions.newAccount')}
+              </Button>
+            ) : null}
+          </>
         }
+      />
+      <IssueAccountsDialog
+        open={issueAccounts}
+        accounts={rows}
+        onClose={() => setIssueAccounts(false)}
       />
       <ProblemAlert problem={problemFromError(accounts.error)} />
       <ListCard scroll>

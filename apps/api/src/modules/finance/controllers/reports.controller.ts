@@ -15,6 +15,8 @@ import { xlsxFile } from '../../../common/excel/xlsx-file';
 import { invalid } from '../../../common/errors/app-error';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
+  OpeningCheckDto,
+  OpeningCheckQueryDto,
   TrialBalanceDto,
   TrialBalanceQueryDto,
   VatReportDto,
@@ -93,6 +95,40 @@ export class ReportsController {
       await this.reports.trialBalanceWorkbook(ctx, query),
       `trial-balance-${query.from}-${query.to}`,
       `${mn.finance.reports.trialBalance.title} ${query.from} – ${query.to}`,
+    );
+  }
+
+  /** Balances per account × party at the opening's date, for the sign-off (ADR-0106 #5). */
+  @Get('reports/opening-check')
+  @RequirePermission('finance.read')
+  @ApiOkResponse({ type: OpeningCheckDto })
+  async openingCheck(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: OpeningCheckQueryDto,
+  ): Promise<OpeningCheckDto> {
+    const report = await this.reports.openingCheck(ctx, query.date);
+    return {
+      date: report.date,
+      opening: report.opening,
+      data: report.rows.map((row) => ({ ...row, balance: money(row.balance) })),
+      debit: money(report.debit),
+      credit: money(report.credit),
+    };
+  }
+
+  @Get('reports/opening-check.xlsx')
+  @RequirePermission('finance.read')
+  @ApiProduces(XLSX_CONTENT_TYPE)
+  @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
+  async openingCheckXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: OpeningCheckQueryDto,
+  ): Promise<StreamableFile> {
+    const report = await this.reports.openingCheck(ctx, query.date);
+    return xlsxFile(
+      await this.reports.openingCheckWorkbook(ctx, report.date),
+      `opening-check-${report.date}`,
+      `${mn.finance.reports.openingCheck.title} ${report.date}`,
     );
   }
 

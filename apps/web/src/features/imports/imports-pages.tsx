@@ -175,8 +175,10 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
   const [issueWarehouse, setIssueWarehouse] = useState<number | undefined>();
   const issueOptions =
     kind === 'ISSUES' && issueWarehouse !== undefined ? { warehouseId: issueWarehouse } : undefined;
-  // An opening import is dated before the file: the day before go-live (TODO-VERIFY D27).
-  const [openingDate, setOpeningDate] = useState(() => addDays(businessDate(), -1));
+  // Bto starts on a month's 1st; the opening is dated the day before (ADR-0106 #5).
+  const thisMonth = businessDate().slice(0, 7);
+  const [startMonth, setStartMonth] = useState(thisMonth);
+  const openingDate = startMonth === '' ? '' : addDays(`${startMonth}-01`, -1);
   const openingOptions =
     kind === 'FIN_OPENING' && openingDate !== '' ? { date: openingDate } : undefined;
   const ready =
@@ -229,17 +231,17 @@ function ImportKindCard({ kind }: { kind: ImportKind }) {
         ) : null}
         {kind === 'FIN_OPENING' ? (
           <FormField
-            label={t('imports.openingOptions.date')}
-            htmlFor="opening-date"
-            hint={t('imports.openingOptions.dateHint')}
+            label={t('imports.openingOptions.startMonth')}
+            htmlFor="opening-month"
+            hint={t('imports.openingOptions.startMonthHint', { date: openingDate })}
           >
             <Input
-              id="opening-date"
-              type="date"
-              max={businessDate()}
+              id="opening-month"
+              type="month"
+              max={thisMonth}
               className="sm:w-44"
-              value={openingDate}
-              onChange={(event) => setOpeningDate(event.target.value)}
+              value={startMonth}
+              onChange={(event) => setStartMonth(event.target.value)}
             />
           </FormField>
         ) : null}

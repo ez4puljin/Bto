@@ -134,6 +134,7 @@ export class InvoicingService implements SaleSink {
         invoiceDate: today,
         dueDate,
         orderNumber: snapshot.orderNumber,
+        branchId: snapshot.branchId,
         ...totals,
       });
       await tx.update(invoices).set({ journalEntryId: entryId }).where(eq(invoices.id, invoice.id));
@@ -234,6 +235,7 @@ export class InvoicingService implements SaleSink {
       invoiceDate: string;
       dueDate: string;
       orderNumber: string | null;
+      branchId: number | null;
     },
   ): Promise<number | null> {
     const party = await this.parties.customerPartyIn(tx, invoice.customerId);
@@ -257,7 +259,7 @@ export class InvoicingService implements SaleSink {
         lines: intakeLines(lines),
         ...(invoice.orderNumber ? { attributes: { orderNumber: invoice.orderNumber } } : {}),
       },
-    });
+    }, invoice.branchId);
     return entryIdOf(result);
   }
 

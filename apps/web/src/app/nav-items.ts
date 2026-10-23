@@ -249,6 +249,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'finance.read',
       },
       {
+        to: '/finance/opening-check',
+        label: 'nav.openingCheck',
+        icon: ClipboardCheck,
+        permission: 'finance.read',
+      },
+      {
         to: '/finance/periods',
         label: 'nav.financePeriods',
         icon: CalendarCheck,

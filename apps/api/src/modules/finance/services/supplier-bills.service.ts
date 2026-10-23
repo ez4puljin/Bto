@@ -5,7 +5,7 @@ import { businessDate } from '@tugeel/shared/time';
 import type { Tx } from '../../../common/db/db.types';
 import { FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
-import type { Actor } from '../../identity';
+import { type Actor, OrgService } from '../../identity';
 import type {
   PurchaseBooks,
   ReceiptBookFacts,
@@ -44,6 +44,7 @@ export class SupplierBillsService implements PurchaseBooks {
     private readonly books: FinBooks,
     private readonly parties: FinPartiesBridge,
     private readonly reader: FinReader,
+    private readonly org: OrgService,
   ) {}
 
   /** `revision`: the bill's revision (2 when the development re-post books an F3 bill again, F4). */
@@ -64,6 +65,7 @@ export class SupplierBillsService implements PurchaseBooks {
         documentType: FIN_DOC_TYPES.SUPPLIER_BILL.code,
         date: facts.date,
         revision,
+        warehouseIds: facts.warehouseIds,
         lines: [
           { role: 'GOODS_RECEIVED', debit: stock, credit: ZERO },
           { role: 'VAT_INPUT', debit: vat, credit: ZERO, taxBase: vatBase },
@@ -119,6 +121,7 @@ export class SupplierBillsService implements PurchaseBooks {
       docNo: `${facts.number}/${facts.version}`,
       documentType: type.code,
       date: today,
+      warehouseIds: facts.warehouseIds,
       lines: [
         signed('GOODS_RECEIVED', delta.stock),
         { ...signed('VAT_INPUT', delta.vat), taxBase: delta.vatBase.abs() },
@@ -136,6 +139,7 @@ export class SupplierBillsService implements PurchaseBooks {
       docNo: facts.number,
       documentType: FIN_DOC_TYPES.SUPPLIER_RETURN.code,
       date: facts.date,
+      warehouseIds: facts.warehouseIds,
       lines: [
         { role: 'AP', debit: payable, credit: ZERO },
         { role: 'INVENTORY', debit: ZERO, credit: facts.cost },
@@ -156,6 +160,7 @@ export class SupplierBillsService implements PurchaseBooks {
       documentType: string;
       date: string;
       revision?: number;
+      warehouseIds: readonly number[];
       lines: RoleLine[];
     },
   ): Promise<void> {
@@ -182,7 +187,7 @@ export class SupplierBillsService implements PurchaseBooks {
         ...(doc.revision && doc.revision > 1 ? { revision: doc.revision } : {}),
       },
       body,
-    });
+    }, await this.org.branchOfWarehouses(doc.warehouseIds, tx));
   }
 }
 

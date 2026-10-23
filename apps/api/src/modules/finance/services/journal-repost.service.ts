@@ -93,13 +93,14 @@ export class JournalRepostService {
       .orderBy(asc(creditNotes.noteDate), asc(creditNotes.id))) {
       await inTransaction(this.db, async (tx) => {
         const [invoice] = await tx
-          .select({ openAmount: invoices.openAmount })
+          .select({ openAmount: invoices.openAmount, branchId: invoices.branchId })
           .from(invoices)
           .where(eq(invoices.id, note.invoiceId))
           .for('update');
         const entryId = await this.creditNotes.postCreditNoteInTx(tx, actor, {
           ...note,
           settles: Decimal.min(note.total, invoice?.openAmount ?? new Decimal(0)),
+          branchId: invoice?.branchId ?? null,
         });
         await tx
           .update(creditNotes)

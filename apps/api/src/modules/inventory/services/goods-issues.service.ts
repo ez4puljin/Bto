@@ -396,6 +396,7 @@ export class GoodsIssuesService {
       cost,
       vat,
       vatBase,
+      warehouseIds: [header.warehouseId],
     };
   }
 

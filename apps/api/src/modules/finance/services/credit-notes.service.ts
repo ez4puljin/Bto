@@ -299,6 +299,7 @@ export class CreditNotesService {
         invoiceId: invoice.id,
         noteDate,
         settles: allocated,
+        branchId: invoice.branchId,
         ...totals,
       });
       await tx
@@ -430,6 +431,7 @@ export class CreditNotesService {
       total: Decimal;
       vatTotal: Decimal;
       cityTaxTotal: Decimal;
+      branchId: number | null;
     },
   ): Promise<number | null> {
     const party = await this.parties.customerPartyIn(tx, note.customerId);
@@ -451,7 +453,7 @@ export class CreditNotesService {
         controlTotal: controlTotal(lines),
         lines: intakeLines(lines),
       },
-    });
+    }, note.branchId);
     return entryIdOf(result);
   }
 

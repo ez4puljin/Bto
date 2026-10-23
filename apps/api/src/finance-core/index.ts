@@ -69,6 +69,7 @@ export {
 } from './posting/fin-reader.service';
 export { type FinDocumentClass } from './posting/intake-command';
 export {
+  type FinAccountPartyBalance,
   FinReports,
   type FinResultBalance,
   type FinTrialBalance,

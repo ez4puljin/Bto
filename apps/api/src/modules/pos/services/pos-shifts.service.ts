@@ -17,7 +17,7 @@ import {
 } from '../../finance';
 import { type Actor, AuditService, type AuthContext, UserNamesService } from '../../identity';
 import type { Accepted, ShiftCloseDoc, ShiftOpenDoc } from '../sale-doc';
-import { posSales, posShifts, posTenders } from '../schema';
+import { posEdgeNodes, posSales, posShifts, posTenders } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosCashiersService } from './pos-cashiers.service';
 import { PosSettingsService } from './pos-settings.service';
@@ -401,8 +401,13 @@ export class PosShiftsService {
     if (lines.length === 0) return null;
     const till = await this.tills.get(shift.tillId, tx);
     const cashierName = (await this.names.namesOf([shift.cashierUserId])).get(shift.cashierUserId);
+    const [node] = await tx
+      .select({ warehouseId: posEdgeNodes.warehouseId })
+      .from(posEdgeNodes)
+      .where(eq(posEdgeNodes.id, shift.edgeNodeId));
     const entry = await this.journal.post(tx, actor, {
       entryDate: closeDay,
+      warehouseIds: node ? [node.warehouseId] : [],
       description: label(shift.number, [till.name, cashierName].filter(Boolean).join(' · ')),
       source: 'AUTO_POS_SHIFT',
       sourceType: 'POS_SHIFT',

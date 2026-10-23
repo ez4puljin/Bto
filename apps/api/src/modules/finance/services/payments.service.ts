@@ -365,7 +365,7 @@ export class PaymentsService implements OnModuleInit {
         lines,
         ...(Object.keys(attributes).length ? { attributes } : {}),
       },
-    });
+    }, account.branchId);
     const document = result.document;
     if (!document) throw new Error('the voucher was not posted');
     const id = Number.parseInt(document.id, 10);

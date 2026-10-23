@@ -93,6 +93,19 @@ export interface FinResultBalance {
   balance: Decimal;
 }
 
+/** One account's balance with one party (none: the account's lines without a party) at a date. */
+export interface FinAccountPartyBalance {
+  accountId: number;
+  code: string;
+  name: string;
+  kind: FinTrialBalanceRow['kind'];
+  /** The party's id in the core, its name there; null for lines without a party. */
+  partyId: string | null;
+  partyName: string | null;
+  /** Debit − credit of the lines dated up to the date. */
+  balance: Decimal;
+}
+
 const MAX_VAT_DOCUMENTS = 2_000;
 
 /**
@@ -159,6 +172,39 @@ export class FinReports {
       totals.closing = totals.closing.plus(closing);
     }
     return { from: query.from, to: query.to, rows, totals };
+  }
+
+  /**
+   * Every non-zero balance per account × party at `date` (lines dated up to it): the opening's
+   * sign-off against Erkhet's closing trial balance (ADR-0106 #5, questionnaire 2.7).
+   */
+  async accountPartyBalances(
+    ctx: FinCallContext,
+    query: { company: string; date: string },
+    executor: FinExecutor = this.db,
+  ): Promise<FinAccountPartyBalance[]> {
+    if (!ISO_DATE.test(query.date)) throw invalid('date');
+    const scope = await this.scope(executor, ctx, query.company);
+    const result = await executor.execute<Row>(sql`
+      SELECT a.id, a.code, a.name, a.kind, l.party_id, p.name AS party_name,
+             sum(l.debit - l.credit)::text AS balance
+        FROM fin.journal_lines l
+        JOIN fin.journal_entries e ON e.company_id = l.company_id AND e.id = l.entry_id
+        JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+        LEFT JOIN fin.parties p ON p.id = l.party_id
+       WHERE l.company_id = ${scope.companyId} AND e.entry_date <= ${query.date}::date
+       GROUP BY a.id, l.party_id, p.name
+      HAVING sum(l.debit - l.credit) <> 0
+       ORDER BY a.code, p.name NULLS FIRST, l.party_id`);
+    return result.rows.map((row) => ({
+      accountId: int(row.id),
+      code: str(row.code),
+      name: str(row.name),
+      kind: str(row.kind) as FinTrialBalanceRow['kind'],
+      partyId: row.party_id === null ? null : str(row.party_id),
+      partyName: row.party_name === null ? null : str(row.party_name),
+      balance: dec(row.balance),
+    }));
   }
 
   /**

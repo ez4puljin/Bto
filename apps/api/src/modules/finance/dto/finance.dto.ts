@@ -1230,3 +1230,69 @@ export class YearCloseStatusDto {
   @ApiProperty({ example: '200000.00', description: 'income − expense still to close' })
   profit: string;
 }
+
+@ApiSchema({ name: 'IssueExpenseAccount' })
+export class IssueExpenseAccountDto {
+  @ApiProperty() typeId: number;
+  @ApiProperty() name: string;
+  @ApiProperty() active: boolean;
+  @ApiProperty({ description: 'a seeded type: its account changes with its role on «Данс»' })
+  seeded: boolean;
+  @ApiProperty({ description: 'false: the issues book to «бусад» (ISSUE_OTHER)' }) own: boolean;
+  @ApiProperty({ type: Number, nullable: true }) accountId: number | null;
+  @ApiProperty({ type: String, nullable: true }) accountCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) accountName: string | null;
+}
+
+@ApiSchema({ name: 'IssueExpenseAccountRequest' })
+export class IssueExpenseAccountRequestDto {
+  @ApiProperty({ type: Number, nullable: true, description: 'null: back to «бусад»' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  accountId: number | null;
+}
+
+@ApiSchema({ name: 'OpeningCheckQuery' })
+export class OpeningCheckQueryDto {
+  @ApiPropertyOptional({
+    example: '2026-12-31',
+    description: "default: the live opening's date, else the previous month's last day",
+  })
+  @IsOptional()
+  @Matches(DATE)
+  date?: string;
+}
+
+@ApiSchema({ name: 'OpeningCheckRow' })
+export class OpeningCheckRowDto {
+  @ApiProperty({ example: '120101' }) accountCode: string;
+  @ApiProperty() accountName: string;
+  @ApiProperty({
+    type: String,
+    enum: ['CUSTOMER', 'SUPPLIER', 'OTHER'],
+    nullable: true,
+    description: "null: the account's lines without a party",
+  })
+  partyKind: 'CUSTOMER' | 'SUPPLIER' | 'OTHER' | null;
+  @ApiProperty({ type: String, nullable: true }) partyCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) partyName: string | null;
+  @ApiProperty({ example: '150000.00', description: 'debit − credit at the date' })
+  balance: string;
+}
+
+@ApiSchema({ name: 'OpeningCheckDocument' })
+export class OpeningCheckDocumentDto {
+  @ApiProperty() number: string;
+  @ApiProperty({ example: '2026-12-31' }) date: string;
+}
+
+@ApiSchema({ name: 'OpeningCheck' })
+export class OpeningCheckDto {
+  @ApiProperty({ example: '2026-12-31' }) date: string;
+  @ApiProperty({ type: OpeningCheckDocumentDto, nullable: true })
+  opening: OpeningCheckDocumentDto | null;
+  @ApiProperty({ type: [OpeningCheckRowDto] }) data: OpeningCheckRowDto[];
+  @ApiProperty({ example: '150000.00' }) debit: string;
+  @ApiProperty({ example: '150000.00' }) credit: string;
+}
