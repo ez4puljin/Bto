@@ -36,8 +36,8 @@ import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page } from '../../../src/ui/layout';
 import { StatRow } from '../../../src/ui/stat-row';
-import { HeaderIconButton, StoreHeader } from '../../../src/customer/store-header';
-import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
+import { HeaderIconButton, StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /** The days the page offers as chips (the Orders board); the calendar sets any other. */

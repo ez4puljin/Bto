@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, useWindowDimensions, View } fr
 import { useStoreHome } from '../../src/api/customer';
 import { problemFrom } from '../../src/api/problem';
 import { CategoryTile } from '../../src/customer/home-parts';
-import { StoreHeader } from '../../src/customer/store-header';
+import { StoreHeader } from '../../src/ui/store-header';
 import { colors, spacing } from '../../src/theme/tokens';
 import { ProblemText } from '../../src/ui/kit';
 import { Page } from '../../src/ui/layout';

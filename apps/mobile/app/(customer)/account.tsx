@@ -31,7 +31,7 @@ import { formatMnt, initialsOf } from '../../src/format/format';
 import { colors, fonts, radii, spacing, storeType, tabular, type } from '../../src/theme/tokens';
 import { Group, Separator } from '../../src/ui/grouped';
 import { ProblemText } from '../../src/ui/kit';
-import { StoreHeader } from '../../src/customer/store-header';
+import { StoreHeader } from '../../src/ui/store-header';
 import { Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
 import { useToast } from '../../src/ui/toast';

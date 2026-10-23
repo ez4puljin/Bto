@@ -1,4 +1,4 @@
-import { Heart, ShoppingCart } from 'lucide-react-native';
+import { Heart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { StockWord, StoreDeal, StoreProduct } from '../api/customer';
@@ -7,8 +7,8 @@ import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
 import { useUnitWords } from '../shop/unit-words';
 import { baseUnitOf, defaultUnitOf, packOf } from '../shop/units';
-import { colors, fonts, spacing, storeType, tabular, type } from '../theme/tokens';
-import { CardPictures } from '../ui/card-pictures';
+import { colors, fonts, spacing, storeType, type } from '../theme/tokens';
+import { CardAdd, CardQty, NewBadge, StoreCardFrame } from '../ui/store-card-frame';
 import { Text } from '../ui/text';
 import { cardPriceOf, dealToneOf } from './deals';
 import { canOrder, STOCK_TONES } from './stock';
@@ -69,16 +69,6 @@ export function DealBadge({ deal }: { deal: Pick<StoreDeal, 'kind' | 'label'> })
       >
         {deal.label}
       </Text>
-    </View>
-  );
-}
-
-/** «ШИНЭ» in blue. */
-export function NewBadge() {
-  const { t } = useTranslation();
-  return (
-    <View style={[styles.badge, styles.newBadge]}>
-      <Text style={[storeType.badge, styles.newText]}>{t('mobile.shop.new')}</Text>
     </View>
   );
 }
@@ -148,114 +138,71 @@ export function CustomerProductCard({
   const { t } = useTranslation();
   const words = useUnitWords();
   const packText = usePackText();
-  const pack = packText(product.units);
   const base = baseUnitOf(product.units);
   const price = cardPriceOf(product);
   const tone = STOCK_TONES[product.stock];
-  const out = product.stock === 'OUT';
   const canAdd = canOrder(product, defaultUnitOf(product.units));
+  const money = (amount: string) => t('pricing.money', { amount: formatMnt(amount) });
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('mobile.shop.openProduct', { name: product.name })}
-      onPress={onOpen}
-      style={[styles.card, width !== undefined ? { width } : styles.fill]}
-    >
-      <View style={[styles.picture, { height: pictureHeight }]}>
-        <CardPictures
-          urls={cardPictures(product)}
-          server={server}
-          dim={out}
-          onPress={onOpen}
-          fit="contain"
-          dots="left"
+    <StoreCardFrame
+      name={product.name}
+      openLabel={t('mobile.shop.openProduct', { name: product.name })}
+      pictures={cardPictures(product)}
+      server={server}
+      dim={product.stock === 'OUT'}
+      onOpen={onOpen}
+      {...(width !== undefined ? { width } : {})}
+      pictureHeight={pictureHeight}
+      corner={
+        <FavouriteButton
+          on={product.favourite}
+          label={
+            product.favourite
+              ? t('mobile.customer.shop.favouriteRemove', { name: product.name })
+              : t('mobile.customer.shop.favouriteAdd', { name: product.name })
+          }
+          onPress={onFavourite}
         />
-        <View style={styles.corner}>
-          <FavouriteButton
-            on={product.favourite}
-            label={
-              product.favourite
-                ? t('mobile.customer.shop.favouriteRemove', { name: product.name })
-                : t('mobile.customer.shop.favouriteAdd', { name: product.name })
-            }
-            onPress={onFavourite}
-          />
-        </View>
-      </View>
-      <View style={styles.body}>
-        <View style={styles.badges}>
+      }
+      badges={
+        <>
           {product.deal ? <DealBadge deal={product.deal} /> : null}
           {product.isNew ? <NewBadge /> : null}
-        </View>
-        <Text style={storeType.cardName} numberOfLines={1}>
-          {product.name}
-        </Text>
-        <Text style={storeType.cardPack} numberOfLines={1}>
-          {pack ?? ' '}
-        </Text>
-        {price ? (
-          <View style={styles.priceRow}>
-            <Text style={[storeType.cardPrice, tabular]} numberOfLines={1}>
-              {t('pricing.money', { amount: formatMnt(price.price) })}
-              {base ? (
-                <Text style={storeType.cardOld}>
-                  {` ${t('mobile.shop.per', { unit: words(base).short })}`}
-                </Text>
-              ) : null}
-            </Text>
-            {price.old ? (
-              <Text
-                style={[storeType.cardOld, styles.struck]}
-                numberOfLines={1}
-                accessibilityLabel={t('mobile.customer.card.oldPrice', {
-                  price: t('pricing.money', { amount: formatMnt(price.old) }),
-                })}
-              >
-                {t('pricing.money', { amount: formatMnt(price.old) })}
-              </Text>
-            ) : null}
-          </View>
-        ) : (
-          <Text style={storeType.cardPack} numberOfLines={1}>
-            {t('mobile.shop.noPrice')}
-          </Text>
-        )}
-        <View style={styles.bottom}>
-          <View style={styles.stock}>
-            <View style={[styles.stockDot, { backgroundColor: tone.dot }]} />
-            <Text style={[storeType.cardStock, { color: tone.text }]} numberOfLines={1}>
-              {t(`sales.stockWords.${product.stock}`)}
-            </Text>
-          </View>
-          {locked ? null : line ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('mobile.shop.inCart', {
-                name: product.name,
-                qty: line.qty,
-                unit: words(line).name,
-              })}
-              onPress={onOpen}
-              style={styles.qty}
-            >
-              <Text style={storeType.badge} numberOfLines={1}>
-                {`${line.qty} ${words(line).short}`}
-              </Text>
-            </Pressable>
-          ) : canAdd ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('mobile.shop.add', { name: product.name })}
-              onPress={onAdd}
-              hitSlop={6}
-              style={styles.add}
-            >
-              <ShoppingCart size={22} strokeWidth={1.6} color={colors.foreground} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
+        </>
+      }
+      line={packText(product.units)}
+      price={
+        price
+          ? {
+              price: money(price.price),
+              per: base ? t('mobile.shop.per', { unit: words(base).short }) : null,
+              old: price.old
+                ? {
+                    text: money(price.old),
+                    label: t('mobile.customer.card.oldPrice', { price: money(price.old) }),
+                  }
+                : null,
+            }
+          : null
+      }
+      noPrice={t('mobile.shop.noPrice')}
+      stock={{ text: t(`sales.stockWords.${product.stock}`), dot: tone.dot, color: tone.text }}
+      action={
+        locked ? null : line ? (
+          <CardQty
+            text={`${line.qty} ${words(line).short}`}
+            label={t('mobile.shop.inCart', {
+              name: product.name,
+              qty: line.qty,
+              unit: words(line).name,
+            })}
+            onPress={onOpen}
+          />
+        ) : canAdd ? (
+          <CardAdd name={product.name} onPress={onAdd} />
+        ) : null
+      }
+    />
   );
 }
 
@@ -285,44 +232,5 @@ const styles = StyleSheet.create({
   promotionText: { color: colors.foreground },
   discount: { backgroundColor: colors.dealDiscount },
   discountText: { color: colors.primaryForeground },
-  newBadge: { backgroundColor: colors.newBadge },
-  newText: { textTransform: 'uppercase' },
   heart: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    overflow: 'hidden',
-  },
-  fill: { flex: 1 },
-  picture: {
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  corner: { position: 'absolute', top: 2, right: 2 },
-  body: { paddingTop: 6, paddingHorizontal: 10, paddingBottom: 6, gap: 1 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 20 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
-  struck: { textDecorationLine: 'line-through', flexShrink: 1 },
-  bottom: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  stock: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
-  stockDot: { width: 6, height: 6, borderRadius: 3 },
-  add: { width: 36, height: 36, marginRight: -7, alignItems: 'center', justifyContent: 'center' },
-  qty: {
-    height: 24,
-    maxWidth: 76,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
 });

@@ -1,33 +1,31 @@
 import { Tabs } from 'expo-router/js-tabs';
-import { CircleUserRound, ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
+import { ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
-import { useNotificationSummary } from '../../../src/api/notifications';
 import { useShop } from '../../../src/state/shop';
 import { colors } from '../../../src/theme/tokens';
-import { FloatingTabBar } from '../../../src/ui/tab-bar';
+import { StoreTabBar } from '../../../src/ui/store-tab-bar';
 
 /**
- * «Нүүр», «Бараа», «Сагс», «Захиалга», «Профайл» on the design's floating bar (ADR-0068): 22 px
- * icons, bolder on the open tab; the cart's count of lines, and the unread count of the bell on
- * «Профайл» (ADR-0062 #3).
+ * «Нүүр», «Бараа», [баркод], «Сагс», «Захиалга» on «Bto300»'s flat bar (ADR-0100 on ADR-0095): the
+ * barcode camera raised in the middle, the cart's count on «Сагс»; «Профайл» and the bell (with its
+ * unread count, ADR-0062 #3) open from «Нүүр»'s header.
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { cart } = useShop();
-  const unread = useNotificationSummary().data?.unread ?? 0;
   const icon =
     (Icon: typeof House) =>
     ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => (
       <Icon
         size={size}
-        color={typeof color === 'string' ? color : colors.label2}
-        strokeWidth={focused ? 2.1 : 1.75}
+        color={typeof color === 'string' ? color : colors.placeholder}
+        strokeWidth={focused ? 2 : 1.6}
       />
     );
   return (
     <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} />}
+      tabBar={(props) => <StoreTabBar {...props} />}
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.canvas } }}
     >
       <Tabs.Screen
@@ -50,14 +48,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{ title: t('mobile.tabs.orders'), tabBarIcon: icon(ClipboardList) }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('mobile.tabs.profile'),
-          tabBarIcon: icon(CircleUserRound),
-          ...(unread > 0 ? { tabBarBadge: unread > 99 ? '99+' : unread } : {}),
-        }}
       />
     </Tabs>
   );

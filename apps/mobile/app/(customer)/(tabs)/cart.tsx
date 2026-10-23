@@ -44,8 +44,8 @@ import { EmptyState, ProblemText } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { usePendingWords } from '../../../src/customer/pending-words';
 import { PendingSendView } from '../../../src/ui/pending-send';
-import { HeaderTextButton, StoreHeader } from '../../../src/customer/store-header';
-import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
+import { HeaderTextButton, StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { Text } from '../../../src/ui/text';
 
 /**

@@ -27,7 +27,7 @@ import { FavouriteButton, StockPill, usePackText } from '../../../src/customer/p
 import { StoreQtyKeypad } from '../../../src/customer/qty-keypad';
 import { priceNoteOf, storeLineOf } from '../../../src/customer/shop';
 import { useStoreLineQuote } from '../../../src/customer/shop-quote';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { canOrder } from '../../../src/customer/stock';
 import { formatMnt } from '../../../src/format/format';
 import { heroPictures, pageAt } from '../../../src/images/pictures';

@@ -22,8 +22,8 @@ import {
   useSectionText,
 } from '../../../src/customer/home-parts';
 import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
-import { HeaderIconButton, StoreHeaderBand } from '../../../src/customer/store-header';
-import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
+import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { initialsOf } from '../../../src/format/format';
 import { useCustomer } from '../../../src/state/session';
 import { colors, fonts, spacing, storeType, TOUCH } from '../../../src/theme/tokens';

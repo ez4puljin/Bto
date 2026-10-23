@@ -32,7 +32,7 @@ import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row, Separator } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { PaymentDot } from '../../../src/ui/status';
 import { Text } from '../../../src/ui/text';

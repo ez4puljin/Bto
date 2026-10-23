@@ -1,36 +1,50 @@
 import { Decimal } from '@tugeel/shared/money';
-import { Plus } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { CardPictures } from './card-pictures';
-import { Text } from './text';
+import { CardAdd, CardQty, NewBadge, StoreCardFrame } from './store-card-frame';
 import type { RepProduct } from '../api/rep';
 import type { CartLine } from '../cart/cart';
 import { formatMnt, formatQty } from '../format/format';
 import { cardPictures } from '../images/pictures';
-import { useUnitWords } from '../shop/unit-words';
+import { type UnitWords, useUnitWords } from '../shop/unit-words';
 import { baseUnitOf, packOf, type UnitLike } from '../shop/units';
-import { colors, fonts, radii, shadows, spacing, tabular, type } from '../theme/tokens';
+import { colors } from '../theme/tokens';
 
-/** «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй». */
+/** «хайрцагт 6» (or «1 уут = 10 ш» without word forms); null without a pack. */
+function packTextOf(
+  units: readonly UnitLike[],
+  words: (unit: UnitLike) => UnitWords,
+  t: TFunction,
+): string | null {
+  const pack = packOf(units);
+  const base = baseUnitOf(units);
+  if (!pack || !base) return null;
+  const packWords = words(pack);
+  const n = formatQty(pack.factorToBase);
+  return packWords.dative
+    ? t('mobile.shop.packIn', { unit: packWords.dative, n })
+    : t('mobile.shop.packOf', { unit: packWords.name, n, base: words(base).short });
+}
+
+/**
+ * «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй» (`text`); `count` is the
+ * card's short form without the pack, which the card shows on its own line.
+ */
 export function useStockLine() {
   const { t } = useTranslation();
   const words = useUnitWords();
-  return (product: RepProduct): { text: string; out: boolean } => {
-    if (!product.sellable) return { text: t('mobile.shop.notSellable'), out: true };
-    if (new Decimal(product.available).lte(0))
-      return { text: t('mobile.shop.outOfStock'), out: true };
-    const stock = t('mobile.shop.stock', { n: formatQty(product.available) });
-    const pack = packOf(product.units);
-    const base = baseUnitOf(product.units);
-    if (!pack || !base) return { text: stock, out: false };
-    const packWords = words(pack);
-    const n = formatQty(pack.factorToBase);
-    const packText = packWords.dative
-      ? t('mobile.shop.packIn', { unit: packWords.dative, n })
-      : t('mobile.shop.packOf', { unit: packWords.name, n, base: words(base).short });
-    return { text: `${stock} · ${packText}`, out: false };
+  return (product: RepProduct): { text: string; count: string; out: boolean } => {
+    if (!product.sellable) {
+      const text = t('mobile.shop.notSellable');
+      return { text, count: text, out: true };
+    }
+    if (new Decimal(product.available).lte(0)) {
+      const text = t('mobile.shop.outOfStock');
+      return { text, count: text, out: true };
+    }
+    const count = t('mobile.shop.stock', { n: formatQty(product.available) });
+    const pack = packTextOf(product.units, words, t);
+    return { text: pack ? `${count} · ${pack}` : count, count, out: false };
   };
 }
 
@@ -52,9 +66,10 @@ export function usePriceParts() {
 }
 
 /**
- * A product of the rep's grid (ADR-0068 #3): its pictures (swiped when it has several) with «Шинэ»
- * and the cart's quantity or «+», the name, the code, the base price and the stock. The card opens
- * the product; «+» adds one of its default unit, the quantity opens the product to change it.
+ * A product of the rep's grid and rows, drawn as «Bto300»'s card (ADR-0100 on ADR-0068 #3): the
+ * pictures, «ШИНЭ», the name, the code with the pack, the base price, the stock count (red when
+ * nothing is left or it cannot be ordered) and the cart's quantity or the cart. The card opens the
+ * product; the cart adds one of its default unit, the quantity opens the product to change it.
  */
 export function ProductCard({
   product,
@@ -63,6 +78,8 @@ export function ProductCard({
   locked,
   onOpen,
   onAdd,
+  width,
+  pictureHeight,
 }: {
   product: RepProduct;
   server: string;
@@ -72,180 +89,50 @@ export function ProductCard({
   locked: boolean;
   onOpen: () => void;
   onAdd: () => void;
-}) {
-  const stockLine = useStockLine();
-  const stock = stockLine(product);
-  return (
-    <ProductCardFrame
-      product={product}
-      server={server}
-      line={line}
-      locked={locked}
-      canAdd
-      dim={new Decimal(product.available).lte(0)}
-      onOpen={onOpen}
-      onAdd={onAdd}
-      footer={
-        <Text style={[type.caption, stock.out && styles.out]} numberOfLines={1}>
-          {stock.text}
-        </Text>
-      }
-    />
-  );
-}
-
-/**
- * The rep's grid card (ADR-0068 #3): the pictures with «Шинэ», an optional corner, the cart's
- * quantity or «+», the name, the code, the base price, then the footer (the stock count).
- * «Bto300» draws the board's own card since 0.2.0 (`src/customer/product-card.tsx`, ADR-0094).
- */
-export function ProductCardFrame({
-  product,
-  server,
-  line,
-  locked,
-  canAdd,
-  dim,
-  corner,
-  footer,
-  onOpen,
-  onAdd,
-}: {
-  product: {
-    name: string;
-    sku: string;
-    isNew: boolean;
-    basePrice: string | null;
-    thumbUrl: string | null;
-    images: readonly { url: string; thumbUrl: string | null }[];
-    units: readonly UnitLike[];
-  };
-  server: string;
-  /** The product's line in the cart. */
-  line: CartLine | undefined;
-  /** A send is pending: the cart waits for its answer. */
-  locked: boolean;
-  /** «+» is offered (a product the store cannot order shows none). */
-  canAdd: boolean;
-  /** The picture faded: nothing to sell. */
-  dim: boolean;
-  /** Over the picture's top right corner. */
-  corner?: ReactNode;
-  footer: ReactNode;
-  onOpen: () => void;
-  onAdd: () => void;
+  /** A row's card (164 on the home); a grid's fills its column. */
+  width?: number;
+  pictureHeight?: number;
 }) {
   const { t } = useTranslation();
   const words = useUnitWords();
   const priceParts = usePriceParts();
   const price = priceParts(product);
+  const stock = useStockLine()(product);
+  const pack = packTextOf(product.units, words, t);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('mobile.shop.openProduct', { name: product.name })}
-      onPress={onOpen}
-      style={styles.card}
-    >
-      <View style={styles.picture}>
-        <CardPictures urls={cardPictures(product)} server={server} dim={dim} onPress={onOpen} />
-        {product.isNew ? (
-          <View style={styles.newBadge}>
-            <Text style={styles.newText}>{t('mobile.shop.new')}</Text>
-          </View>
-        ) : null}
-        {corner ? <View style={styles.corner}>{corner}</View> : null}
-        {locked ? null : line ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.shop.inCart', {
+    <StoreCardFrame
+      name={product.name}
+      openLabel={t('mobile.shop.openProduct', { name: product.name })}
+      pictures={cardPictures(product)}
+      server={server}
+      dim={stock.out}
+      onOpen={onOpen}
+      {...(width !== undefined ? { width } : {})}
+      {...(pictureHeight !== undefined ? { pictureHeight } : {})}
+      badges={product.isNew ? <NewBadge /> : null}
+      line={pack ? `${product.sku} · ${pack}` : product.sku}
+      price={price ? { price: price.price, per: price.per } : null}
+      noPrice={t('mobile.shop.noPrice')}
+      stock={{
+        text: stock.count,
+        dot: stock.out ? colors.destructive : colors.success,
+        color: stock.out ? colors.destructive : colors.success,
+      }}
+      action={
+        locked ? null : line ? (
+          <CardQty
+            text={`${line.qty} ${words(line).short}`}
+            label={t('mobile.shop.inCart', {
               name: product.name,
               qty: line.qty,
               unit: words(line).name,
             })}
             onPress={onOpen}
-            style={styles.qty}
-          >
-            <Text style={styles.qtyText}>{`${line.qty} ${words(line).name}`}</Text>
-          </Pressable>
-        ) : canAdd ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.shop.add', { name: product.name })}
-            onPress={onAdd}
-            hitSlop={6}
-            style={styles.add}
-          >
-            <Plus size={18} strokeWidth={2.6} color={colors.primary} />
-          </Pressable>
-        ) : null}
-      </View>
-      <View style={styles.text}>
-        <Text style={styles.name} numberOfLines={2}>
-          {product.name}
-        </Text>
-        <Text style={type.caption}>{product.sku}</Text>
-        {price ? (
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>{price.price}</Text>
-            <Text style={type.secondary}>{price.per}</Text>
-          </View>
+          />
         ) : (
-          <Text style={[type.secondary, styles.priceRow]}>{t('mobile.shop.noPrice')}</Text>
-        )}
-        {footer}
-      </View>
-    </Pressable>
+          <CardAdd name={product.name} onPress={onAdd} />
+        )
+      }
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  card: { flex: 1, gap: spacing.sm },
-  picture: {
-    aspectRatio: 1,
-    borderRadius: radii.tile,
-    backgroundColor: colors.imageFill,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  newBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    height: 22,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 11,
-    backgroundColor: colors.floatingFill,
-    justifyContent: 'center',
-  },
-  newText: { ...type.secondary, fontFamily: fonts.semibold, color: colors.link },
-  corner: { position: 'absolute', top: 6, right: 6 },
-  add: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.card,
-    boxShadow: shadows.addButton,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qty: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-    height: 32,
-    paddingHorizontal: spacing.md,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
-  qtyText: { ...type.chip, fontFamily: fonts.semibold, color: colors.primaryForeground },
-  text: { gap: 1, paddingHorizontal: 2 },
-  name: type.bodyStrong,
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 5 },
-  price: { ...type.heading, fontFamily: fonts.bold, ...tabular },
-  out: { color: colors.destructive, fontFamily: fonts.medium },
-});

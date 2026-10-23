@@ -12,7 +12,7 @@ import {
   useCardActions,
 } from '../../../src/customer/home-parts';
 import { sectionRouteOf } from '../../../src/customer/home-sections';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { formatCount } from '../../../src/format/format';
 import { colors, spacing, storeType } from '../../../src/theme/tokens';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';

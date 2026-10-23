@@ -23,7 +23,7 @@ import {
   SortSheet,
 } from '../../../src/customer/list-sheets';
 import { shopRouteParams } from '../../../src/customer/shop';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { formatCount } from '../../../src/format/format';
 import { colors, spacing, storeType, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';

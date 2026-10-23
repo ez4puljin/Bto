@@ -10,7 +10,7 @@ import { useCustomer } from '../../src/state/session';
 import { spacing } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { PasswordToggle, TextField } from '../../src/ui/field';
-import { StoreHeader } from '../../src/customer/store-header';
+import { StoreHeader } from '../../src/ui/store-header';
 import { FootNote, Page } from '../../src/ui/layout';
 import type { TextInput } from '../../src/ui/text';
 import { useToast } from '../../src/ui/toast';

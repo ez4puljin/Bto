@@ -4,19 +4,19 @@ import { Bell, ChevronRight, LogOut, Send, Server, User } from 'lucide-react-nat
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from '../../../src/ui/text';
-import { useNotificationSummary } from '../../../src/api/notifications';
-import { useRepContext } from '../../../src/api/rep';
-import { initialsOf } from '../../../src/format/format';
-import { useRoleName } from '../../../src/state/role';
-import { useSignedIn } from '../../../src/state/session';
-import { useShop } from '../../../src/state/shop';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
-import { CircleButton } from '../../../src/ui/controls';
-import { Group, ICON_INSET, IconTile, Row } from '../../../src/ui/grouped';
-import { LargeTitle, Page } from '../../../src/ui/layout';
-import { ActionSheet } from '../../../src/ui/sheet';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { Text } from '../../src/ui/text';
+import { useNotificationSummary } from '../../src/api/notifications';
+import { useRepContext } from '../../src/api/rep';
+import { initialsOf } from '../../src/format/format';
+import { useRoleName } from '../../src/state/role';
+import { useSignedIn } from '../../src/state/session';
+import { useShop } from '../../src/state/shop';
+import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
+import { CircleButton } from '../../src/ui/controls';
+import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
+import { LargeTitle, Page } from '../../src/ui/layout';
+import { ActionSheet } from '../../src/ui/sheet';
+import { useTabBarInset } from '../../src/ui/tab-bar';
 
 /**
  * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3): the bell with the unread count, who is

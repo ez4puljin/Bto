@@ -29,8 +29,8 @@ import {
   SortSheet,
 } from '../../../src/customer/list-sheets';
 import { emptyKindOf, type ShopChip, shopRouteParams } from '../../../src/customer/shop';
-import { StoreHeaderBand } from '../../../src/customer/store-header';
-import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
+import { StoreHeaderBand } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { formatCount } from '../../../src/format/format';
 import { useDebounced } from '../../../src/state/use-debounced';
 import { colors, spacing, storeType, TOUCH, type } from '../../../src/theme/tokens';
