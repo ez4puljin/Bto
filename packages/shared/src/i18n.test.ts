@@ -11,6 +11,7 @@ import {
   NOTICE_KINDS,
   NOTICE_STATES,
 } from './notifications';
+import { POS_EVENT_KINDS, VOID_REASONS } from './pos';
 import { PRICE_BASES, PRICE_ROUNDINGS } from './pricing';
 import {
   PRODUCT_MISSING,
@@ -62,6 +63,13 @@ describe('mn.json covers every code the clients translate (ADR-0011)', () => {
   });
 
   it.each(ADJUSTMENT_REASON_CODES.map((code) => `inventory.reasons.${code}`))('%s', (path) => {
+    expect(message(path)).not.toMatch(/^missing:/);
+  });
+
+  it.each([
+    ...POS_EVENT_KINDS.map((kind) => `pos.eventKinds.${kind}`),
+    ...VOID_REASONS.map((reason) => `pos.voidReasons.${reason}`),
+  ])('%s', (path) => {
     expect(message(path)).not.toMatch(/^missing:/);
   });
 

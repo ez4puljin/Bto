@@ -1,8 +1,15 @@
-import { POS_LIMITS, TENDER_KINDS, type TenderKind } from '@tugeel/shared/pos';
+import {
+  POS_LIMITS,
+  TENDER_KINDS,
+  type TenderKind,
+  VOID_REASONS,
+  type VoidReason,
+} from '@tugeel/shared/pos';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -77,4 +84,60 @@ export class SaleDto {
 
 export class SearchQueryDto {
   @IsString() @MaxLength(80) q: string;
+}
+
+/** A supervisor's PIN for a void or a return (ADR-0104). */
+export class ApprovalDto {
+  @IsInt() @Min(1) supervisorUserId: number;
+  @IsString() @MaxLength(16) pin: string;
+}
+
+export class VoidDto {
+  @IsUUID() clientId: string;
+  @IsIn(VOID_REASONS) reason: VoidReason;
+
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => CartLineDto)
+  lines: CartLineDto[];
+
+  @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
+}
+
+export class ParkDto {
+  @IsUUID() clientId: string;
+
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => CartLineDto)
+  lines: CartLineDto[];
+}
+
+export class DiscardParkedDto {
+  @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
+}
+
+export class ReturnSaleQueryDto {
+  @IsString() @MaxLength(40) number: string;
+}
+
+export class ReturnLineDto {
+  @IsInt() @Min(1) refundsLineNo: number;
+  @Matches(QTY) qty: string;
+  @IsBoolean() damaged: boolean;
+}
+
+export class ReturnDto {
+  @IsUUID() clientId: string;
+  @IsUUID() refundsSaleClientId: string;
+
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxLines)
+  @ValidateNested({ each: true })
+  @Type(() => ReturnLineDto)
+  lines: ReturnLineDto[];
+
+  @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
 }

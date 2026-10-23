@@ -19963,6 +19963,243 @@
         ]
       }
     },
+    "/api/v1/pos/voids": {
+      "get": {
+        "operationId": "PosVoids_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "tillId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cashierUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "reason",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LINE_REMOVED",
+                "QTY_REDUCED",
+                "CART_CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoidPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/voids/{id}": {
+      "get": {
+        "operationId": "PosVoids_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoidDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/quick-buttons": {
+      "get": {
+        "operationId": "PosQuickButtons_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosQuickGroup"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "put": {
+        "operationId": "PosQuickButtons_replace",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosQuickButtonsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosQuickGroup"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/attention": {
       "get": {
         "operationId": "PosAttention_attention",
@@ -20056,7 +20293,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SyncBatchDto"
+                "$ref": "#/components/schemas/PosSyncBatch"
               }
             }
           }
@@ -42248,7 +42485,8 @@
               "SALE",
               "RETURN",
               "SHIFT_CLOSED",
-              "RECEIPT_STATUS"
+              "RECEIPT_STATUS",
+              "VOID"
             ],
             "type": "string"
           },
@@ -42326,7 +42564,8 @@
               "SALE",
               "RETURN",
               "SHIFT_CLOSED",
-              "RECEIPT_STATUS"
+              "RECEIPT_STATUS",
+              "VOID"
             ],
             "type": "string"
           },
@@ -42364,6 +42603,354 @@
           "number",
           "code",
           "params"
+        ]
+      },
+      "PosVoid": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "number",
+            "nullable": true
+          },
+          "shiftNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "enum": [
+              "LINE_REMOVED",
+              "QTY_REDUCED",
+              "CART_CANCELLED"
+            ],
+            "type": "string"
+          },
+          "voidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "example": "7000.00"
+          },
+          "lineCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "tillId",
+          "tillCode",
+          "shiftId",
+          "shiftNumber",
+          "cashierUserId",
+          "cashierName",
+          "approvedBy",
+          "approvedByName",
+          "reason",
+          "voidedAt",
+          "total",
+          "lineCount"
+        ]
+      },
+      "PosVoidPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoid"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "On the first page only"
+          },
+          "sum": {
+            "type": "string",
+            "nullable": true,
+            "description": "The voids’ sum, first page only"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "total",
+          "sum"
+        ]
+      },
+      "PosVoidLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productUnitId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "3500.00"
+          },
+          "total": {
+            "type": "string",
+            "example": "7000.00"
+          }
+        },
+        "required": [
+          "lineNo",
+          "productId",
+          "productUnitId",
+          "productSku",
+          "productName",
+          "uomName",
+          "qty",
+          "unitPrice",
+          "total"
+        ]
+      },
+      "PosVoidDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tillId": {
+            "type": "number"
+          },
+          "tillCode": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "number",
+            "nullable": true
+          },
+          "shiftNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "cashierUserId": {
+            "type": "number"
+          },
+          "cashierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "enum": [
+              "LINE_REMOVED",
+              "QTY_REDUCED",
+              "CART_CANCELLED"
+            ],
+            "type": "string"
+          },
+          "voidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "example": "7000.00"
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoidLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "tillId",
+          "tillCode",
+          "shiftId",
+          "shiftNumber",
+          "cashierUserId",
+          "cashierName",
+          "approvedBy",
+          "approvedByName",
+          "reason",
+          "voidedAt",
+          "total",
+          "lineCount",
+          "lines"
+        ]
+      },
+      "PosQuickButton": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "productSku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "uomName": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "False once the till can no longer sell it"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "productId",
+          "productSku",
+          "productName",
+          "uomName",
+          "label",
+          "sellable"
+        ]
+      },
+      "PosQuickGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosQuickButton"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "buttons"
+        ]
+      },
+      "PosQuickButtonInput": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "productUnitId",
+          "label"
+        ]
+      },
+      "PosQuickGroupInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosQuickButtonInput"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "buttons"
+        ]
+      },
+      "PosQuickButtonsRequest": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "description": "The whole set, in order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosQuickGroupInput"
+            }
+          }
+        },
+        "required": [
+          "groups"
         ]
       },
       "PosAttention": {
@@ -42814,6 +43401,98 @@
           "boundAt"
         ]
       },
+      "PosVoidDocLine": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "productUnitId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "qty": {
+            "type": "string",
+            "example": "2"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "3500"
+          },
+          "total": {
+            "type": "string",
+            "example": "7000"
+          }
+        },
+        "required": [
+          "productId",
+          "productUnitId",
+          "qty",
+          "unitPrice",
+          "total"
+        ]
+      },
+      "PosVoidDoc": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tillCode": {
+            "type": "string",
+            "maxLength": 8,
+            "example": "К3"
+          },
+          "shiftClientId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "cashierUserId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "approvedByUserId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "voidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "enum": [
+              "LINE_REMOVED",
+              "QTY_REDUCED",
+              "CART_CANCELLED"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoidDocLine"
+            }
+          },
+          "total": {
+            "type": "string",
+            "example": "7000"
+          }
+        },
+        "required": [
+          "clientId",
+          "tillCode",
+          "cashierUserId",
+          "voidedAt",
+          "reason",
+          "lines",
+          "total"
+        ]
+      },
       "PosSyncEvent": {
         "type": "object",
         "properties": {
@@ -42824,7 +43503,8 @@
               "SALE",
               "RETURN",
               "SHIFT_CLOSED",
-              "RECEIPT_STATUS"
+              "RECEIPT_STATUS",
+              "VOID"
             ],
             "type": "string"
           },
@@ -42847,6 +43527,9 @@
           },
           "tillBound": {
             "$ref": "#/components/schemas/PosTillBoundDoc"
+          },
+          "voided": {
+            "$ref": "#/components/schemas/PosVoidDoc"
           }
         },
         "required": [
@@ -42854,7 +43537,7 @@
           "clientId"
         ]
       },
-      "SyncBatchDto": {
+      "PosSyncBatch": {
         "type": "object",
         "properties": {
           "events": {
@@ -46441,7 +47124,9 @@
           "POS_PIN_INVALID",
           "POS_CASHIER_LOCKED",
           "POS_SESSION_EXPIRED",
-          "POS_SNAPSHOT_MISSING"
+          "POS_SNAPSHOT_MISSING",
+          "POS_SUPERVISOR_REQUIRED",
+          "POS_PARKED_LIMIT"
         ]
       },
       "ProblemFieldError": {

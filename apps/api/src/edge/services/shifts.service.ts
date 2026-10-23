@@ -143,23 +143,28 @@ export class EdgeShiftsService {
     return this.summary(row);
   }
 
-  /** The shift's figures from its sales on this edge (the Z of the till). */
+  /** The shift's figures from its sales and returns on this edge (the Z of the till). */
   async summary(shift: ShiftRow): Promise<EdgeShiftSummary> {
+    const sale = sql`${edgeSales.kind} = 'SALE'`;
+    const refund = sql`${edgeSales.kind} = 'RETURN'`;
     const [totals] = await this.db
       .select({
-        count: sql<number>`count(*)::int`,
-        cash: sql<string>`coalesce(sum(${edgeSales.cashAmount}), 0)::text`,
-        card: sql<string>`coalesce(sum(${edgeSales.cardAmount}), 0)::text`,
-        total: sql<string>`coalesce(sum(${edgeSales.total}), 0)::text`,
-        vat: sql<string>`coalesce(sum(${edgeSales.vatTotal}), 0)::text`,
+        count: sql<number>`count(*) FILTER (WHERE ${sale})::int`,
+        cash: sql<string>`coalesce(sum(${edgeSales.cashAmount}) FILTER (WHERE ${sale}), 0)::text`,
+        card: sql<string>`coalesce(sum(${edgeSales.cardAmount}) FILTER (WHERE ${sale}), 0)::text`,
+        total: sql<string>`coalesce(sum(${edgeSales.total}) FILTER (WHERE ${sale}), 0)::text`,
+        vat: sql<string>`coalesce(sum(${edgeSales.vatTotal}) FILTER (WHERE ${sale}), 0)::text`,
+        returns: sql<number>`count(*) FILTER (WHERE ${refund})::int`,
+        refunds: sql<string>`coalesce(sum(${edgeSales.cashAmount}) FILTER (WHERE ${refund}), 0)::text`,
       })
       .from(edgeSales)
       .where(eq(edgeSales.shiftClientId, shift.clientId));
     const cashSales = new Decimal(totals?.cash ?? '0');
+    const cashRefunds = new Decimal(totals?.refunds ?? '0');
     const expected = expectedCash({
       openingFloat: shift.openingFloat,
       cashSales,
-      cashRefunds: '0',
+      cashRefunds,
     });
     return {
       clientId: shift.clientId,
@@ -173,6 +178,8 @@ export class EdgeShiftsService {
       cardSales: new Decimal(totals?.card ?? '0').toFixed(2),
       total: new Decimal(totals?.total ?? '0').toFixed(2),
       vatTotal: new Decimal(totals?.vat ?? '0').toFixed(2),
+      returnsCount: totals?.returns ?? 0,
+      cashRefunds: cashRefunds.toFixed(2),
       expectedCash: expected.toFixed(2),
       closedAt: shift.closedAt?.toISOString() ?? null,
       countedCash: shift.countedCash?.toFixed(2) ?? null,

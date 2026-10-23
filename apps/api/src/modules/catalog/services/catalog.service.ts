@@ -26,6 +26,8 @@ export interface PosCatalogueProduct {
     factor: Decimal;
     isBase: boolean;
     barcodes: string[];
+    /** The same barcodes as printed (ADR-0104: shown at the till). */
+    codes: string[];
   }[];
 }
 
@@ -105,16 +107,21 @@ export class CatalogService {
       );
     }
     const codes = new Map<number, string[]>();
+    const printed = new Map<number, string[]>();
     const unitIds = unitRows.map((unit) => unit.unitId);
     for (let at = 0; at < unitIds.length; at += IN_CHUNK) {
       const barcodeRows = await executor
-        .select({ unitId: productBarcodes.productUnitId, lookupKey: productBarcodes.lookupKey })
+        .select({
+          unitId: productBarcodes.productUnitId,
+          code: productBarcodes.code,
+          lookupKey: productBarcodes.lookupKey,
+        })
         .from(productBarcodes)
-        .where(inArray(productBarcodes.productUnitId, unitIds.slice(at, at + IN_CHUNK)));
+        .where(inArray(productBarcodes.productUnitId, unitIds.slice(at, at + IN_CHUNK)))
+        .orderBy(asc(productBarcodes.id));
       for (const row of barcodeRows) {
-        const list = codes.get(row.unitId) ?? [];
-        list.push(row.lookupKey);
-        codes.set(row.unitId, list);
+        codes.set(row.unitId, [...(codes.get(row.unitId) ?? []), row.lookupKey]);
+        printed.set(row.unitId, [...(printed.get(row.unitId) ?? []), row.code]);
       }
     }
     for (const unit of unitRows) {
@@ -125,6 +132,7 @@ export class CatalogService {
         factor: unit.factor,
         isBase: unit.isBase,
         barcodes: codes.get(unit.unitId) ?? [],
+        codes: printed.get(unit.unitId) ?? [],
       });
     }
     return [...byProduct.values()];

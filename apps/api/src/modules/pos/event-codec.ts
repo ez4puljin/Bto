@@ -1,5 +1,5 @@
 import { Decimal } from '@tugeel/shared/money';
-import type { PosEventKind } from '@tugeel/shared/pos';
+import { type PosEventKind, VOID_REASONS, type VoidReason } from '@tugeel/shared/pos';
 import { invalid } from '../../common/errors/app-error';
 import type {
   EbarimtFacts,
@@ -9,6 +9,7 @@ import type {
   ShiftOpenDoc,
   SyncEvent,
   TillBoundDoc,
+  VoidDoc,
 } from './sale-doc';
 
 /**
@@ -44,6 +45,18 @@ export function encodeEvent(event: SyncEvent): Json {
       return { ...event.payload };
     case 'TILL_BOUND':
       return { ...event.payload, boundAt: stamp(event.payload.boundAt) };
+    case 'VOID':
+      return {
+        ...event.payload,
+        voidedAt: stamp(event.payload.voidedAt),
+        total: money(event.payload.total),
+        lines: event.payload.lines.map((line) => ({
+          ...line,
+          qty: money(line.qty),
+          unitPrice: money(line.unitPrice),
+          total: money(line.total),
+        })),
+      };
   }
 }
 
@@ -127,6 +140,36 @@ export function decodeEvent(kind: PosEventKind, clientId: string, payload: unkno
           boundAt: date(json.boundAt),
         } satisfies TillBoundDoc,
       };
+    case 'VOID': {
+      const reason = str(json.reason);
+      if (!(VOID_REASONS as readonly string[]).includes(reason)) {
+        throw invalid('reason', 'enum', 'a void reason');
+      }
+      return {
+        kind,
+        clientId,
+        payload: {
+          clientId: str(json.clientId),
+          tillCode: str(json.tillCode),
+          shiftClientId: optStr(json.shiftClientId),
+          cashierUserId: int(json.cashierUserId),
+          approvedByUserId: optInt(json.approvedByUserId),
+          voidedAt: date(json.voidedAt),
+          reason: reason as VoidReason,
+          lines: list(json.lines).map((raw) => {
+            const line = asObject(raw);
+            return {
+              productId: int(line.productId),
+              productUnitId: int(line.productUnitId),
+              qty: dec(line.qty),
+              unitPrice: dec(line.unitPrice),
+              total: dec(line.total),
+            };
+          }),
+          total: dec(json.total),
+        } satisfies VoidDoc,
+      };
+    }
   }
 }
 

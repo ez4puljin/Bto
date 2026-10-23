@@ -1,4 +1,13 @@
-import type { EdgeReceipt, PosSnapshot, SaleDocWire, SyncEventWire } from '@tugeel/shared/pos';
+import type {
+  EdgeCartLine,
+  EdgeReceipt,
+  PosSnapshot,
+  SaleDocWire,
+  SaleKind,
+  SyncEventWire,
+  VoidDocWire,
+  VoidReason,
+} from '@tugeel/shared/pos';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -92,11 +101,14 @@ export const edgeShifts = pgTable(
   ],
 );
 
-/** A sale as the till made it: the document replayed to the centre and the receipt shown. */
+/** A sale (or a return) as the till made it: the document replayed and the receipt shown. */
 export const edgeSales = pgTable(
   'edge_sales',
   {
     clientId: uuid('client_id').primaryKey(),
+    kind: text('kind').$type<SaleKind>().notNull().default('SALE'),
+    /** On a RETURN: the sale it takes goods back from (ADR-0104). */
+    refundsClientId: uuid('refunds_client_id'),
     shiftClientId: uuid('shift_client_id')
       .notNull()
       .references(() => edgeShifts.clientId),
@@ -116,7 +128,42 @@ export const edgeSales = pgTable(
   (t) => [
     unique('edge_sales_number_key').on(t.number),
     index('edge_sales_shift_idx').on(t.shiftClientId, t.soldAt),
+    index('edge_sales_refunds_idx').on(t.refundsClientId),
+    check('edge_sales_kind', sql`${t.kind} IN ('SALE', 'RETURN')`),
   ],
+);
+
+/** Goods a supervisor let a till take off a cart before payment (ADR-0104), as replayed. */
+export const edgeVoids = pgTable(
+  'edge_voids',
+  {
+    clientId: uuid('client_id').primaryKey(),
+    tillCode: text('till_code').notNull(),
+    cashierUserId: bigint('cashier_user_id', { mode: 'number' }).notNull(),
+    approvedByUserId: bigint('approved_by_user_id', { mode: 'number' }),
+    reason: text('reason').$type<VoidReason>().notNull(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }).notNull(),
+    total: money('total').notNull(),
+    doc: jsonValue('doc').$type<VoidDocWire>().notNull(),
+  },
+  (t) => [index('edge_voids_till_idx').on(t.tillCode, t.voidedAt)],
+);
+
+/** A cart set aside on its till (ADR-0104), resumed there at that day's prices. */
+export const edgeParked = pgTable(
+  'edge_parked',
+  {
+    clientId: uuid('client_id').primaryKey(),
+    tillCode: text('till_code').notNull(),
+    cashierUserId: bigint('cashier_user_id', { mode: 'number' }).notNull(),
+    cashierName: text('cashier_name').notNull(),
+    parkedAt: timestamp('parked_at', { withTimezone: true }).notNull().defaultNow(),
+    lines: jsonValue('lines').$type<EdgeCartLine[]>().notNull(),
+    itemCount: integer('item_count').notNull(),
+    total: money('total').notNull(),
+    preview: text('preview').notNull(),
+  },
+  (t) => [index('edge_parked_till_idx').on(t.tillCode, t.parkedAt)],
 );
 
 export const OUTBOX_STATUSES = ['PENDING', 'SENT', 'REJECTED'] as const;

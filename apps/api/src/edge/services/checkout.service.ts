@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { classifyBarcode } from '@tugeel/shared/gtin';
+import { classifyBarcode, cleanBarcode } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type EdgeBarcodeHit,
   type EdgeCartLine,
   type EdgeCashier,
   type EdgeProductHit,
+  type EdgeQuickGroup,
   type EdgeQuoteResponse,
   type EdgeReceipt,
   type EdgeSaleRequest,
@@ -47,18 +48,56 @@ export class CheckoutService {
     private readonly outbox: OutboxService,
   ) {}
 
+  /**
+   * Products by name, SKU or barcode (ADR-0104): a typed barcode first, then an exact SKU, then
+   * the names and SKUs that match strictly, then those that match by sound (Latin or Cyrillic).
+   */
   search(query: string): EdgeProductHit[] {
     const loaded = this.store.get();
     const terms = queryTerms(query);
     if (terms.length === 0) return [];
+    const first: SnapshotProduct[] = [];
+    const code = cleanBarcode(query);
+    if (code) {
+      const classified = classifyBarcode(code);
+      const unitId = classified.ok ? loaded.barcodes.get(classified.value.lookupKey) : undefined;
+      const found = unitId === undefined ? undefined : loaded.units.get(unitId);
+      if (found) first.push(found.product);
+    }
+    const sku = query.trim().toUpperCase();
     const strict: SnapshotProduct[] = [];
     const loose: SnapshotProduct[] = [];
     for (const { product, keys } of loaded.search) {
-      if (matchesStrictly(keys, terms)) strict.push(product);
+      if (product.sku.toUpperCase() === sku) first.push(product);
+      else if (matchesStrictly(keys, terms)) strict.push(product);
       else if (matchesQuery(keys, terms)) loose.push(product);
       if (strict.length >= SEARCH_LIMIT) break;
     }
-    return [...strict, ...loose].slice(0, SEARCH_LIMIT).map((product) => this.hit(loaded, product));
+    const seen = new Set<number>();
+    return [...first, ...strict, ...loose]
+      .filter((product) => !seen.has(product.id) && seen.add(product.id))
+      .slice(0, SEARCH_LIMIT)
+      .map((product) => this.hit(loaded, product));
+  }
+
+  /** The F7 panel (ADR-0104): the admin's groups with today's prices. */
+  quickGroups(): EdgeQuickGroup[] {
+    const loaded = this.store.get();
+    return (loaded.snapshot.quickGroups ?? []).flatMap((group) => {
+      const buttons = group.buttons.flatMap((button) => {
+        const found = loaded.units.get(button.unitId);
+        return found
+          ? [
+              {
+                label: button.label,
+                unitId: button.unitId,
+                product: this.hit(loaded, found.product),
+              },
+            ]
+          : [];
+      });
+      return buttons.length ? [{ id: group.id, name: group.name, buttons }] : [];
+    });
   }
 
   barcode(code: string): EdgeBarcodeHit {
@@ -173,6 +212,8 @@ export class CheckoutService {
       };
       const receipt: EdgeReceipt = {
         clientId: request.clientId,
+        kind: 'SALE',
+        refundsNumber: null,
         number,
         soldAt: doc.soldAt,
         tillCode,
@@ -325,6 +366,7 @@ export class CheckoutService {
           factor: unit.factor,
           isBase: unit.isBase,
           price: line?.priced ? line.total.toFixed(2) : null,
+          barcodes: unit.codes ?? [],
         };
       }),
     };

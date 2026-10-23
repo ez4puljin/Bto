@@ -32,6 +32,9 @@ export const kioskKeys = {
   device: (epoch: number) => ['kiosk', epoch, 'device'] as const,
   session: (epoch: number) => ['kiosk', epoch, 'session'] as const,
   recent: (epoch: number) => ['kiosk', epoch, 'recent'] as const,
+  quickButtons: (epoch: number) => ['kiosk', epoch, 'quick-buttons'] as const,
+  supervisors: (epoch: number) => ['kiosk', epoch, 'supervisors'] as const,
+  parked: (epoch: number) => ['kiosk', epoch, 'parked'] as const,
   search: (epoch: number, q: string) => ['kiosk', epoch, 'search', q] as const,
   quote: (epoch: number, lines: readonly EdgeCartLine[]) =>
     ['kiosk', epoch, 'quote', lines.map((line) => `${line.productUnitId}:${line.qty}`)] as const,
@@ -98,6 +101,40 @@ export function useQuote(lines: readonly EdgeCartLine[]) {
     queryFn: ({ signal }) => client.quote({ lines: [...lines] }, signal),
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
+    staleTime: 0,
+  });
+}
+
+/** The F7 panel's groups with today's prices (ADR-0104). */
+export function useQuickButtons(enabled: boolean) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.quickButtons(epoch),
+    queryFn: ({ signal }) => client.quickButtons(signal),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useSupervisors(enabled: boolean) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.supervisors(epoch),
+    queryFn: ({ signal }) => client.supervisors(signal),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** This till's parked baskets (ADR-0104). */
+export function useParked() {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.parked(epoch),
+    queryFn: ({ signal }) => client.parked(signal),
     staleTime: 0,
   });
 }

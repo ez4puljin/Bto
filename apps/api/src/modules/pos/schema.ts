@@ -7,6 +7,7 @@ import {
   SALE_KINDS,
   SHIFT_STATUSES,
   TENDER_KINDS,
+  VOID_REASONS,
 } from '@tugeel/shared/pos';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { type SQL, sql } from 'drizzle-orm';
@@ -531,5 +532,113 @@ export const posSyncRejections = pgTable(
     index('pos_sync_rejections_node_idx').on(t.edgeNodeId, t.id),
     check('pos_sync_rejections_kind', inList(t.kind, POS_EVENT_KINDS)),
     check('pos_sync_rejections_code', sql`length(${t.code}) BETWEEN 1 AND 60`),
+  ],
+);
+
+// ---------------------------------------------------------------- ADR-0104 (migration 0043)
+
+/**
+ * The till's F7 panel (ADR-0104): groups of product units the admin chose, the same on every till.
+ * The admin saves the whole set at once, so groups and buttons are replaced, not edited in place.
+ */
+export const posQuickGroups = pgTable(
+  'pos_quick_groups',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    sort: smallint('sort').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_quick_groups_sort').on(t.sort),
+    check(
+      'pos_quick_groups_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(POS_LIMITS.maxQuickLabel)}`,
+    ),
+    check('pos_quick_groups_sort_range', sql`${t.sort} >= 0`),
+  ],
+);
+
+export const posQuickButtons = pgTable(
+  'pos_quick_buttons',
+  {
+    id: id(),
+    groupId: ref('group_id')
+      .notNull()
+      .references(() => posQuickGroups.id, { onDelete: 'cascade' }),
+    productUnitId: ref('product_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    /** Shown instead of the product's name when set («Талх»). */
+    label: text('label'),
+    sort: smallint('sort').notNull(),
+  },
+  (t) => [
+    uniqueIndex('pos_quick_buttons_group_sort').on(t.groupId, t.sort),
+    uniqueIndex('pos_quick_buttons_group_unit').on(t.groupId, t.productUnitId),
+    check('pos_quick_buttons_label', sql`${textLength(t.label, POS_LIMITS.maxQuickLabel)}`),
+    check('pos_quick_buttons_sort_range', sql`${t.sort} >= 0`),
+  ],
+);
+
+/**
+ * Goods taken off a till's cart before payment (ADR-0104): a removed line, a lowered quantity, a
+ * cancelled cart or parked basket, with the supervisor whose PIN approved it. Append-only.
+ */
+export const posVoids = pgTable(
+  'pos_voids',
+  {
+    id: id(),
+    clientId: uuid('client_id').notNull(),
+    edgeNodeId: ref('edge_node_id')
+      .notNull()
+      .references(() => posEdgeNodes.id),
+    tillId: ref('till_id')
+      .notNull()
+      .references(() => posTills.id),
+    /** The till's open shift at the time; null between shifts. */
+    shiftId: ref('shift_id').references(() => posShifts.id),
+    cashierUserId: userRef('cashier_user_id').notNull(),
+    approvedBy: userRef('approved_by'),
+    reason: text('reason', { enum: VOID_REASONS }).notNull(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }).notNull(),
+    total: money('total').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_voids_client').on(t.edgeNodeId, t.clientId),
+    index('pos_voids_voided_idx').on(t.voidedAt, t.id),
+    index('pos_voids_shift_idx').on(t.shiftId),
+    check('pos_voids_reason', inList(t.reason, VOID_REASONS)),
+    check('pos_voids_total', sql`${t.total} >= 0`),
+  ],
+);
+
+export const posVoidLines = pgTable(
+  'pos_void_lines',
+  {
+    id: id(),
+    voidId: ref('void_id')
+      .notNull()
+      .references(() => posVoids.id),
+    lineNo: smallint('line_no').notNull(),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    productUnitId: ref('product_unit_id')
+      .notNull()
+      .references(() => productUnits.id),
+    productSku: text('product_sku').notNull(),
+    productName: text('product_name').notNull(),
+    uomName: text('uom_name').notNull(),
+    qty: qty('qty').notNull(),
+    unitPrice: money('unit_price').notNull(),
+    total: money('total').notNull(),
+  },
+  (t) => [
+    uniqueIndex('pos_void_lines_void_line').on(t.voidId, t.lineNo),
+    index('pos_void_lines_product_idx').on(t.productId),
+    check('pos_void_lines_qty', sql`${t.qty} > 0`),
+    check('pos_void_lines_money', sql`${t.unitPrice} >= 0 AND ${t.total} >= 0`),
   ],
 );

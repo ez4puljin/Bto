@@ -147,6 +147,7 @@ function SearchPanel({ onPick }: { onPick: (product: EdgeProductHit, unitId: num
                         uom: option.unit.uomName,
                         factor: formatQty(option.unit.factor),
                       })}
+                  {option.unit.barcodes?.[0] ? ` · ${option.unit.barcodes[0]}` : null}
                 </p>
               </div>
               <span

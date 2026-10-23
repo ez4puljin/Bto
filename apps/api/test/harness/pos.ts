@@ -161,6 +161,17 @@ export function posApi(app: NestExpressApplication, token: string) {
       ),
     replay: (id: number) =>
       http().post(`/api/v1/pos/sync-rejections/${id}/replay`).set(auth).set(idempotency()),
+    quickButtons: () => get<Record<string, unknown>[]>('/pos/quick-buttons'),
+    setQuickButtons: (body: Record<string, unknown>) =>
+      http().put('/api/v1/pos/quick-buttons').set(auth).send(body),
+    voids: (query: Record<string, unknown> = {}) =>
+      get<{
+        data: Record<string, unknown>[];
+        nextCursor: string | null;
+        total: number | null;
+        sum: string | null;
+      }>('/pos/voids', query),
+    void: (id: number) => get<Record<string, unknown>>(`/pos/voids/${id}`),
     attention: () =>
       get<{
         openShifts: number;

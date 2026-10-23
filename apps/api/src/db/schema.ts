@@ -100,6 +100,8 @@ export {
 export {
   posCashiers,
   posEdgeNodes,
+  posQuickButtons,
+  posQuickGroups,
   posSaleLines,
   posSales,
   posSettings,
@@ -109,6 +111,8 @@ export {
   posTenders,
   posTillDevices,
   posTills,
+  posVoidLines,
+  posVoids,
 } from '../modules/pos/schema';
 export {
   appNoticeCustomerReads,

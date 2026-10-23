@@ -4776,6 +4776,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/voids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosVoids_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/voids/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosVoids_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/quick-buttons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PosQuickButtons_list"];
+        put: operations["PosQuickButtons_replace"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/attention": {
         parameters: {
             query?: never;
@@ -11340,7 +11388,7 @@ export interface components {
             edgeNodeCode: string;
             clientId: string;
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
             /** @example POS_TOTALS_MISMATCH */
             code: string;
             params: {
@@ -11363,7 +11411,7 @@ export interface components {
             /** Format: uuid */
             clientId: string;
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
             /** @enum {string} */
             status: "APPLIED" | "DUPLICATE" | "REJECTED";
             id: number | null;
@@ -11372,6 +11420,96 @@ export interface components {
             params: {
                 [key: string]: unknown;
             } | null;
+        };
+        PosVoid: {
+            id: number;
+            /** Format: uuid */
+            clientId: string;
+            tillId: number;
+            tillCode: string;
+            shiftId: number | null;
+            shiftNumber: string | null;
+            cashierUserId: number;
+            cashierName: string | null;
+            approvedBy: number | null;
+            approvedByName: string | null;
+            /** @enum {string} */
+            reason: "LINE_REMOVED" | "QTY_REDUCED" | "CART_CANCELLED";
+            /** Format: date-time */
+            voidedAt: string;
+            /** @example 7000.00 */
+            total: string;
+            lineCount: number;
+        };
+        PosVoidPage: {
+            data: components["schemas"]["PosVoid"][];
+            nextCursor: string | null;
+            /** @description On the first page only */
+            total: number | null;
+            /** @description The voids’ sum, first page only */
+            sum: string | null;
+        };
+        PosVoidLine: {
+            lineNo: number;
+            productId: number;
+            productUnitId: number;
+            productSku: string;
+            productName: string;
+            uomName: string;
+            /** @example 2 */
+            qty: string;
+            /** @example 3500.00 */
+            unitPrice: string;
+            /** @example 7000.00 */
+            total: string;
+        };
+        PosVoidDetail: {
+            id: number;
+            /** Format: uuid */
+            clientId: string;
+            tillId: number;
+            tillCode: string;
+            shiftId: number | null;
+            shiftNumber: string | null;
+            cashierUserId: number;
+            cashierName: string | null;
+            approvedBy: number | null;
+            approvedByName: string | null;
+            /** @enum {string} */
+            reason: "LINE_REMOVED" | "QTY_REDUCED" | "CART_CANCELLED";
+            /** Format: date-time */
+            voidedAt: string;
+            /** @example 7000.00 */
+            total: string;
+            lineCount: number;
+            lines: components["schemas"]["PosVoidLine"][];
+        };
+        PosQuickButton: {
+            productUnitId: number;
+            productId: number;
+            productSku: string;
+            productName: string;
+            uomName: string;
+            label: string | null;
+            /** @description False once the till can no longer sell it */
+            sellable: boolean;
+        };
+        PosQuickGroup: {
+            id: number;
+            name: string;
+            buttons: components["schemas"]["PosQuickButton"][];
+        };
+        PosQuickButtonInput: {
+            productUnitId: number;
+            label: string | null;
+        };
+        PosQuickGroupInput: {
+            name: string;
+            buttons: components["schemas"]["PosQuickButtonInput"][];
+        };
+        PosQuickButtonsRequest: {
+            /** @description The whole set, in order */
+            groups: components["schemas"]["PosQuickGroupInput"][];
         };
         PosAttention: {
             openShifts: number;
@@ -11507,9 +11645,36 @@ export interface components {
             /** Format: date-time */
             boundAt: string;
         };
+        PosVoidDocLine: {
+            productId: number;
+            productUnitId: number;
+            /** @example 2 */
+            qty: string;
+            /** @example 3500 */
+            unitPrice: string;
+            /** @example 7000 */
+            total: string;
+        };
+        PosVoidDoc: {
+            /** Format: uuid */
+            clientId: string;
+            /** @example К3 */
+            tillCode: string;
+            /** Format: uuid */
+            shiftClientId?: string | null;
+            cashierUserId: number;
+            approvedByUserId?: number | null;
+            /** Format: date-time */
+            voidedAt: string;
+            /** @enum {string} */
+            reason: "LINE_REMOVED" | "QTY_REDUCED" | "CART_CANCELLED";
+            lines: components["schemas"]["PosVoidDocLine"][];
+            /** @example 7000 */
+            total: string;
+        };
         PosSyncEvent: {
             /** @enum {string} */
-            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS";
+            kind: "TILL_BOUND" | "SHIFT_OPENED" | "SALE" | "RETURN" | "SHIFT_CLOSED" | "RECEIPT_STATUS" | "VOID";
             /**
              * Format: uuid
              * @description The document’s id; a batch never repeats one
@@ -11520,8 +11685,9 @@ export interface components {
             shiftClosed?: components["schemas"]["PosShiftCloseDoc"];
             receiptStatus?: components["schemas"]["PosReceiptStatusDoc"];
             tillBound?: components["schemas"]["PosTillBoundDoc"];
+            voided?: components["schemas"]["PosVoidDoc"];
         };
-        SyncBatchDto: {
+        PosSyncBatch: {
             /** @description In the order they happened */
             events: components["schemas"]["PosSyncEvent"][];
         };
@@ -12537,7 +12703,7 @@ export interface components {
             sections: components["schemas"]["SalesRepHomeSection"][];
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -24465,6 +24631,133 @@ export interface operations {
             };
         };
     };
+    PosVoids_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                tillId?: number;
+                cashierUserId?: number;
+                reason?: "LINE_REMOVED" | "QTY_REDUCED" | "CART_CANCELLED";
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosVoidPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosVoids_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosVoidDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosQuickButtons_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosQuickGroup"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosQuickButtons_replace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosQuickButtonsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosQuickGroup"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PosAttention_attention: {
         parameters: {
             query?: never;
@@ -24534,7 +24827,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SyncBatchDto"];
+                "application/json": components["schemas"]["PosSyncBatch"];
             };
         };
         responses: {
