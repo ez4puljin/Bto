@@ -14,7 +14,7 @@ const WH2 = { id: 2, name: 'Хоёрдугаар агуулах' };
 
 /**
  * A posted receipt of two warehouses: boxes of cola at 24,000, rice for 5,000 with 300 off and a
- * free box of cola, then 10% off the whole note (ADR-0101).
+ * free box of cola, then 10% off the whole note (ADR-0103).
  */
 const RECEIPT: Detail = {
   ...DRAFT,

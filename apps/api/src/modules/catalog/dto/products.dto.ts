@@ -254,7 +254,7 @@ export class ProductLookupQueryDto {
   q: string;
 
   @ApiPropertyOptional({
-    description: 'Only the products linked to this supplier (ADR-0101); an empty q lists them',
+    description: 'Only the products linked to this supplier (ADR-0103); an empty q lists them',
   })
   @IsOptional()
   @Type(() => Number)

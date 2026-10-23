@@ -479,7 +479,7 @@ export function allocateReceiptDiscount(
   return shares;
 }
 
-/** The discounts of a receipt (ADR-0101): on chosen lines, or on the whole note (at most one). */
+/** The discounts of a receipt (ADR-0103): on chosen lines, or on the whole note (at most one). */
 export const RECEIPT_DISCOUNT_KINDS = ['LINES', 'NOTE'] as const;
 export type ReceiptDiscountKind = (typeof RECEIPT_DISCOUNT_KINDS)[number];
 
@@ -504,7 +504,7 @@ export class ReceiptDiscountError extends RangeError {
 }
 
 /**
- * Each line's share of a receipt's discounts (ADR-0101, owner 2026-10-23): every LINES discount
+ * Each line's share of a receipt's discounts (ADR-0103, owner 2026-10-23): every LINES discount
  * first, on the sum of its chosen priced lines (a percentage of it, or an amount) spread over them
  * by amount; then the NOTE discount on what the priced lines keep after those, spread by that
  * remainder. Returns each line's share and each discount in tugriks. Shares are two decimals; a line without an amount (free goods, not priced yet) takes

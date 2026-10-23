@@ -238,14 +238,14 @@ export function useReadinessProducts(filter: { gap?: ReadinessGap; categoryId?: 
 
 /**
  * A picker's quick search (ADR-0099 #3): active products with their units and barcodes, no
- * pictures, at most `limit`; `supplierId` keeps that supplier's products (ADR-0101). Nothing while
+ * pictures, at most `limit`; `supplierId` keeps that supplier's products (ADR-0103). Nothing while
  * the text is empty, unless a supplier lists its products.
  */
 export function useProductLookup(q: string, limit = 20, supplierId?: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: [...KEYS.products, 'lookup', q, limit, supplierId ?? null],
-    // A supplier's products are listed even before anything is typed (ADR-0101).
+    // A supplier's products are listed even before anything is typed (ADR-0103).
     enabled: enabled && (q !== '' || supplierId !== undefined),
     staleTime: 30_000,
     placeholderData: keepPreviousData,

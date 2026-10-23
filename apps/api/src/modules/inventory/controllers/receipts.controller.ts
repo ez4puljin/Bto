@@ -55,7 +55,7 @@ const lineInput = (line: ReceiptLineRequestDto) => ({
   ...(line.salePrice === undefined ? {} : { salePrice: money(line.salePrice) }),
 });
 
-/** Discounts as typed, as decimals (ADR-0101). */
+/** Discounts as typed, as decimals (ADR-0103). */
 const discountsInput = (discounts: readonly ReceiptDiscountRequestDto[]) =>
   discounts.map((discount) => ({
     kind: discount.kind,
@@ -155,7 +155,7 @@ export class ReceiptsController {
     return detail(ctx)(await this.receipts.update(ctx, id, body));
   }
 
-  /** A draft's discounts, replaced as a whole (ADR-0101). */
+  /** A draft's discounts, replaced as a whole (ADR-0103). */
   @Put(':id/discounts')
   @RequirePermission(COSTS)
   @ApiOkResponse({ type: ReceiptDetailDto })

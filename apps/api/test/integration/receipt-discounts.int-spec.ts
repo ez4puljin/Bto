@@ -49,7 +49,7 @@ interface ProblemJson {
 }
 
 /**
- * A receipt's discounts on chosen lines and on the whole note (ADR-0101): line discounts first,
+ * A receipt's discounts on chosen lines and on the whole note (ADR-0103): line discounts first,
  * each on the sum of its lines, then the note's on what remains; the books at the net; a re-costing
  * that replaces them books the difference; a discount larger than its lines is flagged on the draft
  * and refused at posting. The posting links each product to the supplier, and the line picker lists

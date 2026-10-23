@@ -439,7 +439,7 @@ function priceBody(entry: CostEntry, before: CostEntry | null): ReceiptLineUpdat
  * is added or «Хадгалах» is pressed: then the draft is created with the header (and that line) and
  * the address becomes the draft's, the page staying as it is. Each header change of a draft is
  * saved at once (selects on change, texts when left). Lines come from the panel (ReceiptLinePanel);
- * every add is a line of its own (ADR-0101); a line chosen in the table opens in the panel.
+ * every add is a line of its own (ADR-0103); a line chosen in the table opens in the panel.
  * Saves run one after another against the latest copy of the draft.
  */
 function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: number) => void }) {
@@ -569,7 +569,7 @@ function DraftEditor(props: { detail: ReceiptDetail | null; onCreated: (id: numb
               });
               return;
             }
-            // Every add is a line of its own (owner, 2026-10-23, ADR-0101).
+            // Every add is a line of its own (owner, 2026-10-23, ADR-0103).
             await mutations.addReceiptLine.mutateAsync({
               id,
               body: {

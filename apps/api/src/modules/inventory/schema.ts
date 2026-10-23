@@ -409,11 +409,11 @@ export const goodsReceiptLines = pgTable(
   ],
 );
 
-/** What a receipt's discount applies to (ADR-0101). */
+/** What a receipt's discount applies to (ADR-0103). */
 export const RECEIPT_DISCOUNT_KINDS = ['LINES', 'NOTE'] as const;
 
 /**
- * A receipt's discounts (ADR-0101): on chosen lines, or on the whole note (at most one), a
+ * A receipt's discounts (ADR-0103): on chosen lines, or on the whole note (at most one), a
  * percentage or an amount. Line discounts come first, the note's on what remains; the shares land
  * on each costing version (stock_valuation_adjustments.discount_amount).
  */

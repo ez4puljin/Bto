@@ -93,7 +93,7 @@ export class ReceiptTotalsDto {
   @ApiProperty({ description: 'Lines priced or free' }) pricedLines: number;
 }
 
-/** A receipt's discount (ADR-0101): on chosen lines or on the whole note. Cost data. */
+/** A receipt's discount (ADR-0103): on chosen lines or on the whole note. Cost data. */
 @ApiSchema({ name: 'ReceiptDiscount' })
 export class ReceiptDiscountDto {
   @ApiProperty() id: number;
@@ -403,7 +403,7 @@ export class CostLineRequestDto {
 export class CostReceiptDto {
   @ApiPropertyOptional({
     type: [ReceiptDiscountRequestDto],
-    description: 'Given, replaces the receipt’s discounts (ADR-0101)',
+    description: 'Given, replaces the receipt’s discounts (ADR-0103)',
   })
   @IsOptional()
   @IsArray()

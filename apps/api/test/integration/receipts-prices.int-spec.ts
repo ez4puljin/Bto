@@ -108,7 +108,7 @@ describe('receipt prices and payment', () => {
     http().patch(`/api/v1/receipt-lines/${id}`).set(bearer(token)).send(body);
   const post = (token: string, id: number) =>
     http().post(`/api/v1/receipts/${id}/post`).set(bearer(token)).set(idempotency());
-  /** Replaces a draft's discounts (ADR-0101). */
+  /** Replaces a draft's discounts (ADR-0103). */
   const setDiscounts = (token: string, id: number, discounts: Record<string, unknown>[]) =>
     http().put(`/api/v1/receipts/${id}/discounts`).set(bearer(token)).send({ discounts });
   /** Creates a draft as the admin with its discounts. */

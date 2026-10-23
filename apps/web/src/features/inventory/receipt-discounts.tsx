@@ -59,7 +59,7 @@ function parsePct(text: string): string | null {
 }
 
 /**
- * «Хөнгөлөлт, урамшуулал» under the lines (ADR-0101, owner 2026-10-23), for cost holders: free goods
+ * «Хөнгөлөлт, урамшуулал» under the lines (ADR-0103, owner 2026-10-23), for cost holders: free goods
  * (a product and a quantity, costed at zero) in their own list, discounts on chosen lines (a
  * percentage or an amount spread over them) and at most one on the whole note, taken after the
  * line discounts. «Нэмэх» opens the form of each; the list is saved as a whole (`onChange`).

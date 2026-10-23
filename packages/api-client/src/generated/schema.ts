@@ -674,7 +674,7 @@ export interface paths {
         /**
          * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
          *     and barcodes without pictures, at most 30; `supplierId` keeps that supplier's products
-         *     (ADR-0101). Declared before `:id`.
+         *     (ADR-0103). Declared before `:id`.
          */
         get: operations["Products_lookup"];
         put?: never;
@@ -1832,7 +1832,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** A draft's discounts, replaced as a whole (ADR-0101). */
+        /** A draft's discounts, replaced as a whole (ADR-0103). */
         put: operations["Receipts_setDiscounts"];
         post?: never;
         delete?: never;
@@ -7270,7 +7270,7 @@ export interface components {
             freeGoods?: boolean;
         };
         ReceiptCostRequest: {
-            /** @description Given, replaces the receipt’s discounts (ADR-0101) */
+            /** @description Given, replaces the receipt’s discounts (ADR-0103) */
             discounts?: components["schemas"]["ReceiptDiscountRequest"][];
             /** @description The costing version the form was opened at */
             costingVersion: number;
@@ -13780,7 +13780,7 @@ export interface operations {
             query: {
                 /** @description Words of the name in either script, a SKU or a barcode */
                 q: string;
-                /** @description Only the products linked to this supplier (ADR-0101); an empty q lists them */
+                /** @description Only the products linked to this supplier (ADR-0103); an empty q lists them */
                 supplierId?: number;
                 /** @description At most 30; default 20 */
                 limit?: number;

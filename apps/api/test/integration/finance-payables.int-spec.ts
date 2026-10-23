@@ -76,7 +76,7 @@ describe('finance payables', () => {
         .send({ supplierId, supplierDocDate: today, lines, ...extra })
         .expect(201)
     ).body as ReceiptJson;
-    // A cost holder types the discounts on the draft (ADR-0101).
+    // A cost holder types the discounts on the draft (ADR-0103).
     if (discounts !== undefined) {
       await http()
         .put(`/api/v1/receipts/${draft.id}/discounts`)

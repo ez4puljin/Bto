@@ -500,7 +500,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
           .replace('{{date}}', '2026-10-01'),
       ),
     ).toBeInTheDocument();
-    // The search kept to the chosen supplier's products (ADR-0101).
+    // The search kept to the chosen supplier's products (ADR-0103).
     expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
     await user.keyboard('3{Enter}');
     expect(qty).toHaveValue('3');
@@ -538,7 +538,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(lines.getByRole('cell', { name: WH1.name })).toBeInTheDocument();
     expect(lines.getByRole('cell', { name: '3,600' })).toBeInTheDocument();
 
-    // The same product and unit again is a line of its own (owner 2026-10-23, ADR-0101).
+    // The same product and unit again is a line of its own (owner 2026-10-23, ADR-0103).
     await pickByKeyboard(user, 'Будаа');
     await waitFor(() => expect(panel().getByLabelText(mn.inventory.qty)).toHaveFocus());
     await user.keyboard('2{Enter}{Enter}');
@@ -605,7 +605,7 @@ describe('the line panel (ADR-0099 #3)', () => {
     expect(panel().getByLabelText(mn.inventory.unit)).toHaveValue('77');
     const info = within(screen.getByLabelText(panelText.infoLabel));
     expect(await info.findByText(`${WH1.name} · үлдэгдэл 240`)).toBeInTheDocument();
-    // The units and the weight come from the lookup by the product's code (ADR-0101).
+    // The units and the weight come from the lookup by the product's code (ADR-0103).
     const byCode = lookups(fetchMock).find((query) => query.get('q') === COLA.sku);
     expect(byCode?.get('limit')).toBe('5');
     const weight = (total: string) =>
@@ -647,7 +647,7 @@ describe('the line panel (ADR-0099 #3)', () => {
     expect(calls(fetchMock, 'GET', '/api/v1/barcodes/4006381333931')).toHaveLength(1);
   });
 
-  it("lists the supplier's products on focus, every product at a switch (ADR-0101)", async () => {
+  it("lists the supplier's products on focus, every product at a switch (ADR-0103)", async () => {
     const fetchMock = signedIn(WAREHOUSE_ME, {
       ...editorRoutes,
       'GET /api/v1/receipts/5': () => json(DRAFT),
@@ -1077,7 +1077,7 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
   });
 });
 
-describe('discounts and free goods of a draft (ADR-0101)', () => {
+describe('discounts and free goods of a draft (ADR-0103)', () => {
   it('adds a discount on the whole note, then one on chosen lines', async () => {
     let receipt: Detail = PRICED_DRAFT;
     const fetchMock = signedIn(ADMIN_ME, {

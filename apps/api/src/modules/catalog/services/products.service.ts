@@ -391,7 +391,7 @@ export class ProductsService {
   /**
    * A picker's search (ADR-0099 #3: the receipt window's line panel): the list's match and order
    * over active products, at most `limit` rows with their units and barcodes, without pictures.
-   * `within` narrows it to a set (a supplier's products, ADR-0101), which an empty text lists by
+   * `within` narrows it to a set (a supplier's products, ADR-0103), which an empty text lists by
    * name; without a set an empty text finds nothing.
    */
   async lookup(

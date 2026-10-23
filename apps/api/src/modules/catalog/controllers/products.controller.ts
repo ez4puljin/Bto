@@ -88,13 +88,13 @@ export class ProductsController {
   /**
    * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
    * and barcodes without pictures, at most 30; `supplierId` keeps that supplier's products
-   * (ADR-0101). Declared before `:id`.
+   * (ADR-0103). Declared before `:id`.
    */
   @Get('lookup')
   @Authenticated()
   @ApiOkResponse({ type: [ProductListItemDto] })
   async lookup(@Query() query: ProductLookupQueryDto): Promise<ProductListItemDto[]> {
-    // A supplier's products through the segments' resolver (partners owns the links, ADR-0101).
+    // A supplier's products through the segments' resolver (partners owns the links, ADR-0103).
     const within =
       query.supplierId === undefined
         ? null

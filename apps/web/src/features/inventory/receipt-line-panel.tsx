@@ -95,13 +95,13 @@ function parseWhole(text: string): string | null {
  * asks for the warehouse it goes into, which becomes its home. Under the fields: the home
  * warehouse and its stock, the weight, the last receipt price, the sale price and the markup. A
  * line of the table opens here for editing (its product and unit stay). With a supplier chosen the
- * search shows that supplier's products, or all products at a switch (ADR-0101). The `free`
+ * search shows that supplier's products, or all products at a switch (ADR-0103). The `free`
  * variant takes free goods: a product, its unit and the quantity, no prices and no scanner.
  */
 export function ReceiptLinePanel(props: {
   editing: ReceiptLine | null;
   pending: boolean;
-  /** The receipt's supplier: its products are searched first (ADR-0101). */
+  /** The receipt's supplier: its products are searched first (ADR-0103). */
   supplierId?: number;
   /** Free goods (урамшуулал): no prices, no sale price, no page-wide scanner. */
   free?: boolean;

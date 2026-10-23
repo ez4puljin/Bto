@@ -18,7 +18,7 @@ import { type CostEntry, entryAmount, parseMoney } from './helpers';
 /*
  * A receipt's delivery-note prices (ADR-0033, ADR-0078, ADR-0099): typed on the receipt itself by
  * holders of inventory.costs.manage, VAT included as on the note, with the receipt's discounts
- * (ADR-0101); the server spreads them and takes the VAT out. On a draft each line is saved from the line
+ * (ADR-0103); the server spreads them and takes the VAT out. On a draft each line is saved from the line
  * panel; on a posted receipt the whole costing is saved at once.
  */
 
@@ -62,7 +62,7 @@ export function focusNextPrice(
   else from.blur();
 }
 
-/** A discount as the card holds it: a saved one keeps its id and tugriks (ADR-0101). */
+/** A discount as the card holds it: a saved one keeps its id and tugriks (ADR-0103). */
 export interface DiscountDraft extends ReceiptDiscountRequest {
   id?: number;
   total?: string | null;
@@ -76,7 +76,7 @@ export const toDiscountRequest = (discount: DiscountDraft): ReceiptDiscountReque
   lineIds: discount.kind === 'LINES' ? (discount.lineIds ?? []) : [],
 });
 
-/** A receipt's discounts as the card holds them (ADR-0101). */
+/** A receipt's discounts as the card holds them (ADR-0103). */
 export function discountsOf(detail: Pick<ReceiptDetail, 'discounts'> | null): DiscountDraft[] {
   return (detail?.discounts ?? []).map((discount) => ({ ...discount }));
 }

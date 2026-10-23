@@ -2519,7 +2519,7 @@
             "name": "supplierId",
             "required": false,
             "in": "query",
-            "description": "Only the products linked to this supplier (ADR-0101); an empty q lists them",
+            "description": "Only the products linked to this supplier (ADR-0103); an empty q lists them",
             "schema": {
               "minimum": 1,
               "type": "number"
@@ -2567,7 +2567,7 @@
             "bearer": []
           }
         ],
-        "summary": "A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units\nand barcodes without pictures, at most 30; `supplierId` keeps that supplier's products\n(ADR-0101). Declared before `:id`.",
+        "summary": "A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units\nand barcodes without pictures, at most 30; `supplierId` keeps that supplier's products\n(ADR-0103). Declared before `:id`.",
         "tags": [
           "catalog"
         ]
@@ -7500,7 +7500,7 @@
             "bearer": []
           }
         ],
-        "summary": "A draft's discounts, replaced as a whole (ADR-0101).",
+        "summary": "A draft's discounts, replaced as a whole (ADR-0103).",
         "tags": [
           "inventory"
         ]
@@ -28488,7 +28488,7 @@
         "properties": {
           "discounts": {
             "maxItems": 50,
-            "description": "Given, replaces the receipt’s discounts (ADR-0101)",
+            "description": "Given, replaces the receipt’s discounts (ADR-0103)",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReceiptDiscountRequest"

@@ -1,5 +1,5 @@
--- ADR-0101: a receipt's discounts on chosen lines or on the whole note replace the header's one
--- discount of 0038 (numbered 0040: 0039 is reserved for the rep app's «Bto300» look).
+-- ADR-0103: a receipt's discounts on chosen lines or on the whole note replace the header's one
+-- discount of 0038 (numbered 0042: 0039–0041 are reserved for other work).
 CREATE TABLE "goods_receipt_discount_lines" (
 	"discount_id" bigint NOT NULL,
 	"line_id" bigint NOT NULL,
@@ -26,7 +26,7 @@ ALTER TABLE "goods_receipt_discounts" ADD CONSTRAINT "goods_receipt_discounts_re
 CREATE INDEX "goods_receipt_discount_lines_line_idx" ON "goods_receipt_discount_lines" USING btree ("line_id");--> statement-breakpoint
 CREATE INDEX "goods_receipt_discounts_receipt_idx" ON "goods_receipt_discounts" USING btree ("receipt_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "goods_receipt_discounts_note_key" ON "goods_receipt_discounts" USING btree ("receipt_id") WHERE "goods_receipt_discounts"."kind" = 'NOTE';--> statement-breakpoint
--- ADR-0101: a header discount of 0038 becomes the receipt's NOTE discount.
+-- ADR-0103: a header discount of 0038 becomes the receipt's NOTE discount.
 INSERT INTO "goods_receipt_discounts" ("receipt_id", "kind", "pct", "amount")
   SELECT "id", 'NOTE', "discount_pct", "discount_amount" FROM "goods_receipts"
    WHERE "discount_pct" IS NOT NULL OR "discount_amount" IS NOT NULL;--> statement-breakpoint

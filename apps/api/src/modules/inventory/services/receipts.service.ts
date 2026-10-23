@@ -115,7 +115,7 @@ export interface ReceiptPatch {
 }
 
 /**
- * A discount as typed (ADR-0101): on chosen lines (`LINES`) or on the whole note (`NOTE`, at most
+ * A discount as typed (ADR-0103): on chosen lines (`LINES`) or on the whole note (`NOTE`, at most
  * one), a percentage or an amount.
  */
 export interface ReceiptDiscountRequest {
@@ -156,7 +156,7 @@ export interface ReceiptLine {
   docUnitPrice: Decimal | null;
   docAmount: Decimal | null;
   freeGoods: boolean;
-  /** The line's share of the receipt's discounts (ADR-0099 #4, ADR-0101). */
+  /** The line's share of the receipt's discounts (ADR-0099 #4, ADR-0103). */
   discountAmount: Decimal | null;
   /** `docAmount` less its discount share: what the supplier is owed for the line. */
   netAmount: Decimal | null;
@@ -207,7 +207,7 @@ export interface ReceiptDetail {
   supplierVatPayer: boolean;
   /** VAT inside the delivery-note prices; frozen at posting. */
   vatRatePct: Decimal;
-  /** Cost data, like the prices (ADR-0101). */
+  /** Cost data, like the prices (ADR-0103). */
   discounts: ReceiptDiscountView[];
   effectiveDate: string | null;
   postedAt: Date | null;
@@ -443,7 +443,7 @@ export class ReceiptsService implements OnModuleInit {
   }
 
   /**
-   * A draft's discounts, replaced as a whole (ADR-0101, cost holders): line discounts name lines of
+   * A draft's discounts, replaced as a whole (ADR-0103, cost holders): line discounts name lines of
    * this receipt that are not free goods; at most one note discount. Whether a discount fits its
    * lines is checked by the posting and the costing (the prices may come later).
    */
@@ -520,7 +520,7 @@ export class ReceiptsService implements OnModuleInit {
     return inTransaction(this.db, async (tx) => {
       const { header } = await this.lockLine(tx, lineId);
       await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.id, lineId));
-      // A line discount whose last line went goes with it (ADR-0101).
+      // A line discount whose last line went goes with it (ADR-0103).
       await tx.execute(sql`
         DELETE FROM goods_receipt_discounts d
          WHERE d.receipt_id = ${header.id} AND d.kind = 'LINES'
@@ -534,8 +534,8 @@ export class ReceiptsService implements OnModuleInit {
    * DRAFT → POSTED: stock arrives in each line's bin, in its warehouse, at the provisional cost
    * (ADR-0033); the lines' sale prices come into force from the posting's business date (ADR-0099
    * #5); a receipt whose every line has its price or is free is costed at once from those prices,
-   * less its discounts (ADR-0078 #3, ADR-0101); each product not yet linked to the supplier is
-   * linked to it (ADR-0101).
+   * less its discounts (ADR-0078 #3, ADR-0103); each product not yet linked to the supplier is
+   * linked to it (ADR-0103).
    */
   post(ctx: AuthContext, id: number): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
@@ -678,7 +678,7 @@ export class ReceiptsService implements OnModuleInit {
    * The accountant's costing (ADR-0033, ADR-0078 #4): every line at once, by the delivery note's
    * amount or price per entered unit (VAT included as printed), bonus lines at zero. Each line's cost
    * is its amount less the VAT at the receipt's frozen rate. `costingVersion` is the version the
-   * form was opened at. The receipt's discounts (ADR-0101) lower the lines' cost; discounts given
+   * form was opened at. The receipt's discounts (ADR-0103) lower the lines' cost; discounts given
    * here replace the receipt's.
    */
   cost(
@@ -1191,7 +1191,7 @@ export class ReceiptsService implements OnModuleInit {
     };
   }
 
-  /** A receipt's discounts with the lines of each (ADR-0101), in the order they were added. */
+  /** A receipt's discounts with the lines of each (ADR-0103), in the order they were added. */
   private async discountsOf(
     executor: Db | Tx,
     receiptId: number,
@@ -1297,7 +1297,7 @@ export class ReceiptsService implements OnModuleInit {
   }
 
   /**
-   * Links the receipt's supplier to each of its products not linked to it yet (ADR-0101, owner
+   * Links the receipt's supplier to each of its products not linked to it yet (ADR-0103, owner
    * 2026-10-23), in the posting's transaction; a product's first link becomes its main supplier.
    */
   private async linkSupplierInTx(
@@ -1549,7 +1549,7 @@ function lineAmounts(lines: readonly LineRow[]): { id: number; amount: Decimal |
 }
 
 /**
- * Each line's share of the receipt's discounts and each discount in tugriks (ADR-0101);
+ * Each line's share of the receipt's discounts and each discount in tugriks (ADR-0103);
  * RECEIPT_DISCOUNT_TOO_LARGE when one exceeds its lines.
  */
 function sharesOf(

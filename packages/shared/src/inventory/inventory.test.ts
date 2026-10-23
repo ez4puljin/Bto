@@ -269,7 +269,7 @@ describe('receipt discount and markup (ADR-0099)', () => {
   });
 });
 
-describe('receipt discounts on lines and the note (ADR-0101)', () => {
+describe('receipt discounts on lines and the note (ADR-0103)', () => {
   const lines = [
     { id: 1, amount: '1000' },
     { id: 2, amount: '2000' },
