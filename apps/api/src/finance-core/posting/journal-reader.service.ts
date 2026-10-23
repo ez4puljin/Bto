@@ -395,6 +395,19 @@ export class FinJournalReader {
     return resolveCompany(executor, ctx, company, { source: true, userAnyOf: ['finance.read'] });
   }
 
+  /** The accounts among `ids` that hold journal lines (ADR-0102 #4: their kind and control stay). */
+  async accountsInUse(
+    ctx: FinCallContext,
+    query: { company: string; ids: readonly number[] },
+    executor: FinExecutor = this.db,
+  ): Promise<Set<number>> {
+    return accountsWithLines(
+      executor,
+      await this.companyId(executor, ctx, query.company),
+      query.ids,
+    );
+  }
+
   private async companyId(executor: FinExecutor, ctx: FinCallContext, company: string) {
     return (await this.scope(executor, ctx, company)).companyId;
   }
@@ -413,6 +426,23 @@ export class FinJournalReader {
       .innerJoin(finSourceSystems, eq(finSourceSystems.id, finJournalEntries.sourceSystemId))
       .$dynamic();
   }
+}
+
+/** The accounts among `ids` of a company that hold journal lines (an account in use, ADR-0102 #4). */
+export async function accountsWithLines(
+  executor: FinExecutor,
+  companyId: number,
+  ids: readonly number[],
+): Promise<Set<number>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Set();
+  const rows = await executor
+    .selectDistinct({ accountId: finJournalLines.accountId })
+    .from(finJournalLines)
+    .where(
+      and(eq(finJournalLines.companyId, companyId), inArray(finJournalLines.accountId, unique)),
+    );
+  return new Set(rows.map((row) => row.accountId));
 }
 
 function originFilters(systemIds: number[], origin: FinEntryOrigin): SQL[] {

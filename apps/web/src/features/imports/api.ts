@@ -91,6 +91,7 @@ export function useImportMutations() {
         key,
         receiptOptions,
         issueOptions,
+        openingOptions,
       }: {
         kind: ImportKind;
         file: File;
@@ -99,6 +100,8 @@ export function useImportMutations() {
         receiptOptions?: ReceiptImportOptions;
         /** An issues import's warehouse (ADR-0081). */
         issueOptions?: IssueImportOptions;
+        /** An opening import's date (ADR-0102 #5). */
+        openingOptions?: { date: string };
       }) => {
         const fileId = await uploadFile(
           api,
@@ -114,6 +117,7 @@ export function useImportMutations() {
               fileName: file.name,
               ...(receiptOptions ? { receiptOptions } : {}),
               ...(issueOptions ? { issueOptions } : {}),
+              ...(openingOptions ? { openingOptions } : {}),
             },
           }),
         );

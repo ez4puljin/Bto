@@ -45,13 +45,24 @@ export class FinContexts {
 
   /** A signed-in staff member on a finance screen, with their rights per company. */
   forUser(ctx: AuthContext): FinCallContext {
+    return this.forStaff(ctx, ctx.companyPermissions);
+  }
+
+  /**
+   * A staff member acting through a job that a screen started (an import's commit, ADR-0102 #6),
+   * with the rights per company read for that job (`PermissionHoldersService.companyPermissionsOf`).
+   */
+  forStaff(
+    actor: Extract<Actor, { kind: 'STAFF' }>,
+    companyPermissions: ReadonlyMap<string, ReadonlySet<string>>,
+  ): FinCallContext {
     return createFinCallContext({
-      principal: { kind: 'USER', tenant: BTO_TENANT, ref: `user:${ctx.userId}` },
+      principal: { kind: 'USER', tenant: BTO_TENANT, ref: `user:${actor.userId}` },
       permissions: Object.fromEntries(
-        [...ctx.companyPermissions].map(([company, codes]) => [company, [...codes]]),
+        [...companyPermissions].map(([company, codes]) => [company, [...codes]]),
       ),
-      actor: finActor(ctx),
-      requestId: ctx.requestId ?? null,
+      actor: finActor(actor),
+      requestId: actor.requestId ?? null,
     });
   }
 }

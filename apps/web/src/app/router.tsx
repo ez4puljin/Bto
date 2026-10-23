@@ -57,6 +57,7 @@ import {
 import { HomePage } from '@/features/home/home-page';
 import { AiPage } from '@/features/ai/ai-page';
 import { AccountLedgerPage, AccountsPage } from '@/features/finance/accounts-page';
+import { PeriodsPage } from '@/features/finance/periods-page';
 import { CashPage } from '@/features/finance/cash-page';
 import { CustomerBalancesPage } from '@/features/finance/customer-balances-page';
 import { CustomerLedgerPage } from '@/features/finance/customer-ledger-page';
@@ -570,6 +571,7 @@ function financeRoutes(): RouteObject[] {
       handle: { width: 'wide' },
       element: read(<AccountLedgerPage />),
     },
+    { path: 'finance/periods', handle: { width: 'wide' }, element: read(<PeriodsPage />) },
     {
       path: 'finance/settings',
       handle: { width: 'reading' },
