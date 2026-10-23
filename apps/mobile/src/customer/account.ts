@@ -39,6 +39,44 @@ export function creditBarOf(account: {
   return { available: available.toFixed(2), limit: limit.toFixed(2), free };
 }
 
+/**
+ * «Тооцоо хийх өдөр» under the debt (ADR-0101 #6, the Account board): the settlement day and the
+ * days to it, «Төлөх дүн» with the purchases it settles («10-р сарын авалт» for a month-end store,
+ * «09/21–10/20-ны авалт» for a 20th store), the overdue part in red under it, and the panel's tone:
+ * blue while nothing is overdue, red once something is.
+ */
+export interface SettlementCard {
+  dueDate: string;
+  days: { kind: 'left'; days: number } | { kind: 'today' };
+  amountDue: string;
+  purchases: { kind: 'month'; month: number } | { kind: 'range'; from: string; to: string };
+  overdue: string | null;
+  tone: 'due' | 'overdue';
+}
+
+export function settlementCardOf(settlement: {
+  group: 'DAY_20' | 'MONTH_END';
+  periodFrom: string;
+  periodTo: string;
+  dueDate: string;
+  daysLeft: number;
+  amountDue: string;
+  overdueAmount: string;
+}): SettlementCard {
+  const overdue = new Decimal(settlement.overdueAmount).gt(0) ? settlement.overdueAmount : null;
+  return {
+    dueDate: settlement.dueDate,
+    days: settlement.daysLeft > 0 ? { kind: 'left', days: settlement.daysLeft } : { kind: 'today' },
+    amountDue: settlement.amountDue,
+    purchases:
+      settlement.group === 'MONTH_END'
+        ? { kind: 'month', month: Number.parseInt(settlement.periodFrom.slice(5, 7), 10) }
+        : { kind: 'range', from: settlement.periodFrom, to: settlement.periodTo },
+    overdue,
+    tone: overdue === null ? 'due' : 'overdue',
+  };
+}
+
 /** An open invoice's due state: «N хоног хэтэрсэн», «N хоног үлдсэн», or due today. */
 export type InvoiceDue =
   { kind: 'overdue'; days: number } | { kind: 'left'; days: number } | { kind: 'today' };

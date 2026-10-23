@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { creditBarOf, creditWarningOf, debtOf, invoiceDueOf, overdueOf } from './account';
+import {
+  creditBarOf,
+  creditWarningOf,
+  debtOf,
+  invoiceDueOf,
+  overdueOf,
+  settlementCardOf,
+} from './account';
 import { noticeTabsOf, STORE_TILES, storeFactsOf, storeTargetOf } from './notifications';
 import { backorderedIn, byDay, orderAmount, orderNotes, progressOf, takerOf } from './orders';
 import { reorderPlan } from './reorder';
@@ -103,6 +110,39 @@ describe('«Bto300»: the account (ADR-0079 #7)', () => {
       free: 0.5718,
     });
     expect(creditBarOf({ creditLimit: '1000.00', creditAvailable: '-50.00' })?.free).toBe(0);
+  });
+
+  it('words «Тооцоо хийх өдөр» for both settlement groups (ADR-0101 #6)', () => {
+    const monthEnd = {
+      group: 'MONTH_END' as const,
+      periodFrom: '2026-10-01',
+      periodTo: '2026-10-31',
+      dueDate: '2026-10-31',
+      daysLeft: 10,
+      amountDue: '1284600.00',
+      overdueAmount: '0.00',
+    };
+    expect(settlementCardOf(monthEnd)).toEqual({
+      dueDate: '2026-10-31',
+      days: { kind: 'left', days: 10 },
+      amountDue: '1284600.00',
+      purchases: { kind: 'month', month: 10 },
+      overdue: null,
+      tone: 'due',
+    });
+    const day20 = settlementCardOf({
+      ...monthEnd,
+      group: 'DAY_20',
+      periodFrom: '2026-09-21',
+      periodTo: '2026-10-20',
+      dueDate: '2026-10-20',
+      daysLeft: 0,
+      overdueAmount: '350000.00',
+    });
+    expect(day20.days).toEqual({ kind: 'today' });
+    expect(day20.purchases).toEqual({ kind: 'range', from: '2026-09-21', to: '2026-10-20' });
+    expect(day20.overdue).toBe('350000.00');
+    expect(day20.tone).toBe('overdue');
   });
 
   it('says how an invoice stands and which credit warning comes first', () => {
