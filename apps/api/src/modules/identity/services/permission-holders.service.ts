@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Permission } from '@tugeel/shared/auth';
+import { isPermission, type Permission } from '@tugeel/shared/auth';
 import { and, eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
-import { rolePermissions, roles, userRoles, users } from '../schema';
+import { rolePermissions, roles, userCompanyRoles, userRoles, users } from '../schema';
 
 /**
  * Who holds a permission now (ADR-0062 #2): the active users whose roles carry it, for modules
@@ -37,5 +37,39 @@ export class PermissionHoldersService {
       )
       .orderBy(users.id);
     return rows.map((row) => row.id);
+  }
+
+  /**
+   * An active staff member's finance rights per company (`user_company_roles`, ADR-0084 #2), as the
+   * AuthGuard reads them for a request: for a job that acts for the user who asked for it (an
+   * import's commit, ADR-0102 #6). Empty for an inactive or unknown user.
+   */
+  async companyPermissionsOf(
+    userId: number,
+    executor: Db | Tx = this.db,
+  ): Promise<Map<string, Set<Permission>>> {
+    const rows = await executor
+      .selectDistinct({
+        company: userCompanyRoles.companyCode,
+        permission: rolePermissions.permissionCode,
+      })
+      .from(userCompanyRoles)
+      .innerJoin(users, eq(users.id, userCompanyRoles.userId))
+      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userCompanyRoles.roleId))
+      .where(
+        and(
+          eq(userCompanyRoles.userId, userId),
+          eq(users.status, 'ACTIVE'),
+          sql`${rolePermissions.permissionCode} LIKE 'finance.%'`,
+        ),
+      );
+    const rights = new Map<string, Set<Permission>>();
+    for (const row of rows) {
+      if (!isPermission(row.permission)) continue;
+      const codes = rights.get(row.company) ?? new Set<Permission>();
+      codes.add(row.permission);
+      rights.set(row.company, codes);
+    }
+    return rights;
   }
 }

@@ -20,6 +20,8 @@ import type {
 import { LevelsImporter } from '../importers/levels.importer';
 import { OpeningStockImporter } from '../importers/opening-stock.importer';
 import { PricesImporter } from '../importers/prices.importer';
+import { FinChartImporter } from '../importers/fin-chart.importer';
+import { FinOpeningImporter } from '../importers/fin-opening.importer';
 import { IssuesImporter } from '../importers/issues.importer';
 import { ReceiptsImporter } from '../importers/receipts.importer';
 import { ProductsImporter } from '../importers/products.importer';
@@ -60,6 +62,8 @@ export class ImportPipelineService {
     prices: PricesImporter,
     receipts: ReceiptsImporter,
     issues: IssuesImporter,
+    finChart: FinChartImporter,
+    finOpening: FinOpeningImporter,
   ) {
     this.importers = new Map<ImportKind, Importer>([
       ['PRODUCTS', products],
@@ -70,6 +74,8 @@ export class ImportPipelineService {
       ['PRICES', prices],
       ['RECEIPTS', receipts],
       ['ISSUES', issues],
+      ['FIN_CHART', finChart],
+      ['FIN_OPENING', finOpening],
     ]);
   }
 

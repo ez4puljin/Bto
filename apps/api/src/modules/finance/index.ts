@@ -21,6 +21,17 @@ export {
   CreditNotesService,
   type CreditNoteSummary,
 } from './services/credit-notes.service';
+export {
+  type ChartAccountFact,
+  type ChartFacts,
+  CUSTOMER_CONTROLS,
+  FinanceImportsService,
+  OPENING_ROWS_PER_DOCUMENT,
+  type OpeningAccountFact,
+  type OpeningFacts,
+  type OpeningLine,
+  SUPPLIER_CONTROLS,
+} from './services/finance-imports.service';
 export { type FinanceNumbering, FinanceSettingsService } from './services/finance-settings.service';
 export {
   type GlAccount,

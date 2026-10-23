@@ -1,7 +1,13 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import type { FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
 import { finFiscalPeriods } from '../schema';
+
+/**
+ * pg_advisory_xact_lock key per company between postings (shared) and a close or reopen (exclusive,
+ * ADR-0102 #2): a posting that creates an earlier month's row never interleaves with a close.
+ */
+export const PERIOD_LOCK = 72_026_133;
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -21,12 +27,13 @@ export function monthOf(date: string): { code: string; startsOn: string; endsOn:
 
 /**
  * The OPEN period a posting dated `date` lands in, share-locked for the rest of the transaction (a
- * close in F5 takes it FOR UPDATE). A month without a row is created OPEN, unless the company has
+ * close takes the company's period lock exclusively and the row FOR UPDATE, ADR-0102 #2). A month without a row is created OPEN, unless the company has
  * closed that month or a later one (ADR-0075, docs/modules/finance-core.md §4): a document dated
  * in a closed month, or in an earlier month that has no row, is refused with FIN_PERIOD_CLOSED.
  */
 export async function openPeriodInTx(tx: FinTx, companyId: number, date: string): Promise<number> {
   const month = monthOf(date);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock_shared(${PERIOD_LOCK}, ${companyId})`);
   const [closedLater] = await tx
     .select({ code: finFiscalPeriods.code })
     .from(finFiscalPeriods)

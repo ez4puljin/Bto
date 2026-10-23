@@ -119,6 +119,13 @@ export const TEST_SPEC: FinInstallationSpec = {
       numberSeries: 'JOURNAL',
     },
     {
+      code: 'FIN.OPENING',
+      system: 'FIN',
+      class: 'OPENING',
+      numberMode: 'CORE',
+      numberSeries: 'JOURNAL',
+    },
+    {
       code: 'FIN.RECEIPT',
       system: 'FIN',
       class: 'RECEIPT',

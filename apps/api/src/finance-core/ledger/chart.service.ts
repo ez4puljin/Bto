@@ -6,11 +6,14 @@ import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/
 import type { FinCallContext } from '../context/call-context';
 import { FIN_DB, type FinDb, type FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
+import { accountsWithLines } from '../posting/journal-reader.service';
 import {
+  FIN_ACCOUNT_CONTROLS,
   FIN_ACCOUNT_KINDS,
   FIN_MONEY_ACCOUNT_KINDS,
   type FIN_SIDES,
   FIN_STATUSES,
+  finAccountGroups,
   finAccounts,
   finBranchRefs,
   finMoneyAccounts,
@@ -33,8 +36,55 @@ export interface FinAccountView {
   normalSide: FinSide;
   control: FinAccountControl;
   status: FinStatus;
+  /** Its group in the chart (ADR-0102 #4), or null. */
+  groupId: number | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface FinAccountGroupView {
+  id: number;
+  code: string;
+  name: string;
+  status: FinStatus;
+}
+
+/**
+ * One account of an imported chart (ADR-0102 #4). `normalSide` null: the kind's (an existing
+ * account of the same kind keeps its own); `control` and `group` null: the account's own (NONE /
+ * none for a new one); `group.name` null keeps a group's name (a new group is named by its code);
+ * `key` re-points that posting key's rule to the account.
+ */
+export interface FinChartImportRow {
+  code: string;
+  name: string;
+  kind: FinAccountKind;
+  normalSide: FinSide | null;
+  control: FinAccountControl | null;
+  group: { code: string; name: string | null } | null;
+  key: string | null;
+}
+
+interface FinAccountFields {
+  name: string;
+  kind: FinAccountKind;
+  normalSide: FinSide;
+  control: FinAccountControl;
+  groupId: number | null;
+}
+
+/** What an imported row did, kept by the import for its revert. */
+export interface FinChartImportApplied {
+  code: string;
+  accountId: number;
+  action: 'CREATE' | 'UPDATE' | 'UNCHANGED';
+  before: FinAccountFields | null;
+  after: FinAccountFields;
+  /** The key re-pointed to the account and the account it pointed to before (null: none). */
+  rule: { key: string; previousAccountId: number | null } | null;
+  /** A group this row created, or one it renamed with its previous name. */
+  groupCreated: number | null;
+  groupBefore: { id: number; name: string } | null;
 }
 
 /** A posting key's company-default rule in force on a date; `accountId` null = no account. */
@@ -451,6 +501,381 @@ export class FinChartService {
     return view ?? null;
   }
 
+  /** The company's posting keys with the control each wants of its account. */
+  async postingKeys(
+    ctx: FinCallContext,
+    query: { company: string },
+    executor: FinExecutor = this.db,
+  ): Promise<Map<string, FinAccountControl>> {
+    const scope = await this.read(executor, ctx, query.company);
+    const rows = await executor
+      .select({ code: finPostingKeys.code, requiredControl: finPostingKeys.requiredControl })
+      .from(finPostingKeys)
+      .where(eq(finPostingKeys.companyId, scope.companyId));
+    return new Map(rows.map((row) => [row.code, row.requiredControl]));
+  }
+
+  /** The company's account groups. */
+  async groups(
+    ctx: FinCallContext,
+    query: { company: string },
+    executor: FinExecutor = this.db,
+  ): Promise<FinAccountGroupView[]> {
+    const scope = await this.read(executor, ctx, query.company);
+    return executor
+      .select({
+        id: finAccountGroups.id,
+        code: finAccountGroups.code,
+        name: finAccountGroups.name,
+        status: finAccountGroups.status,
+      })
+      .from(finAccountGroups)
+      .where(eq(finAccountGroups.companyId, scope.companyId))
+      .orderBy(asc(finAccountGroups.code));
+  }
+
+  /**
+   * Erkhet's chart, inside the caller's transaction (ADR-0102 #4): each row's group is found or made
+   * by code, its account made or changed by code (name, kind, normal side, control, group; a null
+   * control or group keeps the account's), and its posting key, if any, re-pointed to it by a rule
+   * from `on`. An account holding journal lines keeps its kind, side and control
+   * (FIN_ACCOUNT_IN_USE); a key that wants a control the account lacks is refused
+   * (FIN_PAYLOAD_INVALID `rows.<n>.key`). Returns what changed, for the revert.
+   */
+  async importChartInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; rows: readonly FinChartImportRow[]; on: string },
+  ): Promise<FinChartImportApplied[]> {
+    const scope = await resolveCompany(tx, ctx, input.company, {
+      source: false,
+      userAnyOf: CHART_WRITE,
+    });
+    if (input.rows.some((row) => row.key !== null)) {
+      await resolveCompany(tx, ctx, input.company, { source: false, userAnyOf: RULE_WRITE });
+    }
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${RULES_LOCK}, ${scope.companyId})`);
+    const codes = input.rows.map((row, index) => trimmed(row.code, `rows.${index}.code`, 64));
+    const existing = new Map(
+      (
+        await tx
+          .select(accountColumns)
+          .from(finAccounts)
+          .where(and(eq(finAccounts.companyId, scope.companyId), inArray(finAccounts.code, codes)))
+          .orderBy(asc(finAccounts.id))
+          .for('update')
+      ).map((row) => [row.code, row]),
+    );
+    const inUse = await accountsWithLines(
+      tx,
+      scope.companyId,
+      [...existing.values()].map((row) => row.id),
+    );
+    const keys = new Map(
+      (
+        await tx
+          .select({ code: finPostingKeys.code, requiredControl: finPostingKeys.requiredControl })
+          .from(finPostingKeys)
+          .where(eq(finPostingKeys.companyId, scope.companyId))
+      ).map((row) => [row.code, row.requiredControl]),
+    );
+    const rules = await rulesOn(tx, scope.companyId, input.on);
+    const groups = await this.groupsInTx(tx, scope.companyId);
+    const applied: FinChartImportApplied[] = [];
+    for (const [index, row] of input.rows.entries()) {
+      const path = `rows.${index}`;
+      const code = codes[index] ?? '';
+      const name = trimmed(row.name, `${path}.name`, 200);
+      if (!FIN_ACCOUNT_KINDS.includes(row.kind)) throw invalid(`${path}.kind`);
+      if (row.control !== null && !FIN_ACCOUNT_CONTROLS.includes(row.control)) {
+        throw invalid(`${path}.control`);
+      }
+      const before = existing.get(code) ?? null;
+      let groupId = before?.groupId ?? null;
+      let groupCreated: number | null = null;
+      let groupBefore: { id: number; name: string } | null = null;
+      if (row.group) {
+        const groupCode = trimmed(row.group.code, `${path}.group.code`, 64);
+        const groupName =
+          row.group.name === null ? null : trimmed(row.group.name, `${path}.group.name`, 200);
+        const found = groups.get(groupCode);
+        if (found) {
+          groupId = found.id;
+          if (groupName !== null && groupName !== found.name) {
+            groupBefore = { id: found.id, name: found.name };
+            await tx
+              .update(finAccountGroups)
+              .set({ name: groupName, status: 'ACTIVE', updatedAt: sql`now()` })
+              .where(
+                and(
+                  eq(finAccountGroups.companyId, scope.companyId),
+                  eq(finAccountGroups.id, found.id),
+                ),
+              );
+            found.name = groupName;
+          }
+        } else {
+          const [made] = await tx
+            .insert(finAccountGroups)
+            .values({ companyId: scope.companyId, code: groupCode, name: groupName ?? groupCode })
+            .returning({ id: finAccountGroups.id });
+          if (!made) throw new Error('fin account group was not created');
+          groupId = made.id;
+          groupCreated = made.id;
+          groups.set(groupCode, { id: made.id, name: groupName ?? groupCode });
+        }
+      }
+      const control = row.control ?? before?.control ?? 'NONE';
+      const values: FinAccountFields = {
+        name,
+        kind: row.kind,
+        normalSide:
+          row.normalSide ??
+          (before && before.kind === row.kind ? before.normalSide : normalSideOf(row.kind)),
+        control,
+        groupId,
+      };
+      let accountId: number;
+      let action: FinChartImportApplied['action'];
+      if (!before) {
+        const [made] = await tx
+          .insert(finAccounts)
+          .values({ companyId: scope.companyId, code, ...values })
+          .returning({ id: finAccounts.id });
+        if (!made) throw new Error('fin account was not created');
+        accountId = made.id;
+        action = 'CREATE';
+      } else {
+        accountId = before.id;
+        if (
+          inUse.has(before.id) &&
+          (before.kind !== values.kind ||
+            before.normalSide !== values.normalSide ||
+            before.control !== values.control)
+        ) {
+          throw new FinError('FIN_ACCOUNT_IN_USE', undefined, { path, code });
+        }
+        const same =
+          before.name === values.name &&
+          before.kind === values.kind &&
+          before.normalSide === values.normalSide &&
+          before.control === values.control &&
+          before.groupId === values.groupId;
+        action = same ? 'UNCHANGED' : 'UPDATE';
+        if (!same) {
+          await tx
+            .update(finAccounts)
+            .set({ ...values, updatedAt: sql`now()` })
+            .where(and(eq(finAccounts.companyId, scope.companyId), eq(finAccounts.id, before.id)));
+        }
+      }
+      let rule: FinChartImportApplied['rule'] = null;
+      if (row.key !== null) {
+        const required = keys.get(row.key);
+        if (required === undefined) {
+          throw new FinError('FIN_MAPPING_MISSING', undefined, {
+            key: row.key,
+            path: `${path}.key`,
+          });
+        }
+        if (required !== 'NONE' && required !== control) throw invalid(`${path}.key`);
+        const current = rules.get(row.key) ?? null;
+        if (current?.accountId !== accountId) {
+          await tx.insert(finPostingRules).values({
+            companyId: scope.companyId,
+            postingKey: row.key,
+            accountId,
+            effectiveFrom: input.on,
+          });
+          rule = { key: row.key, previousAccountId: current?.accountId ?? null };
+        }
+      }
+      applied.push({
+        code,
+        accountId,
+        action,
+        before: before
+          ? {
+              name: before.name,
+              kind: before.kind,
+              normalSide: before.normalSide,
+              control: before.control,
+              groupId: before.groupId,
+            }
+          : null,
+        after: values,
+        rule,
+        groupCreated,
+        groupBefore,
+      });
+    }
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'IMPORT',
+      entity: 'chart',
+      entityId: scope.companyId,
+      after: {
+        created: applied.filter((row) => row.action === 'CREATE').length,
+        updated: applied.filter((row) => row.action === 'UPDATE').length,
+        rules: applied.flatMap((row) => (row.rule ? [row.rule.key] : [])),
+      },
+    });
+    return applied;
+  }
+
+  /**
+   * Takes an imported chart back (ADR-0102 #4), newest row first: a re-pointed key goes back to its
+   * previous account while it still points to the imported one (a rule from `on`); a changed account
+   * gets back the fields that still hold the imported values (its kind, side and control only while
+   * it holds no lines); a created account is deactivated unless it holds lines, a rule or a money
+   * account; a renamed group gets its name back, a created one is deactivated once it is empty.
+   */
+  async revertChartInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; applied: readonly FinChartImportApplied[]; on: string },
+  ): Promise<void> {
+    const scope = await resolveCompany(tx, ctx, input.company, {
+      source: false,
+      userAnyOf: CHART_WRITE,
+    });
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${RULES_LOCK}, ${scope.companyId})`);
+    const ids = input.applied.map((row) => row.accountId);
+    const current = new Map(
+      (
+        await tx
+          .select(accountColumns)
+          .from(finAccounts)
+          .where(and(eq(finAccounts.companyId, scope.companyId), inArray(finAccounts.id, ids)))
+          .for('update')
+      ).map((row) => [row.id, row]),
+    );
+    const inUse = await accountsWithLines(tx, scope.companyId, ids);
+    const rules = await rulesOn(tx, scope.companyId, input.on);
+    const where = (id: number) =>
+      and(eq(finAccounts.companyId, scope.companyId), eq(finAccounts.id, id));
+    for (const row of [...input.applied].reverse()) {
+      if (row.rule && rules.get(row.rule.key)?.accountId === row.accountId) {
+        await tx.insert(finPostingRules).values({
+          companyId: scope.companyId,
+          postingKey: row.rule.key,
+          accountId: row.rule.previousAccountId,
+          effectiveFrom: input.on,
+        });
+        rules.set(row.rule.key, {
+          key: row.rule.key,
+          ruleId: 0,
+          accountId: row.rule.previousAccountId,
+          effectiveFrom: input.on,
+        });
+      }
+      const account = current.get(row.accountId);
+      if (!account) continue;
+      if (row.action === 'CREATE') {
+        const [money] = await tx
+          .select({ id: finMoneyAccounts.id })
+          .from(finMoneyAccounts)
+          .where(
+            and(
+              eq(finMoneyAccounts.companyId, scope.companyId),
+              eq(finMoneyAccounts.accountId, account.id),
+            ),
+          )
+          .limit(1);
+        const held =
+          inUse.has(account.id) ||
+          money !== undefined ||
+          [...rules.values()].some((rule) => rule.accountId === account.id);
+        if (!held && account.status === 'ACTIVE') {
+          await tx
+            .update(finAccounts)
+            .set({ status: 'INACTIVE', updatedAt: sql`now()` })
+            .where(where(account.id));
+        }
+      } else if (row.action === 'UPDATE' && row.before) {
+        const sidesHold =
+          !inUse.has(account.id) &&
+          account.kind === row.after.kind &&
+          account.normalSide === row.after.normalSide &&
+          account.control === row.after.control;
+        const back = {
+          ...(account.name === row.after.name ? { name: row.before.name } : {}),
+          ...(account.groupId === row.after.groupId ? { groupId: row.before.groupId } : {}),
+          ...(sidesHold
+            ? {
+                kind: row.before.kind,
+                normalSide: row.before.normalSide,
+                control: row.before.control,
+              }
+            : {}),
+        };
+        if (Object.keys(back).length) {
+          await tx
+            .update(finAccounts)
+            .set({ ...back, updatedAt: sql`now()` })
+            .where(where(account.id));
+        }
+      }
+      if (row.groupBefore) {
+        await tx
+          .update(finAccountGroups)
+          .set({ name: row.groupBefore.name, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(finAccountGroups.companyId, scope.companyId),
+              eq(finAccountGroups.id, row.groupBefore.id),
+            ),
+          );
+      }
+    }
+    for (const row of input.applied) {
+      if (row.groupCreated === null) continue;
+      const [member] = await tx
+        .select({ id: finAccounts.id })
+        .from(finAccounts)
+        .where(
+          and(
+            eq(finAccounts.companyId, scope.companyId),
+            eq(finAccounts.groupId, row.groupCreated),
+            eq(finAccounts.status, 'ACTIVE'),
+          ),
+        )
+        .limit(1);
+      if (!member) {
+        await tx
+          .update(finAccountGroups)
+          .set({ status: 'INACTIVE', updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(finAccountGroups.companyId, scope.companyId),
+              eq(finAccountGroups.id, row.groupCreated),
+            ),
+          );
+      }
+    }
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'REVERT',
+      entity: 'chart',
+      entityId: scope.companyId,
+      after: { rows: input.applied.length },
+    });
+  }
+
+  private async groupsInTx(
+    tx: FinTx,
+    companyId: number,
+  ): Promise<Map<string, { id: number; name: string }>> {
+    const rows = await tx
+      .select({ id: finAccountGroups.id, code: finAccountGroups.code, name: finAccountGroups.name })
+      .from(finAccountGroups)
+      .where(eq(finAccountGroups.companyId, companyId))
+      .for('update');
+    return new Map(rows.map((row) => [row.code, { id: row.id, name: row.name }]));
+  }
+
   private read(executor: FinExecutor, ctx: FinCallContext, company: string) {
     return resolveCompany(executor, ctx, company, { source: true, userAnyOf: READ });
   }
@@ -509,6 +934,7 @@ const accountColumns = {
   normalSide: finAccounts.normalSide,
   control: finAccounts.control,
   status: finAccounts.status,
+  groupId: finAccounts.groupId,
   createdAt: finAccounts.createdAt,
   updatedAt: finAccounts.updatedAt,
 };

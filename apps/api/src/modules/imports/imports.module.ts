@@ -2,12 +2,15 @@ import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common'
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
+import { FinanceModule } from '../finance';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
 import { ImportsController } from './controllers/imports.controller';
 import { CustomersImporter } from './importers/customers.importer';
+import { FinChartImporter } from './importers/fin-chart.importer';
+import { FinOpeningImporter } from './importers/fin-opening.importer';
 import { LevelsImporter } from './importers/levels.importer';
 import { OpeningStockImporter } from './importers/opening-stock.importer';
 import { PricesImporter } from './importers/prices.importer';
@@ -25,6 +28,8 @@ import { ImportsService } from './services/imports.service';
 
 const CORE_SERVICES = [
   CustomersImporter,
+  FinChartImporter,
+  FinOpeningImporter,
   LevelsImporter,
   ImportPipelineService,
   ImportsService,
@@ -38,7 +43,14 @@ const CORE_SERVICES = [
 
 /** Import services every process may use (the api requests, the worker carries out). */
 @Module({
-  imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule, PricingModule],
+  imports: [
+    IdentityModule,
+    CatalogModule,
+    PartnersModule,
+    InventoryModule,
+    PricingModule,
+    FinanceModule,
+  ],
   providers: CORE_SERVICES,
   exports: CORE_SERVICES,
 })

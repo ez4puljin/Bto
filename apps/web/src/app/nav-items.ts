@@ -4,6 +4,7 @@ import {
   Activity,
   ArrowLeftRight,
   BookOpenText,
+  CalendarCheck,
   CalendarClock,
   Coins,
   FileText,
@@ -230,6 +231,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/finance/accounts',
         label: 'nav.glAccounts',
         icon: ListTree,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/periods',
+        label: 'nav.financePeriods',
+        icon: CalendarCheck,
         permission: 'finance.read',
       },
       {

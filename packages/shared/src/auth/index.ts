@@ -58,6 +58,9 @@ export const PERMISSIONS = [
   'finance.invoices.manage',
   'finance.journal.manage',
   'finance.settings.manage',
+  // Month close (ADR-0102): closing a month that has ended; reopening the latest closed one.
+  'finance.periods.close',
+  'finance.periods.reopen',
   // The supermarket POS (ADR-0063): reading tills, shifts and sales; configuring tills, cashiers,
   // PINs and the store's edge node; working a till; approving returns and no-sale drawer opens.
   'pos.read',
@@ -150,6 +153,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'finance.payments.record',
     'finance.invoices.manage',
     'finance.journal.manage',
+    // The month close and its reopen (ADR-0102 #1).
+    'finance.periods.close',
+    'finance.periods.reopen',
     // The supermarket's shifts and their cash (ADR-0064 #3).
     'pos.read',
   ],
