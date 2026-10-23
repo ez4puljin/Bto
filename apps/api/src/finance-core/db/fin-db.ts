@@ -2,6 +2,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 import type { AnyTx } from '../../common/db/any-tx';
 import {
+  finAccountGroups,
   finAccounts,
   finAllocations,
   finDocumentTypes,
@@ -25,6 +26,7 @@ import {
   finParties,
   finPartyCompanies,
   finPartyRefs,
+  finPeriodEvents,
   finPostingKeys,
   finPostingRules,
   finSourceGrants,
@@ -38,6 +40,7 @@ import {
  * imports.
  */
 const schema = {
+  finAccountGroups,
   finAccounts,
   finAllocations,
   finDocumentTypes,
@@ -61,6 +64,7 @@ const schema = {
   finParties,
   finPartyCompanies,
   finPartyRefs,
+  finPeriodEvents,
   finPostingKeys,
   finPostingRules,
   finSourceGrants,

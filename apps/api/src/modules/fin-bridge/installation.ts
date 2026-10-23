@@ -31,6 +31,8 @@ export const FIN_DOC_TYPES = {
   OTHER_PAYMENT: { code: 'FIN.OTHER_PAYMENT', system: FIN_SOURCE, docType: 'PAYMENT' },
   JOURNAL: { code: 'FIN.JOURNAL', system: FIN_SOURCE, docType: 'JOURNAL' },
   ALLOCATION: { code: 'FIN.ALLOCATION', system: FIN_SOURCE, docType: 'ALLOCATION' },
+  // The opening trial balance (ADR-0102 #5), one per company, posted by the accountant's import.
+  OPENING: { code: 'FIN.OPENING', system: FIN_SOURCE, docType: 'OPENING' },
   SUPPLIER_BILL: { code: 'BTO.SUPPLIER_BILL', system: BTO_SOURCE, docType: 'GOODS_RECEIPT' },
   SUPPLIER_BILL_CREDIT: {
     code: 'BTO.SUPPLIER_BILL_CREDIT',
@@ -241,6 +243,13 @@ export function btoInstallationSpec(input: {
         class: 'ALLOCATION',
         numberMode: 'CORE',
         numberSeries: 'ALLOCATION',
+      },
+      {
+        code: FIN_DOC_TYPES.OPENING.code,
+        system: FIN_SOURCE,
+        class: 'OPENING',
+        numberMode: 'CORE',
+        numberSeries: 'JOURNAL',
       },
       ...(
         [

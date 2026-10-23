@@ -1081,3 +1081,50 @@ export class PayableOpenItemDto {
 export class PayableOpenItemListDto {
   @ApiProperty({ type: [PayableOpenItemDto] }) data: PayableOpenItemDto[];
 }
+
+const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+@ApiSchema({ name: 'FinancePeriodEvent' })
+export class FinancePeriodEventDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: '2026-10' }) period: string;
+  @ApiProperty({ enum: ['CLOSE', 'REOPEN'] }) action: 'CLOSE' | 'REOPEN';
+  @ApiProperty({ type: String, nullable: true }) reason: string | null;
+  @ApiProperty({ example: 'Нягтлан' }) actorLabel: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+}
+
+@ApiSchema({ name: 'FinancePeriod' })
+export class FinancePeriodDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: '2026-10' }) code: string;
+  @ApiProperty({ example: '2026-10-01' }) startsOn: string;
+  @ApiProperty({ example: '2026-10-31' }) endsOn: string;
+  @ApiProperty({ enum: ['OPEN', 'CLOSED'] }) status: 'OPEN' | 'CLOSED';
+  @ApiProperty({ type: FinancePeriodEventDto, nullable: true })
+  lastEvent: FinancePeriodEventDto | null;
+}
+
+@ApiSchema({ name: 'FinancePeriodList' })
+export class FinancePeriodListDto {
+  @ApiProperty({ type: [FinancePeriodDto] }) data: FinancePeriodDto[];
+}
+
+@ApiSchema({ name: 'FinancePeriodEventList' })
+export class FinancePeriodEventListDto {
+  @ApiProperty({ type: [FinancePeriodEventDto] }) data: FinancePeriodEventDto[];
+}
+
+@ApiSchema({ name: 'FinancePeriodEventQuery' })
+export class FinancePeriodEventQueryDto {
+  @ApiPropertyOptional({ example: '2026-10' }) @IsOptional() @Matches(PERIOD) period?: string;
+}
+
+@ApiSchema({ name: 'FinancePeriodReopenRequest' })
+export class FinancePeriodReopenRequestDto {
+  @ApiProperty({ maxLength: FINANCE_LIMITS.maxReason })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(FINANCE_LIMITS.maxReason)
+  reason: string;
+}

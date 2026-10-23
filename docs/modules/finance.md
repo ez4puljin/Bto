@@ -1,5 +1,11 @@
 # Module `finance` — contract
 
+**Status note (2026-10-23, F5 done, ADR-0102).** The month close and the opening:
+- «Санхүү → Сарын хаалт» (`PeriodsService`, `PeriodsController`) closes a month once it has ended, in order and with a clean core reconcile (`finance.periods.close`). It reopens the latest closed one with a reason (`finance.periods.reopen`). Both rights belong to ADMIN and ACCOUNTANT.
+- A closed month refuses every posting (`FIN_PERIOD_CLOSED`, 409).
+- `FinanceImportsService` serves the imports' `FIN_CHART` (Erkhet's chart, the «Үүрэг» column re-pointing a key) and `FIN_OPENING` (the opening trial balance as OPENING documents of 499 rows, AR and AP per party as open items with due dates, the inventory row on the opening offset 390101). The committing staff member's rights are read in the worker.
+- Fictitious data only until D16 and D27 (`docs/modules/finance-core.md` §3.11).
+
 **Status note (2026-10-22, F4 done, ADR-0097).** The stock's value: finance binds inventory's `STOCK_BOOKS` with `StockBooksService` — every stock posting books its value in its transaction as `BTO/STOCK/<docType>:<docId>:<first ledger row>` (INVENTORY 140101 against goods received 310201, the cost of goods sold 610101, a loss 740201, a gain 511030, the opening offset 390101, a goods-issue type's 7302xx), a receipt's costing as `BTO/STOCK_REVALUE/<receipt>:<version>`; F3's supplier bill now debits goods received. `pnpm finance:reconcile` also prints the stock's value against INVENTORY. Temporary accounts, TODO-VERIFY D8 / D16.
 
 **Status note (2026-10-20, F3 done, ADR-0091).** The suppliers' payables: finance binds inventory's `PURCHASE_BOOKS` with `SupplierBillsService` — a goods receipt that gets its prices is the supplier's bill `BTO/GOODS_RECEIPT/<id>` (Dr 140101 stock, Dr 130301 input VAT / Cr 310101 payable, due on the delivery note's date), each re-costing books its difference (`BTO/RECEIPT_RECOST/<id>:<version>`), a goods issue to a supplier an AP credit (`BTO/SUPPLIER_RETURN/<id>`), all posted as source BTO inside the receipt's or issue's transaction. Payments to suppliers and service bills are manual journal entries whose payable line names the supplier (`supplierId`); the accountant pairs them with the bills on «Нийлүүлэгчийн тооцоо» (`POST /finance/allocations` with `supplierId`). `ApLedgerService` reads balances, ledgers and open items; routes `GET /supplier-balances`, `/:supplierId`, `/:supplierId/ledger`, `/:supplierId/open-items` (`finance.read`). Chart roles `AP`, `VAT_INPUT`, `INVENTORY` (temporary codes, TODO-VERIFY D16). Tests: `finance-payables.int-spec.ts`, `fin-payables-races.spec.ts`, web `supplier-payables.test.tsx`.
@@ -100,6 +106,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `GET /customer-balances`, `GET /customer-balances/:customerId`, `GET /customer-balances/:customerId/ledger` [read] | balances largest first (`q`, `overdue`) with aging; one customer; the ledger with `balanceAfter` and `opening` |
 | `GET /finance/attention` [read] | overdue amount and customers, open amount and invoices (the home tile) |
 | `GET /finance-settings/numbering` [read], `PUT` [`finance.settings.manage`] | the four formats |
+| `GET /finance/periods`, `GET /finance/periods/events` [read], `POST /finance/periods/:code/close` [`finance.periods.close`], `POST /finance/periods/:code/reopen` [`finance.periods.reopen`] (idempotent) | the months with their status and last event; every close and reopen; close a month that has ended (`FIN_PERIOD_NOT_ENDED`, `FIN_PERIOD_ORDER`, `FIN_CHECKLIST_FAILED`, all 409); reopen the latest closed month with `{reason}` (a blank one 422 `FIN_PAYLOAD_INVALID`) (ADR-0102) |
 
 Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'10'`), instants in ISO 8601, business dates as `YYYY-MM-DD`.
 
@@ -150,6 +157,7 @@ Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'1
 | `/finance/cash` (+ `?account=`) | the money accounts as cards with balances, the chosen one's book newest first with the balance after each voucher and the opening before `from` |
 | `/finance/customers`, `/finance/customers/:id` (+ `?new=1`) | who owes what with aging and credit terms; one customer's balance card and ledger with «Төлбөр бүртгэх» for that customer; `CustomerBalanceCard` («Тооцоо») on `/partners/customers/:id` |
 | `/finance/journal` (+ `?new=1`, `?entry=`), `/finance/accounts`, `/finance/accounts/:id` | the journal with «Гараар бичилт» (lines that must balance before sending) and the entry panel (a manual entry's «Эсрэг бичилт»); the chart with turnover and balances, account dialogs, the role dialog (`finance.settings.manage`), an account's ledger |
+| `/finance/periods` | «Сарын хаалт»: the months with their status and last close or reopen, «Сарыг хаах» (a month field, a confirmation), «Дахин нээх» with a reason on the latest closed month, the history (ADR-0102) |
 | `/finance/settings` (`finance.settings.manage`) | the four number formats with today's example; the money accounts, a bank account's «Харилцагчид харуулах» switch (the customer app lists it with the advice to name the invoice) and its «Апп-д харагдана» badge |
 
 Also: the home tile «Хугацаа хэтэрсэн авлагатай харилцагч» (`GET /finance/attention`, opens the balances filtered to overdue), the order panel's «Нэхэмжлэх» fact with the settlement badge, and `ProblemAlert` rendering `CREDIT_BLOCKED` as one line per reason with the formatted amounts.
@@ -165,7 +173,7 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 
 - e-Barimt receipts on invoices (ADR-0017): after P0a; the invoice carries everything the receipt needs (lines with `vat_type`, rates and amounts, the customer's TIN through partners); `ebarimt_receipts` is keyed by the source document from its first migration, never by `invoice_id` (ADR-0074).
 - Done 2026-10-19 (ADR-0082): no QPay (ADR-0080); the customer app reads the store's balance, open invoices and payments through finance's public services and lists the `money_accounts` flagged «Харилцагчид харуулах» (`docs/modules/customer.md`).
-- Opening balances: the full trial balance at the cut-over, AR and AP per party as open items, imported into the Finance Core and signed off against Erkhet's closing trial balance (ADR-0077); manual journal entries meanwhile.
+- Opening balances: built 2026-10-23 (ADR-0102) as the `FIN_OPENING` import; the date and the sign-off against Erkhet's closing trial balance per account and per party wait for the accountant (TODO-VERIFY D27), and Erkhet's real chart for D16.
 - The Finance Core carve itself: phases P0b … P5, H1, H2, A1, A2 and the go-live additions (`docs/modules/finance-core.md` §16).
 - A shorter due date for cash sales if the owner wants it (today every invoice takes the customer's term).
 - CLOSED orders when their invoice is paid; reminders.

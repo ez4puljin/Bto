@@ -11,6 +11,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -94,6 +95,13 @@ export class IssueImportOptionsDto {
   @ApiProperty({ description: 'A warehouse or store' }) @IsInt() @Min(1) warehouseId: number;
 }
 
+@ApiSchema({ name: 'FinOpeningImportOptions' })
+export class FinOpeningImportOptionsDto {
+  @ApiProperty({ example: '2026-12-31', description: 'The opening date: the day before go-live' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  date: string;
+}
+
 @ApiSchema({ name: 'ImportJob' })
 export class ImportJobDto {
   @ApiProperty() id: number;
@@ -116,6 +124,12 @@ export class ImportJobDto {
   receiptOptions: ReceiptImportOptionsDto | null;
   @ApiProperty({ type: IssueImportOptionsDto, nullable: true, description: 'ISSUES only' })
   issueOptions: IssueImportOptionsDto | null;
+  @ApiProperty({
+    type: FinOpeningImportOptionsDto,
+    nullable: true,
+    description: 'FIN_OPENING only',
+  })
+  openingOptions: FinOpeningImportOptionsDto | null;
   @ApiProperty({ description: 'The most recent committed import: only it can be reverted' })
   canRevert: boolean;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
@@ -186,6 +200,14 @@ export class CreateImportDto {
   @ValidateNested()
   @Type(() => IssueImportOptionsDto)
   issueOptions?: IssueImportOptionsDto;
+  @ApiPropertyOptional({
+    type: FinOpeningImportOptionsDto,
+    description: 'Required for FIN_OPENING',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FinOpeningImportOptionsDto)
+  openingOptions?: FinOpeningImportOptionsDto;
 }
 
 export class ImportListQueryDto extends PageQueryDto {

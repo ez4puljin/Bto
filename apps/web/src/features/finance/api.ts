@@ -592,3 +592,58 @@ export function useFinanceMutations() {
     }),
   };
 }
+
+export type FinancePeriod = Schemas['FinancePeriod'];
+export type FinancePeriodEvent = Schemas['FinancePeriodEvent'];
+
+const PERIOD_KEYS = {
+  periods: ['finance', 'periods'] as const,
+  events: ['finance', 'period-events'] as const,
+};
+
+/** The company's months with their status (ADR-0102), the newest first. */
+export function useFinancePeriods() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: PERIOD_KEYS.periods,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/periods', { signal })).data,
+  });
+}
+
+/** Every close and reopen, the newest first. */
+export function useFinancePeriodEvents() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: PERIOD_KEYS.events,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance/periods/events', { signal })).data,
+  });
+}
+
+export function usePeriodMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: ['finance'] });
+  return {
+    close: useMutation({
+      mutationFn: async ({ code, key }: Keyed<{ code: string }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/periods/{code}/close', {
+            params: { path: { code }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    reopen: useMutation({
+      mutationFn: async ({ code, key, reason }: Keyed<{ code: string; reason: string }>) =>
+        unwrap(
+          await api.POST('/api/v1/finance/periods/{code}/reopen', {
+            params: { path: { code }, header: idempotencyKey(key) },
+            body: { reason },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+  };
+}
