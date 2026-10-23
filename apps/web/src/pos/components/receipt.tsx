@@ -22,6 +22,7 @@ import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
 export function ReceiptView({ receipt }: { receipt: EdgeReceipt }) {
   const { t } = useTranslation();
   const discount = new Decimal(receipt.discountTotal).gt(0);
+  const refund = receipt.kind === 'RETURN';
   return (
     <article
       aria-label={t('posKiosk.receipt.label', { number: receipt.number })}
@@ -36,12 +37,23 @@ export function ReceiptView({ receipt }: { receipt: EdgeReceipt }) {
             {t('posKiosk.receipt.test')}
           </p>
         ) : null}
+        {refund ? (
+          <p className="rounded-md bg-danger-soft px-2 py-1 font-sans text-sm font-semibold tracking-wide text-destructive">
+            {t('posKiosk.receipt.returnBanner')}
+          </p>
+        ) : null}
       </header>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 border-b border-dashed border-input py-3">
         <dt className="text-muted-foreground">{t('pos.fields.number')}</dt>
         <dd className="text-right font-semibold">{receipt.number}</dd>
         <dt className="text-muted-foreground">{t('pos.fields.soldAt')}</dt>
         <dd className="text-right">{formatUbDateTime(Date.parse(receipt.soldAt))}</dd>
+        {refund && receipt.refundsNumber ? (
+          <>
+            <dt className="text-muted-foreground">{t('posKiosk.receipt.refunds')}</dt>
+            <dd className="text-right">{receipt.refundsNumber}</dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">{t('pos.fields.till')}</dt>
         <dd className="text-right">{receipt.tillCode}</dd>
         <dt className="text-muted-foreground">{t('pos.fields.cashier')}</dt>
@@ -85,11 +97,20 @@ export function ReceiptView({ receipt }: { receipt: EdgeReceipt }) {
         <dd className="text-right text-muted-foreground">{formatMnt(receipt.vatTotal)}</dd>
       </dl>
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 pt-3">
-        {receipt.tenders.map((tender, index) => (
-          <TenderRow key={index} tender={tender} />
-        ))}
-        <dt className="font-sans font-semibold">{t('pos.fields.change')}</dt>
-        <dd className="text-right font-semibold">{formatTugrik(receipt.change)}</dd>
+        {refund ? (
+          <>
+            <dt className="font-sans font-semibold">{t('posKiosk.receipt.refund')}</dt>
+            <dd className="text-right font-semibold">{formatTugrik(receipt.total)}</dd>
+          </>
+        ) : (
+          <>
+            {receipt.tenders.map((tender, index) => (
+              <TenderRow key={index} tender={tender} />
+            ))}
+            <dt className="font-sans font-semibold">{t('pos.fields.change')}</dt>
+            <dd className="text-right font-semibold">{formatTugrik(receipt.change)}</dd>
+          </>
+        )}
       </dl>
       <p className="pt-3 text-center font-sans text-xs text-muted-foreground">
         {t('posKiosk.receipt.thanks')}
@@ -128,6 +149,7 @@ export function ReceiptDialog(props: {
   const { t } = useTranslation();
   const next = useRef<HTMLButtonElement>(null);
   const { receipt } = props;
+  const refund = receipt?.kind === 'RETURN';
   return (
     <Dialog
       open={props.open && receipt !== null}
@@ -145,15 +167,17 @@ export function ReceiptDialog(props: {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CircleCheck aria-hidden className="size-5 text-success" />
-            {t('posKiosk.receipt.title')}
+            {refund ? t('posKiosk.receipt.returnTitle') : t('posKiosk.receipt.title')}
           </DialogTitle>
           <DialogDescription>
-            {receipt
-              ? t('posKiosk.receipt.summary', {
-                  total: formatTugrik(receipt.total),
-                  change: formatTugrik(receipt.change),
-                })
-              : null}
+            {receipt && refund
+              ? t('posKiosk.receipt.returnSummary', { total: formatTugrik(receipt.total) })
+              : receipt
+                ? t('posKiosk.receipt.summary', {
+                    total: formatTugrik(receipt.total),
+                    change: formatTugrik(receipt.change),
+                  })
+                : null}
           </DialogDescription>
         </DialogHeader>
         {receipt ? <ReceiptView receipt={receipt} /> : null}

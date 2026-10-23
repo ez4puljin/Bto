@@ -170,6 +170,7 @@ export class KioskController {
       shift: shift ? await this.shifts.summary(shift) : null,
       businessDate: businessDate(),
       companyName: loaded.snapshot.company.name,
+      approvalRequired: loaded.snapshot.settings.supervisorRequired,
     };
   }
 

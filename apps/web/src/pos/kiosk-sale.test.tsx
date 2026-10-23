@@ -14,6 +14,7 @@ import {
   json,
   problem,
   receiptOf,
+  SESSION,
   storeRoutes,
 } from './test/fake-edge';
 import { renderKiosk } from './test/render-kiosk';
@@ -188,7 +189,10 @@ describe('kiosk: the sale screen', () => {
   });
 
   it('changes the selected line with + / − and removes it with Delete', async () => {
-    await openSale();
+    // Without a supervisor asked for (the store's setting), a void is only logged (ADR-0104).
+    const edge = await openSale({
+      'GET /session': () => json({ ...SESSION, approvalRequired: false }),
+    });
     const user = userEvent.setup();
     await wedgeScan(MILK_BARCODE);
     const qty = await waitFor(() => qtyField('Сүү 1л (ш)'));
@@ -204,10 +208,22 @@ describe('kiosk: the sale screen', () => {
     expect(screen.getByLabelText(k.sale.scanLabel)).toHaveFocus();
     await user.keyboard('{Delete}');
     expect(await screen.findByText(k.sale.empty)).toBeInTheDocument();
+    expect(edge.callsTo('POST /voids').map((call) => call.body)).toEqual([
+      expect.objectContaining({
+        reason: 'QTY_REDUCED',
+        lines: [{ productUnitId: 11, qty: '1' }],
+        approval: null,
+      }),
+      expect.objectContaining({
+        reason: 'LINE_REMOVED',
+        lines: [{ productUnitId: 11, qty: '2' }],
+        approval: null,
+      }),
+    ]);
   });
 
   it('asks before cancelling the sale', async () => {
-    await openSale();
+    await openSale({ 'GET /session': () => json({ ...SESSION, approvalRequired: false }) });
     const user = userEvent.setup();
     await wedgeScan(MILK_BARCODE);
     await screen.findByText('Сүү 1л');

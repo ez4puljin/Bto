@@ -71,6 +71,8 @@ export const SHIFT: EdgeShiftSummary = {
   cardSales: '18000.00',
   total: '60000.00',
   vatTotal: '5454.55',
+  returnsCount: 0,
+  cashRefunds: '0.00',
   expectedCash: '92000.00',
   closedAt: null,
   countedCash: null,
@@ -84,7 +86,11 @@ export const SESSION: EdgeSession = {
   shift: SHIFT,
   businessDate: '2026-10-17',
   companyName: COMPANY,
+  approvalRequired: true,
 };
+
+/** The store's one supervisor (ADR-0104): approves voids and returns with PIN 654321. */
+export const SUPERVISOR = { userId: 9, fullName: 'Ахлах Нараа' };
 
 export const HEALTH: EdgeHealth = {
   status: 'ok',
@@ -100,8 +106,22 @@ export const MILK: EdgeProductHit = {
   sku: '100001',
   name: 'Сүү 1л',
   units: [
-    { unitId: 11, uomName: 'ш', factor: '1.000000', isBase: true, price: '3500.00' },
-    { unitId: 12, uomName: 'хайрцаг', factor: '12.000000', isBase: false, price: '40000.00' },
+    {
+      unitId: 11,
+      uomName: 'ш',
+      factor: '1.000000',
+      isBase: true,
+      price: '3500.00',
+      barcodes: ['4006381333931'],
+    },
+    {
+      unitId: 12,
+      uomName: 'хайрцаг',
+      factor: '12.000000',
+      isBase: false,
+      price: '40000.00',
+      barcodes: [],
+    },
   ],
 };
 export const MILK_BARCODE = '4006381333931';
@@ -111,7 +131,16 @@ export const BREAD: EdgeProductHit = {
   productId: 2,
   sku: '100002',
   name: 'Талх',
-  units: [{ unitId: 21, uomName: 'ш', factor: '1.000000', isBase: true, price: null }],
+  units: [
+    {
+      unitId: 21,
+      uomName: 'ш',
+      factor: '1.000000',
+      isBase: true,
+      price: null,
+      barcodes: ['4870001000014'],
+    },
+  ],
 };
 export const BREAD_BARCODE = '4870001000014';
 
@@ -205,6 +234,16 @@ export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<str
     },
     'POST /sales': (call) => json(receiptOf(call.body as EdgeSaleRequest)),
     'GET /sales/recent': () => json([]),
+    'GET /supervisors': () => json([SUPERVISOR]),
+    'POST /voids': (call) => {
+      const body = call.body as { clientId: string; approval: { pin: string } | null };
+      if (body.approval && body.approval.pin !== '654321') {
+        return problem('POS_PIN_INVALID', 401, { attemptsLeft: 4 });
+      }
+      return json({ clientId: body.clientId, approvedByName: SUPERVISOR.fullName });
+    },
+    'GET /parked': () => json([]),
+    'GET /quick-buttons': () => json([]),
     ...extra,
   };
 }

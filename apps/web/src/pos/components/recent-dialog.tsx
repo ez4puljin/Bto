@@ -80,7 +80,14 @@ function RecentPanel() {
               {dayjs(receipt.soldAt).tz(BUSINESS_TZ).format('HH:mm')}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-mono font-semibold">{receipt.number}</span>
+              <span className="block truncate font-mono font-semibold">
+                {receipt.number}
+                {receipt.kind === 'RETURN' ? (
+                  <span className="ml-2 rounded bg-danger-soft px-1.5 py-0.5 font-sans text-xs text-destructive">
+                    {t('posKiosk.recent.returnTag')}
+                  </span>
+                ) : null}
+              </span>
               <span className="block truncate text-xs text-muted-foreground">
                 {receipt.tenders.map((tender) => t(`pos.tenderKinds.${tender.kind}`)).join(' + ')}
                 {' · '}
@@ -88,6 +95,7 @@ function RecentPanel() {
               </span>
             </span>
             <span className="font-mono text-[15px] font-semibold">
+              {receipt.kind === 'RETURN' ? '−' : null}
               {formatTugrik(receipt.total)}
             </span>
             <ChevronRight aria-hidden className="size-4 text-muted-foreground" />

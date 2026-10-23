@@ -25,6 +25,8 @@ export interface Cart {
   select: (unitId: number | null) => void;
   moveSelection: (delta: 1 | -1) => void;
   clear: () => void;
+  /** A parked basket coming back (ADR-0104): its lines replace the empty cart. */
+  load: (lines: readonly CartLine[]) => void;
 }
 
 /** Whether − may take one off: the line keeps more than zero. */
@@ -110,6 +112,11 @@ export function useCart(): Cart {
     setSelected(null);
   }, []);
 
+  const load = useCallback((next: readonly CartLine[]) => {
+    setLines(next);
+    setSelected(next.at(-1)?.productUnitId ?? null);
+  }, []);
+
   const wire = useMemo(
     () => lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
     [lines],
@@ -126,5 +133,6 @@ export function useCart(): Cart {
     select: setSelected,
     moveSelection,
     clear,
+    load,
   };
 }

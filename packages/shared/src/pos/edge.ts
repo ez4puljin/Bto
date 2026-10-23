@@ -440,6 +440,8 @@ export interface EdgeSession {
   shift: EdgeShiftSummary | null;
   businessDate: string;
   companyName: string | null;
+  /** Whether a void or a return needs a supervisor's PIN (the store's settings, ADR-0104). */
+  approvalRequired?: boolean;
 }
 
 export interface EdgeShiftOpenRequest {
