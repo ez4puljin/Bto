@@ -64,11 +64,7 @@ export default function CustomerProfileScreen() {
           <Row title={t('mobile.customer.profile.address')} value={address ?? t('common.none')} />
           <Row
             title={t('mobile.customer.profile.term')}
-            value={
-              store.paymentTermDays !== null
-                ? t('mobile.customer.profile.termDays', { n: store.paymentTermDays })
-                : t('common.none')
-            }
+            value={t(`mobile.customer.profile.settleDays.${store.settlementGroup}`)}
           />
         </Group>
         <FootNote>{t('mobile.customer.profile.changeNote')}</FootNote>

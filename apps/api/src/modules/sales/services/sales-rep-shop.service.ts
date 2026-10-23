@@ -23,6 +23,7 @@ import type { AuthContext } from '../../identity';
 import { ProductLocationsService, StockQueryService } from '../../inventory';
 import { CustomersService, ProductSuppliersService } from '../../partners';
 import { ProductPricesService } from '../../pricing';
+import { overdueDto } from '../overdue';
 import { SalesOrdersService } from './sales-orders.service';
 
 /** A product as the rep's shop shows it: units with their wholesale price, and the stock. */
@@ -96,6 +97,8 @@ export interface RepCustomer {
   phone: string | null;
   /** The default address. */
   address: string | null;
+  /** The overdue receivable, whole MNT (ADR-0101: a red reminder, never a block). */
+  overdue: { amount: string; oldestDueDate: string | null } | null;
 }
 
 export interface RepCustomerDetail {
@@ -106,6 +109,8 @@ export interface RepCustomerDetail {
   /** Active addresses, the default first. */
   addresses: { id: number; label: string | null; address: string | null; isDefault: boolean }[];
   contacts: { name: string | null; phone: string | null }[];
+  /** The overdue receivable, whole MNT (ADR-0101: a red reminder, never a block). */
+  overdue: { amount: string; oldestDueDate: string | null } | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -304,6 +309,7 @@ export class SalesRepShopService {
     query: { q?: string; cursor?: string; limit?: number },
   ): Promise<{ data: RepCustomer[]; nextCursor: string | null }> {
     const page = await this.customers.list(ctx, { ...query, status: 'ACTIVE' });
+    const overdue = await this.customers.overdueOf(page.data.map((customer) => customer.id));
     return {
       data: page.data.map((customer) => ({
         id: customer.id,
@@ -311,6 +317,7 @@ export class SalesRepShopService {
         name: customer.name,
         phone: customer.phone,
         address: customer.address,
+        overdue: overdueDto(overdue.get(customer.id) ?? null),
       })),
       nextCursor: page.nextCursor,
     };
@@ -334,6 +341,7 @@ export class SalesRepShopService {
           isDefault: address.isDefault,
         })),
       contacts: customer.contacts.map((contact) => ({ name: contact.name, phone: contact.phone })),
+      overdue: overdueDto((await this.customers.overdueOf([id])).get(id) ?? null),
     };
   }
 

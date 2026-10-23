@@ -27,6 +27,8 @@ import {
   PAYMENT_DIRECTIONS,
   PAYMENT_KINDS,
   PAYMENT_STATUSES,
+  SETTLEMENT_GROUPS,
+  type SettlementGroup,
   type PaymentDirection,
   type PaymentKind,
   type PaymentStatus,
@@ -862,6 +864,8 @@ export class CustomerBalanceDto {
   @ApiProperty({ enum: STATUSES }) status: string;
   @ApiProperty({ type: String, nullable: true, example: '5000000.00' }) creditLimit: string | null;
   @ApiProperty() creditHold: boolean;
+  @ApiProperty({ enum: SETTLEMENT_GROUPS, description: 'When the invoices fall due (ADR-0101)' })
+  settlementGroup: SettlementGroup;
   @ApiProperty({ example: '150000.00', description: 'Negative = in advance' }) balance: string;
   @ApiProperty() openInvoices: number;
   @ApiProperty({ example: '0.00' }) overdueAmount: string;

@@ -18,7 +18,7 @@ const STORE = {
   phone: '+97699112233',
   centre: { branchName: 'Оргил Бөөний төв', warehouses: ['Төв агуулах'] },
   defaultAddress: { id: 3, label: null, address: 'Мөрөн, 5-р баг' },
-  paymentTermDays: 30,
+  settlementGroup: 'DAY_20',
   ordersOpen: true,
   today: '2026-10-19',
 };

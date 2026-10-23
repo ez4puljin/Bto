@@ -155,6 +155,7 @@ const ORDER: Schemas['SalesOrderDetail'] = {
   customerId: 9,
   customerCode: '1001',
   customerName: 'Номин дэлгүүр',
+  customerOverdue: null,
   fulfilment: 'DELIVERY',
   deliveryDate: '2099-10-16',
   addressId: 50,

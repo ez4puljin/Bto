@@ -150,6 +150,7 @@ describe('fin-bridge', () => {
       const created = await customers.create(systemActor('import:test'), {
         kind: 'INDIVIDUAL',
         name: 'Болд',
+        settlementGroup: 'MONTH_END',
       });
       expect(await partyOf(created.id)).toMatchObject({
         kind: 'INDIVIDUAL',

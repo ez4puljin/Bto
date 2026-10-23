@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { type components, idempotencyKey } from '@tugeel/api-client';
+import type { SettlementGroup } from '@tugeel/shared/finance';
 import { useApiClient } from '@/app/api-client-context';
 import type { ListReadOptions } from '@/lib/list-read';
 import { unwrap } from '@/lib/problem';
@@ -64,6 +65,8 @@ export interface CustomerFilter {
   segmentId?: number;
   /** The customer app account: open, closed or none (ADR-0079 #11). */
   app?: AppAccountFilter;
+  /** «Мөрөн» or «Орон нутаг» (ADR-0101). */
+  settlementGroup?: SettlementGroup;
 }
 
 export function useCustomers(filter: CustomerFilter, options: ListReadOptions = {}) {
@@ -86,6 +89,7 @@ export function useCustomers(filter: CustomerFilter, options: ListReadOptions = 
               gpsMissing: filter.gpsMissing,
               segmentId: filter.segmentId,
               app: filter.app,
+              settlementGroup: filter.settlementGroup,
               cursor: pageParam,
               limit,
             },

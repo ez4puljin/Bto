@@ -31,7 +31,7 @@ import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagina
 import { CatalogService, type ProductSummary, UnitConversionService } from '../../catalog';
 import { type Actor, type AuthContext, UserNamesService } from '../../identity';
 import { BinsService } from '../../inventory';
-import { CustomersService } from '../../partners';
+import { type CustomerOverdue, CustomersService } from '../../partners';
 import {
   orderStatusEvents,
   salesBoards,
@@ -114,6 +114,8 @@ export interface OrderDetail extends Omit<
 > {
   customerCode: string;
   customerName: string;
+  /** The customer's overdue receivable (ADR-0101: a red reminder, never a block); null when none. */
+  customerOverdue: CustomerOverdue | null;
   boardId: number | null;
   boardName: string | null;
   pipelineName: string | null;
@@ -159,6 +161,8 @@ export interface OrderSummary {
   customerId: number;
   customerCode: string;
   customerName: string;
+  /** The customer's overdue receivable (ADR-0101: a red reminder, never a block); null when none. */
+  customerOverdue: CustomerOverdue | null;
   fulfilment: Fulfilment;
   paymentMethod: PaymentMethod;
   deliveryDate: string;
@@ -182,6 +186,8 @@ export interface OrderCard {
   customerId: number;
   customerCode: string;
   customerName: string;
+  /** The customer's overdue receivable (ADR-0101: a red reminder, never a block); null when none. */
+  customerOverdue: CustomerOverdue | null;
   fulfilment: Fulfilment;
   paymentMethod: PaymentMethod;
   deliveryDate: string;
@@ -338,6 +344,7 @@ export class SalesOrderQueryService {
     const customers = new Map(
       (await this.customers.getMany(rows.map((row) => int(row.customer_id)))).map((c) => [c.id, c]),
     );
+    const overdue = await this.customers.overdueOf([...customers.keys()]);
     const names = await this.names.namesOf(
       rows.flatMap((row) => (row.created_by === null ? [] : [int(row.created_by)])),
     );
@@ -360,6 +367,7 @@ export class SalesOrderQueryService {
               customerId,
               customerCode: customers.get(customerId)?.code ?? '',
               customerName: customers.get(customerId)?.name ?? '',
+              customerOverdue: overdue.get(customerId) ?? null,
               fulfilment: row.fulfilment,
               paymentMethod: row.payment_method,
               deliveryDate: row.delivery_date,
@@ -434,11 +442,13 @@ export class SalesOrderQueryService {
     const names = await this.names.namesOf(
       page.data.flatMap((row) => (row.createdBy === null ? [] : [row.createdBy])),
     );
+    const overdue = await this.customers.overdueOf([...customers.keys()]);
     return {
       data: page.data.map(({ createdBy, lineCount, ...row }) => ({
         ...row,
         customerCode: customers.get(row.customerId)?.code ?? '',
         customerName: customers.get(row.customerId)?.name ?? '',
+        customerOverdue: overdue.get(row.customerId) ?? null,
         lineCount: Number.parseInt(lineCount, 10),
         pipelineName:
           row.pipelineId === null ? null : (access.pipeline(row.pipelineId)?.name ?? null),
@@ -580,6 +590,7 @@ export class SalesOrderQueryService {
       ...moves.flatMap((move) => (move.actorId === null ? [] : [move.actorId])),
     ]);
     const nameOf = (id: number | null) => (id === null ? null : (names.get(id) ?? null));
+    const overdue = await this.customers.overdueOf(orders.map((order) => order.customerId));
     return orders.map((order) => {
       const {
         createdBy,
@@ -596,6 +607,7 @@ export class SalesOrderQueryService {
         ...rest,
         customerCode: customer?.code ?? '',
         customerName: customer?.name ?? '',
+        customerOverdue: overdue.get(order.customerId) ?? null,
         boardId: pipeline?.boardId ?? null,
         boardName: pipeline ? (boards.get(pipeline.boardId) ?? null) : null,
         pipelineName: pipeline?.name ?? null,

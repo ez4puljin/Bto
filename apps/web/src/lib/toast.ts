@@ -1,9 +1,10 @@
 /**
  * Short confirmations («Хадгалагдлаа») shown at the bottom of the screen for a few seconds
  * (ADR-0042). Errors stay in ProblemAlert next to what failed. A module-level store read with
- * useSyncExternalStore, like the auth session: any code may call `toast.success(...)`.
+ * useSyncExternalStore, like the auth session: any code may call `toast.success(...)`. A `warning`
+ * is a reminder that did not stop what was done (an overdue debt at a confirmation, ADR-0101).
  */
-export type ToastTone = 'success' | 'info';
+export type ToastTone = 'success' | 'info' | 'warning';
 
 export interface ToastItem {
   id: number;
@@ -57,6 +58,7 @@ function show(message: string, tone: ToastTone): number {
 export const toast = {
   success: (message: string) => show(message, 'success'),
   info: (message: string) => show(message, 'info'),
+  warning: (message: string) => show(message, 'warning'),
 };
 
 export function dismissToast(id: number) {

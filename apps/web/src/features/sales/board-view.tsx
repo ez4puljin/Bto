@@ -6,7 +6,7 @@ import {
   PRINT_KINDS,
   type PrintKind,
 } from '@tugeel/shared/sales';
-import { ArrowRightLeft, Ellipsis, Plus, Printer } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Ellipsis, Plus, Printer } from 'lucide-react';
 import {
   type DragEvent,
   type MouseEvent,
@@ -436,8 +436,25 @@ function Card({
       </div>
       {/* The status beside the customer: the money line never wraps, so cards keep one height. */}
       <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate" title={card.customerName}>
-          {card.customerName}
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate" title={card.customerName}>
+            {card.customerName}
+          </span>
+          {card.customerOverdue ? (
+            // ADR-0101: the customer's overdue debt, a red reminder that never blocks.
+            <span
+              role="img"
+              className="shrink-0 text-destructive"
+              aria-label={t('sales.overdue.amount', {
+                amount: formatTugrik(card.customerOverdue.amount),
+              })}
+              title={t('sales.overdue.amount', {
+                amount: formatTugrik(card.customerOverdue.amount),
+              })}
+            >
+              <AlertTriangle className="size-3.5" aria-hidden />
+            </span>
+          ) : null}
         </span>
         <OrderStatusBadge status={card.status} />
       </div>

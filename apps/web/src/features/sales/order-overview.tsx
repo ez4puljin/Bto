@@ -1,5 +1,5 @@
 import { isEditable } from '@tugeel/shared/sales';
-import { Check } from 'lucide-react';
+import { AlertTriangle, Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -18,6 +18,30 @@ import { PaymentLabel } from './order-badges';
 import type { PanelTab } from './order-panel-tabs';
 import { placeName, type SalesPipeline, type SalesStage, useBoardTree } from './pipelines-api';
 import type { Mover } from './use-mover';
+
+/**
+ * The customer's overdue debt in red (ADR-0101): a reminder only, the order still goes on.
+ */
+export function CustomerOverdueNote({ overdue }: { overdue: SalesOrder['customerOverdue'] }) {
+  const { t } = useTranslation();
+  if (!overdue) return null;
+  return (
+    <p
+      role="status"
+      className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-danger-soft px-3 py-2 text-sm text-destructive"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        {overdue.oldestDueDate
+          ? t('sales.overdue.since', {
+              amount: formatTugrik(overdue.amount),
+              date: overdue.oldestDueDate,
+            })
+          : t('sales.overdue.amount', { amount: formatTugrik(overdue.amount) })}
+      </span>
+    </p>
+  );
+}
 
 /**
  * «Ерөнхий» (ADR-0059, erxes's Overview): where the order stands among its pipeline's stages and
@@ -104,6 +128,7 @@ export function OrderOverview({
       {pipeline && order.stageId !== null ? (
         <StageProgress order={order} pipeline={pipeline} mover={mover} blocked={blocked} />
       ) : null}
+      <CustomerOverdueNote overdue={order.customerOverdue} />
       <FactChips facts={facts} />
       <section className="rounded-xl border border-border p-4">
         <div className="mb-1 flex items-center justify-between gap-2">

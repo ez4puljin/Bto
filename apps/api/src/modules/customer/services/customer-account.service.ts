@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { type SettlementSummary, settlementSummary } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import type { OrderChannel } from '@tugeel/shared/sales';
 import { addDays, businessDate } from '@tugeel/shared/time';
@@ -41,7 +42,8 @@ export interface CustomerAccount {
   creditAvailable: Decimal | null;
   /** «Зээл хаалттай». */
   creditHold: boolean;
-  paymentTermDays: number | null;
+  /** «Тооцоо хийх өдөр» (ADR-0101): the current period, its day and what is due by it. */
+  settlement: SettlementSummary;
   openInvoices: number;
   payments: number;
 }
@@ -152,7 +154,7 @@ export class CustomerAccountService {
       creditLimit: credit.creditLimit,
       creditAvailable: credit.creditAvailable,
       creditHold: credit.creditHold,
-      paymentTermDays: credit.paymentTermDays,
+      settlement: credit.settlement,
       openInvoices: credit.openInvoices,
       payments: payments.total ?? 0,
     };
@@ -278,7 +280,7 @@ export class CustomerAccountService {
       defaultAddress: address
         ? { id: address.id, label: address.label, address: address.address }
         : null,
-      paymentTermDays: terms.paymentTerm.days,
+      settlementGroup: terms.settlementGroup,
       ordersOpen: await this.pipelines.customerAppOpen(),
       today: businessDate(),
     };
@@ -338,7 +340,10 @@ export class CustomerAccountService {
       creditLimit: limit,
       creditAvailable: limit === null ? null : Decimal.max(ZERO, limit.minus(exposure)),
       creditHold: terms.creditHold,
-      paymentTermDays: terms.paymentTerm.days,
+      settlement: settlementSummary(terms.settlementGroup, businessDate(), {
+        net: balance.balance,
+        overdue: overdue.amount,
+      }),
       exposure,
     };
   }

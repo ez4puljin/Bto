@@ -174,6 +174,7 @@ export const customerBalanceDto = (row: CustomerBalanceRow): CustomerBalanceDto 
   status: row.status,
   creditLimit: moneyOrNull(row.creditLimit),
   creditHold: row.creditHold,
+  settlementGroup: row.settlementGroup,
   balance: money(row.balance),
   openInvoices: row.openInvoices,
   overdueAmount: money(row.overdueAmount),

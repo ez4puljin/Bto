@@ -71,7 +71,7 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('address', 'text'),
     column('gps', 'link'),
     column('creditLimit', 'decimal'),
-    column('paymentTermDays', 'decimal'),
+    column('settlementGroup', 'text'),
     column('note', 'text'),
   ],
   SUPPLIERS: [

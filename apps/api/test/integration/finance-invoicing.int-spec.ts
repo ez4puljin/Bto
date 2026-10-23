@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { addDays, businessDate } from '@tugeel/shared/time';
+import { settlementDueDate } from '@tugeel/shared/finance';
+import { businessDate } from '@tugeel/shared/time';
 import type { ProductJson } from '../harness/catalog';
 import { createHttpApp } from '../harness/apps';
 import { financeApi, type ProblemJson, salesFlow, setSetting } from '../harness/finance';
@@ -60,7 +61,8 @@ describe('finance invoicing', () => {
       orderId: draft.id,
       orderNumber: draft.number,
       invoiceDate: today,
-      dueDate: addDays(today, 30),
+      // The settlement day of the harness's DAY_20 customer (ADR-0101).
+      dueDate: settlementDueDate('DAY_20', today),
       overdue: false,
       paymentMethod: 'CASH',
       subtotal: '10000.00',
@@ -111,7 +113,7 @@ describe('finance invoicing', () => {
       balance: '10000.00',
       openInvoices: 1,
       overdueAmount: '0.00',
-      oldestDueDate: addDays(today, 30),
+      oldestDueDate: settlementDueDate('DAY_20', today),
       aging: expect.objectContaining({ NOT_DUE: '10000.00', D1_30: '0.00' }),
     });
     expect((await finance.ledger(shop.id)).data).toEqual([

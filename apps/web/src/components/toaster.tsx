@@ -1,13 +1,14 @@
-import { CircleCheck, Info, X } from 'lucide-react';
+import { AlertTriangle, CircleCheck, Info, X } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { dismissToast, getToasts, pauseToasts, resumeToasts, subscribeToasts } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 
 /**
  * The toasts of `lib/toast` (ADR-0042): a dark pill at the bottom of the screen (at the top on
  * phones, above the keyboard), each one a polite `status` so screen readers read it once. Colours
  * are the theme's tokens turned around (ADR-0066): the text colour as the pill, white as its text,
- * the switch green for a success.
+ * the switch green for a success; a warning is the danger colour (ADR-0101's overdue reminder).
  */
 export function Toaster() {
   const { t } = useTranslation();
@@ -24,10 +25,15 @@ export function Toaster() {
         <div
           key={item.id}
           role="status"
-          className="pointer-events-auto flex max-w-full items-center gap-2.5 rounded-full bg-foreground/95 py-2 pr-2 pl-4 text-[13px] font-medium text-background shadow-popover animate-in fade-in-0 slide-in-from-bottom-2"
+          className={cn(
+            'pointer-events-auto flex max-w-full items-center gap-2.5 rounded-full py-2 pr-2 pl-4 text-[13px] font-medium text-background shadow-popover animate-in fade-in-0 slide-in-from-bottom-2',
+            item.tone === 'warning' ? 'bg-destructive' : 'bg-foreground/95',
+          )}
         >
           {item.tone === 'success' ? (
             <CircleCheck aria-hidden className="size-4 shrink-0 text-toggle" />
+          ) : item.tone === 'warning' ? (
+            <AlertTriangle aria-hidden className="size-4 shrink-0" />
           ) : (
             <Info aria-hidden className="size-4 shrink-0 text-background/80" />
           )}
