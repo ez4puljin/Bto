@@ -28,9 +28,38 @@ export interface ReceiptMoneyAccounts {
 export const RECEIPT_MONEY_ACCOUNTS = Symbol('RECEIPT_MONEY_ACCOUNTS');
 
 /**
+ * What inventory asks of pricing (ADR-0099 #5): a receipt line may carry a new warehouse price per
+ * base unit, put in force by the receipt's posting from its business date, in the posting's
+ * transaction. Pricing binds this token with `useExisting`; with nothing bound (the worker, tests
+ * that load inventory alone) a receipt's sale prices are not applied.
+ */
+export interface ReceiptSalePrice {
+  productId: number;
+  /** Whole MNT per base unit, VAT included. */
+  warehousePrice: Decimal;
+}
+
+export interface ReceiptSalePrices {
+  /**
+   * Puts each price in force from `validFrom`, keeping the profile and whole unit of the terms in
+   * force; a price equal to the one in force writes nothing. SALE_PRICE_NO_TERMS for a product
+   * without terms in force (its first terms are set on the price page).
+   */
+  applyInTx(
+    tx: Tx,
+    actor: Actor,
+    validFrom: string,
+    prices: readonly ReceiptSalePrice[],
+  ): Promise<void>;
+}
+
+export const RECEIPT_SALE_PRICES = Symbol('RECEIPT_SALE_PRICES');
+
+/**
  * A receipt's figures for the books at one costing version (ADR-0078 #4, F3 ADR-0091): the payable
- * is Σ `doc_amount` (the delivery note, VAT included), the stock Σ `amount` (ex-VAT cost), the
- * input VAT their difference, its base the stock of the lines that carry VAT.
+ * is Σ `doc_amount` less each line's share of the note's discount (VAT included, ADR-0099 #4), the
+ * stock Σ `amount` (ex-VAT cost), the input VAT their difference, its base the stock of the lines
+ * that carry VAT.
  */
 export interface ReceiptBookTotals {
   payable: Decimal;

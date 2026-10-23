@@ -79,7 +79,6 @@ export class ImportSummaryDto {
 
 @ApiSchema({ name: 'ReceiptImportOptions' })
 export class ReceiptImportOptionsDto implements ReceiptImportOptions {
-  @ApiProperty({ description: 'A wholesale warehouse' }) @IsInt() @Min(1) warehouseId: number;
   @ApiProperty({ enum: RECEIPT_IMPORT_PAYMENT_METHODS })
   @IsIn(RECEIPT_IMPORT_PAYMENT_METHODS)
   paymentMethod: ReceiptImportOptions['paymentMethod'];

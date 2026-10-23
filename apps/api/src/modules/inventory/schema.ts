@@ -295,8 +295,9 @@ const lineQtyColumns = () => ({
 });
 
 /**
- * Goods receipts (GR-, ADR-0033, ADR-0078): counted by the warehouse and posted at once into each
- * line's bin. The delivery note's prices may be typed on the draft lines; a receipt priced in full is
+ * Goods receipts (GR-, ADR-0033, ADR-0078, ADR-0099): one supplier delivery note, counted and posted
+ * at once into each line's bin; the lines may lie in several wholesale warehouses (each its product's
+ * home). The delivery note's prices may be typed on the draft lines; a receipt priced in full is
  * costed at posting, else the accountant costs it afterwards. The cost history lives in
  * stock_valuation_adjustments; the payment method and account are facts for the books.
  */
@@ -304,9 +305,6 @@ export const goodsReceipts = pgTable(
   'goods_receipts',
   {
     id: id(),
-    warehouseId: ref('warehouse_id')
-      .notNull()
-      .references(() => warehouses.id),
     supplierId: ref('supplier_id')
       .notNull()
       .references(() => suppliers.id),
@@ -328,11 +326,15 @@ export const goodsReceipts = pgTable(
     moneyAccountId: integer('money_account_id'),
     /** VAT inside the delivery-note prices: the company rate when both sides pay VAT, else 0. */
     vatRatePct: percent('vat_rate_pct').notNull().default(zero),
+    /** The delivery note's discount (ADR-0099 #4): a percentage of its priced total, or an
+     * amount; spread over the priced lines by amount, it lowers the cost and the payable. */
+    discountPct: percent('discount_pct'),
+    discountAmount: money('discount_amount'),
     ...postingColumns(),
   },
   (t) => [
     unique('goods_receipts_number_key').on(t.number),
-    index('goods_receipts_warehouse_idx').on(t.warehouseId, t.status, t.id),
+    index('goods_receipts_status_idx').on(t.status, t.id),
     index('goods_receipts_supplier_idx').on(t.supplierId, t.id),
     index('goods_receipts_costing_idx')
       .on(t.id)
@@ -357,6 +359,12 @@ export const goodsReceipts = pgTable(
     ),
     check('goods_receipts_vat_rate', sql`${t.vatRatePct} >= 0 AND ${t.vatRatePct} < 100`),
     check(
+      'goods_receipts_discount',
+      sql`(${t.discountPct} IS NULL OR ${t.discountAmount} IS NULL)
+        AND (${t.discountPct} IS NULL OR (${t.discountPct} > 0 AND ${t.discountPct} <= 100))
+        AND (${t.discountAmount} IS NULL OR ${t.discountAmount} > 0)`,
+    ),
+    check(
       'goods_receipts_texts',
       sql`(${t.supplierDocNo} IS NULL OR length(${t.supplierDocNo}) BETWEEN 1 AND 50)
         AND (${t.note} IS NULL OR length(${t.note}) BETWEEN 1 AND 500)`,
@@ -372,7 +380,11 @@ export const goodsReceiptLines = pgTable(
       .notNull()
       .references(() => goodsReceipts.id),
     ...lineQtyColumns(),
-    /** Destination bin in the receipt's warehouse (checked by the service and at posting). */
+    /** The line's wholesale warehouse: its product's home when the line was entered (ADR-0099 #1). */
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    /** Destination bin in the line's warehouse (checked by the service and at posting). */
     binId: ref('bin_id')
       .notNull()
       .references(() => bins.id),
@@ -382,11 +394,20 @@ export const goodsReceiptLines = pgTable(
     docAmount: money('doc_amount'),
     /** Free goods (бонус): costed at zero. */
     freeGoods: boolean('free_goods').notNull().default(false),
+    /** A new warehouse price per base unit (whole MNT, VAT included), put in force by the posting
+     * from its business date (ADR-0099 #5); typed by price holders only. */
+    salePrice: money('sale_price'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index('goods_receipt_lines_receipt_idx').on(t.receiptId, t.id),
+    index('goods_receipt_lines_warehouse_idx').on(t.warehouseId, t.receiptId),
+    index('goods_receipt_lines_product_idx').on(t.productId, t.id),
+    check(
+      'goods_receipt_lines_sale_price',
+      sql`${t.salePrice} IS NULL OR (${t.salePrice} > 0 AND ${t.salePrice} = trunc(${t.salePrice}))`,
+    ),
     check('goods_receipt_lines_qty', sql`${t.enteredQty} > 0 AND ${t.qtyBase} > 0`),
     check(
       'goods_receipt_lines_price',

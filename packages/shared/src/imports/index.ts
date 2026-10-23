@@ -144,9 +144,11 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
   ],
 };
 
-/** What a receipts import is told in its dialog (ADR-0078): the warehouse and how the notes are paid. */
+/**
+ * What a receipts import is told in its dialog (ADR-0078, ADR-0099 #7): how the notes are paid; each
+ * row goes to its product's home warehouse.
+ */
 export interface ReceiptImportOptions {
-  warehouseId: number;
   paymentMethod: ReceiptPaymentMethod;
   moneyAccountId: number | null;
 }
@@ -202,6 +204,7 @@ export const ROW_ERROR_CODES = [
   'NO_PROFILE_VALUES',
   'NO_PACKS',
   'TOO_MANY_LINES',
+  'NO_HOME',
 ] as const;
 export type RowErrorCode = (typeof ROW_ERROR_CODES)[number];
 

@@ -169,6 +169,8 @@ export interface CostedLine {
   amount: Decimal;
   /** What was typed, VAT included (ADR-0078); null for a costing that typed only the cost. */
   docAmount?: Decimal | null;
+  /** The line's share of the delivery note's discount (ADR-0099 #4); `amount` is already net of it. */
+  discountAmount?: Decimal | null;
   freeGoods: boolean;
 }
 
@@ -177,6 +179,7 @@ export interface Valuation {
   version: number;
   amount: Decimal;
   docAmount: Decimal | null;
+  discountAmount: Decimal | null;
   freeGoods: boolean;
   valueBefore: Decimal;
   valueDelta: Decimal;
@@ -710,6 +713,7 @@ export class StockPostingService implements OnModuleInit {
           version: input.version,
           amount: line.amount,
           docAmount: line.docAmount ?? null,
+          discountAmount: line.discountAmount ?? null,
           freeGoods: line.freeGoods,
           valueBefore: before.get(line.docLineId) ?? ZERO,
           valueDelta: lineDelta,
@@ -747,6 +751,7 @@ export class StockPostingService implements OnModuleInit {
           freeGoods: line.freeGoods,
           amount: result.amount,
           docAmount: result.docAmount,
+          discountAmount: result.discountAmount,
           valueBefore: result.valueBefore,
           valueDelta: result.valueDelta,
           onHandAt: balance?.onHand ?? ZERO,
@@ -868,6 +873,7 @@ export class StockPostingService implements OnModuleInit {
         version: row.version,
         amount: row.amount,
         docAmount: row.docAmount,
+        discountAmount: row.discountAmount,
         freeGoods: row.freeGoods,
         valueBefore: row.valueBefore,
         valueDelta: row.valueDelta,
@@ -879,6 +885,45 @@ export class StockPostingService implements OnModuleInit {
       });
     }
     return latest;
+  }
+
+  /**
+   * Each costed receipt's payable at its latest version (ADR-0099 #4): Σ over its priced lines of the
+   * delivery-note amount less the line's discount share. The receipt list's amount column.
+   */
+  async receiptPayables(
+    docIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, Decimal>> {
+    const payables = new Map<number, Decimal>();
+    if (docIds.length === 0) return payables;
+    const rows = await executor
+      .select({
+        docId: stockValuationAdjustments.docId,
+        docLineId: stockValuationAdjustments.docLineId,
+        amount: stockValuationAdjustments.amount,
+        docAmount: stockValuationAdjustments.docAmount,
+        discountAmount: stockValuationAdjustments.discountAmount,
+        freeGoods: stockValuationAdjustments.freeGoods,
+      })
+      .from(stockValuationAdjustments)
+      .where(
+        and(
+          eq(stockValuationAdjustments.docType, 'GR'),
+          inArray(stockValuationAdjustments.docId, [...docIds]),
+        ),
+      )
+      .orderBy(desc(stockValuationAdjustments.version));
+    const seen = new Set<number>();
+    for (const row of rows) {
+      if (seen.has(row.docLineId)) continue;
+      seen.add(row.docLineId);
+      const payable = row.freeGoods
+        ? ZERO
+        : (row.docAmount ?? row.amount).minus(row.discountAmount ?? ZERO);
+      payables.set(row.docId, (payables.get(row.docId) ?? ZERO).plus(payable));
+    }
+    return payables;
   }
 
   /** The provisional cost each line of a posted receipt went in at (its RECEIPT ledger row). */

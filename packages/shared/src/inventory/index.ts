@@ -426,6 +426,69 @@ export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInpu
   return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
 }
 
+/** A delivery note's discount (ADR-0099 #4): a percentage of its total or an amount, never both. */
+export interface ReceiptDiscount {
+  pct: DecimalInput | null;
+  amount: DecimalInput | null;
+}
+
+/**
+ * The discount in tugriks on a delivery note whose priced lines add up to `gross` (VAT included as
+ * printed): the amount as typed, or `gross × pct / 100`, two decimals half up; 0 without one.
+ */
+export function receiptDiscountTotal(gross: DecimalInput, discount: ReceiptDiscount): Decimal {
+  if (discount.amount !== null) return new Decimal(discount.amount);
+  if (discount.pct !== null) {
+    return new Decimal(gross).times(discount.pct).dividedBy(100).toDecimalPlaces(MONEY_SCALE);
+  }
+  return new Decimal(0);
+}
+
+/**
+ * Spreads a delivery note's discount over its priced lines in proportion to their amounts (ADR-0099
+ * #4): each share two decimals half up, the rounding remainder on the largest line (the first of
+ * equal ones). A line without an amount (free goods, not priced yet) takes nothing. The shares add
+ * up to `total`; a discount above the lines' sum is a RangeError.
+ */
+export function allocateReceiptDiscount(
+  amounts: readonly (DecimalInput | null)[],
+  total: DecimalInput,
+): Decimal[] {
+  const discount = new Decimal(total);
+  const values = amounts.map((amount) => (amount === null ? null : new Decimal(amount)));
+  const gross = values.reduce<Decimal>((sum, value) => sum.plus(value ?? 0), new Decimal(0));
+  if (discount.isNegative() || discount.gt(gross)) {
+    throw new RangeError(`a discount of ${discount.toString()} on ${gross.toString()}`);
+  }
+  if (discount.isZero()) return values.map(() => new Decimal(0));
+  const shares = values.map((value) =>
+    value === null ? new Decimal(0) : discount.times(value).dividedBy(gross).toDecimalPlaces(2),
+  );
+  const rest = discount.minus(shares.reduce((sum, share) => sum.plus(share), new Decimal(0)));
+  if (!rest.isZero()) {
+    let largest = -1;
+    values.forEach((value, index) => {
+      const best = largest < 0 ? null : values[largest];
+      if (value !== null && (best === null || best === undefined || value.gt(best))) {
+        largest = index;
+      }
+    });
+    const share = shares[largest];
+    if (share !== undefined) shares[largest] = share.plus(rest);
+  }
+  return shares;
+}
+
+/**
+ * The markup of a sale price over a delivery-note price, both per base unit (owner, 2026-10-23:
+ * (sale − receipt) / receipt × 100), one decimal half up; null without a positive receipt price.
+ */
+export function markupPct(salePrice: DecimalInput, receiptPrice: DecimalInput): Decimal | null {
+  const cost = new Decimal(receiptPrice);
+  if (!cost.gt(0)) return null;
+  return new Decimal(salePrice).minus(cost).dividedBy(cost).times(100).toDecimalPlaces(1);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Goods issues (ADR-0081)
 

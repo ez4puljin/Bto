@@ -79,11 +79,7 @@ export class InventoryAttentionService {
       may('inventory.costs.manage')
         ? count(
             goodsReceipts,
-            and(
-              eq(goodsReceipts.status, 'POSTED'),
-              eq(goodsReceipts.costingStatus, 'PENDING'),
-              within(goodsReceipts.warehouseId),
-            ),
+            and(eq(goodsReceipts.status, 'POSTED'), eq(goodsReceipts.costingStatus, 'PENDING')),
           )
         : none,
       transferring ? this.lowStock(scope) : Promise.resolve({ count: 0, warehouseId: null }),
