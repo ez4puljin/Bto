@@ -18,12 +18,13 @@ import {
   CategoryTile,
   ListHeading,
   SectionRow,
+  StoreCard,
   useCardActions,
   useSectionText,
 } from '../../../src/customer/home-parts';
 import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
-import { HeaderIconButton, StoreHeaderBand } from '../../../src/customer/store-header';
-import { useStoreTabBarInset } from '../../../src/customer/store-tab-bar';
+import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 import { initialsOf } from '../../../src/format/format';
 import { useCustomer } from '../../../src/state/session';
 import { colors, fonts, spacing, storeType, TOUCH } from '../../../src/theme/tokens';
@@ -42,7 +43,7 @@ export default function CustomerHomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const inset = useStoreTabBarInset();
-  const { me } = useCustomer();
+  const { me, server } = useCustomer();
   const storeMe = useStoreMe();
   const store = storeMe.data ?? me.store;
   const summary = useStoreNotificationSummary();
@@ -154,7 +155,7 @@ export default function CustomerHomeScreen() {
         contentContainerStyle={{ paddingBottom: inset + spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
       >
-        {data ? <BannerCarousel banners={data.banners} /> : null}
+        {data ? <BannerCarousel banners={data.banners} server={server} /> : null}
 
         {rows.length > 0 ? (
           <>
@@ -174,6 +175,7 @@ export default function CustomerHomeScreen() {
                       <CategoryTile
                         key={category.id}
                         category={category}
+                        server={server}
                         onPress={() => router.push(`/category/${category.id}`)}
                       />
                     ) : (
@@ -191,7 +193,9 @@ export default function CustomerHomeScreen() {
           <SectionRow
             key={section.key}
             section={section}
-            actions={actions}
+            renderCard={(product, size) => (
+              <StoreCard product={product} actions={actions} {...size} />
+            )}
             onMore={() => router.push(sectionRouteOf(section.key))}
           />
         ))}

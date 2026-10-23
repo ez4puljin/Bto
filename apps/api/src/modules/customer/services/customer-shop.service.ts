@@ -15,14 +15,8 @@ import {
   type ProductIndexRow,
 } from '../../catalog';
 import type { CustomerContext } from '../../identity';
-import {
-  type DealBook,
-  PriceQuoteService,
-  type ProductDeal,
-  ProductDealsService,
-  type Quote,
-} from '../../pricing';
-import { type RepProduct, SalesRepShopService } from '../../sales';
+import { type DealBook, PriceQuoteService, type ProductDeal, type Quote } from '../../pricing';
+import { type RepProduct, type RepShopProduct, SalesRepShopService } from '../../sales';
 import { customerFavourites } from '../schema';
 
 /**
@@ -95,12 +89,14 @@ export class CustomerShopService {
     private readonly categories: CategoriesService,
     private readonly barcodes: BarcodeService,
     private readonly quotes: PriceQuoteService,
-    private readonly deals: ProductDealsService,
   ) {}
 
-  /** The WHOLESALE programs in force today and the products they mark (one read per request). */
+  /**
+   * The WHOLESALE programs in force today and the products they mark (one read per request): the
+   * rep shop's book, so both apps' cards read one rule (ADR-0093, ADR-0100 #10).
+   */
   dealBook(today = businessDate()): Promise<DealBook> {
-    return this.deals.book('WHOLESALE', today);
+    return this.shop.dealBook(today);
   }
 
   /** The shop's universe in the NEW order (ADR-0093): every product «Bto300» lists. */
@@ -191,33 +187,36 @@ export class CustomerShopService {
     );
   }
 
+  /**
+   * The rep app's cards of these products (the rep home, 2026-10-23): the shop's rows with their
+   * badges and struck-through prices from `book`, in order; the rep sees numbers, so no words.
+   */
+  async repProductsOf(ids: readonly number[], book: DealBook): Promise<RepShopProduct[]> {
+    return this.shop.withDeals(await this.listed(ids), book);
+  }
+
   /** The cards of these rows: stock words, ♡, badges and the struck-through price, in order. */
   async decorate(
     rows: readonly RepProduct[],
     starred: ReadonlySet<number>,
     book: DealBook,
   ): Promise<CustomerProduct[]> {
-    const ids = rows.map((row) => row.id);
-    const deals = await this.deals.dealsOf(book, ids);
-    const packs = await this.deals.packPrices(book, ids);
-    return rows.map((product) => {
-      const pack = packs.get(product.id);
-      return {
-        id: product.id,
-        sku: product.sku,
-        name: product.name,
-        categoryId: product.categoryId,
-        thumbUrl: product.thumbUrl,
-        images: product.images,
-        isNew: product.isNew,
-        stock: wordOf(product),
-        favourite: starred.has(product.id),
-        basePrice: product.basePrice,
-        dealPrice: pack && pack.price.lt(pack.regular) ? pack.price : null,
-        deal: deals.get(product.id) ?? null,
-        units: product.units,
-      };
-    });
+    // The rep's cards carry the same badges (ADR-0093): one rule, sales' `withDeals`.
+    return (await this.shop.withDeals(rows, book)).map((product) => ({
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      categoryId: product.categoryId,
+      thumbUrl: product.thumbUrl,
+      images: product.images,
+      isNew: product.isNew,
+      stock: wordOf(product),
+      favourite: starred.has(product.id),
+      basePrice: product.basePrice,
+      dealPrice: product.dealPrice,
+      deal: product.deal,
+      units: product.units,
+    }));
   }
 
   thumbs(): Promise<string[]> {

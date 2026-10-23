@@ -6,11 +6,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShop } from '../state/shop';
 import { colors, spacing, storeType, TOUCH } from '../theme/tokens';
-import { CountBadge } from '../ui/controls';
-import { Text } from '../ui/text';
+import { CountBadge } from './controls';
+import { Text } from './text';
 
-// «Bto300»'s blue header (ADR-0095, the E-mart structure in Bto300's blue): it runs under the
-// status bar; a page has ← with its title and the cart, the home its own rows.
+// The blue header of both apps (ADR-0095, the E-mart structure in Bto300's blue; the rep app since
+// ADR-0100): it runs under the status bar; a page has ← with its title and the cart, the home its
+// own rows.
 
 /** The header's 48 px row height and its icons. */
 export const HEADER_ROW = 48;
@@ -57,7 +58,7 @@ export function HeaderCart() {
   return (
     <HeaderIconButton
       icon={<ShoppingCart size={ICON} strokeWidth={1.8} color={colors.primaryForeground} />}
-      label={t('mobile.customer.list.cart', { n })}
+      label={t('mobile.tabs.cartCount', { n })}
       badge={n}
       onPress={() => router.navigate('/cart')}
     />

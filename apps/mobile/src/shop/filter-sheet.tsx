@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useCategories, useProductCount, useRepContext } from '../api/rep';
-import { colors, spacing } from '../theme/tokens';
-import { ChoiceChip, PillButton, Segmented, Toggle } from '../ui/controls';
+import { formatCount } from '../format/format';
+import { colors, radii, spacing } from '../theme/tokens';
+import { ChoiceChip, PillButton, Toggle } from '../ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../ui/grouped';
 import { BarButton, SectionHeader } from '../ui/layout';
 import { Sheet, SheetClose, SheetHeader } from '../ui/sheet';
@@ -19,9 +20,10 @@ const WAREHOUSE_TINTS = [
 ];
 
 /**
- * «Шүүлтүүр» (the Filter board, ADR-0068): the order, categories, the home warehouse, the
- * suppliers and «Зөвхөн үлдэгдэлтэй» on a draft of the filters; «N бараа харуулах» counts the
- * draft and applies it, closing leaves the shop as it was.
+ * «Шүүлтүүр» (the Filter board, ADR-0068; «Bto300»'s filter sheet since ADR-0100): categories, the
+ * home warehouse, the suppliers and «Зөвхөн үлдэгдэлтэй» on a draft of the filters; «N бараа
+ * харуулах» counts the draft and applies it, closing leaves the shop as it was. The order has its
+ * own sheet («Эрэмбэлэх» on the floating pill); the draft carries it unchanged.
  */
 export function FilterSheet({
   visible,
@@ -55,12 +57,6 @@ export function FilterSheet({
   const branches = [...new Set(warehouses.map((warehouse) => warehouse.branchName))];
   const total = count.data;
 
-  const sorts = [
-    { value: 'NEW' as const, label: t('mobile.filter.sortNew') },
-    { value: 'PRICE_ASC' as const, label: t('mobile.filter.sortPriceAsc') },
-    { value: 'PRICE_DESC' as const, label: t('mobile.filter.sortPriceDesc') },
-  ];
-
   return (
     <>
       <Sheet
@@ -86,7 +82,7 @@ export function FilterSheet({
                 ? t('mobile.filter.show')
                 : total === 0
                   ? t('mobile.filter.none')
-                  : t('mobile.filter.showCount', { n: total })
+                  : t('mobile.filter.showCount', { n: formatCount(total) })
             }
             loading={count.isFetching && total === undefined}
             onPress={() => onApply(draft)}
@@ -94,17 +90,7 @@ export function FilterSheet({
         }
       >
         <ScrollView contentContainerStyle={styles.body}>
-          <SectionHeader style={styles.first}>{t('mobile.filter.sort')}</SectionHeader>
-          <Segmented
-            options={sorts}
-            value={draft.sort}
-            onChange={(sort) => setDraft({ ...draft, sort })}
-            height={40}
-            small
-            label={t('mobile.filter.sort')}
-          />
-
-          <SectionHeader style={styles.section}>{t('mobile.filter.categories')}</SectionHeader>
+          <SectionHeader style={styles.first}>{t('mobile.filter.categories')}</SectionHeader>
           <View style={styles.chips}>
             <ChoiceChip
               label={t('common.all')}
@@ -217,7 +203,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     padding: 14,
-    borderRadius: 18,
+    borderRadius: radii.card,
     backgroundColor: colors.card,
   },
 });

@@ -8,7 +8,7 @@ import { useContacts, useStoreMe } from '../../src/api/customer';
 import { useStoreNotificationSummary } from '../../src/api/customer-notifications';
 import { Contacts } from '../../src/customer/contacts';
 import { phoneShown } from '../../src/customer/home';
-import { StoreHeader } from '../../src/customer/store-header';
+import { StoreHeader } from '../../src/ui/store-header';
 import { initialsOf } from '../../src/format/format';
 import { useCustomer } from '../../src/state/session';
 import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';

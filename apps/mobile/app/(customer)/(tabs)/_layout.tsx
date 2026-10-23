@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { ClipboardList, House, Package, ShoppingCart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
-import { StoreTabBar } from '../../../src/customer/store-tab-bar';
+import { StoreTabBar } from '../../../src/ui/store-tab-bar';
 import { useShop } from '../../../src/state/shop';
 import { colors } from '../../../src/theme/tokens';
 

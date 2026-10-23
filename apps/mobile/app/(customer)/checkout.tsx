@@ -36,7 +36,7 @@ import { MonthCalendar } from '../../src/ui/calendar';
 import { PillButton, Segmented } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { ProblemText } from '../../src/ui/kit';
-import { HeaderTextButton, StoreHeader } from '../../src/customer/store-header';
+import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
 import { Page, SectionHeader } from '../../src/ui/layout';
 import { usePendingWords } from '../../src/customer/pending-words';
 import { PendingSendView } from '../../src/ui/pending-send';

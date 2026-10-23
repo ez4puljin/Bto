@@ -3,14 +3,15 @@ import { KeyRound, LockKeyhole } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
-import { Text, type TextInput } from '../../src/ui/text';
+import type { TextInput } from '../../src/ui/text';
 import { type AppProblem, NETWORK, problemOf } from '../../src/api/problem';
 import { useSignedIn } from '../../src/state/session';
-import { spacing, type } from '../../src/theme/tokens';
+import { spacing } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { PasswordToggle, TextField } from '../../src/ui/field';
 import { ProblemText } from '../../src/ui/kit';
-import { FootNote, NavBar, Page } from '../../src/ui/layout';
+import { FootNote, Page } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/ui/store-header';
 import { useToast } from '../../src/ui/toast';
 
 type Which = 'current' | 'next' | 'again';
@@ -18,7 +19,7 @@ type Which = 'current' | 'next' | 'again';
 /**
  * «Нууц үг солих» (ADR-0068): the current password and the new one twice, each with its eye. The
  * server checks the rules (the phone has no `normalize()` for the shared check); this session
- * stays, the others end.
+ * stays, the others end. Under the blue header with ← since ADR-0100, as «Bto300»'s.
  */
 export default function PasswordScreen() {
   const { t } = useTranslation();
@@ -74,16 +75,13 @@ export default function PasswordScreen() {
   );
 
   return (
-    <Page white>
-      <NavBar back={t('mobile.profileInfo.title')} onBack={() => router.back()} />
+    <Page white edges={[]}>
+      <StoreHeader title={t('mobile.password.title')} onBack={() => router.back()} right={null} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.grow}
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={[type.title2, styles.title]}>
-            {t('mobile.password.title')}
-          </Text>
           <TextField
             style={styles.first}
             label={t('mobile.password.current')}
@@ -156,7 +154,6 @@ export default function PasswordScreen() {
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
   first: { marginTop: 22 },
   field: { marginTop: spacing.lg },
   problem: { marginTop: spacing.lg },

@@ -5,6 +5,7 @@ import { Package } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../../src/ui/text';
 import { problemFrom } from '../../../src/api/problem';
 import { useOrder, useProductsOf, useRepContext } from '../../../src/api/rep';
@@ -15,11 +16,12 @@ import { useSignedIn } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { Group, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { FootNote, NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { PaymentDot, StatusPill } from '../../../src/ui/status';
+import { StoreHeader } from '../../../src/ui/store-header';
 
-/** A line's picture; the separators start past it. */
-const THUMB = 52;
+/** A line's picture (Bto300's order page); the separators start past it. */
+const THUMB = 48;
 const LINE_INSET = spacing.lg + THUMB + spacing.md;
 
 /**
@@ -27,11 +29,13 @@ const LINE_INSET = spacing.lg + THUMB + spacing.md;
  * customer, delivery, payment and where it sits, the lines (the owner, 2026-10-18: each with its
  * picture, name, «qty unit × price» per part and its total, and «Дутуу …» only when something is
  * short), and the totals. A draft has no prices yet: its lines and total show the estimate at
- * today's prices («≈ …₮»), with a note that the office's confirmation fixes them.
+ * today's prices («≈ …₮»), with a note that the office's confirmation fixes them. Bto300's blue
+ * header with ← and the cart (ADR-0100).
  */
 export default function OrderScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { server } = useSignedIn();
   const { id } = useLocalSearchParams<{ id: string }>();
   const order = useOrder(Number.parseInt(id ?? '0', 10));
@@ -63,14 +67,16 @@ export default function OrderScreen() {
   };
 
   return (
-    <Page>
-      <NavBar back={t('mobile.tabs.orders')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.tabs.orders')} onBack={() => router.back()} />
       {order.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
       <View style={styles.pad}>
         {order.error ? <ProblemText problem={problemFrom(order.error)} /> : null}
       </View>
       {data ? (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView
+          contentContainerStyle={[styles.body, { paddingBottom: spacing.xxl + insets.bottom }]}
+        >
           <View style={styles.head}>
             <Text accessibilityRole="header" style={[type.title, styles.number]}>
               {data.number ?? t('common.none')}
@@ -235,14 +241,15 @@ export default function OrderScreen() {
 
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.lg },
-  body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  body: { paddingHorizontal: spacing.lg },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.md,
     marginHorizontal: spacing.xs,
   },
-  number: { flexShrink: 1, fontVariant: ['tabular-nums'] },
+  number: { flexShrink: 1, ...tabular },
   created: { marginTop: 2, marginHorizontal: spacing.xs },
   muted: { color: colors.muted },
   section: { marginTop: 22 },
@@ -259,7 +266,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: THUMB,
     height: THUMB,
-    borderRadius: radii.control,
+    borderRadius: radii.field,
     backgroundColor: colors.imageFill,
     overflow: 'hidden',
     alignItems: 'center',
@@ -280,9 +287,9 @@ const styles = StyleSheet.create({
   shortText: { ...type.caption, fontFamily: fonts.semibold, color: colors.warningText },
   lineTotal: { ...type.rowStrong, ...tabular, textAlign: 'right' },
   // A draft's estimate: softer than a confirmed price.
-  estimate: { color: colors.label2 },
+  estimate: { color: colors.muted },
   totalRow: {
-    minHeight: 56,
+    minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -290,5 +297,5 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.lg,
     paddingRight: 14,
   },
-  total: { ...type.title2, ...tabular, flexShrink: 1, textAlign: 'right' },
+  total: { ...type.title3, ...tabular, flexShrink: 1, textAlign: 'right' },
 });

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme/tokens';
+import { colors, spacing, storeType } from '../theme/tokens';
 import { Group, Row } from '../ui/grouped';
 import { Sheet, SheetClose, SheetHeader } from '../ui/sheet';
 import { type MapStore, stateOf, type StoreState } from './stores';
@@ -71,6 +71,7 @@ export function StorePicker({
               key={store.customerId}
               icon={<View style={[styles.dot, { backgroundColor: DOT_COLORS[stateOf(store)] }]} />}
               title={store.name}
+              titleStyle={storeType.cardName}
               subtitle={t('mobile.map.code', { code: store.code })}
               minHeight={ROW_HEIGHT}
               onPress={() => onPick(store.customerId)}

@@ -24,7 +24,8 @@ import { useShop } from '../../src/state/shop';
 import { colors, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
 import { ChoiceChip, CircleButton, PillButton } from '../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { NavBar, Page } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/ui/store-header';
 import { Text } from '../../src/ui/text';
 import { useToast } from '../../src/ui/toast';
 
@@ -39,7 +40,8 @@ const LAST_KNOWN_MAX_AGE_MS = 5 * 60_000;
  * closed its orders, the rep's own position (where the map opens), and a store's card on a tap
  * (start an order, its order history, a direct call); stores at one point are listed to pick
  * from. Tiles are OpenStreetMap's through OpenFreeMap (no key); the map is a DOM component
- * (src/map/store-map.tsx).
+ * (src/map/store-map.tsx). The blue header with ← sits above the map; the chip, the legend and
+ * «my location» stay over the map (ADR-0100).
  */
 export default function MapScreen() {
   const { t } = useTranslation();
@@ -243,12 +245,8 @@ export default function MapScreen() {
   const loading = map.isLoading;
 
   return (
-    <Page>
-      <NavBar
-        back={t('mobile.tabs.home')}
-        onBack={() => router.back()}
-        title={t('mobile.map.title')}
-      />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.map.title')} onBack={() => router.back()} />
       <View style={styles.area} accessibilityLabel={t('mobile.map.label')}>
         <StoreMap
           key={attempt}

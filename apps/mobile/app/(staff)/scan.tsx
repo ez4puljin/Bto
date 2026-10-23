@@ -13,6 +13,7 @@ import { colors, radii, spacing, type } from '../../src/theme/tokens';
 import { PillButton } from '../../src/ui/controls';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
 import { Page } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/ui/store-header';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e', 'itf14', 'code128'] as const;
 
@@ -59,7 +60,9 @@ export default function ScanScreen() {
   if (!permission) return <Page />;
   if (!permission.granted) {
     return (
-      <Page edges={['top', 'bottom']}>
+      // Under the blue header like every page (ADR-0100): the status bar is white on it.
+      <Page edges={['bottom']}>
+        <StoreHeader title={t('mobile.scan.title')} onBack={() => router.back()} right={null} />
         <View style={styles.ask}>
           <EmptyState
             icon={<Camera size={48} strokeWidth={1.5} color={colors.input} />}

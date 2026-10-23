@@ -17,7 +17,7 @@ import { useCustomer } from '../../../src/state/session';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { Group } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { Page, SectionHeader } from '../../../src/ui/layout';
 import { usePriceParts } from '../../../src/ui/product-card';
 import { Text } from '../../../src/ui/text';

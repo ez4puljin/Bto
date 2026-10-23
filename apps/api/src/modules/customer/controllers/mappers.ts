@@ -2,7 +2,7 @@ import type { Decimal } from '@tugeel/shared/money';
 import type { CustomerPayment } from '../../finance';
 import type { CustomerNotice, CustomerNotification } from '../../notifications';
 import type { ProductDeal } from '../../pricing';
-import type { CustomerOrderDetail, CustomerOrderRow } from '../../sales';
+import { type CustomerOrderDetail, type CustomerOrderRow, toRepDealDto } from '../../sales';
 import type {
   CustomerAppInvoiceDetailDto,
   CustomerAppInvoiceDto,
@@ -57,24 +57,12 @@ export function productDto(product: CustomerProduct): CustomerAppProductDto {
   };
 }
 
+/**
+ * The badge on the wire (ADR-0092 #3): the rep's cards send the same one (ADR-0100 #10), so one
+ * mapper, sales' `toRepDealDto`, writes both; `CustomerAppDeal` and `SalesRepDeal` are one shape.
+ */
 export function dealDto(deal: ProductDeal): CustomerAppDealDto {
-  return {
-    kind: deal.kind,
-    label: deal.label,
-    programId: deal.programId,
-    programName: deal.programName,
-    scope: deal.scope,
-    effect: deal.effect,
-    value: deal.value.toString(),
-    threshold:
-      deal.threshold === null
-        ? null
-        : 'qty' in deal.threshold
-          ? { qty: deal.threshold.qty.toString(), unitName: deal.threshold.unitName, amount: null }
-          : { qty: null, unitName: null, amount: deal.threshold.amount.toFixed(0) },
-    perUnitName: deal.perUnitName,
-    lastDay: deal.lastDay,
-  };
+  return toRepDealDto(deal);
 }
 
 export function orderRowDto(row: CustomerOrderRow): CustomerAppOrderRowDto {

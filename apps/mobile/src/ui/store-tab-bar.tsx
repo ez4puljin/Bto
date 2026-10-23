@@ -6,10 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows, spacing, storeType } from '../theme/tokens';
-import { Text } from '../ui/text';
+import { Text } from './text';
 
-// «Bto300»'s tab bar (ADR-0095, the E-mart structure): flat and white along the bottom, the four
-// tabs and, raised in the middle, the barcode camera.
+// The tab bar of both apps (ADR-0095, the E-mart structure; the rep app since ADR-0100): flat and
+// white along the bottom, the four tabs and, raised in the middle, the barcode camera.
 
 const BAR_HEIGHT = 56;
 const ICON = 22;
@@ -73,7 +73,7 @@ export function StoreTabBar({ state, descriptors, navigation, insets }: BottomTa
                   <ScanBarcode size={24} strokeWidth={2} color={colors.primaryForeground} />
                 </View>
                 <Text numberOfLines={1} style={storeType.tab}>
-                  {t('mobile.customer.tabs.scan')}
+                  {t('mobile.tabs.scan')}
                 </Text>
               </Pressable>
             ) : null}

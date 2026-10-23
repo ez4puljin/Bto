@@ -24,9 +24,8 @@ import {
 } from '../dto/sales-rep.dto';
 import { REP } from '../services/rep-access';
 import { type RepOrderDetail, SalesRepOrdersService } from '../services/sales-rep-orders.service';
-import { type RepProduct, SalesRepShopService } from '../services/sales-rep-shop.service';
-
-const money = (value: Decimal | null): string | null => (value ? value.toFixed(0) : null);
+import { SalesRepShopService } from '../services/sales-rep-shop.service';
+import { repMoney as money, toRepProductDto } from './rep-mappers';
 
 function toRepOrder(order: RepOrderDetail): SalesRepOrderDto {
   return {
@@ -79,34 +78,6 @@ function toRepOrder(order: RepOrderDetail): SalesRepOrderDto {
       toStatus: event.toStatus,
       reason: event.reason,
       createdAt: event.createdAt.toISOString(),
-    })),
-  };
-}
-
-function toRepProduct(product: RepProduct): SalesRepProductDto {
-  return {
-    id: product.id,
-    sku: product.sku,
-    name: product.name,
-    categoryId: product.categoryId,
-    thumbUrl: product.thumbUrl,
-    images: product.images,
-    isNew: product.isNew,
-    sellable: product.sellable,
-    homeWarehouseId: product.homeWarehouseId,
-    available: product.available.toString(),
-    basePrice: money(product.basePrice),
-    basePriceBefore: money(product.basePriceBefore),
-    units: product.units.map((unit) => ({
-      id: unit.id,
-      uomName: unit.uomName,
-      uomCode: unit.uomCode,
-      factorToBase: unit.factorToBase.toString(),
-      isBase: unit.isBase,
-      isDefaultSales: unit.isDefaultSales,
-      barcodes: unit.barcodes,
-      wholesale: money(unit.wholesale),
-      basis: unit.basis,
     })),
   };
 }
@@ -244,7 +215,11 @@ export class SalesRepController {
       ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
       ...(query.limit === undefined ? {} : { limit: query.limit }),
     });
-    return { data: page.data.map(toRepProduct), nextCursor: page.nextCursor, total: page.total };
+    return {
+      data: (await this.shop.withDeals(page.data)).map(toRepProductDto),
+      nextCursor: page.nextCursor,
+      total: page.total,
+    };
   }
 
   @Get('products/batch')
@@ -252,7 +227,9 @@ export class SalesRepController {
   @ApiOkResponse({ type: [SalesRepProductDto] })
   async productBatch(@Query() query: SalesRepProductBatchQueryDto): Promise<SalesRepProductDto[]> {
     const ids = query.productIds.split(',').map((id) => Number.parseInt(id, 10));
-    return (await this.shop.productsOf(ids, query.priceBefore)).map(toRepProduct);
+    return (await this.shop.withDeals(await this.shop.productsOf(ids, query.priceBefore))).map(
+      toRepProductDto,
+    );
   }
 
   @Get('suppliers')

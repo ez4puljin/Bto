@@ -21,8 +21,9 @@ import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src
 import { ChoiceChip } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { FootNote, NavBar, Page } from '../../src/ui/layout';
+import { FootNote, Page } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
+import { StoreHeader } from '../../src/ui/store-header';
 
 /** Up to this many pipelines are chips; more open an action sheet. */
 const PIPELINE_CHIPS = 4;
@@ -40,7 +41,7 @@ const STEP_TOP = 12;
  * three steps: the board (cards with their branch), its pipeline (chips, or a sheet past
  * PIPELINE_CHIPS) and the stage (a vertical stepper in the pipeline's order). Choosing another
  * board or pipeline takes its first stage, so the next order always has a place; nothing changes
- * while a send waits for its answer.
+ * while a send waits for its answer. Under the blue header with ← since ADR-0100.
  */
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -69,12 +70,9 @@ export default function SettingsScreen() {
     t(action === 'CONFIRM' ? 'mobile.settings.confirms' : 'mobile.settings.drafts');
 
   return (
-    <Page>
-      <NavBar back={t('mobile.tabs.profile')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.settings.title')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.body}>
-        <Text accessibilityRole="header" style={[type.title2, styles.title]}>
-          {t('mobile.settings.title')}
-        </Text>
         <Text style={[type.body, styles.hint]}>{t('mobile.settings.hint')}</Text>
         {context.isLoading ? (
           <ActivityIndicator color={colors.primary} style={styles.loading} />
@@ -397,8 +395,7 @@ function StageStep({
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  hint: { marginTop: 6, marginHorizontal: spacing.xs, color: colors.muted },
+  hint: { marginTop: spacing.lg, marginHorizontal: spacing.xs, color: colors.muted },
   loading: { marginTop: spacing.xl },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },

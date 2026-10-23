@@ -18,17 +18,19 @@ import { ubTime } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { dayName, type FeedItem, feedOf, unreadIds } from '../../src/notifications/feed';
 import { FeedBadge, useNoticeEyebrow } from '../../src/notifications/kinds';
-import { colors, radii, spacing, type } from '../../src/theme/tokens';
+import { colors, fonts, spacing, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { BarButton, FootNote, LargeTitle, NavBar, Page } from '../../src/ui/layout';
+import { FootNote, Page } from '../../src/ui/layout';
+import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
 
 type Item = FeedItem<MyNotice, MyNotification>;
 
 /**
  * «Мэдэгдэл» (the Notifications board; ADR-0062 #3, ADR-0068): the running notices and the rep's
- * sold orders, by day, newest first, in one white group a day. A notice opens its page, a sold
- * order the order; «Бүгдийг уншсан» marks what is loaded.
+ * sold orders, by day, newest first, in one group a day with a hairline on the white page
+ * («Bto300»'s look, ADR-0100). A notice opens its page, a sold order the order; «Бүгдийг уншсан»
+ * on the blue header marks what is loaded.
  */
 export default function NotificationsScreen() {
   const { t } = useTranslation();
@@ -61,12 +63,12 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <Page>
-      <NavBar
-        back={t('mobile.tabs.profile')}
+    <Page white edges={[]}>
+      <StoreHeader
+        title={t('mobile.notifications.title')}
         onBack={() => router.back()}
         right={
-          <BarButton
+          <HeaderTextButton
             title={t('mobile.notifications.readAll')}
             disabled={!anyUnread || isPending}
             onPress={() => markRead(unread)}
@@ -80,7 +82,6 @@ export default function NotificationsScreen() {
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           <View>
-            <LargeTitle style={styles.title}>{t('mobile.notifications.title')}</LargeTitle>
             {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
             {mine.error ? <ProblemText problem={problemFrom(mine.error)} /> : null}
           </View>
@@ -164,7 +165,7 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
       <FeedBadge kind={item.type === 'notice' ? item.notice.kind : 'ORDER_SOLD'} />
       <View style={styles.text}>
         <View style={styles.head}>
-          <Text style={styles.rowTitle} numberOfLines={2}>
+          <Text style={[styles.rowTitle, !read && styles.unreadTitle]} numberOfLines={2}>
             {title}
           </Text>
           <Text style={type.secondary}>{ubTime(item.at)}</Text>
@@ -182,11 +183,15 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  day: { marginTop: 22, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: { backgroundColor: colors.card },
-  firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
-  lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
+  day: { marginTop: 18, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  cell: {
+    backgroundColor: colors.card,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+  },
+  firstCell: { borderTopWidth: 1, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+  lastCell: { borderBottomWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -203,8 +208,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  rowTitle: { ...type.heading, flex: 1 },
+  rowTitle: { ...type.rowStrong, flex: 1 },
+  unreadTitle: { fontFamily: fonts.bold },
   body: { ...type.body, color: colors.label2 },
-  unread: { width: 10, height: 10, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
+  unread: { width: 9, height: 9, borderRadius: 5, marginTop: 6, backgroundColor: colors.primary },
   loading: { marginTop: spacing.xxl },
 });

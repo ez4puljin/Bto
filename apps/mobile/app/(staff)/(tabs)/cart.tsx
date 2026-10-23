@@ -19,23 +19,25 @@ import { formatMnt } from '../../../src/format/format';
 import { useUnitWords } from '../../../src/shop/unit-words';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState } from '../../../src/ui/kit';
-import { BarButton, LargeTitle, Page, SectionHeader } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { PendingSendCard } from '../../../src/ui/pending-send';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { HeaderTextButton, StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
 /**
- * «Сагс» (the Cart board, ADR-0068): one row per product with its pieces, the server's line total
- * and the unit pill that opens the product; «Засах» shows the remove buttons; the server's total;
- * «Захиалга илгээх» goes on to the customer's details.
+ * «Сагс» (the Cart board, ADR-0068; Bto300's look since ADR-0100): the blue header with «Засах»,
+ * which shows the remove buttons; one row per product with its pieces, the server's line total and
+ * the unit pill that opens the product; the server's total; «Захиалга илгээх» goes on to the
+ * customer's details.
  */
 export default function CartScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
+  const inset = useStoreTabBarInset();
   const { server } = useSignedIn();
   const { cart, dispatch, pending } = useShop();
   const [editing, setEditing] = useState(false);
@@ -47,7 +49,8 @@ export default function CartScreen() {
 
   if (cart.lines.length === 0 && !locked) {
     return (
-      <Page>
+      <Page edges={[]}>
+        <StoreHeader title={t('mobile.tabs.cart')} right={null} />
         <View style={[styles.empty, { paddingBottom: inset }]}>
           <EmptyState
             icon={<ShoppingCart size={48} strokeWidth={1.5} color={colors.input} />}
@@ -68,18 +71,19 @@ export default function CartScreen() {
   const discount = quote.data ? new Decimal(quote.data.discountTotal) : new Decimal(0);
 
   return (
-    <Page>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
-        <View style={styles.bar}>
-          {locked ? null : (
-            <BarButton
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.tabs.cart')}
+        right={
+          locked ? null : (
+            <HeaderTextButton
               title={editing ? t('mobile.cart.done') : t('common.edit')}
               onPress={() => setEditing(!editing)}
-              strong={editing}
             />
-          )}
-        </View>
-        <LargeTitle style={styles.title}>{t('mobile.tabs.cart')}</LargeTitle>
+          )
+        }
+      />
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
         <Text style={[type.body, styles.subtitle]}>
           {t('mobile.cart.count', { n: cart.lines.length })}
         </Text>
@@ -268,6 +272,7 @@ function CartRow({
           accessibilityLabel={t('mobile.cart.changeQty', { name: line.name })}
           disabled={locked}
           onPress={onOpen}
+          hitSlop={8}
           style={styles.qtyPill}
         >
           <Text style={styles.qtyText}>{`${line.qty} ${words(line).name}`}</Text>
@@ -279,10 +284,8 @@ function CartRow({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  bar: { height: 44, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  subtitle: { marginTop: 2, marginHorizontal: spacing.xs, color: colors.muted },
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  subtitle: { marginHorizontal: spacing.xs, color: colors.muted },
   section: { marginTop: 22 },
   group: { backgroundColor: colors.card, borderRadius: radii.card, overflow: 'hidden' },
   row: {
@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
   text: { flex: 1 },
   name: { ...type.heading },
   right: { alignItems: 'flex-end', gap: 6 },
-  lineTotal: { ...type.heading },
+  lineTotal: { ...type.heading, ...tabular },
   red: { ...type.chip, fontFamily: fonts.semibold, color: colors.destructive },
   qtyPill: {
     height: 28,
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
   },
-  total: { ...type.title2 },
+  total: { ...type.title2, ...tabular },
   discountRow: {
     minHeight: 44,
     flexDirection: 'row',
@@ -346,7 +349,7 @@ const styles = StyleSheet.create({
   green: { color: colors.success },
   note: { paddingVertical: 11, paddingHorizontal: spacing.lg },
   warning: { marginTop: spacing.md, marginHorizontal: spacing.xs, color: colors.destructive },
-  next: { marginTop: 20 },
+  next: { marginTop: 20, borderRadius: 10 },
   empty: {
     flex: 1,
     justifyContent: 'center',

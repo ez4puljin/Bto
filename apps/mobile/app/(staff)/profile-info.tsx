@@ -10,13 +10,15 @@ import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
 import { colors, fonts, spacing, type } from '../../src/theme/tokens';
 import { Group, Row } from '../../src/ui/grouped';
-import { FootNote, NavBar, Page, SectionHeader } from '../../src/ui/layout';
+import { FootNote, Page, SectionHeader } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/ui/store-header';
 
 const HOUR_MS = 3_600_000;
 
 /**
  * «Хэрэглэгчийн мэдээлэл» (the ProfileInfo board, ADR-0068): the name, the login, the role and the
- * branches; when the session signed in and when it ends; the server; «Нууц үг солих».
+ * branches; when the session signed in and when it ends; the server; «Нууц үг солих». Under the
+ * blue header with ← since ADR-0100.
  */
 export default function ProfileInfoScreen() {
   const { t } = useTranslation();
@@ -38,16 +40,14 @@ export default function ProfileInfoScreen() {
   );
 
   return (
-    <Page>
-      <NavBar back={t('mobile.tabs.profile')} onBack={() => router.back()} />
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.profileInfo.title')} onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.head}>
           <View style={styles.avatar}>
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
-          <Text accessibilityRole="header" style={[type.title3, styles.center]}>
-            {me.fullName}
-          </Text>
+          <Text style={[type.title3, styles.center]}>{me.fullName}</Text>
           {roleName ? (
             <View style={styles.rolePill}>
               <Text style={styles.roleText}>{roleName}</Text>
@@ -106,16 +106,16 @@ export default function ProfileInfoScreen() {
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  head: { alignItems: 'center', gap: spacing.sm, paddingTop: 6 },
+  head: { alignItems: 'center', gap: spacing.sm, paddingTop: 20 },
   avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.display, fontFamily: fonts.semibold, color: colors.primaryForeground },
+  initials: { ...type.title, fontFamily: fonts.bold, color: colors.primaryForeground },
   center: { textAlign: 'center', marginTop: spacing.xs },
   rolePill: {
     height: 26,

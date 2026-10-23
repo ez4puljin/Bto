@@ -1,5 +1,5 @@
 import { Decimal } from '@tugeel/shared/money';
-import type { StoreDeal, StoreOrderDeal, StoreProduct } from '../api/customer';
+import type { StoreDeal, StoreOrderDeal } from '../api/customer';
 import { monthDay } from '../dates/calendar';
 import { formatMnt, formatQty } from '../format/format';
 
@@ -17,13 +17,15 @@ export function dealToneOf(kind: StoreDeal['kind']): DealTone {
 /**
  * The card's price per base unit: the deal price with the regular one struck through when an
  * unconditional program lowers it (`dealPrice`, ADR-0093 #4), else the regular price; null without
- * a price.
+ * a price. Either app's product (the rep's since ADR-0100). A server older than the rep's deals
+ * sends no `dealPrice` at all: that reads as no deal price, never a crash.
  */
-export function cardPriceOf(
-  product: Pick<StoreProduct, 'basePrice' | 'dealPrice'>,
-): { price: string; old: string | null } | null {
+export function cardPriceOf(product: {
+  basePrice: string | null;
+  dealPrice?: string | null | undefined;
+}): { price: string; old: string | null } | null {
   if (product.basePrice === null) return null;
-  if (product.dealPrice !== null && new Decimal(product.dealPrice).lt(product.basePrice)) {
+  if (product.dealPrice != null && new Decimal(product.dealPrice).lt(product.basePrice)) {
     return { price: product.dealPrice, old: product.basePrice };
   }
   return { price: product.basePrice, old: null };

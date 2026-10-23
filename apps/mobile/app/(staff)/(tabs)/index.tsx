@@ -1,60 +1,80 @@
 import { Decimal } from '@tugeel/shared/money';
 import { useRouter } from 'expo-router';
-import {
-  Bell,
-  ChevronRight,
-  Map as MapIcon,
-  ScanBarcode,
-  Send,
-  ShoppingCart,
-  TriangleAlert,
-} from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { Bell, ScanLine, Send, ShoppingCart, TriangleAlert } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Text } from '../../../src/ui/text';
 import { useNotificationSummary } from '../../../src/api/notifications';
 import { problemFrom } from '../../../src/api/problem';
-import { useOrders, useProducts, useRepContext, useRepMap } from '../../../src/api/rep';
+import {
+  type RepHome,
+  useOrders,
+  useRepContext,
+  useRepHome,
+  useRepMap,
+} from '../../../src/api/rep';
+import { lineOf } from '../../../src/cart/cart';
+import {
+  BannerCarousel,
+  CategoryTile,
+  ListHeading,
+  SectionRow,
+  useSectionText,
+} from '../../../src/customer/home-parts';
+import { homeCategoriesOf, sectionRouteOf } from '../../../src/customer/home-sections';
 import { presetRange } from '../../../src/dates/calendar';
 import { formatMillions, formatMnt, initialsOf } from '../../../src/format/format';
-import { dateLineOf, givenNameOf, newProductsOf } from '../../../src/home/home';
 import { allOrdered, countsOf } from '../../../src/map/stores';
 import { shortMoney } from '../../../src/orders/amounts';
-import { EMPTY_FILTERS } from '../../../src/shop/filters';
+import { useAddOne } from '../../../src/shop/use-add';
 import { effectiveStage, placeOf } from '../../../src/state/placement';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, radii, shadows, spacing, tabular, type } from '../../../src/theme/tokens';
-import { CircleButton, PillButton } from '../../../src/ui/controls';
+import { colors, fonts, spacing, storeType, tabular, TOUCH, type } from '../../../src/theme/tokens';
+import { PillButton } from '../../../src/ui/controls';
 import { Group, IconTile, Row } from '../../../src/ui/grouped';
 import { ProblemText } from '../../../src/ui/kit';
-import { Page, SectionHeader, SectionTitle } from '../../../src/ui/layout';
+import { Page } from '../../../src/ui/layout';
 import { OrderRow } from '../../../src/ui/order-row';
-import { ProductTile, TILE_WIDTH } from '../../../src/ui/product-tile';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { ProductCard } from '../../../src/ui/product-card';
+import { HeaderIconButton, StoreHeaderBand } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
-const TILE_GAP = 12;
 const RECENT = 3;
 
+type HomeCategory = RepHome['categories'][number];
+
 /**
- * «Нүүр» (ADR-0068, the owner 2026-10-17: more modern, larger text): who is signed in and the day
- * with the scanner and the bell (no search by name or code here, the owner 2026-10-18: «Бараа»
- * searches), this month's orders on the blue card, the cart when it has lines, the stage new orders
- * land on, the newest products and the last orders. The tab bar is the way to the other tabs, so
- * the home does not repeat it.
+ * «Нүүр» (ADR-0068; «Bto300»'s shop window on top since ADR-0100 #9): the blue header with «Bto»,
+ * the search field (it opens «Бараа» searching), the scanner, the bell and the initials (to
+ * «Профайл»), and the upper-case links (categories, discounts, new, the map, the orders); the
+ * banners edge to edge; «АНГИЛЛЫН ЖАГСААЛТ ›» with 4×2 pictures; the sections (promotions, the
+ * shown segments, discounts, new) as rows of the rep's cards. Below them the rep's own blocks with
+ * ›: this month's orders, the cart when it has lines, the stage new orders land on, the store map
+ * and the last orders.
  */
 export default function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
-  const { me } = useSignedIn();
+  const inset = useStoreTabBarInset();
+  const { me, server } = useSignedIn();
   const { cart, pending, stageId, setStageId, ready } = useShop();
-  const unread = useNotificationSummary().data?.unread ?? 0;
+  const notifications = useNotificationSummary();
+  const unread = notifications.data?.unread ?? 0;
   const context = useRepContext();
   const today = context.data?.today ?? null;
   const orders = useOrders(today ? { ...presetRange('month', today), q: '' } : null);
-  const products = useProducts({ ...EMPTY_FILTERS, q: '' });
+  const home = useRepHome();
+  const sectionText = useSectionText();
+  const add = useAddOne();
   const [refreshing, setRefreshing] = useState(false);
 
   // A stage the rep may no longer use is dropped; the default (or the only one) is taken.
@@ -67,19 +87,52 @@ export default function HomeScreen() {
   const firstPage = orders.data?.pages[0];
   const summary = firstPage?.summary ?? null;
   const recent = firstPage?.data.slice(0, RECENT) ?? [];
-  const fresh = useMemo(() => newProductsOf(products.data?.pages[0]?.data ?? []), [products.data]);
   const place = context.data ? placeOf(context.data, stageId) : null;
   const stageKnown = ready && context.data !== undefined;
   const monthLoading = !summary && !orders.error && !context.error;
 
-  const date = today ? dateLineOf(today) : null;
-  const dateLine = date
-    ? t('mobile.home.dateLong', {
-        weekday: t(`mobile.weekdaysLong.${date.weekday}`),
-        month: date.month,
-        day: date.day,
-      })
-    : ' ';
+  // Null when the server is older than the shop window (404): «Нүүр» then has none, quietly.
+  const shopWindow = home.data ?? null;
+  const sections = shopWindow?.sections ?? [];
+  // The links under the search: the categories (once the shop window is there: their page reads
+  // it), the discounts and the new products (when the home has them), the store map and the orders.
+  const deals = sections.find(
+    (section) => section.kind === 'DISCOUNTS' || section.kind === 'DEALS',
+  );
+  const fresh = sections.find((section) => section.kind === 'NEW');
+  const links: { key: string; label: string; onPress: () => void }[] = [
+    ...(shopWindow
+      ? [
+          {
+            key: 'categories',
+            label: t('mobile.filter.categories'),
+            onPress: () => router.push('/categories'),
+          },
+        ]
+      : []),
+    ...[deals, fresh].flatMap((section) =>
+      section
+        ? [
+            {
+              key: section.key,
+              label: sectionText(section).title,
+              onPress: () => router.push(sectionRouteOf(section.key)),
+            },
+          ]
+        : [],
+    ),
+    { key: 'map', label: t('mobile.map.title'), onPress: () => router.push('/map') },
+    { key: 'orders', label: t('mobile.tabs.orders'), onPress: () => router.navigate('/orders') },
+  ];
+
+  // Four tiles a row; the last row keeps its tiles at their place.
+  const categories = homeCategoriesOf(shopWindow?.categories ?? []);
+  const tileRows: (HomeCategory | null)[][] = [];
+  for (let at = 0; at < categories.length; at += 4) {
+    const row: (HomeCategory | null)[] = categories.slice(at, at + 4);
+    while (row.length < 4) row.push(null);
+    tileRows.push(row);
+  }
   const millions = summary ? formatMillions(summary.total) : null;
   const total = summary
     ? millions
@@ -92,7 +145,7 @@ export default function HomeScreen() {
       ? t('mobile.orders.approx', { amount: shortMoney(t, summary.draftsEstimate) })
       : null;
 
-  // The store map's card: how many located stores have no order of the rep lately, and how many
+  // The store map's line: how many located stores have no order of the rep lately, and how many
   // the accountant closed (as the map's legend counts them: a closed store is not «stale»).
   const storeMap = useRepMap();
   const mapCounts = storeMap.data ? countsOf(storeMap.data.data) : null;
@@ -119,109 +172,205 @@ export default function HomeScreen() {
     try {
       await Promise.all([
         context.refetch(),
+        home.refetch(),
         orders.refetch(),
-        products.refetch(),
         storeMap.refetch(),
+        notifications.refetch(),
       ]);
     } finally {
       setRefreshing(false);
     }
   };
 
+  const heading = (title: string, onPress: () => void, subtitle?: string | null) => (
+    <ListHeading
+      title={title}
+      subtitle={subtitle ?? null}
+      label={t('mobile.customer.home.seeAll', { title })}
+      onPress={onPress}
+    />
+  );
+
   return (
-    <Page>
-      <ScrollView
-        contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
-      >
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
+    <Page white edges={[]}>
+      <StoreHeaderBand>
+        <View style={styles.bar}>
+          <Text accessibilityRole="header" style={storeType.wordmark}>
+            {t('app.name')}
+          </Text>
+          <View style={styles.search}>
+            <Pressable
+              accessibilityRole="search"
+              accessibilityLabel={t('mobile.shop.searchLabel')}
+              onPress={() => router.navigate({ pathname: '/shop', params: { search: '1' } })}
+              style={styles.searchText}
+            >
+              <Text style={storeType.search} numberOfLines={1}>
+                {t('mobile.customer.home.search')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.scan.title')}
+              onPress={() => router.push('/scan')}
+              hitSlop={6}
+              style={styles.searchScan}
+            >
+              <ScanLine size={19} strokeWidth={1.8} color={colors.label2} />
+            </Pressable>
           </View>
-          <View style={styles.grow}>
-            <Text style={type.secondary} numberOfLines={1}>
-              {dateLine}
-            </Text>
-            <Text accessibilityRole="header" style={type.title3} numberOfLines={1}>
-              {t('mobile.home.hello', { name: givenNameOf(me.fullName) || me.username })}
-            </Text>
-          </View>
-          <CircleButton
-            icon={<ScanBarcode size={22} strokeWidth={1.9} color={colors.foreground} />}
-            label={t('mobile.scan.title')}
-            onPress={() => router.push('/scan')}
-          />
-          <CircleButton
-            icon={<Bell size={22} strokeWidth={1.9} color={colors.foreground} />}
+          <HeaderIconButton
+            icon={<Bell size={22} strokeWidth={1.9} color={colors.primaryForeground} />}
             label={
               unread > 0
                 ? t('mobile.notifications.bellUnread', { n: unread })
                 : t('mobile.notifications.title')
             }
             badge={unread}
-            badgeRing={colors.canvas}
             onPress={() => router.push('/notifications')}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.tabs.profile')}
+            onPress={() => router.push('/profile')}
+            hitSlop={7}
+            style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
+          >
+            <Text style={styles.avatarText}>{initialsOf(me.fullName)}</Text>
+          </Pressable>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          accessibilityLabel={t('mobile.customer.home.quickLinks')}
+          contentContainerStyle={styles.links}
+        >
+          {links.map((link) => (
+            <Pressable key={link.key} accessibilityRole="link" onPress={link.onPress} hitSlop={8}>
+              <Text style={[storeType.headerLink, styles.upper]} numberOfLines={1}>
+                {link.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </StoreHeaderBand>
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: inset + spacing.lg }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
+      >
+        {shopWindow ? <BannerCarousel banners={shopWindow.banners} server={server} /> : null}
+
+        {tileRows.length > 0 ? (
+          <>
+            <View style={styles.categoriesHead}>
+              <ListHeading
+                big
+                title={t('mobile.customer.home.categories')}
+                label={t('mobile.customer.home.allCategories')}
+                onPress={() => router.push('/categories')}
+              />
+            </View>
+            <View style={styles.grid}>
+              {tileRows.map((row, index) => (
+                <View key={index} style={styles.gridRow}>
+                  {row.map((category, at) =>
+                    category ? (
+                      <CategoryTile
+                        key={category.id}
+                        category={category}
+                        server={server}
+                        onPress={() => router.push(`/category/${category.id}`)}
+                      />
+                    ) : (
+                      <View key={`empty-${at}`} style={styles.grow} />
+                    ),
+                  )}
+                </View>
+              ))}
+            </View>
+            <View style={styles.divider} />
+          </>
+        ) : null}
+
+        {sections.map((section) => (
+          <SectionRow
+            key={section.key}
+            section={section}
+            renderCard={(product, size) => (
+              <ProductCard
+                product={product}
+                server={server}
+                line={lineOf(cart, product.id)}
+                locked={pending !== null}
+                onOpen={() => router.push(`/product/${product.id}`)}
+                onAdd={() => add(product)}
+                {...size}
+              />
+            )}
+            onMore={() => router.push(sectionRouteOf(section.key))}
+          />
+        ))}
+
+        {home.isLoading ? (
+          <ActivityIndicator style={styles.loading} color={colors.primary} />
+        ) : home.error && !shopWindow ? (
+          <ProblemText problem={problemFrom(home.error)} style={styles.homeProblem} />
+        ) : null}
+        {sections.length > 0 ? <View style={styles.divider} /> : null}
+
+        <View style={styles.section}>
+          {heading(t('mobile.home.month'), () => router.navigate('/orders'))}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/orders')}
+            style={({ pressed }) => [styles.panel, styles.month, pressed && styles.pressedPanel]}
+          >
+            {monthLoading ? (
+              <View style={styles.totalSlot}>
+                <View style={[styles.block, styles.blockTotal]} />
+              </View>
+            ) : (
+              <Text
+                style={styles.total}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {total}
+              </Text>
+            )}
+            <Text style={type.secondary}>{t('mobile.orders.confirmed')}</Text>
+            <View style={styles.rule} />
+            {monthLoading ? (
+              <View style={[styles.block, styles.blockCounts]} />
+            ) : (
+              <View style={styles.counts}>
+                <View style={styles.count}>
+                  <Text style={styles.countValue}>
+                    {summary ? String(summary.count) : t('common.none')}
+                  </Text>
+                  <Text style={type.secondary}>{t('mobile.orders.count')}</Text>
+                </View>
+                <View style={[styles.count, styles.shrink]}>
+                  {summary && summary.drafts > 0 ? <View style={styles.draftDot} /> : null}
+                  <Text style={styles.countValue}>
+                    {summary ? String(summary.drafts) : t('common.none')}
+                  </Text>
+                  <Text style={type.secondary}>{t('mobile.orders.drafts')}</Text>
+                  {draftsEstimate ? (
+                    <Text style={[type.secondary, styles.shrink]} numberOfLines={1}>
+                      {draftsEstimate}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
+          </Pressable>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.navigate('/orders')}
-          style={({ pressed }) => [
-            styles.month,
-            { backgroundColor: pressed ? colors.primaryPressed : colors.primary },
-          ]}
-        >
-          <View style={styles.monthTop}>
-            <Text style={[type.sectionHeader, styles.onMuted, styles.grow]}>
-              {t('mobile.home.month')}
-            </Text>
-            <ChevronRight size={16} strokeWidth={2.4} color={colors.onPrimaryMuted} />
-          </View>
-          {monthLoading ? (
-            <View style={styles.totalSlot}>
-              <View style={[styles.block, styles.blockTotal]} />
-            </View>
-          ) : (
-            <Text
-              style={styles.total}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {total}
-            </Text>
-          )}
-          <Text style={[type.secondary, styles.onMuted]}>{t('mobile.orders.confirmed')}</Text>
-          <View style={styles.hairline} />
-          {monthLoading ? (
-            <View style={[styles.block, styles.blockCounts]} />
-          ) : (
-            <View style={styles.counts}>
-              <View style={styles.count}>
-                <Text style={styles.countValue}>
-                  {summary ? String(summary.count) : t('common.none')}
-                </Text>
-                <Text style={[type.secondary, styles.onMuted]}>{t('mobile.orders.count')}</Text>
-              </View>
-              <View style={[styles.count, styles.shrink]}>
-                {summary && summary.drafts > 0 ? <View style={styles.draftDot} /> : null}
-                <Text style={styles.countValue}>
-                  {summary ? String(summary.drafts) : t('common.none')}
-                </Text>
-                <Text style={[type.secondary, styles.onMuted]}>{t('mobile.orders.drafts')}</Text>
-                {draftsEstimate ? (
-                  <Text style={[type.secondary, styles.onMuted, styles.shrink]} numberOfLines={1}>
-                    {draftsEstimate}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          )}
-        </Pressable>
-
         {cart.lines.length > 0 ? (
-          <View style={styles.cart}>
+          <View style={[styles.panel, styles.cart]}>
             <View style={styles.cartIcon}>
               <ShoppingCart size={20} strokeWidth={2} color={colors.success} />
             </View>
@@ -244,149 +393,148 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <SectionHeader>{t('mobile.home.stage')}</SectionHeader>
-        {context.error && !context.data ? (
-          // The context did not load: say why instead of «loading» (pull down to try again).
-          <ProblemText problem={problemFrom(context.error)} style={styles.flush} />
-        ) : (
-          <Group style={stageKnown && !place ? styles.stageWarning : null}>
-            <Row
-              minHeight={56}
-              icon={
-                <IconTile
-                  color={
-                    !stageKnown ? colors.tint.gray : place ? colors.tint.orange : colors.tint.red
-                  }
-                >
-                  {stageKnown && !place ? (
-                    <TriangleAlert size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-                  ) : (
-                    <Send size={16} color={colors.primaryForeground} />
-                  )}
-                </IconTile>
-              }
-              title={
-                !stageKnown
-                  ? t('common.loading')
-                  : place
-                    ? `${place.pipelineName} › ${place.stageName}`
-                    : t('mobile.settings.notChosen')
-              }
-              subtitle={
-                !stageKnown
-                  ? null
-                  : place
-                    ? t(place.confirms ? 'mobile.settings.confirms' : 'mobile.settings.drafts')
-                    : t('mobile.home.chooseStage')
-              }
-              onPress={() => router.push('/settings')}
-            />
-          </Group>
-        )}
-
-        <Group style={styles.mapCard}>
-          <Row
-            minHeight={56}
-            icon={
-              <IconTile color={colors.tint.teal}>
-                <MapIcon size={16} strokeWidth={2.2} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.map.title')}
-            subtitle={mapLine}
-            onPress={() => router.push('/map')}
-          />
-        </Group>
-
-        {products.isLoading || fresh.length > 0 ? (
-          <>
-            <SectionTitle
-              action={t('mobile.home.seeAll')}
-              onAction={() => router.navigate('/shop')}
-            >
-              {t('mobile.home.newProducts')}
-            </SectionTitle>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.strip}
-              contentContainerStyle={styles.stripContent}
-              snapToInterval={TILE_WIDTH + TILE_GAP}
-              decelerationRate="fast"
-            >
-              {products.isLoading
-                ? [0, 1, 2].map((index) => <View key={index} style={styles.tileSkeleton} />)
-                : fresh.map((product) => <ProductTile key={product.id} product={product} />)}
-            </ScrollView>
-          </>
-        ) : null}
-
-        <SectionTitle action={t('mobile.home.seeAll')} onAction={() => router.navigate('/orders')}>
-          {t('mobile.home.recent')}
-        </SectionTitle>
-        {recent.length > 0 ? (
-          <Group>
-            {recent.map((order) => (
-              <OrderRow
-                key={order.id}
-                order={order}
-                onPress={() => router.push(`/order/${order.id}`)}
+        <View style={styles.section}>
+          {heading(t('mobile.home.stage'), () => router.push('/settings'))}
+          {context.error && !context.data ? (
+            // The context did not load: say why instead of «loading» (pull down to try again).
+            <ProblemText problem={problemFrom(context.error)} style={styles.problem} />
+          ) : (
+            <Group style={[styles.panel, stageKnown && !place ? styles.stageWarning : null]}>
+              <Row
+                minHeight={56}
+                icon={
+                  <IconTile
+                    color={
+                      !stageKnown ? colors.tint.gray : place ? colors.tint.orange : colors.tint.red
+                    }
+                  >
+                    {stageKnown && !place ? (
+                      <TriangleAlert size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+                    ) : (
+                      <Send size={16} color={colors.primaryForeground} />
+                    )}
+                  </IconTile>
+                }
+                title={
+                  !stageKnown
+                    ? t('common.loading')
+                    : place
+                      ? `${place.pipelineName} › ${place.stageName}`
+                      : t('mobile.settings.notChosen')
+                }
+                subtitle={
+                  !stageKnown
+                    ? null
+                    : place
+                      ? t(place.confirms ? 'mobile.settings.confirms' : 'mobile.settings.drafts')
+                      : t('mobile.home.chooseStage')
+                }
+                onPress={() => router.push('/settings')}
               />
-            ))}
-          </Group>
-        ) : firstPage ? (
-          <View style={styles.empty}>
-            <Text style={[type.body, styles.mutedText, styles.center]}>
-              {t('mobile.home.recentEmpty')}
-            </Text>
-          </View>
-        ) : orders.error ? (
-          <ProblemText problem={problemFrom(orders.error)} style={styles.flush} />
-        ) : null}
+            </Group>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          {heading(t('mobile.map.title'), () => router.push('/map'), mapLine)}
+        </View>
+
+        <View style={styles.section}>
+          <ListHeading
+            title={t('mobile.home.recent')}
+            icon={{ icon: 'history', tone: 'muted' }}
+            label={t('mobile.customer.home.seeAll', { title: t('mobile.home.recent') })}
+            onPress={() => router.navigate('/orders')}
+          />
+          {recent.length > 0 ? (
+            <Group style={styles.panel}>
+              {recent.map((order) => (
+                <OrderRow
+                  key={order.id}
+                  order={order}
+                  onPress={() => router.push(`/order/${order.id}`)}
+                />
+              ))}
+            </Group>
+          ) : firstPage ? (
+            <View style={[styles.panel, styles.empty]}>
+              <Text style={[type.body, styles.mutedText, styles.center]}>
+                {t('mobile.home.recentEmpty')}
+              </Text>
+            </View>
+          ) : orders.error ? (
+            <ProblemText problem={problemFrom(orders.error)} style={styles.problem} />
+          ) : null}
+        </View>
       </ScrollView>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
+  shrink: { flexShrink: 1 },
   center: { textAlign: 'center' },
   mutedText: { color: colors.muted },
-  header: {
-    paddingTop: spacing.sm,
-    minHeight: 52 + spacing.sm,
+  upper: { textTransform: 'uppercase' },
+  pressed: { opacity: 0.7 },
+  // «Bto300»'s header bar and search pill (ADR-0100 #9).
+  bar: {
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 6,
+    paddingLeft: 14,
+    paddingRight: spacing.sm,
   },
+  search: {
+    flex: 1,
+    minWidth: 0,
+    height: 34,
+    marginLeft: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 17,
+    backgroundColor: colors.card,
+  },
+  searchText: { flex: 1, height: TOUCH, justifyContent: 'center', paddingLeft: 14 },
+  searchScan: { width: 36, height: 34, alignItems: 'center', justifyContent: 'center' },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.rowStrong, letterSpacing: 0, color: colors.primaryForeground },
-  month: {
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radii.tile,
-    boxShadow: shadows.accentCard,
+  avatarText: { ...storeType.badge, fontFamily: fonts.bold, color: colors.primary },
+  links: { gap: 20, paddingTop: 2, paddingBottom: 10, paddingHorizontal: 14 },
+  categoriesHead: { paddingTop: 12 },
+  grid: { gap: 12, paddingHorizontal: 6 },
+  gridRow: { flexDirection: 'row', gap: spacing.xs },
+  divider: { height: 2, marginTop: 16, marginHorizontal: 10, backgroundColor: colors.border },
+  loading: { marginTop: spacing.xl },
+  homeProblem: { marginTop: spacing.lg, marginHorizontal: 14 },
+  section: { paddingTop: 18 },
+  // «Bto300»'s white panel with a hairline and 10 px corners (ADR-0095 #4).
+  panel: {
+    marginHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
-  monthTop: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  onMuted: { color: colors.onPrimaryMuted },
-  total: { ...type.display, ...tabular, color: colors.primaryForeground },
-  totalSlot: { height: type.display.lineHeight, justifyContent: 'center' },
-  block: { borderRadius: 8, backgroundColor: colors.onPrimaryHairline },
-  blockTotal: { width: 140, height: 30 },
+  pressedPanel: { backgroundColor: colors.accent },
+  month: { paddingVertical: 14, paddingHorizontal: spacing.lg },
+  total: { ...type.title2, ...tabular },
+  totalSlot: { height: type.title2.lineHeight, justifyContent: 'center' },
+  block: { borderRadius: 6, backgroundColor: colors.fill },
+  blockTotal: { width: 140, height: 22 },
   blockCounts: { width: 90, height: 16, marginVertical: 2.5 },
-  hairline: { height: 1, marginVertical: 14, backgroundColor: colors.onPrimaryHairline },
+  rule: { height: 1, marginVertical: spacing.md, backgroundColor: colors.border },
   counts: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   count: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  shrink: { flexShrink: 1 },
-  countValue: { ...type.heading, ...tabular, color: colors.primaryForeground },
+  countValue: { ...type.heading, ...tabular },
   draftDot: {
     width: 8,
     height: 8,
@@ -395,14 +543,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tint.amber,
   },
   cart: {
-    marginTop: spacing.md,
+    marginTop: 18,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
   },
   cartIcon: {
     width: 40,
@@ -414,16 +560,6 @@ const styles = StyleSheet.create({
   },
   cartButton: { paddingHorizontal: 14 },
   stageWarning: { backgroundColor: colors.warningSoft },
-  mapCard: { marginTop: spacing.md },
-  // Edge to edge: the strip scrolls under the page's margins.
-  strip: { marginHorizontal: -spacing.lg },
-  stripContent: { paddingHorizontal: spacing.lg, gap: TILE_GAP },
-  tileSkeleton: {
-    width: TILE_WIDTH,
-    height: TILE_WIDTH,
-    borderRadius: 18,
-    backgroundColor: colors.fill,
-  },
-  empty: { padding: 20, borderRadius: radii.card, backgroundColor: colors.card },
-  flush: { marginTop: 0 },
+  empty: { padding: 20 },
+  problem: { marginTop: 0, marginHorizontal: 14 },
 });

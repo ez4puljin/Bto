@@ -3,6 +3,7 @@ import { ClipboardList } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, SectionList, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
 import { useRepContext, useStoreOrders } from '../../../src/api/rep';
 import { dayNameOf, monthDay } from '../../../src/dates/calendar';
@@ -12,17 +13,20 @@ import { byDay } from '../../../src/orders/store-orders';
 import { colors, radii, spacing, type } from '../../../src/theme/tokens';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { FootNote, LargeTitle, NavBar, Page } from '../../../src/ui/layout';
+import { FootNote, Page } from '../../../src/ui/layout';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 
 /**
  * «Захиалгын түүх» of a store (the owner, 2026-10-18), opened from its card on the map: every
  * order of the store, anyone's (the office, other reps, the rep's own), by day, newest first, with
- * who took it, when, the amount and the status. Only the rep's own orders open.
+ * who took it, when, the amount and the status. Only the rep's own orders open. Bto300's blue
+ * header with ← and the store's name (ADR-0100).
  */
 export default function StoreOrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const customerId = Number.parseInt(id ?? '', 10);
   const orders = useStoreOrders(Number.isFinite(customerId) ? customerId : null);
@@ -43,22 +47,15 @@ export default function StoreOrdersScreen() {
   };
 
   return (
-    <Page>
-      <NavBar
-        back={t('mobile.map.title')}
-        onBack={() => router.back()}
-        {...(name ? { title: t('mobile.storeOrders.title') } : {})}
-      />
+    <Page edges={[]}>
+      <StoreHeader title={name || t('mobile.storeOrders.title')} onBack={() => router.back()} />
       <SectionList
         sections={sections}
         keyExtractor={(order) => String(order.id)}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: 40 + insets.bottom }]}
         ListHeaderComponent={
-          <View>
-            <LargeTitle style={styles.title}>{name || t('mobile.storeOrders.title')}</LargeTitle>
-            {orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null}
-          </View>
+          orders.error ? <ProblemText problem={problemFrom(orders.error)} /> : null
         }
         renderSectionHeader={({ section }) => (
           <Text accessibilityRole="header" style={[type.sectionHeader, styles.day]}>
@@ -112,10 +109,9 @@ export default function StoreOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
-  day: { marginTop: 22, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: { backgroundColor: colors.card },
+  list: { paddingHorizontal: spacing.lg },
+  day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   loading: { marginTop: spacing.xl },

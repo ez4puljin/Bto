@@ -22,7 +22,12 @@ import {
 import type { AuthContext } from '../../identity';
 import { ProductLocationsService, StockQueryService } from '../../inventory';
 import { CustomersService, ProductSuppliersService } from '../../partners';
-import { ProductPricesService } from '../../pricing';
+import {
+  type DealBook,
+  type ProductDeal,
+  ProductDealsService,
+  ProductPricesService,
+} from '../../pricing';
 import { overdueDto } from '../overdue';
 import { SalesOrdersService } from './sales-orders.service';
 
@@ -62,6 +67,20 @@ export interface RepProduct {
     wholesale: Decimal | null;
     basis: 'WAREHOUSE' | 'LOOSE' | 'MIXED' | null;
   }[];
+}
+
+/**
+ * A rep product with its discount program's badge and the struck-through price, as «Bto300» shows
+ * them (ADR-0092 #3, ADR-0093; the owner, 2026-10-23: rep orders are quoted with the same programs).
+ */
+export interface RepShopProduct extends RepProduct {
+  /**
+   * One base unit in whole packs after the product's unconditional programs, when lower than
+   * `basePrice`; null otherwise.
+   */
+  dealPrice: Decimal | null;
+  /** The badge; null when no program marks the product. */
+  deal: ProductDeal | null;
 }
 
 /** The shop's filters and order (ADR-0068). */
@@ -171,8 +190,8 @@ function priceCursorOf(
  * What the rep's shop and customer picker read (ADR-0061 #5, #7; ADR-0068): active, sale-ready
  * products with each unit's wholesale price and the home warehouse's stock, filtered and sorted as
  * the app asks; the suppliers to filter by; active customers with what an order needs, through
- * `CustomersService.visibleTo` (the hook reserved for rep zones). Prices come from pricing: the app
- * never computes one.
+ * `CustomersService.visibleTo` (the hook reserved for rep zones). Prices and the discount badges
+ * (`withDeals`) come from pricing: the app never computes one.
  */
 @Injectable()
 export class SalesRepShopService {
@@ -185,7 +204,33 @@ export class SalesRepShopService {
     private readonly customers: CustomersService,
     private readonly productSuppliers: ProductSuppliersService,
     private readonly locations: ProductLocationsService,
+    private readonly deals: ProductDealsService,
   ) {}
+
+  /** The WHOLESALE programs in force on `today` and the products they mark (one read per request). */
+  dealBook(today = businessDate()): Promise<DealBook> {
+    return this.deals.book('WHOLESALE', today);
+  }
+
+  /**
+   * These products with their badge and struck-through price from one deal book (today's when
+   * none is given), in one batch; the same rule as «Bto300»'s cards (ADR-0093).
+   */
+  async withDeals(rows: readonly RepProduct[], book?: DealBook): Promise<RepShopProduct[]> {
+    if (rows.length === 0) return [];
+    const own = book ?? (await this.dealBook());
+    const ids = rows.map((row) => row.id);
+    const deals = await this.deals.dealsOf(own, ids);
+    const packs = await this.deals.packPrices(own, ids);
+    return rows.map((product) => {
+      const pack = packs.get(product.id);
+      return {
+        ...product,
+        dealPrice: pack && pack.price.lt(pack.regular) ? pack.price : null,
+        deal: deals.get(product.id) ?? null,
+      };
+    });
+  }
 
   /**
    * One page of the shop. NEW pages through catalog's keyset; a price sort orders every product

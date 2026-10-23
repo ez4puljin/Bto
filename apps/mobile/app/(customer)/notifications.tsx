@@ -37,7 +37,7 @@ import { useCustomer } from '../../src/state/session';
 import { colors, fonts, spacing, storeType, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { HeaderTextButton, StoreHeader } from '../../src/customer/store-header';
+import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
 import { Page } from '../../src/ui/layout';
 import { Text } from '../../src/ui/text';
 

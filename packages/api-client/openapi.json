@@ -22722,6 +22722,194 @@
           "customer"
         ]
       }
+    },
+    "/api/v1/sales-rep/home": {
+      "get": {
+        "operationId": "SalesRepHome_homePage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepHome"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Нүүр»: running banners, the category grid and PROMOTIONS, segments, DISCOUNTS, NEW.",
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/sections/{key}/products": {
+      "get": {
+        "operationId": "SalesRepHome_section",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "DEFAULT when left out",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEFAULT",
+                "DEAL",
+                "NEW",
+                "PRICE_ASC",
+                "PRICE_DESC"
+              ]
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Each with its subcategories (repeated)",
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 1
+              }
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "«Зөвхөн байгаа бараа»",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepSectionPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A section's full list (`promotions`, `segment-<id>`, `discounts`, `new`, `deals`).",
+        "tags": [
+          "sales-rep"
+        ]
+      }
+    },
+    "/api/v1/sales-rep/categories/{id}/page": {
+      "get": {
+        "operationId": "SalesRepHome_categoryPage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesRepCategoryPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A category's page: its banners, subcategories, new products and deals of its subtree.",
+        "tags": [
+          "sales-rep"
+        ]
+      }
     }
   },
   "info": {
@@ -36582,6 +36770,107 @@
           "thumbUrl"
         ]
       },
+      "SalesRepDealThreshold": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "A quantity in `unitName`"
+          },
+          "unitName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The unit the quantity is in"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "An amount in MNT (the order’s or a category’s)"
+          }
+        },
+        "required": [
+          "qty",
+          "unitName",
+          "amount"
+        ]
+      },
+      "SalesRepDeal": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "PROMOTION",
+              "DISCOUNT"
+            ],
+            "type": "string",
+            "description": "PROMOTION: with an end date (orange); DISCOUNT (red)"
+          },
+          "label": {
+            "type": "string",
+            "description": "The badge: «10+ ш −5%», «−200₮», «−10% · 10/31»"
+          },
+          "programId": {
+            "type": "number"
+          },
+          "programName": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "PRODUCT",
+              "CATEGORY",
+              "ORDER"
+            ],
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PRICE",
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "The first step: a percentage, tugriks off, or a new unit price"
+          },
+          "threshold": {
+            "nullable": true,
+            "description": "The first step’s condition; null when it always applies",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesRepDealThreshold"
+              }
+            ]
+          },
+          "perUnitName": {
+            "type": "string",
+            "nullable": true,
+            "description": "A pack unit the price or amount is for"
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "A promotion’s last day"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "programId",
+          "programName",
+          "scope",
+          "effect",
+          "value",
+          "threshold",
+          "perUnitName",
+          "lastDay"
+        ]
+      },
       "SalesRepProductUnit": {
         "type": "object",
         "properties": {
@@ -36693,6 +36982,21 @@
             "nullable": true,
             "description": "The base price on `priceBefore`; null without it"
           },
+          "dealPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "MNT, one base unit in whole packs after an unconditional discount, when lower than basePrice; the card strikes basePrice through"
+          },
+          "deal": {
+            "nullable": true,
+            "description": "The badge of its WHOLESALE discount program; null when none marks it",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesRepDeal"
+              }
+            ]
+          },
           "units": {
             "type": "array",
             "items": {
@@ -36713,6 +37017,8 @@
           "available",
           "basePrice",
           "basePriceBefore",
+          "dealPrice",
+          "deal",
           "units"
         ]
       },
@@ -46509,6 +46815,193 @@
         },
         "required": [
           "direction"
+        ]
+      },
+      "SalesRepHomeSection": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "`promotions`, `segment-<id>`, `discounts`, `new`, `deals` — its full list’s key"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTIONS",
+              "SEGMENT",
+              "DISCOUNTS",
+              "NEW",
+              "DEALS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "A segment’s name"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true,
+            "description": "A segment’s description"
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "«Урамшуулал»: the earliest last day of its promotions"
+          },
+          "total": {
+            "type": "number",
+            "description": "How many products the full list holds"
+          },
+          "products": {
+            "description": "At most 10, «Дууссан» last",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProduct"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "subtitle",
+          "lastDay",
+          "total",
+          "products"
+        ]
+      },
+      "SalesRepHome": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "banners": {
+            "description": "Running, in their order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppBanner"
+            }
+          },
+          "categories": {
+            "description": "«Ангиллын жагсаалт»: top categories with products, by name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeCategory"
+            }
+          },
+          "sections": {
+            "description": "PROMOTIONS, the shown segments, DISCOUNTS and NEW in that order; an empty one is left out",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepHomeSection"
+            }
+          }
+        },
+        "required": [
+          "today",
+          "banners",
+          "categories",
+          "sections"
+        ]
+      },
+      "SalesRepSectionPage": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "PROMOTIONS",
+              "SEGMENT",
+              "DISCOUNTS",
+              "NEW",
+              "DEALS"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastDay": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepProduct"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "nullable": true,
+            "description": "On the first page"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "title",
+          "subtitle",
+          "lastDay",
+          "data",
+          "nextCursor",
+          "total"
+        ]
+      },
+      "SalesRepCategoryPage": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CustomerAppCategoryHeader"
+          },
+          "productCount": {
+            "type": "number",
+            "description": "«… бүх бараа · N»: products «Бараа» sells in its subtree"
+          },
+          "banners": {
+            "description": "Running banners linked to it",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppBanner"
+            }
+          },
+          "subcategories": {
+            "description": "Its subcategories with products",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAppHomeCategory"
+            }
+          },
+          "sections": {
+            "description": "«Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesRepHomeSection"
+            }
+          }
+        },
+        "required": [
+          "category",
+          "productCount",
+          "banners",
+          "subcategories",
+          "sections"
         ]
       },
       "ErrorCode": {

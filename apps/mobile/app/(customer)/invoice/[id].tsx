@@ -18,7 +18,7 @@ import { formatMnt } from '../../../src/format/format';
 import { colors, fonts, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { PillButton } from '../../../src/ui/controls';
 import { Group, Row, Separator } from '../../../src/ui/grouped';
-import { StoreHeader } from '../../../src/customer/store-header';
+import { StoreHeader } from '../../../src/ui/store-header';
 import { FootNote, Page, SectionHeader } from '../../../src/ui/layout';
 import { ProblemText } from '../../../src/ui/kit';
 import { Text } from '../../../src/ui/text';
