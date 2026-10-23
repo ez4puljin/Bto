@@ -33,6 +33,8 @@ export const FIN_DOC_TYPES = {
   ALLOCATION: { code: 'FIN.ALLOCATION', system: FIN_SOURCE, docType: 'ALLOCATION' },
   // The opening trial balance (ADR-0102 #5), one per company, posted by the accountant's import.
   OPENING: { code: 'FIN.OPENING', system: FIN_SOURCE, docType: 'OPENING' },
+  // The year close (ADR-0105 #4): income and expense into retained earnings on 31 December.
+  YEAR_CLOSE: { code: 'FIN.YEAR_CLOSE', system: FIN_SOURCE, docType: 'YEAR_CLOSE' },
   SUPPLIER_BILL: { code: 'BTO.SUPPLIER_BILL', system: BTO_SOURCE, docType: 'GOODS_RECEIPT' },
   SUPPLIER_BILL_CREDIT: {
     code: 'BTO.SUPPLIER_BILL_CREDIT',
@@ -121,6 +123,8 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   ISSUE_WRITE_OFF: key('ISSUE_WRITE_OFF'),
   ISSUE_TRANSFER_OUT: key('ISSUE_TRANSFER_OUT'),
   ISSUE_OTHER: key('ISSUE_OTHER'),
+  // The year close (F6, ADR-0105): the profit or loss of a year closes into it.
+  RETAINED_EARNINGS: key('RETAINED_EARNINGS'),
 };
 
 /** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */
@@ -248,6 +252,13 @@ export function btoInstallationSpec(input: {
         code: FIN_DOC_TYPES.OPENING.code,
         system: FIN_SOURCE,
         class: 'OPENING',
+        numberMode: 'CORE',
+        numberSeries: 'JOURNAL',
+      },
+      {
+        code: FIN_DOC_TYPES.YEAR_CLOSE.code,
+        system: FIN_SOURCE,
+        class: 'JOURNAL',
         numberMode: 'CORE',
         numberSeries: 'JOURNAL',
       },

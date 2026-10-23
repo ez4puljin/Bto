@@ -1128,3 +1128,101 @@ export class FinancePeriodReopenRequestDto {
   @MaxLength(FINANCE_LIMITS.maxReason)
   reason: string;
 }
+
+@ApiSchema({ name: 'TrialBalanceQuery' })
+export class TrialBalanceQueryDto {
+  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
+  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiPropertyOptional({ description: 'Also accounts without lines' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  all?: boolean;
+}
+
+@ApiSchema({ name: 'TrialBalanceRow' })
+export class TrialBalanceRowDto {
+  @ApiProperty() accountId: number;
+  @ApiProperty({ example: '120101' }) code: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: GL_ACCOUNT_KINDS }) kind: GlAccountKind;
+  @ApiProperty({ enum: STATUSES }) status: AccountStatus;
+  @ApiProperty({ type: String, nullable: true, example: '12' }) groupCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) groupName: string | null;
+  @ApiProperty({ example: '150000.00', description: 'debit − credit before `from`' })
+  opening: string;
+  @ApiProperty({ example: '10000.00' }) debit: string;
+  @ApiProperty({ example: '0.00' }) credit: string;
+  @ApiProperty({ example: '160000.00', description: 'debit − credit at `to`' }) closing: string;
+}
+
+@ApiSchema({ name: 'TrialBalance' })
+export class TrialBalanceDto {
+  @ApiProperty({ example: '2026-10-01' }) from: string;
+  @ApiProperty({ example: '2026-10-31' }) to: string;
+  @ApiProperty({ type: [TrialBalanceRowDto] }) data: TrialBalanceRowDto[];
+  @ApiProperty({ example: '0.00' }) opening: string;
+  @ApiProperty({ example: '10000.00' }) debit: string;
+  @ApiProperty({ example: '10000.00' }) credit: string;
+  @ApiProperty({ example: '0.00' }) closing: string;
+}
+
+@ApiSchema({ name: 'VatReportQuery' })
+export class VatReportQueryDto {
+  @ApiProperty({ example: '2026-10' }) @Matches(PERIOD) period: string;
+}
+
+@ApiSchema({ name: 'VatGroup' })
+export class VatGroupDto {
+  @ApiProperty({ enum: ['OUTPUT', 'INPUT'] }) side: 'OUTPUT' | 'INPUT';
+  @ApiProperty({ example: 'BTO' }) system: string;
+  @ApiProperty({ type: String, nullable: true, example: 'SALES_INVOICE' }) docType: string | null;
+  @ApiProperty({ example: '10000.00' }) vat: string;
+  @ApiProperty({ example: '100000.00' }) base: string;
+  @ApiProperty({ description: 'Lines that carry no base' }) linesWithoutBase: number;
+}
+
+@ApiSchema({ name: 'VatDocument' })
+export class VatDocumentDto {
+  @ApiProperty() entryId: number;
+  @ApiProperty() entryNumber: string;
+  @ApiProperty({ example: '2026-10-15' }) entryDate: string;
+  @ApiProperty() system: string;
+  @ApiProperty({ type: String, nullable: true }) docType: string | null;
+  @ApiProperty({ type: String, nullable: true }) documentNumber: string | null;
+  @ApiProperty() reversal: boolean;
+  @ApiProperty({ example: '10000.00' }) output: string;
+  @ApiProperty({ example: '0.00' }) input: string;
+  @ApiProperty({ example: '100000.00' }) base: string;
+}
+
+@ApiSchema({ name: 'VatReport' })
+export class VatReportDto {
+  @ApiProperty({ example: '2026-10' }) period: string;
+  @ApiProperty() from: string;
+  @ApiProperty() to: string;
+  @ApiProperty({ type: [VatGroupDto] }) groups: VatGroupDto[];
+  @ApiProperty({ type: [VatDocumentDto] }) documents: VatDocumentDto[];
+  @ApiProperty({ description: 'More than 2,000 documents: the list is cut' }) truncated: boolean;
+  @ApiProperty({ example: '10000.00' }) output: string;
+  @ApiProperty({ example: '4000.00' }) input: string;
+  @ApiProperty({ example: '6000.00', description: 'output − input' }) payable: string;
+}
+
+@ApiSchema({ name: 'YearCloseDocument' })
+export class YearCloseDocumentDto {
+  @ApiProperty() id: number;
+  @ApiProperty() number: string;
+  @ApiProperty({ example: '2026-12-31' }) date: string;
+}
+
+@ApiSchema({ name: 'YearCloseStatus' })
+export class YearCloseStatusDto {
+  @ApiProperty({ example: 2026 }) year: number;
+  @ApiProperty({ description: '31 December has passed' }) ended: boolean;
+  @ApiProperty({ type: [YearCloseDocumentDto] }) documents: YearCloseDocumentDto[];
+  @ApiProperty({ example: '1000000.00' }) income: string;
+  @ApiProperty({ example: '800000.00' }) expense: string;
+  @ApiProperty({ example: '200000.00', description: 'income − expense still to close' })
+  profit: string;
+}

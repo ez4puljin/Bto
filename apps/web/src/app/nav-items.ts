@@ -56,6 +56,8 @@ import {
   Truck,
   Users,
   Warehouse,
+  Percent,
+  Scale,
 } from 'lucide-react';
 
 type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'menu' | 'account'>}`;
@@ -231,6 +233,18 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/finance/accounts',
         label: 'nav.glAccounts',
         icon: ListTree,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/trial-balance',
+        label: 'nav.trialBalance',
+        icon: Scale,
+        permission: 'finance.read',
+      },
+      {
+        to: '/finance/vat',
+        label: 'nav.vatReport',
+        icon: Percent,
         permission: 'finance.read',
       },
       {
