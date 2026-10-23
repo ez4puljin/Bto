@@ -31,7 +31,9 @@ import {
   ProductDetailDto,
   ProductIdsDto,
   ProductIdsRequestDto,
+  ProductListItemDto,
   ProductListQueryDto,
+  ProductLookupQueryDto,
   ProductPageDto,
   ProductQueryPageDto,
   ProductQueryRequestDto,
@@ -81,6 +83,17 @@ export class ProductsController {
   async list(@Query() query: ProductListQueryDto): Promise<ProductPageDto> {
     const page = await this.products.listItems(query);
     return { data: page.data.map(toProductListItemDto), nextCursor: page.nextCursor };
+  }
+
+  /**
+   * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
+   * and barcodes without pictures, at most 30. Declared before `:id`.
+   */
+  @Get('lookup')
+  @Authenticated()
+  @ApiOkResponse({ type: [ProductListItemDto] })
+  async lookup(@Query() query: ProductLookupQueryDto): Promise<ProductListItemDto[]> {
+    return (await this.products.lookup(query.q, query.limit ?? 20)).map(toProductListItemDto);
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   ChevronHead,
   EmptyState,
   FilterBar,
+  FilterChip,
   FilterToggle,
   LinkRow,
   ListCard,
@@ -29,12 +30,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DateRangeFilter } from '@/features/finance/date-range-filter';
+import { useSupplier } from '@/features/partners/api';
+import { SupplierPicker } from '@/features/partners/supplier-picker';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
-import { type ReceiptDetail, type ReceiptStatus, useReceipt, useReceipts } from './api';
-import { useWarehouseName, useWarehouseOptions, wantsScanFocus } from './helpers';
+import {
+  type ReceiptDetail,
+  type ReceiptStatus,
+  useProductStock,
+  useReceipt,
+  useReceipts,
+} from './api';
+import { useWarehouseOptions, wantsScanFocus } from './helpers';
 import { ReceiptForm } from './receipt-form';
-import { DocStatusBadge, WarehouseSelect } from './shared';
+import { DocStatusBadge, ProductSearch, WarehouseSelect } from './shared';
 
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['DRAFT', 'POSTED', 'CANCELLED'];
 const WHOLESALE = ['WHOLESALE'] as const;
@@ -42,7 +53,11 @@ const WHOLESALE = ['WHOLESALE'] as const;
 const isStatus = (value: string | null): value is ReceiptStatus =>
   RECEIPT_STATUSES.some((status) => status === value);
 
-/** Goods receipts (ADR-0033): every user reads them; accountants find the ones waiting for costs. */
+/**
+ * Goods receipts (ADR-0033, ADR-0099): every user reads them, filtered by the delivery note's dates,
+ * the supplier, a product they hold or a warehouse they fill; cost holders see each note's payable;
+ * accountants find the ones waiting for costs.
+ */
 export function ReceiptsPage() {
   const { t } = useTranslation();
   const canManage = useHasPermission('inventory.receipts.manage');
@@ -53,12 +68,29 @@ export function ReceiptsPage() {
   const q = useDeferredValue(search.trim());
   const statusParam = params.get('status');
   const status = isStatus(statusParam) ? statusParam : undefined;
-  const warehouseParam = Number.parseInt(params.get('warehouseId') ?? '', 10);
-  const warehouseId = Number.isNaN(warehouseParam) ? undefined : warehouseParam;
+  const idParam = (name: string) => {
+    const value = Number.parseInt(params.get(name) ?? '', 10);
+    return Number.isNaN(value) ? undefined : value;
+  };
+  const warehouseId = idParam('warehouseId');
+  const supplierId = idParam('supplierId');
+  const productId = idParam('productId');
+  const from = params.get('from') ?? undefined;
+  const to = params.get('to') ?? undefined;
   const costingPending = params.get('costing') === 'pending';
   const warehouses = useWarehouseOptions(WHOLESALE);
-  const warehouseName = useWarehouseName();
-  const receipts = useReceipts({ q, status, warehouseId, costingPending });
+  const supplier = useSupplier(supplierId ?? 0, supplierId !== undefined);
+  const product = useProductStock(productId ?? 0, productId !== undefined);
+  const receipts = useReceipts({
+    q,
+    status,
+    warehouseId,
+    costingPending,
+    supplierId,
+    productId,
+    from,
+    to,
+  });
   const rows = receipts.data?.pages.flatMap((page) => page.data) ?? [];
 
   // Old links (the home page, the search) opened a create dialog; a receipt is now its own page.
@@ -89,6 +121,57 @@ export function ReceiptsPage() {
             setParam('q', event.target.value.trim());
           }}
         />
+        <DateRangeFilter
+          label={t('inventory.date')}
+          fromLabel={t('inventory.receipts.from')}
+          toLabel={t('inventory.receipts.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setParam('from', value ?? '')}
+          onTo={(value) => setParam('to', value ?? '')}
+        />
+        {supplierId !== undefined ? (
+          <FilterChip
+            clearLabel={t('inventory.receipts.clearSupplier')}
+            onClear={() => setParam('supplierId', '')}
+          >
+            {supplier.data?.name ?? t('common.loading')}
+          </FilterChip>
+        ) : (
+          <div className="w-full sm:w-64">
+            <label htmlFor="receipts-supplier" className="sr-only">
+              {t('inventory.receipts.supplier')}
+            </label>
+            <SupplierPicker
+              floating
+              id="receipts-supplier"
+              value={null}
+              onChange={(picked) => setParam('supplierId', picked ? String(picked.id) : '')}
+            />
+          </div>
+        )}
+        {productId !== undefined ? (
+          <FilterChip
+            clearLabel={t('inventory.receipts.clearProduct')}
+            onClear={() => setParam('productId', '')}
+          >
+            <span className="font-mono text-muted-foreground">{product.data?.product.sku}</span>{' '}
+            <span>{product.data?.product.name}</span>
+          </FilterChip>
+        ) : (
+          <>
+            <label htmlFor="receipts-product" className="sr-only">
+              {t('inventory.receipts.product')}
+            </label>
+            <ProductSearch
+              id="receipts-product"
+              variant="filter"
+              className="sm:w-56"
+              pickLabel={t('inventory.receipts.pickProduct')}
+              onPick={(picked) => setParam('productId', String(picked.id))}
+            />
+          </>
+        )}
         <WarehouseSelect
           variant="filter"
           options={warehouses.options}
@@ -124,16 +207,19 @@ export function ReceiptsPage() {
             <TableRow>
               <TableHead>{t('inventory.number')}</TableHead>
               <TableHead>{t('inventory.date')}</TableHead>
-              <TableHead>{t('inventory.warehouse')}</TableHead>
               <TableHead>{t('inventory.receipts.supplier')}</TableHead>
               <TableHead>{t('inventory.receipts.supplierDoc')}</TableHead>
+              <TableHead>{t('inventory.receipts.payment')}</TableHead>
+              {canCost ? (
+                <TableHead className="text-right">{t('inventory.receipts.amount')}</TableHead>
+              ) : null}
               <TableHead className="text-right">{t('inventory.lines')}</TableHead>
               <TableHead>{t('inventory.status')}</TableHead>
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {receipts.isPending ? <SkeletonRows columns={8} /> : null}
+            {receipts.isPending ? <SkeletonRows columns={canCost ? 9 : 8} /> : null}
             {rows.map((receipt) => (
               <LinkRow key={receipt.id} to={`/inventory/receipts/${receipt.id}`}>
                 <TableCell className="font-mono">
@@ -145,13 +231,20 @@ export function ReceiptsPage() {
                   </Link>
                 </TableCell>
                 <TableCell className="font-mono">
-                  {receipt.effectiveDate ?? t('common.none')}
+                  {receipt.supplierDocDate ?? receipt.effectiveDate ?? t('common.none')}
                 </TableCell>
-                <TableCell>{warehouseName(receipt.warehouseId)}</TableCell>
                 <TruncateCell text={receipt.supplierName} />
                 <TableCell className="font-mono">
                   {receipt.supplierDocNo ?? t('common.none')}
                 </TableCell>
+                <TableCell>
+                  {t(`inventory.receipt.paymentMethods.${receipt.paymentMethod}`)}
+                </TableCell>
+                {canCost ? (
+                  <TableCell className="text-right font-mono">
+                    {receipt.netAmount ? formatTugrik(receipt.netAmount) : t('common.none')}
+                  </TableCell>
+                ) : null}
                 <TableCell className="text-right font-mono">{receipt.lineCount}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">

@@ -51,17 +51,13 @@ export interface StoredReceiptOptions extends ReceiptImportOptions {
   withPrices: boolean;
 }
 
+/** A job made before ADR-0099 also stored its warehouse, which is no longer read. */
 export function receiptOptionsOf(job: Pick<ImportJobRow, 'options'>): StoredReceiptOptions {
   const value = job.options as Partial<StoredReceiptOptions> | null;
-  if (
-    !value ||
-    typeof value.warehouseId !== 'number' ||
-    !RECEIPT_IMPORT_PAYMENT_METHODS.includes(value.paymentMethod as never)
-  ) {
+  if (!value || !RECEIPT_IMPORT_PAYMENT_METHODS.includes(value.paymentMethod as never)) {
     throw new Error('a receipts import without its options');
   }
   return {
-    warehouseId: value.warehouseId,
     paymentMethod: value.paymentMethod as StoredReceiptOptions['paymentMethod'],
     moneyAccountId: value.moneyAccountId ?? null,
     withPrices: value.withPrices === true,
@@ -69,10 +65,10 @@ export function receiptOptionsOf(job: Pick<ImportJobRow, 'options'>): StoredRece
 }
 
 /**
- * Delivery notes from a sheet (ADR-0078 #7): rows of one date, supplier and note number make one
- * DRAFT receipt in the warehouse chosen for the import, paid as chosen there. A product by code or
- * barcode (a box barcode counts boxes); its fixed shelf, else the receiving area; the price as
- * printed. Nothing is posted: the warehouse counts and posts each receipt. The revert cancels the
+ * Delivery notes from a sheet (ADR-0078 #7, ADR-0099 #7): rows of one date, supplier and note number
+ * make one DRAFT receipt, paid as chosen in the import's dialog. A product by code or barcode (a box
+ * barcode counts boxes) goes to its home warehouse (a product without one is a row error) and its
+ * fixed shelf there, else the receiving area; the price as printed. Nothing is posted: the warehouse counts and posts each receipt. The revert cancels the
  * drafts while every one of them is untouched.
  */
 @Injectable()
@@ -94,7 +90,6 @@ export class ReceiptsImporter implements Importer<ReceiptRowPlan> {
   ): Promise<CheckedRow<ReceiptRowPlan>[]> {
     if (!job) throw new Error('a receipts import is validated with its job');
     const options = receiptOptionsOf(job);
-    const warehouses = await this.org.listWarehouses();
     const reference = await this.catalog.reference(executor);
     const uomById = new Map(reference.uoms.map((uom) => [uom.id, uom]));
     const today = businessDate();
@@ -203,14 +198,7 @@ export class ReceiptsImporter implements Importer<ReceiptRowPlan> {
       }
       if (row.sku === null && row.barcode === null) check.error('sku', 'REQUIRED');
       if (product && product.status !== 'ACTIVE') check.error('sku', 'NOT_ALLOWED');
-      if (product) {
-        const home = homeOf.get(product.id);
-        if (home !== undefined && home !== options.warehouseId) {
-          check.error('sku', 'NOT_ALLOWED', {
-            value: warehouses.find((w) => w.id === home)?.name ?? String(home),
-          });
-        }
-      }
+      if (product && !homeOf.has(product.id)) check.error('sku', 'NO_HOME');
 
       // The unit: as written, else the barcode's, else the base unit.
       const base = product?.units.find((unit) => unit.isBase);
@@ -300,7 +288,6 @@ export class ReceiptsImporter implements Importer<ReceiptRowPlan> {
       const [first] = noteRows;
       if (!first?.plan) continue;
       const receiptId = await this.receipts.createInTx(tx, actor, {
-        warehouseId: options.warehouseId,
         supplierId: first.plan.supplierId,
         supplierDocNo: first.plan.docNo,
         supplierDocDate: first.plan.date,

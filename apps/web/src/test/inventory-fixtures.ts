@@ -79,8 +79,7 @@ export const COLA_BOX: Schemas['BarcodeResolution'] = {
 export const DRAFT: Schemas['ReceiptDetail'] = {
   id: 5,
   number: null,
-  warehouseId: 1,
-  warehouseName: WH1.name,
+  warehouses: [{ id: WH1.id, name: WH1.name }],
   supplierId: 3,
   supplierCode: '010',
   supplierName: 'МСМ ХХК',
@@ -101,6 +100,8 @@ export const DRAFT: Schemas['ReceiptDetail'] = {
   createdAt: STAMP,
   updatedAt: STAMP,
   lines: [],
+  weightKg: '0',
+  weightMissing: 0,
 };
 export const BOX_LINE: Schemas['ReceiptLine'] = {
   id: 1,
@@ -112,9 +113,13 @@ export const BOX_LINE: Schemas['ReceiptLine'] = {
   enteredQty: '1',
   factorSnapshot: '24',
   qtyBase: '24',
+  warehouseId: WH1.id,
+  warehouseName: WH1.name,
   binId: SHELF.id,
   binCode: SHELF.code,
   lotId: null,
+  weightKg: null,
+  salePrice: null,
 };
 
 export const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: string) =>

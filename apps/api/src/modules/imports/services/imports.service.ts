@@ -135,25 +135,16 @@ export class ImportsService {
   }
 
   /**
-   * A receipts import's options (ADR-0078 #7): a wholesale warehouse the user writes for, how the
-   * notes are paid, and whether the sheet's prices are taken (cost holders only).
+   * A receipts import's options (ADR-0078 #7, ADR-0099 #7): how the notes are paid, and whether the
+   * sheet's prices are taken (cost holders only); each row goes to its product's home warehouse.
    */
   private async receiptOptions(
     ctx: AuthContext,
     options: ReceiptImportOptions | null | undefined,
   ): Promise<StoredReceiptOptions> {
     if (!options) {
-      throw invalid('receiptOptions', 'required', 'a receipts import names its warehouse');
+      throw invalid('receiptOptions', 'required', 'a receipts import names how it is paid');
     }
-    const warehouse = await this.org.getWarehouse(options.warehouseId);
-    if (warehouse.kind !== 'WHOLESALE') {
-      throw new AppError(
-        'WAREHOUSE_KIND_NOT_ALLOWED',
-        'goods are received into wholesale warehouses',
-        { kind: warehouse.kind },
-      );
-    }
-    this.scope.assertCanWriteWarehouse(ctx, warehouse.id);
     if (options.paymentMethod === 'CREDIT' && options.moneyAccountId) {
       throw invalid(
         'receiptOptions.moneyAccountId',
@@ -173,7 +164,6 @@ export class ImportsService {
       }
     }
     return {
-      warehouseId: warehouse.id,
       paymentMethod: options.paymentMethod,
       moneyAccountId: accountId,
       withPrices: ctx.permissions.has('inventory.costs.manage'),

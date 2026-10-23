@@ -25,6 +25,7 @@ import { BinsPage } from '@/features/inventory/bins-page';
 import { LowStockPage } from '@/features/inventory/low-stock-page';
 import { BinMovesPage } from '@/features/inventory/moves-page';
 import { IssuePage, IssuesPage } from '@/features/inventory/issues-pages';
+import { ReceiptPrintPage } from '@/features/inventory/receipt-print-page';
 import { ReceiptPage, ReceiptsPage } from '@/features/inventory/receipts-pages';
 import { MovementsPage } from '@/features/inventory/movements-page';
 import { StockPage, StockProductPage } from '@/features/inventory/stock-pages';
@@ -128,6 +129,16 @@ export const routes: RouteObject[] = [
         <RequirePermission permission="pos.read">
           <PosSalePrintPage />
         </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // A goods receipt for paper: the priced document or the warehouses' lists (ADR-0099 #6).
+    path: '/inventory/receipts/:id/print/:kind',
+    element: (
+      <RequireAuth>
+        <ReceiptPrintPage />
       </RequireAuth>
     ),
     errorElement: <RouteErrorBoundary />,

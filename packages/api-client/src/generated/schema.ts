@@ -664,6 +664,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units
+         *     and barcodes without pictures, at most 30. Declared before `:id`.
+         */
+        get: operations["Products_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/query": {
         parameters: {
             query?: never;
@@ -1762,6 +1782,23 @@ export interface paths {
         };
         /** The cash boxes and bank accounts a receipt may name (ADR-0078 #5). */
         get: operations["Receipts_paymentAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts/last-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Each product's latest delivery-note price, from any supplier (ADR-0099 #3). */
+        get: operations["Receipts_lastPrices"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6932,15 +6969,20 @@ export interface components {
         ReceiptSummary: {
             id: number;
             number: string | null;
-            warehouseId: number;
             supplierId: number;
             supplierName: string;
             supplierDocNo: string | null;
+            /** Format: date */
+            supplierDocDate: string | null;
             /** @enum {string} */
             status: "DRAFT" | "POSTED" | "CANCELLED";
             /** @enum {string|null} */
             costingStatus: "PENDING" | "COSTED" | null;
+            /** @enum {string} */
+            paymentMethod: "CREDIT" | "CASH" | "BANK";
             lineCount: number;
+            /** @description The payable (cost holders only) */
+            netAmount?: string | null;
             /** Format: date */
             effectiveDate: string | null;
             /** Format: date-time */
@@ -6956,6 +6998,26 @@ export interface components {
             name: string;
             /** @enum {string} */
             kind: "CASH" | "BANK";
+        };
+        LastReceiptPrice: {
+            productId: number;
+            receiptId: number;
+            receiptNumber: string;
+            /**
+             * Format: date
+             * @description The delivery note’s date
+             */
+            date: string;
+            supplierName: string;
+            unitName: string;
+            /** @description Per entered unit, VAT in, before the discount */
+            unitPrice: string;
+            /** @description Per base unit */
+            basePrice: string;
+        };
+        ReceiptWarehouse: {
+            id: number;
+            name: string;
         };
         ReceiptLine: {
             id: number;
@@ -6974,22 +7036,37 @@ export interface components {
              * @example 48
              */
             qtyBase: string;
+            /** @description Its product’s home warehouse (ADR-0099) */
+            warehouseId: number;
+            warehouseName: string;
             binId: number;
             /** @example A-01-03 */
             binCode: string;
             lotId: number | null;
+            /** @description kg per base unit */
+            weightKg: string | null;
+            /** @description New warehouse price per base unit, in force from the posting */
+            salePrice: string | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
             /** @description Delivery-note amount, VAT in */
             docAmount?: string | null;
             freeGoods?: boolean;
+            /** @description Share of the discount */
+            discountAmount?: string | null;
+            /** @description Amount less the discount */
+            netAmount?: string | null;
             vatAmount?: string | null;
-            /** @description Amount less VAT */
+            /** @description Net amount less VAT */
             costAmount?: string | null;
         };
         ReceiptTotals: {
             /** @description Σ delivery-note amounts, VAT in */
             docTotal: string;
+            /** @description The delivery note’s discount */
+            discountTotal: string;
+            /** @description The payable: docTotal less the discount */
+            netTotal: string;
             vatTotal: string;
             costTotal: string;
             /** @description Lines priced or free */
@@ -6999,8 +7076,8 @@ export interface components {
             id: number;
             /** @example GR-2026-000001 */
             number: string | null;
-            warehouseId: number;
-            warehouseName: string;
+            /** @description The warehouses of its lines */
+            warehouses: components["schemas"]["ReceiptWarehouse"][];
             supplierId: number;
             supplierCode: string;
             supplierName: string;
@@ -7035,6 +7112,14 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             lines: components["schemas"]["ReceiptLine"][];
+            /** @description Σ base qty × weight, kg (lines with a weight) */
+            weightKg: string;
+            /** @description Lines whose product has no weight */
+            weightMissing: number;
+            /** @description Discount, % of the note */
+            discountPct?: string | null;
+            /** @description Or a discount amount */
+            discountAmount?: string | null;
             /** @description Cost holders only */
             totals?: components["schemas"]["ReceiptTotals"];
         };
@@ -7045,14 +7130,16 @@ export interface components {
              * @example 2
              */
             enteredQty: string;
-            /** @description Omitted: the fixed shelf of the product, else the receiving area */
-            binId?: number | null;
+            /** @description Only for a product without a home: the wholesale warehouse, which becomes its home */
+            warehouseId?: number | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
             /** @description Or the line amount, VAT in */
             docAmount?: string | null;
             /** @description Free goods (бонус) */
             freeGoods?: boolean;
+            /** @description New warehouse price per base unit (price holders) */
+            salePrice?: string | null;
         };
         ReceiptCreateRequest: {
             supplierDocNo?: string | null;
@@ -7066,7 +7153,10 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
-            warehouseId: number;
+            /** @description Discount, % of the priced total (cost holders); clears an amount */
+            discountPct?: string | null;
+            /** @description Or a discount amount (cost holders); clears a percentage */
+            discountAmount?: string | null;
             supplierId: number;
             lines?: components["schemas"]["ReceiptLineRequest"][];
         };
@@ -7082,6 +7172,10 @@ export interface components {
             paymentMethod?: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
             moneyAccountId?: number | null;
+            /** @description Discount, % of the priced total (cost holders); clears an amount */
+            discountPct?: string | null;
+            /** @description Or a discount amount (cost holders); clears a percentage */
+            discountAmount?: string | null;
             supplierId?: number;
         };
         ReceiptCostingLine: {
@@ -7097,6 +7191,8 @@ export interface components {
             amount: string | null;
             /** @description As typed, VAT in */
             docAmount: string | null;
+            /** @description Share of the discount */
+            discountAmount: string | null;
             /** @description Per base unit */
             unitCost: string | null;
             freeGoods: boolean;
@@ -7115,6 +7211,8 @@ export interface components {
             costedAt: string | null;
             /** @example 10 */
             vatRatePct: string;
+            discountPct: string | null;
+            discountAmount: string | null;
             /** @description Σ cost */
             total: string | null;
             /** @description Σ as typed */
@@ -7137,6 +7235,10 @@ export interface components {
             freeGoods?: boolean;
         };
         ReceiptCostRequest: {
+            /** @description Discount, %; given (or discountAmount) replaces the receipt’s, null clears it */
+            discountPct?: string | null;
+            /** @description Or a discount amount */
+            discountAmount?: string | null;
             /** @description The costing version the form was opened at */
             costingVersion: number;
             lines: components["schemas"]["ReceiptCostLineRequest"][];
@@ -7144,12 +7246,13 @@ export interface components {
         ReceiptLineUpdateRequest: {
             /** @example 3 */
             enteredQty?: string;
-            binId?: number;
             /** @description null clears the price */
             docUnitPrice?: string | null;
             /** @description null clears the price */
             docAmount?: string | null;
             freeGoods?: boolean;
+            /** @description New warehouse price per base unit; null clears it (price holders) */
+            salePrice?: string | null;
         };
         BinMoveSummary: {
             id: number;
@@ -7907,8 +8010,6 @@ export interface components {
             };
         };
         ReceiptImportOptions: {
-            /** @description A wholesale warehouse */
-            warehouseId: number;
             /** @enum {string} */
             paymentMethod: "CREDIT" | "CASH" | "BANK";
             /** @description Cash box or bank account */
@@ -11873,7 +11974,7 @@ export interface components {
             direction: "UP" | "DOWN";
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -13628,6 +13729,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Products_lookup: {
+        parameters: {
+            query: {
+                /** @description Words of the name in either script, a SKU or a barcode */
+                q: string;
+                /** @description At most 30; default 20 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListItem"][];
                 };
             };
             /** @description RFC 9457 problem details */
@@ -16394,7 +16528,14 @@ export interface operations {
                 /** @description nextCursor of the previous page */
                 cursor?: string;
                 limit?: number;
+                /** @description Receipts with a line in this warehouse */
                 warehouseId?: number;
+                /** @description Receipts with a line of this product */
+                productId?: number;
+                /** @description Delivery-note date (else the posting date) from */
+                from?: string;
+                /** @description … until (inclusive) */
+                to?: string;
                 status?: "DRAFT" | "POSTED" | "CANCELLED";
                 /** @description Posted receipts waiting for the accountant */
                 costingPending?: boolean;
@@ -16477,6 +16618,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiptPaymentAccount"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Receipts_lastPrices: {
+        parameters: {
+            query: {
+                /** @description Repeated: productIds=1&productIds=2 */
+                productIds: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastReceiptPrice"][];
                 };
             };
             /** @description RFC 9457 problem details */

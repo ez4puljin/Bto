@@ -236,6 +236,22 @@ export function useReadinessProducts(filter: { gap?: ReadinessGap; categoryId?: 
   });
 }
 
+/**
+ * A picker's quick search (ADR-0099 #3): active products with their units and barcodes, no
+ * pictures, at most `limit`. Nothing while the text is empty.
+ */
+export function useProductLookup(q: string, limit = 20) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.products, 'lookup', q, limit],
+    enabled: q !== '',
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/products/lookup', { params: { query: { q, limit } }, signal })),
+  });
+}
+
 /** Looks a scanned code up (ADR-0029); a mutation because every scan is a new question. */
 export function useBarcodeLookup() {
   const api = useApiClient();

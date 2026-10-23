@@ -1,14 +1,13 @@
 import { Decimal } from '@tugeel/shared/money';
-import { type RefObject, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { TableCell } from '@/components/ui/table';
 import { formatMnt, formatTugrik } from '@/lib/money';
-import type { ReceiptDetail, ReceiptLine, ReceiptLineUpdate } from './api';
+import type { ReceiptDetail } from './api';
 import { type CostEntry, entryAmount, parseMoney } from './helpers';
-import { EMPTY_ENTRY, entryOfLine, focusNextPrice, type PriceColumn } from './receipt-prices';
+import type { PriceColumn } from './receipt-prices';
 
 /**
  * The three price cells of a line: «Нэгж үнэ» and «Дүн» (the one typed last is the source, the
@@ -99,65 +98,22 @@ export function PriceCells(props: {
 }
 
 /**
- * A draft line's prices, each field saved as it is left (a unit price makes the amount and follows
- * later quantity changes; an amount stays as typed; an emptied field clears the price). The fields
- * take the server's answer when the line's saved prices change, without losing the cursor.
+ * The receipt's totals for cost holders, as the server computed them (with the discount and the
+ * payable when the note has a discount, ADR-0099 #4).
  */
-export function DraftPriceCells(props: {
-  line: ReceiptLine;
-  name: string;
-  table: RefObject<HTMLTableElement | null>;
-  onSave: (body: ReceiptLineUpdate) => void;
-}) {
-  const { line } = props;
-  const saved = entryOfLine(line, false);
-  const stamp = `${line.docUnitPrice ?? ''}|${line.docAmount ?? ''}|${String(line.freeGoods)}|${line.enteredQty}`;
-  const [entry, setEntry] = useState(saved);
-  const [shownStamp, setShownStamp] = useState(stamp);
-  if (shownStamp !== stamp) {
-    setShownStamp(stamp);
-    setEntry(saved);
-  }
-  const leave = (column: PriceColumn) => {
-    if (entry.free || entry.source !== column) return;
-    const before = saved.source === column && !saved.free ? saved.value : '';
-    if (entry.value.trim() === '') {
-      if (before === '') setEntry(saved);
-      else props.onSave(column === 'unitPrice' ? { docUnitPrice: null } : { docAmount: null });
-      return;
-    }
-    const value = parseMoney(entry.value);
-    if (value === null) {
-      setEntry(saved);
-      return;
-    }
-    if (before !== '' && new Decimal(value).equals(before)) return;
-    props.onSave(column === 'unitPrice' ? { docUnitPrice: value } : { docAmount: value });
-  };
-  return (
-    <PriceCells
-      name={props.name}
-      enteredQty={props.line.enteredQty}
-      entry={entry}
-      editable
-      onChange={(patch) => setEntry((previous) => ({ ...previous, ...patch }))}
-      onLeave={leave}
-      onEnter={(column, field) => focusNextPrice(props.table, column, field)}
-      onFree={(free) => {
-        setEntry({ ...EMPTY_ENTRY, free });
-        props.onSave({ freeGoods: free });
-      }}
-    />
-  );
-}
-
-/** The receipt's totals for cost holders, as the server computed them. */
 export function ReceiptTotals({ detail }: { detail: ReceiptDetail }) {
   const { t } = useTranslation();
   const totals = detail.totals;
   if (!totals || detail.lines.length === 0) return null;
+  const discounted = new Decimal(totals.discountTotal).gt(0);
   const rows: [string, string][] = [
     [t('inventory.receipt.form.docTotal'), totals.docTotal],
+    ...(discounted
+      ? ([
+          [t('inventory.receipt.form.discountTotal'), `-${totals.discountTotal}`],
+          [t('inventory.receipt.form.netTotal'), totals.netTotal],
+        ] as [string, string][])
+      : []),
     ...(new Decimal(totals.vatTotal).gt(0)
       ? [[t('inventory.receipt.form.vatTotal'), totals.vatTotal] as [string, string]]
       : []),

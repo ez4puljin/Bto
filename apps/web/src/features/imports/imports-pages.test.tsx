@@ -253,7 +253,7 @@ describe('price sheet (ADR-0054)', () => {
 });
 
 describe('receipts import (ADR-0078)', () => {
-  it('names the warehouse and the payment before the sheet and sends them with it', async () => {
+  it('names the payment before the sheet and sends it with it, no warehouse (ADR-0099 #7)', async () => {
     const fetchMock = signedIn(ADMIN_ME, {
       'GET /api/v1/imports': () => json({ data: [], nextCursor: null }),
       'GET /api/v1/warehouses': () =>
@@ -296,32 +296,31 @@ describe('receipts import (ADR-0078)', () => {
       .mockImplementation((input, init) => fetchMock(new Request(input, init)));
     renderApp('/imports', fetchMock);
     const user = userEvent.setup();
-    const warehouse = await screen.findByRole('combobox', {
-      name: mn.imports.receiptOptions.warehouse,
+    const payment = await screen.findByRole('combobox', {
+      name: mn.imports.receiptOptions.payment,
     });
-    const upload = screen.getAllByRole('button', { name: mn.imports.upload });
-    expect(upload.some((button) => button.hasAttribute('disabled'))).toBe(true);
-    await within(warehouse).findByRole('option', { name: 'Төв агуулах' });
-    await user.selectOptions(warehouse, 'Төв агуулах');
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: mn.imports.receiptOptions.payment }),
-      mn.imports.receiptOptions.methods.CASH,
-    );
+    // Each row goes to its product's home warehouse: no warehouse to choose.
+    expect(screen.getByText(mn.imports.receiptOptions.homeHint)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: mn.inventory.warehouse })).toBeNull();
+    const input = screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.RECEIPTS}`);
+    const upload = input.parentElement!.querySelector('button')!;
+    // On credit the sheet may go at once; paid at once it waits for the account.
+    expect(upload).toBeEnabled();
+    await user.selectOptions(payment, mn.imports.receiptOptions.methods.CASH);
+    expect(upload).toBeDisabled();
     await user.selectOptions(
       await screen.findByRole('combobox', { name: mn.imports.receiptOptions.account }),
       'Касс',
     );
     expect(screen.queryByRole('option', { name: 'Хаан банк' })).not.toBeInTheDocument();
-    await user.upload(
-      screen.getByLabelText(`${mn.imports.upload}: ${mn.imports.kinds.RECEIPTS}`),
-      new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Падаан.xlsx'),
-    );
+    expect(upload).toBeEnabled();
+    await user.upload(input, new File([new Uint8Array([0x50, 0x4b, 3, 4])], 'Падаан.xlsx'));
     await waitFor(() => expect(calls(fetchMock, 'POST', '/api/v1/imports')).toHaveLength(1));
     expect(await calls(fetchMock, 'POST', '/api/v1/imports')[0]?.clone().json()).toEqual({
       kind: 'RECEIPTS',
       fileId: 42,
       fileName: 'Падаан.xlsx',
-      receiptOptions: { warehouseId: 1, paymentMethod: 'CASH', moneyAccountId: 7 },
+      receiptOptions: { paymentMethod: 'CASH', moneyAccountId: 7 },
     });
     put.mockRestore();
   });

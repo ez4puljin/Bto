@@ -94,14 +94,20 @@ export function toReceiptLineDto(line: ReceiptLine, withCosts = false): ReceiptL
     enteredQty: line.enteredQty.toFixed(),
     factorSnapshot: line.factorSnapshot.toFixed(),
     qtyBase: line.qtyBase.toFixed(),
+    warehouseId: line.warehouseId,
+    warehouseName: line.warehouseName,
     binId: line.binId,
     binCode: line.binCode,
     lotId: line.lotId,
+    weightKg: line.weightKg?.toFixed() ?? null,
+    salePrice: line.salePrice?.toFixed(0) ?? null,
     ...(withCosts
       ? {
           docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
           docAmount: line.docAmount?.toFixed(2) ?? null,
           freeGoods: line.freeGoods,
+          discountAmount: line.discountAmount?.toFixed(2) ?? null,
+          netAmount: line.netAmount?.toFixed(2) ?? null,
           vatAmount: line.vatAmount?.toFixed(2) ?? null,
           costAmount: line.costAmount?.toFixed(2) ?? null,
         }
@@ -114,8 +120,7 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
   return {
     id: receipt.id,
     number: receipt.number,
-    warehouseId: receipt.warehouseId,
-    warehouseName: receipt.warehouseName,
+    warehouses: receipt.warehouses,
     supplierId: receipt.supplierId,
     supplierCode: receipt.supplierCode,
     supplierName: receipt.supplierName,
@@ -136,10 +141,16 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
     createdAt: receipt.createdAt.toISOString(),
     updatedAt: receipt.updatedAt.toISOString(),
     lines: receipt.lines.map((line) => toReceiptLineDto(line, withCosts)),
+    weightKg: receipt.totals.weightKg.toFixed(),
+    weightMissing: receipt.totals.weightMissing,
     ...(withCosts
       ? {
+          discountPct: receipt.discountPct?.toFixed() ?? null,
+          discountAmount: receipt.discountAmount?.toFixed(2) ?? null,
           totals: {
             docTotal: receipt.totals.docTotal.toFixed(2),
+            discountTotal: receipt.totals.discountTotal.toFixed(2),
+            netTotal: receipt.totals.netTotal.toFixed(2),
             vatTotal: receipt.totals.vatTotal.toFixed(2),
             costTotal: receipt.totals.costTotal.toFixed(2),
             pricedLines: receipt.totals.pricedLines,
@@ -149,17 +160,20 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
   };
 }
 
-export function toReceiptSummaryDto(summary: ReceiptSummary): ReceiptSummaryDto {
+/** The amount only with `withCosts` (ADR-0099 #8). */
+export function toReceiptSummaryDto(summary: ReceiptSummary, withCosts = false): ReceiptSummaryDto {
   return {
     id: summary.id,
     number: summary.number,
-    warehouseId: summary.warehouseId,
     supplierId: summary.supplierId,
     supplierName: summary.supplierName,
     supplierDocNo: summary.supplierDocNo,
+    supplierDocDate: summary.supplierDocDate,
     status: summary.status,
     costingStatus: summary.costingStatus,
+    paymentMethod: summary.paymentMethod,
     lineCount: summary.lineCount,
+    ...(withCosts ? { netAmount: summary.netAmount?.toFixed(2) ?? null } : {}),
     effectiveDate: summary.effectiveDate,
     createdAt: summary.createdAt.toISOString(),
   };
@@ -175,6 +189,8 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
     recostUntil: costing.recostUntil,
     costedAt: costing.costedAt?.toISOString() ?? null,
     vatRatePct: costing.vatRatePct.toFixed(),
+    discountPct: costing.discountPct?.toFixed() ?? null,
+    discountAmount: costing.discountAmount?.toFixed(2) ?? null,
     total: costing.total?.toFixed(2) ?? null,
     docTotal: costing.docTotal?.toFixed(2) ?? null,
     lines: costing.lines.map((line) => ({
@@ -187,6 +203,7 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
       provisionalUnitCost: line.provisionalUnitCost.toFixed(),
       amount: line.amount?.toFixed(2) ?? null,
       docAmount: line.docAmount?.toFixed(2) ?? null,
+      discountAmount: line.discountAmount?.toFixed(2) ?? null,
       unitCost: line.unitCost?.toFixed() ?? null,
       freeGoods: line.freeGoods,
     })),

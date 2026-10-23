@@ -79,6 +79,9 @@ export const ErrorCode = {
   // the customer app (docs/modules/customer.md, ADR-0079 #5): no stage takes app orders
   CUSTOMER_APP_CLOSED: 'CUSTOMER_APP_CLOSED',
   COSTING_CLOSED: 'COSTING_CLOSED',
+  // the receipt window (ADR-0099)
+  RECEIPT_DISCOUNT_TOO_LARGE: 'RECEIPT_DISCOUNT_TOO_LARGE',
+  SALE_PRICE_NO_TERMS: 'SALE_PRICE_NO_TERMS',
   TRANSFER_NOTHING_SHIPPED: 'TRANSFER_NOTHING_SHIPPED',
   STOCKTAKE_BINS_UNFINISHED: 'STOCKTAKE_BINS_UNFINISHED',
   // imports (docs/modules/imports.md)

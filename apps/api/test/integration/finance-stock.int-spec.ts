@@ -7,7 +7,7 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled } from '../harness/inventory';
+import { expectReconciled, inventoryApi } from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -168,18 +168,17 @@ describe('finance stock and cost', () => {
   });
 
   it('books an unpriced receipt against goods received, and its costing and bill clear it', async () => {
+    // The receipt brings the flour onto its fixed shelf in its home (ADR-0099 #1).
+    await inventoryApi(app, admin).homeShelf(flour.id, flow.wh.id, flow.shelf.id);
     const draft = (
       await http()
         .post('/api/v1/receipts')
         .set(bearer(admin))
         .set(idempotency())
         .send({
-          warehouseId: flow.wh.id,
           supplierId: supplier,
           supplierDocDate: today,
-          lines: [
-            { productUnitId: unitOf(flour, 'PCS').id, enteredQty: '10', binId: flow.shelf.id },
-          ],
+          lines: [{ productUnitId: unitOf(flour, 'PCS').id, enteredQty: '10' }],
         })
         .expect(201)
     ).body as { id: number; lines: { id: number }[] };
