@@ -29,13 +29,14 @@ import {
   withoutFilter,
 } from '../../../src/orders/order-filters';
 import { colors, radii, spacing, type } from '../../../src/theme/tokens';
-import { ActiveChip, ChoiceChip, CircleButton, PillButton } from '../../../src/ui/controls';
+import { ActiveChip, ChoiceChip, PillButton } from '../../../src/ui/controls';
 import { Separator } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { LargeTitle, Page } from '../../../src/ui/layout';
+import { Page } from '../../../src/ui/layout';
 import { OrderRow } from '../../../src/ui/order-row';
 import { StatRow } from '../../../src/ui/stat-row';
-import { useTabBarInset } from '../../../src/ui/tab-bar';
+import { HeaderIconButton, StoreHeader } from '../../../src/ui/store-header';
+import { useStoreTabBarInset } from '../../../src/ui/store-tab-bar';
 
 const PAGE_PRESETS: readonly RangePreset[] = ['today', 'week', 'month'];
 
@@ -45,12 +46,13 @@ type Opened = 'none' | 'filters' | 'dates';
  * «Миний захиалгууд» (the MyOrders board, ADR-0068 #7; filters instead of a search, the owner
  * 2026-10-18): the days (today, a week, this month, or any range from the calendar), the filters
  * that are on as chips, the range's count, confirmed total and drafts, and the rep's own orders
- * by day, newest first. The filter button opens customer, product, payment, delivery and state.
+ * by day, newest first. The filter button on Bto300's blue header (ADR-0100) opens customer,
+ * product, payment, delivery and state.
  */
 export default function OrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
+  const inset = useStoreTabBarInset();
   const context = useRepContext();
   const today = context.data?.today ?? null;
   const [picked, setPicked] = useState<DateRange | null>(null);
@@ -125,18 +127,6 @@ export default function OrdersScreen() {
 
   const header = (
     <View>
-      <View style={styles.bar} />
-      <View style={styles.head}>
-        <LargeTitle style={styles.title}>{t('mobile.orders.title')}</LargeTitle>
-        <CircleButton
-          icon={<SlidersHorizontal size={22} strokeWidth={1.9} color={colors.foreground} />}
-          label={t('mobile.orders.filterButton', { n: filterCount })}
-          badge={filterCount}
-          badgeTone="accent"
-          badgeRing={colors.canvas}
-          onPress={() => setOpened('filters')}
-        />
-      </View>
       <View style={styles.chips}>
         {today
           ? PAGE_PRESETS.map((entry) => (
@@ -203,7 +193,20 @@ export default function OrdersScreen() {
   );
 
   return (
-    <Page>
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.tabs.orders')}
+        right={
+          <HeaderIconButton
+            icon={
+              <SlidersHorizontal size={22} strokeWidth={1.9} color={colors.primaryForeground} />
+            }
+            label={t('mobile.orders.filterButton', { n: filterCount })}
+            badge={filterCount}
+            onPress={() => setOpened('filters')}
+          />
+        }
+      />
       <SectionList
         sections={sections}
         keyExtractor={(order) => String(order.id)}
@@ -292,9 +295,6 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
-  bar: { height: 38 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  title: { flex: 1, marginHorizontal: spacing.xs },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   active: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingTop: spacing.sm },
   stats: { marginTop: spacing.md },
   day: { marginTop: 20, marginBottom: spacing.sm, marginHorizontal: spacing.xs },
-  cell: { backgroundColor: colors.card },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   loading: { marginTop: spacing.xl },

@@ -1,28 +1,31 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Check, Store } from 'lucide-react-native';
+import { Check, Search, Store } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '../../src/ui/text';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '../../src/ui/text';
 import { problemFrom, unwrap } from '../../src/api/problem';
 import { type RepCustomer, useCustomers } from '../../src/api/rep';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import { useDebounced } from '../../src/state/use-debounced';
-import { colors, radii, spacing, type } from '../../src/theme/tokens';
-import { SearchField } from '../../src/ui/controls';
+import { colors, radii, spacing, storeType, TOUCH, type } from '../../src/theme/tokens';
 import { Separator } from '../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../src/ui/kit';
-import { BarButton, LargeTitle, Page } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
+import { StoreHeader } from '../../src/ui/store-header';
 
 /**
  * Picks the cart's customer among the active ones (ADR-0061 #5): name, code or phone. The pick
  * brings the default address (ADR-0068); the order takes no contact person (the owner, 2026-10-18).
+ * Bto300's blue header with ← and the search field in the band, like its shop (ADR-0100).
  */
 export default function CustomersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { session } = useSignedIn();
   const { cart, dispatch } = useShop();
@@ -61,24 +64,27 @@ export default function CustomersScreen() {
   };
 
   return (
-    <Page edges={['top', 'bottom']}>
-      <View style={styles.bar}>
-        <BarButton title={t('common.cancel')} onPress={() => router.back()} />
-      </View>
-      <LargeTitle style={styles.title}>{t('mobile.customers.title')}</LargeTitle>
-      <View style={styles.search}>
-        <SearchField
-          value={text}
-          onChangeText={setText}
-          placeholder={t('mobile.customers.search')}
-          accessibilityLabel={t('mobile.customers.search')}
-          autoFocus
-        />
-      </View>
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.customers.title')} onBack={() => router.back()} right={null}>
+        <View style={styles.search}>
+          <Search size={17} strokeWidth={2.2} color={colors.muted} />
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder={t('mobile.customers.search')}
+            placeholderTextColor={colors.muted}
+            accessibilityLabel={t('mobile.customers.search')}
+            autoCorrect={false}
+            returnKeyType="search"
+            autoFocus
+            style={[storeType.search, styles.searchInput]}
+          />
+        </View>
+      </StoreHeader>
       <FlatList
         data={rows}
         keyExtractor={(customer) => String(customer.id)}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item, index }) => (
           <View
@@ -137,11 +143,21 @@ export default function CustomersScreen() {
 }
 
 const styles = StyleSheet.create({
-  bar: { height: 44, paddingHorizontal: spacing.lg, justifyContent: 'center' },
-  title: { marginHorizontal: 20, marginTop: 2 },
-  search: { paddingHorizontal: spacing.lg, paddingTop: 10 },
+  // Bto300's shop search: a white 34 px field in the blue band.
+  search: {
+    height: 34,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    backgroundColor: colors.card,
+  },
+  searchInput: { flex: 1, minWidth: 0, height: TOUCH, padding: 0, color: colors.foreground },
   list: { padding: spacing.lg },
-  cell: { backgroundColor: colors.card },
+  cell: { backgroundColor: colors.card, overflow: 'hidden' },
   firstCell: { borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
   lastCell: { borderBottomLeftRadius: radii.card, borderBottomRightRadius: radii.card },
   row: {

@@ -1,10 +1,9 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Bell, ChevronRight, LogOut, Send, Server, User } from 'lucide-react-native';
+import { Bell, ChevronRight, Send, Server, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from '../../src/ui/text';
 import { useNotificationSummary } from '../../src/api/notifications';
 import { useRepContext } from '../../src/api/rep';
 import { initialsOf } from '../../src/format/format';
@@ -12,21 +11,22 @@ import { useRoleName } from '../../src/state/role';
 import { useSignedIn } from '../../src/state/session';
 import { useShop } from '../../src/state/shop';
 import { colors, fonts, radii, spacing, type } from '../../src/theme/tokens';
-import { CircleButton } from '../../src/ui/controls';
+import { CountBadge } from '../../src/ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../../src/ui/grouped';
-import { LargeTitle, Page } from '../../src/ui/layout';
+import { Page } from '../../src/ui/layout';
 import { ActionSheet } from '../../src/ui/sheet';
-import { useTabBarInset } from '../../src/ui/tab-bar';
+import { StoreHeader } from '../../src/ui/store-header';
+import { Text } from '../../src/ui/text';
 
 /**
- * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3): the bell with the unread count, who is
- * signed in, the user's details and the order settings, the server, «Гарах» with its question, and
- * the app's version.
+ * «Профайл» (the Profile board, ADR-0068; ADR-0062 #3; a page opened from the home's header since
+ * ADR-0100, in «Bto300»'s profile layout): who is signed in (a tap opens their details), the
+ * notifications with the unread count, the user's details and the order settings, the server,
+ * «Гарах» with its question, and the app's version.
  */
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const inset = useTabBarInset();
   const { session, me, server } = useSignedIn();
   const { cart, pending, stageId } = useShop();
   const context = useRepContext();
@@ -41,24 +41,9 @@ export default function ProfileScreen() {
   const build = Constants.expoConfig?.android?.versionCode;
 
   return (
-    <Page>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: inset + spacing.lg }]}>
-        <View style={styles.bar}>
-          <CircleButton
-            icon={<Bell size={22} strokeWidth={1.9} color={colors.foreground} />}
-            label={
-              unread > 0
-                ? t('mobile.notifications.bellUnread', { n: unread })
-                : t('mobile.notifications.title')
-            }
-            badge={unread}
-            badgeRing={colors.canvas}
-            onPress={() => router.push('/notifications')}
-            style={styles.bell}
-          />
-        </View>
-        <LargeTitle style={styles.title}>{t('mobile.tabs.profile')}</LargeTitle>
-
+    <Page edges={[]}>
+      <StoreHeader title={t('mobile.tabs.profile')} onBack={() => router.back()} />
+      <ScrollView contentContainerStyle={styles.body}>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/profile-info')}
@@ -68,10 +53,10 @@ export default function ProfileScreen() {
             <Text style={styles.initials}>{initialsOf(me.fullName)}</Text>
           </View>
           <View style={styles.grow}>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={styles.name} numberOfLines={2}>
               {me.fullName}
             </Text>
-            <Text style={styles.role} numberOfLines={1}>
+            <Text style={[type.body, styles.muted]} numberOfLines={2}>
               {roleName ? `${me.username} · ${roleName}` : me.username}
             </Text>
           </View>
@@ -80,18 +65,36 @@ export default function ProfileScreen() {
 
         <Group inset={ICON_INSET} style={styles.group}>
           <Row
+            minHeight={52}
+            icon={
+              <IconTile color={colors.tint.red}>
+                <Bell size={16} strokeWidth={2.2} color={colors.primaryForeground} />
+              </IconTile>
+            }
+            title={t('mobile.notifications.title')}
+            accessibilityLabel={
+              unread > 0
+                ? t('mobile.notifications.bellUnread', { n: unread })
+                : t('mobile.notifications.title')
+            }
+            right={<CountBadge count={unread} ring={colors.card} />}
+            onPress={() => router.push('/notifications')}
+          />
+          <Row
+            minHeight={52}
             icon={
               <IconTile color={colors.tint.blue}>
-                <User size={17} color={colors.primaryForeground} />
+                <User size={16} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.profileInfo.title')}
             onPress={() => router.push('/profile-info')}
           />
           <Row
+            minHeight={52}
             icon={
               <IconTile color={colors.tint.orange}>
-                <Send size={16} color={colors.primaryForeground} />
+                <Send size={16} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.settings.title')}
@@ -100,11 +103,12 @@ export default function ProfileScreen() {
           />
         </Group>
 
-        <Group style={styles.group}>
+        <Group inset={ICON_INSET} style={styles.group}>
           <Row
+            minHeight={52}
             icon={
               <IconTile color={colors.tint.gray}>
-                <Server size={16} color={colors.primaryForeground} />
+                <Server size={16} strokeWidth={2.2} color={colors.primaryForeground} />
               </IconTile>
             }
             title={t('mobile.profile.server')}
@@ -112,19 +116,13 @@ export default function ProfileScreen() {
           />
         </Group>
 
-        <Group style={styles.group}>
-          <Row
-            icon={
-              <IconTile color={colors.tint.red}>
-                <LogOut size={16} color={colors.primaryForeground} />
-              </IconTile>
-            }
-            title={t('mobile.profile.logout')}
-            destructive
-            chevron={false}
-            onPress={() => setLeaving(true)}
-          />
-        </Group>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setLeaving(true)}
+          style={({ pressed }) => [styles.logout, pressed && styles.pressed]}
+        >
+          <Text style={[type.button, styles.logoutText]}>{t('mobile.profile.logout')}</Text>
+        </Pressable>
 
         <View style={styles.footer}>
           <Text style={type.secondary}>
@@ -160,12 +158,12 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg },
-  bar: { height: 44, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
-  bell: { backgroundColor: colors.card },
-  title: { marginTop: 2, marginHorizontal: spacing.xs },
+  body: { paddingHorizontal: spacing.lg, paddingBottom: 40 },
+  grow: { flex: 1, gap: 2 },
+  muted: { color: colors.muted },
+  pressed: { backgroundColor: colors.accent },
   user: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
@@ -173,7 +171,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.tile,
     backgroundColor: colors.card,
   },
-  pressed: { backgroundColor: colors.accent },
   avatar: {
     width: 60,
     height: 60,
@@ -182,10 +179,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { ...type.title2, fontFamily: fonts.semibold, color: colors.primaryForeground },
-  grow: { flex: 1, gap: 2 },
-  name: { ...type.title3, fontFamily: fonts.semibold },
-  role: { ...type.body, color: colors.muted },
+  initials: { ...type.title2, fontFamily: fonts.bold, color: colors.primaryForeground },
+  name: type.title3,
   group: { marginTop: 22 },
-  footer: { marginTop: 20, alignItems: 'center', gap: 3 },
+  logout: {
+    marginTop: 22,
+    minHeight: 52,
+    borderRadius: radii.card,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutText: { color: colors.destructive },
+  footer: { marginTop: spacing.lg, alignItems: 'center', gap: 3 },
 });

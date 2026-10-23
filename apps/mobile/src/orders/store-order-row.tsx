@@ -96,9 +96,10 @@ const styles = StyleSheet.create({
   taker: { ...type.heading },
   me: { color: colors.primary },
   right: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
-  total: { ...type.bodyStrong, ...tabular, textAlign: 'right' },
+  // Bto300's order rows (ADR-0100).
+  total: { ...type.sectionTitle, ...tabular, textAlign: 'right' },
   // Not final yet: a softer figure than a confirmed total.
-  estimate: { color: colors.label2 },
-  later: { ...type.secondary, color: colors.muted, textAlign: 'right' },
+  estimate: { color: colors.muted },
+  later: { ...type.body, color: colors.muted, textAlign: 'right' },
   struck: { color: colors.muted, textDecorationLine: 'line-through' },
 });

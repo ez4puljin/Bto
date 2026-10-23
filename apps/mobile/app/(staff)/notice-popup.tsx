@@ -26,11 +26,12 @@ import { useToast } from '../../src/ui/toast';
 const LISTED = 3;
 
 /**
- * The notices that pop up when the app opens (the Launch board; ADR-0062 #3, ADR-0068 #8), one at
- * a time in the middle of the screen: a picture by kind, the kind and days, the title, the text,
- * a price drop's old and new prices, the dots, «… харах» and «Дараагийнх / Хаах». A notice counts
- * as read once shown. After the last, a toast says they are kept under the bell and offers them
- * again («Дахин харах», `?ids=`).
+ * The notices that pop up when the app opens (the Launch board; ADR-0062 #3, ADR-0068 #8; drawn as
+ * «Bto300»'s popup since ADR-0100), one at a time in the middle of the screen: a picture by kind,
+ * the kind and days on a chip, the title, the text, a price drop's old and new prices, the dots,
+ * then «Хаах» and «Дараагийнх» — on the last one «Бараа харах» when it lists products (before the
+ * last, its products are a link above the buttons). A notice counts as read once shown. After the
+ * last, a toast says they are kept under the bell and offers them again («Дахин харах», `?ids=`).
  */
 export default function NoticePopup() {
   const { t } = useTranslation();
@@ -56,6 +57,7 @@ export default function NoticePopup() {
   }, [noticeId, notice?.read, markRead, router]);
 
   if (!notice) return null;
+  const hasNext = index + 1 < queue.length;
   const close = () => {
     const ids = queue.map((entry) => entry.id).join(',');
     router.back();
@@ -67,7 +69,7 @@ export default function NoticePopup() {
       },
     });
   };
-  const next = () => (index + 1 < queue.length ? setIndex(index + 1) : close());
+  const viewProducts = () => router.replace(`/notice/${notice.id}`);
 
   return (
     <View style={styles.backdrop}>
@@ -89,27 +91,51 @@ export default function NoticePopup() {
                         total: queue.length,
                       })}
                       onPress={() => setIndex(at)}
-                      hitSlop={6}
+                      hitSlop={8}
                       style={[styles.dot, at === index && styles.dotOn]}
                     />
                   ))}
                 </View>
               ) : null}
-              {notice.productIds.length > 0 ? (
-                <PillButton
-                  title={t(`mobile.notifications.cta.${notice.kind}`)}
-                  height={50}
-                  style={styles.cta}
-                  onPress={() => router.replace(`/notice/${notice.id}`)}
-                />
+              {hasNext && notice.productIds.length > 0 ? (
+                // Not the last one: its products stay one tap away above the pager's buttons.
+                <Pressable accessibilityRole="button" onPress={viewProducts} style={styles.link}>
+                  <Text style={[type.row, styles.linkText]}>
+                    {t(`mobile.notifications.cta.${notice.kind}`)}
+                  </Text>
+                </Pressable>
               ) : null}
-              <Pressable accessibilityRole="button" onPress={next} style={styles.secondary}>
-                <Text style={styles.secondaryText}>
-                  {index + 1 < queue.length
-                    ? t('mobile.notifications.next')
-                    : t('mobile.notifications.close')}
-                </Text>
-              </Pressable>
+              <View style={styles.buttons}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={close}
+                  style={({ pressed }) => [
+                    styles.button,
+                    styles.closeButton,
+                    pressed && styles.closePressed,
+                  ]}
+                >
+                  <Text style={type.button} numberOfLines={1}>
+                    {t('mobile.notifications.close')}
+                  </Text>
+                </Pressable>
+                {hasNext ? (
+                  <PillButton
+                    height={48}
+                    style={styles.button}
+                    title={t('mobile.notifications.next')}
+                    onPress={() => setIndex(index + 1)}
+                  />
+                ) : notice.productIds.length > 0 ? (
+                  <PillButton
+                    height={48}
+                    style={styles.button}
+                    title={t('mobile.notifications.viewProducts')}
+                    accessibilityLabel={t(`mobile.notifications.cta.${notice.kind}`)}
+                    onPress={viewProducts}
+                  />
+                ) : null}
+              </View>
             </>
           }
         />
@@ -118,7 +144,7 @@ export default function NoticePopup() {
   );
 }
 
-/** One notice of the popup: the picture, the words, the prices, then the given buttons. */
+/** One notice of the popup: the picture, the chip, the words, the prices, then the buttons. */
 function NoticeCard({
   notice,
   eyebrow,
@@ -210,7 +236,11 @@ function NoticeCard({
         </Pressable>
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.text}>
-        <Text style={[styles.eyebrow, { color: style.strong }]}>{eyebrow}</Text>
+        <View style={[styles.chip, { backgroundColor: style.soft }]}>
+          <Text style={[styles.chipText, { color: style.strong }]} numberOfLines={1}>
+            {eyebrow}
+          </Text>
+        </View>
         <Text style={styles.title}>{notice.title}</Text>
         <Text style={styles.body}>{notice.body}</Text>
         {notice.kind === 'PRICE_DROP' && rows.length > 0 ? (
@@ -245,11 +275,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.popupBackdrop,
     justifyContent: 'center',
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
   },
   card: {
     maxHeight: '88%',
-    borderRadius: radii.sheet,
+    borderRadius: radii.hero,
     backgroundColor: colors.card,
     overflow: 'hidden',
     boxShadow: shadows.popup,
@@ -268,9 +298,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileImage: { width: '100%', height: '100%' },
-  percent: { alignItems: 'flex-start' },
-  percentText: type.jumbo,
-  percentLabel: { ...type.rowStrong, color: colors.warningText },
+  percent: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.card,
+    boxShadow: shadows.hero,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  percentText: type.display,
+  percentLabel: { ...type.chip, color: colors.label2 },
   kindIcon: {
     width: 96,
     height: 96,
@@ -303,12 +341,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scroll: { flexGrow: 0 },
-  text: { paddingTop: 18, paddingHorizontal: 22, paddingBottom: spacing.lg },
-  eyebrow: { ...type.chip, fontFamily: fonts.bold },
-  title: { ...type.title3, marginTop: spacing.xs },
-  body: { ...type.row, marginTop: 6, color: colors.label2 },
+  text: { paddingTop: 18, paddingHorizontal: 20, paddingBottom: 20, gap: spacing.sm },
+  chip: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    height: 24,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  chipText: { ...type.secondary, fontFamily: fonts.semibold },
+  title: type.title3,
+  body: { ...type.row, color: colors.label2 },
   prices: {
-    marginTop: spacing.md,
     borderRadius: 14,
     backgroundColor: colors.imageFill,
     overflow: 'hidden',
@@ -331,10 +376,19 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   newPrice: { ...type.rowStrong, fontFamily: fonts.bold, color: colors.cancelled },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.lg },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.dotIdle },
-  dotOn: { width: 22, backgroundColor: colors.primary },
-  cta: { marginTop: spacing.lg },
-  secondary: { marginTop: spacing.xs, height: 44, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { ...type.row, color: colors.primary },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: spacing.xs },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.input },
+  dotOn: { width: 20, backgroundColor: colors.primary },
+  link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  linkText: { color: colors.primary, textAlign: 'center' },
+  buttons: { flexDirection: 'row', gap: 10, marginTop: spacing.xs },
+  button: { flex: 1, paddingHorizontal: spacing.md },
+  closeButton: {
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.closeFill,
+  },
+  closePressed: { backgroundColor: colors.fill },
 });

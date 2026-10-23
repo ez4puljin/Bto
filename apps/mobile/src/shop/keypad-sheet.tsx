@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft, Package } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -83,6 +84,8 @@ export function KeypadSheet({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel} statusBarTranslucent>
+      {/* Dark icons on the white keypad: under the apps' blue headers the bar is white. */}
+      <StatusBar style="dark" />
       <SafeAreaView edges={['top']} style={styles.page}>
         <View style={styles.head}>
           <Pressable

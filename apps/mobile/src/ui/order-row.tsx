@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   right: { flexShrink: 0, alignItems: 'flex-end', gap: 6 },
   total: { ...type.sectionTitle, ...tabular, textAlign: 'right' },
-  // Not final yet: a softer figure than a confirmed total.
-  estimate: { color: colors.label2 },
+  // Not final yet: a softer figure than a confirmed total (Bto300's rows, ADR-0100).
+  estimate: { color: colors.muted },
   later: { ...type.body, color: colors.muted, textAlign: 'right' },
   struck: { color: colors.muted, textDecorationLine: 'line-through' },
 });

@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useOrderCount } from '../api/rep';
 import { type DateRange, daysBetween, monthDay, presetOf, presetRange } from '../dates/calendar';
-import { colors, radii, spacing } from '../theme/tokens';
+import { colors, spacing } from '../theme/tokens';
 import { ChoiceChip, PillButton } from '../ui/controls';
 import { Group, ICON_INSET, IconTile, Row } from '../ui/grouped';
 import { BarButton, FootNote, SectionHeader } from '../ui/layout';
@@ -156,7 +156,6 @@ export function OrderFilterSheet({
               label={t('common.all')}
               selected={draft.paymentMethod === null}
               onPress={() => set({ paymentMethod: null })}
-              onWhite
             />
             {PAYMENT_METHODS.map((method) => (
               <ChoiceChip
@@ -165,7 +164,6 @@ export function OrderFilterSheet({
                 icon={dot(method, draft.paymentMethod === method)}
                 selected={draft.paymentMethod === method}
                 onPress={() => set({ paymentMethod: toggleChoice(draft.paymentMethod, method) })}
-                onWhite
               />
             ))}
           </View>
@@ -176,7 +174,6 @@ export function OrderFilterSheet({
               label={t('common.all')}
               selected={draft.fulfilment === null}
               onPress={() => set({ fulfilment: null })}
-              onWhite
             />
             {[...FULFILMENTS].reverse().map((fulfilment) => {
               const on = draft.fulfilment === fulfilment;
@@ -193,7 +190,6 @@ export function OrderFilterSheet({
                   )}
                   selected={on}
                   onPress={() => set({ fulfilment: toggleChoice(draft.fulfilment, fulfilment) })}
-                  onWhite
                 />
               );
             })}
@@ -205,7 +201,6 @@ export function OrderFilterSheet({
               label={t('common.all')}
               selected={draft.state === null}
               onPress={() => set({ state: null })}
-              onWhite
             />
             {REP_ORDER_STATES.map((state) => (
               <ChoiceChip
@@ -213,7 +208,6 @@ export function OrderFilterSheet({
                 label={t(`mobile.orderFilter.states.${state}`)}
                 selected={draft.state === state}
                 onPress={() => set({ state: toggleChoice(draft.state, state) })}
-                onWhite
               />
             ))}
           </View>
@@ -253,17 +247,11 @@ export function OrderFilterSheet({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.xl },
+  body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   first: { marginTop: spacing.sm },
   section: { marginTop: 22 },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    padding: 14,
-    borderRadius: radii.card,
-    backgroundColor: colors.card,
-  },
+  // Bto300's filter sheet: the chips straight on the sheet (ADR-0100).
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   dotRing: { padding: 2, borderRadius: 5 },
   dotRingOn: { backgroundColor: colors.card },
 });

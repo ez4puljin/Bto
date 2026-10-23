@@ -13,16 +13,18 @@ import { KIND_STYLES, useNoticeEyebrow } from '../../../src/notifications/kinds'
 import { useAddOne } from '../../../src/shop/use-add';
 import { useSignedIn } from '../../../src/state/session';
 import { useShop } from '../../../src/state/shop';
-import { colors, fonts, radii, spacing, type } from '../../../src/theme/tokens';
+import { colors, fonts, spacing, type } from '../../../src/theme/tokens';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
-import { NavBar, Page, SectionHeader } from '../../../src/ui/layout';
+import { Page, SectionHeader } from '../../../src/ui/layout';
 import { ProductCard } from '../../../src/ui/product-card';
+import { StoreHeader } from '../../../src/ui/store-header';
 
-const GAP = 12;
+const GAP = 10;
 
 /**
- * A notice opened from the popup or the list (ADR-0062 #3): its picture and words, then its
- * products in the admin's order, as cards of «Бараа» (ADR-0068).
+ * A notice opened from the popup or the list (ADR-0062 #3): under the blue header with ← (ADR-0100),
+ * its picture and words, then its products in the admin's order, as cards of «Бараа» (ADR-0068)
+ * two by two.
  */
 export default function NoticeScreen() {
   const { t } = useTranslation();
@@ -54,8 +56,8 @@ export default function NoticeScreen() {
   const cardWidth = (width - spacing.lg * 2 - GAP) / 2;
 
   return (
-    <Page white>
-      <NavBar back={t('common.back')} onBack={() => router.back()} />
+    <Page white edges={[]}>
+      <StoreHeader title={t('mobile.notifications.title')} onBack={() => router.back()} />
       <View style={styles.pad}>
         {summary.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
         {summary.error ? <ProblemText problem={problemFrom(summary.error)} /> : null}
@@ -96,16 +98,16 @@ export default function NoticeScreen() {
               ) : null}
               <View style={styles.grid}>
                 {products.map((product) => (
-                  <View key={product.id} style={{ width: cardWidth }}>
-                    <ProductCard
-                      product={product}
-                      server={server}
-                      line={lineOf(cart, product.id)}
-                      locked={pending !== null}
-                      onOpen={() => router.push(`/product/${product.id}`)}
-                      onAdd={() => add(product)}
-                    />
-                  </View>
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    server={server}
+                    line={lineOf(cart, product.id)}
+                    locked={pending !== null}
+                    onOpen={() => router.push(`/product/${product.id}`)}
+                    onAdd={() => add(product)}
+                    width={cardWidth}
+                  />
                 ))}
               </View>
             </>
@@ -118,15 +120,15 @@ export default function NoticeScreen() {
 
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.lg },
-  body: { paddingHorizontal: spacing.lg, paddingBottom: 40, gap: 6 },
+  body: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 40, gap: 6 },
   image: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: radii.tile,
+    borderRadius: 10,
     backgroundColor: colors.imageFill,
     marginBottom: spacing.sm,
   },
   eyebrow: { ...type.chip, fontFamily: fonts.bold },
   text: { ...type.row, color: colors.label2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: GAP, rowGap: 22 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: GAP, rowGap: 12 },
 });

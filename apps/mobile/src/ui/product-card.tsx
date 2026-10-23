@@ -28,23 +28,25 @@ function packTextOf(
 
 /**
  * «Үлдэгдэл 73 · хайрцагт 6», «Үлдэгдэл дууссан», «Захиалах боломжгүй» (`text`); `count` is the
- * card's short form without the pack, which the card shows on its own line.
+ * card's short form beside its cart («73 ш», «Дууссан», «Боломжгүй»): a card is narrow on a 360 dp
+ * phone, and the pack has its own line there.
  */
 export function useStockLine() {
   const { t } = useTranslation();
   const words = useUnitWords();
   return (product: RepProduct): { text: string; count: string; out: boolean } => {
     if (!product.sellable) {
-      const text = t('mobile.shop.notSellable');
-      return { text, count: text, out: true };
+      return { text: t('mobile.shop.notSellable'), count: t('mobile.shop.cardBlocked'), out: true };
     }
     if (new Decimal(product.available).lte(0)) {
-      const text = t('mobile.shop.outOfStock');
-      return { text, count: text, out: true };
+      return { text: t('mobile.shop.outOfStock'), count: t('mobile.shop.cardOut'), out: true };
     }
-    const count = t('mobile.shop.stock', { n: formatQty(product.available) });
+    const n = formatQty(product.available);
+    const stock = t('mobile.shop.stock', { n });
+    const base = baseUnitOf(product.units);
+    const count = base ? t('mobile.shop.cardStock', { n, unit: words(base).short }) : stock;
     const pack = packTextOf(product.units, words, t);
-    return { text: pack ? `${count} · ${pack}` : count, count, out: false };
+    return { text: pack ? `${stock} · ${pack}` : stock, count, out: false };
   };
 }
 

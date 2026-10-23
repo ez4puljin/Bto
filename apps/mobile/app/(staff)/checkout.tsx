@@ -29,14 +29,15 @@ import { monthOf, weekdayOf } from '../../src/dates/dates';
 import { formatMnt } from '../../src/format/format';
 import { placeOf } from '../../src/state/placement';
 import { useShop } from '../../src/state/shop';
-import { colors, fonts, radii, shadows, spacing, type } from '../../src/theme/tokens';
+import { colors, fonts, radii, shadows, spacing, tabular, type } from '../../src/theme/tokens';
 import { PillButton, Segmented } from '../../src/ui/controls';
 import { Group, Row } from '../../src/ui/grouped';
 import { MonthCalendar } from '../../src/ui/calendar';
 import { ProblemText } from '../../src/ui/kit';
-import { BarButton, NavBar, Page, SectionHeader } from '../../src/ui/layout';
+import { Page, SectionHeader } from '../../src/ui/layout';
 import { PendingSendCard } from '../../src/ui/pending-send';
 import { Sheet, SheetClose, SheetHeader } from '../../src/ui/sheet';
+import { HeaderTextButton, StoreHeader } from '../../src/ui/store-header';
 
 /** How far ahead a delivery may be set. */
 const DAYS_AHEAD = 60;
@@ -52,7 +53,8 @@ const PAY_DOTS = {
  * contact person, the owner 2026-10-18), «Хүлээн авах» (delivery or pickup as two cards, the
  * address, and the day as four tiles: today, tomorrow, the day after, another day), the payment, a
  * note, where the order lands, and «Баталгаажуулж илгээх». A sent order shows its number over the
- * page; a send without an answer keeps the cart locked (ADR-0061 #8).
+ * page; a send without an answer keeps the cart locked (ADR-0061 #8). Bto300's blue header with ←
+ * and, while the note is typed in, «Болсон» (ADR-0100).
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
@@ -184,19 +186,16 @@ export default function CheckoutScreen() {
   ];
 
   return (
-    <Page>
-      {noteFocused ? (
-        <NavBar
-          back={t('mobile.tabs.cart')}
-          onBack={() => router.back()}
-          title={t('mobile.checkout.short')}
-          right={
-            <BarButton title={t('mobile.keypad.done')} onPress={() => Keyboard.dismiss()} strong />
-          }
-        />
-      ) : (
-        <NavBar back={t('mobile.tabs.cart')} onBack={() => router.back()} />
-      )}
+    <Page edges={[]}>
+      <StoreHeader
+        title={t('mobile.checkout.title')}
+        onBack={() => router.back()}
+        right={
+          noteFocused ? (
+            <HeaderTextButton title={t('mobile.keypad.done')} onPress={() => Keyboard.dismiss()} />
+          ) : null
+        }
+      />
       <ScrollView
         ref={scroll}
         onScroll={(event) => {
@@ -413,7 +412,7 @@ export default function CheckoutScreen() {
               <Check size={30} strokeWidth={3} color={colors.primaryForeground} />
             </View>
             <Text style={styles.sentTitle}>{t('mobile.checkout.sent')}</Text>
-            <Text style={[type.body, styles.sentLine]}>
+            <Text style={[type.row, styles.sentLine]}>
               {[
                 sent?.number,
                 sent?.stageName,
@@ -558,7 +557,7 @@ function ReceiveCard({
           {title}
         </Text>
         <View style={styles.optionLine}>
-          <Text style={[type.secondary, styles.shrink, link && styles.link]} numberOfLines={1}>
+          <Text style={[type.secondary, styles.shrink, link && styles.link]} numberOfLines={2}>
             {line}
           </Text>
           {chevron ? <ChevronRight size={12} strokeWidth={2.6} color={colors.muted} /> : null}
@@ -694,7 +693,7 @@ const styles = StyleSheet.create({
   options: { flexDirection: 'row', gap: 10 },
   option: {
     flex: 1,
-    minHeight: 96,
+    minHeight: 104,
     padding: spacing.md,
     gap: 10,
     borderRadius: radii.card,
@@ -782,7 +781,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  total: { ...type.title2 },
+  total: { ...type.title2, ...tabular },
   sheetBody: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
@@ -815,7 +814,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sentTitle: { ...type.title3 },
-  sentLine: { color: colors.muted, textAlign: 'center' },
+  sentLine: { color: colors.label2, textAlign: 'center', ...tabular },
   sentActions: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: spacing.md },
   sentButton: { flex: 1, paddingHorizontal: spacing.sm },
 });
