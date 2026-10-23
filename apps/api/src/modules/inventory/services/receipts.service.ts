@@ -1,12 +1,12 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import {
-  allocateReceiptDiscount,
+  allocateReceiptDiscounts,
   canRecost,
   costingDeadline,
   lineAmountOf,
-  type ReceiptDiscount,
-  receiptDiscountTotal,
+  ReceiptDiscountError,
+  type ReceiptDiscountKind,
   type ReceiptPaymentMethod,
   receiptLineCost,
   receiptLineVat,
@@ -29,7 +29,7 @@ import {
   AuditService,
   OrgService,
 } from '../../identity';
-import { SuppliersService } from '../../partners';
+import { ProductSuppliersService, SuppliersService } from '../../partners';
 import {
   RECEIPT_MONEY_ACCOUNTS,
   RECEIPT_SALE_PRICES,
@@ -39,7 +39,14 @@ import {
   type ReceiptBookTotals,
   type ReceiptSalePrices,
 } from '../hooks';
-import { bins, goodsReceiptLines, goodsReceipts, RECEIPT_STATUSES } from '../schema';
+import {
+  bins,
+  goodsReceiptDiscountLines,
+  goodsReceiptDiscounts,
+  goodsReceiptLines,
+  goodsReceipts,
+  RECEIPT_STATUSES,
+} from '../schema';
 import { BinsService } from './bins.service';
 import { ProductLocationsService } from './product-locations.service';
 import { PurchaseBooksService } from './purchase-books.service';
@@ -95,9 +102,6 @@ export interface ReceiptInput {
   paymentMethod?: ReceiptPaymentMethod;
   /** The cash box or bank account of a CASH / BANK receipt; required by the posting. */
   moneyAccountId?: number | null;
-  /** The delivery note's discount (ADR-0099 #4, cost holders): a percentage or an amount. */
-  discountPct?: Decimal | null;
-  discountAmount?: Decimal | null;
   lines?: readonly ReceiptLineInput[];
 }
 
@@ -108,9 +112,24 @@ export interface ReceiptPatch {
   note?: string | null;
   paymentMethod?: ReceiptPaymentMethod;
   moneyAccountId?: number | null;
-  /** Setting one clears the other; null clears it. */
-  discountPct?: Decimal | null;
-  discountAmount?: Decimal | null;
+}
+
+/**
+ * A discount as typed (ADR-0103): on chosen lines (`LINES`) or on the whole note (`NOTE`, at most
+ * one), a percentage or an amount.
+ */
+export interface ReceiptDiscountRequest {
+  kind: ReceiptDiscountKind;
+  pct: Decimal | null;
+  amount: Decimal | null;
+  /** The lines of a LINES discount (priced, not free goods); none for NOTE. */
+  lineIds: readonly number[];
+}
+
+export interface ReceiptDiscountView extends ReceiptDiscountRequest {
+  id: number;
+  /** The discount in tugriks on the lines priced so far; null while it exceeds them. */
+  total: Decimal | null;
 }
 
 export interface ReceiptLine {
@@ -137,7 +156,7 @@ export interface ReceiptLine {
   docUnitPrice: Decimal | null;
   docAmount: Decimal | null;
   freeGoods: boolean;
-  /** The line's share of the delivery note's discount (ADR-0099 #4). */
+  /** The line's share of the receipt's discounts (ADR-0099 #4, ADR-0103). */
   discountAmount: Decimal | null;
   /** `docAmount` less its discount share: what the supplier is owed for the line. */
   netAmount: Decimal | null;
@@ -150,8 +169,10 @@ export interface ReceiptLine {
 export interface ReceiptTotals {
   /** Σ delivery-note amounts of the priced lines, VAT included, before the discount. */
   docTotal: Decimal;
-  /** The delivery note's discount in tugriks. */
+  /** The receipt's discounts in tugriks. */
   discountTotal: Decimal;
+  /** A discount exceeds the lines it applies to: the posting will refuse it. */
+  discountTooLarge: boolean;
   /** `docTotal` less the discount: the payable. */
   netTotal: Decimal;
   vatTotal: Decimal;
@@ -186,8 +207,8 @@ export interface ReceiptDetail {
   supplierVatPayer: boolean;
   /** VAT inside the delivery-note prices; frozen at posting. */
   vatRatePct: Decimal;
-  discountPct: Decimal | null;
-  discountAmount: Decimal | null;
+  /** Cost data, like the prices (ADR-0103). */
+  discounts: ReceiptDiscountView[];
   effectiveDate: string | null;
   postedAt: Date | null;
   createdAt: Date;
@@ -256,10 +277,9 @@ export interface LastReceiptPrice {
   basePrice: Decimal;
 }
 
-/** The costing's discount: either key given replaces the receipt's (null clears it). */
+/** The costing's discounts: given, they replace the receipt's (an empty list clears them). */
 export interface CostDiscountInput {
-  discountPct?: Decimal | null;
-  discountAmount?: Decimal | null;
+  discounts?: readonly ReceiptDiscountRequest[];
 }
 
 export interface CostedReceiptLine {
@@ -289,8 +309,7 @@ export interface ReceiptCosting {
   recostUntil: string | null;
   costedAt: Date | null;
   vatRatePct: Decimal;
-  discountPct: Decimal | null;
-  discountAmount: Decimal | null;
+  discounts: ReceiptDiscountView[];
   total: Decimal | null;
   docTotal: Decimal | null;
   lines: CostedReceiptLine[];
@@ -321,6 +340,7 @@ export class ReceiptsService implements OnModuleInit {
     private readonly org: OrgService,
     private readonly posting: StockPostingService,
     private readonly suppliers: SuppliersService,
+    private readonly links: ProductSuppliersService,
     private readonly units: UnitConversionService,
     private readonly purchases: PurchaseBooksService,
     private readonly moduleRef: ModuleRef,
@@ -349,7 +369,7 @@ export class ReceiptsService implements OnModuleInit {
   }
 
   async create(ctx: AuthContext, input: ReceiptInput): Promise<ReceiptDetail> {
-    if ((input.lines ?? []).some(hasPrice) || hasDiscount(input)) assertCosts(ctx);
+    if ((input.lines ?? []).some(hasPrice)) assertCosts(ctx);
     if ((input.lines ?? []).some(hasSalePrice)) assertPrices(ctx);
     return inTransaction(this.db, async (tx) => {
       const id = await this.createInTx(tx, ctx, input);
@@ -359,7 +379,6 @@ export class ReceiptsService implements OnModuleInit {
 
   async createInTx(tx: Tx, actor: Actor, input: ReceiptInput): Promise<number> {
     await this.suppliers.assertActive(tx, input.supplierId);
-    const discount = discountOf(input.discountPct ?? null, input.discountAmount ?? null);
     const paymentMethod = input.paymentMethod ?? 'CREDIT';
     const moneyAccountId = await this.checkPayment(tx, paymentMethod, input.moneyAccountId);
     const supplierDocDate = input.supplierDocDate ?? null;
@@ -373,8 +392,6 @@ export class ReceiptsService implements OnModuleInit {
         paymentMethod,
         moneyAccountId,
         vatRatePct: await this.vatRateOf(tx, input.supplierId, supplierDocDate),
-        discountPct: discount.pct,
-        discountAmount: discount.amount,
         createdBy: actorUserId(actor),
       })
       .returning();
@@ -389,14 +406,9 @@ export class ReceiptsService implements OnModuleInit {
     return row.id;
   }
 
-  update(ctx: AuthContext, id: number, patch: ReceiptPatch): Promise<ReceiptDetail> {
-    const discountGiven = patch.discountPct !== undefined || patch.discountAmount !== undefined;
-    if (discountGiven) assertCosts(ctx);
+  update(_ctx: AuthContext, id: number, patch: ReceiptPatch): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
       const header = await this.lockDraft(tx, id);
-      const discount = discountGiven
-        ? discountOf(patch.discountPct ?? null, patch.discountAmount ?? null)
-        : { pct: header.discountPct, amount: header.discountAmount };
       const supplierId = patch.supplierId ?? header.supplierId;
       if (supplierId !== header.supplierId) await this.suppliers.assertActive(tx, supplierId);
       const supplierDocDate =
@@ -423,11 +435,28 @@ export class ReceiptsService implements OnModuleInit {
           paymentMethod,
           moneyAccountId,
           vatRatePct: await this.vatRateOf(tx, supplierId, supplierDocDate),
-          discountPct: discount.pct,
-          discountAmount: discount.amount,
           updatedAt: sql`now()`,
         })
         .where(eq(goodsReceipts.id, id));
+      return this.get(id, tx);
+    });
+  }
+
+  /**
+   * A draft's discounts, replaced as a whole (ADR-0103, cost holders): line discounts name lines of
+   * this receipt that are not free goods; at most one note discount. Whether a discount fits its
+   * lines is checked by the posting and the costing (the prices may come later).
+   */
+  setDiscounts(
+    ctx: AuthContext,
+    id: number,
+    discounts: readonly ReceiptDiscountRequest[],
+  ): Promise<ReceiptDetail> {
+    assertCosts(ctx);
+    return inTransaction(this.db, async (tx) => {
+      await this.lockDraft(tx, id);
+      await this.writeDiscounts(tx, id, await this.linesOf(tx, id), discounts);
+      await this.touch(tx, id);
       return this.get(id, tx);
     });
   }
@@ -491,6 +520,11 @@ export class ReceiptsService implements OnModuleInit {
     return inTransaction(this.db, async (tx) => {
       const { header } = await this.lockLine(tx, lineId);
       await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.id, lineId));
+      // A line discount whose last line went goes with it (ADR-0103).
+      await tx.execute(sql`
+        DELETE FROM goods_receipt_discounts d
+         WHERE d.receipt_id = ${header.id} AND d.kind = 'LINES'
+           AND NOT EXISTS (SELECT 1 FROM goods_receipt_discount_lines l WHERE l.discount_id = d.id)`);
       await this.touch(tx, header.id);
       return this.get(header.id, tx);
     });
@@ -500,7 +534,8 @@ export class ReceiptsService implements OnModuleInit {
    * DRAFT → POSTED: stock arrives in each line's bin, in its warehouse, at the provisional cost
    * (ADR-0033); the lines' sale prices come into force from the posting's business date (ADR-0099
    * #5); a receipt whose every line has its price or is free is costed at once from those prices,
-   * less the note's discount (ADR-0078 #3, ADR-0099 #4).
+   * less its discounts (ADR-0078 #3, ADR-0103); each product not yet linked to the supplier is
+   * linked to it (ADR-0103).
    */
   post(ctx: AuthContext, id: number): Promise<ReceiptDetail> {
     return inTransaction(this.db, async (tx) => {
@@ -533,7 +568,9 @@ export class ReceiptsService implements OnModuleInit {
       }
       const salePrices = salePricesOf(lines);
       const priced = lines.every((line) => line.freeGoods || line.docAmount !== null);
-      const shares = priced ? discountShares(lines, header) : null;
+      const shares = priced
+        ? sharesOf(lineAmounts(lines), await this.discountsOf(tx, id)).shares
+        : null;
       // The VAT rate is frozen with the posting, on the delivery note's date.
       const vatRatePct = await this.vatRateOf(tx, header.supplierId, header.supplierDocDate);
       await tx.update(goodsReceipts).set({ vatRatePct }).where(eq(goodsReceipts.id, id));
@@ -558,13 +595,14 @@ export class ReceiptsService implements OnModuleInit {
       if (salePrices.length > 0 && this.salePrices) {
         await this.salePrices.applyInTx(tx, ctx, result.effectiveDate, salePrices);
       }
+      await this.linkSupplierInTx(tx, ctx, header.supplierId, lines);
       if (shares) {
         const rates = await this.lineVatRates(tx, lines, vatRatePct);
         await this.posting.revalue(tx, ctx, {
           docId: id,
           version: 1,
-          lines: lines.map((line, index) => {
-            const share = shares[index] ?? new Decimal(0);
+          lines: lines.map((line) => {
+            const share = shares.get(line.id) ?? new Decimal(0);
             return {
               docLineId: line.id,
               warehouseId: line.warehouseId,
@@ -640,8 +678,8 @@ export class ReceiptsService implements OnModuleInit {
    * The accountant's costing (ADR-0033, ADR-0078 #4): every line at once, by the delivery note's
    * amount or price per entered unit (VAT included as printed), bonus lines at zero. Each line's cost
    * is its amount less the VAT at the receipt's frozen rate. `costingVersion` is the version the
-   * form was opened at. The note's discount (ADR-0099 #4) is spread over the priced lines and
-   * lowers their cost; a discount given here replaces the receipt's.
+   * form was opened at. The receipt's discounts (ADR-0103) lower the lines' cost; discounts given
+   * here replace the receipt's.
    */
   cost(
     ctx: AuthContext,
@@ -688,21 +726,30 @@ export class ReceiptsService implements OnModuleInit {
           return [line.id, lineAmount(cost, line.enteredQty)];
         }),
       );
-      const discount =
-        input.discountPct !== undefined || input.discountAmount !== undefined
-          ? discountOf(input.discountPct ?? null, input.discountAmount ?? null)
-          : { pct: header.discountPct, amount: header.discountAmount };
       const free = (line: LineRow) => given.get(line.id)?.freeGoods ?? false;
-      const shares = shareDiscount(
-        lines.map((line) => (free(line) ? null : (typed.get(line.id) ?? new Decimal(0)))),
-        discount,
+      if (input.discounts !== undefined) {
+        // Free goods as this costing has them, not as the draft typed them.
+        await this.writeDiscounts(
+          tx,
+          id,
+          lines.map((line) => ({ ...line, freeGoods: free(line) })),
+          input.discounts,
+        );
+      }
+      const discounts = await this.discountsOf(tx, id);
+      const { shares } = sharesOf(
+        lines.map((line) => ({
+          id: line.id,
+          amount: free(line) ? null : (typed.get(line.id) ?? new Decimal(0)),
+        })),
+        discounts,
       );
       await this.posting.revalue(tx, ctx, {
         docId: id,
         version,
-        lines: lines.map((line, index) => {
+        lines: lines.map((line) => {
           const docAmount = typed.get(line.id) ?? new Decimal(0);
-          const share = free(line) ? null : (shares[index] ?? new Decimal(0));
+          const share = free(line) ? null : (shares.get(line.id) ?? new Decimal(0));
           return {
             docLineId: line.id,
             warehouseId: line.warehouseId,
@@ -723,8 +770,6 @@ export class ReceiptsService implements OnModuleInit {
           costingVersion: version,
           costedAt: sql`now()`,
           costedBy: actorUserId(ctx),
-          discountPct: discount.pct,
-          discountAmount: discount.amount,
           updatedAt: sql`now()`,
         })
         .where(eq(goodsReceipts.id, id));
@@ -735,7 +780,7 @@ export class ReceiptsService implements OnModuleInit {
         after: {
           version,
           vatRatePct: header.vatRatePct,
-          discount,
+          discounts,
           lines: lines.map((line) => ({ lineId: line.id, docAmount: typed.get(line.id) ?? null })),
         },
       });
@@ -778,8 +823,13 @@ export class ReceiptsService implements OnModuleInit {
       recostUntil: header.effectiveDate ? costingDeadline(header.effectiveDate) : null,
       costedAt: header.costedAt,
       vatRatePct: header.vatRatePct,
-      discountPct: header.discountPct,
-      discountAmount: header.discountAmount,
+      discounts: discountViews(
+        await this.discountsOf(executor, id),
+        costed.map((line) => ({
+          id: line.lineId,
+          amount: line.freeGoods ? null : line.docAmount,
+        })),
+      ),
       total: header.costingVersion > 0 ? sum((line) => line.amount) : null,
       docTotal: header.costingVersion > 0 ? sum((line) => line.docAmount) : null,
       lines: costed,
@@ -793,11 +843,12 @@ export class ReceiptsService implements OnModuleInit {
     const rows = await this.linesOf(executor, id);
     const lines = await this.describeLines(executor, rows);
     // A costed receipt shows its latest costing; a draft or a pending one its typed prices, its
-    // discount spread over the lines priced so far (none while it exceeds them).
+    // discounts spread over the lines priced so far (none while one exceeds them).
     const latest = header.costingVersion > 0 ? await this.posting.costingOf(id, executor) : null;
     const rates = await this.lineVatRates(executor, rows, header.vatRatePct);
-    const typedShares = latest ? null : draftShares(rows, header);
-    const priced = lines.map((line, index) => {
+    const stored = await this.discountsOf(executor, id);
+    const typed = latest ? null : trySharesOf(lineAmounts(rows), stored);
+    const priced = lines.map((line) => {
       const valuation = latest?.get(line.id);
       const docAmount = valuation ? (valuation.docAmount ?? valuation.amount) : line.docAmount;
       const freeGoods = valuation ? valuation.freeGoods : line.freeGoods;
@@ -811,7 +862,7 @@ export class ReceiptsService implements OnModuleInit {
           ? null
           : valuation
             ? (valuation.discountAmount ?? new Decimal(0))
-            : (typedShares?.[index] ?? new Decimal(0));
+            : (typed?.shares.get(line.id) ?? new Decimal(0));
       const netAmount = docAmount === null ? null : docAmount.minus(discountAmount ?? 0);
       const vatAmount =
         netAmount === null ? null : receiptLineVat(netAmount, rates.get(line.id) ?? 0);
@@ -830,12 +881,11 @@ export class ReceiptsService implements OnModuleInit {
     const sum = (pick: (line: (typeof priced)[number]) => Decimal | null) =>
       priced.reduce((total, line) => total.plus(pick(line) ?? 0), zero);
     const docTotal = sum((line) => line.docAmount);
-    const discountTotal = latest
-      ? sum((line) => line.discountAmount)
-      : receiptDiscountTotal(docTotal, {
-          pct: header.discountPct,
-          amount: header.discountAmount,
-        });
+    const discountTotal = sum((line) => line.discountAmount);
+    const views = discountViews(
+      stored,
+      priced.map((line) => ({ id: line.id, amount: line.freeGoods ? null : line.docAmount })),
+    );
     const warehouses = [
       ...new Map(lines.map((line) => [line.warehouseId, line.warehouseName])).entries(),
     ]
@@ -865,8 +915,7 @@ export class ReceiptsService implements OnModuleInit {
       moneyAccountName: accountName,
       supplierVatPayer: supplier?.vatPayer ?? false,
       vatRatePct: header.vatRatePct,
-      discountPct: header.discountPct,
-      discountAmount: header.discountAmount,
+      discounts: views,
       effectiveDate: header.effectiveDate,
       postedAt: header.postedAt,
       createdAt: header.createdAt,
@@ -875,6 +924,7 @@ export class ReceiptsService implements OnModuleInit {
       totals: {
         docTotal,
         discountTotal,
+        discountTooLarge: stored.length > 0 && !latest && typed === null,
         netTotal: docTotal.minus(discountTotal),
         vatTotal: sum((line) => line.vatAmount),
         costTotal: sum((line) => line.costAmount),
@@ -1004,8 +1054,6 @@ export class ReceiptsService implements OnModuleInit {
         costingStatus: goodsReceipts.costingStatus,
         costingVersion: goodsReceipts.costingVersion,
         paymentMethod: goodsReceipts.paymentMethod,
-        discountPct: goodsReceipts.discountPct,
-        discountAmount: goodsReceipts.discountAmount,
         effectiveDate: goodsReceipts.effectiveDate,
         createdAt: goodsReceipts.createdAt,
         // Spelled out: Drizzle leaves columns of a single-table select unqualified, and a bare "id"
@@ -1028,23 +1076,21 @@ export class ReceiptsService implements OnModuleInit {
     const payables = await this.posting.receiptPayables(
       page.data.filter((row) => row.costingVersion > 0).map((row) => row.id),
     );
+    const drafts = await this.typedPayables(
+      page.data.filter((row) => row.costingVersion === 0).map((row) => row.id),
+    );
     return {
-      data: page.data.map(({ costingVersion, discountPct, discountAmount, typedTotal, ...row }) => {
-        const typed = typedTotal === null ? null : new Decimal(typedTotal);
-        return {
-          ...row,
-          lineCount: Number.parseInt(row.lineCount, 10),
-          supplierName: suppliers.get(row.supplierId)?.name ?? '',
-          netAmount:
-            costingVersion > 0
-              ? (payables.get(row.id) ?? new Decimal(0))
-              : typed === null
-                ? null
-                : typed.minus(
-                    receiptDiscountTotal(typed, { pct: discountPct, amount: discountAmount }),
-                  ),
-        };
-      }),
+      data: page.data.map(({ costingVersion, typedTotal, ...row }) => ({
+        ...row,
+        lineCount: Number.parseInt(row.lineCount, 10),
+        supplierName: suppliers.get(row.supplierId)?.name ?? '',
+        netAmount:
+          costingVersion > 0
+            ? (payables.get(row.id) ?? new Decimal(0))
+            : typedTotal === null
+              ? null
+              : (drafts.get(row.id) ?? new Decimal(typedTotal)),
+      })),
       nextCursor: page.nextCursor,
     };
   }
@@ -1143,6 +1189,137 @@ export class ReceiptsService implements OnModuleInit {
       totals,
       previous,
     };
+  }
+
+  /** A receipt's discounts with the lines of each (ADR-0103), in the order they were added. */
+  private async discountsOf(
+    executor: Db | Tx,
+    receiptId: number,
+  ): Promise<(ReceiptDiscountRequest & { id: number })[]> {
+    return (await this.discountsOfMany(executor, [receiptId])).get(receiptId) ?? [];
+  }
+
+  /** `discountsOf` for several receipts in two statements, by receipt. */
+  private async discountsOfMany(
+    executor: Db | Tx,
+    receiptIds: readonly number[],
+  ): Promise<Map<number, (ReceiptDiscountRequest & { id: number })[]>> {
+    const byReceipt = new Map<number, (ReceiptDiscountRequest & { id: number })[]>();
+    if (receiptIds.length === 0) return byReceipt;
+    const rows = await executor
+      .select()
+      .from(goodsReceiptDiscounts)
+      .where(inArray(goodsReceiptDiscounts.receiptId, [...receiptIds]))
+      .orderBy(goodsReceiptDiscounts.id);
+    if (rows.length === 0) return byReceipt;
+    const links = await executor
+      .select()
+      .from(goodsReceiptDiscountLines)
+      .where(
+        inArray(
+          goodsReceiptDiscountLines.discountId,
+          rows.map((row) => row.id),
+        ),
+      )
+      .orderBy(goodsReceiptDiscountLines.lineId);
+    for (const row of rows) {
+      const list = byReceipt.get(row.receiptId) ?? [];
+      list.push({
+        id: row.id,
+        kind: row.kind,
+        pct: row.pct,
+        amount: row.amount,
+        lineIds: links.filter((link) => link.discountId === row.id).map((link) => link.lineId),
+      });
+      byReceipt.set(row.receiptId, list);
+    }
+    return byReceipt;
+  }
+
+  /** Replaces a receipt's discounts after checking them against `lines` (those that may take one). */
+  private async writeDiscounts(
+    tx: Tx,
+    receiptId: number,
+    lines: readonly LineRow[],
+    discounts: readonly ReceiptDiscountRequest[],
+  ): Promise<void> {
+    const allowed = new Set(lines.filter((line) => !line.freeGoods).map((line) => line.id));
+    if (discounts.filter((discount) => discount.kind === 'NOTE').length > 1) {
+      throw invalid('discounts', 'oneNote', 'at most one discount on the whole note');
+    }
+    discounts.forEach((discount, index) => {
+      assertDiscountValue(discount, index);
+      if (discount.kind === 'LINES') {
+        if (discount.lineIds.length === 0) {
+          throw invalid(`discounts[${index}].lineIds`, 'required', 'choose the lines');
+        }
+        if (discount.lineIds.some((lineId) => !allowed.has(lineId))) {
+          throw invalid(`discounts[${index}].lineIds`, 'line', 'priced lines of this receipt');
+        }
+      }
+    });
+    await tx.delete(goodsReceiptDiscounts).where(eq(goodsReceiptDiscounts.receiptId, receiptId));
+    for (const discount of discounts) {
+      const [row] = await tx
+        .insert(goodsReceiptDiscounts)
+        .values({ receiptId, kind: discount.kind, pct: discount.pct, amount: discount.amount })
+        .returning({ id: goodsReceiptDiscounts.id });
+      if (!row) throw new Error('discount insert returned no row');
+      const lineIds = discount.kind === 'LINES' ? [...new Set(discount.lineIds)] : [];
+      if (lineIds.length > 0) {
+        await tx
+          .insert(goodsReceiptDiscountLines)
+          .values(lineIds.map((lineId) => ({ discountId: row.id, lineId })));
+      }
+    }
+  }
+
+  /** The payable of drafts and pending receipts: the typed amounts less their discounts. */
+  private async typedPayables(receiptIds: readonly number[]): Promise<Map<number, Decimal>> {
+    const payables = new Map<number, Decimal>();
+    if (receiptIds.length === 0) return payables;
+    const rows = await this.db
+      .select()
+      .from(goodsReceiptLines)
+      .where(inArray(goodsReceiptLines.receiptId, [...receiptIds]))
+      .orderBy(goodsReceiptLines.id);
+    const discounts = await this.discountsOfMany(this.db, receiptIds);
+    for (const receiptId of receiptIds) {
+      const lines = rows.filter((line) => line.receiptId === receiptId);
+      const typed = lines.reduce((sum, line) => sum.plus(line.docAmount ?? 0), new Decimal(0));
+      const shares = trySharesOf(lineAmounts(lines), discounts.get(receiptId) ?? []);
+      const discount = shares
+        ? [...shares.shares.values()].reduce((sum, share) => sum.plus(share), new Decimal(0))
+        : new Decimal(0);
+      payables.set(receiptId, typed.minus(discount));
+    }
+    return payables;
+  }
+
+  /**
+   * Links the receipt's supplier to each of its products not linked to it yet (ADR-0103, owner
+   * 2026-10-23), in the posting's transaction; a product's first link becomes its main supplier.
+   */
+  private async linkSupplierInTx(
+    tx: Tx,
+    actor: Actor,
+    supplierId: number,
+    lines: readonly LineRow[],
+  ): Promise<void> {
+    const linked = new Set(
+      await this.links.productIdsWhere({ field: 'supplier', op: 'IN', ids: [supplierId] }, tx),
+    );
+    const missing = [...new Set(lines.map((line) => line.productId))]
+      .filter((productId) => !linked.has(productId))
+      .sort((a, b) => a - b);
+    // linkManyInTx locks the links and skips pairs another posting linked meanwhile.
+    if (missing.length > 0) {
+      await this.links.linkManyInTx(
+        tx,
+        actor,
+        missing.map((productId) => ({ productId, supplierId })),
+      );
+    }
   }
 
   private async cancelLocked(tx: Tx, actor: Actor, header: ReceiptRow): Promise<void> {
@@ -1345,13 +1522,6 @@ function hasSalePrice(line: ReceiptLineInput): boolean {
   return line.salePrice !== undefined && line.salePrice !== null;
 }
 
-function hasDiscount(input: { discountPct?: Decimal | null; discountAmount?: Decimal | null }) {
-  return (
-    (input.discountPct !== undefined && input.discountPct !== null) ||
-    (input.discountAmount !== undefined && input.discountAmount !== null)
-  );
-}
-
 /** A warehouse price per base unit: whole tugriks above zero (as `product_prices`). */
 function assertSalePrice(value: Decimal): void {
   if (!value.gt(0) || !value.isInteger()) {
@@ -1359,59 +1529,65 @@ function assertSalePrice(value: Decimal): void {
   }
 }
 
-/** The discount as stored: a percentage in (0, 100] with two decimals, or an amount above zero. */
-function discountOf(
-  pct: Decimal | null,
-  amount: Decimal | null,
-): ReceiptDiscount & {
-  pct: Decimal | null;
-  amount: Decimal | null;
-} {
-  if (pct !== null && amount !== null) {
-    throw invalid('discountAmount', 'oneOf', 'a percentage or an amount, not both');
+/** A discount's value: a percentage in (0, 100] with two decimals, or an amount above zero. */
+function assertDiscountValue(discount: ReceiptDiscountRequest, index: number): void {
+  const { pct, amount } = discount;
+  if ((pct === null) === (amount === null)) {
+    throw invalid(`discounts[${index}].amount`, 'oneOf', 'a percentage or an amount');
   }
   if (pct !== null && (!pct.gt(0) || pct.gt(100) || pct.decimalPlaces() > 2)) {
-    throw invalid('discountPct', 'percent', 'a percentage above 0 and at most 100');
+    throw invalid(`discounts[${index}].pct`, 'percent', 'a percentage above 0 and at most 100');
   }
-  if (amount !== null) assertMoney('discountAmount', amount);
-  if (amount !== null && amount.isZero()) {
-    throw invalid('discountAmount', 'positive', 'an amount above zero');
+  if (amount !== null && (!amount.gt(0) || amount.decimalPlaces() > 2)) {
+    throw invalid(`discounts[${index}].amount`, 'money', 'an amount above zero');
   }
-  return { pct, amount };
+}
+
+/** The lines' amounts as the allocation takes them: free goods and unpriced lines take none. */
+function lineAmounts(lines: readonly LineRow[]): { id: number; amount: Decimal | null }[] {
+  return lines.map((line) => ({ id: line.id, amount: line.freeGoods ? null : line.docAmount }));
 }
 
 /**
- * The discount's share of each line (free or unpriced lines take none), the note's discount in
- * tugriks on its priced lines; RECEIPT_DISCOUNT_TOO_LARGE when it exceeds them.
+ * Each line's share of the receipt's discounts and each discount in tugriks (ADR-0103);
+ * RECEIPT_DISCOUNT_TOO_LARGE when one exceeds its lines.
  */
-function shareDiscount(amounts: readonly (Decimal | null)[], discount: ReceiptDiscount): Decimal[] {
-  const gross = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
-  const total = receiptDiscountTotal(gross, discount);
-  if (total.gt(gross)) {
-    throw new AppError('RECEIPT_DISCOUNT_TOO_LARGE', `a discount of ${total.toFixed()}`, {
-      discount: total.toFixed(2),
-      total: gross.toFixed(2),
+function sharesOf(
+  lines: readonly { id: number; amount: Decimal | null }[],
+  discounts: readonly ReceiptDiscountRequest[],
+): { shares: Map<number, Decimal>; totals: Decimal[] } {
+  try {
+    return allocateReceiptDiscounts(lines, discounts);
+  } catch (error) {
+    if (!(error instanceof ReceiptDiscountError)) throw error;
+    throw new AppError('RECEIPT_DISCOUNT_TOO_LARGE', error.message, {
+      discount: error.discount.toFixed(2),
+      total: error.base.toFixed(2),
+      index: error.index,
     });
   }
-  return allocateReceiptDiscount(amounts, total);
 }
 
-/** Shares at posting, every line priced or free. */
-function discountShares(lines: readonly LineRow[], header: ReceiptRow): Decimal[] {
-  return shareDiscount(
-    lines.map((line) => (line.freeGoods ? null : line.docAmount)),
-    { pct: header.discountPct, amount: header.discountAmount },
-  );
-}
-
-/** A draft's shares over the lines priced so far; none while the discount exceeds them. */
-function draftShares(lines: readonly LineRow[], header: ReceiptRow): Decimal[] | null {
+/** `sharesOf` for a draft's view: null while a discount exceeds its lines. */
+function trySharesOf(
+  lines: readonly { id: number; amount: Decimal | null }[],
+  discounts: readonly ReceiptDiscountRequest[],
+): { shares: Map<number, Decimal>; totals: Decimal[] } | null {
   try {
-    return discountShares(lines, header);
+    return sharesOf(lines, discounts);
   } catch (error) {
     if (error instanceof AppError) return null;
     throw error;
   }
+}
+
+/** The discounts with their tugriks on these amounts (null throughout while one exceeds its lines). */
+function discountViews(
+  discounts: readonly (ReceiptDiscountRequest & { id: number })[],
+  lines: readonly { id: number; amount: Decimal | null }[],
+): ReceiptDiscountView[] {
+  const totals = trySharesOf(lines, discounts)?.totals ?? null;
+  return discounts.map((discount, index) => ({ ...discount, total: totals?.[index] ?? null }));
 }
 
 /**

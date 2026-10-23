@@ -2516,6 +2516,16 @@
             }
           },
           {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "description": "Only the products linked to this supplier (ADR-0103); an empty q lists them",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "limit",
             "required": false,
             "in": "query",
@@ -2557,7 +2567,7 @@
             "bearer": []
           }
         ],
-        "summary": "A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units\nand barcodes without pictures, at most 30. Declared before `:id`.",
+        "summary": "A picker's quick search (ADR-0099 #3): active products only, the list's match and order, units\nand barcodes without pictures, at most 30; `supplierId` keeps that supplier's products\n(ADR-0103). Declared before `:id`.",
         "tags": [
           "catalog"
         ]
@@ -7447,6 +7457,62 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/receipts/{id}/discounts": {
+      "put": {
+        "operationId": "Receipts_setDiscounts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptDiscountsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A draft's discounts, replaced as a whole (ADR-0103).",
         "tags": [
           "inventory"
         ]
@@ -27847,6 +27913,50 @@
           "salePrice"
         ]
       },
+      "ReceiptDiscount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "LINES",
+              "NOTE"
+            ],
+            "type": "string"
+          },
+          "pct": {
+            "type": "string",
+            "nullable": true,
+            "example": "5"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineIds": {
+            "description": "LINES: the lines it applies to",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "description": "In tugriks on the lines priced so far; null while it exceeds them"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "pct",
+          "amount",
+          "lineIds",
+          "total"
+        ]
+      },
       "ReceiptTotals": {
         "type": "object",
         "properties": {
@@ -27856,7 +27966,11 @@
           },
           "discountTotal": {
             "type": "string",
-            "description": "The delivery note’s discount"
+            "description": "The receipt’s discounts"
+          },
+          "discountTooLarge": {
+            "type": "boolean",
+            "description": "A discount exceeds its lines; the posting will refuse it"
           },
           "netTotal": {
             "type": "string",
@@ -27876,6 +27990,7 @@
         "required": [
           "docTotal",
           "discountTotal",
+          "discountTooLarge",
           "netTotal",
           "vatTotal",
           "costTotal",
@@ -28003,15 +28118,12 @@
             "type": "number",
             "description": "Lines whose product has no weight"
           },
-          "discountPct": {
-            "type": "string",
-            "nullable": true,
-            "description": "Discount, % of the note"
-          },
-          "discountAmount": {
-            "type": "string",
-            "nullable": true,
-            "description": "Or a discount amount"
+          "discounts": {
+            "description": "Cost holders only",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptDiscount"
+            }
           },
           "totals": {
             "description": "Cost holders only",
@@ -28126,16 +28238,6 @@
             "minimum": 1,
             "description": "Cash box or bank account"
           },
-          "discountPct": {
-            "type": "string",
-            "nullable": true,
-            "description": "Discount, % of the priced total (cost holders); clears an amount"
-          },
-          "discountAmount": {
-            "type": "string",
-            "nullable": true,
-            "description": "Or a discount amount (cost holders); clears a percentage"
-          },
           "supplierId": {
             "type": "number",
             "minimum": 1
@@ -28185,21 +28287,61 @@
             "minimum": 1,
             "description": "Cash box or bank account"
           },
-          "discountPct": {
-            "type": "string",
-            "nullable": true,
-            "description": "Discount, % of the priced total (cost holders); clears an amount"
-          },
-          "discountAmount": {
-            "type": "string",
-            "nullable": true,
-            "description": "Or a discount amount (cost holders); clears a percentage"
-          },
           "supplierId": {
             "type": "number",
             "minimum": 1
           }
         }
+      },
+      "ReceiptDiscountRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "LINES",
+              "NOTE"
+            ],
+            "type": "string"
+          },
+          "pct": {
+            "type": "string",
+            "nullable": true,
+            "description": "A percentage, or …"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "description": "… an amount"
+          },
+          "lineIds": {
+            "maxItems": 500,
+            "description": "LINES only",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "ReceiptDiscountsRequest": {
+        "type": "object",
+        "properties": {
+          "discounts": {
+            "maxItems": 50,
+            "description": "Replaces the receipt’s list",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptDiscountRequest"
+            }
+          }
+        },
+        "required": [
+          "discounts"
+        ]
       },
       "ReceiptCostingLine": {
         "type": "object",
@@ -28308,13 +28450,11 @@
             "type": "string",
             "example": "10"
           },
-          "discountPct": {
-            "type": "string",
-            "nullable": true
-          },
-          "discountAmount": {
-            "type": "string",
-            "nullable": true
+          "discounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptDiscount"
+            }
           },
           "total": {
             "type": "string",
@@ -28342,8 +28482,7 @@
           "recostUntil",
           "costedAt",
           "vatRatePct",
-          "discountPct",
-          "discountAmount",
+          "discounts",
           "total",
           "docTotal",
           "lines"
@@ -28378,15 +28517,13 @@
       "ReceiptCostRequest": {
         "type": "object",
         "properties": {
-          "discountPct": {
-            "type": "string",
-            "nullable": true,
-            "description": "Discount, %; given (or discountAmount) replaces the receipt’s, null clears it"
-          },
-          "discountAmount": {
-            "type": "string",
-            "nullable": true,
-            "description": "Or a discount amount"
+          "discounts": {
+            "maxItems": 50,
+            "description": "Given, replaces the receipt’s discounts (ADR-0103)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptDiscountRequest"
+            }
           },
           "costingVersion": {
             "type": "number",

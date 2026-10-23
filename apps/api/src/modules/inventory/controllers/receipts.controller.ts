@@ -27,6 +27,8 @@ import {
   LastReceiptPricesQueryDto,
   ReceiptCostingDto,
   ReceiptDetailDto,
+  ReceiptDiscountRequestDto,
+  ReceiptDiscountsDto,
   ReceiptLineRequestDto,
   ReceiptListQueryDto,
   ReceiptPageDto,
@@ -53,11 +55,14 @@ const lineInput = (line: ReceiptLineRequestDto) => ({
   ...(line.salePrice === undefined ? {} : { salePrice: money(line.salePrice) }),
 });
 
-/** The discount keys a request gave, as decimals (ADR-0099 #4). */
-const discountInput = (body: { discountPct?: string | null; discountAmount?: string | null }) => ({
-  ...(body.discountPct === undefined ? {} : { discountPct: money(body.discountPct) }),
-  ...(body.discountAmount === undefined ? {} : { discountAmount: money(body.discountAmount) }),
-});
+/** Discounts as typed, as decimals (ADR-0103). */
+const discountsInput = (discounts: readonly ReceiptDiscountRequestDto[]) =>
+  discounts.map((discount) => ({
+    kind: discount.kind,
+    pct: money(discount.pct) ?? null,
+    amount: money(discount.amount) ?? null,
+    lineIds: discount.lineIds ?? [],
+  }));
 
 /** Prices and totals only for cost holders (ADR-0033 #8, ADR-0078 #2). */
 const detail = (ctx: AuthContext) => (receipt: Parameters<typeof toReceiptDetailDto>[0]) =>
@@ -134,7 +139,6 @@ export class ReceiptsController {
         ...(body.note === undefined ? {} : { note: body.note }),
         ...(body.paymentMethod === undefined ? {} : { paymentMethod: body.paymentMethod }),
         ...(body.moneyAccountId === undefined ? {} : { moneyAccountId: body.moneyAccountId }),
-        ...discountInput(body),
         lines: (body.lines ?? []).map(lineInput),
       }),
     );
@@ -148,13 +152,19 @@ export class ReceiptsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateReceiptDto,
   ): Promise<ReceiptDetailDto> {
-    const { discountPct, discountAmount, ...header } = body;
-    return detail(ctx)(
-      await this.receipts.update(ctx, id, {
-        ...header,
-        ...discountInput({ discountPct, discountAmount }),
-      }),
-    );
+    return detail(ctx)(await this.receipts.update(ctx, id, body));
+  }
+
+  /** A draft's discounts, replaced as a whole (ADR-0103). */
+  @Put(':id/discounts')
+  @RequirePermission(COSTS)
+  @ApiOkResponse({ type: ReceiptDetailDto })
+  async setDiscounts(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ReceiptDiscountsDto,
+  ): Promise<ReceiptDetailDto> {
+    return detail(ctx)(await this.receipts.setDiscounts(ctx, id, discountsInput(body.discounts)));
   }
 
   @Post(':id/lines')
@@ -211,7 +221,7 @@ export class ReceiptsController {
     return toReceiptCostingDto(
       await this.receipts.cost(ctx, id, {
         costingVersion: body.costingVersion,
-        ...discountInput(body),
+        ...(body.discounts === undefined ? {} : { discounts: discountsInput(body.discounts) }),
         lines: body.lines.map((line) => ({
           lineId: line.lineId,
           ...(line.amount === undefined ? {} : { amount: new Decimal(line.amount) }),

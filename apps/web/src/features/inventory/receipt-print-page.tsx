@@ -1,4 +1,5 @@
 import { Decimal } from '@tugeel/shared/money';
+import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -196,8 +197,17 @@ function DocumentSheet({ detail, number }: { detail: ReceiptDetail; number: stri
             <dd className="text-right font-mono">{formatMnt(totals.docTotal)}</dd>
             {new Decimal(totals.discountTotal).gt(0) ? (
               <>
-                <dt>{t('inventory.receipt.form.discountTotal')}</dt>
-                <dd className="text-right font-mono">-{formatMnt(totals.discountTotal)}</dd>
+                {(detail.discounts ?? []).map((discount) => (
+                  <Fragment key={discount.id}>
+                    <dt>
+                      {t(`inventory.receipt.discounts.kinds.${discount.kind}`)}
+                      {discount.pct ? ` (${new Decimal(discount.pct).toString()}%)` : ''}
+                    </dt>
+                    <dd className="text-right font-mono">
+                      {discount.total ? `-${formatMnt(discount.total)}` : ''}
+                    </dd>
+                  </Fragment>
+                ))}
                 <dt className="font-semibold">{t('inventory.receipt.form.netTotal')}</dt>
                 <dd className="text-right font-mono font-semibold">{formatMnt(totals.netTotal)}</dd>
               </>

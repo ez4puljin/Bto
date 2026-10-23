@@ -1,6 +1,6 @@
 {
-  "id": "09d78951-5681-4651-a0fb-f1cb86d3296c",
-  "prevId": "0e1e24b0-8c06-4e59-819d-142b53341359",
+  "id": "54b92de4-def9-40b0-a141-bbbedf3adb3b",
+  "prevId": "9fad825d-9bbe-46f1-b8b0-76d21ce8976a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -10652,6 +10652,204 @@
       },
       "isRLSEnabled": false
     },
+    "public.goods_receipt_discount_lines": {
+      "name": "goods_receipt_discount_lines",
+      "schema": "",
+      "columns": {
+        "discount_id": {
+          "name": "discount_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "goods_receipt_discount_lines_line_idx": {
+          "name": "goods_receipt_discount_lines_line_idx",
+          "columns": [
+            {
+              "expression": "line_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "goods_receipt_discount_lines_discount_id_goods_receipt_discounts_id_fk": {
+          "name": "goods_receipt_discount_lines_discount_id_goods_receipt_discounts_id_fk",
+          "tableFrom": "goods_receipt_discount_lines",
+          "tableTo": "goods_receipt_discounts",
+          "columnsFrom": [
+            "discount_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "goods_receipt_discount_lines_line_id_goods_receipt_lines_id_fk": {
+          "name": "goods_receipt_discount_lines_line_id_goods_receipt_lines_id_fk",
+          "tableFrom": "goods_receipt_discount_lines",
+          "tableTo": "goods_receipt_lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "goods_receipt_discount_lines_discount_id_line_id_pk": {
+          "name": "goods_receipt_discount_lines_discount_id_line_id_pk",
+          "columns": [
+            "discount_id",
+            "line_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.goods_receipt_discounts": {
+      "name": "goods_receipt_discounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "goods_receipt_discounts_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pct": {
+          "name": "pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "goods_receipt_discounts_receipt_idx": {
+          "name": "goods_receipt_discounts_receipt_idx",
+          "columns": [
+            {
+              "expression": "receipt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "goods_receipt_discounts_note_key": {
+          "name": "goods_receipt_discounts_note_key",
+          "columns": [
+            {
+              "expression": "receipt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"goods_receipt_discounts\".\"kind\" = 'NOTE'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "goods_receipt_discounts_receipt_id_goods_receipts_id_fk": {
+          "name": "goods_receipt_discounts_receipt_id_goods_receipts_id_fk",
+          "tableFrom": "goods_receipt_discounts",
+          "tableTo": "goods_receipts",
+          "columnsFrom": [
+            "receipt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "goods_receipt_discounts_kind": {
+          "name": "goods_receipt_discounts_kind",
+          "value": "\"goods_receipt_discounts\".\"kind\" IN ('LINES', 'NOTE')"
+        },
+        "goods_receipt_discounts_value": {
+          "name": "goods_receipt_discounts_value",
+          "value": "(\"goods_receipt_discounts\".\"pct\" IS NULL) <> (\"goods_receipt_discounts\".\"amount\" IS NULL)\n        AND (\"goods_receipt_discounts\".\"pct\" IS NULL OR (\"goods_receipt_discounts\".\"pct\" > 0 AND \"goods_receipt_discounts\".\"pct\" <= 100))\n        AND (\"goods_receipt_discounts\".\"amount\" IS NULL OR \"goods_receipt_discounts\".\"amount\" > 0)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.goods_receipt_lines": {
       "name": "goods_receipt_lines",
       "schema": "",
@@ -11028,18 +11226,6 @@
           "notNull": true,
           "default": "0"
         },
-        "discount_pct": {
-          "name": "discount_pct",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "discount_amount": {
-          "name": "discount_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "number": {
           "name": "number",
           "type": "text",
@@ -11234,10 +11420,6 @@
         "goods_receipts_vat_rate": {
           "name": "goods_receipts_vat_rate",
           "value": "\"goods_receipts\".\"vat_rate_pct\" >= 0 AND \"goods_receipts\".\"vat_rate_pct\" < 100"
-        },
-        "goods_receipts_discount": {
-          "name": "goods_receipts_discount",
-          "value": "(\"goods_receipts\".\"discount_pct\" IS NULL OR \"goods_receipts\".\"discount_amount\" IS NULL)\n        AND (\"goods_receipts\".\"discount_pct\" IS NULL OR (\"goods_receipts\".\"discount_pct\" > 0 AND \"goods_receipts\".\"discount_pct\" <= 100))\n        AND (\"goods_receipts\".\"discount_amount\" IS NULL OR \"goods_receipts\".\"discount_amount\" > 0)"
         },
         "goods_receipts_texts": {
           "name": "goods_receipts_texts",
