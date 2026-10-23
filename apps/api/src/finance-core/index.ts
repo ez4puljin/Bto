@@ -68,6 +68,16 @@ export {
   FinReader,
 } from './posting/fin-reader.service';
 export { type FinDocumentClass } from './posting/intake-command';
+export {
+  FinReports,
+  type FinResultBalance,
+  type FinTrialBalance,
+  type FinTrialBalanceRow,
+  type FinVatDocument,
+  type FinVatGroup,
+  type FinVatReport,
+  type FinVatSide,
+} from './posting/report-reader.service';
 export { type FinIntakeResult, type FinIntakeVia, FinIntakeInTx } from './posting/intake.service';
 export {
   type FinReconcileDrift,

@@ -1,8 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { FINANCE_LIMITS, invoicePartsFor, taxSplit } from '@tugeel/shared/finance';
+import {
+  FINANCE_LIMITS,
+  invoicePartsFor,
+  settlementDueDate,
+  taxSplit,
+} from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import type { PriceBasis } from '@tugeel/shared/pricing';
-import { addDays, businessDate } from '@tugeel/shared/time';
+import { businessDate } from '@tugeel/shared/time';
 import { eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -99,8 +104,8 @@ export class InvoicingService implements SaleSink {
     const totals = totalsOf(lines);
     // Lock order (docs/modules/finance.md §4): the sale posted the stock; the customer comes next.
     const customer = await this.customers.lockForUpdate(tx, snapshot.customerId);
-    const terms = await this.customers.creditTerms(customer.id, today, tx);
-    const dueDate = addDays(today, terms.paymentTerm.days ?? 0);
+    // Due on the customer's settlement day, whatever the payment method (ADR-0101).
+    const dueDate = settlementDueDate(customer.settlementGroup, today);
     const number = await this.settings.allocateNumber(tx, 'INVOICE', today);
     const [invoice] = await tx
       .insert(invoices)

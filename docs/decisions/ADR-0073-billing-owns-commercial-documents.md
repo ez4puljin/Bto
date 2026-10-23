@@ -5,7 +5,7 @@
 | Status | Accepted |
 | Date | 2026-10-18 |
 | Deciders | Owner, Claude (Claude Code session) |
-| Amended by | ADR-0083 (2026-10-20: the billing split, H1, moves after go-live; modules/finance calls the core directly until then) |
+| Amended by | ADR-0083 (2026-10-20: the billing split, H1, moves after go-live; modules/finance calls the core directly until then); ADR-0101 (2026-10-23: #5 superseded — an overdue amount never refuses, so `credit.overdue_nets_credits` and `creditsOpen` are gone; HOLD and LIMIT stand) |
 | Supersedes | ADR-0060 #3 (ownership only: the invoice is a Bto document of `billing`; its rules stand — one invoice per sold order, the delivered quantities, the part filling, the tax split per line, the due date, immutability, the void); ADR-0060 #6 (stock handling leaves finance: the sales return of `billing` posts `RETURN_IN`; the core receives an `AR_CREDIT`) |
 | Amends | ADR-0060 #2 (the balance and the overdue amount come from the core's exposure; by default unapplied credits net the overdue amount; HOLD → OVERDUE → LIMIT, no tolerance, every payment method and the open orders summed by sales are unchanged); SPEC §6.2 #1–#2; architecture §4 (the `finance` row; new `billing` and `fin-bridge` rows) and §5.5 |
 

@@ -1,10 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { SETTLEMENT_GROUPS } from '@tugeel/shared/finance';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { DetailCard, FieldList } from '@/components/detail';
 import { FormFooter, FormRow, FormSection } from '@/components/form';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -118,26 +120,14 @@ export function CustomerPage() {
   );
 }
 
-/** The payment term in words: the customer's own days, the company setting, or not set yet. */
-function useTermText() {
-  const { t } = useTranslation();
-  return (term: CustomerDetail['paymentTerm']) => {
-    if (term.source === 'UNSET' || term.days === null) return t('partners.credit.termUnset');
-    return term.source === 'CUSTOMER'
-      ? t('partners.credit.termCustomer', { days: term.days })
-      : t('partners.credit.termDefault', { days: term.days });
-  };
-}
-
 /**
- * Credit terms (SPEC §5.3, §6): the limit (empty = not decided yet), the payment term (empty = the
- * company setting) and the hold. Read first; accountants and admins change them with «Засах»
- * (ADR-0042), others only read them.
+ * Credit terms (SPEC §5.3, §6): the limit (empty = not decided yet), the settlement group its
+ * invoices fall due by (ADR-0101) and the hold. Read first; accountants and admins change them
+ * with «Засах» (ADR-0042), others only read them.
  */
 function CreditCard(props: { customer: CustomerDetail; canEdit: boolean }) {
   const { t } = useTranslation();
   const { customer } = props;
-  const termText = useTermText();
   return (
     <DetailCard
       title={t('partners.credit.title')}
@@ -157,8 +147,9 @@ function CreditCard(props: { customer: CustomerDetail; canEdit: boolean }) {
                   ),
               },
               {
-                label: t('partners.customers.columns.paymentTerm'),
-                value: termText(customer.paymentTerm),
+                label: t('partners.settlement.group'),
+                value: t(`partners.settlement.groups.${customer.settlementGroup}`),
+                hint: t(`partners.settlement.rules.${customer.settlementGroup}`),
               },
               {
                 label: t('partners.credit.status'),
@@ -184,7 +175,6 @@ function CreditCard(props: { customer: CustomerDetail; canEdit: boolean }) {
 function CreditForm(props: { customer: CustomerDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const { customer } = props;
-  const termText = useTermText();
   const mutations = usePartnersMutations();
   const action = useAction();
   const form = useForm<CreditFormValues>({
@@ -223,22 +213,21 @@ function CreditForm(props: { customer: CustomerDetail; onClose: () => void }) {
           />
         </FormRow>
         <FormRow
-          label={t('partners.credit.term')}
-          htmlFor="credit-term"
-          hint={
-            customer.paymentTerm.source === 'CUSTOMER'
-              ? t('partners.credit.termHint')
-              : `${t('partners.credit.termHint')}. ${termText(customer.paymentTerm)}`
-          }
-          error={errors.paymentTermDays?.message}
+          label={t('partners.settlement.group')}
+          htmlFor="credit-settlement-group"
+          hint={t(`partners.settlement.rules.${form.watch('settlementGroup')}`)}
         >
-          <Input
-            id="credit-term"
-            inputMode="numeric"
-            autoComplete="off"
-            className="font-mono sm:w-28"
-            {...form.register('paymentTermDays')}
-          />
+          <NativeSelect
+            id="credit-settlement-group"
+            className="sm:w-56"
+            {...form.register('settlementGroup')}
+          >
+            {SETTLEMENT_GROUPS.map((value) => (
+              <option key={value} value={value}>
+                {t(`partners.settlement.groups.${value}`)}
+              </option>
+            ))}
+          </NativeSelect>
         </FormRow>
         <FormRow label={t('partners.credit.hold')} htmlFor="credit-hold" align="center">
           <Controller

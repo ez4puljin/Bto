@@ -2,6 +2,9 @@
 // file; named exports only (ESLint G2 rejects `export *`).
 export {
   CUSTOMER_CHANGED_HOOK,
+  CUSTOMER_DEBT_READER,
+  type CustomerDebtReader,
+  type CustomerOverdue,
   type CustomerChangedHook,
   type CustomerPartyFacts,
   SUPPLIER_CHANGED_HOOK,
@@ -34,7 +37,6 @@ export {
   type LocatedCustomer,
   type LockedCustomer,
   type PartnerStatus,
-  type PaymentTerm,
 } from './services/customers.service';
 export {
   type ProductSupplierLink,

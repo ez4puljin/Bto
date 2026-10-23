@@ -201,7 +201,7 @@ describe('imports', () => {
     expect((await productRow('1001'))?.name).toBe('Кока кола 0.5 л');
   });
 
-  it('imports customers with the kind read from their numbers, credit terms and GPS', async () => {
+  it('imports customers with the kind read from their numbers, credit terms, settlement group and GPS', async () => {
     const job = await imports.check('CUSTOMERS', [
       {
         code: '501',
@@ -212,16 +212,27 @@ describe('imports', () => {
         address: 'БЗД, 3-р хороо',
         gps: 'https://www.google.com/maps/@47.918,106.917,17z',
         creditLimit: '5,000,000',
-        paymentTermDays: 30,
+        settlementGroup: 'Орон нутаг',
       },
-      { code: '502', name: 'Бат', regNo: 'УБ90010112', consumerNo: '12345678' },
-      { code: '503', name: 'Шинэ харилцагч' },
-      { code: '504', name: 'Буруу', phone: '123', consumerNo: '1' },
+      {
+        code: '502',
+        name: 'Бат',
+        regNo: 'УБ90010112',
+        consumerNo: '12345678',
+        settlementGroup: 'Мөрөн',
+      },
+      { code: '503', name: 'Шинэ харилцагч', settlementGroup: 'DAY_20' },
+      { code: '504', name: 'Буруу', phone: '123', consumerNo: '1', settlementGroup: 'Мөрөн' },
+      { code: '505', name: 'Бүлэггүй' },
+      { code: '506', name: 'Буруу бүлэг', settlementGroup: 'Хот' },
     ]);
-    expect(job).toMatchObject({ status: 'INVALID', errorRows: 1 });
+    expect(job).toMatchObject({ status: 'INVALID', errorRows: 3 });
+    // A new customer needs its settlement group (ADR-0101).
     expect(codes(await imports.rows(job.id, 'ERRORS'))).toEqual([
       'consumerNo:NOT_ALLOWED',
       'phone:FORMAT',
+      'settlementGroup:REQUIRED',
+      'settlementGroup:FORMAT',
     ]);
     const fixed = await imports.check('CUSTOMERS', [
       {
@@ -233,10 +244,16 @@ describe('imports', () => {
         address: 'БЗД, 3-р хороо',
         gps: 'https://www.google.com/maps/@47.918,106.917,17z',
         creditLimit: '5,000,000',
-        paymentTermDays: 30,
+        settlementGroup: 'Орон нутаг',
       },
-      { code: '502', name: 'Бат', regNo: 'УБ90010112', consumerNo: '12345678' },
-      { code: '503', name: 'Шинэ харилцагч' },
+      {
+        code: '502',
+        name: 'Бат',
+        regNo: 'УБ90010112',
+        consumerNo: '12345678',
+        settlementGroup: 'Мөрөн',
+      },
+      { code: '503', name: 'Шинэ харилцагч', settlementGroup: 'DAY_20' },
     ]);
     expect(fixed).toMatchObject({ status: 'VALIDATED', warningRows: 1 });
     expect((await imports.rows(fixed.id, 'WARNINGS'))[0]?.warnings).toEqual([
@@ -245,7 +262,7 @@ describe('imports', () => {
     expect((await imports.commit(fixed.id)).status).toBe('COMMITTED');
     committed.push(fixed.id);
     const { rows } = await sql.query(
-      `SELECT c.code, c.kind, c.phone, c.credit_limit::text AS credit, c.payment_term_days AS term,
+      `SELECT c.code, c.kind, c.phone, c.credit_limit::text AS credit, c.settlement_group AS term,
               a.lat::text AS lat
          FROM customers c LEFT JOIN customer_addresses a ON a.customer_id = c.id
         ORDER BY c.code`,
@@ -256,11 +273,11 @@ describe('imports', () => {
         kind: 'COMPANY',
         phone: '+97699112233',
         credit: '5000000.00',
-        term: 30,
+        term: 'MONTH_END',
         lat: '47.918000',
       },
-      { code: '502', kind: 'INDIVIDUAL', phone: null, credit: null, term: null, lat: null },
-      { code: '503', kind: 'COMPANY', phone: null, credit: null, term: null, lat: null },
+      { code: '502', kind: 'INDIVIDUAL', phone: null, credit: null, term: 'DAY_20', lat: null },
+      { code: '503', kind: 'COMPANY', phone: null, credit: null, term: 'DAY_20', lat: null },
     ]);
   });
 

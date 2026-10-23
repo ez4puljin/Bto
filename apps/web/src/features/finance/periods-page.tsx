@@ -32,6 +32,7 @@ import {
   useFinancePeriods,
   usePeriodMutations,
 } from './api';
+import { YearCloseCard } from './reports-pages';
 import { VoidDialog } from './void-dialog';
 
 /** The month before this one, `YYYY-MM`: the one usually closed next. */
@@ -114,6 +115,7 @@ export function PeriodsPage() {
           </CardContent>
         </Card>
       ) : null}
+      <YearCloseCard />
       <ListCard>
         <Table>
           <TableHeader>

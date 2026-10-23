@@ -1130,7 +1130,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Credit limit, payment term and hold: the accountant's (partners.credit.manage). */
+        /** Credit limit, settlement group and hold: the accountant's (partners.credit.manage). */
         put: operations["Customers_setCredit"];
         post?: never;
         delete?: never;
@@ -4360,6 +4360,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/reports/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/trial-balance.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_trialBalanceXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/reports/vat.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_vatXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_yearClose"];
+        put?: never;
+        post: operations["Reports_closeYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/year-close/{year}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Reports_revertYear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/settings": {
         parameters: {
             query?: never;
@@ -5868,7 +5964,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "credit.payment_term_days" | "credit.overdue_nets_credits" | "bto.company_code";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "bto.company_code";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -6397,13 +6493,14 @@ export interface components {
             taxProductCode: number;
             cityTax: number;
         };
-        PaymentTerm: {
-            days: number | null;
+        CustomerOverdue: {
             /**
-             * @description The customer’s own days, the company setting, or neither yet
-             * @enum {string}
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
              */
-            source: "CUSTOMER" | "DEFAULT" | "UNSET";
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
         };
         GpsPoint: {
             /** @example 47.918540 */
@@ -6452,8 +6549,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /** @enum {string} */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["CustomerOverdue"] | null;
             note: string | null;
             /** @description The point of the default address */
             gps: components["schemas"]["GpsPoint"] | null;
@@ -6535,9 +6635,11 @@ export interface components {
              * @example 5000000.00
              */
             creditLimit: string | null;
-            /** @description Own days; null = the company setting */
-            paymentTermDays: number | null;
-            paymentTerm: components["schemas"]["PaymentTerm"];
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHoldReason: string | null;
             note: string | null;
             /** Format: date-time */
@@ -6576,6 +6678,11 @@ export interface components {
             /** @enum {string} */
             kind: "COMPANY" | "INDIVIDUAL";
             name: string;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description The first, default address */
             address?: components["schemas"]["CustomerAddressRequest"];
         };
@@ -6602,8 +6709,11 @@ export interface components {
         CustomerCreditRequest: {
             /** @description MNT; null = not decided yet */
             creditLimit: string | null;
-            /** @description null = the company setting */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             creditHold: boolean;
             creditHoldReason: string | null;
         };
@@ -8841,6 +8951,15 @@ export interface components {
             /** @description The list's visible columns; the file keeps the list's order */
             columns: ("sku" | "name" | "category" | "baseUnit" | "units" | "warehousePrice" | "priceProfile" | "baseBarcodes" | "unitBarcodes" | "weight" | "homeWarehouse" | "fixedBins" | "supplier" | "status")[];
         };
+        SalesCustomerOverdue: {
+            /**
+             * @description Open invoices past their due date, whole MNT
+             * @example 50000
+             */
+            amount: string;
+            /** Format: date */
+            oldestDueDate: string | null;
+        };
         SalesOrderSummary: {
             id: number;
             number: string | null;
@@ -8851,6 +8970,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** @enum {string} */
@@ -8965,6 +9086,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /** Format: date */
@@ -9193,6 +9316,8 @@ export interface components {
             customerId: number;
             customerCode: string;
             customerName: string;
+            /** @description The customer's overdue receivable: a red reminder, never a block (ADR-0101) */
+            customerOverdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @enum {string} */
             fulfilment: "PICKUP" | "DELIVERY";
             /**
@@ -9456,6 +9581,8 @@ export interface components {
             creditHold: boolean;
             /** @description Set only while on hold */
             creditHoldReason: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
             /** @description The customer address whose point this is */
             addressId: number;
             /** @description The point's address text */
@@ -9559,6 +9686,8 @@ export interface components {
             phone: string | null;
             /** @description The default address */
             address: string | null;
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         SalesRepCustomerPage: {
             data: components["schemas"]["SalesRepCustomer"][];
@@ -9620,6 +9749,8 @@ export interface components {
             /** @description Active, the default first */
             addresses: components["schemas"]["SalesRepCustomerAddress"][];
             contacts: components["schemas"]["SalesRepCustomerContact"][];
+            /** @description The overdue receivable: a red reminder, never a block (ADR-0101); null when none */
+            overdue: components["schemas"]["SalesCustomerOverdue"] | null;
         };
         Invoice: {
             id: number;
@@ -10062,7 +10193,7 @@ export interface components {
             /** @enum {string} */
             kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
             /** @enum {string|null} */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
             /**
@@ -10102,7 +10233,7 @@ export interface components {
              * @description null takes the role away
              * @enum {string|null}
              */
-            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | null;
+            role: "AR" | "SALES" | "SALES_DISCOUNT" | "SALES_RETURN" | "VAT_PAYABLE" | "CITY_TAX_PAYABLE" | "CUSTOMER_ADVANCE" | "CASH" | "BANK" | "OTHER_INCOME" | "OTHER_EXPENSE" | "POS_CASH" | "CARD_CLEARING" | "POS_SALES" | "CASH_VARIANCE" | "AP" | "VAT_INPUT" | "INVENTORY" | "GOODS_RECEIVED" | "COGS" | "STOCK_LOSS" | "STOCK_GAIN" | "OPENING_STOCK" | "ISSUE_INTERNAL" | "ISSUE_BONUS" | "ISSUE_MARKETING" | "ISSUE_WRITE_OFF" | "ISSUE_TRANSFER_OUT" | "ISSUE_OTHER" | "RETAINED_EARNINGS" | null;
         };
         AccountLedgerLine: {
             id: number;
@@ -10374,6 +10505,11 @@ export interface components {
             creditLimit: string | null;
             creditHold: boolean;
             /**
+             * @description When the invoices fall due (ADR-0101)
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
+            /**
              * @description Negative = in advance
              * @example 150000.00
              */
@@ -10636,6 +10772,119 @@ export interface components {
         };
         FinancePeriodReopenRequest: {
             reason: string;
+        };
+        TrialBalanceRow: {
+            accountId: number;
+            /** @example 120101 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            kind: "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /** @example 12 */
+            groupCode: string | null;
+            groupName: string | null;
+            /**
+             * @description debit − credit before `from`
+             * @example 150000.00
+             */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 0.00 */
+            credit: string;
+            /**
+             * @description debit − credit at `to`
+             * @example 160000.00
+             */
+            closing: string;
+        };
+        TrialBalance: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-31 */
+            to: string;
+            data: components["schemas"]["TrialBalanceRow"][];
+            /** @example 0.00 */
+            opening: string;
+            /** @example 10000.00 */
+            debit: string;
+            /** @example 10000.00 */
+            credit: string;
+            /** @example 0.00 */
+            closing: string;
+        };
+        VatGroup: {
+            /** @enum {string} */
+            side: "OUTPUT" | "INPUT";
+            /** @example BTO */
+            system: string;
+            /** @example SALES_INVOICE */
+            docType: string | null;
+            /** @example 10000.00 */
+            vat: string;
+            /** @example 100000.00 */
+            base: string;
+            /** @description Lines that carry no base */
+            linesWithoutBase: number;
+        };
+        VatDocument: {
+            entryId: number;
+            entryNumber: string;
+            /** @example 2026-10-15 */
+            entryDate: string;
+            system: string;
+            docType: string | null;
+            documentNumber: string | null;
+            reversal: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 0.00 */
+            input: string;
+            /** @example 100000.00 */
+            base: string;
+        };
+        VatReport: {
+            /** @example 2026-10 */
+            period: string;
+            from: string;
+            to: string;
+            groups: components["schemas"]["VatGroup"][];
+            documents: components["schemas"]["VatDocument"][];
+            /** @description More than 2,000 documents: the list is cut */
+            truncated: boolean;
+            /** @example 10000.00 */
+            output: string;
+            /** @example 4000.00 */
+            input: string;
+            /**
+             * @description output − input
+             * @example 6000.00
+             */
+            payable: string;
+        };
+        YearCloseDocument: {
+            id: number;
+            number: string;
+            /** @example 2026-12-31 */
+            date: string;
+        };
+        YearCloseStatus: {
+            /** @example 2026 */
+            year: number;
+            /** @description 31 December has passed */
+            ended: boolean;
+            documents: components["schemas"]["YearCloseDocument"][];
+            /** @example 1000000.00 */
+            income: string;
+            /** @example 800000.00 */
+            expense: string;
+            /**
+             * @description income − expense still to close
+             * @example 200000.00
+             */
+            profit: string;
         };
         PosSettings: {
             storeWarehouseId: number | null;
@@ -11556,8 +11805,11 @@ export interface components {
             phone: string;
             centre: components["schemas"]["CustomerAppCentre"] | null;
             defaultAddress: components["schemas"]["CustomerAppAddress"] | null;
-            /** @description Changed only by the office */
-            paymentTermDays: number | null;
+            /**
+             * @description DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office
+             * @enum {string}
+             */
+            settlementGroup: "DAY_20" | "MONTH_END";
             /** @description False while no stage takes app orders: the app does not send */
             ordersOpen: boolean;
             /**
@@ -11917,6 +12169,34 @@ export interface components {
             lines: components["schemas"]["CustomerAppReorderLine"][];
             skipped: components["schemas"]["CustomerAppReorderSkip"][];
         };
+        CustomerAppSettlement: {
+            /** @enum {string} */
+            group: "DAY_20" | "MONTH_END";
+            /**
+             * Format: date
+             * @description The current period's first purchase day
+             */
+            periodFrom: string;
+            /**
+             * Format: date
+             * @description The current period's last purchase day
+             */
+            periodTo: string;
+            /**
+             * Format: date
+             * @description «Тооцоо хийх өдөр»; a weekend moves nothing
+             */
+            dueDate: string;
+            /** @description «N хоног үлдлээ»; 0 on the day itself */
+            daysLeft: number;
+            /**
+             * @description «Төлөх дүн»: everything due by the day (the positive balance)
+             * @example 1284600.00
+             */
+            amountDue: string;
+            /** @description The part of amountDue already overdue (shown in red) */
+            overdueAmount: string;
+        };
         CustomerAppBalance: {
             /**
              * @description Negative = an advance
@@ -11932,7 +12212,7 @@ export interface components {
             creditAvailable: string | null;
             /** @description «Зээл хаалттай»; never its internal reason */
             creditHold: boolean;
-            paymentTermDays: number | null;
+            settlement: components["schemas"]["CustomerAppSettlement"];
             /** @description «Нэхэмжлэх (n)» */
             openInvoices: number;
             /** @description «Төлбөр (n)» */
@@ -14841,6 +15121,7 @@ export interface operations {
                 kind?: "COMPANY" | "INDIVIDUAL";
                 status?: "ACTIVE" | "INACTIVE";
                 creditHold?: boolean;
+                settlementGroup?: "DAY_20" | "MONTH_END";
                 /** @description Companies without a TIN */
                 tinPending?: boolean;
                 /** @description The default address has no GPS point */
@@ -23225,6 +23506,228 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinancePeriod"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_trialBalanceXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                /** @description Also accounts without lines */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vat: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VatReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_vatXlsx: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_yearClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_closeYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_revertYear: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearCloseStatus"];
                 };
             };
             /** @description RFC 9457 problem details */

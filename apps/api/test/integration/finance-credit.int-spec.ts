@@ -1,24 +1,20 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { settlementDueDate } from '@tugeel/shared/finance';
 import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { connectAs, createHttpApp } from '../harness/apps';
 import type { ProductJson } from '../harness/catalog';
-import {
-  financeApi,
-  moveInvoiceDue,
-  type ProblemJson,
-  salesFlow,
-  setSetting,
-} from '../harness/finance';
+import { financeApi, moveInvoiceDue, type ProblemJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
 import { type CustomerJson, partnersApi } from '../harness/partners';
 
 /**
  * Credit control (ADR-0060 #2, SPEC §6.2): no tolerance, for every payment method. A limit is
  * checked against the ledger balance, the other open orders and the order at hand (its own total
- * never counted twice); no limit means no limit; an overdue invoice or a hold refuses everything
- * until it is paid or lifted. Synthetic data only.
+ * never counted twice); no limit means no limit; a hold refuses everything until it is lifted. An
+ * overdue invoice only reminds (ADR-0101): it never refuses. Invoices fall due on the customer's
+ * settlement day. Synthetic data only.
  */
 describe('finance credit control', () => {
   let app: NestExpressApplication;
@@ -37,7 +33,7 @@ describe('finance credit control', () => {
       .set(bearer(accountant))
       .send({
         creditLimit: null,
-        paymentTermDays: null,
+        settlementGroup: 'DAY_20',
         creditHold: false,
         creditHoldReason: null,
         ...body,
@@ -102,37 +98,63 @@ describe('finance credit control', () => {
     await flow.confirm(three.id).expect(200);
   });
 
-  it('refuses every order of a customer with an overdue invoice until it is paid', async () => {
+  it("dates an invoice's due date by the customer's settlement group, cash sales too", async () => {
+    const finance = financeApi(app, accountant);
+    for (const [name, group, paymentMethod] of [
+      ['Мөрөнгийн дэлгүүр', 'DAY_20', 'CREDIT'],
+      ['Орон нутгийн дэлгүүр', 'MONTH_END', 'CASH'],
+    ] as const) {
+      const customer = await partnersApi(app, admin).customer({ name, settlementGroup: group });
+      const sold = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }], {
+        paymentMethod,
+      });
+      await flow.sell(sold.id);
+      const invoice = await finance.invoiceOfOrder(sold.id);
+      expect(invoice).toMatchObject({
+        invoiceDate: today,
+        dueDate: settlementDueDate(group, today),
+      });
+    }
+  });
+
+  it('only reminds of an overdue invoice: the order is confirmed and carries the debt', async () => {
     const finance = financeApi(app, accountant);
     const customer = await partnersApi(app, admin).customer({ name: 'Хугацаа хэтэрсэн' });
     const sold = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '5' }]);
     await flow.sell(sold.id);
     const invoice = await finance.invoiceOfOrder(sold.id);
     if (!invoice) throw new Error('no invoice');
-    // Not due yet: another order passes.
-    const next = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
-    await flow.confirm(next.id).expect(200);
     // The clock moves past the due date.
     await moveInvoiceDue(sql, invoice.id, {
       invoiceDate: addDays(today, -1),
       dueDate: addDays(today, -1),
     });
-    const blocked = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }], {
+    expect(await finance.invoice(invoice.id)).toMatchObject({ overdue: true });
+    const next = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }], {
       paymentMethod: 'CASH',
     });
-    expect(await refusal(blocked.id)).toMatchObject({
+    const confirmed = (await flow.confirm(next.id).expect(200)).body as {
+      order: { customerOverdue: unknown };
+    };
+    const reminder = { amount: '5000', oldestDueDate: addDays(today, -1) };
+    expect(confirmed.order.customerOverdue).toEqual(reminder);
+    // The customer list shows it too.
+    const listed = await http()
+      .get('/api/v1/customers')
+      .query({ q: 'Хугацаа хэтэрсэн' })
+      .set(bearer(admin))
+      .expect(200);
+    expect(listed.body.data).toEqual([
+      expect.objectContaining({ id: customer.id, overdue: reminder }),
+    ]);
+    // A limit still refuses, and the refusal names the overdue amount.
+    await credit(customer.id, { creditLimit: '6000' });
+    const over = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
+    expect(await refusal(over.id)).toMatchObject({
       code: 'CREDIT_BLOCKED',
-      params: expect.objectContaining({
-        reason: 'OVERDUE',
-        overdueAmount: '5000',
-        oldestDueDate: expect.any(String),
-      }),
+      params: expect.objectContaining({ reason: 'LIMIT', overdueAmount: '5000' }),
     });
-    expect(await finance.invoice(invoice.id)).toMatchObject({ overdue: true });
-    expect((await finance.invoices({ overdue: true, customerId: customer.id })).data).toHaveLength(
-      1,
-    );
-    // Paid, the customer orders again.
+    // Paid, the reminder goes.
     const cash = await financeApi(app, admin).cashBox('FC-CASH');
     await finance
       .payment({
@@ -143,7 +165,10 @@ describe('finance credit control', () => {
         paidOn: today,
       })
       .expect(201);
-    await flow.confirm(blocked.id).expect(200);
+    const after = (await flow.confirm(over.id).expect(200)).body as {
+      order: { customerOverdue: unknown };
+    };
+    expect(after.order.customerOverdue).toBeNull();
   });
 
   it('refuses a customer on hold whatever the amounts', async () => {
@@ -156,56 +181,5 @@ describe('finance credit control', () => {
     });
     await credit(customer.id, { creditHold: false });
     await flow.confirm(draft.id).expect(200);
-  });
-
-  it('lets open credits at least as large as the overdue amount through (ADR-0073 #5)', async () => {
-    const finance = financeApi(app, accountant);
-    const cash = await financeApi(app, admin).cashBox('FC-NETS');
-    const pay = (customerId: number, amount: string) =>
-      finance
-        .payment({
-          kind: 'CUSTOMER_PAYMENT',
-          moneyAccountId: cash.id,
-          customerId,
-          amount,
-          paidOn: today,
-        })
-        .expect(201);
-    const overdueFor = async (name: string, advance: string) => {
-      const customer = await partnersApi(app, admin).customer({ name });
-      // Paid in advance, then sold: nothing applies the credit to the invoice (D7).
-      await pay(customer.id, advance);
-      const sold = await flow.draft(customer.id, [{ productUnitId: flow.pcs(juice), qty: '5' }]);
-      await flow.sell(sold.id);
-      const invoice = await finance.invoiceOfOrder(sold.id);
-      if (!invoice) throw new Error('no invoice');
-      expect(invoice.openAmount).toBe('5000.00');
-      await moveInvoiceDue(sql, invoice.id, {
-        invoiceDate: addDays(today, -1),
-        dueDate: addDays(today, -1),
-      });
-      return customer;
-    };
-    // Overdue 5,000 against an open credit of 6,000: the order passes.
-    const covered = await overdueFor('Урьдчилгаатай', '6000');
-    const passes = await flow.draft(covered.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
-    await flow.confirm(passes.id).expect(200);
-    // Against 4,000: refused, with the open credits named.
-    const short = await overdueFor('Дутуу урьдчилгаатай', '4000');
-    const refused = await flow.draft(short.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
-    expect(await refusal(refused.id)).toMatchObject({
-      code: 'CREDIT_BLOCKED',
-      params: expect.objectContaining({
-        reason: 'OVERDUE',
-        overdueAmount: '5000',
-        creditsOpen: '4000',
-      }),
-    });
-    // With the rule off, any overdue amount refuses again (today's rule, ADR-0060 #2).
-    await setSetting(app, admin, 'credit.overdue_nets_credits', false, today);
-    const strict = await flow.draft(covered.id, [{ productUnitId: flow.pcs(juice), qty: '1' }]);
-    expect(await refusal(strict.id)).toMatchObject({
-      params: expect.objectContaining({ reason: 'OVERDUE' }),
-    });
   });
 });

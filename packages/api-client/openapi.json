@@ -3829,6 +3829,18 @@
             }
           },
           {
+            "name": "settlementGroup",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_20",
+                "MONTH_END"
+              ]
+            }
+          },
+          {
             "name": "tinPending",
             "required": false,
             "in": "query",
@@ -4194,7 +4206,7 @@
             "bearer": []
           }
         ],
-        "summary": "Credit limit, payment term and hold: the accountant's (partners.credit.manage).",
+        "summary": "Credit limit, settlement group and hold: the accountant's (partners.credit.manage).",
         "tags": [
           "partners"
         ]
@@ -18252,6 +18264,379 @@
         ]
       }
     },
+    "/api/v1/finance/reports/trial-balance": {
+      "get": {
+        "operationId": "Reports_trialBalance",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "description": "Also accounts without lines",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBalance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/trial-balance.xlsx": {
+      "get": {
+        "operationId": "Reports_trialBalanceXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "description": "Also accounts without lines",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/vat": {
+      "get": {
+        "operationId": "Reports_vat",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VatReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/reports/vat.xlsx": {
+      "get": {
+        "operationId": "Reports_vatXlsx",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/year-close/{year}": {
+      "get": {
+        "operationId": "Reports_yearClose",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      },
+      "post": {
+        "operationId": "Reports_closeYear",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/year-close/{year}/revert": {
+      "post": {
+        "operationId": "Reports_revertYear",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearCloseStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/pos/settings": {
       "get": {
         "operationId": "PosSettings_get",
@@ -23748,8 +24133,6 @@
           "company.city_tax_payer",
           "auth.staff_session_hours",
           "auth.customer_session_days",
-          "credit.payment_term_days",
-          "credit.overdue_nets_credits",
           "bto.company_code"
         ]
       },
@@ -25559,26 +25942,23 @@
           "cityTax"
         ]
       },
-      "PaymentTerm": {
+      "CustomerOverdue": {
         "type": "object",
         "properties": {
-          "days": {
-            "type": "number",
-            "nullable": true
-          },
-          "source": {
-            "enum": [
-              "CUSTOMER",
-              "DEFAULT",
-              "UNSET"
-            ],
+          "amount": {
             "type": "string",
-            "description": "The customer’s own days, the company setting, or neither yet"
+            "example": "50000",
+            "description": "Open invoices past their due date, whole MNT"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
           }
         },
         "required": [
-          "days",
-          "source"
+          "amount",
+          "oldestDueDate"
         ]
       },
       "GpsPoint": {
@@ -25703,12 +26083,26 @@
             "example": "5000000.00",
             "description": "null = not decided"
           },
-          "paymentTerm": {
-            "$ref": "#/components/schemas/PaymentTerm"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
           },
           "creditHoldReason": {
             "type": "string",
             "nullable": true
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CustomerOverdue"
+              }
+            ]
           },
           "note": {
             "type": "string",
@@ -25762,8 +26156,9 @@
           "cityPayer",
           "taxStatusSource",
           "creditLimit",
-          "paymentTerm",
+          "settlementGroup",
           "creditHoldReason",
+          "overdue",
           "note",
           "gps",
           "contact",
@@ -26007,13 +26402,13 @@
             "example": "5000000.00",
             "description": "null = not decided"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "description": "Own days; null = the company setting"
-          },
-          "paymentTerm": {
-            "$ref": "#/components/schemas/PaymentTerm"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
           },
           "creditHoldReason": {
             "type": "string",
@@ -26065,8 +26460,7 @@
           "taxStatusSource",
           "taxStatusCheckedAt",
           "creditLimit",
-          "paymentTermDays",
-          "paymentTerm",
+          "settlementGroup",
           "creditHoldReason",
           "note",
           "createdAt",
@@ -26163,6 +26557,14 @@
             "type": "string",
             "maxLength": 200
           },
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
+          },
           "address": {
             "description": "The first, default address",
             "allOf": [
@@ -26174,7 +26576,8 @@
         },
         "required": [
           "kind",
-          "name"
+          "name",
+          "settlementGroup"
         ]
       },
       "CustomerUpdateRequest": {
@@ -26249,12 +26652,13 @@
             "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
             "description": "MNT; null = not decided yet"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "minimum": 0,
-            "maximum": 365,
-            "description": "null = the company setting"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн»: purchases of the 21st–20th due on the 20th; MONTH_END «Орон нутаг»: a month due on its last day (ADR-0101)"
           },
           "creditHold": {
             "type": "boolean"
@@ -26267,7 +26671,7 @@
         },
         "required": [
           "creditLimit",
-          "paymentTermDays",
+          "settlementGroup",
           "creditHold",
           "creditHoldReason"
         ]
@@ -33656,6 +34060,25 @@
           "columns"
         ]
       },
+      "SalesCustomerOverdue": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "example": "50000",
+            "description": "Open invoices past their due date, whole MNT"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          }
+        },
+        "required": [
+          "amount",
+          "oldestDueDate"
+        ]
+      },
       "SalesOrderSummary": {
         "type": "object",
         "properties": {
@@ -33700,6 +34123,16 @@
           },
           "customerName": {
             "type": "string"
+          },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           },
           "fulfilment": {
             "enum": [
@@ -33765,6 +34198,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "paymentMethod",
           "deliveryDate",
@@ -34170,6 +34604,16 @@
           "customerName": {
             "type": "string"
           },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "fulfilment": {
             "enum": [
               "PICKUP",
@@ -34340,6 +34784,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "deliveryDate",
           "addressId",
@@ -35017,6 +35462,16 @@
           "customerName": {
             "type": "string"
           },
+          "customerOverdue": {
+            "nullable": true,
+            "description": "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "fulfilment": {
             "enum": [
               "PICKUP",
@@ -35061,6 +35516,7 @@
           "customerId",
           "customerCode",
           "customerName",
+          "customerOverdue",
           "fulfilment",
           "paymentMethod",
           "deliveryDate",
@@ -36015,6 +36471,16 @@
             "nullable": true,
             "description": "Set only while on hold"
           },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
+          },
           "addressId": {
             "type": "number",
             "description": "The customer address whose point this is"
@@ -36062,6 +36528,7 @@
           "phone",
           "creditHold",
           "creditHoldReason",
+          "overdue",
           "addressId",
           "address",
           "lat",
@@ -36329,6 +36796,16 @@
             "type": "string",
             "nullable": true,
             "description": "The default address"
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           }
         },
         "required": [
@@ -36336,7 +36813,8 @@
           "code",
           "name",
           "phone",
-          "address"
+          "address",
+          "overdue"
         ]
       },
       "SalesRepCustomerPage": {
@@ -36538,6 +37016,16 @@
             "items": {
               "$ref": "#/components/schemas/SalesRepCustomerContact"
             }
+          },
+          "overdue": {
+            "nullable": true,
+            "description": "The overdue receivable: a red reminder, never a block (ADR-0101); null when none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesCustomerOverdue"
+              }
+            ]
           }
         },
         "required": [
@@ -36546,7 +37034,8 @@
           "name",
           "phone",
           "addresses",
-          "contacts"
+          "contacts",
+          "overdue"
         ]
       },
       "Invoice": {
@@ -38052,7 +38541,8 @@
               "ISSUE_MARKETING",
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
-              "ISSUE_OTHER"
+              "ISSUE_OTHER",
+              "RETAINED_EARNINGS"
             ],
             "type": "string"
           },
@@ -38191,7 +38681,8 @@
               "ISSUE_MARKETING",
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
-              "ISSUE_OTHER"
+              "ISSUE_OTHER",
+              "RETAINED_EARNINGS"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -39093,6 +39584,14 @@
           "creditHold": {
             "type": "boolean"
           },
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "When the invoices fall due (ADR-0101)"
+          },
           "balance": {
             "type": "string",
             "example": "150000.00",
@@ -39126,6 +39625,7 @@
           "status",
           "creditLimit",
           "creditHold",
+          "settlementGroup",
           "balance",
           "openInvoices",
           "overdueAmount",
@@ -39949,6 +40449,331 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "TrialBalanceRow": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "120101"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "INCOME",
+              "EXPENSE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "type": "string"
+          },
+          "groupCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "12"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true
+          },
+          "opening": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "debit − credit before `from`"
+          },
+          "debit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "160000.00",
+            "description": "debit − credit at `to`"
+          }
+        },
+        "required": [
+          "accountId",
+          "code",
+          "name",
+          "kind",
+          "status",
+          "groupCode",
+          "groupName",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "TrialBalance": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-31"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrialBalanceRow"
+            }
+          },
+          "opening": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "debit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "credit": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "closing": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "data",
+          "opening",
+          "debit",
+          "credit",
+          "closing"
+        ]
+      },
+      "VatGroup": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "enum": [
+              "OUTPUT",
+              "INPUT"
+            ],
+            "type": "string"
+          },
+          "system": {
+            "type": "string",
+            "example": "BTO"
+          },
+          "docType": {
+            "type": "string",
+            "nullable": true,
+            "example": "SALES_INVOICE"
+          },
+          "vat": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "base": {
+            "type": "string",
+            "example": "100000.00"
+          },
+          "linesWithoutBase": {
+            "type": "number",
+            "description": "Lines that carry no base"
+          }
+        },
+        "required": [
+          "side",
+          "system",
+          "docType",
+          "vat",
+          "base",
+          "linesWithoutBase"
+        ]
+      },
+      "VatDocument": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "number"
+          },
+          "entryNumber": {
+            "type": "string"
+          },
+          "entryDate": {
+            "type": "string",
+            "example": "2026-10-15"
+          },
+          "system": {
+            "type": "string"
+          },
+          "docType": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversal": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "input": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "base": {
+            "type": "string",
+            "example": "100000.00"
+          }
+        },
+        "required": [
+          "entryId",
+          "entryNumber",
+          "entryDate",
+          "system",
+          "docType",
+          "documentNumber",
+          "reversal",
+          "output",
+          "input",
+          "base"
+        ]
+      },
+      "VatReport": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatGroup"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatDocument"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More than 2,000 documents: the list is cut"
+          },
+          "output": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "input": {
+            "type": "string",
+            "example": "4000.00"
+          },
+          "payable": {
+            "type": "string",
+            "example": "6000.00",
+            "description": "output − input"
+          }
+        },
+        "required": [
+          "period",
+          "from",
+          "to",
+          "groups",
+          "documents",
+          "truncated",
+          "output",
+          "input",
+          "payable"
+        ]
+      },
+      "YearCloseDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-12-31"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "date"
+        ]
+      },
+      "YearCloseStatus": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "number",
+            "example": 2026
+          },
+          "ended": {
+            "type": "boolean",
+            "description": "31 December has passed"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YearCloseDocument"
+            }
+          },
+          "income": {
+            "type": "string",
+            "example": "1000000.00"
+          },
+          "expense": {
+            "type": "string",
+            "example": "800000.00"
+          },
+          "profit": {
+            "type": "string",
+            "example": "200000.00",
+            "description": "income − expense still to close"
+          }
+        },
+        "required": [
+          "year",
+          "ended",
+          "documents",
+          "income",
+          "expense",
+          "profit"
         ]
       },
       "PosSettings": {
@@ -43135,10 +43960,13 @@
               }
             ]
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true,
-            "description": "Changed only by the office"
+          "settlementGroup": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string",
+            "description": "DAY_20 «Мөрөн» settles on the 20th, MONTH_END «Орон нутаг» on the last day (ADR-0101); changed only by the office"
           },
           "ordersOpen": {
             "type": "boolean",
@@ -43157,7 +43985,7 @@
           "phone",
           "centre",
           "defaultAddress",
-          "paymentTermDays",
+          "settlementGroup",
           "ordersOpen",
           "today"
         ]
@@ -44418,6 +45246,55 @@
           "skipped"
         ]
       },
+      "CustomerAppSettlement": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
+          },
+          "periodFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The current period's first purchase day"
+          },
+          "periodTo": {
+            "type": "string",
+            "format": "date",
+            "description": "The current period's last purchase day"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "«Тооцоо хийх өдөр»; a weekend moves nothing"
+          },
+          "daysLeft": {
+            "type": "number",
+            "description": "«N хоног үлдлээ»; 0 on the day itself"
+          },
+          "amountDue": {
+            "type": "string",
+            "example": "1284600.00",
+            "description": "«Төлөх дүн»: everything due by the day (the positive balance)"
+          },
+          "overdueAmount": {
+            "type": "string",
+            "description": "The part of amountDue already overdue (shown in red)"
+          }
+        },
+        "required": [
+          "group",
+          "periodFrom",
+          "periodTo",
+          "dueDate",
+          "daysLeft",
+          "amountDue",
+          "overdueAmount"
+        ]
+      },
       "CustomerAppBalance": {
         "type": "object",
         "properties": {
@@ -44448,9 +45325,8 @@
             "type": "boolean",
             "description": "«Зээл хаалттай»; never its internal reason"
           },
-          "paymentTermDays": {
-            "type": "number",
-            "nullable": true
+          "settlement": {
+            "$ref": "#/components/schemas/CustomerAppSettlement"
           },
           "openInvoices": {
             "type": "number",
@@ -44468,7 +45344,7 @@
           "creditLimit",
           "creditAvailable",
           "creditHold",
-          "paymentTermDays",
+          "settlement",
           "openInvoices",
           "payments"
         ]

@@ -1,6 +1,6 @@
 {
-  "id": "264632a4-d667-47aa-9901-4ea71fc768cf",
-  "prevId": "3fb3110e-2c34-40b2-86e5-891966909424",
+  "id": "d65058b8-1224-4940-9437-a5802da7ff47",
+  "prevId": "54b92de4-def9-40b0-a141-bbbedf3adb3b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4479,11 +4479,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "payment_term_days": {
-          "name": "payment_term_days",
-          "type": "integer",
+        "settlement_group": {
+          "name": "settlement_group",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "credit_hold": {
           "name": "credit_hold",
@@ -4679,9 +4679,9 @@
           "name": "customers_credit_limit",
           "value": "\"customers\".\"credit_limit\" IS NULL OR \"customers\".\"credit_limit\" >= 0"
         },
-        "customers_payment_term": {
-          "name": "customers_payment_term",
-          "value": "\"customers\".\"payment_term_days\" IS NULL OR \"customers\".\"payment_term_days\" BETWEEN 0 AND 365"
+        "customers_settlement_group": {
+          "name": "customers_settlement_group",
+          "value": "\"customers\".\"settlement_group\" IN ('DAY_20', 'MONTH_END')"
         },
         "customers_credit_hold_reason": {
           "name": "customers_credit_hold_reason",

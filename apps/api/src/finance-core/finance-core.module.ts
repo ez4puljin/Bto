@@ -11,6 +11,7 @@ import { FinJournalPosting } from './posting/journal-posting.service';
 import { FinJournalReader } from './posting/journal-reader.service';
 import { FinConfig } from './config/fin-config.service';
 import { FinReader } from './posting/fin-reader.service';
+import { FinReports } from './posting/report-reader.service';
 import { FinIntakeInTx } from './posting/intake.service';
 
 /** Refuses to start a production process in which the test StaticCaller was loaded (ADR-0084 #4). */
@@ -24,7 +25,7 @@ class FinBootGuard implements OnApplicationBootstrap {
 /**
  * The Finance Core (ADR-0069): its own database handle, the organisation (P1) — companies and
  * parties behind `FinCallContext` —, the ledger (F1, ADR-0089) — the chart, rules, money accounts,
- * the journal's posting façade and reads, and since F5 the month close (ADR-0102) — and the boot guard. It needs only the process's
+ * the journal's posting façade and reads, since F5 the month close (ADR-0102) and since F6 the reports (ADR-0105) — and the boot guard. It needs only the process's
  * `DB_POOL`, never a Bto module; F2 (ADR-0090) adds the intake, its reader and the configuration port.
  */
 @Module({
@@ -38,6 +39,7 @@ class FinBootGuard implements OnApplicationBootstrap {
     FinJournalReader,
     FinIntakeInTx,
     FinReader,
+    FinReports,
     FinConfig,
     FinBootGuard,
   ],
@@ -51,6 +53,7 @@ class FinBootGuard implements OnApplicationBootstrap {
     FinJournalReader,
     FinIntakeInTx,
     FinReader,
+    FinReports,
     FinConfig,
   ],
 })

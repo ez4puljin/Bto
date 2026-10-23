@@ -467,7 +467,7 @@ describe('sales rep order filters and map', () => {
         .set(bearer(admin))
         .send({
           creditLimit: null,
-          paymentTermDays: null,
+          settlementGroup: 'DAY_20',
           creditHold: hold,
           creditHoldReason: reason,
         })

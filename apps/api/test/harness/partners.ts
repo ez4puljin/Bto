@@ -28,7 +28,7 @@ export interface CustomerJson {
   creditLimit: string | null;
   creditHold: boolean;
   tinPending: boolean;
-  paymentTerm: { days: number | null; source: string };
+  settlementGroup: string;
   addresses: AddressJson[];
   contacts: { id: number; name: string | null; phone: string | null }[];
   [key: string]: unknown;
@@ -52,7 +52,7 @@ export function partnersApi(app: NestExpressApplication, token: string) {
         .post('/api/v1/customers')
         .set(auth)
         .set(idempotency())
-        .send({ kind: 'COMPANY', ...body });
+        .send({ kind: 'COMPANY', settlementGroup: 'DAY_20', ...body });
       if (res.status !== 201) {
         throw new Error(`customer create ${res.status}: ${JSON.stringify(res.body)}`);
       }

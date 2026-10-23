@@ -1,5 +1,13 @@
 # Module `finance` — contract
 
+**Status note (2026-10-23, settlement days, ADR-0101).** An invoice falls due on its customer's settlement day (`settlementDueDate(customer.settlementGroup, invoice date)`: «Мөрөн» the 20th for the 21st–20th, «Орон нутаг» the month's last day), cash sales too; posted invoices keep theirs. `CreditControlService` refuses HOLD and LIMIT only: an overdue amount never refuses (the OVERDUE reason, `credit.overdue_nets_credits` and the param `creditsOpen` are gone; `overdueAmount` / `oldestDueDate` stay in the 409). `CustomerDebtsService` binds partners' `CUSTOMER_DEBT_READER`: the overdue open amounts of a page of customers in one statement over `invoices.open_amount`, for the red reminders. `GET /customer-balances…` rows carry `settlementGroup`; the «Тооцоо» card shows «Тооцоо хийх өдөр» with «Төлөх дүн», and `/finance/customers` a group column with the overdue amount in red. The setting `credit.payment_term_days` is gone; the rules below that name it or OVERDUE describe the state before this note.
+
+**Status note (2026-10-23, F6 done, ADR-0105).** Reports:
+- «Санхүү → Гүйлгээ баланс» (`/finance/trial-balance`) and «НӨАТ-ын тайлан» (`/finance/vat`): on screen, in Excel and in print, behind `finance.read`.
+- The «Жил хаах» card on «Сарын хаалт» closes a year's income and expense into retained earnings 340101 on 31 December and reverts it (`finance.periods.close`).
+- `ReportsService` and `ReportsController` (`docs/modules/finance-core.md` §3.12).
+- The statements СТ-1…СТ-4 wait for the accountant (D17).
+
 **Status note (2026-10-23, F5 done, ADR-0102).** The month close and the opening:
 - «Санхүү → Сарын хаалт» (`PeriodsService`, `PeriodsController`) closes a month once it has ended, in order and with a clean core reconcile (`finance.periods.close`). It reopens the latest closed one with a reason (`finance.periods.reopen`). Both rights belong to ADMIN and ACCOUNTANT.
 - A closed month refuses every posting (`FIN_PERIOD_CLOSED`, 409).
@@ -106,6 +114,8 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `GET /customer-balances`, `GET /customer-balances/:customerId`, `GET /customer-balances/:customerId/ledger` [read] | balances largest first (`q`, `overdue`) with aging; one customer; the ledger with `balanceAfter` and `opening` |
 | `GET /finance/attention` [read] | overdue amount and customers, open amount and invoices (the home tile) |
 | `GET /finance-settings/numbering` [read], `PUT` [`finance.settings.manage`] | the four formats |
+| `GET /finance/reports/trial-balance?from&to[&all]`, `GET /finance/reports/trial-balance.xlsx`, `GET /finance/reports/vat?period`, `GET /finance/reports/vat.xlsx` [read] | the trial balance and the month's VAT (ADR-0105) |
+| `GET /finance/year-close/:year` [read], `POST /finance/year-close/:year`, `POST /finance/year-close/:year/revert` [`finance.periods.close`, idempotent] | what the year still has to close, its closing and the revert (`FIN_PERIOD_NOT_ENDED`, `FIN_PERIOD_CLOSED` 409; `FIN_CLASS_RULE` YEAR_CLOSED / NOTHING_TO_CLOSE / YEAR_NOT_CLOSED 422) |
 | `GET /finance/periods`, `GET /finance/periods/events` [read], `POST /finance/periods/:code/close` [`finance.periods.close`], `POST /finance/periods/:code/reopen` [`finance.periods.reopen`] (idempotent) | the months with their status and last event; every close and reopen; close a month that has ended (`FIN_PERIOD_NOT_ENDED`, `FIN_PERIOD_ORDER`, `FIN_CHECKLIST_FAILED`, all 409); reopen the latest closed month with `{reason}` (a blank one 422 `FIN_PAYLOAD_INVALID`) (ADR-0102) |
 
 Money is serialised with two decimals (`'10000.00'`), quantities as entered (`'10'`), instants in ISO 8601, business dates as `YYYY-MM-DD`.

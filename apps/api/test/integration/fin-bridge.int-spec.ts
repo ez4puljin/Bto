@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(30);
+    expect(keys).toHaveLength(31);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -150,6 +150,7 @@ describe('fin-bridge', () => {
       const created = await customers.create(systemActor('import:test'), {
         kind: 'INDIVIDUAL',
         name: 'Болд',
+        settlementGroup: 'MONTH_END',
       });
       expect(await partyOf(created.id)).toMatchObject({
         kind: 'INDIVIDUAL',
@@ -314,7 +315,7 @@ describe('fin-bridge', () => {
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('BTO.SUPPLIER_BILL',
            'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN',
-           'BTO.STOCK_VALUE', 'FIN.OPENING')`,
+           'BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE')`,
       );
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
@@ -365,7 +366,7 @@ describe('fin-bridge', () => {
            '730201', '730202', '730203', '730204', '730205', '730209')`,
       );
       await admin.query(
-        `DELETE FROM fin.document_types WHERE code IN ('BTO.STOCK_VALUE', 'FIN.OPENING')`,
+        `DELETE FROM fin.document_types WHERE code IN ('BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE')`,
       );
       await admin.query(`DELETE FROM fin.number_series WHERE code = 'STOCK'`);
       await admin.query('SET LOCAL session_replication_role = origin');
@@ -392,8 +393,10 @@ describe('fin-bridge', () => {
       .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
     await admin.query('BEGIN');
     try {
-      // A database of before F5: no opening document type.
-      await admin.query(`DELETE FROM fin.document_types WHERE code = 'FIN.OPENING'`);
+      // A database of before F5: no opening (nor year close) document type.
+      await admin.query(
+        `DELETE FROM fin.document_types WHERE code IN ('FIN.OPENING', 'FIN.YEAR_CLOSE')`,
+      );
       expect(await count('fin.document_types')).toBe(13);
       for (const statement of statements) await admin.query(statement);
       expect(
@@ -404,6 +407,36 @@ describe('fin-bridge', () => {
       // Twice is harmless.
       for (const statement of statements) await admin.query(statement);
       expect(await count('fin.document_types')).toBe(14);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it('replays the year close configuration (0044_fin_year_close data section)', async () => {
+    const file = join(__dirname, '../../src/db/migrations/0044_fin_year_close.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(
+        text.indexOf('-- fin_year_close:data:begin'),
+        text.indexOf('-- fin_year_close:data:end'),
+      )
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    await admin.query('BEGIN');
+    try {
+      // A database of before F6: no retained earnings, no year close type.
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(`DELETE FROM fin.posting_rules WHERE posting_key = 'RETAINED_EARNINGS'`);
+      await admin.query(`DELETE FROM fin.posting_keys WHERE code = 'RETAINED_EARNINGS'`);
+      await admin.query(`DELETE FROM fin.accounts WHERE code = '340101'`);
+      await admin.query(`DELETE FROM fin.document_types WHERE code = 'FIN.YEAR_CLOSE'`);
+      await admin.query('SET LOCAL session_replication_role = origin');
+      for (const statement of statements) await admin.query(statement);
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.accounts WHERE code = '340101' AND kind = 'EQUITY'`)).toBe(1);
+      expect(await count(`fin.posting_rules WHERE posting_key = 'RETAINED_EARNINGS'`)).toBe(1);
+      expect(await count(`fin.document_types WHERE code = 'FIN.YEAR_CLOSE'`)).toBe(1);
     } finally {
       await admin.query('ROLLBACK');
     }

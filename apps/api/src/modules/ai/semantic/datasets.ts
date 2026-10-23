@@ -269,7 +269,11 @@ export const AI_DATASETS: readonly AiDataset[] = [
       col('vat_payer', 'boolean'),
       col('city_payer', 'boolean'),
       col('credit_limit', 'numeric', 'MNT; NULL = not decided yet'),
-      col('payment_term_days', 'integer', 'NULL = the company-wide term'),
+      col(
+        'settlement_group',
+        'text',
+        "'DAY_20' (Мөрөн: purchases of the 21st–20th due on the 20th) or 'MONTH_END' (Орон нутаг: due on the month's last day)",
+      ),
       col('credit_hold', 'boolean', 'credit sales stopped'),
       col('credit_hold_reason', 'text'),
       col('status', 'text', "'ACTIVE' or 'INACTIVE'"),

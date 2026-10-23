@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { settlementPeriodOf } from '@tugeel/shared/finance';
 import { addDays, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
@@ -31,6 +32,9 @@ describe('customer app account (ADR-0079)', () => {
   let soonInvoiceId: number;
   let otherInvoiceId: number;
   const today = businessDate();
+  /** The stores are «Мөрөн» (DAY_20, the harness's group): their invoices fall due on the 20th. */
+  const period = settlementPeriodOf('DAY_20', today);
+  const daysLeft = Math.round((Date.parse(period.dueDate) - Date.parse(today)) / 86_400_000);
   const http = () => request(app.getHttpServer());
 
   /** An app order of `target`, confirmed, picked and sold by the office: its invoice id. */
@@ -71,6 +75,11 @@ describe('customer app account (ADR-0079)', () => {
     invoiceId = await sold(store, '4');
     soonInvoiceId = await sold(store, '1');
     otherInvoiceId = await sold(other, '1');
+    // The other store's invoice far from the reminders' days, whatever today's date.
+    await sql.query('UPDATE invoices SET due_date = $2::date WHERE id = $1', [
+      otherInvoiceId,
+      addDays(today, 30),
+    ]);
   });
   afterAll(async () => {
     await sql.end();
@@ -86,10 +95,21 @@ describe('customer app account (ADR-0079)', () => {
       creditLimit: null,
       creditAvailable: null,
       creditHold: false,
-      paymentTermDays: 30,
+      settlement: {
+        group: 'DAY_20',
+        periodFrom: period.from,
+        periodTo: period.to,
+        dueDate: period.dueDate,
+        daysLeft,
+        amountDue: '12500.00',
+        overdueAmount: '0.00',
+      },
       openInvoices: 2,
       payments: 0,
     });
+    const me = (await store.api.get('/me').expect(200)).body as Record<string, unknown>;
+    expect(me).toMatchObject({ settlementGroup: 'DAY_20' });
+    expect(me).not.toHaveProperty('paymentTermDays');
     const open = (await store.api.get('/invoices').expect(200)).body as {
       id: number;
       total: string;
@@ -97,8 +117,8 @@ describe('customer app account (ADR-0079)', () => {
       daysOverdue: number;
     }[];
     expect(open).toEqual([
-      expect.objectContaining({ id: invoiceId, total: '10000.00', daysLeft: 30, daysOverdue: 0 }),
-      expect.objectContaining({ id: soonInvoiceId, total: '2500.00', daysLeft: 30 }),
+      expect.objectContaining({ id: invoiceId, total: '10000.00', daysLeft, daysOverdue: 0 }),
+      expect.objectContaining({ id: soonInvoiceId, total: '2500.00', daysLeft }),
     ]);
     const invoice = (await store.api.get(`/invoices/${invoiceId}`).expect(200)).body as Record<
       string,
@@ -116,7 +136,7 @@ describe('customer app account (ADR-0079)', () => {
       .set(bearer(accountant))
       .send({
         creditLimit: '20000',
-        paymentTermDays: null,
+        settlementGroup: 'DAY_20',
         creditHold: true,
         creditHoldReason: 'Дотоод нууц тайлбар',
       })
@@ -136,7 +156,12 @@ describe('customer app account (ADR-0079)', () => {
     await http()
       .put(`/api/v1/customers/${store.customerId}/credit`)
       .set(bearer(accountant))
-      .send({ creditLimit: null, paymentTermDays: null, creditHold: false, creditHoldReason: null })
+      .send({
+        creditLimit: null,
+        settlementGroup: 'DAY_20',
+        creditHold: false,
+        creditHoldReason: null,
+      })
       .expect(200);
   });
 
@@ -149,6 +174,8 @@ describe('customer app account (ADR-0079)', () => {
     expect(account).toMatchObject({
       overdueAmount: '10000.00',
       oldestOverdueDate: addDays(today, -2),
+      // Everything due by the settlement day, the overdue part within it (ADR-0101 #6).
+      settlement: expect.objectContaining({ amountDue: '12500.00', overdueAmount: '10000.00' }),
     });
     const open = (await store.api.get('/invoices').expect(200)).body as { daysOverdue: number }[];
     expect(open[0]?.daysOverdue).toBe(2);
@@ -158,7 +185,7 @@ describe('customer app account (ADR-0079)', () => {
 
   it('reminds of invoices due soon and overdue once each, at its own store only', async () => {
     const soon = soonInvoiceId;
-    // Sold today with the 30-day term; brought forward to two days from now.
+    // Sold today, due on the settlement day; brought to two days from now.
     await sql.query('UPDATE invoices SET due_date = $2::date WHERE id = $1', [
       soon,
       addDays(today, 2),

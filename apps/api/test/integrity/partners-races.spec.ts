@@ -37,10 +37,19 @@ describe('integrity: partners concurrency', () => {
   });
 
   it('gives parallel creations without a code distinct next codes', async () => {
-    await customers.create(actor, { code: '41', kind: 'COMPANY', name: 'Эхний' });
+    await customers.create(actor, {
+      code: '41',
+      kind: 'COMPANY',
+      name: 'Эхний',
+      settlementGroup: 'DAY_20',
+    });
     const created = await Promise.all(
       Array.from({ length: 4 }, (_, index) =>
-        customers.create(actor, { kind: 'COMPANY', name: `Зэрэг ${index}` }),
+        customers.create(actor, {
+          kind: 'COMPANY',
+          name: `Зэрэг ${index}`,
+          settlementGroup: 'DAY_20',
+        }),
       ),
     );
     expect(created.map((row) => row.code).sort()).toEqual(['42', '43', '44', '45']);
@@ -50,6 +59,7 @@ describe('integrity: partners concurrency', () => {
     const shop = await customers.create(actor, {
       kind: 'COMPANY',
       name: 'Хоёр хаяг',
+      settlementGroup: 'DAY_20',
       address: { address: 'Нэг' },
     });
     const second = await addresses.add(actor, shop.id, { address: 'Хоёр' });
@@ -66,7 +76,11 @@ describe('integrity: partners concurrency', () => {
   });
 
   it('serialises credit decisions without blocking rows that reference the customer', async () => {
-    const shop = await customers.create(actor, { kind: 'COMPANY', name: 'Зээлийн түгжээ' });
+    const shop = await customers.create(actor, {
+      kind: 'COMPANY',
+      name: 'Зээлийн түгжээ',
+      settlementGroup: 'DAY_20',
+    });
     let release: () => void = () => undefined;
     const held = new Promise<void>((resolve) => {
       release = resolve;

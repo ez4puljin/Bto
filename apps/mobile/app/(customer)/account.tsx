@@ -97,7 +97,8 @@ export default function AccountScreen() {
         })
       : t('mobile.customer.account.overdue', { amount: money(overdue.amount) })
     : null;
-  const termDays = account?.paymentTermDays ?? null;
+  // «Тооцоо хийх өдөр» (ADR-0101); the board's full card comes with the app's own session.
+  const settlement = account?.settlement ?? null;
   // The owner (2026-10-20): the copied invoice number must go in the transfer's description.
   const advice = t('mobile.customer.account.adviceMust');
   const adviceStrong = t('mobile.customer.account.adviceMustStrong');
@@ -160,7 +161,7 @@ export default function AccountScreen() {
                   </View>
                 </View>
               ) : null}
-              {account.creditHold || termDays !== null ? (
+              {account.creditHold || settlement !== null ? (
                 <View style={styles.cardRows}>
                   {account.creditHold ? (
                     <>
@@ -173,7 +174,7 @@ export default function AccountScreen() {
                       </View>
                     </>
                   ) : null}
-                  {termDays !== null ? (
+                  {settlement !== null ? (
                     <>
                       <Separator />
                       <View style={styles.cardRow}>
@@ -181,7 +182,10 @@ export default function AccountScreen() {
                           {t('mobile.customer.account.term')}
                         </Text>
                         <Text style={type.row}>
-                          {t('mobile.customer.account.termDays', { n: termDays })}
+                          {t('mobile.customer.account.settleDay', {
+                            date: monthDay(settlement.dueDate),
+                            amount: money(settlement.amountDue),
+                          })}
                         </Text>
                       </View>
                     </>

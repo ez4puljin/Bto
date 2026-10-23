@@ -25,7 +25,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
-import { SalesOrderFiltersQueryDto } from './sales-boards.dto';
+import { SalesCustomerOverdueDto, SalesOrderFiltersQueryDto } from './sales-boards.dto';
 
 /** Up to 11 whole digits and 3 decimals, as the quantity columns hold. */
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -284,6 +284,12 @@ export class SalesOrderDetailDto {
   @ApiProperty() customerId: number;
   @ApiProperty() customerCode: string;
   @ApiProperty() customerName: string;
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+  })
+  customerOverdue: SalesCustomerOverdueDto | null;
   @ApiProperty({ enum: FULFILMENTS }) fulfilment: Fulfilment;
   @ApiProperty({ format: 'date' }) deliveryDate: string;
   @ApiProperty({ type: Number, nullable: true }) addressId: number | null;
@@ -331,6 +337,12 @@ export class SalesOrderSummaryDto {
   @ApiProperty() customerId: number;
   @ApiProperty() customerCode: string;
   @ApiProperty() customerName: string;
+  @ApiProperty({
+    type: SalesCustomerOverdueDto,
+    nullable: true,
+    description: "The customer's overdue receivable: a red reminder, never a block (ADR-0101)",
+  })
+  customerOverdue: SalesCustomerOverdueDto | null;
   @ApiProperty({ enum: FULFILMENTS }) fulfilment: Fulfilment;
   @ApiProperty({ enum: PAYMENT_METHODS }) paymentMethod: PaymentMethod;
   @ApiProperty({ format: 'date' }) deliveryDate: string;

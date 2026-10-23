@@ -51,7 +51,8 @@ const summary = (
   cityPayer: false,
   taxStatusSource: null,
   creditLimit: null,
-  paymentTerm: { days: null, source: 'UNSET' },
+  settlementGroup: 'DAY_20',
+  overdue: null,
   creditHoldReason: null,
   note: null,
   gps: overrides.hasGps === false ? null : POINT,
@@ -122,8 +123,7 @@ const CUSTOMER: Schemas['CustomerDetail'] = {
   taxStatusSource: 'MANUAL',
   taxStatusCheckedAt: STAMP,
   creditLimit: null,
-  paymentTermDays: null,
-  paymentTerm: { days: 30, source: 'DEFAULT' },
+  settlementGroup: 'DAY_20',
   creditHoldReason: null,
   note: null,
   createdAt: STAMP,
@@ -252,7 +252,8 @@ describe('customers list', () => {
             vatPayer: true,
             taxStatusSource: 'MANUAL',
             creditLimit: '5000000.00',
-            paymentTerm: { days: 30, source: 'CUSTOMER' },
+            settlementGroup: 'MONTH_END',
+            overdue: { amount: '120000', oldestDueDate: '2026-09-30' },
             creditHold: true,
             creditHoldReason: 'Өр төлөөгүй',
             note: 'Өглөө хүргэнэ',
@@ -278,6 +279,7 @@ describe('customers list', () => {
       columns.kind,
       columns.tin,
       columns.phone,
+      columns.overdue,
       columns.creditHold,
       columns.status,
     ];
@@ -300,7 +302,10 @@ describe('customers list', () => {
       'Бат',
       '8811 2233',
       '5,000,000₮',
-      '30 хоног',
+      // The overdue debt in red (ADR-0101) and the settlement groups.
+      '120,000₮',
+      mn.partners.settlement.groups.MONTH_END,
+      mn.partners.settlement.groups.DAY_20,
       mn.partners.credit.held,
       mn.partners.credit.limitUndecided,
       'Өглөө хүргэнэ',
@@ -436,6 +441,9 @@ describe('customer create', () => {
     await user.type(screen.getByLabelText(mn.partners.addresses.address), 'СБД, 1-р хороо');
     await user.click(screen.getByLabelText(mn.partners.addresses.gps));
     await user.paste(MAPS_LINK);
+    // The settlement group has no default (owner 2026-10-23, ADR-0101).
+    const group = screen.getByLabelText(mn.partners.settlement.group);
+    expect(group).toHaveValue('');
     expect(screen.getByText('47.918412, 106.917712')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: mn.partners.addresses.openMap })).toHaveAttribute(
       'href',
@@ -444,9 +452,11 @@ describe('customer create', () => {
 
     await user.click(screen.getByRole('button', { name: mn.common.save }));
     expect(await screen.findByText(mn.validation.tinCompany)).toBeInTheDocument();
+    expect(screen.getByText(mn.validation.required)).toBeInTheDocument();
     expect(posted).toEqual([]);
     await user.clear(tin);
     await user.type(tin, '123 456 789 01');
+    await user.selectOptions(group, 'MONTH_END');
     await user.click(screen.getByRole('button', { name: mn.common.save }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/partners/customers/10'));
@@ -460,6 +470,7 @@ describe('customer create', () => {
       consumerNo: null,
       phone: '9911 2233',
       note: null,
+      settlementGroup: 'MONTH_END',
       address: {
         address: 'СБД, 1-р хороо',
         lat: '47.918412',
@@ -486,6 +497,7 @@ describe('customer create', () => {
     await user.clear(code);
     await user.type(code, '1001');
     await user.type(screen.getByLabelText(mn.partners.customer.name), 'Тэмүүжин ХХК');
+    await user.selectOptions(screen.getByLabelText(mn.partners.settlement.group), 'DAY_20');
     await user.click(screen.getByRole('button', { name: mn.common.save }));
     expect(await screen.findByText(mn.validation.codeTaken)).toBeInTheDocument();
     expect(screen.queryByText(mn.errors.DUPLICATE_VALUE)).toBeNull();
@@ -543,9 +555,8 @@ describe('customer page', () => {
     ).toBeNull();
     expect(screen.queryByLabelText(mn.partners.credit.limit)).toBeNull();
     expect(screen.getByText(mn.partners.credit.limitUndecided)).toBeInTheDocument();
-    expect(
-      screen.getByText(mn.partners.credit.termDefault.replace('{{days}}', '30')),
-    ).toBeInTheDocument();
+    expect(screen.getByText(mn.partners.settlement.groups.DAY_20)).toBeInTheDocument();
+    expect(screen.getByText(mn.partners.settlement.rules.DAY_20)).toBeInTheDocument();
     expect(screen.getByText(mn.partners.credit.readOnly)).toBeInTheDocument();
 
     const shop = within(screen.getByRole('region', { name: 'Дэлгүүр' }));
@@ -560,7 +571,7 @@ describe('customer page', () => {
     expect(screen.getByText('8811 2233')).toBeInTheDocument();
   });
 
-  it('lets an accountant set the limit, the term and a hold', async () => {
+  it('lets an accountant set the limit, the settlement group and a hold', async () => {
     let current = CUSTOMER;
     let put: unknown;
     renderApp(
@@ -572,8 +583,7 @@ describe('customer page', () => {
           current = {
             ...CUSTOMER,
             creditLimit: '5000000.00',
-            paymentTermDays: 45,
-            paymentTerm: { days: 45, source: 'CUSTOMER' },
+            settlementGroup: 'MONTH_END',
             creditHold: true,
             creditHoldReason: 'Хугацаа хэтэрсэн',
             updatedAt: LATER,
@@ -589,7 +599,9 @@ describe('customer page', () => {
     expect(limit).toHaveValue('');
     expect(screen.queryByLabelText(mn.partners.credit.holdReason)).toBeNull();
     await user.type(limit, '5,000,000');
-    await user.type(screen.getByLabelText(mn.partners.credit.term), '45');
+    const group = screen.getByLabelText(mn.partners.settlement.group);
+    expect(group).toHaveValue('DAY_20');
+    await user.selectOptions(group, 'MONTH_END');
     await user.click(screen.getByRole('switch', { name: mn.partners.credit.hold }));
     await user.type(screen.getByLabelText(mn.partners.credit.holdReason), 'Хугацаа хэтэрсэн');
     const card = within(limit.closest<HTMLElement>('form') ?? document.body);
@@ -598,7 +610,7 @@ describe('customer page', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(mn.common.saved);
     expect(put).toEqual({
       creditLimit: '5000000',
-      paymentTermDays: 45,
+      settlementGroup: 'MONTH_END',
       creditHold: true,
       creditHoldReason: 'Хугацаа хэтэрсэн',
     });
@@ -606,6 +618,7 @@ describe('customer page', () => {
     const credit = within(screen.getByRole('region', { name: mn.partners.credit.title }));
     expect(await credit.findByText('5,000,000₮')).toBeInTheDocument();
     expect(credit.getByText('Хугацаа хэтэрсэн')).toBeInTheDocument();
+    expect(credit.getByText(mn.partners.settlement.groups.MONTH_END)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: edit })).toBeInTheDocument();
     expect(screen.getAllByText(mn.partners.credit.held).length).toBeGreaterThan(0);
   });

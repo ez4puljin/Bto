@@ -26,6 +26,7 @@ const store = (over: Partial<MapStore>): MapStore => ({
   phone: null,
   creditHold: false,
   creditHoldReason: null,
+  overdue: null,
   addressId: 1,
   address: null,
   lat: '49.639810',

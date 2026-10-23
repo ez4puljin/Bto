@@ -1,3 +1,4 @@
+import { SETTLEMENT_GROUPS, type SettlementGroup } from '@tugeel/shared/finance';
 import { parseCoordinates } from '@tugeel/shared/geo';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import {
@@ -71,6 +72,11 @@ const phoneField = text(30).refine(
 // ---------------------------------------------------------------------------------------------
 // Customers
 
+/** The settlement group select (ADR-0101): required, with no default (owner 2026-10-23). */
+const settlementGroupField = z
+  .union([z.literal(''), z.enum(SETTLEMENT_GROUPS)])
+  .refine((value: string) => value.length > 0, 'validation.required');
+
 const customerBase = z.object({
   code: z.string().trim().regex(CODE, 'validation.numericCode'),
   kind: z.enum(CUSTOMER_KINDS),
@@ -83,6 +89,8 @@ const customerBase = z.object({
   cityPayer: z.boolean(),
   note: text(1000),
   status: z.enum(PARTNER_STATUSES),
+  /** Create only: chosen by the office; later changed on the credit card (ADR-0101 #8). */
+  settlementGroup: settlementGroupField,
   /** Create only: the first delivery address. */
   address: text(300),
   gps: gpsField,
@@ -122,6 +130,7 @@ export function emptyCustomer(code: string): CustomerFormValues {
     cityPayer: false,
     note: '',
     status: 'ACTIVE',
+    settlementGroup: '',
     address: '',
     gps: '',
     addressNote: '',
@@ -141,6 +150,7 @@ export function customerValues(customer: CustomerDetail): CustomerFormValues {
     cityPayer: customer.cityPayer,
     note: customer.note ?? '',
     status: customer.status,
+    settlementGroup: customer.settlementGroup,
     address: '',
     gps: '',
     addressNote: '',
@@ -171,6 +181,8 @@ export function customerCreateBody(
     kind: values.kind,
     ...(values.code === suggestedCode ? {} : { code: values.code }),
     ...identifiers(values),
+    // The schema refuses an empty group before a body is built.
+    settlementGroup: values.settlementGroup as SettlementGroup,
     ...(payerTicked ? { vatPayer: values.vatPayer, cityPayer: values.cityPayer } : {}),
     ...(hasAddress
       ? {
@@ -208,13 +220,7 @@ export const creditSchema = z.object({
     .string()
     .trim()
     .refine((value) => value === '' || MONEY.test(value.replace(/[\s,]/g, '')), 'validation.money'),
-  paymentTermDays: z
-    .string()
-    .trim()
-    .refine(
-      (value) => value === '' || (DAYS.test(value) && Number.parseInt(value, 10) <= 365),
-      'validation.days',
-    ),
+  settlementGroup: z.enum(SETTLEMENT_GROUPS),
   creditHold: z.boolean(),
   creditHoldReason: text(300),
 });
@@ -223,7 +229,7 @@ export type CreditFormValues = z.infer<typeof creditSchema>;
 export function creditValues(customer: CustomerDetail): CreditFormValues {
   return {
     creditLimit: customer.creditLimit === null ? '' : plainDecimal(customer.creditLimit),
-    paymentTermDays: customer.paymentTermDays === null ? '' : String(customer.paymentTermDays),
+    settlementGroup: customer.settlementGroup,
     creditHold: customer.creditHold,
     creditHoldReason: customer.creditHoldReason ?? '',
   };
@@ -232,8 +238,7 @@ export function creditValues(customer: CustomerDetail): CreditFormValues {
 export function creditBody(values: CreditFormValues): CustomerCredit {
   return {
     creditLimit: orNull(values.creditLimit.replace(/[\s,]/g, '')),
-    paymentTermDays:
-      values.paymentTermDays === '' ? null : Number.parseInt(values.paymentTermDays, 10),
+    settlementGroup: values.settlementGroup,
     creditHold: values.creditHold,
     creditHoldReason: values.creditHold ? orNull(values.creditHoldReason) : null,
   };

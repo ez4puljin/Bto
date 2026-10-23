@@ -97,7 +97,7 @@ Every auth response carries `Cache-Control: no-store`; request bodies are JSON o
 | `company.vat_payer`, `company.city_tax_payer` | boolean | none |
 | `auth.staff_session_hours` | integer 1–168 | 12 |
 | `auth.customer_session_days` | integer 1–365 | 90: a customer app session ends at sign-out or after this many days without use (ADR-0079 #3) |
-| `credit.payment_term_days` | integer 0–365 | none: the one payment term for every customer, the number of days comes from the accountant (SPEC §11 #20); a customer may override it (`docs/modules/partners.md`) |
+| ~~`credit.payment_term_days`~~ | — | removed 2026-10-23 with `credit.overdue_nets_credits` (ADR-0101): the customers' settlement groups set the due dates; old rows stay as history and the settings list ignores them |
 | `bto.company_code` | code (`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$`), **locked** | `BO`: the Finance Core company this installation books into (ADR-0070 #2, ADR-0084 #3). A locked key is fixed at installation: `POST /settings` answers 409 `SETTING_NOT_EDITABLE` and «Тохиргоо» shows it read-only |
 
 Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; nothing else (the screen renders every key; an integer key shows its own min–max range as the error message).
