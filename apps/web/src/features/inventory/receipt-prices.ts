@@ -8,6 +8,7 @@ import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
 import {
   type ReceiptDetail,
+  type ReceiptDiscountRequest,
   type ReceiptLine,
   useInventoryMutations,
   usePendingReceipts,
@@ -16,8 +17,8 @@ import { type CostEntry, entryAmount, parseMoney } from './helpers';
 
 /*
  * A receipt's delivery-note prices (ADR-0033, ADR-0078, ADR-0099): typed on the receipt itself by
- * holders of inventory.costs.manage, VAT included as on the note, with the note's discount; the
- * server spreads the discount and takes the VAT out. On a draft each line is saved from the line
+ * holders of inventory.costs.manage, VAT included as on the note, with the receipt's discounts
+ * (ADR-0101); the server spreads them and takes the VAT out. On a draft each line is saved from the line
  * panel; on a posted receipt the whole costing is saved at once.
  */
 
@@ -61,40 +62,27 @@ export function focusNextPrice(
   else from.blur();
 }
 
-/** The delivery note's discount as typed (ADR-0099 #4): a percentage or an amount. */
-export interface DiscountEntry {
-  kind: 'pct' | 'amount';
-  value: string;
+/** A discount as the card holds it: a saved one keeps its id and tugriks (ADR-0101). */
+export interface DiscountDraft extends ReceiptDiscountRequest {
+  id?: number;
+  total?: string | null;
 }
 
-/** A receipt's discount for its field; a percentage field when it has none. */
-export function discountEntryOf(
-  detail: Pick<ReceiptDetail, 'discountPct' | 'discountAmount'> | null,
-): DiscountEntry {
-  if (detail?.discountAmount) return { kind: 'amount', value: plain(detail.discountAmount) };
-  if (detail?.discountPct) return { kind: 'pct', value: plain(detail.discountPct) };
-  return { kind: 'pct', value: '' };
+/** A discount as the API takes it. */
+export const toDiscountRequest = (discount: DiscountDraft): ReceiptDiscountRequest => ({
+  kind: discount.kind,
+  pct: discount.pct ?? null,
+  amount: discount.amount ?? null,
+  lineIds: discount.kind === 'LINES' ? (discount.lineIds ?? []) : [],
+});
+
+/** A receipt's discounts as the card holds them (ADR-0101). */
+export function discountsOf(detail: Pick<ReceiptDetail, 'discounts'> | null): DiscountDraft[] {
+  return (detail?.discounts ?? []).map((discount) => ({ ...discount }));
 }
 
-/**
- * The discount keys of a request: the typed one, the other cleared; an empty field clears both
- * (nothing at all on a new receipt). A malformed value goes as typed, for the server's refusal.
- */
-export function discountRequest(
-  entry: DiscountEntry,
-  create: boolean,
-): { discountPct?: string | null; discountAmount?: string | null } {
-  const value = entry.value.trim().replace(',', '.');
-  if (value === '') return create ? {} : { discountPct: null, discountAmount: null };
-  const typed = entry.kind === 'amount' ? (parseMoney(value) ?? value) : value;
-  if (create) return entry.kind === 'pct' ? { discountPct: typed } : { discountAmount: typed };
-  return entry.kind === 'pct'
-    ? { discountPct: typed, discountAmount: null }
-    : { discountPct: null, discountAmount: typed };
-}
-
-const sameDiscount = (a: DiscountEntry, b: DiscountEntry) =>
-  a.value.trim() === b.value.trim() && (a.value.trim() === '' || a.kind === b.kind);
+const discountsKey = (discounts: readonly DiscountDraft[]) =>
+  JSON.stringify(discounts.map(toDiscountRequest));
 
 /** Whether a posted receipt's costs may still be changed (PENDING, or until `recostUntil`). */
 export function costsChangeable(detail: ReceiptDetail): boolean {
@@ -128,12 +116,12 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const [saved, setSaved] = useState(false);
   const [key, setKey] = useState(randomUuid);
   const [goTo, setGoTo] = useState<number | null>(null);
-  const savedDiscount = discountEntryOf(detail);
-  const [discount, setDiscount] = useState<DiscountEntry>(savedDiscount);
+  const savedDiscounts = discountsOf(detail);
+  const [discounts, setDiscounts] = useState<DiscountDraft[]>(savedDiscounts);
   if (shownStamp !== stamp) {
     setShownStamp(stamp);
     setEntries({});
-    setDiscount(savedDiscount);
+    setDiscounts(savedDiscounts);
     setSaved(false);
   }
 
@@ -141,7 +129,7 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   const amounts = detail.lines.map((line) => entryAmount(entry(line.id), line.enteredQty));
   const complete = detail.lines.length > 0 && amounts.every((amount) => amount !== null);
   const total = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
-  const discountChanged = !sameDiscount(discount, savedDiscount);
+  const discountChanged = discountsKey(discounts) !== discountsKey(savedDiscounts);
   const dirty =
     discountChanged ||
     detail.lines.some((line) => !sameEntry(entry(line.id), initial[line.id] ?? EMPTY_ENTRY));
@@ -167,7 +155,7 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
         key,
         body: {
           costingVersion: detail.costingVersion,
-          ...(discountChanged ? discountRequest(discount, false) : {}),
+          ...(discountChanged ? { discounts: discounts.map(toDiscountRequest) } : {}),
           lines: detail.lines.map((line) => {
             const value = entry(line.id);
             if (value.free) return { lineId: line.id, freeGoods: true };
@@ -190,8 +178,8 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
   return {
     entry,
     change,
-    discount,
-    changeDiscount: setDiscount,
+    discounts,
+    changeDiscounts: setDiscounts,
     complete,
     dirty,
     saved,

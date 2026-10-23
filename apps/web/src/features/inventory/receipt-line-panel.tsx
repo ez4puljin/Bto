@@ -3,20 +3,19 @@ import { Decimal } from '@tugeel/shared/money';
 import { Popover } from 'radix-ui';
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { useBarcodeLookup, useProductLookup } from '@/features/catalog/api';
 import { useCurrentPricesOf } from '@/features/pricing/api';
 import { formatMnt, formatQty } from '@/lib/money';
-import { problemFromError } from '@/lib/problem';
+import { problemFromError, unwrap } from '@/lib/problem';
 import { useScanGuard, useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
 import { useDebounced } from '@/lib/use-debounced';
-import { cn } from '@/lib/utils';
 import {
   type ReceiptLine,
   useLastReceiptPrices,
@@ -45,6 +44,8 @@ export interface PanelProduct {
   sku: string;
   name: string;
   units: { id: number; uomName: string; factorToBase: string; isBase: boolean }[];
+  /** Net weight of one base unit in kg; null when unknown. */
+  weightKg: string | null;
 }
 
 /** What the panel hands over when a line is added or saved. */
@@ -74,6 +75,7 @@ function productOfLine(line: ReceiptLine): PanelProduct {
         isBase: new Decimal(line.factorSnapshot).equals(1),
       },
     ],
+    weightKg: line.weightKg,
   };
 }
 
@@ -91,12 +93,20 @@ function parseWhole(text: string): string | null {
  * delivery note's price for cost holders and a new sale price per piece for price holders; Enter
  * moves to the next field and adds the line from the last one. A product without a home warehouse
  * asks for the warehouse it goes into, which becomes its home. Under the fields: the home
- * warehouse and its stock, the last receipt price, the sale price and the markup. A line of the
- * table opens here for editing (its product and unit stay).
+ * warehouse and its stock, the weight, the last receipt price, the sale price and the markup. A
+ * line of the table opens here for editing (its product and unit stay). With a supplier chosen the
+ * search shows that supplier's products, or all products at a switch (ADR-0101). The `free`
+ * variant takes free goods: a product, its unit and the quantity, no prices and no scanner.
  */
 export function ReceiptLinePanel(props: {
   editing: ReceiptLine | null;
   pending: boolean;
+  /** The receipt's supplier: its products are searched first (ADR-0101). */
+  supplierId?: number;
+  /** Free goods (урамшуулал): no prices, no sale price, no page-wide scanner. */
+  free?: boolean;
+  /** Shown beside «Нэмэх» (the free goods' «Болих»). */
+  onClose?: () => void;
   /** A problem to show under the fields (a refused add). */
   problem?: ReactNode;
   onSubmit: (line: PanelLine) => Promise<boolean>;
@@ -104,8 +114,10 @@ export function ReceiptLinePanel(props: {
 }) {
   const { t } = useTranslation();
   const { editing } = props;
-  const canCost = useHasPermission('inventory.costs.manage');
-  const canPrice = useHasPermission('pricing.prices.manage');
+  const free = props.free === true;
+  const canCost = useHasPermission('inventory.costs.manage') && !free;
+  const canPrice = useHasPermission('pricing.prices.manage') && !free;
+  const api = useApiClient();
   const lookupBarcode = useBarcodeLookup();
   const warehouses = useWarehouseOptions(WHOLESALE);
   const warehouseName = useWarehouseName();
@@ -130,6 +142,8 @@ export function ReceiptLinePanel(props: {
   const [highlight, setHighlight] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [scope, setScope] = useState<'supplier' | 'all'>('supplier');
+  const bySupplier = scope === 'supplier' && props.supplierId !== undefined;
 
   // A line chosen in the table takes the panel over; leaving the edit empties it.
   if ((editing?.id ?? null) !== editingId) {
@@ -157,10 +171,18 @@ export function ReceiptLinePanel(props: {
 
   const typed = search.trim();
   const q = useDebounced(typed, 200);
-  const lookup = useProductLookup(product ? '' : q, LOOKUP_LIMIT);
-  const matches = typed && q === typed ? (lookup.data ?? []) : [];
+  const lookup = useProductLookup(
+    q,
+    LOOKUP_LIMIT,
+    bySupplier ? props.supplierId : undefined,
+    product === null,
+  );
+  // A supplier's products show as soon as the box has the cursor; a search once typed.
+  // An answer kept from an earlier text (placeholder data) is not this text's: Enter waits.
+  const settled = q === typed && (typed !== '' || bySupplier) && !lookup.isPlaceholderData;
+  const matches = settled ? (lookup.data ?? []) : [];
   const active = highlight < matches.length ? highlight : 0;
-  const nothing = typed !== '' && q === typed && !lookup.isFetching && matches.length === 0;
+  const nothing = settled && typed !== '' && !lookup.isFetching && matches.length === 0;
 
   const productId = product?.id ?? 0;
   const locations = useProductLocations(productId, product !== null);
@@ -218,7 +240,16 @@ export function ReceiptLinePanel(props: {
           return;
         }
         const base = resolved.product.baseUnit;
-        const units = [
+        // Every unit and the weight come from the lookup by code; the scanned unit is chosen.
+        const listed = (
+          await api
+            .GET('/api/v1/products/lookup', {
+              params: { query: { q: resolved.product.sku, limit: 5 } },
+            })
+            .then(unwrap)
+            .catch(() => [])
+        ).find((item) => item.id === resolved.product.id);
+        const units = listed?.units ?? [
           { ...resolved.unit },
           ...(resolved.unit.isBase
             ? []
@@ -233,6 +264,7 @@ export function ReceiptLinePanel(props: {
             sku: resolved.product.sku,
             name: resolved.product.name,
             units,
+            weightKg: listed?.weightKg ?? null,
           },
           resolved.unit.id,
         );
@@ -245,7 +277,7 @@ export function ReceiptLinePanel(props: {
       }
     })();
   };
-  useWedgeScanner(onScan, !editing, { letters: true, root });
+  useWedgeScanner(onScan, !editing && !free, { letters: true, root });
   const guard = useScanGuard(onScan, { letters: true });
 
   /** The fields Enter walks through, in order; the last one adds the line. */
@@ -324,17 +356,22 @@ export function ReceiptLinePanel(props: {
       product,
       productUnitId: unitId,
       enteredQty: qtyValue,
-      price: canCost ? entry : null,
+      price: free ? { ...START, free: true } : canCost ? entry : null,
       salePrice: canPrice ? (newSale ?? '') : null,
       ...(homeless && warehouseId !== undefined ? { warehouseId } : {}),
     });
     if (saved && !editing) reset();
   };
 
-  const field = (label: string, id: string, control: ReactNode, className?: string) => (
-    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
+  const field = (label: string, id: string, control: ReactNode, hint?: ReactNode) => (
+    <div className="flex min-w-0 flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       {control}
+      {hint ? (
+        <p id={`${id}-hint`} className="truncate text-xs text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
   const none = t('common.none');
@@ -343,10 +380,38 @@ export function ReceiptLinePanel(props: {
     <Card role="region" aria-labelledby={`${ids}-title`}>
       <CardHeader>
         <CardTitle id={`${ids}-title`}>
-          {editing ? t('inventory.receipt.panel.editTitle') : t('inventory.receipt.panel.title')}
+          {free
+            ? t('inventory.receipt.discounts.freeTitle')
+            : editing
+              ? t('inventory.receipt.panel.editTitle')
+              : t('inventory.receipt.panel.title')}
         </CardTitle>
       </CardHeader>
       <CardContent ref={root} className="flex flex-col gap-3">
+        {props.supplierId !== undefined && !product ? (
+          <div
+            role="radiogroup"
+            aria-label={t('inventory.receipt.panel.scope')}
+            className="inline-flex w-fit rounded-full border border-border p-0.5 text-[13px]"
+          >
+            {(['supplier', 'all'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={scope === value}
+                className="rounded-full px-3 py-1 font-medium text-muted-foreground aria-checked:bg-secondary aria-checked:text-secondary-foreground"
+                onClick={() => {
+                  setScope(value);
+                  setHighlight(0);
+                  searchRef.current?.focus();
+                }}
+              >
+                {t(`inventory.receipt.panel.scopes.${value}`)}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="grid gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,2.4fr)_minmax(7rem,1fr)_minmax(6rem,0.8fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
           {field(
             t('inventory.product'),
@@ -387,7 +452,11 @@ export function ReceiptLinePanel(props: {
                     id={`${ids}-product`}
                     type="search"
                     autoComplete="off"
-                    placeholder={t('inventory.productSearchPlaceholder')}
+                    placeholder={
+                      bySupplier
+                        ? t('inventory.receipt.panel.supplierSearch')
+                        : t('inventory.productSearchPlaceholder')
+                    }
                     aria-controls={open ? `${ids}-matches` : undefined}
                     aria-activedescendant={
                       open && matches.length > 0 ? `${ids}-match-${active}` : undefined
@@ -469,6 +538,9 @@ export function ReceiptLinePanel(props: {
                             <span className="min-w-0 flex-1 truncate">{match.name}</span>
                             <span className="shrink-0 text-[13px] text-muted-foreground">
                               {match.units.map((candidate) => candidate.uomName).join(' / ')}
+                              {match.weightKg
+                                ? ` · ${t('inventory.receipt.form.weight', { kg: formatQty(match.weightKg) })}`
+                                : null}
                             </span>
                           </li>
                         ))}
@@ -544,6 +616,13 @@ export function ReceiptLinePanel(props: {
                     if (!event.defaultPrevented) onEnter(event);
                   }}
                 />,
+                lastPrice
+                  ? t('inventory.receipt.panel.lastPriceHint', {
+                      price: formatMnt(lastPrice.unitPrice),
+                      unit: lastPrice.unitName,
+                      date: lastPrice.date,
+                    })
+                  : undefined,
               )
             : null}
           {canCost
@@ -595,16 +674,6 @@ export function ReceiptLinePanel(props: {
             : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {canCost ? (
-            <div className="flex items-center gap-2">
-              <Switch
-                id={`${ids}-free`}
-                checked={entry.free}
-                onCheckedChange={(checked) => setEntry({ ...START, free: checked })}
-              />
-              <Label htmlFor={`${ids}-free`}>{t('inventory.costing.freeGoods')}</Label>
-            </div>
-          ) : null}
           {homeless ? (
             <div className="flex items-center gap-2">
               <Label htmlFor={`${ids}-home`} className="text-warning">
@@ -632,6 +701,11 @@ export function ReceiptLinePanel(props: {
             </div>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
+            {props.onClose ? (
+              <Button variant="ghost" onClick={props.onClose}>
+                {t('common.cancel')}
+              </Button>
+            ) : null}
             {editing ? (
               <Button variant="ghost" onClick={props.onCancelEdit}>
                 {t('common.cancel')}
@@ -655,6 +729,23 @@ export function ReceiptLinePanel(props: {
                 : `${warehouseName(home)} · ${t('inventory.receipt.panel.onHand', {
                     qty: onHand === null ? '…' : formatQty(onHand),
                   })}`}
+            </Info>
+            <Info label={t('inventory.receipt.panel.weight')}>
+              {product.weightKg
+                ? t('inventory.receipt.panel.weightValue', {
+                    kg: formatQty(product.weightKg),
+                    total:
+                      qtyValue && unit
+                        ? formatQty(
+                            new Decimal(product.weightKg)
+                              .times(qtyValue)
+                              .times(unit.factorToBase)
+                              .toDecimalPlaces(3)
+                              .toString(),
+                          )
+                        : '…',
+                  })
+                : none}
             </Info>
             {canCost ? (
               <Info label={t('inventory.receipt.panel.lastPrice')}>

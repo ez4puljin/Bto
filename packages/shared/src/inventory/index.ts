@@ -491,12 +491,15 @@ export interface ReceiptDiscountInput extends ReceiptDiscount {
 
 /** A discount above the lines it applies to: `index` names it in the list given. */
 export class ReceiptDiscountError extends RangeError {
-  constructor(
-    readonly index: number,
-    readonly discount: Decimal,
-    readonly base: Decimal,
-  ) {
+  readonly index: number;
+  readonly discount: Decimal;
+  readonly base: Decimal;
+
+  constructor(index: number, discount: Decimal, base: Decimal) {
     super(`discount ${index} of ${discount.toString()} on ${base.toString()}`);
+    this.index = index;
+    this.discount = discount;
+    this.base = base;
   }
 }
 

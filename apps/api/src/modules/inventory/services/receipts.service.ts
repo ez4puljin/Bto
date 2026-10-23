@@ -520,6 +520,11 @@ export class ReceiptsService implements OnModuleInit {
     return inTransaction(this.db, async (tx) => {
       const { header } = await this.lockLine(tx, lineId);
       await tx.delete(goodsReceiptLines).where(eq(goodsReceiptLines.id, lineId));
+      // A line discount whose last line went goes with it (ADR-0101).
+      await tx.execute(sql`
+        DELETE FROM goods_receipt_discounts d
+         WHERE d.receipt_id = ${header.id} AND d.kind = 'LINES'
+           AND NOT EXISTS (SELECT 1 FROM goods_receipt_discount_lines l WHERE l.discount_id = d.id)`);
       await this.touch(tx, header.id);
       return this.get(header.id, tx);
     });
@@ -723,10 +728,11 @@ export class ReceiptsService implements OnModuleInit {
       );
       const free = (line: LineRow) => given.get(line.id)?.freeGoods ?? false;
       if (input.discounts !== undefined) {
+        // Free goods as this costing has them, not as the draft typed them.
         await this.writeDiscounts(
           tx,
           id,
-          lines.filter((line) => !free(line)),
+          lines.map((line) => ({ ...line, freeGoods: free(line) })),
           input.discounts,
         );
       }
@@ -1190,12 +1196,22 @@ export class ReceiptsService implements OnModuleInit {
     executor: Db | Tx,
     receiptId: number,
   ): Promise<(ReceiptDiscountRequest & { id: number })[]> {
+    return (await this.discountsOfMany(executor, [receiptId])).get(receiptId) ?? [];
+  }
+
+  /** `discountsOf` for several receipts in two statements, by receipt. */
+  private async discountsOfMany(
+    executor: Db | Tx,
+    receiptIds: readonly number[],
+  ): Promise<Map<number, (ReceiptDiscountRequest & { id: number })[]>> {
+    const byReceipt = new Map<number, (ReceiptDiscountRequest & { id: number })[]>();
+    if (receiptIds.length === 0) return byReceipt;
     const rows = await executor
       .select()
       .from(goodsReceiptDiscounts)
-      .where(eq(goodsReceiptDiscounts.receiptId, receiptId))
+      .where(inArray(goodsReceiptDiscounts.receiptId, [...receiptIds]))
       .orderBy(goodsReceiptDiscounts.id);
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return byReceipt;
     const links = await executor
       .select()
       .from(goodsReceiptDiscountLines)
@@ -1206,13 +1222,18 @@ export class ReceiptsService implements OnModuleInit {
         ),
       )
       .orderBy(goodsReceiptDiscountLines.lineId);
-    return rows.map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      pct: row.pct,
-      amount: row.amount,
-      lineIds: links.filter((link) => link.discountId === row.id).map((link) => link.lineId),
-    }));
+    for (const row of rows) {
+      const list = byReceipt.get(row.receiptId) ?? [];
+      list.push({
+        id: row.id,
+        kind: row.kind,
+        pct: row.pct,
+        amount: row.amount,
+        lineIds: links.filter((link) => link.discountId === row.id).map((link) => link.lineId),
+      });
+      byReceipt.set(row.receiptId, list);
+    }
+    return byReceipt;
   }
 
   /** Replaces a receipt's discounts after checking them against `lines` (those that may take one). */
@@ -1262,10 +1283,11 @@ export class ReceiptsService implements OnModuleInit {
       .from(goodsReceiptLines)
       .where(inArray(goodsReceiptLines.receiptId, [...receiptIds]))
       .orderBy(goodsReceiptLines.id);
+    const discounts = await this.discountsOfMany(this.db, receiptIds);
     for (const receiptId of receiptIds) {
       const lines = rows.filter((line) => line.receiptId === receiptId);
       const typed = lines.reduce((sum, line) => sum.plus(line.docAmount ?? 0), new Decimal(0));
-      const shares = trySharesOf(lineAmounts(lines), await this.discountsOf(this.db, receiptId));
+      const shares = trySharesOf(lineAmounts(lines), discounts.get(receiptId) ?? []);
       const discount = shares
         ? [...shares.shares.values()].reduce((sum, share) => sum.plus(share), new Decimal(0))
         : new Decimal(0);
@@ -1287,9 +1309,16 @@ export class ReceiptsService implements OnModuleInit {
     const linked = new Set(
       await this.links.productIdsWhere({ field: 'supplier', op: 'IN', ids: [supplierId] }, tx),
     );
-    const products = [...new Set(lines.map((line) => line.productId))].sort((a, b) => a - b);
-    for (const productId of products) {
-      if (!linked.has(productId)) await this.links.linkInTx(tx, actor, productId, supplierId);
+    const missing = [...new Set(lines.map((line) => line.productId))]
+      .filter((productId) => !linked.has(productId))
+      .sort((a, b) => a - b);
+    // linkManyInTx locks the links and skips pairs another posting linked meanwhile.
+    if (missing.length > 0) {
+      await this.links.linkManyInTx(
+        tx,
+        actor,
+        missing.map((productId) => ({ productId, supplierId })),
+      );
     }
   }
 
@@ -1562,7 +1591,6 @@ function discountViews(
 }
 
 /**
- * The sale prices a posting puts in force/**
  * The sale prices a posting puts in force, one per product (ADR-0099 #5): two lines of one product
  * (a box and a piece) must not name different prices.
  */

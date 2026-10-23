@@ -39,6 +39,8 @@ export type ReceiptStatus = ReceiptDetail['status'];
 export type ReceiptPaymentMethod = ReceiptDetail['paymentMethod'];
 export type ReceiptPaymentAccount = Schemas['ReceiptPaymentAccount'];
 export type LastReceiptPrice = Schemas['LastReceiptPrice'];
+export type ReceiptDiscount = Schemas['ReceiptDiscount'];
+export type ReceiptDiscountRequest = Schemas['ReceiptDiscountRequest'];
 export type BinMoveSummary = Schemas['BinMoveSummary'];
 export type BinMoveDetail = Schemas['BinMoveDetail'];
 export type BinMoveCreate = Schemas['BinMoveCreateRequest'];
@@ -498,6 +500,16 @@ export function useInventoryMutations() {
     updateReceiptLine: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: ReceiptLineUpdate }) =>
         unwrap(await api.PATCH('/api/v1/receipt-lines/{id}', { params: { path: { id } }, body })),
+      onSuccess: receiptLinesChanged,
+    }),
+    setReceiptDiscounts: useMutation({
+      mutationFn: async ({ id, discounts }: { id: number; discounts: ReceiptDiscountRequest[] }) =>
+        unwrap(
+          await api.PUT('/api/v1/receipts/{id}/discounts', {
+            params: { path: { id } },
+            body: { discounts },
+          }),
+        ),
       onSuccess: receiptLinesChanged,
     }),
     removeReceiptLine: useMutation({

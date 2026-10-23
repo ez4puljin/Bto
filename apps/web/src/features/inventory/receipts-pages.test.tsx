@@ -29,6 +29,7 @@ type Handler = (request: Request) => Response | Promise<Response>;
 
 const form = mn.inventory.receipt.form;
 const panelText = mn.inventory.receipt.panel;
+const discountsText = mn.inventory.receipt.discounts;
 const COLA_UNIT = `${COLA.name} (хайрцаг)`;
 const RICE_UNIT = 'Будаа (ш)';
 
@@ -89,6 +90,7 @@ const RICE_LINE: Schemas['ReceiptLine'] = {
 const NO_TOTALS: Schemas['ReceiptTotals'] = {
   docTotal: '0',
   discountTotal: '0',
+  discountTooLarge: false,
   netTotal: '0',
   vatTotal: '0',
   costTotal: '0',
@@ -125,10 +127,14 @@ const piece = (id: number): Schemas['ProductListUnit'] => ({
   barcodes: [],
 });
 const RICE_ITEM = item(11, 'Будаа', [piece(110)]);
-const COLA_ITEM = item(COLA.id, COLA.name, [
-  piece(70),
-  { id: 77, uomId: 2, uomName: 'хайрцаг', factorToBase: '24', isBase: false, barcodes: [] },
-]);
+/** Cola weighs 0.26 kg a piece. */
+const COLA_ITEM = {
+  ...item(COLA.id, COLA.name, [
+    piece(70),
+    { id: 77, uomId: 2, uomName: 'хайрцаг', factorToBase: '24', isBase: false, barcodes: [] },
+  ]),
+  weightKg: '0.26',
+};
 /** A new product nobody gave a home warehouse yet. */
 const TEA_ITEM = item(12, 'Цай', [piece(120)]);
 
@@ -158,12 +164,17 @@ const stockOf = (product: Schemas['ProductListItem'], onHand: string): Schemas['
   ],
 });
 
-/** The routes the line panel reads: the search, the home warehouse, stock, last and sale prices. */
+/**
+ * The routes the line panel reads: the search (by name or code; a supplier's products are all
+ * three), the home warehouse, stock, last and sale prices.
+ */
 const panelRoutes: Record<string, Handler> = {
   'GET /api/v1/products/lookup': (request) => {
     const q = (new URL(request.url).searchParams.get('q') ?? '').toLowerCase();
     return json(
-      [RICE_ITEM, COLA_ITEM, TEA_ITEM].filter((product) => product.name.toLowerCase().includes(q)),
+      [RICE_ITEM, COLA_ITEM, TEA_ITEM].filter(
+        (product) => product.name.toLowerCase().includes(q) || product.sku === q,
+      ),
     );
   },
   'GET /api/v1/product-locations': (request) => {
@@ -227,6 +238,36 @@ const COSTED_POSTED: Detail = {
   ],
 };
 
+/** 5% off the whole delivery note, as the server keeps it. */
+const NOTE_5: Schemas['ReceiptDiscount'] = {
+  id: 1,
+  kind: 'NOTE',
+  pct: '5',
+  amount: null,
+  lineIds: [],
+  total: '2650',
+};
+
+/** A draft of two boxes of cola for 48,000 and rice for 5,000, without discounts yet. */
+const PRICED_DRAFT: Detail = {
+  ...DRAFT,
+  discounts: [],
+  totals: {
+    ...NO_TOTALS,
+    docTotal: '53000',
+    netTotal: '53000',
+    costTotal: '53000',
+    pricedLines: 2,
+  },
+  lines: [
+    { ...BOX_LINE, enteredQty: '2', qtyBase: '48', docUnitPrice: '24000', docAmount: '48000' },
+    { ...RICE_LINE, docUnitPrice: '1000', docAmount: '5000' },
+  ],
+};
+
+/** An accessible name that starts with the text (a line's checkbox also reads its amount). */
+const startingWith = (text: string) => (name: string) => name.startsWith(text);
+
 const summary = (id: number, fields: Partial<Schemas['ReceiptSummary']> = {}) =>
   ({
     id,
@@ -247,6 +288,11 @@ const summary = (id: number, fields: Partial<Schemas['ReceiptSummary']> = {}) =>
 const panel = () => within(screen.getByRole('region', { name: panelText.title }));
 const findPanel = async () => within(await screen.findByRole('region', { name: panelText.title }));
 const productSearch = () => panel().getByRole('searchbox', { name: mn.inventory.product });
+/** The query of each product lookup the page made, in order. */
+const lookups = (fetchMock: ReturnType<typeof signedIn>) =>
+  calls(fetchMock, 'GET', '/api/v1/products/lookup').map(
+    (request) => new URL(request.url).searchParams,
+  );
 
 /**
  * Types a figure, then Enter as a person would: four keys or more followed by Enter within 50 ms
@@ -262,9 +308,12 @@ async function typeThenEnter(user: ReturnType<typeof userEvent.setup>, text: str
 async function pickByKeyboard(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(productSearch());
   await user.keyboard(name);
-  expect(await screen.findByRole('option', { name: new RegExp(name) })).toHaveAttribute(
-    'aria-selected',
-    'true',
+  // The supplier's whole list shows until the search's answer comes.
+  await waitFor(() =>
+    expect(screen.getByRole('option', { name: new RegExp(name) })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    ),
   );
   await user.keyboard('{Enter}');
 }
@@ -400,7 +449,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(panel().getByText('Будаа')).toBeInTheDocument();
   });
 
-  it('creates the draft with its first line by keyboard and adds the same unit onto it', async () => {
+  it('creates the draft with its first line by keyboard; the same unit again is a new line', async () => {
     let receipt: Detail = {
       ...DRAFT,
       supplierDocDate: businessDate(),
@@ -419,12 +468,12 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
       ...editorRoutes,
       'POST /api/v1/receipts': () => json(receipt, 201),
       'GET /api/v1/receipts/5': () => json(receipt),
-      'PATCH /api/v1/receipt-lines/2': () => {
+      'POST /api/v1/receipts/5/lines': () => {
         receipt = {
           ...receipt,
-          lines: [{ ...receipt.lines[0]!, enteredQty: '5', qtyBase: '5', docAmount: '6000' }],
+          lines: [...receipt.lines, { ...RICE_LINE, id: 3, enteredQty: '2', qtyBase: '2' }],
         };
-        return json(receipt);
+        return json(receipt, 201);
       },
     });
     const { router } = renderApp('/inventory/receipts/new', fetchMock);
@@ -442,6 +491,17 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(await info.findByText(`${WH1.name} · үлдэгдэл 44`)).toBeInTheDocument();
     expect(await info.findByText('1,100₮/ш (1,100₮/ш) · 2026-10-01 · МСМ ХХК')).toBeInTheDocument();
     expect(await info.findByText('1,500₮')).toBeInTheDocument();
+    // The last receipt price waits under «Нэгж үнэ» too.
+    expect(
+      panel().getByText(
+        panelText.lastPriceHint
+          .replace('{{price}}', '1,100')
+          .replace('{{unit}}', 'ш')
+          .replace('{{date}}', '2026-10-01'),
+      ),
+    ).toBeInTheDocument();
+    // The search kept to the chosen supplier's products (ADR-0101).
+    expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
     await user.keyboard('3{Enter}');
     expect(qty).toHaveValue('3');
     const price = panel().getByLabelText(form.unitPrice);
@@ -470,7 +530,7 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     ).toBeInTheDocument();
     // The cursor is back in the search box for the next product.
     await waitFor(() =>
-      expect(panel().getByPlaceholderText(mn.inventory.productSearchPlaceholder)).toHaveFocus(),
+      expect(panel().getByPlaceholderText(panelText.supplierSearch)).toHaveFocus(),
     );
     // The panel empties for the next product.
     expect(await panel().findByRole('searchbox', { name: mn.inventory.product })).toHaveValue('');
@@ -478,18 +538,20 @@ describe('a new receipt (owner 2026-10-18 and 2026-10-23: one window like Erkhet
     expect(lines.getByRole('cell', { name: WH1.name })).toBeInTheDocument();
     expect(lines.getByRole('cell', { name: '3,600' })).toBeInTheDocument();
 
-    // The same product and unit again adds onto its line.
+    // The same product and unit again is a line of its own (owner 2026-10-23, ADR-0101).
     await pickByKeyboard(user, 'Будаа');
     await waitFor(() => expect(panel().getByLabelText(mn.inventory.qty)).toHaveFocus());
     await user.keyboard('2{Enter}{Enter}');
     await waitFor(() =>
-      expect(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/2')).toHaveLength(1),
+      expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(1),
     );
-    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/2')[0])).toEqual({
-      enteredQty: '5',
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')[0])).toEqual({
+      productUnitId: 110,
+      enteredQty: '2',
     });
-    expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
+    expect(calls(fetchMock, 'PATCH', '/api/v1/receipt-lines/2')).toHaveLength(0);
     expect(calls(fetchMock, 'POST', '/api/v1/receipts')).toHaveLength(1);
+    expect(await lines.findAllByRole('cell', { name: 'Будаа' })).toHaveLength(2);
   }, 25_000);
 
   it('saves a new receipt with its header alone', async () => {
@@ -541,15 +603,19 @@ describe('the line panel (ADR-0099 #3)', () => {
     const qty = panel().getByLabelText(mn.inventory.qty);
     await waitFor(() => expect(qty).toHaveFocus());
     expect(panel().getByLabelText(mn.inventory.unit)).toHaveValue('77');
-    expect(
-      await within(screen.getByLabelText(panelText.infoLabel)).findByText(
-        `${WH1.name} · үлдэгдэл 240`,
-      ),
-    ).toBeInTheDocument();
+    const info = within(screen.getByLabelText(panelText.infoLabel));
+    expect(await info.findByText(`${WH1.name} · үлдэгдэл 240`)).toBeInTheDocument();
+    // The units and the weight come from the lookup by the product's code (ADR-0101).
+    const byCode = lookups(fetchMock).find((query) => query.get('q') === COLA.sku);
+    expect(byCode?.get('limit')).toBe('5');
+    const weight = (total: string) =>
+      panelText.weightValue.replace('{{kg}}', '0.26').replace('{{total}}', total);
+    expect(await info.findByText(weight('6.24'))).toBeInTheDocument();
 
     // The same code again counts one more box, never a quantity of the barcode's digits.
     await wedgeScan('4006381333931');
     await waitFor(() => expect(qty).toHaveValue('2'));
+    expect(info.getByText(weight('12.48'))).toBeInTheDocument();
     expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
     await user.keyboard('{Enter}');
     await waitFor(() =>
@@ -579,6 +645,42 @@ describe('the line panel (ADR-0099 #3)', () => {
     await user.type(productSearch(), '4006381333931{Enter}');
     expect(await panel().findByText(COLA.name)).toBeInTheDocument();
     expect(calls(fetchMock, 'GET', '/api/v1/barcodes/4006381333931')).toHaveLength(1);
+  });
+
+  it("lists the supplier's products on focus, every product at a switch (ADR-0101)", async () => {
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json(DRAFT),
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    await findPanel();
+    const scope = within(panel().getByRole('radiogroup', { name: panelText.scope }));
+    const supplierOnly = scope.getByRole('radio', { name: panelText.scopes.supplier });
+    const all = scope.getByRole('radio', { name: panelText.scopes.all });
+    expect(supplierOnly).toHaveAttribute('aria-checked', 'true');
+    expect(all).toHaveAttribute('aria-checked', 'false');
+    expect(productSearch()).toHaveAttribute('placeholder', panelText.supplierSearch);
+
+    // The cursor in the box lists the supplier's products before anything is typed.
+    await user.click(productSearch());
+    const listed = () => within(screen.getByRole('listbox')).getAllByRole('option');
+    await waitFor(() => expect(listed()).toHaveLength(3));
+    expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
+    expect(lookups(fetchMock).at(-1)?.get('q') ?? '').toBe('');
+    await user.keyboard('Будаа');
+    await waitFor(() => expect(listed()).toHaveLength(1));
+    expect(lookups(fetchMock).at(-1)?.get('q')).toBe('Будаа');
+    expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBe('3');
+
+    // «Бүх бараа» searches every product with the same text.
+    await user.click(all);
+    expect(all).toHaveAttribute('aria-checked', 'true');
+    expect(supplierOnly).toHaveAttribute('aria-checked', 'false');
+    await waitFor(() => expect(lookups(fetchMock).at(-1)?.get('supplierId')).toBeNull());
+    expect(lookups(fetchMock).at(-1)?.get('q')).toBe('Будаа');
+    expect(productSearch()).toHaveAttribute('placeholder', mn.inventory.productSearchPlaceholder);
+    expect(productSearch()).toHaveFocus();
   });
 
   it('asks a product without a home for its warehouse and sends it', async () => {
@@ -783,8 +885,8 @@ describe('the delivery note header', () => {
     // The bank accounts are offered; none is chosen yet.
     expect(await header.findByRole('option', { name: 'Хаан банк' })).toBeInTheDocument();
     expect(header.queryByRole('option', { name: 'Касс' })).toBeNull();
-    // The warehouse never sees the discount.
-    expect(header.queryByLabelText(form.discount)).toBeNull();
+    // The warehouse never sees the discounts.
+    expect(screen.queryByRole('region', { name: discountsText.title })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: mn.inventory.receipt.post }));
     expect(header.getByText(mn.validation.moneyAccountRequired)).toBeInTheDocument();
@@ -821,68 +923,6 @@ describe('the delivery note header', () => {
     expect(posts).toHaveLength(1);
     expect(posts[0]!.headers.get('Idempotency-Key')).toMatch(UUID);
     expect(await screen.findByRole('status')).toHaveTextContent('GR-2026-000001');
-  }, 15_000);
-
-  it('saves the discount when it is left, as a percentage or an amount', async () => {
-    let receipt: Detail = {
-      ...DRAFT,
-      totals: { ...NO_TOTALS, docTotal: '48000', netTotal: '48000', costTotal: '48000' },
-      lines: [
-        { ...BOX_LINE, enteredQty: '2', qtyBase: '48', docUnitPrice: '24000', docAmount: '48000' },
-      ],
-    };
-    const fetchMock = signedIn(ADMIN_ME, {
-      ...editorRoutes,
-      'GET /api/v1/receipts/5': () => json(receipt),
-      'PATCH /api/v1/receipts/5': async (request) => {
-        const body = (await request.clone().json()) as Partial<Detail>;
-        const discountTotal = body.discountPct ? '2400' : (body.discountAmount ?? '0');
-        receipt = {
-          ...receipt,
-          ...body,
-          totals: {
-            ...receipt.totals!,
-            discountTotal,
-            netTotal: String(48000 - Number.parseInt(discountTotal, 10)),
-          },
-        };
-        return json(receipt);
-      },
-    });
-    renderApp('/inventory/receipts/5', fetchMock);
-    const user = userEvent.setup();
-    const header = within(await screen.findByRole('region', { name: form.header }));
-    const discount = header.getByLabelText(form.discount);
-    await user.type(discount, '5{Enter}');
-    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(1));
-    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')[0])).toEqual({
-      discountPct: '5',
-      discountAmount: null,
-    });
-    // The totals show the discount and the payable.
-    const totals = within(screen.getByLabelText(mn.inventory.costing.total));
-    expect(await totals.findByText(form.netTotal)).toBeInTheDocument();
-    expect(totals.getByText('-2,400₮')).toBeInTheDocument();
-    expect(totals.getByText('45,600₮')).toBeInTheDocument();
-    // Leaving the same value saves nothing more.
-    await user.tab();
-    expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(1);
-
-    // «₮» turns the figure into an amount at once; a new amount is saved with Enter.
-    await user.selectOptions(header.getByLabelText(form.discountKind), '₮');
-    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(2));
-    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')[1])).toEqual({
-      discountPct: null,
-      discountAmount: '5',
-    });
-    await user.clear(discount);
-    await user.type(discount, '1000{Enter}');
-    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')).toHaveLength(3));
-    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/receipts/5')[2])).toEqual({
-      discountPct: null,
-      discountAmount: '1000',
-    });
-    expect(await totals.findByText('47,000₮')).toBeInTheDocument();
   }, 15_000);
 
   it('shows a refused account on its field', async () => {
@@ -978,6 +1018,7 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
             totals: {
               docTotal: '48000',
               discountTotal: '0',
+              discountTooLarge: false,
               netTotal: '48000',
               vatTotal: '4363.64',
               costTotal: '43636.36',
@@ -988,6 +1029,7 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
                 ...BOX_LINE,
                 enteredQty: '2',
                 qtyBase: '48',
+                weightKg: '0.26',
                 docUnitPrice: '24000',
                 docAmount: '48000',
               },
@@ -1009,6 +1051,12 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
     ).toBeInTheDocument();
     const lines = within(screen.getByRole('region', { name: form.linesTitle }));
     expect(lines.getByRole('cell', { name: '24,000' })).toBeInTheDocument();
+    // «Жин (кг)»: 48 pieces of 0.26 kg; rice has no weight.
+    expect(lines.getByRole('columnheader', { name: form.weightColumn })).toBeInTheDocument();
+    const cola = within(lines.getByRole('row', { name: /Кока кола/ }));
+    expect(cola.getByRole('cell', { name: '12.48' })).toBeInTheDocument();
+    const rice = within(lines.getByRole('row', { name: /Будаа/ }));
+    expect(rice.getAllByRole('cell', { name: mn.common.none }).length).toBeGreaterThan(0);
   });
 
   it('never shows prices to the warehouse', async () => {
@@ -1027,6 +1075,197 @@ describe('delivery-note prices (ADR-0078, ADR-0099)', () => {
     expect(screen.queryByLabelText(mn.inventory.costing.total)).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/receipts/last-prices')).toHaveLength(0);
   });
+});
+
+describe('discounts and free goods of a draft (ADR-0101)', () => {
+  it('adds a discount on the whole note, then one on chosen lines', async () => {
+    let receipt: Detail = PRICED_DRAFT;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json(receipt),
+      'PUT /api/v1/receipts/5/discounts': async (request) => {
+        const body = (await request.clone().json()) as Schemas['ReceiptDiscountsRequest'];
+        receipt = {
+          ...receipt,
+          discounts: body.discounts.map((discount, index) => ({
+            id: index + 1,
+            kind: discount.kind,
+            pct: discount.pct ?? null,
+            amount: discount.amount ?? null,
+            lineIds: discount.lineIds ?? [],
+            total: discount.kind === 'NOTE' ? '2650' : '1000',
+          })),
+        };
+        return json(receipt);
+      },
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    const puts = () => calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts');
+    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    expect(card.getByText(discountsText.empty)).toBeInTheDocument();
+
+    await user.click(card.getByRole('button', { name: discountsText.add }));
+    await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.NOTE }));
+    const value = card.getByLabelText(discountsText.value);
+    await user.type(value, '0{Enter}');
+    expect(card.getByText(discountsText.valueInvalid)).toBeInTheDocument();
+    expect(puts()).toHaveLength(0);
+    await user.clear(value);
+    await user.type(value, '5{Enter}');
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect(await bodyOf(puts()[0])).toEqual({
+      discounts: [{ kind: 'NOTE', pct: '5', amount: null, lineIds: [] }],
+    });
+    const note = within(
+      await card.findByRole('row', { name: new RegExp(discountsText.kinds.NOTE) }),
+    );
+    expect(note.getByText(discountsText.wholeNote)).toBeInTheDocument();
+    expect(note.getByText('5%')).toBeInTheDocument();
+    expect(note.getByText('-2,650₮')).toBeInTheDocument();
+
+    // One discount on the whole note at most; a second one on chosen lines.
+    await user.click(card.getByRole('button', { name: discountsText.add }));
+    expect(await screen.findByRole('menuitem', { name: discountsText.kinds.NOTE })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await user.click(screen.getByRole('menuitem', { name: discountsText.kinds.LINES }));
+    await user.type(card.getByLabelText(discountsText.value), '1000');
+    await user.selectOptions(card.getByLabelText(discountsText.valueKind), '₮');
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    // Without a line ticked nothing is saved (the message repeats the list's caption).
+    expect(card.getAllByText(discountsText.chooseLines)).toHaveLength(2);
+    expect(puts()).toHaveLength(1);
+    await user.click(card.getByRole('checkbox', { name: startingWith(COLA_UNIT) }));
+    await user.click(card.getByRole('checkbox', { name: startingWith(RICE_UNIT) }));
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    expect(await bodyOf(puts()[1])).toEqual({
+      discounts: [
+        { kind: 'NOTE', pct: '5', amount: null, lineIds: [] },
+        { kind: 'LINES', pct: null, amount: '1000', lineIds: [1, 2] },
+      ],
+    });
+    const chosen = within(
+      await card.findByRole('row', { name: new RegExp(discountsText.kinds.LINES) }),
+    );
+    expect(chosen.getByText(`${COLA_UNIT}, ${RICE_UNIT}`)).toBeInTheDocument();
+    expect(chosen.getByText('-1,000₮')).toBeInTheDocument();
+  }, 20_000);
+
+  it('removes a discount and saves the rest; one above its lines is named', async () => {
+    let receipt: Detail = {
+      ...PRICED_DRAFT,
+      totals: { ...PRICED_DRAFT.totals!, discountTooLarge: true },
+      discounts: [
+        NOTE_5,
+        { id: 2, kind: 'LINES', pct: null, amount: '9000', lineIds: [2], total: null },
+      ],
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json(receipt),
+      'PUT /api/v1/receipts/5/discounts': () => {
+        receipt = {
+          ...receipt,
+          discounts: [NOTE_5],
+          totals: { ...receipt.totals!, discountTooLarge: false },
+        };
+        return json(receipt);
+      },
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    expect(card.getByText(discountsText.tooLarge)).toBeInTheDocument();
+    // 9,000₮ off rice of 5,000₮ comes to no tugriks yet.
+    const tooLarge = within(card.getByRole('row', { name: new RegExp(discountsText.kinds.LINES) }));
+    expect(tooLarge.getByText(RICE_UNIT)).toBeInTheDocument();
+    expect(tooLarge.getByText('9,000₮')).toBeInTheDocument();
+    expect(tooLarge.getByText(mn.common.none)).toBeInTheDocument();
+
+    await user.click(
+      card.getByRole('button', { name: `${mn.inventory.remove}: ${discountsText.kinds.LINES}` }),
+    );
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts')[0])).toEqual({
+      discounts: [{ kind: 'NOTE', pct: '5', amount: null, lineIds: [] }],
+    });
+    await waitFor(() => expect(card.queryByText(discountsText.tooLarge)).toBeNull());
+    expect(card.queryByRole('row', { name: new RegExp(discountsText.kinds.LINES) })).toBeNull();
+  });
+
+  it('adds free goods by product and quantity, listed apart from the lines bought', async () => {
+    const FREE_RICE: Schemas['ReceiptLine'] = {
+      ...RICE_LINE,
+      id: 3,
+      enteredQty: '3',
+      qtyBase: '3',
+      freeGoods: true,
+    };
+    let receipt: Detail = { ...PRICED_DRAFT, lines: [PRICED_DRAFT.lines[0]!] };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...editorRoutes,
+      'GET /api/v1/receipts/5': () => json(receipt),
+      'POST /api/v1/receipts/5/lines': () => {
+        receipt = { ...receipt, lines: [...receipt.lines, FREE_RICE] };
+        return json(receipt, 201);
+      },
+      'DELETE /api/v1/receipt-lines/3': () => {
+        receipt = { ...receipt, lines: receipt.lines.filter((line) => line.id !== 3) };
+        return json(receipt);
+      },
+    });
+    renderApp('/inventory/receipts/5', fetchMock);
+    const user = userEvent.setup();
+    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    await user.click(card.getByRole('button', { name: discountsText.add }));
+    await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.FREE }));
+    const free = within(card.getByRole('region', { name: discountsText.freeTitle }));
+    // A product, its unit and the quantity: no prices.
+    expect(free.queryByLabelText(form.unitPrice)).toBeNull();
+    expect(free.queryByLabelText(panelText.salePrice)).toBeNull();
+    await user.click(free.getByRole('searchbox', { name: mn.inventory.product }));
+    await user.keyboard('Будаа');
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /Будаа/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      ),
+    );
+    await user.keyboard('{Enter}');
+    const qty = free.getByLabelText(mn.inventory.qty);
+    await waitFor(() => expect(qty).toHaveFocus());
+    await user.keyboard('3{Enter}');
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')[0])).toEqual({
+      productUnitId: 110,
+      enteredQty: '3',
+      freeGoods: true,
+    });
+    const freeList = within(await card.findByRole('region', { name: discountsText.freeList }));
+    const row = within(freeList.getByRole('row', { name: /Будаа/ }));
+    expect(row.getByRole('cell', { name: '3' })).toBeInTheDocument();
+    // Not among the lines bought.
+    const lines = within(screen.getByRole('region', { name: form.linesTitle }));
+    expect(lines.getByRole('cell', { name: COLA.name })).toBeInTheDocument();
+    expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull();
+
+    await user.click(
+      freeList.getByRole('button', { name: `${mn.inventory.remove}: ${RICE_UNIT}` }),
+    );
+    await waitFor(() =>
+      expect(calls(fetchMock, 'DELETE', '/api/v1/receipt-lines/3')).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(card.queryByRole('region', { name: discountsText.freeList })).toBeNull(),
+    );
+  }, 20_000);
 });
 
 describe('costs of a posted receipt (ADR-0047 #1)', () => {
@@ -1069,13 +1308,13 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     expect(await screen.findByRole('heading', { name: 'GR-2026-000004' })).toBeInTheDocument();
   }, 15_000);
 
-  it('sends a changed discount with the costs', async () => {
+  it('sends changed discounts with the costs, the free goods listed apart', async () => {
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       'GET /api/v1/warehouses': () => list([WH1]),
       'GET /api/v1/receipts/5': () =>
         json({
           ...COSTED_POSTED,
-          discountPct: '5',
+          discounts: [NOTE_5],
           lines: [
             {
               ...BOX_LINE,
@@ -1093,20 +1332,39 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     });
     renderApp('/inventory/receipts/5', fetchMock);
     const user = userEvent.setup();
-    const header = within(await screen.findByRole('region', { name: form.header }));
-    const discount = header.getByLabelText(form.discount);
-    expect(discount).toHaveValue('5');
-    await user.clear(discount);
-    await user.type(discount, '2500');
-    await user.selectOptions(header.getByLabelText(form.discountKind), '₮');
+    const card = within(await screen.findByRole('region', { name: discountsText.title }));
+    // The free rice is listed with the discounts, not among the lines bought.
+    const free = within(card.getByRole('region', { name: discountsText.freeList }));
+    expect(free.getByRole('cell', { name: 'Будаа' })).toBeInTheDocument();
+    const lines = within(screen.getByRole('region', { name: form.linesTitle }));
+    expect(lines.queryByRole('cell', { name: 'Будаа' })).toBeNull();
+    // No free goods are added once posted, and the whole note has its discount already.
+    await user.click(card.getByRole('button', { name: discountsText.add }));
+    expect(await screen.findByRole('menuitem', { name: discountsText.kinds.NOTE })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.queryByRole('menuitem', { name: discountsText.kinds.FREE })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    // 5% becomes 2,500₮: nothing is saved until the costs are.
+    await user.click(
+      card.getByRole('button', { name: `${mn.inventory.remove}: ${discountsText.kinds.NOTE}` }),
+    );
+    await user.click(card.getByRole('button', { name: discountsText.add }));
+    await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.NOTE }));
+    await user.type(card.getByLabelText(discountsText.value), '2500');
+    await user.selectOptions(card.getByLabelText(discountsText.valueKind), '₮');
+    await user.click(card.getByRole('button', { name: mn.common.save }));
+    expect(await card.findByText('2,500₮')).toBeInTheDocument();
+    expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/discounts')).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: form.saveCosts }));
     await waitFor(() =>
       expect(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')).toHaveLength(1),
     );
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/receipts/5/costs')[0])).toEqual({
       costingVersion: 0,
-      discountPct: null,
-      discountAmount: '2500',
+      discounts: [{ kind: 'NOTE', pct: null, amount: '2500', lineIds: [] }],
       lines: [
         { lineId: 1, unitPrice: '24000' },
         { lineId: 2, freeGoods: true },
@@ -1117,7 +1375,7 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
   it('keeps what was typed when someone else costed it meanwhile', async () => {
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       'GET /api/v1/warehouses': () => list([WH1]),
-      'GET /api/v1/receipts/5': () => json(COSTED_POSTED),
+      'GET /api/v1/receipts/5': () => json({ ...COSTED_POSTED, discounts: [NOTE_5] }),
       'GET /api/v1/receipts': () => list([summary(5)]),
       'PUT /api/v1/receipts/5/costs': () => problem('CONFLICT', 409),
     });
@@ -1128,7 +1386,7 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     await user.click(
       screen.getByRole('switch', { name: `${mn.inventory.costing.freeGoods}: ${RICE_UNIT}` }),
     );
-    // The discount is not touched: it is not sent.
+    // The discounts are not touched: they are not sent.
     await user.click(screen.getByRole('button', { name: form.saveCosts }));
     expect(await screen.findByText(mn.errors.CONFLICT)).toBeInTheDocument();
     expect(amount).toHaveValue('48000');
@@ -1146,7 +1404,7 @@ describe('costs of a posted receipt (ADR-0047 #1)', () => {
     expect(await screen.findByRole('heading', { name: POSTED.number ?? '' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: form.unitPrice })).toBeNull();
     expect(screen.queryByRole('button', { name: form.saveCosts })).toBeNull();
-    expect(screen.queryByLabelText(form.discount)).toBeNull();
+    expect(screen.queryByRole('region', { name: discountsText.title })).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/receipts/5/costing')).toHaveLength(0);
   });
 });

@@ -66,7 +66,7 @@ describe('finance payables', () => {
   const receipt = async (
     supplierId: number,
     lines: Record<string, unknown>[],
-    extra: Record<string, unknown> = {},
+    { discounts, ...extra }: Record<string, unknown> = {},
   ): Promise<ReceiptJson> => {
     const draft = (
       await http()
@@ -76,6 +76,14 @@ describe('finance payables', () => {
         .send({ supplierId, supplierDocDate: today, lines, ...extra })
         .expect(201)
     ).body as ReceiptJson;
+    // A cost holder types the discounts on the draft (ADR-0101).
+    if (discounts !== undefined) {
+      await http()
+        .put(`/api/v1/receipts/${draft.id}/discounts`)
+        .set(bearer(admin))
+        .send({ discounts })
+        .expect(200);
+    }
     // The warehouse posts it: the bill books as Bto itself, no finance right needed.
     return (
       await http()
@@ -260,7 +268,7 @@ describe('finance payables', () => {
     const posted = await receipt(
       shop,
       [{ productUnitId: unitOf(water, 'BOX').id, enteredQty: '2', docUnitPrice: '13200' }],
-      { discountPct: '10' },
+      { discounts: [{ kind: 'NOTE', pct: '10' }] },
     );
     expect(posted).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     // 26,400 less 10 %: 23,760 owed, 2,160 of it input VAT, 21,600 into the stock.
@@ -283,7 +291,7 @@ describe('finance payables', () => {
         })
         .expect(200);
     // The discount dropped: the difference is billed.
-    await recost(1, { discountPct: null });
+    await recost(1, { discounts: [] });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
       '130301': '240.00',
       '310201': '2400.00',
@@ -291,7 +299,7 @@ describe('finance payables', () => {
     });
     expect(await balance(shop)).toMatchObject({ balance: '26400.00' });
     // An amount instead: a credit of the difference.
-    await recost(2, { discountAmount: '1100' });
+    await recost(2, { discounts: [{ kind: 'NOTE', amount: '1100' }] });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
       '130301': '-100.00',
       '310201': '-1000.00',

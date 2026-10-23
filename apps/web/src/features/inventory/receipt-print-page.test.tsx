@@ -9,9 +9,13 @@ type Detail = components['schemas']['ReceiptDetail'];
 
 const print = mn.inventory.receipt.print;
 const form = mn.inventory.receipt.form;
+const discounts = mn.inventory.receipt.discounts;
 const WH2 = { id: 2, name: 'Хоёрдугаар агуулах' };
 
-/** A posted receipt of two warehouses: boxes of cola at 24,000 and rice for 5,000, 10% off. */
+/**
+ * A posted receipt of two warehouses: boxes of cola at 24,000, rice for 5,000 with 300 off and a
+ * free box of cola, then 10% off the whole note (ADR-0101).
+ */
 const RECEIPT: Detail = {
   ...DRAFT,
   status: 'POSTED',
@@ -22,14 +26,18 @@ const RECEIPT: Detail = {
   warehouses: [{ id: WH1.id, name: WH1.name }, WH2],
   weightKg: '12.5',
   weightMissing: 1,
-  discountPct: '10',
+  discounts: [
+    { id: 1, kind: 'LINES', pct: null, amount: '300', lineIds: [2], total: '300' },
+    { id: 2, kind: 'NOTE', pct: '10', amount: null, lineIds: [], total: '5270' },
+  ],
   totals: {
     docTotal: '53000',
-    discountTotal: '5300',
-    netTotal: '47700',
+    discountTotal: '5570',
+    discountTooLarge: false,
+    netTotal: '47430',
     vatTotal: '0',
-    costTotal: '47700',
-    pricedLines: 2,
+    costTotal: '47430',
+    pricedLines: 3,
   },
   lines: [
     {
@@ -57,6 +65,7 @@ const RECEIPT: Detail = {
       docUnitPrice: null,
       docAmount: '5000',
     },
+    { ...BOX_LINE, id: 3, productSku: '10', freeGoods: true, docUnitPrice: null, docAmount: null },
   ],
 };
 
@@ -67,7 +76,7 @@ beforeEach(() => {
 afterEach(() => printSpy.mockRestore());
 
 describe('a goods receipt on paper (ADR-0099 #6)', () => {
-  it('prints the delivery note with its prices, the discount and the payable', async () => {
+  it('prints the delivery note with its prices, each discount and the payable', async () => {
     renderApp(
       '/inventory/receipts/5/print/document',
       signedIn(ADMIN_ME, {
@@ -84,7 +93,10 @@ describe('a goods receipt on paper (ADR-0099 #6)', () => {
 
     const table = within(screen.getByRole('table'));
     expect(table.getByRole('columnheader', { name: form.unitPrice })).toBeInTheDocument();
-    const cola = within(table.getByRole('row', { name: /Кока кола/ }));
+    const [cola, freeCola] = table
+      .getAllByRole('row', { name: /Кока кола/ })
+      .map((row) => within(row));
+    if (!cola || !freeCola) throw new Error('two rows of cola');
     expect(cola.getByRole('cell', { name: '24,000' })).toBeInTheDocument();
     expect(cola.getByRole('cell', { name: '48,000' })).toBeInTheDocument();
     // 48 pieces of 0.26 kg.
@@ -93,13 +105,18 @@ describe('a goods receipt on paper (ADR-0099 #6)', () => {
     const rice = within(table.getByRole('row', { name: /Будаа/ }));
     expect(rice.getByRole('cell', { name: '1,000' })).toBeInTheDocument();
     expect(rice.getByRole('cell', { name: '5,000' })).toBeInTheDocument();
+    // Free goods say so instead of a price.
+    expect(freeCola.getByRole('cell', { name: print.free })).toBeInTheDocument();
 
     expect(screen.getByText(form.docTotal)).toBeInTheDocument();
     expect(screen.getByText('53,000')).toBeInTheDocument();
-    expect(screen.getByText(form.discountTotal)).toBeInTheDocument();
-    expect(screen.getByText('-5,300')).toBeInTheDocument();
+    // Each discount above the payable: the chosen lines' first, then the whole note's.
+    expect(screen.getByText(discounts.kinds.LINES)).toBeInTheDocument();
+    expect(screen.getByText('-300')).toBeInTheDocument();
+    expect(screen.getByText(`${discounts.kinds.NOTE} (10%)`)).toBeInTheDocument();
+    expect(screen.getByText('-5,270')).toBeInTheDocument();
     expect(screen.getByText(form.netTotal)).toBeInTheDocument();
-    expect(screen.getByText('47,700')).toBeInTheDocument();
+    expect(screen.getByText('47,430')).toBeInTheDocument();
     expect(screen.queryByText(form.vatTotal)).toBeNull();
     expect(screen.getByText('12.5 кг')).toBeInTheDocument();
     expect(screen.getByText(form.weightMissing.replace('{{count}}', '1'))).toBeInTheDocument();
@@ -139,10 +156,12 @@ describe('a goods receipt on paper (ADR-0099 #6)', () => {
 
     const first = within(sheets[0]!);
     expect(first.getByText(WH1.name)).toBeInTheDocument();
-    expect(first.getByRole('cell', { name: 'Кока кола' })).toBeInTheDocument();
-    expect(first.getByRole('cell', { name: 'A-01-03' })).toBeInTheDocument();
+    // The free box is counted in too.
+    expect(first.getAllByRole('cell', { name: 'Кока кола' })).toHaveLength(2);
+    expect(first.getAllByRole('cell', { name: 'A-01-03' })).toHaveLength(2);
     expect(first.queryByRole('cell', { name: 'Будаа' })).toBeNull();
-    expect(first.getByText('48')).toBeInTheDocument();
+    // 48 pieces bought and 24 free.
+    expect(first.getByText('72')).toBeInTheDocument();
 
     const second = within(sheets[1]!);
     expect(second.getByText(WH2.name)).toBeInTheDocument();

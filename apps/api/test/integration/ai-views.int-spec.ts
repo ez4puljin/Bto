@@ -519,8 +519,10 @@ describe('AI views (ADR-0045)', () => {
     expect(await rowsOf('customer_addresses')).toEqual([
       expect.objectContaining({ lat: '49.634200', is_default: true, archived: false }),
     ]);
+    // The juice received from the supplier is linked to it by the posting (ADR-0101).
     expect(await rowsOf('product_suppliers')).toEqual([
       expect.objectContaining({ sku: '10', supplier_name: 'МСМ ХХК', is_main: true }),
+      expect.objectContaining({ sku: '11', supplier_name: 'МСМ ХХК', is_main: true }),
     ]);
   });
 });

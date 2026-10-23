@@ -238,17 +238,24 @@ export function useReadinessProducts(filter: { gap?: ReadinessGap; categoryId?: 
 
 /**
  * A picker's quick search (ADR-0099 #3): active products with their units and barcodes, no
- * pictures, at most `limit`. Nothing while the text is empty.
+ * pictures, at most `limit`; `supplierId` keeps that supplier's products (ADR-0101). Nothing while
+ * the text is empty, unless a supplier lists its products.
  */
-export function useProductLookup(q: string, limit = 20) {
+export function useProductLookup(q: string, limit = 20, supplierId?: number, enabled = true) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.products, 'lookup', q, limit],
-    enabled: q !== '',
+    queryKey: [...KEYS.products, 'lookup', q, limit, supplierId ?? null],
+    // A supplier's products are listed even before anything is typed (ADR-0101).
+    enabled: enabled && (q !== '' || supplierId !== undefined),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }) =>
-      unwrap(await api.GET('/api/v1/products/lookup', { params: { query: { q, limit } }, signal })),
+      unwrap(
+        await api.GET('/api/v1/products/lookup', {
+          params: { query: { q, limit, ...(supplierId === undefined ? {} : { supplierId }) } },
+          signal,
+        }),
+      ),
   });
 }
 
