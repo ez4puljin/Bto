@@ -5683,6 +5683,248 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/refresh-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_refreshState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Шинэчлэх»: rebuilds the daily totals unless they are younger than a minute. */
+        post: operations["Reports_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/dashboard.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_dashboardXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_aging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/aging.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_agingXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/aging/{partyId}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_agingItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_profit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/profit.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_profitXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/sales-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The documents behind a sales figure (the drill-down); costs only with margins. */
+        get: operations["Reports_salesDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_stock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/stock.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_stockXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_supplierReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/suppliers.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_supplierXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/suppliers/{partyId}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_supplierEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5760,7 +6002,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send" | "customer.home.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.rep" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "notifications.send" | "customer.home.manage" | "reports.view" | "reports.margins.view";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -6081,7 +6323,7 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
         };
         /** @enum {string} */
-        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "bto.company_code";
+        SettingKey: "tax.vat_rate_pct" | "tax.city_tax_rate_pct" | "company.vat_payer" | "company.city_tax_payer" | "auth.staff_session_hours" | "auth.customer_session_days" | "bto.company_code" | "reports.margin_threshold_pct";
         SettingEntry: {
             id: number;
             key: components["schemas"]["SettingKey"];
@@ -10654,16 +10896,12 @@ export interface components {
             description: string;
         };
         Aging: {
-            /** @example 150000.00 */
-            NOT_DUE: string;
-            /** @example 0.00 */
-            D1_30: string;
-            /** @example 0.00 */
-            D31_60: string;
-            /** @example 0.00 */
-            D61_90: string;
-            /** @example 0.00 */
-            D90_PLUS: string;
+            date: string;
+            rows: components["schemas"]["AgingRow"][];
+            totals: components["schemas"]["AgingAmounts"];
+            credit: string;
+            total: string;
+            overdue: string;
         };
         CustomerBalance: {
             customerId: number;
@@ -12815,6 +13053,293 @@ export interface components {
             subcategories: components["schemas"]["CustomerAppHomeCategory"][];
             /** @description «Шинээр нэмэгдсэн бараа» (new) and «Хямдралтай бараа» (deals) of its subtree */
             sections: components["schemas"]["SalesRepHomeSection"][];
+        };
+        ReportRefreshState: {
+            /**
+             * Format: date-time
+             * @description The daily totals are as of this time
+             */
+            refreshedAt: string | null;
+            durationMs: number | null;
+        };
+        ReportRange: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+        };
+        ReportCompared: {
+            /** @example 1500000.00 */
+            current: string;
+            /**
+             * @description The same days a month earlier
+             * @example 1400000.00
+             */
+            previous: string;
+            /**
+             * @description The same days a year earlier
+             * @example 1200000.00
+             */
+            lastYear: string;
+        };
+        ReportComparedOrNull: {
+            current: string | null;
+            previous: string | null;
+            lastYear: string | null;
+        };
+        DashboardTrendPoint: {
+            /** @example 2026-10 */
+            month: string;
+            sales: string;
+            lastYearSales: string;
+            grossProfit: string | null;
+        };
+        DashboardCategory: {
+            categoryId: number | null;
+            name: string | null;
+            sales: string;
+            grossProfit: string | null;
+            /** @example 12.5 */
+            margin: string | null;
+            previousMargin: string | null;
+        };
+        DashboardOverdueCustomer: {
+            partyId: number;
+            customerId: number | null;
+            name: string;
+            overdue: string;
+            oldestDueDate: string | null;
+        };
+        DashboardLowStock: {
+            productId: number;
+            sku: string;
+            name: string;
+            warehouseId: number;
+            warehouseName: string;
+            onHand: string;
+            minQty: string;
+        };
+        DashboardTopRep: {
+            userId: number;
+            name: string;
+            sales: string;
+            /** @description Percent of wholesale sales */
+            share: string | null;
+        };
+        DashboardAlerts: {
+            overdue: components["schemas"]["DashboardOverdueCustomer"][];
+            lowStock: components["schemas"]["DashboardLowStock"][];
+            lowStockCount: number;
+            fallingCategories: components["schemas"]["DashboardCategory"][];
+            topRep: components["schemas"]["DashboardTopRep"] | null;
+        };
+        Dashboard: {
+            /** @example 2026-10 */
+            month: string;
+            /** @description The month runs: the comparisons take the same days */
+            running: boolean;
+            current: components["schemas"]["ReportRange"];
+            previous: components["schemas"]["ReportRange"];
+            lastYear: components["schemas"]["ReportRange"];
+            today: string;
+            /** Format: date-time */
+            refreshedAt: string | null;
+            /** @description The caller sees costs, profit and margins */
+            margins: boolean;
+            /** @example 8.0 */
+            threshold: string;
+            /** @description Ex-VAT, net of returns */
+            sales: components["schemas"]["ReportCompared"];
+            wholesale: string;
+            pos: string;
+            returns: string;
+            grossProfit: components["schemas"]["ReportComparedOrNull"] | null;
+            margin: components["schemas"]["ReportComparedOrNull"] | null;
+            /** @description Balance at each period end */
+            receivables: components["schemas"]["ReportCompared"];
+            /** @description Overdue today */
+            overdue: string;
+            overdueCustomers: number;
+            stockValue: components["schemas"]["ReportComparedOrNull"] | null;
+            turnoverDays: number | null;
+            trend: components["schemas"]["DashboardTrendPoint"][];
+            categories: components["schemas"]["DashboardCategory"][];
+            alerts: components["schemas"]["DashboardAlerts"];
+        };
+        AgingAmounts: {
+            NOT_DUE: string;
+            D1_30: string;
+            D31_60: string;
+            D61_90: string;
+            D90_PLUS: string;
+        };
+        AgingRow: {
+            partyId: number;
+            customerId: number | null;
+            code: string | null;
+            name: string;
+            /** @enum {string|null} */
+            settlementGroup: "DAY_20" | "MONTH_END" | null;
+            buckets: components["schemas"]["AgingAmounts"];
+            /** @description Advances and unapplied payments */
+            credit: string;
+            total: string;
+            overdue: string;
+            oldestDueDate: string | null;
+        };
+        AgingItem: {
+            itemId: number;
+            /** @enum {string} */
+            side: "DEBIT" | "CREDIT";
+            documentNumber: string;
+            documentClass: string;
+            invoiceId: number | null;
+            itemDate: string;
+            dueDate: string | null;
+            daysOverdue: number | null;
+            /** @enum {string|null} */
+            bucket: "NOT_DUE" | "D1_30" | "D31_60" | "D61_90" | "D90_PLUS" | null;
+            amount: string;
+            openAmount: string;
+        };
+        AgingItems: {
+            data: components["schemas"]["AgingItem"][];
+        };
+        ProfitRow: {
+            sales: string;
+            returns: string;
+            cost: string;
+            profit: string;
+            margin: string | null;
+            /** @enum {string} */
+            kind: "CUSTOMER" | "PRODUCT" | "CATEGORY" | "USER" | "APP" | "POS" | "COST_ADJ" | "NONE";
+            id: number | null;
+            code: string | null;
+            name: string | null;
+            /** @description Base units (by product only) */
+            qty: string | null;
+            /** @description Margin under the threshold, or a loss */
+            flagged: boolean;
+        };
+        ProfitTotals: {
+            sales: string;
+            returns: string;
+            cost: string;
+            profit: string;
+            margin: string | null;
+        };
+        ProfitReport: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+            /** @enum {string} */
+            by: "customer" | "product" | "category" | "rep";
+            /** @example 8.0 */
+            threshold: string;
+            rows: components["schemas"]["ProfitRow"][];
+            totals: components["schemas"]["ProfitTotals"];
+            /** @description Rows beyond the first 2,000, summed */
+            others: components["schemas"]["ProfitTotals"] | null;
+        };
+        SalesDocument: {
+            /** @enum {string} */
+            kind: "INVOICE" | "CREDIT_NOTE" | "POS_SALE" | "POS_RETURN" | "COST_ADJ";
+            id: number;
+            number: string | null;
+            date: string;
+            orderId: number | null;
+            customerId: number | null;
+            customerName: string | null;
+            sales: string;
+            cost: string | null;
+            profit: string | null;
+            margin: string | null;
+        };
+        SalesDocuments: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+            rows: components["schemas"]["SalesDocument"][];
+            /** @description More documents than shown (the newest 500 are) */
+            more: boolean;
+        };
+        StockReportRow: {
+            productId: number;
+            sku: string;
+            name: string;
+            categoryName: string | null;
+            onHand: string;
+            value: string | null;
+            /** @description Sold in the last slowDays days, net of returns */
+            soldQty: string;
+            coverDays: number | null;
+            lastSaleDate: string | null;
+            daysSinceSale: number | null;
+            slow: boolean;
+            low: boolean;
+            minQty: string | null;
+        };
+        StockReportTotals: {
+            products: number;
+            value: string | null;
+            slowProducts: number;
+            slowValue: string | null;
+            lowProducts: number;
+        };
+        StockReport: {
+            date: string;
+            slowDays: number;
+            rows: components["schemas"]["StockReportRow"][];
+            nextOffset: number | null;
+            totals: components["schemas"]["StockReportTotals"];
+        };
+        SupplierReportRow: {
+            /** @description With VAT, at the delivery notes, net of returns */
+            purchases: string;
+            purchasesExVat: string;
+            otherBills: string;
+            payments: string;
+            /** @description Owed at `to` (+ we owe) */
+            balance: string;
+            partyId: number;
+            supplierId: number | null;
+            code: string | null;
+            name: string;
+        };
+        SupplierReportTotals: {
+            /** @description With VAT, at the delivery notes, net of returns */
+            purchases: string;
+            purchasesExVat: string;
+            otherBills: string;
+            payments: string;
+            /** @description Owed at `to` (+ we owe) */
+            balance: string;
+        };
+        SupplierReport: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+            /** @description Largest purchases first */
+            rows: components["schemas"]["SupplierReportRow"][];
+            totals: components["schemas"]["SupplierReportTotals"];
+        };
+        SupplierEntry: {
+            entryId: number;
+            date: string;
+            /** @enum {string} */
+            kind: "PURCHASE" | "OPENING" | "PAYMENT" | "OTHER_BILL";
+            number: string | null;
+            receiptId: number | null;
+            /** @description + raised the payable, − lowered it */
+            amount: string;
+            vatAmount: string;
+            reversal: boolean;
+        };
+        SupplierEntries: {
+            data: components["schemas"]["SupplierEntry"][];
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT";
@@ -26649,6 +27174,505 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesRepCategoryPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_refreshState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRefreshState"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRefreshState"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_dashboard: {
+        parameters: {
+            query?: {
+                /** @description Default: the current month */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_dashboardXlsx: {
+        parameters: {
+            query?: {
+                /** @description Default: the current month */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_aging: {
+        parameters: {
+            query?: {
+                settlementGroup?: "DAY_20" | "MONTH_END";
+                q?: string;
+                overdueOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Aging"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_agingXlsx: {
+        parameters: {
+            query?: {
+                settlementGroup?: "DAY_20" | "MONTH_END";
+                q?: string;
+                overdueOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_agingItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partyId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgingItems"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_profit: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                repUserId?: number;
+                /** @description «Bto300» orders only */
+                app?: boolean;
+                by: "customer" | "product" | "category" | "rep";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_profitXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                repUserId?: number;
+                /** @description «Bto300» orders only */
+                app?: boolean;
+                by: "customer" | "product" | "category" | "rep";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_salesDocuments: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                customerId?: number;
+                productId?: number;
+                categoryId?: number;
+                repUserId?: number;
+                /** @description «Bto300» orders only */
+                app?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesDocuments"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_stock: {
+        parameters: {
+            query?: {
+                slowDays?: 30 | 60 | 90 | 180;
+                filter?: "ALL" | "SLOW" | "LOW";
+                warehouseId?: number;
+                categoryId?: number;
+                q?: string;
+                /** @description nextOffset of the previous page */
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_stockXlsx: {
+        parameters: {
+            query?: {
+                slowDays?: 30 | 60 | 90 | 180;
+                filter?: "ALL" | "SLOW" | "LOW";
+                warehouseId?: number;
+                categoryId?: number;
+                q?: string;
+                /** @description nextOffset of the previous page */
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_supplierReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierReport"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_supplierXlsx: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_supplierEntries: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                partyId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierEntries"];
                 };
             };
             /** @description RFC 9457 problem details */

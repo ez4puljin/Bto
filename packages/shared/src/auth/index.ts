@@ -71,6 +71,10 @@ export const PERMISSIONS = [
   'notifications.send',
   // The customer app's home (ADR-0092 #9): banners, the segments it shows and category pictures.
   'customer.home.manage',
+  // Management reports (ADR-0108): the dashboard and the reports; costs, profit, margins and stock
+  // values in them only with the second code.
+  'reports.view',
+  'reports.margins.view',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -158,6 +162,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     'finance.periods.reopen',
     // The supermarket's shifts and their cash (ADR-0064 #3).
     'pos.read',
+    // Management reports with margins (ADR-0108 #5).
+    'reports.view',
+    'reports.margins.view',
   ],
   HR: [],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).

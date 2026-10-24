@@ -11,6 +11,7 @@ import { IdentityWorkerModule } from './modules/identity';
 import { ImportsWorkerModule } from './modules/imports';
 import { InventoryWorkerModule } from './modules/inventory';
 import { NotificationsWorkerModule } from './modules/notifications';
+import { ReportingWorkerModule } from './modules/reporting';
 
 /** The pg-boss worker (ROLE=worker): job handlers and their schedules (ADR-0040), no public HTTP. */
 @Module({
@@ -27,6 +28,7 @@ import { NotificationsWorkerModule } from './modules/notifications';
     // Imports create customers in the worker: their Finance Core parties follow (ADR-0084).
     FinBridgeModule,
     NotificationsWorkerModule,
+    ReportingWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })
