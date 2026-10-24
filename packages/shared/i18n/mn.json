@@ -6263,6 +6263,7 @@
       "returns": "Буцаалт {{amount}}",
       "profit": "Нийт ашиг",
       "margin": "Ашгийн хувь {{value}}%",
+      "marginNone": "Ашгийн хувь —",
       "marginChange": "Ашгийн хувь, өмнөх сартай",
       "receivables": "Авлага",
       "overdue": "Хугацаа хэтэрсэн {{amount}} · {{count}} харилцагч",

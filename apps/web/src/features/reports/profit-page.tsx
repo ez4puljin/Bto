@@ -141,7 +141,8 @@ function ProfitTable(props: { report: ProfitReport; onOpen?: (row: ProfitRow) =>
   const columns = 'reports.profit.columns';
   const product = report.by === 'product';
   const coded = report.by !== 'rep';
-  const span = 2 + (coded ? 1 : 0) + (product ? 1 : 0);
+  // The cells before the amounts: the name, the code and the quantity when shown.
+  const span = 1 + (coded ? 1 : 0) + (product ? 1 : 0);
   const amounts = (row: {
     sales: string;
     returns: string;

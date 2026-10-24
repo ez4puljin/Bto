@@ -200,6 +200,16 @@ describe('management reports (ADR-0108)', () => {
     expect(within(table).getByText('4.0%')).toHaveClass('text-destructive');
     expect(within(table).getByText('20.0%')).not.toHaveClass('text-destructive');
     expect(within(table).getByText(mn.reports.excel.kinds.POS)).toBeInTheDocument();
+    // The totals row spans the same columns as the header (each amount under its heading).
+    const width = (row: HTMLElement) =>
+      Array.from(row.children).reduce(
+        (sum, cell) => sum + Number.parseInt(cell.getAttribute('colspan') ?? '1', 10),
+        0,
+      );
+    const rows = within(table).getAllByRole('row');
+    const header = rows[0] as HTMLElement;
+    const totals = rows[rows.length - 1] as HTMLElement;
+    expect(width(totals)).toBe(width(header));
     const first = queryOf(calls(fetchMock, 'GET', '/api/v1/reports/profit')[0] as Request);
     expect([first.get('by'), first.get('from'), first.get('to')]).toEqual([
       'customer',

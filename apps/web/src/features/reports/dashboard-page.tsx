@@ -159,7 +159,11 @@ function Tiles({ data, canProfit }: { data: Dashboard; canProfit: boolean }) {
         title={t('reports.dashboard.profit')}
         to={canProfit ? reportHref('/reports/profit', { by: 'category', ...range }) : undefined}
         value={data.grossProfit.current === null ? NONE : formatTugrik(data.grossProfit.current)}
-        lines={[t('reports.dashboard.margin', { value: margin?.current ?? NONE })]}
+        lines={[
+          margin?.current
+            ? t('reports.dashboard.margin', { value: margin.current })
+            : t('reports.dashboard.marginNone'),
+        ]}
         deltas={[
           ...compare('profit', data.grossProfit, 'good'),
           <Delta
