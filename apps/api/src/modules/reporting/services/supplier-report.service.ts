@@ -16,6 +16,7 @@ import {
   rowsOf,
   searchSql,
   textOrNull,
+  scalar,
 } from './report-sql';
 
 export const AP_ENTRY_KINDS = ['PURCHASE', 'OPENING', 'PAYMENT', 'OTHER_BILL'] as const;
@@ -120,7 +121,7 @@ export class SupplierReportService {
           partyId: int(row.party_id),
           supplierId: intOrNull(row.supplier_id),
           code: textOrNull(row.code),
-          name: String(row.name),
+          name: scalar(row.name),
           purchases: money(values.purchases),
           purchasesExVat: money(values.purchasesExVat),
           otherBills: money(values.otherBills),

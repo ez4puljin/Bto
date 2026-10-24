@@ -12,32 +12,42 @@ export async function rowsOf<T extends SqlRow = SqlRow>(db: Db, query: SQL): Pro
   return result.rows as T[];
 }
 
+/** A scalar column's text (node-postgres gives NUMERIC, DATE and BIGINT as text). */
+export function scalar(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') {
+    return value.toString();
+  }
+  if (value instanceof Date) return value.toISOString();
+  throw new Error(`unexpected SQL value of type ${typeof value}`);
+}
+
 /** A NUMERIC column (NULL is zero). */
 export function dec(value: unknown): Decimal {
-  return value === null || value === undefined ? new Decimal(0) : new Decimal(String(value));
+  return value === null || value === undefined ? new Decimal(0) : new Decimal(scalar(value));
 }
 
 export function decOrNull(value: unknown): Decimal | null {
-  return value === null || value === undefined ? null : new Decimal(String(value));
+  return value === null || value === undefined ? null : new Decimal(scalar(value));
 }
 
 export function int(value: unknown): number {
-  return Number.parseInt(String(value), 10);
+  return Number.parseInt(scalar(value), 10);
 }
 
 export function intOrNull(value: unknown): number | null {
-  return value === null || value === undefined ? null : Number.parseInt(String(value), 10);
+  return value === null || value === undefined ? null : Number.parseInt(scalar(value), 10);
 }
 
 export function textOrNull(value: unknown): string | null {
-  return value === null || value === undefined ? null : String(value);
+  return value === null || value === undefined ? null : scalar(value);
 }
 
 /** A date column as `YYYY-MM-DD` (node-postgres gives a DATE as text, a cast result maybe a Date). */
 export function dateText(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return String(value).slice(0, 10);
+  return scalar(value).slice(0, 10);
 }
 
 /** Gross margin in percent with one decimal, or null without sales. */

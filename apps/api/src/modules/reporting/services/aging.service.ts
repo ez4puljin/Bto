@@ -16,6 +16,7 @@ import {
   rowsOf,
   searchSql,
   textOrNull,
+  scalar,
 } from './report-sql';
 
 export type AgingAmounts = Record<AgingBucket, string>;
@@ -130,7 +131,7 @@ export class AgingService {
             partyId,
             customerId: intOrNull(row.customer_id),
             code: textOrNull(row.code),
-            name: String(row.name),
+            name: scalar(row.name),
             settlementGroup: textOrNull(row.settlement_group) as SettlementGroup | null,
             oldestDueDate: null,
           },
@@ -207,8 +208,8 @@ export class AgingService {
       return {
         itemId: int(row.item_id),
         side: row.side as 'DEBIT' | 'CREDIT',
-        documentNumber: String(row.document_number),
-        documentClass: String(row.document_class),
+        documentNumber: scalar(row.document_number),
+        documentClass: scalar(row.document_class),
         invoiceId:
           row.source_doc_type === 'SALES_INVOICE' && sourceId && /^\d+$/.test(sourceId)
             ? Number.parseInt(sourceId, 10)

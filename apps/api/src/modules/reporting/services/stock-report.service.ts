@@ -7,7 +7,17 @@ import type { Db } from '../../../common/db/db.types';
 import { invalid } from '../../../common/errors/app-error';
 import type { AuthContext } from '../../identity';
 import { ReportContext } from './report-context';
-import { allOf, dateText, dec, int, money, rowsOf, searchSql, textOrNull } from './report-sql';
+import {
+  allOf,
+  dateText,
+  dec,
+  int,
+  money,
+  rowsOf,
+  searchSql,
+  textOrNull,
+  scalar,
+} from './report-sql';
 
 /** «Удаан эргэдэг»: in stock and not sold for this many days (owner 2026-10-24: 90 by default). */
 export const SLOW_DAY_OPTIONS = [30, 60, 90, 180] as const;
@@ -163,8 +173,8 @@ export class StockReportService {
         const lastSale = dateText(row.last_sale);
         return {
           productId: int(row.product_id),
-          sku: String(row.sku),
-          name: String(row.name),
+          sku: scalar(row.sku),
+          name: scalar(row.name),
           categoryName: textOrNull(row.category_name),
           onHand: onHand.toFixed(),
           value: scope.margins ? money(dec(row.value)) : null,

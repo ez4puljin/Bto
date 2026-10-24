@@ -25,6 +25,7 @@ import {
   pct,
   rowsOf,
   textOrNull,
+  scalar,
 } from './report-sql';
 import { RefreshService } from './refresh.service';
 
@@ -259,7 +260,7 @@ export class DashboardService {
            WHERE day BETWEEN ${start}::date AND ${periods.current.to}::date
            GROUP BY 1`,
     );
-    const byMonth = new Map(rows.map((row) => [String(row.month), row]));
+    const byMonth = new Map(rows.map((row) => [scalar(row.month), row]));
     return months.map((m) => {
       const row = byMonth.get(m);
       const lastYearMonth = `${Number.parseInt(m.slice(0, 4), 10) - 1}${m.slice(4)}`;
@@ -347,7 +348,7 @@ export class DashboardService {
       top: rows.map((row) => ({
         partyId: int(row.party_id),
         customerId: intOrNull(row.customer_id),
-        name: String(row.party_name),
+        name: scalar(row.party_name),
         overdue: money(dec(row.overdue)),
         oldestDueDate: dateText(row.oldest),
       })),
@@ -417,10 +418,10 @@ export class DashboardService {
       count: rows[0] ? int(rows[0].total) : 0,
       rows: rows.map((row) => ({
         productId: int(row.product_id),
-        sku: String(row.sku),
-        name: String(row.name),
+        sku: scalar(row.sku),
+        name: scalar(row.name),
         warehouseId: int(row.warehouse_id),
-        warehouseName: String(row.warehouse_name),
+        warehouseName: scalar(row.warehouse_name),
         onHand: dec(row.on_hand).toFixed(),
         minQty: dec(row.min_qty).toFixed(),
       })),
@@ -447,7 +448,7 @@ export class DashboardService {
     const total = dec(row.total);
     return {
       userId: int(row.rep_user_id),
-      name: String(row.full_name),
+      name: scalar(row.full_name),
       sales: money(sales),
       share: total.gt(0) ? pct(sales.div(total).times(100)) : null,
     };
