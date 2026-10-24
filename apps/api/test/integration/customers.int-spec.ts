@@ -405,4 +405,88 @@ describe('customers', () => {
       contact: { name: 'Эхний хүн', phone: '+97699001122' },
     });
   });
+
+  it('keeps categories and suggests the next code of a category (ADR-0107)', async () => {
+    const category = async (token: string, name: string) =>
+      http()
+        .post('/api/v1/customer-categories')
+        .set(bearer(token))
+        .set(idempotency())
+        .send({ name });
+    await http().get('/api/v1/customer-categories').set(bearer(worker)).expect(403);
+    await category(worker, 'Хориотой').then((res) => expect(res.status).toBe(403));
+    const ward = (await category(office, '  1-р  хороо ')).body as { id: number; name: string };
+    expect(ward).toMatchObject({ name: '1-р хороо', active: true, sortOrder: 10 });
+    const sum = (await category(admin, 'Алаг-Эрдэнэ')).body as { id: number };
+    const empty = (await category(admin, 'Хоосон')).body as { id: number };
+    const twin = await category(admin, '1-Р ХОРОО');
+    expect(twin.status).toBe(409);
+    expect(twin.body).toMatchObject({
+      code: 'DUPLICATE_VALUE',
+      params: { constraint: 'customer_categories_name_key_key' },
+    });
+
+    await api.customer({ code: '90101', name: 'Ангилал А1', categoryId: ward.id });
+    await api.customer({ code: '90102', name: 'Ангилал А2', categoryId: ward.id });
+    // Another category took the ward's next number: the suggestion steps over it.
+    await api.customer({ code: '90103', name: 'Ангилал Б1', categoryId: sum.id });
+    const next = async (categoryId?: number) =>
+      (
+        await http()
+          .get('/api/v1/customers/next-code')
+          .query(categoryId ? { categoryId } : {})
+          .set(bearer(office))
+          .expect(200)
+      ).body.code as string;
+    expect(await next(ward.id)).toBe('90104');
+    expect(await next(sum.id)).toBe('90104');
+    const global = await next();
+    expect(await next(empty.id)).toBe(global);
+    const allocated = await api.customer({ name: 'Ангилал А3', categoryId: ward.id });
+    expect(allocated).toMatchObject({ code: '90104', categoryId: ward.id });
+
+    const rows = (
+      await http()
+        .get('/api/v1/customers')
+        .query({ categoryId: ward.id })
+        .set(bearer(office))
+        .expect(200)
+    ).body.data as { code: string; categoryId: number; categoryName: string }[];
+    expect(rows.map((row) => row.code).sort()).toEqual(['90101', '90102', '90104']);
+    expect(rows[0]).toMatchObject({ categoryId: ward.id, categoryName: '1-р хороо' });
+
+    const moved = await http()
+      .patch(`/api/v1/customers/${allocated.id}`)
+      .set(bearer(office))
+      .send({ categoryId: sum.id })
+      .expect(200);
+    expect(moved.body.categoryId).toBe(sum.id);
+    await http()
+      .patch(`/api/v1/customer-categories/${empty.id}`)
+      .set(bearer(office))
+      .send({ active: false, name: 'Хасагдсан', sortOrder: 5 })
+      .expect(200)
+      .then((res) => expect(res.body).toMatchObject({ active: false, name: 'Хасагдсан' }));
+    const retired = await http()
+      .post('/api/v1/customers')
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({
+        kind: 'COMPANY',
+        name: 'Хасагдсанд',
+        settlementGroup: 'DAY_20',
+        categoryId: empty.id,
+      })
+      .expect(409);
+    expect(retired.body.code).toBe('CUSTOMER_CATEGORY_INACTIVE');
+    await http()
+      .patch(`/api/v1/customers/${allocated.id}`)
+      .set(bearer(office))
+      .send({ categoryId: 999999 })
+      .expect(422);
+    const listed = (
+      await http().get('/api/v1/customer-categories').set(bearer(accountant)).expect(200)
+    ).body as { name: string; active: boolean }[];
+    expect(listed.map((entry) => entry.name)).toEqual(['Хасагдсан', '1-р хороо', 'Алаг-Эрдэнэ']);
+  });
 });

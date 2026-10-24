@@ -168,8 +168,11 @@ const identifiers = (values: CustomerFormValues) => ({
   consumerNo: values.kind === 'INDIVIDUAL' ? orNull(cleanTaxNumber(values.consumerNo)) : null,
   phone: orNull(values.phone),
   note: orNull(values.note),
-  categoryId: values.categoryId === '' ? null : Number.parseInt(values.categoryId, 10),
 });
+
+/** The chosen category's id (ADR-0107); null = none. */
+const categoryOf = (values: CustomerFormValues) =>
+  values.categoryId === '' ? null : Number.parseInt(values.categoryId, 10);
 
 /**
  * The create body. The suggested code is left to the server, which allocates it under a lock; the
@@ -186,6 +189,7 @@ export function customerCreateBody(
     kind: values.kind,
     ...(values.code === suggestedCode ? {} : { code: values.code }),
     ...identifiers(values),
+    ...(categoryOf(values) === null ? {} : { categoryId: categoryOf(values) }),
     // The schema refuses an empty group before a body is built.
     settlementGroup: values.settlementGroup as SettlementGroup,
     ...(payerTicked ? { vatPayer: values.vatPayer, cityPayer: values.cityPayer } : {}),
@@ -213,6 +217,7 @@ export function customerUpdateBody(
     kind: values.kind,
     status: values.status,
     ...identifiers(values),
+    categoryId: categoryOf(values),
     ...(payerChanged ? { vatPayer: values.vatPayer, cityPayer: values.cityPayer } : {}),
   };
 }

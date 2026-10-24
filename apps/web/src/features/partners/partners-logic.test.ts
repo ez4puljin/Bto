@@ -34,6 +34,7 @@ const CUSTOMER: components['schemas']['CustomerDetail'] = {
   creditLimit: '5000000.00',
   settlementGroup: 'MONTH_END',
   creditHoldReason: null,
+  categoryId: 4,
   note: null,
   createdAt: '2026-10-01T02:00:00.000Z',
   updatedAt: '2026-10-01T02:00:00.000Z',
@@ -101,6 +102,20 @@ describe('customer bodies', () => {
     expect(customerUpdateBody(customerValues(CUSTOMER), CUSTOMER)).not.toHaveProperty(
       'settlementGroup',
     );
+  });
+
+  it('sends the category: on create only when chosen, on update always (ADR-0107)', () => {
+    const values = { ...emptyCustomer('1002'), name: 'Шинэ', settlementGroup: 'DAY_20' as const };
+    expect(customerCreateBody(values, '1002')).not.toHaveProperty('categoryId');
+    expect(customerCreateBody({ ...values, categoryId: '12' }, '1002')).toMatchObject({
+      categoryId: 12,
+    });
+    const unchanged = customerValues(CUSTOMER);
+    expect(unchanged.categoryId).toBe('4');
+    expect(customerUpdateBody(unchanged, CUSTOMER)).toMatchObject({ categoryId: 4 });
+    expect(customerUpdateBody({ ...unchanged, categoryId: '' }, CUSTOMER)).toMatchObject({
+      categoryId: null,
+    });
   });
 
   it('sends the payer flags on update only when they changed', () => {
