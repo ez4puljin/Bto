@@ -6,7 +6,17 @@ import type { Db } from '../../../common/db/db.types';
 import type { AuthContext } from '../../identity';
 import { ReportContext } from './report-context';
 import { checkedRange, type DateRange } from './report-periods';
-import { allOf, dateText, dec, int, intOrNull, money, rowsOf, searchSql, textOrNull } from './report-sql';
+import {
+  allOf,
+  dateText,
+  dec,
+  int,
+  intOrNull,
+  money,
+  rowsOf,
+  searchSql,
+  textOrNull,
+} from './report-sql';
 
 export const AP_ENTRY_KINDS = ['PURCHASE', 'OPENING', 'PAYMENT', 'OTHER_BILL'] as const;
 export type ApEntryKind = (typeof AP_ENTRY_KINDS)[number];
@@ -54,7 +64,10 @@ export class SupplierReportService {
     private readonly context: ReportContext,
   ) {}
 
-  async suppliers(ctx: AuthContext, query: { from: string; to: string; q?: string }): Promise<SupplierReport> {
+  async suppliers(
+    ctx: AuthContext,
+    query: { from: string; to: string; q?: string },
+  ): Promise<SupplierReport> {
     const scope = await this.context.scope(ctx);
     const range = checkedRange(query.from, query.to);
     const inRange = sql`e.entry_date BETWEEN ${range.from}::date AND ${range.to}::date`;
@@ -74,7 +87,13 @@ export class SupplierReportService {
            GROUP BY e.party_id, e.supplier_id, s.code, s.name, e.party_name`,
     );
     const zero = () => new Decimal(0);
-    const totals = { purchases: zero(), purchasesExVat: zero(), otherBills: zero(), payments: zero(), balance: zero() };
+    const totals = {
+      purchases: zero(),
+      purchasesExVat: zero(),
+      otherBills: zero(),
+      payments: zero(),
+      balance: zero(),
+    };
     const out = rows
       .map((row) => {
         const values = {
@@ -123,7 +142,11 @@ export class SupplierReportService {
   }
 
   /** One supplier's entries in the period, oldest first, with the goods receipt behind each purchase. */
-  async entries(ctx: AuthContext, partyId: number, query: { from: string; to: string }): Promise<SupplierEntry[]> {
+  async entries(
+    ctx: AuthContext,
+    partyId: number,
+    query: { from: string; to: string },
+  ): Promise<SupplierEntry[]> {
     const scope = await this.context.scope(ctx);
     const range = checkedRange(query.from, query.to);
     const rows = await rowsOf(
@@ -144,7 +167,8 @@ export class SupplierReportService {
         kind: row.kind as ApEntryKind,
         number: textOrNull(row.number),
         receiptId:
-          receipt && (row.source_doc_type === 'GOODS_RECEIPT' || row.source_doc_type === 'RECEIPT_RECOST')
+          receipt &&
+          (row.source_doc_type === 'GOODS_RECEIPT' || row.source_doc_type === 'RECEIPT_RECOST')
             ? Number.parseInt(receipt[1] ?? '', 10)
             : null,
         amount: money(dec(row.amount)),

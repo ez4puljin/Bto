@@ -6,7 +6,17 @@ import type { Db } from '../../../common/db/db.types';
 import type { AuthContext } from '../../identity';
 import { ReportContext } from './report-context';
 import { checkedRange, type DateRange } from './report-periods';
-import { allOf, dateText, dec, intOrNull, marginPct, money, pct, rowsOf, textOrNull } from './report-sql';
+import {
+  allOf,
+  dateText,
+  dec,
+  intOrNull,
+  marginPct,
+  money,
+  pct,
+  rowsOf,
+  textOrNull,
+} from './report-sql';
 
 export const PROFIT_GROUPINGS = ['customer', 'product', 'category', 'rep'] as const;
 export type ProfitGrouping = (typeof PROFIT_GROUPINGS)[number];
@@ -18,7 +28,16 @@ export type SalesSource = (typeof SALES_SOURCES)[number];
  * What a row stands for: a customer, product, category or order author (USER), «Bto300» orders
  * (APP), the supermarket (POS), re-costing differences (COST_ADJ) or nothing known (NONE).
  */
-export const PROFIT_ROW_KINDS = ['CUSTOMER', 'PRODUCT', 'CATEGORY', 'USER', 'APP', 'POS', 'COST_ADJ', 'NONE'] as const;
+export const PROFIT_ROW_KINDS = [
+  'CUSTOMER',
+  'PRODUCT',
+  'CATEGORY',
+  'USER',
+  'APP',
+  'POS',
+  'COST_ADJ',
+  'NONE',
+] as const;
 export type ProfitRowKind = (typeof PROFIT_ROW_KINDS)[number];
 
 export interface SalesFilter {
@@ -66,7 +85,13 @@ export interface ProfitReport extends DateRange {
   others: ProfitTotals | null;
 }
 
-export const SALES_DOC_KINDS = ['INVOICE', 'CREDIT_NOTE', 'POS_SALE', 'POS_RETURN', 'COST_ADJ'] as const;
+export const SALES_DOC_KINDS = [
+  'INVOICE',
+  'CREDIT_NOTE',
+  'POS_SALE',
+  'POS_RETURN',
+  'COST_ADJ',
+] as const;
 export type SalesDocKind = (typeof SALES_DOC_KINDS)[number];
 
 export interface SalesDocument {
@@ -114,7 +139,13 @@ function filterSql(filter: SalesFilter, range: DateRange): SQL {
 
 function totalsOf(sales: Decimal, returns: Decimal, cost: Decimal): ProfitTotals {
   const profit = sales.minus(cost);
-  return { sales: money(sales), returns: money(returns), cost: money(cost), profit: money(profit), margin: pct(marginPct(profit, sales)) };
+  return {
+    sales: money(sales),
+    returns: money(returns),
+    cost: money(cost),
+    profit: money(profit),
+    margin: pct(marginPct(profit, sales)),
+  };
 }
 
 /**

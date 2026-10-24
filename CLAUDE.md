@@ -39,6 +39,7 @@ Confirmed 2026-10-10 from the npm registry (exact pins in every `package.json`; 
 | vite, @vitejs/plugin-react, vitest | 8.3.4, 6.1.2, 5.0.3 | |
 | react, react-dom, react-router, @tanstack/react-query | 19.2.3, 19.2.3, 7.18.4, 5.104.1 | ONE React workspace-wide, the Expo SDK's (ADR-0061; a test fails on a second copy); v8 of React Router exists; stay on 7 (docs: reactrouter.com/7.18.4) |
 | tailwindcss, shadcn, radix-ui, cn, lucide-react | 4.3.3, 4.21.4 (`radix-nova`), 1.7.0, 0.4.0, 1.53.0 | never `shadcn init --defaults` |
+| recharts, react-is | 3.10.1, 19.2.3 (web only) | the reports' charts (ADR-0108); colours only from the design tokens |
 | i18next, react-i18next, @fontsource-variable/inter | 26.4.2, 17.0.16, 5.3.0 | Inter is the web font (ADR-0042); PDFs embed Noto Sans (ADR-0011) |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | |
 | TanStack Table | not used in delivery 1 (decided 2026-10-11): plain shadcn tables, server-side filters, keyset "load more" | choose 8.21.3 (frozen since 2025-04) or 9.x when a screen first needs client-side sorting or grouping |

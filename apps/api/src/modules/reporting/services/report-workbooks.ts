@@ -1,6 +1,10 @@
 import { AGING_BUCKETS } from '@tugeel/shared/finance';
 import mn from '@tugeel/shared/i18n/mn.json';
-import { type ExcelColumn, type ExcelRow, tableWorkbook } from '../../../common/excel/table-workbook';
+import {
+  type ExcelColumn,
+  type ExcelRow,
+  tableWorkbook,
+} from '../../../common/excel/table-workbook';
 import type { Aging } from './aging.service';
 import type { Dashboard } from './dashboard.service';
 import type { ProfitReport, ProfitRow } from './profit.service';
@@ -28,15 +32,35 @@ export function dashboardWorkbook(report: Dashboard): Promise<Buffer> {
     [d.returns, report.returns, null, null],
   ];
   if (report.grossProfit && report.margin) {
-    rows.push([d.grossProfit, report.grossProfit.current, report.grossProfit.previous, report.grossProfit.lastYear]);
+    rows.push([
+      d.grossProfit,
+      report.grossProfit.current,
+      report.grossProfit.previous,
+      report.grossProfit.lastYear,
+    ]);
     rows.push([d.margin, report.margin.current, report.margin.previous, report.margin.lastYear]);
   }
-  rows.push([d.receivables, report.receivables.current, report.receivables.previous, report.receivables.lastYear]);
+  rows.push([
+    d.receivables,
+    report.receivables.current,
+    report.receivables.previous,
+    report.receivables.lastYear,
+  ]);
   rows.push([d.overdue, report.overdue, null, null]);
   if (report.stockValue) {
-    rows.push([d.stockValue, report.stockValue.current, report.stockValue.previous, report.stockValue.lastYear]);
+    rows.push([
+      d.stockValue,
+      report.stockValue.current,
+      report.stockValue.previous,
+      report.stockValue.lastYear,
+    ]);
   }
-  rows.push([d.turnoverDays, report.turnoverDays === null ? null : String(report.turnoverDays), null, null]);
+  rows.push([
+    d.turnoverDays,
+    report.turnoverDays === null ? null : String(report.turnoverDays),
+    null,
+    null,
+  ]);
   for (const point of report.trend) {
     rows.push([`${d.monthSales} ${point.month}`, point.sales, null, point.lastYearSales]);
   }
@@ -66,7 +90,15 @@ export function agingWorkbook(report: Aging): Promise<Buffer> {
     row.total,
     row.oldestDueDate,
   ]);
-  rows.push([null, a.total, null, ...AGING_BUCKETS.map((b) => report.totals[b]), report.credit, report.total, null]);
+  rows.push([
+    null,
+    a.total,
+    null,
+    ...AGING_BUCKETS.map((b) => report.totals[b]),
+    report.credit,
+    report.total,
+    null,
+  ]);
   return sheet(`${a.title} ${report.date}`, columns, rows);
 }
 
@@ -90,7 +122,12 @@ export function profitWorkbook(report: ProfitReport): Promise<Buffer> {
     num(p.profit),
     num(p.margin),
   ];
-  const line = (code: string | null, name: string | null, qty: string | null, t: ProfitReport['totals']): ExcelRow => [
+  const line = (
+    code: string | null,
+    name: string | null,
+    qty: string | null,
+    t: ProfitReport['totals'],
+  ): ExcelRow => [
     code,
     name,
     ...(withQty ? [qty] : []),

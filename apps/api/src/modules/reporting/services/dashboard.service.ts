@@ -6,7 +6,13 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import type { AuthContext } from '../../identity';
 import { ReportContext, type ReportScope } from './report-context';
-import { type DateRange, daysIn, type MonthPeriods, monthPeriods, trailingMonths } from './report-periods';
+import {
+  type DateRange,
+  daysIn,
+  type MonthPeriods,
+  monthPeriods,
+  trailingMonths,
+} from './report-periods';
 import {
   dateText,
   dec,
@@ -157,7 +163,10 @@ export class DashboardService {
           if (row.margin === null) return false;
           const now = new Decimal(row.margin);
           if (now.lt(scope.threshold)) return true;
-          return row.previousMargin !== null && new Decimal(row.previousMargin).minus(now).gte(FALLING_MARGIN_POINTS);
+          return (
+            row.previousMargin !== null &&
+            new Decimal(row.previousMargin).minus(now).gte(FALLING_MARGIN_POINTS)
+          );
         })
       : [];
     falling.sort((a, b) => new Decimal(a.margin ?? 0).cmp(new Decimal(b.margin ?? 0)));
@@ -313,7 +322,11 @@ export class DashboardService {
             FROM reporting.control_daily
            WHERE company_code = ${scope.company} AND control = 'RECEIVABLE'`,
     );
-    return { current: money(dec(row?.c)), previous: money(dec(row?.p)), lastYear: money(dec(row?.y)) };
+    return {
+      current: money(dec(row?.c)),
+      previous: money(dec(row?.p)),
+      lastYear: money(dec(row?.y)),
+    };
   }
 
   /** Overdue today: the open debit items due before today, the customers and the five largest. */
@@ -362,8 +375,12 @@ export class DashboardService {
       sql`SELECT coalesce(sum(on_hand * avg_cost), 0) AS value FROM public.warehouse_stock`,
     );
     const now = dec(live?.value);
-    const current = periods.running || periods.current.to >= scope.today ? now : await at(periods.current.to);
-    const [previous, lastYear] = await Promise.all([at(periods.previous.to), at(periods.lastYear.to)]);
+    const current =
+      periods.running || periods.current.to >= scope.today ? now : await at(periods.current.to);
+    const [previous, lastYear] = await Promise.all([
+      at(periods.previous.to),
+      at(periods.lastYear.to),
+    ]);
     const [avg] = await rowsOf(
       this.db,
       sql`SELECT avg(v) AS value FROM (
@@ -371,7 +388,11 @@ export class DashboardService {
              WHERE ${between('snapshot_date', periods.current)} GROUP BY snapshot_date) x`,
     );
     return {
-      values: { current: moneyOrNull(current), previous: moneyOrNull(previous), lastYear: moneyOrNull(lastYear) },
+      values: {
+        current: moneyOrNull(current),
+        previous: moneyOrNull(previous),
+        lastYear: moneyOrNull(lastYear),
+      },
       average: decOrNull(avg?.value) ?? current,
     };
   }

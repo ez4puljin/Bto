@@ -86,6 +86,8 @@ SELECT 'COST_ADJ', a.doc_id, NULL::text, NULL::bigint, a.effective_date, 'COST_A
 CREATE MATERIALIZED VIEW reporting.mv_sales_daily AS
 SELECT f.day, f.source, f.channel, f.warehouse_id, w.branch_id, f.customer_id, f.product_id,
        p.category_id, f.rep_user_id,
+       concat_ws(':', f.day, f.source, f.channel, coalesce(f.warehouse_id, 0), coalesce(f.customer_id, 0),
+                 f.product_id, coalesce(f.rep_user_id, 0)) AS row_key,
        sum(f.qty_base)::numeric(18, 3) AS qty_base,
        sum(f.net_sales)::numeric(16, 2) AS net_sales,
        round(sum(f.cost), 2)::numeric(16, 2) AS cost,
@@ -98,11 +100,9 @@ SELECT f.day, f.source, f.channel, f.warehouse_id, w.branch_id, f.customer_id, f
           p.category_id, f.rep_user_id
 WITH DATA;
 --> statement-breakpoint
--- REFRESH … CONCURRENTLY needs a unique index without a predicate (branch and category follow
--- from the warehouse and the product).
-CREATE UNIQUE INDEX mv_sales_daily_key ON reporting.mv_sales_daily
-  (day, source, channel, coalesce(warehouse_id, 0), coalesce(customer_id, 0), product_id,
-   coalesce(rep_user_id, 0));
+-- REFRESH … CONCURRENTLY needs a unique index on plain columns, without a predicate: row_key
+-- spells the grouping (branch and category follow from the warehouse and the product).
+CREATE UNIQUE INDEX mv_sales_daily_key ON reporting.mv_sales_daily (row_key);
 --> statement-breakpoint
 CREATE INDEX mv_sales_daily_product ON reporting.mv_sales_daily (product_id, day);
 --> statement-breakpoint

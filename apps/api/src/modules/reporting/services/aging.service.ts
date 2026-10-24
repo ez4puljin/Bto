@@ -6,7 +6,17 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import type { AuthContext } from '../../identity';
 import { ReportContext } from './report-context';
-import { allOf, dateText, dec, int, intOrNull, money, rowsOf, searchSql, textOrNull } from './report-sql';
+import {
+  allOf,
+  dateText,
+  dec,
+  int,
+  intOrNull,
+  money,
+  rowsOf,
+  searchSql,
+  textOrNull,
+} from './report-sql';
 
 export type AgingAmounts = Record<AgingBucket, string>;
 
@@ -65,7 +75,10 @@ const bucketSql = (today: string) => {
 const MAX_ROWS = 5_000;
 
 function zeroBuckets(): Record<AgingBucket, Decimal> {
-  return Object.fromEntries(AGING_BUCKETS.map((b) => [b, new Decimal(0)])) as Record<AgingBucket, Decimal>;
+  return Object.fromEntries(AGING_BUCKETS.map((b) => [b, new Decimal(0)])) as Record<
+    AgingBucket,
+    Decimal
+  >;
 }
 
 function moneyBuckets(buckets: Record<AgingBucket, Decimal>): AgingAmounts {
@@ -102,7 +115,11 @@ export class AgingService {
     );
     const byParty = new Map<
       number,
-      { row: Omit<AgingRow, 'buckets' | 'credit' | 'total' | 'overdue'>; buckets: Record<AgingBucket, Decimal>; credit: Decimal }
+      {
+        row: Omit<AgingRow, 'buckets' | 'credit' | 'total' | 'overdue'>;
+        buckets: Record<AgingBucket, Decimal>;
+        credit: Decimal;
+      }
     >();
     for (const row of rows) {
       const partyId = int(row.party_id);
@@ -155,7 +172,12 @@ export class AgingService {
         sort: overdue,
       });
     }
-    out.sort((a, b) => b.sort.cmp(a.sort) || new Decimal(b.total).cmp(new Decimal(a.total)) || a.partyId - b.partyId);
+    out.sort(
+      (a, b) =>
+        b.sort.cmp(a.sort) ||
+        new Decimal(b.total).cmp(new Decimal(a.total)) ||
+        a.partyId - b.partyId,
+    );
     const debitAll = AGING_BUCKETS.reduce((sum, b) => sum.plus(totals[b]), new Decimal(0));
     return {
       date: scope.today,

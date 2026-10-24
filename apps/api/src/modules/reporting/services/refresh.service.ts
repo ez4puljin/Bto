@@ -28,7 +28,8 @@ export class RefreshService {
     );
     return {
       refreshedAt: row?.refreshed_at ? new Date(row.refreshed_at) : null,
-      durationMs: row?.duration_ms === null || row?.duration_ms === undefined ? null : int(row.duration_ms),
+      durationMs:
+        row?.duration_ms === null || row?.duration_ms === undefined ? null : int(row.duration_ms),
     };
   }
 
@@ -41,7 +42,10 @@ export class RefreshService {
   /** «Шинэчлэх»: rebuilds unless the totals are younger than a minute. */
   async refreshByUser(now: Date = new Date()): Promise<RefreshState> {
     const current = await this.state();
-    if (current.refreshedAt && now.getTime() - current.refreshedAt.getTime() < MANUAL_REFRESH_GAP_MS) {
+    if (
+      current.refreshedAt &&
+      now.getTime() - current.refreshedAt.getTime() < MANUAL_REFRESH_GAP_MS
+    ) {
       return current;
     }
     return this.refresh();

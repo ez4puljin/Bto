@@ -94,7 +94,9 @@ export class StockReportService {
         : null,
     ]);
     const kept = filter === 'SLOW' ? sql`r.slow` : filter === 'LOW' ? sql`r.low` : sql`TRUE`;
-    const order = scope.margins ? sql`r.value DESC, r.product_id` : sql`r.on_hand DESC, r.product_id`;
+    const order = scope.margins
+      ? sql`r.value DESC, r.product_id`
+      : sql`r.on_hand DESC, r.product_id`;
     const rows = await rowsOf(
       this.db,
       sql`WITH st AS (
@@ -170,7 +172,10 @@ export class StockReportService {
           coverDays: sold.gt(0) ? onHand.div(sold.div(days)).round().toNumber() : null,
           lastSaleDate: lastSale,
           daysSinceSale: lastSale
-            ? Math.round((Date.parse(`${scope.today}T00:00:00Z`) - Date.parse(`${lastSale}T00:00:00Z`)) / 86_400_000)
+            ? Math.round(
+                (Date.parse(`${scope.today}T00:00:00Z`) - Date.parse(`${lastSale}T00:00:00Z`)) /
+                  86_400_000,
+              )
             : null,
           slow: row.slow === true,
           low: row.low === true,
@@ -187,4 +192,3 @@ export class StockReportService {
     };
   }
 }
-

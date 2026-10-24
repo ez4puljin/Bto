@@ -485,6 +485,13 @@ describe('nightly jobs', () => {
           timezone: 'Asia/Ulaanbaatar',
           missed: 'once',
         },
+        // The management reports' daily totals (ADR-0108 #6): every 15 minutes, day and night.
+        {
+          name: 'reporting.refresh',
+          cron: '*/15 * * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
       ]);
     });
 

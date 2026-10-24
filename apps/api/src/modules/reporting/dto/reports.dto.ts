@@ -1,7 +1,22 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { AGING_BUCKETS, type AgingBucket, SETTLEMENT_GROUPS, type SettlementGroup } from '@tugeel/shared/finance';
+import {
+  AGING_BUCKETS,
+  type AgingBucket,
+  SETTLEMENT_GROUPS,
+  type SettlementGroup,
+} from '@tugeel/shared/finance';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import {
   PROFIT_GROUPINGS,
   PROFIT_ROW_KINDS,
@@ -12,7 +27,11 @@ import {
   type SalesDocKind,
   type SalesSource,
 } from '../services/profit.service';
-import { SLOW_DAY_OPTIONS, STOCK_FILTERS, type StockFilter } from '../services/stock-report.service';
+import {
+  SLOW_DAY_OPTIONS,
+  STOCK_FILTERS,
+  type StockFilter,
+} from '../services/stock-report.service';
 import { AP_ENTRY_KINDS, type ApEntryKind } from '../services/supplier-report.service';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -24,7 +43,8 @@ const queryBoolean = ({ value }: { value: unknown }) => {
   if (value === 'false') return false;
   return value;
 };
-const trimmed = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+const trimmed = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
 
 // ---------------------------------------------------------------- common
 
@@ -36,7 +56,12 @@ export class ReportRangeDto {
 
 @ApiSchema({ name: 'ReportRefreshState' })
 export class RefreshStateDto {
-  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'The daily totals are as of this time' })
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'The daily totals are as of this time',
+  })
   refreshedAt: string | null;
   @ApiProperty({ type: Number, nullable: true }) durationMs: number | null;
 }
@@ -54,8 +79,10 @@ export class DashboardQueryDto {
 @ApiSchema({ name: 'ReportCompared' })
 export class ComparedDto {
   @ApiProperty({ example: '1500000.00' }) current: string;
-  @ApiProperty({ example: '1400000.00', description: 'The same days a month earlier' }) previous: string;
-  @ApiProperty({ example: '1200000.00', description: 'The same days a year earlier' }) lastYear: string;
+  @ApiProperty({ example: '1400000.00', description: 'The same days a month earlier' })
+  previous: string;
+  @ApiProperty({ example: '1200000.00', description: 'The same days a year earlier' })
+  lastYear: string;
 }
 
 @ApiSchema({ name: 'ReportComparedOrNull' })
@@ -108,7 +135,8 @@ export class DashboardTopRepDto {
   @ApiProperty() userId: number;
   @ApiProperty() name: string;
   @ApiProperty() sales: string;
-  @ApiProperty({ type: String, nullable: true, description: 'Percent of wholesale sales' }) share: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Percent of wholesale sales' }) share:
+    string | null;
 }
 
 @ApiSchema({ name: 'DashboardAlerts' })
@@ -123,7 +151,8 @@ export class DashboardAlertsDto {
 @ApiSchema({ name: 'Dashboard' })
 export class DashboardDto {
   @ApiProperty({ example: '2026-10' }) month: string;
-  @ApiProperty({ description: 'The month runs: the comparisons take the same days' }) running: boolean;
+  @ApiProperty({ description: 'The month runs: the comparisons take the same days' })
+  running: boolean;
   @ApiProperty({ type: ReportRangeDto }) current: ReportRangeDto;
   @ApiProperty({ type: ReportRangeDto }) previous: ReportRangeDto;
   @ApiProperty({ type: ReportRangeDto }) lastYear: ReportRangeDto;
@@ -137,7 +166,8 @@ export class DashboardDto {
   @ApiProperty() returns: string;
   @ApiProperty({ type: ComparedOrNullDto, nullable: true }) grossProfit: ComparedOrNullDto | null;
   @ApiProperty({ type: ComparedOrNullDto, nullable: true }) margin: ComparedOrNullDto | null;
-  @ApiProperty({ type: ComparedDto, description: 'Balance at each period end' }) receivables: ComparedDto;
+  @ApiProperty({ type: ComparedDto, description: 'Balance at each period end' })
+  receivables: ComparedDto;
   @ApiProperty({ description: 'Overdue today' }) overdue: string;
   @ApiProperty() overdueCustomers: number;
   @ApiProperty({ type: ComparedOrNullDto, nullable: true }) stockValue: ComparedOrNullDto | null;
@@ -218,7 +248,10 @@ export class AgingItemsDto {
 export class SalesFilterQueryDto {
   @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
   @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
-  @ApiPropertyOptional({ enum: SALES_SOURCES }) @IsOptional() @IsIn(SALES_SOURCES) source?: SalesSource;
+  @ApiPropertyOptional({ enum: SALES_SOURCES })
+  @IsOptional()
+  @IsIn(SALES_SOURCES)
+  source?: SalesSource;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) customerId?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) productId?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) categoryId?: number;
@@ -250,7 +283,8 @@ export class ProfitRowDto extends ProfitTotalsDto {
   @ApiProperty({ type: Number, nullable: true }) id: number | null;
   @ApiProperty({ type: String, nullable: true }) code: string | null;
   @ApiProperty({ type: String, nullable: true }) name: string | null;
-  @ApiProperty({ type: String, nullable: true, description: 'Base units (by product only)' }) qty: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Base units (by product only)' }) qty:
+    string | null;
   @ApiProperty({ description: 'Margin under the threshold, or a loss' }) flagged: boolean;
 }
 
@@ -260,7 +294,11 @@ export class ProfitReportDto extends ReportRangeDto {
   @ApiProperty({ example: '8.0' }) threshold: string;
   @ApiProperty({ type: [ProfitRowDto] }) rows: ProfitRowDto[];
   @ApiProperty({ type: ProfitTotalsDto }) totals: ProfitTotalsDto;
-  @ApiProperty({ type: ProfitTotalsDto, nullable: true, description: 'Rows beyond the first 2,000, summed' })
+  @ApiProperty({
+    type: ProfitTotalsDto,
+    nullable: true,
+    description: 'Rows beyond the first 2,000, summed',
+  })
   others: ProfitTotalsDto | null;
 }
 
@@ -294,7 +332,10 @@ export class StockReportQueryDto {
   @Type(() => Number)
   @IsIn(SLOW_DAY_OPTIONS)
   slowDays?: number;
-  @ApiPropertyOptional({ enum: STOCK_FILTERS }) @IsOptional() @IsIn(STOCK_FILTERS) filter?: StockFilter;
+  @ApiPropertyOptional({ enum: STOCK_FILTERS })
+  @IsOptional()
+  @IsIn(STOCK_FILTERS)
+  filter?: StockFilter;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) warehouseId?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) categoryId?: number;
   @ApiPropertyOptional() @IsOptional() @Transform(trimmed) @IsString() @MaxLength(100) q?: string;
@@ -359,7 +400,8 @@ export class SupplierReportQueryDto {
 
 @ApiSchema({ name: 'SupplierReportTotals' })
 export class SupplierReportTotalsDto {
-  @ApiProperty({ description: 'With VAT, at the delivery notes, net of returns' }) purchases: string;
+  @ApiProperty({ description: 'With VAT, at the delivery notes, net of returns' })
+  purchases: string;
   @ApiProperty() purchasesExVat: string;
   @ApiProperty() otherBills: string;
   @ApiProperty() payments: string;
@@ -376,7 +418,8 @@ export class SupplierReportRowDto extends SupplierReportTotalsDto {
 
 @ApiSchema({ name: 'SupplierReport' })
 export class SupplierReportDto extends ReportRangeDto {
-  @ApiProperty({ type: [SupplierReportRowDto], description: 'Largest purchases first' }) rows: SupplierReportRowDto[];
+  @ApiProperty({ type: [SupplierReportRowDto], description: 'Largest purchases first' })
+  rows: SupplierReportRowDto[];
   @ApiProperty({ type: SupplierReportTotalsDto }) totals: SupplierReportTotalsDto;
 }
 

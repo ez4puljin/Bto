@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query, StreamableFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { XLSX_CONTENT_TYPE } from '@tugeel/shared/files';
 import mn from '@tugeel/shared/i18n/mn.json';
@@ -85,7 +94,10 @@ export class ReportsController {
   @Get('dashboard')
   @RequirePermission('reports.view')
   @ApiOkResponse({ type: DashboardDto })
-  async dashboard(@CurrentUser() ctx: AuthContext, @Query() query: DashboardQueryDto): Promise<DashboardDto> {
+  async dashboard(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: DashboardQueryDto,
+  ): Promise<DashboardDto> {
     return dashboardDto(await this.dashboards.dashboard(ctx, query.month));
   }
 
@@ -93,7 +105,10 @@ export class ReportsController {
   @RequirePermission('reports.view')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async dashboardXlsx(@CurrentUser() ctx: AuthContext, @Query() query: DashboardQueryDto): Promise<StreamableFile> {
+  async dashboardXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: DashboardQueryDto,
+  ): Promise<StreamableFile> {
     const report = await this.dashboards.dashboard(ctx, query.month);
     return xlsxFile(
       await dashboardWorkbook(report),
@@ -113,9 +128,16 @@ export class ReportsController {
   @RequirePermission('reports.view')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async agingXlsx(@CurrentUser() ctx: AuthContext, @Query() query: AgingQueryDto): Promise<StreamableFile> {
+  async agingXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: AgingQueryDto,
+  ): Promise<StreamableFile> {
     const report = await this.agings.aging(ctx, query);
-    return xlsxFile(await agingWorkbook(report), `aging-${report.date}`, `${L.aging.title} ${report.date}`);
+    return xlsxFile(
+      await agingWorkbook(report),
+      `aging-${report.date}`,
+      `${L.aging.title} ${report.date}`,
+    );
   }
 
   @Get('aging/:partyId/items')
@@ -131,7 +153,10 @@ export class ReportsController {
   @Get('profit')
   @RequirePermission('reports.margins.view')
   @ApiOkResponse({ type: ProfitReportDto })
-  profit(@CurrentUser() ctx: AuthContext, @Query() query: ProfitQueryDto): Promise<ProfitReportDto> {
+  profit(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProfitQueryDto,
+  ): Promise<ProfitReportDto> {
     const { by, ...filter } = query;
     return this.profits.profit(ctx, by, filter);
   }
@@ -140,7 +165,10 @@ export class ReportsController {
   @RequirePermission('reports.margins.view')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async profitXlsx(@CurrentUser() ctx: AuthContext, @Query() query: ProfitQueryDto): Promise<StreamableFile> {
+  async profitXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProfitQueryDto,
+  ): Promise<StreamableFile> {
     const { by, ...filter } = query;
     const report = await this.profits.profit(ctx, by, filter);
     return xlsxFile(
@@ -154,14 +182,20 @@ export class ReportsController {
   @Get('sales-documents')
   @RequirePermission('reports.view')
   @ApiOkResponse({ type: SalesDocumentsDto })
-  salesDocuments(@CurrentUser() ctx: AuthContext, @Query() query: SalesFilterQueryDto): Promise<SalesDocumentsDto> {
+  salesDocuments(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SalesFilterQueryDto,
+  ): Promise<SalesDocumentsDto> {
     return this.profits.documents(ctx, query);
   }
 
   @Get('stock')
   @RequirePermission('reports.view')
   @ApiOkResponse({ type: StockReportDto })
-  stock(@CurrentUser() ctx: AuthContext, @Query() query: StockReportQueryDto): Promise<StockReportDto> {
+  stock(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: StockReportQueryDto,
+  ): Promise<StockReportDto> {
     return this.stocks.stock(ctx, query);
   }
 
@@ -169,7 +203,10 @@ export class ReportsController {
   @RequirePermission('reports.view')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async stockXlsx(@CurrentUser() ctx: AuthContext, @Query() query: StockReportQueryDto): Promise<StreamableFile> {
+  async stockXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: StockReportQueryDto,
+  ): Promise<StreamableFile> {
     let page: StockReport = await this.stocks.stock(ctx, { ...query, offset: 0, limit: 500 });
     const all: StockReport = { ...page, rows: [...page.rows] };
     for (let n = 1; n < STOCK_EXCEL_PAGES && page.nextOffset !== null; n += 1) {
@@ -186,7 +223,10 @@ export class ReportsController {
   @Get('suppliers')
   @RequirePermission('reports.margins.view')
   @ApiOkResponse({ type: SupplierReportDto })
-  supplierReport(@CurrentUser() ctx: AuthContext, @Query() query: SupplierReportQueryDto): Promise<SupplierReportDto> {
+  supplierReport(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SupplierReportQueryDto,
+  ): Promise<SupplierReportDto> {
     return this.suppliers.suppliers(ctx, query);
   }
 
@@ -194,7 +234,10 @@ export class ReportsController {
   @RequirePermission('reports.margins.view')
   @ApiProduces(XLSX_CONTENT_TYPE)
   @ApiOkResponse({ schema: { type: 'string', format: 'binary' } })
-  async supplierXlsx(@CurrentUser() ctx: AuthContext, @Query() query: SupplierReportQueryDto): Promise<StreamableFile> {
+  async supplierXlsx(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SupplierReportQueryDto,
+  ): Promise<StreamableFile> {
     const report = await this.suppliers.suppliers(ctx, query);
     return xlsxFile(
       await supplierWorkbook(report),
