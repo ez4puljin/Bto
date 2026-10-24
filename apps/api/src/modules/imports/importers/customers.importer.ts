@@ -13,10 +13,15 @@ import {
   REG_NO_MAX_LENGTH,
   TIN_PATTERN,
 } from '@tugeel/shared/taxpayer';
-import { normalizeName } from '@tugeel/shared/text';
+import { nameKey, normalizeName } from '@tugeel/shared/text';
 import type { Db, Tx } from '../../../common/db/db.types';
 import type { Actor } from '../../identity';
-import { CustomerAddressesService, CustomersService } from '../../partners';
+import {
+  CustomerAddressesService,
+  CustomerCategoriesService,
+  CustomerContactsService,
+  CustomersService,
+} from '../../partners';
 import {
   type AppliedRow,
   type CheckedRow,
@@ -34,12 +39,14 @@ const CODE = /^[0-9]{1,20}$/;
 const CREDIT_MAX = new Decimal('999999999999.99');
 
 type Fields = Partial<{
+  kind: CustomerKind;
   name: string;
   regNo: string | null;
   tin: string | null;
   consumerNo: string | null;
   phone: string | null;
   note: string | null;
+  categoryId: number | null;
   status: 'ACTIVE' | 'INACTIVE';
 }>;
 
@@ -62,16 +69,32 @@ export function settlementGroupCell(text: string): SettlementGroup | null {
   return null;
 }
 
+/**
+ * The kind cell (ADR-0107 #4): «Байгууллага» / «Компани» (COMPANY) or «Хувь хүн» / «Иргэн»
+ * (INDIVIDUAL), also the codes themselves; case and spaces are ignored.
+ */
+export function customerKindCell(text: string): CustomerKind | null {
+  const word = text
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (['байгууллага', 'компани', 'company'].includes(word)) return 'COMPANY';
+  if (['хувьхүн', 'иргэн', 'individual'].includes(word)) return 'INDIVIDUAL';
+  return null;
+}
+
 /** What the commit does with one customer row (JSON: stored as the row's plan). */
 export interface CustomerPlan {
   code: string;
   kind: CustomerKind;
   customerId: number | null;
-  create: (Required<Omit<Fields, 'status'>> & { settlementGroup: SettlementGroup }) | null;
+  create: (Required<Omit<Fields, 'status' | 'kind'>> & { settlementGroup: SettlementGroup }) | null;
   patch: Fields;
   before: Fields;
   /** A new address (the first one becomes the default). */
   address: { address: string | null; lat: string | null; lng: string | null } | null;
+  /** A new contact person (ADR-0107 #4), added when the customer does not have them yet. */
+  contact: { name: string | null; phone: string | null } | null;
   credit: Credit | null;
   creditBefore: (Credit & { creditHold: boolean; creditHoldReason: string | null }) | null;
   changed: string[];
@@ -87,10 +110,11 @@ interface CustomerChanges {
 }
 
 /**
- * Customers (SPEC §5.5, ADR-0036): keyed on the code. The sheet has no company/individual column:
- * the kind is read from the registration number, else the TIN's length, else a company with a
- * warning. Empty cells never clear what a customer already has; a new customer needs its settlement
- * group (ADR-0101).
+ * Customers (SPEC §5.5, ADR-0036): keyed on the code. The kind comes from its column (ADR-0107),
+ * else from the registration number, else the TIN's length, else a company with a warning. The
+ * category is an active one by name; a contact person is added when the customer does not have
+ * them yet. Empty cells never clear what a customer already has; a new customer needs its
+ * settlement group (ADR-0101).
  */
 @Injectable()
 export class CustomersImporter implements Importer<CustomerPlan> {
@@ -99,6 +123,8 @@ export class CustomersImporter implements Importer<CustomerPlan> {
   constructor(
     private readonly customers: CustomersService,
     private readonly addresses: CustomerAddressesService,
+    private readonly contacts: CustomerContactsService,
+    private readonly categories: CustomerCategoriesService,
   ) {}
 
   async validate(
@@ -121,6 +147,27 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         )
       ).map((customer) => [customer.code, customer]),
     );
+    const categoryOf = new Map(
+      (
+        await this.categories.findByNames(
+          rows.flatMap((row) => {
+            const text = row.raw.category?.trim();
+            return text ? [text] : [];
+          }),
+          executor,
+        )
+      ).map((category) => [category.nameKey, category]),
+    );
+    const contactsOf = new Map<number, { name: string | null; phone: string | null }[]>();
+    for (const contact of await this.contacts.ofCustomers(
+      [...existing.values()].map((customer) => customer.id),
+      executor,
+    )) {
+      contactsOf.set(contact.customerId, [
+        ...(contactsOf.get(contact.customerId) ?? []),
+        { name: contact.name, phone: contact.phone },
+      ]);
+    }
     const addressesOf = new Map<number, { address: string | null; lat: Decimal | null }[]>();
     for (const address of await this.addresses.ofCustomers(
       [...existing.values()].map((customer) => customer.id),
@@ -143,16 +190,41 @@ export class CustomersImporter implements Importer<CustomerPlan> {
       const tinText = check.text('tin');
       const tin = tinText === null ? null : cleanTaxNumber(tinText);
       if (tin !== null && !TIN_PATTERN.test(tin)) check.error('tin', 'FORMAT');
+      const kindText = check.text('kind');
+      const kindCell = kindText === null ? null : customerKindCell(kindText);
+      if (kindText !== null && kindCell === null) check.error('kind', 'FORMAT');
       let kind: CustomerKind;
-      if (customer) {
+      if (kindCell !== null) {
+        kind = kindCell;
+      } else if (customer) {
         kind = customer.kind;
       } else {
         const guess = guessCustomerKind(regNo, tin);
         kind = guess.kind;
-        if (guess.source === 'DEFAULT') check.warn(null, 'KIND_GUESSED');
+        if (guess.source === 'DEFAULT' && kindText === null) check.warn(null, 'KIND_GUESSED');
       }
       if (tin !== null && TIN_PATTERN.test(tin) && !isTinFor(kind, tin))
         check.error('tin', 'FORMAT');
+      // A kind changed by the sheet must still fit what the customer already has.
+      if (customer && kindCell !== null && kindCell !== customer.kind) {
+        const keptTin = tin === null ? customer.tin : null;
+        if (keptTin !== null && !isTinFor(kind, keptTin)) check.error('kind', 'NOT_ALLOWED');
+        if (kind !== 'INDIVIDUAL' && customer.consumerNo !== null)
+          check.error('kind', 'NOT_ALLOWED');
+      }
+      const categoryText = check.text('category');
+      let categoryId: number | null = null;
+      if (categoryText !== null) {
+        const category = categoryOf.get(nameKey(normalizeName(categoryText)));
+        if (!category) check.error('category', 'NOT_FOUND');
+        else if (!category.active) check.error('category', 'NOT_ALLOWED');
+        else categoryId = category.id;
+      }
+      const contactName = check.text('contactName');
+      if (contactName !== null && contactName.length > 100) check.error('contactName', 'TOO_LONG');
+      const contactPhoneText = check.text('contactPhone');
+      const contactPhone = contactPhoneText === null ? null : normalizeMnPhone(contactPhoneText);
+      if (contactPhoneText !== null && contactPhone === null) check.error('contactPhone', 'FORMAT');
       const consumerText = check.text('consumerNo');
       const consumerNo = consumerText === null ? null : cleanTaxNumber(consumerText);
       if (consumerNo !== null) {
@@ -198,6 +270,7 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         patch: {},
         before: {},
         address: null,
+        contact: null,
         credit: null,
         creditBefore: null,
         changed: [],
@@ -210,6 +283,7 @@ export class CustomersImporter implements Importer<CustomerPlan> {
           consumerNo,
           phone,
           note,
+          categoryId,
           settlementGroup: settlementGroup ?? 'DAY_20',
         };
       } else {
@@ -223,12 +297,14 @@ export class CustomersImporter implements Importer<CustomerPlan> {
           plan.before[key] = current;
           plan.changed.push(key);
         };
+        set('kind', kindCell, customer.kind);
         set('name', name, customer.name);
         set('regNo', regNo, customer.regNo);
         set('tin', tin, customer.tin);
         set('consumerNo', consumerNo, customer.consumerNo);
         set('phone', phone, customer.phone);
         set('note', note, customer.note);
+        set('categoryId', categoryId, customer.categoryId);
         if (customer.status === 'INACTIVE') {
           set('status', 'ACTIVE', 'INACTIVE');
           check.warn(null, 'REACTIVATED');
@@ -248,6 +324,18 @@ export class CustomersImporter implements Importer<CustomerPlan> {
             lng: point?.lng.toFixed() ?? null,
           };
           if (customer) plan.changed.push('address');
+        }
+      }
+      if (contactName !== null || contactPhone !== null) {
+        const known = customer ? (contactsOf.get(customer.id) ?? []) : [];
+        const same = known.some(
+          (contact) =>
+            (contactName === null || contact.name === contactName) &&
+            (contactPhone === null || contact.phone === contactPhone),
+        );
+        if (!same) {
+          plan.contact = { name: contactName, phone: contactPhone };
+          if (customer) plan.changed.push('contact');
         }
       }
       // A new customer takes its group at creation; the credit step then sets only the limit.
@@ -327,6 +415,7 @@ export class CustomersImporter implements Importer<CustomerPlan> {
         }
       }
       if (customerId === null) throw new Error(`customer ${plan.code} has no id`);
+      if (plan.contact) await this.contacts.addInTx(tx, actor, customerId, plan.contact);
       if (plan.credit) {
         await this.customers.setCreditInTx(tx, actor, customerId, {
           creditLimit:
@@ -353,7 +442,7 @@ export class CustomersImporter implements Importer<CustomerPlan> {
 
   /**
    * Created customers become inactive; on updated ones, fields and credit terms still holding the
-   * imported value get their old value back. Addresses an import added stay (they may be used).
+   * imported value get their old value back. Addresses and contacts an import added stay.
    */
   async revert(
     tx: Tx,

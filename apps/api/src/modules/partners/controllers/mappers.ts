@@ -66,6 +66,8 @@ export function toCustomerListItemDto(row: CustomerListItem): CustomerListItemDt
     creditLimit: row.creditLimit?.toFixed(2) ?? null,
     settlementGroup: row.settlementGroup,
     creditHoldReason: row.creditHoldReason,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName,
     overdue: row.overdue
       ? { amount: row.overdue.amount.toFixed(0), oldestDueDate: row.overdue.oldestDueDate }
       : null,
@@ -100,6 +102,7 @@ export function toCustomerDetailDto(detail: CustomerDetail): CustomerDetailDto {
     creditLimit: detail.creditLimit?.toFixed(2) ?? null,
     settlementGroup: detail.settlementGroup,
     creditHoldReason: detail.creditHoldReason,
+    categoryId: detail.categoryId,
     note: detail.note,
     createdAt: detail.createdAt.toISOString(),
     updatedAt: detail.updatedAt.toISOString(),

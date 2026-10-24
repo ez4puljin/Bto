@@ -32,6 +32,7 @@ export {
 } from '../modules/catalog/schema';
 export {
   customerAddresses,
+  customerCategories,
   customerContacts,
   customers,
   productSuppliers,

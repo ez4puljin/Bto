@@ -54,6 +54,8 @@ const summary = (
   settlementGroup: 'DAY_20',
   overdue: null,
   creditHoldReason: null,
+  categoryId: null,
+  categoryName: null,
   note: null,
   gps: overrides.hasGps === false ? null : POINT,
   contact: null,
@@ -125,6 +127,7 @@ const CUSTOMER: Schemas['CustomerDetail'] = {
   creditLimit: null,
   settlementGroup: 'DAY_20',
   creditHoldReason: null,
+  categoryId: null,
   note: null,
   createdAt: STAMP,
   updatedAt: STAMP,
@@ -257,6 +260,8 @@ describe('customers list', () => {
             creditHold: true,
             creditHoldReason: 'Өр төлөөгүй',
             note: 'Өглөө хүргэнэ',
+            categoryId: 7,
+            categoryName: '13-р хороо',
             contact: { name: 'Бат', phone: '+97688112233' },
           }),
           summary({
@@ -271,11 +276,13 @@ describe('customers list', () => {
     const first = renderApp('/partners/customers', signedIn(OFFICE_ME, routes));
     const table = within(await screen.findByRole('table'));
     expect(await table.findByText('Өр төлөөгүй')).toBeInTheDocument();
+    expect(table.getByText('13-р хороо')).toBeInTheDocument();
     // A user who never chose sees the columns that fit a 1366px screen (ADR-0066).
     const columns = mn.partners.customers.columns;
     const shown = [
       columns.code,
       columns.name,
+      columns.category,
       columns.kind,
       columns.tin,
       columns.phone,

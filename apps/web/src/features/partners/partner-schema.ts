@@ -89,6 +89,8 @@ const customerBase = z.object({
   cityPayer: z.boolean(),
   note: text(1000),
   status: z.enum(PARTNER_STATUSES),
+  /** The category's id as the select holds it; '' = none (ADR-0107). */
+  categoryId: z.string(),
   /** Create only: chosen by the office; later changed on the credit card (ADR-0101 #8). */
   settlementGroup: settlementGroupField,
   /** Create only: the first delivery address. */
@@ -130,6 +132,7 @@ export function emptyCustomer(code: string): CustomerFormValues {
     cityPayer: false,
     note: '',
     status: 'ACTIVE',
+    categoryId: '',
     settlementGroup: '',
     address: '',
     gps: '',
@@ -150,6 +153,7 @@ export function customerValues(customer: CustomerDetail): CustomerFormValues {
     cityPayer: customer.cityPayer,
     note: customer.note ?? '',
     status: customer.status,
+    categoryId: customer.categoryId === null ? '' : String(customer.categoryId),
     settlementGroup: customer.settlementGroup,
     address: '',
     gps: '',
@@ -166,6 +170,10 @@ const identifiers = (values: CustomerFormValues) => ({
   note: orNull(values.note),
 });
 
+/** The chosen category's id (ADR-0107); null = none. */
+const categoryOf = (values: CustomerFormValues) =>
+  values.categoryId === '' ? null : Number.parseInt(values.categoryId, 10);
+
 /**
  * The create body. The suggested code is left to the server, which allocates it under a lock; the
  * payer flags go only when one is ticked (sending them records a manual check).
@@ -181,6 +189,7 @@ export function customerCreateBody(
     kind: values.kind,
     ...(values.code === suggestedCode ? {} : { code: values.code }),
     ...identifiers(values),
+    ...(categoryOf(values) === null ? {} : { categoryId: categoryOf(values) }),
     // The schema refuses an empty group before a body is built.
     settlementGroup: values.settlementGroup as SettlementGroup,
     ...(payerTicked ? { vatPayer: values.vatPayer, cityPayer: values.cityPayer } : {}),
@@ -208,6 +217,7 @@ export function customerUpdateBody(
     kind: values.kind,
     status: values.status,
     ...identifiers(values),
+    categoryId: categoryOf(values),
     ...(payerChanged ? { vatPayer: values.vatPayer, cityPayer: values.cityPayer } : {}),
   };
 }

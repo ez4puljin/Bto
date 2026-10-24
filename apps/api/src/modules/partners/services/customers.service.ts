@@ -37,6 +37,7 @@ import {
 } from '../hooks';
 import { customerAddresses, customerContacts, customers, type PARTNER_STATUSES } from '../schema';
 import { type AddressInput, CustomerAddressesService } from './customer-addresses.service';
+import { CustomerCategoriesService } from './customer-categories.service';
 import { advisoryLock, LOCKS, nextNumericCode, optionalText, partnerSearch } from './support';
 
 type CustomerRow = typeof customers.$inferSelect;
@@ -56,6 +57,8 @@ export interface CustomerInput {
   vatPayer?: boolean;
   cityPayer?: boolean;
   note?: string | null;
+  /** The office's category (ADR-0107); null = none. */
+  categoryId?: number | null;
   /** When its invoices fall due (ADR-0101): chosen at creation, then changed only with the credit. */
   settlementGroup: SettlementGroup;
   /** The first delivery address, created as the default one. */
@@ -96,6 +99,8 @@ export interface CustomerQuery {
   status?: PartnerStatus;
   creditHold?: boolean;
   settlementGroup?: SettlementGroup;
+  /** One category (ADR-0107). */
+  categoryId?: number;
   /** Companies without a TIN: receipts wait for it (SPEC §6.10). */
   tinPending?: boolean;
   /** No GPS point on the default address. */
@@ -157,6 +162,8 @@ export interface CustomerListItem extends CustomerSummary {
   creditHoldReason: string | null;
   /** The overdue receivable (ADR-0101: a reminder, never a block); null when nothing is overdue. */
   overdue: CustomerOverdue | null;
+  categoryId: number | null;
+  categoryName: string | null;
   note: string | null;
   /** The point of the default address. */
   gps: { lat: Decimal; lng: Decimal } | null;
@@ -198,6 +205,7 @@ export class CustomersService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly addresses: CustomerAddressesService,
     private readonly appAccounts: CustomerAccountsService,
+    private readonly categories: CustomerCategoriesService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -232,8 +240,49 @@ export class CustomersService implements OnModuleInit {
     return sql`true`;
   }
 
-  async nextCode(executor: Db | Tx = this.db): Promise<string> {
+  /**
+   * The suggested code of a new customer (ADR-0107 #3): with a category that has customers, the
+   * category's largest code plus one (same width), stepping over codes other categories took;
+   * otherwise the largest code of all plus one.
+   */
+  async nextCode(categoryId?: number | null, executor: Db | Tx = this.db): Promise<string> {
+    if (categoryId) {
+      const [last] = await executor
+        .select({ code: customers.code })
+        .from(customers)
+        .where(eq(customers.categoryId, categoryId))
+        .orderBy(desc(sql`length(${customers.code})`), desc(customers.code))
+        .limit(1);
+      if (last) return this.firstFreeAfter(last.code, executor);
+    }
     return nextNumericCode(executor, 'customers');
+  }
+
+  /**
+   * The first code after `code` that no customer has, keeping its width; past the width's last
+   * number the largest code of all plus one.
+   */
+  private async firstFreeAfter(code: string, executor: Db | Tx): Promise<string> {
+    const width = code.length;
+    const text = (value: bigint) => value.toString().padStart(width, '0');
+    let candidate = BigInt(code) + 1n;
+    for (;;) {
+      if (text(candidate).length !== width) return nextNumericCode(executor, 'customers');
+      // Codes of one width sort as numbers: the taken run from the candidate on, a batch at a time.
+      const taken = await executor
+        .select({ code: customers.code })
+        .from(customers)
+        .where(
+          sql`length(${customers.code}) = ${width} AND ${customers.code} >= ${text(candidate)}`,
+        )
+        .orderBy(asc(customers.code))
+        .limit(500);
+      for (const row of taken) {
+        if (row.code !== text(candidate)) return text(candidate);
+        candidate += 1n;
+      }
+      if (taken.length < 500 && text(candidate).length === width) return text(candidate);
+    }
   }
 
   create(actor: Actor, input: CustomerInput): Promise<CustomerDetail> {
@@ -251,8 +300,9 @@ export class CustomersService implements OnModuleInit {
       consumerNo: input.consumerNo,
       phone: input.phone,
     });
+    if (input.categoryId) await this.categories.assertActive(tx, input.categoryId);
     await advisoryLock(tx, LOCKS.customerCode);
-    const code = input.code ?? (await this.nextCode(tx));
+    const code = input.code ?? (await this.nextCode(input.categoryId, tx));
     const name = normalizeName(input.name);
     const keys = searchKeys(name, [code]);
     const payerChecked = input.vatPayer !== undefined || input.cityPayer !== undefined;
@@ -275,6 +325,7 @@ export class CustomersService implements OnModuleInit {
         taxStatusSource: payerChecked ? 'MANUAL' : null,
         taxStatusCheckedAt: payerChecked ? sql`now()` : null,
         settlementGroup: input.settlementGroup,
+        categoryId: input.categoryId ?? null,
         note: optionalText(input.note) ?? null,
       })
       .returning();
@@ -301,6 +352,9 @@ export class CustomersService implements OnModuleInit {
 
   async updateInTx(tx: Tx, actor: Actor, id: number, patch: CustomerPatch): Promise<void> {
     const before = await this.lockRow(tx, id);
+    if (patch.categoryId && patch.categoryId !== before.categoryId) {
+      await this.categories.assertActive(tx, patch.categoryId);
+    }
     const kind = patch.kind ?? before.kind;
     const values = this.validated(kind, {
       regNo: patch.regNo === undefined ? before.regNo : patch.regNo,
@@ -336,6 +390,7 @@ export class CustomersService implements OnModuleInit {
             }
           : {}),
         ...(patch.note === undefined ? {} : { note: optionalText(patch.note) ?? null }),
+        ...(patch.categoryId === undefined ? {} : { categoryId: patch.categoryId }),
         ...(patch.status === undefined ? {} : { status: patch.status }),
         updatedAt: sql`now()`,
       })
@@ -493,6 +548,8 @@ export class CustomersService implements OnModuleInit {
           settlementGroup: row.settlementGroup,
           creditHoldReason: row.creditHoldReason,
           overdue: overdueOf.get(row.id) ?? null,
+          categoryId: row.categoryId,
+          categoryName: row.categoryName,
           note: row.note,
           gps: point?.lat && point.lng ? { lat: point.lat, lng: point.lng } : null,
           contact: contact ? { name: contact.name, phone: contact.phone } : null,
@@ -608,6 +665,7 @@ export class CustomersService implements OnModuleInit {
     if (query.status) filters.push(eq(customers.status, query.status));
     if (query.creditHold !== undefined) filters.push(eq(customers.creditHold, query.creditHold));
     if (query.settlementGroup) filters.push(eq(customers.settlementGroup, query.settlementGroup));
+    if (query.categoryId) filters.push(eq(customers.categoryId, query.categoryId));
     if (query.tinPending)
       filters.push(sql`${customers.kind} = 'COMPANY' AND ${customers.tin} IS NULL`);
     if (query.gpsMissing) {
@@ -641,6 +699,9 @@ export class CustomersService implements OnModuleInit {
         creditLimit: customers.creditLimit,
         settlementGroup: customers.settlementGroup,
         creditHoldReason: customers.creditHoldReason,
+        categoryId: customers.categoryId,
+        categoryName: sql<string | null>`(SELECT c.name FROM customer_categories c
+          WHERE c.id = customers.category_id)`,
         note: customers.note,
         rank: sql<number>`${rank}`,
       })

@@ -48,6 +48,7 @@ import { SegmentEditorPage, SegmentPage, SegmentsPage } from '@/features/segment
 import { TransferPage, TransfersPage } from '@/features/inventory/transfers-pages';
 import { CustomerCreatePage } from '@/features/partners/customer-create-page';
 import { CustomerPage } from '@/features/partners/customer-page';
+import { CustomerCategoriesPage } from '@/features/partners/customer-categories-page';
 import { CustomersPage } from '@/features/partners/customers-page';
 import {
   SupplierCreatePage,
@@ -282,6 +283,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="partners.customers.read">
                 <CustomersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'partners/customer-categories',
+            handle: { width: 'reading' },
+            element: (
+              <RequirePermission permission="partners.customers.read">
+                <CustomerCategoriesPage />
               </RequirePermission>
             ),
           },

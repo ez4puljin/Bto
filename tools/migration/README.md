@@ -34,3 +34,29 @@ These scripts move the product master of the old system (Erxes) into Bto through
    node tools/migration/erxes-images.mjs --dir tmp/erxes/<day> --phase attach --user <script admin>
    ```
 7. Check: `pnpm inventory:reconcile`, `pnpm finance:reconcile`, the counts against `summary.json`, and the screens.
+
+# The Erkhet customer migration (ADR-0107)
+
+These scripts move Erkhet's customers into Bto through the CUSTOMERS import. They hold no data. The export, the converted sheet and the report stay in the gitignored `tmp/`.
+
+| File | What it does |
+|---|---|
+| `erkhet-customers-map.json` | The owner's decisions, one entry per Erkhet group code in category order: the settlement group, an INDIVIDUAL kind, or `skip` with its reason (Kharkhorin, suppliers, the owner's choice) |
+| `erkhet-customers-rules.mjs` | Pure rules: phones split into the phone, a contact and the note; the «мэйл» cell placed; codes with letters given their category's next free code; categories planned (same names share one). Proved by `erkhet-customers-rules.test.mjs` on synthetic rows (`pnpm lint:guards`) |
+| `erkhet-customers.mjs` | Converts the export into `customers.xlsx`, `categories.json`, `report.xlsx` (rows left out, codes changed, notes) and `summary.json`. An Erkhet group the map does not name stops the run (`unknown-groups.json`) |
+| `erkhet-customers-load.mjs` | Over the local api: creates the missing categories in order, then runs the CUSTOMERS import (`runSheetImport` of `bto-api.mjs`, shared with `erxes-load.mjs`) |
+
+## Run
+
+1. Build the packages (`pnpm build:packages`).
+2. Convert. `--taken` is an optional file of codes Bto already has; a reassigned code steps over them.
+   ```bash
+   node tools/migration/erkhet-customers.mjs --in "<Харилцагч>.xlsx" --out tmp/erkhet-customers/<day>
+   ```
+   Read `summary.json` and `report.xlsx` with the owner before loading.
+3. With the api and the worker running (migration `0045` applied), and a script admin in `tmp/dev-logins.txt`:
+   ```bash
+   node tools/migration/erkhet-customers-load.mjs --dir tmp/erkhet-customers/<day> --user <script admin>
+   ```
+   A refused sheet writes `CUSTOMERS-errors.json` beside it. Finished steps are skipped on a rerun.
+4. Check: the counts per category and per settlement group against `summary.json`, a few customers on the screens, and `pnpm finance:reconcile`.

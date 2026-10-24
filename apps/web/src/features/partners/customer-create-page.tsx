@@ -11,13 +11,15 @@ import { type CustomerFormValues, customerCreateBody, emptyCustomer } from './pa
 
 /**
  * A new customer with the first delivery address (SPEC §5.3). The code field starts with the next
- * free number; the office may type the code from the Excel sheet instead. One Idempotency-Key per
+ * free number, then follows the chosen category's codes (ADR-0107); the office may type the code
+ * from the Excel sheet instead. One Idempotency-Key per
  * page: a resent save never creates a second customer.
  */
 export function CustomerCreatePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const nextCode = useNextCustomerCode();
+  const [categoryId, setCategoryId] = useState<number>();
+  const nextCode = useNextCustomerCode(categoryId);
   const mutations = usePartnersMutations();
   const [key] = useState(randomUuid);
 
@@ -46,6 +48,8 @@ export function CustomerCreatePage() {
           page
           mode="create"
           defaultValues={emptyCustomer(nextCode.data ?? '')}
+          suggestedCode={nextCode.data}
+          onCategoryChange={setCategoryId}
           submitLabel={t('common.save')}
           onCancel={() => void navigate('/partners/customers')}
           onSubmit={create}

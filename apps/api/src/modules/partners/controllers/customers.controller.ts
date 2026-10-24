@@ -32,6 +32,7 @@ import {
   CustomerLookupDto,
   CustomerLookupQueryDto,
   CustomerPageDto,
+  NextCustomerCodeQueryDto,
   UpdateCustomerDto,
 } from '../dto/customers.dto';
 import { PartnerSegmentsService } from '../services/partner-segments.service';
@@ -88,8 +89,8 @@ export class CustomersController {
   @Get('next-code')
   @RequirePermission(MANAGE)
   @ApiOkResponse({ type: NextCodeDto })
-  async nextCode(): Promise<NextCodeDto> {
-    return { code: await this.customers.nextCode() };
+  async nextCode(@Query() query: NextCustomerCodeQueryDto): Promise<NextCodeDto> {
+    return { code: await this.customers.nextCode(query.categoryId) };
   }
 
   @Get(':id')
