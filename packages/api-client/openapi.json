@@ -23313,7 +23313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Aging"
+                  "$ref": "#/components/schemas/AgingReport"
                 }
               }
             }
@@ -41222,35 +41222,33 @@
       "Aging": {
         "type": "object",
         "properties": {
-          "date": {
-            "type": "string"
+          "NOT_DUE": {
+            "type": "string",
+            "example": "150000.00"
           },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AgingRow"
-            }
+          "D1_30": {
+            "type": "string",
+            "example": "0.00"
           },
-          "totals": {
-            "$ref": "#/components/schemas/AgingAmounts"
+          "D31_60": {
+            "type": "string",
+            "example": "0.00"
           },
-          "credit": {
-            "type": "string"
+          "D61_90": {
+            "type": "string",
+            "example": "0.00"
           },
-          "total": {
-            "type": "string"
-          },
-          "overdue": {
-            "type": "string"
+          "D90_PLUS": {
+            "type": "string",
+            "example": "0.00"
           }
         },
         "required": [
-          "date",
-          "rows",
-          "totals",
-          "credit",
-          "total",
-          "overdue"
+          "NOT_DUE",
+          "D1_30",
+          "D31_60",
+          "D61_90",
+          "D90_PLUS"
         ]
       },
       "CustomerBalance": {
@@ -48990,6 +48988,40 @@
           "total",
           "overdue",
           "oldestDueDate"
+        ]
+      },
+      "AgingReport": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgingRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AgingAmounts"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "rows",
+          "totals",
+          "credit",
+          "total",
+          "overdue"
         ]
       },
       "AgingItem": {

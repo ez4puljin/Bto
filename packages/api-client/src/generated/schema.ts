@@ -10896,12 +10896,16 @@ export interface components {
             description: string;
         };
         Aging: {
-            date: string;
-            rows: components["schemas"]["AgingRow"][];
-            totals: components["schemas"]["AgingAmounts"];
-            credit: string;
-            total: string;
-            overdue: string;
+            /** @example 150000.00 */
+            NOT_DUE: string;
+            /** @example 0.00 */
+            D1_30: string;
+            /** @example 0.00 */
+            D31_60: string;
+            /** @example 0.00 */
+            D61_90: string;
+            /** @example 0.00 */
+            D90_PLUS: string;
         };
         CustomerBalance: {
             customerId: number;
@@ -13186,6 +13190,14 @@ export interface components {
             total: string;
             overdue: string;
             oldestDueDate: string | null;
+        };
+        AgingReport: {
+            date: string;
+            rows: components["schemas"]["AgingRow"][];
+            totals: components["schemas"]["AgingAmounts"];
+            credit: string;
+            total: string;
+            overdue: string;
         };
         AgingItem: {
             itemId: number;
@@ -27323,7 +27335,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Aging"];
+                    "application/json": components["schemas"]["AgingReport"];
                 };
             };
             /** @description RFC 9457 problem details */

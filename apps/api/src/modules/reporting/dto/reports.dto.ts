@@ -212,7 +212,7 @@ export class AgingRowDto {
   @ApiProperty({ type: String, nullable: true }) oldestDueDate: string | null;
 }
 
-@ApiSchema({ name: 'Aging' })
+@ApiSchema({ name: 'AgingReport' })
 export class AgingDto {
   @ApiProperty() date: string;
   @ApiProperty({ type: [AgingRowDto] }) rows: AgingRowDto[];
