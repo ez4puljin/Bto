@@ -18,6 +18,7 @@ import { NotificationsHttpModule } from './modules/notifications';
 import { PartnersHttpModule } from './modules/partners';
 import { PosHttpModule } from './modules/pos';
 import { PricingHttpModule } from './modules/pricing';
+import { ReportingHttpModule } from './modules/reporting';
 import { SalesHttpModule } from './modules/sales';
 import { SegmentsHttpModule } from './modules/segments';
 
@@ -45,6 +46,7 @@ import { SegmentsHttpModule } from './modules/segments';
     PosHttpModule,
     NotificationsHttpModule,
     CustomerHttpModule,
+    ReportingHttpModule,
   ],
 })
 export class AppModule {}

@@ -39,6 +39,8 @@ declare module './job-catalog' {
     'finance.reconcile': ScheduledPayload;
     /** Mornings: the customer app's «due soon» and «overdue» invoice reminders (ADR-0079 #8). */
     'notifications.invoiceReminders': ScheduledPayload;
+    /** Every 15 minutes: the daily sales totals of the management reports (ADR-0108 #6). */
+    'reporting.refresh': ScheduledPayload;
   }
 }
 
@@ -66,6 +68,7 @@ const BTO_JOB_QUEUES = {
   'imports.housekeeping': scheduledQueue(),
   'finance.reconcile': scheduledQueue(),
   'notifications.invoiceReminders': scheduledQueue(),
+  'reporting.refresh': scheduledQueue(),
 } as const satisfies Readonly<Partial<Record<JobName, QueueOptions>>>;
 
 /** Every owner's queues: a job name without a queue fails typecheck. */
