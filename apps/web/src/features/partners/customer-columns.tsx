@@ -19,6 +19,7 @@ function overdueTitle(overdue: NonNullable<CustomerListItem['overdue']>, t: TFun
 export const CUSTOMER_COLUMN_KEYS = [
   'code',
   'name',
+  'category',
   'kind',
   'regNo',
   'tin',
@@ -95,6 +96,13 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumn[] = [
         {row.name}
       </Link>
     ),
+  },
+  {
+    // The office's category (ADR-0107), the Erkhet group at the migration.
+    key: 'category',
+    truncate: { text: (row, t) => row.categoryName ?? t('common.none') },
+    className: 'max-w-48',
+    cell: (row, t) => text(row.categoryName, t),
   },
   { key: 'kind', cell: (row, t) => t(`partners.kinds.${row.kind}`) },
   { key: 'regNo', className: 'font-mono', cell: (row, t) => text(row.regNo, t) },

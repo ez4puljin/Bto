@@ -89,6 +89,8 @@ const customerBase = z.object({
   cityPayer: z.boolean(),
   note: text(1000),
   status: z.enum(PARTNER_STATUSES),
+  /** The category's id as the select holds it; '' = none (ADR-0107). */
+  categoryId: z.string(),
   /** Create only: chosen by the office; later changed on the credit card (ADR-0101 #8). */
   settlementGroup: settlementGroupField,
   /** Create only: the first delivery address. */
@@ -130,6 +132,7 @@ export function emptyCustomer(code: string): CustomerFormValues {
     cityPayer: false,
     note: '',
     status: 'ACTIVE',
+    categoryId: '',
     settlementGroup: '',
     address: '',
     gps: '',
@@ -150,6 +153,7 @@ export function customerValues(customer: CustomerDetail): CustomerFormValues {
     cityPayer: customer.cityPayer,
     note: customer.note ?? '',
     status: customer.status,
+    categoryId: customer.categoryId === null ? '' : String(customer.categoryId),
     settlementGroup: customer.settlementGroup,
     address: '',
     gps: '',
@@ -164,6 +168,7 @@ const identifiers = (values: CustomerFormValues) => ({
   consumerNo: values.kind === 'INDIVIDUAL' ? orNull(cleanTaxNumber(values.consumerNo)) : null,
   phone: orNull(values.phone),
   note: orNull(values.note),
+  categoryId: values.categoryId === '' ? null : Number.parseInt(values.categoryId, 10),
 });
 
 /**

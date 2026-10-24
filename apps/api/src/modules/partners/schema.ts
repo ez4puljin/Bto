@@ -40,6 +40,28 @@ const lengthCheck = (column: AnyPgColumn, max: number) =>
   sql`${column} IS NULL OR length(${column}) BETWEEN 1 AND ${sql.raw(String(max))}`;
 
 /**
+ * Customer categories (ADR-0107): the office's flat list of groups, the Erkhet groups at the
+ * migration. Never deleted (customers name them); a retired one stays on its customers and leaves
+ * the pickers. A new customer's suggested code follows its category's codes.
+ */
+export const customerCategories = pgTable(
+  'customer_categories',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('customer_categories_name_key_key').on(t.nameKey),
+    check('customer_categories_name', sql`length(${t.name}) BETWEEN 1 AND 80`),
+  ],
+);
+
+/**
  * Customers (SPEC §5.3, §6.10): every store is its own customer, so registration numbers, TINs and
  * phones may repeat. Kind-specific TIN and registration-number rules live in @tugeel/shared/taxpayer;
  * the database keeps the formats receipts rely on.
@@ -74,6 +96,8 @@ export const customers = pgTable(
     settlementGroup: text('settlement_group', { enum: SETTLEMENT_GROUPS }).notNull(),
     creditHold: boolean('credit_hold').notNull().default(false),
     creditHoldReason: text('credit_hold_reason'),
+    /** The office's category (ADR-0107); NULL = none. */
+    categoryId: ref('category_id').references(() => customerCategories.id),
     note: text('note'),
     status: text('status', { enum: PARTNER_STATUSES }).notNull().default('ACTIVE'),
     createdAt: createdAt(),
@@ -81,6 +105,7 @@ export const customers = pgTable(
   },
   (t) => [
     unique('customers_code_key').on(t.code),
+    index('customers_category_idx').on(t.categoryId, t.id),
     index('customers_name_idx').on(t.name, t.id),
     index('customers_search_text_idx').using('gin', t.searchText.op('gin_trgm_ops')),
     index('customers_search_phonetic_idx').using('gin', t.searchPhonetic.op('gin_trgm_ops')),

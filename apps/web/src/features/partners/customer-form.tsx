@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { ProblemDetails } from '@tugeel/api-client';
 import { SETTLEMENT_GROUPS } from '@tugeel/shared/finance';
 import { CUSTOMER_KINDS, regNoShape } from '@tugeel/shared/taxpayer';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { FieldList } from '@/components/detail';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import type { CustomerDetail } from './api';
+import { type CustomerCategory, type CustomerDetail, useCustomerCategories } from './api';
 import { PartnerFormFrame } from './form-frame';
 import { GpsField } from './gps-field';
 import { type CustomerFormValues, customerSchema, fieldOfDuplicate } from './partner-schema';
@@ -40,6 +40,10 @@ export function CustomerForm(props: {
   onCancel?: () => void;
   /** The `/new` page: fields in a card, buttons at the window's foot (`PartnerFormFrame`). */
   page?: boolean;
+  /** Create only: the code the server suggests for the chosen category (ADR-0107). */
+  suggestedCode?: string;
+  /** Create only: the category changed, so the page asks for its suggested code. */
+  onCategoryChange?: (categoryId: number | undefined) => void;
 }) {
   const { t } = useTranslation();
   const { mode, customer } = props;
@@ -52,6 +56,17 @@ export function CustomerForm(props: {
   const kind = form.watch('kind');
   const regNo = form.watch('regNo').trim();
   const regNoLooksOff = regNo !== '' && regNoShape(regNo) !== kind;
+  const categories = useCustomerCategories();
+  const options = categoryOptions(categories.data, props.defaultValues.categoryId);
+
+  // A new suggestion replaces the code only while the office has not typed one of its own.
+  const shownSuggestion = useRef(props.defaultValues.code);
+  const { suggestedCode } = props;
+  useEffect(() => {
+    if (suggestedCode === undefined || suggestedCode === shownSuggestion.current) return;
+    if (form.getValues('code') === shownSuggestion.current) form.setValue('code', suggestedCode);
+    shownSuggestion.current = suggestedCode;
+  }, [suggestedCode, form]);
 
   const submit = form.handleSubmit(async (values) => {
     const result = await props.onSubmit(values);
@@ -72,6 +87,29 @@ export function CustomerForm(props: {
   const fields = (
     <fieldset disabled={props.readOnly} className="flex min-w-0 flex-col gap-5">
       <FormSection title={t('partners.customer.sectionGeneral')}>
+        <FormRow
+          label={t('partners.customer.category')}
+          htmlFor="customer-category"
+          hint={mode === 'create' ? t('partners.customer.categoryHint') : undefined}
+        >
+          <NativeSelect
+            id="customer-category"
+            className="sm:w-72"
+            {...form.register('categoryId', {
+              onChange: (event: { target: { value: string } }) =>
+                props.onCategoryChange?.(
+                  event.target.value === '' ? undefined : Number.parseInt(event.target.value, 10),
+                ),
+            })}
+          >
+            <option value="">{t('partners.customer.noCategory')}</option>
+            {options.map((category) => (
+              <option key={category.id} value={String(category.id)}>
+                {category.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </FormRow>
         <FormRow
           label={t('partners.customer.code')}
           htmlFor="customer-code"
@@ -308,9 +346,21 @@ export function CustomerForm(props: {
   );
 }
 
+/** The active categories, plus the customer's own when it was retired since (ADR-0107). */
+function categoryOptions(
+  categories: readonly CustomerCategory[] | undefined,
+  current: string,
+): CustomerCategory[] {
+  return (categories ?? []).filter(
+    (category) => category.active || String(category.id) === current,
+  );
+}
+
 /** The reading side of a customer's card: the form's sections, label beside value (ADR-0043). */
 export function CustomerFacts({ customer }: { customer: CustomerDetail }) {
   const { t } = useTranslation();
+  const categories = useCustomerCategories();
+  const category = categories.data?.find((entry) => entry.id === customer.categoryId);
   const mono = (value: string | null) =>
     value ? <span className="font-mono">{value}</span> : null;
   return (
@@ -318,6 +368,7 @@ export function CustomerFacts({ customer }: { customer: CustomerDetail }) {
       <FieldList
         title={t('partners.customer.sectionGeneral')}
         items={[
+          { label: t('partners.customer.category'), value: category?.name ?? null },
           { label: t('partners.customer.code'), value: mono(customer.code) },
           { label: t('partners.customer.name'), value: customer.name },
           { label: t('partners.customer.kind'), value: t(`partners.kinds.${customer.kind}`) },

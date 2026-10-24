@@ -3841,6 +3841,16 @@
             }
           },
           {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "One customer category (ADR-0107)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
             "name": "tinPending",
             "required": false,
             "in": "query",
@@ -4024,7 +4034,18 @@
     "/api/v1/customers/next-code": {
       "get": {
         "operationId": "Customers_nextCode",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "The new customer's category: its largest code plus one (ADR-0107)",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -4624,6 +4645,154 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CustomerAppAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customer-categories": {
+      "get": {
+        "operationId": "CustomerCategories_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerCategory"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      },
+      "post": {
+        "operationId": "CustomerCategories_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCategoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCategory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "partners"
+        ]
+      }
+    },
+    "/api/v1/customer-categories/{id}": {
+      "patch": {
+        "operationId": "CustomerCategories_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCategoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCategory"
                 }
               }
             }
@@ -26486,6 +26655,15 @@
               }
             ]
           },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The customer category (ADR-0107)"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -26541,6 +26719,8 @@
           "settlementGroup",
           "creditHoldReason",
           "overdue",
+          "categoryId",
+          "categoryName",
           "note",
           "gps",
           "contact",
@@ -26796,6 +26976,11 @@
             "type": "string",
             "nullable": true
           },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The customer category (ADR-0107)"
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -26844,6 +27029,7 @@
           "creditLimit",
           "settlementGroup",
           "creditHoldReason",
+          "categoryId",
           "note",
           "createdAt",
           "updatedAt",
@@ -26917,6 +27103,12 @@
           },
           "cityPayer": {
             "type": "boolean"
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An active customer category (ADR-0107); null = none"
           },
           "note": {
             "type": "string",
@@ -26995,6 +27187,12 @@
           },
           "cityPayer": {
             "type": "boolean"
+          },
+          "categoryId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "An active customer category (ADR-0107); null = none"
           },
           "note": {
             "type": "string",
@@ -27230,6 +27428,64 @@
           "code",
           "expiresAt"
         ]
+      },
+      "CustomerCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false = retired: kept on its customers, left out of the pickers"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active",
+          "sortOrder"
+        ]
+      },
+      "CustomerCategoryCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Omitted: after the others"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CustomerCategoryUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
       },
       "SupplierListItem": {
         "type": "object",
@@ -47402,6 +47658,7 @@
           "CUSTOMER_INACTIVE",
           "SUPPLIER_INACTIVE",
           "EXPENSE_TYPE_INACTIVE",
+          "CUSTOMER_CATEGORY_INACTIVE",
           "PRODUCT_INACTIVE",
           "SKU_OUT_OF_RANGE",
           "SKU_RESERVED",

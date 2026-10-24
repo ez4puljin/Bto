@@ -17,6 +17,7 @@ export {
 export { PartnersHttpModule, PartnersModule } from './partners.module';
 export {
   type ContactInput,
+  CustomerContactsService,
   type SupplierContact,
   SupplierContactsService,
 } from './services/contacts.service';
@@ -26,6 +27,10 @@ export {
   CustomerAddressesService,
   type GpsSource,
 } from './services/customer-addresses.service';
+export {
+  type CustomerCategory,
+  CustomerCategoriesService,
+} from './services/customer-categories.service';
 export {
   type CreditInput,
   type CreditTerms,
