@@ -61,6 +61,14 @@ describe('the PosAPI 3.0 receipt (ADR-0065)', () => {
     expect(built).not.toHaveProperty('billIdSuffix');
   });
 
+  it('sends the branch and PosAPI numbers, and an empty barcode for a unit without one', () => {
+    const built = buildPosapiReceipt(
+      receipt({ branchNo: '01', posNo: '00000001', lines: [line({ barCode: null })] }),
+    );
+    expect(built).toMatchObject({ branchNo: '01', posNo: '00000001' });
+    expect(built.receipts[0]?.items[0]).toMatchObject({ barCode: '', barCodeType: 'UNDEFINED' });
+  });
+
   it('splits the tax types into sub-receipts and keeps the exempt line’s product code', () => {
     const built = buildPosapiReceipt(
       receipt({

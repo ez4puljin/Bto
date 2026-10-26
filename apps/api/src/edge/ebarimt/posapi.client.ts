@@ -47,6 +47,8 @@ export type PosapiCancelResult =
 
 export interface PosapiInfo {
   version: string | null;
+  /** The PosAPI's own number, sent back as each receipt's `posNo`. */
+  posNo: string | null;
   lastSentDate: string | null;
   leftLotteries: number | null;
   merchants: { tin: string; name: string; vatPayer: boolean }[];
@@ -118,6 +120,7 @@ export class PosapiClient {
     const merchants = Array.isArray(body.merchants) ? body.merchants : [];
     return {
       version: textOf(body.version),
+      posNo: textOf(body.posNo),
       lastSentDate: textOf(body.lastSentDate),
       leftLotteries: typeof body.leftLotteries === 'number' ? body.leftLotteries : null,
       merchants: merchants.flatMap((merchant: unknown) => {

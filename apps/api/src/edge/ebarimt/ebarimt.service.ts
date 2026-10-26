@@ -74,7 +74,7 @@ export interface IssueInput {
 @Injectable()
 export class EbarimtService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EbarimtService.name);
-  private merchant: { tin: string; name: string } | null = null;
+  private merchant: { tin: string; name: string; posNo: string | null } | null = null;
   private running: Promise<number> | null = null;
 
   constructor(
@@ -337,8 +337,8 @@ export class EbarimtService implements OnApplicationBootstrap {
           type: op.receiptType,
           merchantTin: merchant.tin,
           districtCode: this.store.peek()?.snapshot.settings.ebarimtDistrictCode ?? '',
-          branchNo: null,
-          posNo: null,
+          branchNo: this.config.get('EBARIMT_BRANCH_NO') ?? null,
+          posNo: merchant.posNo,
           customerTin: op.customerTin,
           consumerNo: null,
           inactiveId: target?.state === 'issued' ? target.ddtd : null,
@@ -639,7 +639,7 @@ export class EbarimtService implements OnApplicationBootstrap {
     try {
       const answer = await this.posapi.info();
       const only = answer.merchants.length === 1 ? answer.merchants[0] : undefined;
-      this.merchant = only ? { tin: only.tin, name: only.name } : null;
+      this.merchant = only ? { tin: only.tin, name: only.name, posNo: answer.posNo } : null;
       info = {
         version: answer.version,
         lastSentDate: answer.lastSentDate,
@@ -696,7 +696,11 @@ export class EbarimtService implements OnApplicationBootstrap {
     };
   }
 
-  private async merchantOrNull(): Promise<{ tin: string; name: string } | null> {
+  private async merchantOrNull(): Promise<{
+    tin: string;
+    name: string;
+    posNo: string | null;
+  } | null> {
     if (!this.merchant) await this.refreshInfo();
     return this.merchant;
   }

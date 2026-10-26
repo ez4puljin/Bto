@@ -43,6 +43,7 @@ services:
       # ADR-0065: fake (test receipts) or posapi (the store PosAPI on the LAN at POSAPI_URL).
       EBARIMT_PROVIDER: ${EBARIMT_PROVIDER:-fake}
       POSAPI_URL: ${POSAPI_URL:-}
+      EBARIMT_BRANCH_NO: ${EBARIMT_BRANCH_NO:-}
       EBARIMT_LOOKUP_URL: ${EBARIMT_LOOKUP_URL:-https://api.ebarimt.mn}
       APP_VERSION: ${APP_VERSION:-local}
     # Lets the container reach the dev api on the owner's PC.

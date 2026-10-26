@@ -69,7 +69,9 @@ export interface EbarimtReceiptInput {
   type: ReceiptType;
   merchantTin: string;
   districtCode: string;
+  /** The merchant's branch number at PosAPI (digits, e.g. "01"); PosAPI refuses a receipt without it. */
   branchNo: string | null;
+  /** The PosAPI's own number (`posNo` of `/rest/info`). */
   posNo: string | null;
   /** B2B: the buyer's TIN; B2C: null. */
   customerTin: string | null;
@@ -83,7 +85,8 @@ export interface EbarimtReceiptInput {
 
 export interface PosapiItem {
   name: string;
-  barCode: string | null;
+  /** Empty when the unit has no barcode (PosAPI refuses null). */
+  barCode: string;
   barCodeType: 'GS1' | 'ISBN' | 'UNDEFINED';
   classificationCode: string;
   taxProductCode: string | null;
@@ -183,11 +186,11 @@ export function buildPosapiReceipt(input: EbarimtReceiptInput): PosapiReceiptReq
       const total = toMoney(line.total);
       return {
         name: line.name,
-        barCode: line.barCode,
+        barCode: line.barCode ?? '',
         barCodeType: line.barCode ? line.barCodeType : 'UNDEFINED',
         classificationCode: line.classificationCode,
         taxProductCode: exempt ? line.taxProductCode : null,
-        measureUnit: line.measureUnit,
+        measureUnit: line.measureUnit || 'ш',
         qty,
         unitPrice: toMoney(total.div(qty)),
         totalVAT: toMoney(line.vat),

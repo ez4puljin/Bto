@@ -37,6 +37,17 @@ export const EdgeEnvSchema = z.object({
     (value) => (value === '' ? undefined : value),
     z.url({ protocol: /^http$/ }).optional(),
   ),
+  /**
+   * The merchant's branch number PosAPI registered this store under (digits; the old till sends
+   * "01"); required with posapi: PosAPI refuses a receipt without it (2026-10-26).
+   */
+  EBARIMT_BRANCH_NO: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^[0-9]{1,6}$/)
+      .optional(),
+  ),
   /** How long the till waits for PosAPI's answer before the receipt is left to be checked. */
   POSAPI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
   /** The public taxpayer lookup (Mongolian addresses only) for a company's name at the till. */
@@ -60,8 +71,10 @@ export function parseEdgeEnv(raw: Record<string, unknown>): EdgeEnv {
   if (data.NODE_ENV === 'production' && data.EDGE_JWT_SECRET.startsWith('dev-')) {
     throw new Error('Invalid environment (edge): EDGE_JWT_SECRET is a development placeholder');
   }
-  if (data.EBARIMT_PROVIDER === 'posapi' && !data.POSAPI_URL) {
-    throw new Error('Invalid environment (edge): EBARIMT_PROVIDER=posapi needs POSAPI_URL');
+  if (data.EBARIMT_PROVIDER === 'posapi' && (!data.POSAPI_URL || !data.EBARIMT_BRANCH_NO)) {
+    throw new Error(
+      'Invalid environment (edge): EBARIMT_PROVIDER=posapi needs POSAPI_URL and EBARIMT_BRANCH_NO',
+    );
   }
   return data;
 }

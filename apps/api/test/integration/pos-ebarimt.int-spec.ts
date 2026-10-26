@@ -118,6 +118,8 @@ describe('pos e-Barimt on the edge', () => {
     expect(sent[0]).toMatchObject({
       type: 'B2C_RECEIPT',
       districtCode: '1234',
+      branchNo: '01',
+      posNo: '00000001',
       merchantTin: FAKE_MERCHANT.tin,
       customerTin: null,
       inactiveId: null,
