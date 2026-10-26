@@ -24,6 +24,8 @@ export const SETTINGS = {
    * never changed through the api (ADR-0084 #3; the PMS or a second Bto books into its own).
    */
   'bto.company_code': { kind: 'code', default: 'BO', locked: true },
+  /** Margins under this percent are flagged red in the reports (ADR-0108 #3, owner 2026-10-24). */
+  'reports.margin_threshold_pct': { kind: 'percent', default: '8' },
 } as const satisfies Record<string, SettingDefinition>;
 
 export interface SettingDefinition {

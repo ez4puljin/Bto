@@ -141,6 +141,12 @@ export const ROUTES = [
   { area: 'pos', name: 'pos-settings', path: '/pos/settings' },
   { area: 'pos', name: 'pos-test-till', path: '/pos/test-till' },
 
+  { area: 'reports', name: 'reports-dashboard', path: '/reports/dashboard' },
+  { area: 'reports', name: 'reports-aging', path: '/reports/aging' },
+  { area: 'reports', name: 'reports-profit', path: '/reports/profit' },
+  { area: 'reports', name: 'reports-stock', path: '/reports/stock' },
+  { area: 'reports', name: 'reports-suppliers', path: '/reports/suppliers' },
+
   { area: 'ai', name: 'ai', path: '/ai' },
   { area: 'ai', name: 'ai-conversation', path: '/ai?c={conversation}' },
   { area: 'ai', name: 'ai-reports', path: '/ai/reports' },

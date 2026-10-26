@@ -23273,6 +23273,1140 @@
           "sales-rep"
         ]
       }
+    },
+    "/api/v1/reports/refresh-state": {
+      "get": {
+        "operationId": "Reports_refreshState",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRefreshState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/refresh": {
+      "post": {
+        "operationId": "Reports_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRefreshState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Шинэчлэх»: rebuilds the daily totals unless they are younger than a minute.",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/dashboard": {
+      "get": {
+        "operationId": "Reports_dashboard",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Default: the current month",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/dashboard.xlsx": {
+      "get": {
+        "operationId": "Reports_dashboardXlsx",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Default: the current month",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/aging": {
+      "get": {
+        "operationId": "Reports_aging",
+        "parameters": [
+          {
+            "name": "settlementGroup",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_20",
+                "MONTH_END"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "overdueOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgingReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/aging.xlsx": {
+      "get": {
+        "operationId": "Reports_agingXlsx",
+        "parameters": [
+          {
+            "name": "settlementGroup",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY_20",
+                "MONTH_END"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "overdueOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/aging/{partyId}/items": {
+      "get": {
+        "operationId": "Reports_agingItems",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgingItems"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/profit": {
+      "get": {
+        "operationId": "Reports_profit",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "description": "«Bto300» orders only",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "by",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer",
+                "product",
+                "category",
+                "rep"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/profit.xlsx": {
+      "get": {
+        "operationId": "Reports_profitXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "description": "«Bto300» orders only",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "by",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer",
+                "product",
+                "category",
+                "rep"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/sales-documents": {
+      "get": {
+        "operationId": "Reports_salesDocuments",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "repUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "description": "«Bto300» orders only",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesDocuments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The documents behind a sales figure (the drill-down); costs only with margins.",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock": {
+      "get": {
+        "operationId": "Reports_stock",
+        "parameters": [
+          {
+            "name": "slowDays",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 90,
+              "type": "number",
+              "enum": [
+                30,
+                60,
+                90,
+                180
+              ]
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SLOW",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "nextOffset of the previous page",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock.xlsx": {
+      "get": {
+        "operationId": "Reports_stockXlsx",
+        "parameters": [
+          {
+            "name": "slowDays",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 90,
+              "type": "number",
+              "enum": [
+                30,
+                60,
+                90,
+                180
+              ]
+            }
+          },
+          {
+            "name": "filter",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SLOW",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "nextOffset of the previous page",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/suppliers": {
+      "get": {
+        "operationId": "Reports_supplierReport",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/suppliers.xlsx": {
+      "get": {
+        "operationId": "Reports_supplierXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/suppliers/{partyId}/entries": {
+      "get": {
+        "operationId": "Reports_supplierEntries",
+        "parameters": [
+          {
+            "name": "partyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierEntries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
     }
   },
   "info": {
@@ -23576,7 +24710,9 @@
           "pos.till.operate",
           "pos.till.supervise",
           "notifications.send",
-          "customer.home.manage"
+          "customer.home.manage",
+          "reports.view",
+          "reports.margins.view"
         ]
       },
       "RoleRef": {
@@ -24684,7 +25820,8 @@
           "company.city_tax_payer",
           "auth.staff_session_hours",
           "auth.customer_session_days",
-          "bto.company_code"
+          "bto.company_code",
+          "reports.margin_threshold_pct"
         ]
       },
       "SettingEntry": {
@@ -47608,6 +48745,1156 @@
           "banners",
           "subcategories",
           "sections"
+        ]
+      },
+      "ReportRefreshState": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The daily totals are as of this time"
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "refreshedAt",
+          "durationMs"
+        ]
+      },
+      "ReportRange": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "ReportCompared": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string",
+            "example": "1500000.00"
+          },
+          "previous": {
+            "type": "string",
+            "example": "1400000.00",
+            "description": "The same days a month earlier"
+          },
+          "lastYear": {
+            "type": "string",
+            "example": "1200000.00",
+            "description": "The same days a year earlier"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "ReportComparedOrNull": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string",
+            "nullable": true
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastYear": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "DashboardTrendPoint": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "lastYearSales": {
+            "type": "string"
+          },
+          "grossProfit": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "month",
+          "sales",
+          "lastYearSales",
+          "grossProfit"
+        ]
+      },
+      "DashboardCategory": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "sales": {
+            "type": "string"
+          },
+          "grossProfit": {
+            "type": "string",
+            "nullable": true
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "previousMargin": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "categoryId",
+          "name",
+          "sales",
+          "grossProfit",
+          "margin",
+          "previousMargin"
+        ]
+      },
+      "DashboardOverdueCustomer": {
+        "type": "object",
+        "properties": {
+          "partyId": {
+            "type": "number"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "string"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "partyId",
+          "customerId",
+          "name",
+          "overdue",
+          "oldestDueDate"
+        ]
+      },
+      "DashboardLowStock": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "minQty": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "warehouseId",
+          "warehouseName",
+          "onHand",
+          "minQty"
+        ]
+      },
+      "DashboardTopRep": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "share": {
+            "type": "string",
+            "nullable": true,
+            "description": "Percent of wholesale sales"
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "sales",
+          "share"
+        ]
+      },
+      "DashboardAlerts": {
+        "type": "object",
+        "properties": {
+          "overdue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardOverdueCustomer"
+            }
+          },
+          "lowStock": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardLowStock"
+            }
+          },
+          "lowStockCount": {
+            "type": "number"
+          },
+          "fallingCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCategory"
+            }
+          },
+          "topRep": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardTopRep"
+              }
+            ]
+          }
+        },
+        "required": [
+          "overdue",
+          "lowStock",
+          "lowStockCount",
+          "fallingCategories",
+          "topRep"
+        ]
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "running": {
+            "type": "boolean",
+            "description": "The month runs: the comparisons take the same days"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "lastYear": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "today": {
+            "type": "string"
+          },
+          "refreshedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "margins": {
+            "type": "boolean",
+            "description": "The caller sees costs, profit and margins"
+          },
+          "threshold": {
+            "type": "string",
+            "example": "8.0"
+          },
+          "sales": {
+            "description": "Ex-VAT, net of returns",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportCompared"
+              }
+            ]
+          },
+          "wholesale": {
+            "type": "string"
+          },
+          "pos": {
+            "type": "string"
+          },
+          "returns": {
+            "type": "string"
+          },
+          "grossProfit": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportComparedOrNull"
+              }
+            ]
+          },
+          "margin": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportComparedOrNull"
+              }
+            ]
+          },
+          "receivables": {
+            "description": "Balance at each period end",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportCompared"
+              }
+            ]
+          },
+          "overdue": {
+            "type": "string",
+            "description": "Overdue today"
+          },
+          "overdueCustomers": {
+            "type": "number"
+          },
+          "stockValue": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportComparedOrNull"
+              }
+            ]
+          },
+          "turnoverDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTrendPoint"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCategory"
+            }
+          },
+          "alerts": {
+            "$ref": "#/components/schemas/DashboardAlerts"
+          }
+        },
+        "required": [
+          "month",
+          "running",
+          "current",
+          "previous",
+          "lastYear",
+          "today",
+          "refreshedAt",
+          "margins",
+          "threshold",
+          "sales",
+          "wholesale",
+          "pos",
+          "returns",
+          "grossProfit",
+          "margin",
+          "receivables",
+          "overdue",
+          "overdueCustomers",
+          "stockValue",
+          "turnoverDays",
+          "trend",
+          "categories",
+          "alerts"
+        ]
+      },
+      "AgingAmounts": {
+        "type": "object",
+        "properties": {
+          "NOT_DUE": {
+            "type": "string"
+          },
+          "D1_30": {
+            "type": "string"
+          },
+          "D31_60": {
+            "type": "string"
+          },
+          "D61_90": {
+            "type": "string"
+          },
+          "D90_PLUS": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "NOT_DUE",
+          "D1_30",
+          "D31_60",
+          "D61_90",
+          "D90_PLUS"
+        ]
+      },
+      "AgingRow": {
+        "type": "object",
+        "properties": {
+          "partyId": {
+            "type": "number"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "settlementGroup": {
+            "nullable": true,
+            "enum": [
+              "DAY_20",
+              "MONTH_END"
+            ],
+            "type": "string"
+          },
+          "buckets": {
+            "$ref": "#/components/schemas/AgingAmounts"
+          },
+          "credit": {
+            "type": "string",
+            "description": "Advances and unapplied payments"
+          },
+          "total": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "string"
+          },
+          "oldestDueDate": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "partyId",
+          "customerId",
+          "code",
+          "name",
+          "settlementGroup",
+          "buckets",
+          "credit",
+          "total",
+          "overdue",
+          "oldestDueDate"
+        ]
+      },
+      "AgingReport": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgingRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AgingAmounts"
+          },
+          "credit": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "rows",
+          "totals",
+          "credit",
+          "total",
+          "overdue"
+        ]
+      },
+      "AgingItem": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "number"
+          },
+          "side": {
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ],
+            "type": "string"
+          },
+          "documentNumber": {
+            "type": "string"
+          },
+          "documentClass": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "itemDate": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "daysOverdue": {
+            "type": "number",
+            "nullable": true
+          },
+          "bucket": {
+            "nullable": true,
+            "enum": [
+              "NOT_DUE",
+              "D1_30",
+              "D31_60",
+              "D61_90",
+              "D90_PLUS"
+            ],
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "openAmount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "side",
+          "documentNumber",
+          "documentClass",
+          "invoiceId",
+          "itemDate",
+          "dueDate",
+          "daysOverdue",
+          "bucket",
+          "amount",
+          "openAmount"
+        ]
+      },
+      "AgingItems": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgingItem"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ProfitRow": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string"
+          },
+          "returns": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "profit": {
+            "type": "string"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "enum": [
+              "CUSTOMER",
+              "PRODUCT",
+              "CATEGORY",
+              "USER",
+              "APP",
+              "POS",
+              "COST_ADJ",
+              "NONE"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "qty": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units (by product only)"
+          },
+          "flagged": {
+            "type": "boolean",
+            "description": "Margin under the threshold, or a loss"
+          }
+        },
+        "required": [
+          "sales",
+          "returns",
+          "cost",
+          "profit",
+          "margin",
+          "kind",
+          "id",
+          "code",
+          "name",
+          "qty",
+          "flagged"
+        ]
+      },
+      "ProfitTotals": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string"
+          },
+          "returns": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "profit": {
+            "type": "string"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sales",
+          "returns",
+          "cost",
+          "profit",
+          "margin"
+        ]
+      },
+      "ProfitReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          },
+          "by": {
+            "enum": [
+              "customer",
+              "product",
+              "category",
+              "rep"
+            ],
+            "type": "string"
+          },
+          "threshold": {
+            "type": "string",
+            "example": "8.0"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ProfitTotals"
+          },
+          "others": {
+            "nullable": true,
+            "description": "Rows beyond the first 2,000, summed",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitTotals"
+              }
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "by",
+          "threshold",
+          "rows",
+          "totals",
+          "others"
+        ]
+      },
+      "SalesDocument": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "INVOICE",
+              "CREDIT_NOTE",
+              "POS_SALE",
+              "POS_RETURN",
+              "COST_ADJ"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sales": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string",
+            "nullable": true
+          },
+          "profit": {
+            "type": "string",
+            "nullable": true
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "number",
+          "date",
+          "orderId",
+          "customerId",
+          "customerName",
+          "sales",
+          "cost",
+          "profit",
+          "margin"
+        ]
+      },
+      "SalesDocuments": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesDocument"
+            }
+          },
+          "more": {
+            "type": "boolean",
+            "description": "More documents than shown (the newest 500 are)"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "more"
+        ]
+      },
+      "StockReportRow": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string",
+            "nullable": true
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "soldQty": {
+            "type": "string",
+            "description": "Sold in the last slowDays days, net of returns"
+          },
+          "coverDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastSaleDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "daysSinceSale": {
+            "type": "number",
+            "nullable": true
+          },
+          "slow": {
+            "type": "boolean"
+          },
+          "low": {
+            "type": "boolean"
+          },
+          "minQty": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "categoryName",
+          "onHand",
+          "value",
+          "soldQty",
+          "coverDays",
+          "lastSaleDate",
+          "daysSinceSale",
+          "slow",
+          "low",
+          "minQty"
+        ]
+      },
+      "StockReportTotals": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "number"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "slowProducts": {
+            "type": "number"
+          },
+          "slowValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "lowProducts": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "products",
+          "value",
+          "slowProducts",
+          "slowValue",
+          "lowProducts"
+        ]
+      },
+      "StockReport": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "slowDays": {
+            "type": "number"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockReportRow"
+            }
+          },
+          "nextOffset": {
+            "type": "number",
+            "nullable": true
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StockReportTotals"
+          }
+        },
+        "required": [
+          "date",
+          "slowDays",
+          "rows",
+          "nextOffset",
+          "totals"
+        ]
+      },
+      "SupplierReportRow": {
+        "type": "object",
+        "properties": {
+          "purchases": {
+            "type": "string",
+            "description": "With VAT, at the delivery notes, net of returns"
+          },
+          "purchasesExVat": {
+            "type": "string"
+          },
+          "otherBills": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string",
+            "description": "Owed at `to` (+ we owe)"
+          },
+          "partyId": {
+            "type": "number"
+          },
+          "supplierId": {
+            "type": "number",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "purchases",
+          "purchasesExVat",
+          "otherBills",
+          "payments",
+          "balance",
+          "partyId",
+          "supplierId",
+          "code",
+          "name"
+        ]
+      },
+      "SupplierReportTotals": {
+        "type": "object",
+        "properties": {
+          "purchases": {
+            "type": "string",
+            "description": "With VAT, at the delivery notes, net of returns"
+          },
+          "purchasesExVat": {
+            "type": "string"
+          },
+          "otherBills": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "string"
+          },
+          "balance": {
+            "type": "string",
+            "description": "Owed at `to` (+ we owe)"
+          }
+        },
+        "required": [
+          "purchases",
+          "purchasesExVat",
+          "otherBills",
+          "payments",
+          "balance"
+        ]
+      },
+      "SupplierReport": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          },
+          "rows": {
+            "description": "Largest purchases first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierReportRow"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SupplierReportTotals"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "totals"
+        ]
+      },
+      "SupplierEntry": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "PURCHASE",
+              "OPENING",
+              "PAYMENT",
+              "OTHER_BILL"
+            ],
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiptId": {
+            "type": "number",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "description": "+ raised the payable, − lowered it"
+          },
+          "vatAmount": {
+            "type": "string"
+          },
+          "reversal": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entryId",
+          "date",
+          "kind",
+          "number",
+          "receiptId",
+          "amount",
+          "vatAmount",
+          "reversal"
+        ]
+      },
+      "SupplierEntries": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierEntry"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "ErrorCode": {

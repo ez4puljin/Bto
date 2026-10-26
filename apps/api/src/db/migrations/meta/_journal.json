@@ -316,6 +316,13 @@
       "when": 1792809655776,
       "tag": "0045_customer_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792981947570,
+      "tag": "0046_reporting",
+      "breakpoints": true
     }
   ]
 }

@@ -78,6 +78,11 @@ import { InvoicesPage } from '@/features/finance/invoices-page';
 import { JournalPage } from '@/features/finance/journal-page';
 import { PaymentsPage } from '@/features/finance/payments-page';
 import { InvoicePrintPage, PaymentPrintPage } from '@/features/finance/print-pages';
+import { AgingPage, AgingPrintPage } from '@/features/reports/aging-page';
+import { DashboardPage, DashboardPrintPage } from '@/features/reports/dashboard-page';
+import { ProfitPage, ProfitPrintPage } from '@/features/reports/profit-page';
+import { StockPrintPage, StockReportPage } from '@/features/reports/stock-page';
+import { SuppliersPrintPage, SuppliersReportPage } from '@/features/reports/suppliers-page';
 import { AiReportsPage } from '@/features/ai/reports-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
 import { CustomerAppPage } from '@/features/customer-app/customer-app-page';
@@ -189,6 +194,8 @@ export const routes: RouteObject[] = [
     ),
     errorElement: <RouteErrorBoundary />,
   },
+  // The management reports for paper (ADR-0108).
+  ...reportPrintRoutes(),
   {
     path: '/finance/payments/:id/print',
     element: (
@@ -215,6 +222,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage />, handle: { width: 'wide' } },
           ...financeRoutes(),
+          ...reportRoutes(),
           ...posRoutes(),
           { path: 'system/status', handle: { width: 'reading' }, element: <SystemStatusPage /> },
           {
@@ -584,6 +592,51 @@ function posRoutes(): RouteObject[] {
     ...(import.meta.env.DEV
       ? [{ path: 'pos/test-till', handle: { width: 'wide' }, element: manage(<PosTestTillPage />) }]
       : []),
+  ];
+}
+
+/** The «Тайлан» pages (ADR-0108): the margins behind reports.margins.view, the rest behind reports.view. */
+function reportRoutes(): RouteObject[] {
+  const view = (element: ReactNode) => (
+    <RequirePermission permission="reports.view">{element}</RequirePermission>
+  );
+  const margins = (element: ReactNode) => (
+    <RequirePermission permission="reports.margins.view">{element}</RequirePermission>
+  );
+  return [
+    { path: 'reports/dashboard', handle: { width: 'wide' }, element: view(<DashboardPage />) },
+    { path: 'reports/aging', handle: { width: 'wide' }, element: view(<AgingPage />) },
+    { path: 'reports/profit', handle: { width: 'wide' }, element: margins(<ProfitPage />) },
+    { path: 'reports/stock', handle: { width: 'wide' }, element: view(<StockReportPage />) },
+    {
+      path: 'reports/suppliers',
+      handle: { width: 'wide' },
+      element: margins(<SuppliersReportPage />),
+    },
+  ];
+}
+
+/** The reports' paper, outside the shell like the finance print pages. */
+function reportPrintRoutes(): RouteObject[] {
+  const page = (
+    path: string,
+    permission: 'reports.view' | 'reports.margins.view',
+    element: ReactNode,
+  ) => ({
+    path,
+    element: (
+      <RequireAuth>
+        <RequirePermission permission={permission}>{element}</RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  });
+  return [
+    page('/reports/dashboard/print', 'reports.view', <DashboardPrintPage />),
+    page('/reports/aging/print', 'reports.view', <AgingPrintPage />),
+    page('/reports/profit/print', 'reports.margins.view', <ProfitPrintPage />),
+    page('/reports/stock/print', 'reports.view', <StockPrintPage />),
+    page('/reports/suppliers/print', 'reports.margins.view', <SuppliersPrintPage />),
   ];
 }
 
