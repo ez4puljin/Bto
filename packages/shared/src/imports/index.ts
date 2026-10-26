@@ -75,6 +75,10 @@ export const IMPORT_COLUMNS: Readonly<Record<ImportKind, readonly ImportColumn[]
     column('gps', 'link'),
     column('creditLimit', 'decimal'),
     column('settlementGroup', 'text'),
+    column('kind', 'text'),
+    column('category', 'text'),
+    column('contactName', 'text'),
+    column('contactPhone', 'code'),
     column('note', 'text'),
   ],
   SUPPLIERS: [

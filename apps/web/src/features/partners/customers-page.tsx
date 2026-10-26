@@ -27,7 +27,13 @@ import { useSetParam } from '@/lib/search-params';
 import { useHiddenColumns } from '@/lib/use-hidden-columns';
 import { segmentParam } from '@/features/segments/segment-definition';
 import { SegmentFilter } from '@/features/segments/segment-filter';
-import { type AppAccountFilter, type CustomerKind, type PartnerStatus, useCustomers } from './api';
+import {
+  type AppAccountFilter,
+  type CustomerKind,
+  type PartnerStatus,
+  useCustomerCategories,
+  useCustomers,
+} from './api';
 import {
   CUSTOMER_COLUMN_KEYS,
   CUSTOMER_COLUMNS,
@@ -55,7 +61,7 @@ const isGroup = (value: string | null): value is SettlementGroup =>
 
 /**
  * Customers: search by name in either script, code, phone, TIN or registration number; filter by
- * kind, status, settlement group (ADR-0101) and the customer app account (ADR-0079 #11), and find the rows that still miss a
+ * category (ADR-0107), kind, status, settlement group (ADR-0101) and the customer app account (ADR-0079 #11), and find the rows that still miss a
  * TIN or a GPS point, or are on credit hold (SPEC §5.3). Filters live in the URL so "back" keeps them. A user who never chose sees the
  * columns that fit a 1366px screen (ADR-0066).
  */
@@ -74,6 +80,9 @@ export function CustomersPage() {
   const app = isAppFilter(appParam) ? appParam : undefined;
   const groupParam = params.get('group');
   const settlementGroup = isGroup(groupParam) ? groupParam : undefined;
+  const categories = useCustomerCategories();
+  const categoryParam = Number.parseInt(params.get('category') ?? '', 10);
+  const categoryId = categoryParam > 0 ? categoryParam : undefined;
   const flag = (name: Flag) => (params.get(name) === '1' ? true : undefined);
   const segmentId = segmentParam(params);
   const customers = useCustomers({
@@ -83,6 +92,7 @@ export function CustomersPage() {
     segmentId,
     app,
     settlementGroup,
+    categoryId,
     tinPending: flag('tinPending'),
     gpsMissing: flag('gpsMissing'),
     creditHold: flag('creditHold'),
@@ -105,6 +115,7 @@ export function CustomersPage() {
     status ||
     app ||
     settlementGroup ||
+    categoryId ||
     segmentId ||
     FLAGS.some((name) => flag(name) === true),
   );
@@ -150,6 +161,19 @@ export function CustomersPage() {
             setParam('q', event.target.value.trim());
           }}
         />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('partners.customer.category')}
+          value={categoryId ?? ''}
+          onChange={(event) => setParam('category', event.target.value)}
+        >
+          <option value="">{t('partners.customers.allCategories')}</option>
+          {(categories.data ?? []).map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </NativeSelect>
         <NativeSelect
           variant="filter"
           aria-label={t('partners.customer.kind')}

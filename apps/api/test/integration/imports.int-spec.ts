@@ -281,6 +281,84 @@ describe('imports', () => {
     ]);
   });
 
+  it('imports the kind, the category and a contact phone of customers (ADR-0107)', async () => {
+    const category = async (name: string) =>
+      (
+        await http()
+          .post('/api/v1/customer-categories')
+          .set(bearer(admin))
+          .set(idempotency())
+          .send({ name })
+          .expect(201)
+      ).body as { id: number };
+    const ward = await category('Мөрөн хороо');
+    const old = await category('Хуучин');
+    await http()
+      .patch(`/api/v1/customer-categories/${old.id}`)
+      .set(bearer(admin))
+      .send({ active: false })
+      .expect(200);
+    const good = [
+      {
+        code: '510',
+        name: 'Ангилалтай',
+        kind: 'Хувь хүн',
+        category: 'мөрөн  хороо',
+        contactPhone: '8811 2233',
+        settlementGroup: 'Мөрөн',
+      },
+      {
+        code: '501',
+        name: 'Номин дэлгүүр',
+        category: 'Мөрөн хороо',
+        contactName: 'Бат',
+        contactPhone: '99001122',
+      },
+      { code: '503', name: 'Шинэ харилцагч', kind: 'Хувь хүн' },
+    ];
+    const job = await imports.check('CUSTOMERS', [
+      ...good,
+      {
+        code: '511',
+        name: 'Буруу',
+        kind: 'Хот',
+        category: 'Байхгүй',
+        contactPhone: '12',
+        settlementGroup: 'Мөрөн',
+      },
+      { code: '512', name: 'Хуучинд', category: 'Хуучин', settlementGroup: 'Мөрөн' },
+      // 502 is a citizen with a consumer number: it cannot become a company.
+      { code: '502', name: 'Бат', kind: 'Байгууллага' },
+    ]);
+    expect(job).toMatchObject({ status: 'INVALID', errorRows: 3 });
+    expect(codes(await imports.rows(job.id, 'ERRORS')).sort()).toEqual([
+      'category:NOT_ALLOWED',
+      'category:NOT_FOUND',
+      'contactPhone:FORMAT',
+      'kind:FORMAT',
+      'kind:NOT_ALLOWED',
+    ]);
+    const fixed = await imports.check('CUSTOMERS', good);
+    expect(fixed).toMatchObject({ status: 'VALIDATED', warningRows: 0 });
+    expect((await imports.commit(fixed.id)).status).toBe('COMMITTED');
+    committed.push(fixed.id);
+    const { rows } = await sql.query(
+      `SELECT c.code, c.kind, c.category_id::int AS category,
+              (SELECT string_agg(coalesce(k.name, '-') || ':' || k.phone, ',' ORDER BY k.id)
+                 FROM customer_contacts k WHERE k.customer_id = c.id) AS contacts
+         FROM customers c WHERE c.code IN ('501', '503', '510') ORDER BY c.code`,
+    );
+    expect(rows).toEqual([
+      { code: '501', kind: 'COMPANY', category: ward.id, contacts: 'Бат:+97699001122' },
+      { code: '503', kind: 'INDIVIDUAL', category: null, contacts: null },
+      { code: '510', kind: 'INDIVIDUAL', category: ward.id, contacts: '-:+97688112233' },
+    ]);
+    // The same sheet again changes nothing: the contacts are already there.
+    const again = await imports.check('CUSTOMERS', good);
+    expect(again).toMatchObject({ status: 'VALIDATED' });
+    expect(again.summary?.actions).toMatchObject({ UNCHANGED: 3 });
+  });
+
   it('imports suppliers keyed on the name when they have no code, with their contact', async () => {
     const job = await imports.check('SUPPLIERS', [
       { name: 'Таван богд', contactName: 'Сараа', contactPhone: '88112233', paymentTermDays: 14 },

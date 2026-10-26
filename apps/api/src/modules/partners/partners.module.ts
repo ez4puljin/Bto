@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog';
 import { CUSTOMER_ACCOUNT_GATE, IdentityModule } from '../identity';
 import { CustomerAppAccountController } from './controllers/customer-app-account.controller';
+import { CustomerCategoriesController } from './controllers/customer-categories.controller';
 import {
   CustomerAddressesController,
   CustomerContactsController,
@@ -15,6 +16,7 @@ import {
 import { PartnerSegmentsService } from './services/partner-segments.service';
 import { CustomerContactsService, SupplierContactsService } from './services/contacts.service';
 import { CustomerAddressesService } from './services/customer-addresses.service';
+import { CustomerCategoriesService } from './services/customer-categories.service';
 import {
   CustomerAccountGateService,
   CustomerAppAccountsService,
@@ -27,6 +29,7 @@ const CORE_SERVICES = [
   CustomerAccountGateService,
   CustomerAddressesService,
   CustomerAppAccountsService,
+  CustomerCategoriesService,
   CustomerContactsService,
   CustomersService,
   PartnerSegmentsService,
@@ -56,6 +59,7 @@ export class PartnersModule {}
   controllers: [
     CustomersController,
     CustomerAppAccountController,
+    CustomerCategoriesController,
     CustomerAddressesController,
     CustomerContactsController,
     SuppliersController,

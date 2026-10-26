@@ -43,10 +43,14 @@ export type CustomerAppAccount = Schemas['CustomerAppAccount'];
 export type CustomerAppCode = Schemas['CustomerAppCode'];
 export type AppAccountFilter = 'ACTIVE' | 'DISABLED' | 'NONE';
 export type CustomerKind = CustomerDetail['kind'];
+/** A customer category (ADR-0107); retired ones stay on their customers. */
+export type CustomerCategory = Schemas['CustomerCategory'];
+export type CustomerCategoryUpdate = Schemas['CustomerCategoryUpdateRequest'];
 export type PartnerStatus = CustomerDetail['status'];
 
 export const KEYS = {
   customers: ['partners', 'customers'] as const,
+  customerCategories: ['partners', 'customer-categories'] as const,
   suppliers: ['partners', 'suppliers'] as const,
   productSuppliers: ['partners', 'product-suppliers'] as const,
 };
@@ -67,6 +71,8 @@ export interface CustomerFilter {
   app?: AppAccountFilter;
   /** «Мөрөн» or «Орон нутаг» (ADR-0101). */
   settlementGroup?: SettlementGroup;
+  /** One customer category (ADR-0107). */
+  categoryId?: number;
 }
 
 export function useCustomers(filter: CustomerFilter, options: ListReadOptions = {}) {
@@ -90,6 +96,7 @@ export function useCustomers(filter: CustomerFilter, options: ListReadOptions = 
               segmentId: filter.segmentId,
               app: filter.app,
               settlementGroup: filter.settlementGroup,
+              categoryId: filter.categoryId,
               cursor: pageParam,
               limit,
             },
@@ -161,14 +168,57 @@ export function useCustomerAppMutations(customerId: number) {
   };
 }
 
-export function useNextCustomerCode() {
+/** The suggested code of a new customer: its category's largest code + 1 (ADR-0107). */
+export function useNextCustomerCode(categoryId?: number) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...KEYS.customers, 'next-code'],
+    queryKey: [...KEYS.customers, 'next-code', categoryId ?? null],
     staleTime: 0,
+    placeholderData: keepPreviousData,
     queryFn: async ({ signal }) =>
-      unwrap(await api.GET('/api/v1/customers/next-code', { signal })).code,
+      unwrap(
+        await api.GET('/api/v1/customers/next-code', {
+          params: { query: { categoryId } },
+          signal,
+        }),
+      ).code,
   });
+}
+
+/** Every customer category, retired ones too, in the office's order (ADR-0107). */
+export function useCustomerCategories(options: { enabled?: boolean } = {}) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.customerCategories,
+    enabled: options.enabled ?? true,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/customer-categories', { signal })),
+  });
+}
+
+export function useCustomerCategoryMutations() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const changed = () => queryClient.invalidateQueries({ queryKey: KEYS.customerCategories });
+  return {
+    create: useMutation({
+      mutationFn: async ({ key, ...body }: Keyed<{ name: string; sortOrder?: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/customer-categories', {
+            params: { header: idempotencyKey(key) },
+            body,
+          }),
+        ),
+      onSuccess: changed,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: CustomerCategoryUpdate }) =>
+        unwrap(
+          await api.PATCH('/api/v1/customer-categories/{id}', { params: { path: { id } }, body }),
+        ),
+      onSuccess: changed,
+    }),
+  };
 }
 
 export function useSuppliers(

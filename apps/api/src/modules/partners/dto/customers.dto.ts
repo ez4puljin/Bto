@@ -146,6 +146,8 @@ export class CustomerDetailDto extends CustomerSummaryDto {
   })
   settlementGroup: SettlementGroup;
   @ApiProperty({ type: String, nullable: true }) creditHoldReason: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The customer category (ADR-0107)' })
+  categoryId: number | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
@@ -183,6 +185,9 @@ export class CustomerListItemDto extends CustomerSummaryDto {
     description: 'The overdue receivable: a reminder, never a block (ADR-0101); null when none',
   })
   overdue: CustomerOverdueDto | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The customer category (ADR-0107)' })
+  categoryId: number | null;
+  @ApiProperty({ type: String, nullable: true }) categoryName: string | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
   @ApiProperty({
     type: GpsPointDto,
@@ -248,6 +253,16 @@ class CustomerFieldsDto {
   vatPayer?: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsBoolean() cityPayer?: boolean;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'An active customer category (ADR-0107); null = none',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  categoryId?: number | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 1000 })
   @IsOptional()
@@ -367,6 +382,13 @@ export class CustomerListQueryDto extends PageQueryDto {
   @IsIn(SETTLEMENT_GROUPS)
   settlementGroup?: SettlementGroup;
 
+  @ApiPropertyOptional({ description: 'One customer category (ADR-0107)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
+
   @ApiPropertyOptional({ description: 'Companies without a TIN' })
   @IsOptional()
   @Transform(queryBoolean)
@@ -408,4 +430,55 @@ export class CustomerLookupQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+}
+
+export class NextCustomerCodeQueryDto {
+  @ApiPropertyOptional({
+    description: "The new customer's category: its largest code plus one (ADR-0107)",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
+}
+
+@ApiSchema({ name: 'CustomerCategory' })
+export class CustomerCategoryDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ maxLength: 80 }) name: string;
+  @ApiProperty({ description: 'false = retired: kept on its customers, left out of the pickers' })
+  active: boolean;
+  @ApiProperty() sortOrder: number;
+}
+
+@ApiSchema({ name: 'CustomerCategoryCreateRequest' })
+export class CreateCustomerCategoryDto {
+  @ApiProperty({ maxLength: 80 })
+  @Transform(trimmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Omitted: after the others' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+@ApiSchema({ name: 'CustomerCategoryUpdateRequest' })
+export class UpdateCustomerCategoryDto {
+  @ApiPropertyOptional({ maxLength: 80 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  name?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() active?: boolean;
 }

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -60,25 +60,46 @@ export class CustomerContactsService {
   }
 
   add(actor: Actor, customerId: number, input: ContactInput): Promise<CustomerContact> {
-    return inTransaction(this.db, async (tx) => {
-      const [owner] = await tx
-        .select({ id: customers.id })
-        .from(customers)
-        .where(eq(customers.id, customerId));
-      if (!owner) throw notFound('customer', customerId);
-      const [row] = await tx
-        .insert(customerContacts)
-        .values({ customerId, ...validated(input) })
-        .returning();
-      if (!row) throw new Error('contact insert returned no row');
-      await this.audit.record(tx, actor, {
-        action: 'CREATE',
-        entity: 'customer_contacts',
-        entityId: row.id,
-        after: row,
-      });
-      return row;
+    return inTransaction(this.db, (tx) => this.addInTx(tx, actor, customerId, input));
+  }
+
+  /** The customer import adds a contact the customer does not have yet (ADR-0107). */
+  async addInTx(
+    tx: Tx,
+    actor: Actor,
+    customerId: number,
+    input: ContactInput,
+  ): Promise<CustomerContact> {
+    const [owner] = await tx
+      .select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.id, customerId));
+    if (!owner) throw notFound('customer', customerId);
+    const [row] = await tx
+      .insert(customerContacts)
+      .values({ customerId, ...validated(input) })
+      .returning();
+    if (!row) throw new Error('contact insert returned no row');
+    await this.audit.record(tx, actor, {
+      action: 'CREATE',
+      entity: 'customer_contacts',
+      entityId: row.id,
+      after: row,
     });
+    return row;
+  }
+
+  /** The contacts of many customers (the import's "already has it" check). */
+  async ofCustomers(
+    customerIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<CustomerContact[]> {
+    if (customerIds.length === 0) return [];
+    return executor
+      .select()
+      .from(customerContacts)
+      .where(inArray(customerContacts.customerId, [...customerIds]))
+      .orderBy(asc(customerContacts.customerId), asc(customerContacts.id));
   }
 
   update(actor: Actor, id: number, input: ContactInput): Promise<CustomerContact> {
