@@ -9,12 +9,16 @@ import { eq } from 'drizzle-orm';
 import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
+import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { CentralClient, CentralError } from './central.client';
 import { OutboxService } from './outbox.service';
 import { SnapshotStore } from './snapshot.store';
 
 const BATCH = 50;
 const HEARTBEAT_MS = 30_000;
+/** The store PosAPI: due receipts every 10 s, its own facts every 5 minutes (ADR-0065). */
+const EBARIMT_MS = 10_000;
+const POSAPI_INFO_MS = 5 * 60_000;
 const DEFAULT_PULL_MS = 60_000;
 /** After a failed call: wait longer each time, up to a minute. */
 const MAX_BACKOFF_MS = 60_000;
@@ -44,6 +48,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly central: CentralClient,
     private readonly outbox: OutboxService,
     private readonly store: SnapshotStore,
+    private readonly ebarimt: EbarimtService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -65,6 +70,15 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     this.loop('heartbeat', 5_000, async () => {
       await this.heartbeatOnce();
       return HEARTBEAT_MS;
+    });
+    if (!this.ebarimt.enabled) return;
+    this.loop('posapi-info', 2_000, async () => {
+      await this.ebarimt.refreshInfo();
+      return POSAPI_INFO_MS;
+    });
+    this.loop('ebarimt', 3_000, async () => {
+      const tried = await this.ebarimt.runDue();
+      return tried > 0 ? 1_000 : EBARIMT_MS;
     });
   }
 
@@ -105,6 +119,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
         backlog: counts.pending,
         clockSkewMs: null,
         snapshotVersion: this.store.version(),
+        posapi: await this.ebarimt.info(),
       });
       await this.noteContact(null);
       return true;

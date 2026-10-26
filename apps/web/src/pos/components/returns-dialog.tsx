@@ -1,7 +1,7 @@
 import { Decimal, toMoney } from '@tugeel/shared/money';
 import type {
   EdgeApproval,
-  EdgeReceipt,
+  EdgePrintableReceipt,
   EdgeReturnSale,
   EdgeReturnableLine,
 } from '@tugeel/shared/pos';
@@ -43,7 +43,7 @@ export function ReturnsDialog(props: {
   open: boolean;
   approvalRequired: boolean;
   onClose: () => void;
-  onDone: (receipt: EdgeReceipt) => void;
+  onDone: (receipt: EdgePrintableReceipt) => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
   const { t } = useTranslation();
@@ -74,7 +74,7 @@ function partOf(line: EdgeReturnableLine, qty: string): Decimal {
 function ReturnsPanel(props: {
   approvalRequired: boolean;
   onCancel: () => void;
-  onDone: (receipt: EdgeReceipt) => void;
+  onDone: (receipt: EdgePrintableReceipt) => void;
 }) {
   const { t } = useTranslation();
   const { client } = useKiosk();

@@ -6,6 +6,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
@@ -15,11 +16,13 @@ import { Decimal } from '@tugeel/shared/money';
 import type {
   EdgeBarcodeHit,
   EdgeDeviceInfo,
+  EdgeEbarimtQueue,
   EdgeHealth,
   EdgeLoginResponse,
   EdgeCartLine,
   EdgePairResponse,
   EdgeParkedBasket,
+  EdgePrintableReceipt,
   EdgeProductHit,
   EdgeQuickGroup,
   EdgeQuoteResponse,
@@ -28,7 +31,9 @@ import type {
   EdgeSession,
   EdgeShiftSummary,
   EdgeSupervisor,
+  EdgeTaxpayer,
   EdgeVoidResponse,
+  PosapiInfoWire,
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
@@ -37,6 +42,8 @@ import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import {
   DiscardParkedDto,
+  EbarimtResolveDto,
+  EbarimtSendDataDto,
   LoginDto,
   PairDto,
   ParkDto,
@@ -47,8 +54,11 @@ import {
   SearchQueryDto,
   ShiftCloseDto,
   ShiftOpenDto,
+  TaxpayerQueryDto,
   VoidDto,
 } from '../dto/kiosk.dto';
+import { EbarimtService } from '../ebarimt/ebarimt.service';
+import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import {
   cashierOf,
   DeviceOnly,
@@ -90,6 +100,8 @@ export class KioskController {
     private readonly voids: EdgeVoidsService,
     private readonly parked: EdgeParkedService,
     private readonly returns: EdgeReturnsService,
+    private readonly ebarimt: EbarimtService,
+    private readonly taxpayers: TaxpayerClient,
   ) {}
 
   @Get('health')
@@ -113,6 +125,7 @@ export class KioskController {
         lastPushAt: state?.lastPushAt?.toISOString() ?? null,
       },
       outbox: await this.outbox.counts(),
+      ebarimt: await this.ebarimt.summary(),
     };
   }
 
@@ -212,8 +225,9 @@ export class KioskController {
 
   @Post('sales')
   @HttpCode(200)
-  sell(@Kiosk() kiosk: KioskContext, @Body() body: SaleDto): Promise<EdgeReceipt> {
-    return this.checkout.sell(kiosk.device.tillCode, cashierOf(kiosk), body);
+  async sell(@Kiosk() kiosk: KioskContext, @Body() body: SaleDto): Promise<EdgePrintableReceipt> {
+    const receipt = await this.checkout.sell(kiosk.device.tillCode, cashierOf(kiosk), body);
+    return this.ebarimt.afterCommit(kiosk.device.tillCode, receipt.clientId);
   }
 
   @Get('sales/recent')
@@ -276,7 +290,54 @@ export class KioskController {
 
   @Post('returns')
   @HttpCode(200)
-  refund(@Kiosk() kiosk: KioskContext, @Body() body: ReturnDto): Promise<EdgeReceipt> {
-    return this.returns.refund(kiosk.device.tillCode, cashierOf(kiosk), body);
+  async refund(
+    @Kiosk() kiosk: KioskContext,
+    @Body() body: ReturnDto,
+  ): Promise<EdgePrintableReceipt> {
+    const receipt = await this.returns.refund(kiosk.device.tillCode, cashierOf(kiosk), body);
+    return this.ebarimt.afterCommit(kiosk.device.tillCode, receipt.clientId);
+  }
+
+  // ADR-0065: printing, the company lookup and the store PosAPI's list.
+
+  /** A receipt to print: with its lottery and QR while the edge holds them, else a copy. */
+  @Get('receipts/:clientId/print')
+  print(
+    @Kiosk() kiosk: KioskContext,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+  ): Promise<EdgePrintableReceipt> {
+    return this.ebarimt.printable(kiosk.device.tillCode, clientId);
+  }
+
+  @Get('ebarimt/taxpayer')
+  taxpayer(@Query() query: TaxpayerQueryDto): Promise<EdgeTaxpayer> {
+    return this.taxpayers.lookup(query.no);
+  }
+
+  @Get('ebarimt/queue')
+  ebarimtQueue(): Promise<EdgeEbarimtQueue> {
+    return this.ebarimt.queue();
+  }
+
+  @Post('ebarimt/:id/resolve')
+  @HttpCode(204)
+  async resolve(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: EbarimtResolveDto,
+  ): Promise<void> {
+    const approver = await this.auth.approve(body.approval);
+    await this.ebarimt.resolve(
+      id,
+      body.outcome,
+      { ddtd: body.ddtd?.trim() || null, posapiDate: body.posapiDate?.trim() || null },
+      approver?.userId ?? null,
+    );
+  }
+
+  @Post('ebarimt/send-data')
+  @HttpCode(200)
+  async sendData(@Body() body: EbarimtSendDataDto): Promise<PosapiInfoWire> {
+    await this.auth.approve(body.approval);
+    return this.ebarimt.sendData();
   }
 }

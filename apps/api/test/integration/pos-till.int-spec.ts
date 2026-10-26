@@ -198,7 +198,7 @@ describe('pos till tools', () => {
           tenders: [{ kind: 'CASH', amount: '3900', tendered: '5000' }],
         })
         .expect(200)
-    ).body as EdgeReceipt;
+    ).body.receipt as EdgeReceipt;
     // Typed on a Latin keyboard: «K1-…» still finds till К1's receipt.
     const latin = sold.number.replace('К', 'K');
     const found = (await kiosk.get(`/returns/sale?number=${encodeURIComponent(latin)}`).expect(200))
@@ -215,8 +215,8 @@ describe('pos till tools', () => {
       approval,
     });
     await kiosk.post('/returns', body('1', null)).expect(403);
-    const refund = (await kiosk.post('/returns', body('2', supervisor())).expect(200))
-      .body as EdgeReceipt;
+    const refund = (await kiosk.post('/returns', body('2', supervisor())).expect(200)).body
+      .receipt as EdgeReceipt;
     expect(refund).toMatchObject({
       kind: 'RETURN',
       refundsNumber: sold.number,

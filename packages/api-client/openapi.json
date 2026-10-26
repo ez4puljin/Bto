@@ -42855,6 +42855,24 @@
           "supervisorRequired": {
             "type": "boolean"
           },
+          "receiptTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "receiptFooter": {
+            "type": "string",
+            "nullable": true
+          },
+          "ebarimtDistrictCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "0000"
+          },
+          "ebarimtClassificationCode": {
+            "type": "string",
+            "nullable": true,
+            "example": "0000000"
+          },
           "updatedAt": {
             "type": "string",
             "nullable": true,
@@ -42869,6 +42887,10 @@
           "returnWindowDays",
           "snapshotIntervalSec",
           "supervisorRequired",
+          "receiptTitle",
+          "receiptFooter",
+          "ebarimtDistrictCode",
+          "ebarimtClassificationCode",
           "updatedAt"
         ]
       },
@@ -42897,6 +42919,26 @@
           },
           "supervisorRequired": {
             "type": "boolean"
+          },
+          "receiptTitle": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "receiptFooter": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "ebarimtDistrictCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{4}$"
+          },
+          "ebarimtClassificationCode": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[0-9]{7}$"
           }
         }
       },
@@ -42961,6 +43003,29 @@
             "type": "string",
             "nullable": true
           },
+          "posapiVersion": {
+            "type": "string",
+            "nullable": true,
+            "description": "The store PosAPI (ADR-0065)"
+          },
+          "posapiLastSent": {
+            "type": "string",
+            "nullable": true,
+            "description": "PosAPI lastSentDate verbatim"
+          },
+          "posapiLeftLotteries": {
+            "type": "number",
+            "nullable": true
+          },
+          "posapiCheckedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "posapiError": {
+            "type": "string",
+            "nullable": true
+          },
           "status": {
             "enum": [
               "ACTIVE",
@@ -42992,6 +43057,11 @@
           "backlog",
           "clockSkewMs",
           "snapshotVersion",
+          "posapiVersion",
+          "posapiLastSent",
+          "posapiLeftLotteries",
+          "posapiCheckedAt",
+          "posapiError",
           "status",
           "createdAt",
           "updatedAt"
@@ -44710,13 +44780,18 @@
           },
           "rejections": {
             "type": "number"
+          },
+          "receiptsToCheck": {
+            "type": "number",
+            "description": "Sales whose e-Barimt failed or went unanswered (ADR-0065)"
           }
         },
         "required": [
           "openShifts",
           "shiftsToHandOver",
           "openShortfalls",
-          "rejections"
+          "rejections",
+          "receiptsToCheck"
         ]
       },
       "PosSaleDocLine": {
@@ -45315,6 +45390,39 @@
           "serverTime"
         ]
       },
+      "PosPosapiInfo": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "lastSentDate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "example": "2026-10-26 16:27:07"
+          },
+          "leftLotteries": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "checkedAt"
+        ]
+      },
       "PosHeartbeat": {
         "type": "object",
         "properties": {
@@ -45335,6 +45443,15 @@
             "type": "string",
             "nullable": true,
             "maxLength": 80
+          },
+          "posapi": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PosPosapiInfo"
+              }
+            ]
           }
         },
         "required": [
@@ -50020,7 +50137,11 @@
           "POS_SESSION_EXPIRED",
           "POS_SNAPSHOT_MISSING",
           "POS_SUPERVISOR_REQUIRED",
-          "POS_PARKED_LIMIT"
+          "POS_PARKED_LIMIT",
+          "EBARIMT_LOOKUP_UNAVAILABLE",
+          "EBARIMT_TAXPAYER_NOT_FOUND",
+          "EBARIMT_RECEIPT_STATE_INVALID",
+          "EBARIMT_POSAPI_UNAVAILABLE"
         ]
       },
       "ProblemFieldError": {

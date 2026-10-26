@@ -36,7 +36,19 @@ export async function createEdgeApp(options: {
   databaseUrl: string;
   centralUrl: string;
   nodeToken: string;
+  /** ADR-0065: the store PosAPI and the taxpayer lookup (fakes the test runs); absent = fake receipts. */
+  ebarimt?: { posapiUrl: string; lookupUrl: string; timeoutMs?: number };
 }): Promise<NestExpressApplication> {
+  process.env.EBARIMT_PROVIDER = options.ebarimt ? 'posapi' : 'fake';
+  if (options.ebarimt) {
+    process.env.POSAPI_URL = options.ebarimt.posapiUrl;
+    process.env.EBARIMT_LOOKUP_URL = options.ebarimt.lookupUrl;
+    process.env.POSAPI_TIMEOUT_MS = String(options.ebarimt.timeoutMs ?? 2_000);
+  } else {
+    delete process.env.POSAPI_URL;
+    delete process.env.EBARIMT_LOOKUP_URL;
+    delete process.env.POSAPI_TIMEOUT_MS;
+  }
   process.env.EDGE_DATABASE_URL = options.databaseUrl;
   process.env.CENTRAL_API_URL = options.centralUrl;
   process.env.EDGE_NODE_TOKEN = options.nodeToken;

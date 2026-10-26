@@ -5,6 +5,9 @@ import {
   type EdgeCartLine,
   type EdgeDeviceInfo,
   type EdgeDiscardParkedRequest,
+  type EdgeEbarimtQueue,
+  type EdgeEbarimtResolveRequest,
+  type EdgeEbarimtSendDataRequest,
   type EdgeHealth,
   type EdgeLoginRequest,
   type EdgeLoginResponse,
@@ -12,6 +15,7 @@ import {
   type EdgePairResponse,
   type EdgeParkedBasket,
   type EdgeParkRequest,
+  type EdgePrintableReceipt,
   type EdgeProductHit,
   type EdgeQuickGroup,
   type EdgeQuoteRequest,
@@ -25,6 +29,7 @@ import {
   type EdgeShiftOpenRequest,
   type EdgeShiftSummary,
   type EdgeSupervisor,
+  type EdgeTaxpayer,
   type EdgeVoidRequest,
   type EdgeVoidResponse,
 } from '@tugeel/shared/pos';
@@ -260,7 +265,7 @@ export class EdgeClient {
   }
 
   sale(body: EdgeSaleRequest) {
-    return this.request<EdgeReceipt>('POST', '/sales', { body });
+    return this.request<EdgePrintableReceipt>('POST', '/sales', { body });
   }
 
   recentSales(signal?: AbortSignal) {
@@ -301,7 +306,30 @@ export class EdgeClient {
   }
 
   refund(body: EdgeReturnRequest) {
-    return this.request<EdgeReceipt>('POST', '/returns', { body });
+    return this.request<EdgePrintableReceipt>('POST', '/returns', { body });
+  }
+
+  // ADR-0065: printing, the company lookup, the store PosAPI's list.
+
+  printReceipt(clientId: string) {
+    return this.request<EdgePrintableReceipt>('GET', `/receipts/${clientId}/print`);
+  }
+
+  taxpayer(no: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({ no }).toString();
+    return this.request<EdgeTaxpayer>('GET', `/ebarimt/taxpayer?${query}`, { signal });
+  }
+
+  ebarimtQueue(signal?: AbortSignal) {
+    return this.request<EdgeEbarimtQueue>('GET', '/ebarimt/queue', { signal });
+  }
+
+  resolveEbarimt(id: number, body: EdgeEbarimtResolveRequest) {
+    return this.request<undefined>('POST', `/ebarimt/${id}/resolve`, { body });
+  }
+
+  sendData(body: EdgeEbarimtSendDataRequest) {
+    return this.request<unknown>('POST', '/ebarimt/send-data', { body });
   }
 
   private async request<T>(method: string, path: string, options: RequestOptions = {}) {

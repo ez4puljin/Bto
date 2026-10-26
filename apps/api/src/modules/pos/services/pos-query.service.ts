@@ -208,6 +208,8 @@ export interface PosAttention {
   shiftsToHandOver: number;
   openShortfalls: number;
   rejections: number;
+  /** Sales whose e-Barimt failed or went unanswered on the edge (ADR-0065). */
+  receiptsToCheck: number;
 }
 
 type ShiftRow = typeof posShifts.$inferSelect;
@@ -482,12 +484,17 @@ export class PosQueryService {
       .select({ count: sql<string>`count(*)` })
       .from(posSyncRejections)
       .where(isNull(posSyncRejections.replayedAt));
+    const [receipts] = await this.db
+      .select({ count: sql<string>`count(*)` })
+      .from(posSales)
+      .where(inArray(posSales.ebarimtStatus, ['ERROR', 'INDETERMINATE']));
     const int = (value: string | undefined) => Number.parseInt(value ?? '0', 10);
     return {
       openShifts: int(shifts?.open),
       shiftsToHandOver: int(shifts?.closed),
       openShortfalls: int(shortfalls?.count),
       rejections: int(rejections?.count),
+      receiptsToCheck: int(receipts?.count),
     };
   }
 

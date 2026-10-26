@@ -4,6 +4,7 @@ import {
   type EdgeCashier,
   type EdgeDeviceInfo,
   type EdgeHealth,
+  type EdgePrintableReceipt,
   type EdgeProductHit,
   type EdgeQuoteRequest,
   type EdgeQuoteResponse,
@@ -218,6 +219,15 @@ export function receiptOf(request: EdgeSaleRequest, number = 'К1-261017-0004'):
   };
 }
 
+/** What the edge answers a sale or a return (ADR-0065): the receipt and what it prints with. */
+export function printable(
+  receipt: EdgeReceipt,
+  print: EdgePrintableReceipt['print'] = null,
+  copy = false,
+): EdgePrintableReceipt {
+  return { receipt, print, copy };
+}
+
 /** A paired till with a signed-in cashier and an open shift; `extra` replaces or adds routes. */
 export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<string, EdgeHandler> {
   return {
@@ -232,7 +242,7 @@ export function storeRoutes(extra: Record<string, EdgeHandler> = {}): Record<str
       const q = (call.url.searchParams.get('q') ?? '').toLowerCase();
       return json(PRODUCTS.filter((product) => product.name.toLowerCase().includes(q)));
     },
-    'POST /sales': (call) => json(receiptOf(call.body as EdgeSaleRequest)),
+    'POST /sales': (call) => json(printable(receiptOf(call.body as EdgeSaleRequest))),
     'GET /sales/recent': () => json([]),
     'GET /supervisors': () => json([SUPERVISOR]),
     'POST /voids': (call) => {

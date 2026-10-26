@@ -80,6 +80,29 @@ export class SaleDto {
   @ValidateNested({ each: true })
   @Type(() => TenderDto)
   tenders: TenderDto[];
+
+  /** A company's receipt (ADR-0065): the TIN the lookup answered. */
+  @IsOptional() @ValidateNested() @Type(() => BuyerDto) buyer?: BuyerDto | null;
+}
+
+export class BuyerDto {
+  @Matches(/^[0-9]{11,14}$/) tin: string;
+}
+
+/** A company by its 7-digit registration number or its 11–14 digit TIN. */
+export class TaxpayerQueryDto {
+  @Matches(/^s*[0-9][0-9s-]{5,20}s*$/) no: string;
+}
+
+export class EbarimtResolveDto {
+  @IsIn(['ISSUED', 'NOT_ISSUED']) outcome: 'ISSUED' | 'NOT_ISSUED';
+  @IsOptional() @IsString() @MaxLength(40) ddtd?: string | null;
+  @IsOptional() @IsString() @MaxLength(19) posapiDate?: string | null;
+  @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
+}
+
+export class EbarimtSendDataDto {
+  @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
 }
 
 export class SearchQueryDto {

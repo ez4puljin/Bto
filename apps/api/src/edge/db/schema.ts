@@ -1,7 +1,9 @@
+import type { EbarimtPaymentCode, EbarimtTaxType } from '@tugeel/shared/mn';
 import type {
   EdgeCartLine,
   EdgeReceipt,
   PosSnapshot,
+  ReceiptType,
   SaleDocWire,
   SaleKind,
   SyncEventWire,
@@ -11,6 +13,7 @@ import type {
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   check,
   index,
   integer,
@@ -44,6 +47,13 @@ export const edgeState = pgTable(
     lastPushAt: timestamp('last_push_at', { withTimezone: true }),
     lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
     lastError: text('last_error'),
+    /** ADR-0065: the store PosAPI as `GET /rest/info` last answered (never a credential). */
+    posapiVersion: text('posapi_version'),
+    /** PosAPI's `lastSentDate` verbatim. */
+    posapiLastSent: text('posapi_last_sent'),
+    posapiLeftLotteries: integer('posapi_left_lotteries'),
+    posapiCheckedAt: timestamp('posapi_checked_at', { withTimezone: true }),
+    posapiError: text('posapi_error'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check('edge_state_single_row', sql`${t.id} = 1`)],
@@ -188,6 +198,96 @@ export const edgeOutbox = pgTable(
   (t) => [
     unique('edge_outbox_kind_client_key').on(t.kind, t.clientId),
     index('edge_outbox_pending_idx').on(t.status, t.seq),
+  ],
+);
+
+export const EDGE_RECEIPT_OPS = ['ISSUE', 'CANCEL'] as const;
+export type EdgeReceiptOp = (typeof EDGE_RECEIPT_OPS)[number];
+
+/**
+ * An operation's state (ADR-0065). SENDING: claimed by one caller, the call under way (found at
+ * boot it becomes INDETERMINATE for an ISSUE, PENDING again for a CANCEL). DONE: issued, or the
+ * cancellation accepted. ERROR: PosAPI refused (certainly not issued). INDETERMINATE: sent and
+ * unanswered — never sent again without a supervisor. ABANDONED: a supervisor found it was not
+ * issued; a new operation took its place.
+ */
+export const EDGE_RECEIPT_STATUSES = [
+  'PENDING',
+  'SENDING',
+  'DONE',
+  'ERROR',
+  'INDETERMINATE',
+  'ABANDONED',
+] as const;
+export type EdgeReceiptStatus = (typeof EDGE_RECEIPT_STATUSES)[number];
+
+/** One line of a receipt as it was sold, kept to build the PosAPI request (ADR-0065). */
+export interface EdgeReceiptLine {
+  name: string;
+  barCode: string | null;
+  barCodeType: 'GS1' | 'ISBN' | 'UNDEFINED';
+  classificationCode: string | null;
+  taxType: EbarimtTaxType;
+  taxProductCode: string | null;
+  measureUnit: string;
+  qty: string;
+  total: string;
+  vat: string;
+}
+
+/**
+ * The store PosAPI's operations, in the order they must happen (ADR-0065): a sale's receipt, a
+ * full return's cancellation, a partial return's replacement. Only facts PosAPI answered — never
+ * the lottery or the QR data (CLAUDE.md NEVER).
+ */
+export const edgeReceipts = pgTable(
+  'edge_receipts',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    op: text('op', { enum: EDGE_RECEIPT_OPS }).notNull(),
+    /** The edge sale (SALE or RETURN) this operation was made for. */
+    ownerClientId: uuid('owner_client_id')
+      .notNull()
+      .references(() => edgeSales.clientId),
+    /** The first sale of the chain: every receipt of one sale and its returns share it. */
+    chainClientId: uuid('chain_client_id').notNull(),
+    /** CANCEL: whose receipt it cancels; a replacement ISSUE: whose receipt it makes inactive. */
+    targetClientId: uuid('target_client_id'),
+    tillCode: text('till_code').notNull(),
+    status: text('status', { enum: EDGE_RECEIPT_STATUSES }).notNull().default('PENDING'),
+    receiptType: text('receipt_type').$type<ReceiptType>().notNull(),
+    customerTin: text('customer_tin'),
+    customerName: text('customer_name'),
+    /** ISSUE: the lines and payments the receipt is built from; null for a CANCEL. */
+    lines: jsonValue('lines').$type<EdgeReceiptLine[] | null>(),
+    payments: jsonValue('payments').$type<{ code: EbarimtPaymentCode; amount: string }[] | null>(),
+    total: money('total').notNull(),
+    vatTotal: money('vat_total').notNull(),
+    ddtd: text('ddtd'),
+    /** PosAPI's `date` verbatim. */
+    posapiDate: text('posapi_date'),
+    inactiveId: text('inactive_id'),
+    message: text('message'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    /** The first try failed: once issued, the receipt waits to be printed (`READY`). */
+    late: boolean('late').notNull().default(false),
+    resolvedByUserId: bigint('resolved_by_user_id', { mode: 'number' }),
+    createdAt: createdAt(),
+    settledAt: timestamp('settled_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('edge_receipts_open_idx').on(t.status, t.id),
+    index('edge_receipts_owner_idx').on(t.ownerClientId),
+    index('edge_receipts_chain_idx').on(t.chainClientId, t.id),
+    check('edge_receipts_op', sql`${t.op} IN ('ISSUE', 'CANCEL')`),
+    check(
+      'edge_receipts_status',
+      sql`${t.status} IN ('PENDING', 'SENDING', 'DONE', 'ERROR', 'INDETERMINATE', 'ABANDONED')`,
+    ),
+    check('edge_receipts_type', sql`${t.receiptType} IN ('B2C', 'B2B')`),
+    check('edge_receipts_cancel_target', sql`${t.op} = 'ISSUE' OR ${t.targetClientId} IS NOT NULL`),
+    check('edge_receipts_issue_lines', sql`${t.op} = 'CANCEL' OR ${t.lines} IS NOT NULL`),
   ],
 );
 

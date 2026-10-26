@@ -12,6 +12,7 @@ import {
   type EdgeHandler,
   fakeEdge,
   json,
+  printable,
   problem,
   receiptOf,
   SESSION,
@@ -143,7 +144,7 @@ describe('kiosk: the sale screen', () => {
         tries += 1;
         return tries === 1
           ? problem('INTERNAL_ERROR', 500)
-          : json(receiptOf(call.body as EdgeSaleRequest));
+          : json(printable(receiptOf(call.body as EdgeSaleRequest)));
       },
     });
     const user = userEvent.setup();

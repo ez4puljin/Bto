@@ -7,6 +7,10 @@ import { buildLoggerParams } from '../common/logging/logger.config';
 import { EdgeConfig, parseEdgeEnv } from './config/edge-env';
 import { KioskController } from './controllers/kiosk.controller';
 import { EdgeDbModule } from './db/edge-db';
+import { EbarimtService } from './ebarimt/ebarimt.service';
+import { PosapiClient } from './ebarimt/posapi.client';
+import { PrintableCache } from './ebarimt/printable.cache';
+import { TaxpayerClient } from './ebarimt/taxpayer.client';
 import { KioskGuard } from './guards/kiosk.guard';
 import { CentralClient } from './services/central.client';
 import { CheckoutService } from './services/checkout.service';
@@ -76,6 +80,10 @@ export class EdgeModule {
         EdgeVoidsService,
         EdgeParkedService,
         EdgeReturnsService,
+        PosapiClient,
+        TaxpayerClient,
+        PrintableCache,
+        EbarimtService,
         KioskGuard,
       ],
     };

@@ -26,6 +26,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import { AppError, notFound } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales } from '../db/schema';
+import { EbarimtService } from '../ebarimt/ebarimt.service';
+import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
@@ -37,7 +39,9 @@ const SEARCH_LIMIT = 30;
  * Selling at a till (ADR-0063 #3–#5, ADR-0067): products found by name, SKU or barcode in the
  * snapshot, priced at RETAIL by the same pure resolver as the centre, a sale written with its
  * document and its outbox entry in one edge transaction under the till's own number. Payments are
- * taken as given (cash with change, card by hand); the e-Barimt is a test receipt for now.
+ * taken as given (cash with change, card by hand). The e-Barimt (ADR-0065) is queued in the same
+ * transaction and issued right after it (`EbarimtService.afterCommit`); a company's receipt needs
+ * its TIN found by the online lookup first.
  */
 @Injectable()
 export class CheckoutService {
@@ -46,6 +50,8 @@ export class CheckoutService {
     private readonly store: SnapshotStore,
     private readonly shifts: EdgeShiftsService,
     private readonly outbox: OutboxService,
+    private readonly ebarimt: EbarimtService,
+    private readonly taxpayers: TaxpayerClient,
   ) {}
 
   /**
@@ -176,6 +182,10 @@ export class CheckoutService {
     );
     const totals = saleTotals(lines);
     const tenders = this.tenders(request, totals.total);
+    // Offline there are no company receipts (owner 2026-10-26): the lookup refuses first.
+    const buyer = request.buyer ? await this.taxpayers.lookup(request.buyer.tin) : null;
+    const receiptType = buyer ? 'B2B' : 'B2C';
+    const settings = loaded.snapshot.settings;
     return inEdgeTransaction(this.db, async (tx) => {
       const shift = await this.shifts.current(tillCode, tx);
       if (!shift) {
@@ -195,9 +205,9 @@ export class CheckoutService {
         approvedByUserId: null,
         number,
         soldAt: soldAt.toISOString(),
-        receiptType: 'B2C',
-        customerTin: null,
-        customerName: null,
+        receiptType,
+        customerTin: buyer?.tin ?? null,
+        customerName: buyer?.name ?? null,
         consumerNo: null,
         refundsSaleClientId: null,
         lines,
@@ -208,7 +218,15 @@ export class CheckoutService {
         vatTotal: totals.vatTotal.toFixed(2),
         note: null,
         snapshotVersion: loaded.snapshot.version,
-        ebarimt: null,
+        ebarimt: this.ebarimt.enabled
+          ? {
+              status: 'PENDING',
+              ddtd: null,
+              posapiDate: null,
+              billIdSuffix: null,
+              inactiveId: null,
+            }
+          : null,
       };
       const receipt: EdgeReceipt = {
         clientId: request.clientId,
@@ -239,7 +257,11 @@ export class CheckoutService {
           tendered: tender.tendered,
         })),
         change: tenders.change.toFixed(2),
-        ebarimt: { mode: 'TEST', ddtd: null },
+        title: settings.receiptTitle ?? null,
+        footer: settings.receiptFooter ?? null,
+        ebarimt: this.ebarimt.enabled
+          ? this.ebarimt.pendingFacts(receiptType, buyer?.tin ?? null, buyer?.name ?? null)
+          : { mode: 'TEST', ddtd: null },
       };
       await tx.insert(edgeSales).values({
         clientId: request.clientId,
@@ -256,6 +278,20 @@ export class CheckoutService {
         receipt,
       });
       await this.outbox.enqueue(tx, { kind: 'SALE', clientId: request.clientId, sale: doc });
+      if (this.ebarimt.enabled) {
+        await this.ebarimt.enqueueSale(tx, {
+          ownerClientId: request.clientId,
+          tillCode,
+          receiptType,
+          customerTin: buyer?.tin ?? null,
+          customerName: buyer?.name ?? null,
+          lines: this.ebarimt.linesOf(doc, loaded),
+          cash: tenders.cash,
+          card: tenders.card,
+          total: totals.total,
+          vatTotal: totals.vatTotal,
+        });
+      }
       return receipt;
     });
   }

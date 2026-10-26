@@ -10,6 +10,7 @@ import {
   type QuoteProgram,
   type QuoteResult,
 } from '../pricing';
+import type { EbarimtTaxType } from '../mn';
 import type {
   EbarimtStatus,
   PosEventKind,
@@ -136,13 +137,20 @@ export interface VoidDocWire {
   total: string;
 }
 
+/** What the edge learnt of a sale's (or a return's) receipt after it replayed it (ADR-0065). */
+export interface ReceiptStatusDocWire {
+  saleClientId: string;
+  ebarimt: EbarimtFactsWire;
+}
+
 /** One document of `POST /api/v1/pos/sync/events`, in the shape of the centre's SyncEventDto. */
 export type SyncEventWire =
   | { kind: 'SALE' | 'RETURN'; clientId: string; sale: SaleDocWire }
   | { kind: 'VOID'; clientId: string; voided: VoidDocWire }
   | { kind: 'SHIFT_OPENED'; clientId: string; shiftOpened: ShiftOpenDocWire }
   | { kind: 'SHIFT_CLOSED'; clientId: string; shiftClosed: ShiftCloseDocWire }
-  | { kind: 'TILL_BOUND'; clientId: string; tillBound: TillBoundDocWire };
+  | { kind: 'TILL_BOUND'; clientId: string; tillBound: TillBoundDocWire }
+  | { kind: 'RECEIPT_STATUS'; clientId: string; receiptStatus: ReceiptStatusDocWire };
 
 export interface SyncOutcomeWire {
   clientId: string;
@@ -159,11 +167,24 @@ export interface SyncResponseWire {
   serverTime: string;
 }
 
+/** The store PosAPI as the edge last read it (`GET /rest/info`, ADR-0065); never a credential. */
+export interface PosapiInfoWire {
+  version: string | null;
+  /** `lastSentDate` verbatim (when PosAPI last sent its receipts to the tax office). */
+  lastSentDate: string | null;
+  leftLotteries: number | null;
+  checkedAt: string;
+  /** Why the last read failed; null when it answered. */
+  error: string | null;
+}
+
 export interface HeartbeatWire {
   appVersion: string | null;
   backlog: number;
   clockSkewMs: number | null;
   snapshotVersion: string | null;
+  /** Absent from an edge older than ADR-0065 or one on the fake provider. */
+  posapi?: PosapiInfoWire | null;
 }
 
 // ---------------------------------------------------------------- centre → edge (snapshot)
@@ -187,6 +208,11 @@ export interface SnapshotProduct {
   categoryId: number;
   /** VAT the company charges on it today (0 for an exempt product or a non-payer). */
   vatRatePct: string;
+  /** The e-Barimt tax type (the catalog's `vat_type`); absent in a snapshot older than ADR-0065. */
+  vatType?: EbarimtTaxType;
+  taxProductCode?: string | null;
+  /** The product's classification code, else its nearest category's default (ADR-0065). */
+  classificationCode?: string | null;
   units: SnapshotUnit[];
   /** Null without price terms or a profile version today: the till cannot sell it. */
   terms: { warehousePrice: string; wholeUomId: number | null; profileId: number } | null;
@@ -252,7 +278,16 @@ export interface PosSnapshot {
   generatedAt: string;
   businessDate: string;
   node: { id: number; code: string; name: string; warehouseId: number; warehouseName: string };
-  settings: { returnWindowDays: number; snapshotIntervalSec: number; supervisorRequired: boolean };
+  settings: {
+    returnWindowDays: number;
+    snapshotIntervalSec: number;
+    supervisorRequired: boolean;
+    /** ADR-0065: the receipt's heading and closing line, the store's e-Barimt codes. */
+    receiptTitle?: string | null;
+    receiptFooter?: string | null;
+    ebarimtDistrictCode?: string | null;
+    ebarimtClassificationCode?: string | null;
+  };
   company: { name: string | null; vatPayer: boolean; vatRatePct: string };
   tills: SnapshotTill[];
   cashiers: SnapshotCashier[];
@@ -376,6 +411,16 @@ export interface EdgeHealth {
   snapshot: { version: string | null; pulledAt: string | null; products: number };
   central: { reachable: boolean; lastPullAt: string | null; lastPushAt: string | null };
   outbox: { pending: number; rejected: number };
+  /** ADR-0065: the provider and how many receipts wait to be printed or checked on this edge. */
+  ebarimt?: EdgeEbarimtSummary;
+}
+
+export interface EdgeEbarimtSummary {
+  provider: 'fake' | 'posapi';
+  /** Issued late (PosAPI was away) and not printed yet. */
+  ready: number;
+  /** Waiting for PosAPI, failed or unanswered: a supervisor looks at them. */
+  attention: number;
 }
 
 export interface EdgePairRequest {
@@ -536,6 +581,8 @@ export interface EdgeSaleRequest {
   clientId: string;
   lines: EdgeCartLine[];
   tenders: EdgeTenderInput[];
+  /** A company's receipt (B2B, ADR-0065): its TIN as the lookup answered; absent for a citizen. */
+  buyer?: { tin: string } | null;
 }
 
 /** A supervisor's PIN typed at the till for a void or a return (ADR-0104). */
@@ -651,6 +698,93 @@ export interface EdgeReceipt {
   vatTotal: string;
   tenders: { kind: TenderKind; amount: string; tendered: string | null }[];
   change: string;
-  /** TEST: the fake provider (ADR-0067), never a tax receipt; REAL arrives with PosAPI (ADR-0065). */
-  ebarimt: { mode: 'TEST' | 'REAL'; ddtd: string | null };
+  /** The store's heading and closing line from its settings (ADR-0065); absent on older receipts. */
+  title?: string | null;
+  footer?: string | null;
+  /** TEST: the fake provider (ADR-0067), never a tax receipt; REAL: the store PosAPI (ADR-0065). */
+  ebarimt: EdgeReceiptEbarimt;
+}
+
+/** The receipt's e-Barimt facts as kept on the edge: never the lottery or the QR (ADR-0065). */
+export interface EdgeReceiptEbarimt {
+  mode: 'TEST' | 'REAL';
+  ddtd: string | null;
+  status?: EbarimtStatus;
+  /** PosAPI's `date` verbatim. */
+  posapiDate?: string | null;
+  receiptType?: ReceiptType;
+  customerTin?: string | null;
+  customerName?: string | null;
+  merchantTin?: string | null;
+  merchantName?: string | null;
+  /** The ДДТД this receipt replaced (a partial return's new receipt). */
+  inactiveId?: string | null;
+  /** PosAPI's refusal, shown to the supervisor. */
+  message?: string | null;
+}
+
+/**
+ * What only a printer may see (ADR-0065, CLAUDE.md NEVER): the lottery and the QR data, held in
+ * the edge's memory for the till's last receipt and for a late receipt until it is printed once.
+ * Never stored, never logged.
+ */
+export interface EdgePrintSecrets {
+  lottery: string | null;
+  qrData: string | null;
+}
+
+/** A receipt to print: with the secrets while the edge still holds them, else a copy. */
+export interface EdgePrintableReceipt {
+  receipt: EdgeReceipt;
+  print: EdgePrintSecrets | null;
+  /** Printed before, or the secrets are gone: «ХУУЛБАР». */
+  copy: boolean;
+}
+
+/** A company found by its registration number or TIN (`api.ebarimt.mn`, online only). */
+export interface EdgeTaxpayer {
+  tin: string;
+  name: string;
+  vatPayer: boolean;
+}
+
+export const EDGE_EBARIMT_GROUPS = ['READY', 'WAITING', 'CHECK', 'ERROR'] as const;
+export type EdgeEbarimtGroup = (typeof EDGE_EBARIMT_GROUPS)[number];
+
+/** One PosAPI operation of this edge as the supervisor's list shows it. */
+export interface EdgeEbarimtItem {
+  id: number;
+  group: EdgeEbarimtGroup;
+  op: 'ISSUE' | 'CANCEL';
+  saleClientId: string;
+  number: string;
+  kind: SaleKind;
+  tillCode: string;
+  soldAt: string;
+  total: string;
+  receiptType: ReceiptType;
+  status: string;
+  ddtd: string | null;
+  message: string | null;
+  attempts: number;
+  createdAt: string;
+}
+
+export interface EdgeEbarimtQueue {
+  provider: 'fake' | 'posapi';
+  posapi: PosapiInfoWire | null;
+  items: EdgeEbarimtItem[];
+}
+
+/** A supervisor's decision on an unanswered receipt after looking it up on ebarimt.mn. */
+export interface EdgeEbarimtResolveRequest {
+  outcome: 'ISSUED' | 'NOT_ISSUED';
+  /** ISSUED: the ДДТД and PosAPI's date as ebarimt.mn shows them. */
+  ddtd?: string | null;
+  posapiDate?: string | null;
+  approval: EdgeApproval | null;
+}
+
+export interface EdgeEbarimtSendDataRequest {
+  approval: EdgeApproval | null;
 }

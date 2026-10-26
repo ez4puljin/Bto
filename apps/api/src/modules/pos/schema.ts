@@ -67,6 +67,12 @@ export const posSettings = pgTable(
       .notNull()
       .default(POS_LIMITS.defaultSnapshotIntervalSec),
     supervisorRequired: boolean('supervisor_required').notNull().default(true),
+    /** ADR-0065: the printed receipt's heading (the store's name) and closing line. */
+    receiptTitle: text('receipt_title'),
+    receiptFooter: text('receipt_footer'),
+    /** ADR-0065: the store's district (сум) code and default classification code for e-Barimt. */
+    ebarimtDistrictCode: text('ebarimt_district_code'),
+    ebarimtClassificationCode: text('ebarimt_classification_code'),
     updatedBy: userRef('updated_by'),
     updatedAt: updatedAt(),
   },
@@ -75,6 +81,16 @@ export const posSettings = pgTable(
     check(
       'pos_settings_return_window',
       sql`${t.returnWindowDays} BETWEEN 0 AND ${lim(POS_LIMITS.maxReturnWindowDays)}`,
+    ),
+    check('pos_settings_receipt_title', textLength(t.receiptTitle, POS_LIMITS.maxReceiptText)),
+    check('pos_settings_receipt_footer', textLength(t.receiptFooter, POS_LIMITS.maxReceiptText)),
+    check(
+      'pos_settings_district_code',
+      sql`${t.ebarimtDistrictCode} IS NULL OR ${t.ebarimtDistrictCode} ~ '^[0-9]{4}$'`,
+    ),
+    check(
+      'pos_settings_classification_code',
+      sql`${t.ebarimtClassificationCode} IS NULL OR ${t.ebarimtClassificationCode} ~ '^[0-9]{7}$'`,
     ),
     check(
       'pos_settings_snapshot_interval',
@@ -108,6 +124,13 @@ export const posEdgeNodes = pgTable(
     /** The edge's clock minus the centre's, in milliseconds, as it last reported. */
     clockSkewMs: integer('clock_skew_ms'),
     snapshotVersion: text('snapshot_version'),
+    /** ADR-0065: the store PosAPI as the edge last read it (`GET /rest/info`, heartbeat). */
+    posapiVersion: text('posapi_version'),
+    /** PosAPI's `lastSentDate` verbatim: when it last sent its receipts to the tax office. */
+    posapiLastSent: text('posapi_last_sent'),
+    posapiLeftLotteries: integer('posapi_left_lotteries'),
+    posapiCheckedAt: timestamp('posapi_checked_at', { withTimezone: true }),
+    posapiError: text('posapi_error'),
     status: text('status', { enum: POS_STATUSES }).notNull().default('ACTIVE'),
     createdBy: userRef('created_by'),
     createdAt: createdAt(),

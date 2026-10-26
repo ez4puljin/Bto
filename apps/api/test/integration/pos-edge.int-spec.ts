@@ -197,7 +197,7 @@ describe('pos edge', () => {
         ],
         [{ kind: 'CASH', amount: '5200', tendered: '10000' }],
       ).expect(200)
-    ).body as EdgeReceipt;
+    ).body.receipt as EdgeReceipt;
     expect(cash).toMatchObject({
       total: '5200.00',
       change: '4800.00',
@@ -214,7 +214,7 @@ describe('pos edge', () => {
         [{ productUnitId: colaUnit(), qty: '1' }],
         [{ kind: 'CARD', amount: '1300' }],
       ).expect(200)
-    ).body as EdgeReceipt;
+    ).body.receipt as EdgeReceipt;
     receipts.push(card);
     expect(await sync.pushOnce()).toEqual({ state: 'sent', applied: 4, rejected: 0 });
     const posted = await centreSaleOf(cash.number);
@@ -239,7 +239,7 @@ describe('pos edge', () => {
         [{ productUnitId: colaUnit(), qty: '3' }],
         [{ kind: 'CASH', amount: '3900', tendered: '5000' }],
       ).expect(200)
-    ).body as EdgeReceipt;
+    ).body.receipt as EdgeReceipt;
     receipts.push(offline);
     const failed = await sync.pushOnce();
     expect(failed.state).toBe('failed');
@@ -258,8 +258,8 @@ describe('pos edge', () => {
       lines: [{ productUnitId: colaUnit(), qty: '1' }],
       tenders: [{ kind: 'CASH', amount: '1300' }],
     };
-    const first = (await kiosk.post('/sales', body).expect(200)).body as EdgeReceipt;
-    const again = (await kiosk.post('/sales', body).expect(200)).body as EdgeReceipt;
+    const first = (await kiosk.post('/sales', body).expect(200)).body.receipt as EdgeReceipt;
+    const again = (await kiosk.post('/sales', body).expect(200)).body.receipt as EdgeReceipt;
     expect(again).toEqual(first);
     receipts.push(first);
     const db = edge.get<EdgeDb>(EDGE_DB);

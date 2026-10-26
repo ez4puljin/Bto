@@ -204,13 +204,14 @@ export function PosTillsPage() {
                 <TableHead>{t('pos.fields.tokenPrefix')}</TableHead>
                 <TableHead>{t('pos.fields.lastSeen')}</TableHead>
                 <TableHead className="text-right">{t('pos.fields.backlog')}</TableHead>
+                <TableHead>{t('pos.fields.posapi')}</TableHead>
                 <TableHead>{t('pos.fields.status')}</TableHead>
                 <SpacerHead />
                 <TableHead className="w-px" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nodes.isPending ? <SkeletonRows columns={9} rows={2} /> : null}
+              {nodes.isPending ? <SkeletonRows columns={10} rows={2} /> : null}
               {(nodes.data ?? []).map((node) => (
                 <TableRow key={node.id}>
                   <TableCell className="font-mono font-medium">{node.code}</TableCell>
@@ -230,6 +231,9 @@ export function PosTillsPage() {
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCount(node.backlog)}
+                  </TableCell>
+                  <TableCell>
+                    <PosapiFacts node={node} />
                   </TableCell>
                   <TableCell>
                     <ActiveBadge status={node.status} />
@@ -667,5 +671,38 @@ function TillForm({
         <DialogFormFooter pending={pending} onCancel={onClose} />
       </form>
     </DialogContent>
+  );
+}
+
+/** The lotteries PosAPI has left below this are a warning (ADR-0065). */
+const FEW_LOTTERIES = 500;
+const SEND_LATE_MS = 24 * 3_600_000;
+
+/**
+ * The store PosAPI as the edge last reported it (ADR-0065): when it last sent its receipts to the
+ * tax office and how many lotteries it has left; a warning after a day without sending.
+ */
+function PosapiFacts({ node }: { node: EdgeNode }) {
+  const { t } = useTranslation();
+  if (!node.posapiCheckedAt) {
+    return <span className="text-muted-foreground">{t('pos.fields.none')}</span>;
+  }
+  const sent = node.posapiLastSent
+    ? Date.parse(node.posapiLastSent.replace(' ', 'T') + '+08:00')
+    : NaN;
+  const late = Number.isNaN(sent) || Date.now() - sent > SEND_LATE_MS;
+  const few = node.posapiLeftLotteries !== null && node.posapiLeftLotteries < FEW_LOTTERIES;
+  return (
+    <div className="text-xs leading-snug">
+      {node.posapiError ? <p className="text-warning">{node.posapiError}</p> : null}
+      <p className={late ? 'font-medium text-warning' : undefined}>
+        {t('pos.fields.posapiLastSent')}:{' '}
+        <span className="font-mono">{node.posapiLastSent ?? '—'}</span>
+      </p>
+      <p className={few ? 'font-medium text-warning' : 'text-muted-foreground'}>
+        {t('pos.fields.posapiLotteries')}:{' '}
+        <span className="font-mono">{node.posapiLeftLotteries ?? '—'}</span>
+      </p>
+    </div>
   );
 }

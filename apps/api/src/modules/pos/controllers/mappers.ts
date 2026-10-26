@@ -47,6 +47,7 @@ export const edgeNodeDto = (node: EdgeNode): EdgeNodeDto => ({
   lastSeenAt: isoOrNull(node.lastSeenAt),
   lastPullAt: isoOrNull(node.lastPullAt),
   lastPushAt: isoOrNull(node.lastPushAt),
+  posapiCheckedAt: isoOrNull(node.posapiCheckedAt),
   createdAt: iso(node.createdAt),
   updatedAt: iso(node.updatedAt),
 });
