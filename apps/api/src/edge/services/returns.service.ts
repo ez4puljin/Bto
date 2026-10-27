@@ -9,6 +9,7 @@ import {
   lineVat,
   posSaleNumber,
   refundSplit,
+  voucherSaleRefundable,
   type SaleDocLineWire,
   type SaleDocWire,
   saleTotals,
@@ -86,6 +87,9 @@ export class EdgeReturnsService {
               0,
             ).toFixed(2),
           }
+        : null,
+      refundable: sale.voucherAmount.gt(0)
+        ? (await this.voucherRefundable(this.db, sale)).toFixed(2)
         : null,
       lines: sale.doc.lines.map((line, index) => {
         const shown = sale.receipt.lines[index];
@@ -188,6 +192,16 @@ export class EdgeReturnsService {
         };
       });
       const totals = saleTotals(lines);
+      // ADR-0110 #4: a partner voucher's part is never paid back (owner 2026-10-27).
+      if (sale.voucherAmount.gt(0)) {
+        const refundable = await this.voucherRefundable(tx, sale);
+        if (totals.total.gt(refundable)) {
+          throw new AppError('POS_RETURN_VOUCHER_PART', `sale ${sale.number}: its voucher part stays`, {
+            number: sale.number,
+            refundable: refundable.toFixed(2),
+          });
+        }
+      }
       // ADR-0109 #6: a sale with credit is paid back off its customer's debt first, then in cash.
       const split = sale.creditAmount.gt(0)
         ? refundSplit({
@@ -328,6 +342,21 @@ export class EdgeReturnsService {
         await this.ebarimt.enqueueReturn(tx, { clientId: request.clientId, tillCode }, sale);
       }
       return receipt;
+    });
+  }
+
+  /** What a sale partly paid by vouchers may still give back: its cash and card, less returns. */
+  private async voucherRefundable(
+    executor: EdgeDb | EdgeTx,
+    sale: { clientId: string; total: Decimal; voucherAmount: Decimal },
+  ): Promise<Decimal> {
+    const rows = await executor
+      .select({ total: edgeSales.total })
+      .from(edgeSales)
+      .where(and(eq(edgeSales.refundsClientId, sale.clientId), eq(edgeSales.kind, 'RETURN')));
+    return voucherSaleRefundable({
+      cashAndCardPaid: sale.total.minus(sale.voucherAmount),
+      refunded: rows.reduce((sum, row) => sum.plus(row.total), new Decimal(0)),
     });
   }
 

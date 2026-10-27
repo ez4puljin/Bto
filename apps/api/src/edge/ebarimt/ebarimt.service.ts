@@ -8,6 +8,7 @@ import {
   type EbarimtPaymentCode,
   type EbarimtStatus,
   POSAPI_DATE_PATTERN,
+  VOUCHER_PAYMENT_CODE,
 } from '@tugeel/shared/mn';
 import { Decimal } from '@tugeel/shared/money';
 import type {
@@ -58,6 +59,8 @@ export interface IssueInput {
   lines: EdgeReceiptLine[];
   cash: Decimal;
   card: Decimal;
+  /** ADR-0110: what partner vouchers paid, sent under VOUCHER_PAYMENT_CODE. */
+  voucher?: Decimal;
   total: Decimal;
   vatTotal: Decimal;
 }
@@ -156,7 +159,7 @@ export class EbarimtService implements OnApplicationBootstrap {
       customerTin: input.customerTin,
       customerName: input.customerName,
       lines: input.lines,
-      payments: payments(input.cash, input.card),
+      payments: payments(input.cash, input.card, input.voucher),
       total: input.total,
       vatTotal: input.vatTotal,
     });
@@ -772,11 +775,19 @@ export class EbarimtService implements OnApplicationBootstrap {
   }
 }
 
-function payments(cash: Decimal, card: Decimal): { code: EbarimtPaymentCode; amount: string }[] {
-  return [
-    { code: 'CASH' as const, amount: cash.toFixed(2) },
-    { code: 'PAYMENT_CARD' as const, amount: card.toFixed(2) },
-  ].filter((payment) => new Decimal(payment.amount).gt(0));
+function payments(
+  cash: Decimal,
+  card: Decimal,
+  voucher: Decimal = new Decimal(0),
+): { code: EbarimtPaymentCode; amount: string }[] {
+  const sums = new Map<EbarimtPaymentCode, Decimal>([
+    ['CASH', cash],
+    ['PAYMENT_CARD', card],
+  ]);
+  sums.set(VOUCHER_PAYMENT_CODE, (sums.get(VOUCHER_PAYMENT_CODE) ?? new Decimal(0)).plus(voucher));
+  return [...sums]
+    .filter(([, amount]) => amount.gt(0))
+    .map(([code, amount]) => ({ code, amount: amount.toFixed(2) }));
 }
 
 function zeroes() {

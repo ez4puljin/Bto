@@ -27,6 +27,12 @@ export const EBARIMT_PAYMENT_CODES = ['CASH', 'PAYMENT_CARD', 'BANK_TRANSFER'] a
 export type EbarimtPaymentCode = (typeof EBARIMT_PAYMENT_CODES)[number];
 
 /**
+ * The code a partner voucher's part of a till sale is sent under (ADR-0110). TODO-VERIFY with the
+ * accountant and ITC: PosAPI has no voucher code we know of, so it goes as cash until then.
+ */
+export const VOUCHER_PAYMENT_CODE: EbarimtPaymentCode = 'CASH';
+
+/**
  * PosAPI 3.0's tax types, one sub-receipt each; the catalog's `vat_type` values are the same
  * words. VAT_FREE and VAT_ZERO items name their `taxProductCode`.
  */

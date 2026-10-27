@@ -25,9 +25,16 @@ export type VoucherStatus = (typeof VOUCHER_STATUSES)[number];
 
 /**
  * Why a till cannot take a code: not one of ours, used already, its batch not yet or no longer
- * valid, or stopped by the admin.
+ * valid, stopped by the admin, or a partner voucher with nothing left to pay.
  */
-export const VOUCHER_REFUSALS = ['UNKNOWN', 'USED', 'NOT_YET', 'EXPIRED', 'STOPPED'] as const;
+export const VOUCHER_REFUSALS = [
+  'UNKNOWN',
+  'USED',
+  'NOT_YET',
+  'EXPIRED',
+  'STOPPED',
+  'NOTHING_DUE',
+] as const;
 export type VoucherRefusal = (typeof VOUCHER_REFUSALS)[number];
 
 /**

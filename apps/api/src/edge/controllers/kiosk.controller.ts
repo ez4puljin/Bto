@@ -21,6 +21,7 @@ import type {
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
+  EdgeVoucher,
   EdgePairResponse,
   EdgeParkedBasket,
   EdgePrintableReceipt,
@@ -70,6 +71,7 @@ import {
 } from '../guards/kiosk.guard';
 import { CheckoutService } from '../services/checkout.service';
 import { CustomerStore } from '../services/customer.store';
+import { VoucherStore } from '../services/voucher.store';
 import { DevicesService } from '../services/devices.service';
 import { KioskAuthService } from '../services/kiosk-auth.service';
 import { OutboxService } from '../services/outbox.service';
@@ -105,6 +107,7 @@ export class KioskController {
     private readonly ebarimt: EbarimtService,
     private readonly taxpayers: TaxpayerClient,
     private readonly customers: CustomerStore,
+    private readonly vouchers: VoucherStore,
   ) {}
 
   @Get('health')
@@ -222,8 +225,14 @@ export class KioskController {
 
   @Post('quote')
   @HttpCode(200)
-  quote(@Body() body: QuoteDto): EdgeQuoteResponse {
-    return this.checkout.quote(body.lines);
+  quote(@Body() body: QuoteDto): Promise<EdgeQuoteResponse> {
+    return this.checkout.quoteWithCodes(body.lines, body.codes ?? []);
+  }
+
+  /** ADR-0110: a scanned or typed coupon or partner voucher, as the till may take it today. */
+  @Get('vouchers/:code')
+  voucher(@Param('code') code: string): Promise<EdgeVoucher> {
+    return this.vouchers.check(code);
   }
 
   @Post('sales')

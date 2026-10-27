@@ -14,6 +14,7 @@ import { CentralClient, CentralError } from './central.client';
 import { CustomerStore } from './customer.store';
 import { OutboxService } from './outbox.service';
 import { SnapshotStore } from './snapshot.store';
+import { VoucherStore } from './voucher.store';
 
 const BATCH = 50;
 const HEARTBEAT_MS = 30_000;
@@ -51,6 +52,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly store: SnapshotStore,
     private readonly ebarimt: EbarimtService,
     private readonly customers: CustomerStore,
+    private readonly vouchers: VoucherStore,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -100,6 +102,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
       await this.store.apply(answer.changed ? answer.snapshot : null);
       await this.noteContact(null);
       await this.pullCustomersOnce();
+      await this.pullVouchersOnce();
       return answer.changed ? 'changed' : 'unchanged';
     } catch (error: unknown) {
       await this.noteContact(describe(error));
@@ -115,6 +118,18 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
       return answer.changed ? 'changed' : 'unchanged';
     } catch (error: unknown) {
       this.logger.warn({ error: describe(error) }, 'customer feed not pulled');
+      return 'failed';
+    }
+  }
+
+  /** The coupons and partner vouchers alone (ADR-0110); a failure leaves the last ones in force. */
+  async pullVouchersOnce(): Promise<'changed' | 'unchanged' | 'failed'> {
+    try {
+      const answer = await this.central.vouchers(this.vouchers.version());
+      await this.vouchers.apply(answer.changed ? answer.feed : null);
+      return answer.changed ? 'changed' : 'unchanged';
+    } catch (error: unknown) {
+      this.logger.warn({ error: describe(error) }, 'voucher feed not pulled');
       return 'failed';
     }
   }
