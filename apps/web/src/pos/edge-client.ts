@@ -3,6 +3,7 @@ import {
   EDGE_DEVICE_HEADER,
   type EdgeBarcodeHit,
   type EdgeCartLine,
+  type EdgeCustomer,
   type EdgeDeviceInfo,
   type EdgeDiscardParkedRequest,
   type EdgeEbarimtQueue,
@@ -266,6 +267,16 @@ export class EdgeClient {
 
   sale(body: EdgeSaleRequest) {
     return this.request<EdgePrintableReceipt>('POST', '/sales', { body });
+  }
+
+  /** ADR-0109: the customers a sale on credit may charge (the edge's feed, offline too). */
+  customers(q: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({ q }).toString();
+    return this.request<EdgeCustomer[]>('GET', `/customers?${query}`, { signal });
+  }
+
+  customer(id: number, signal?: AbortSignal) {
+    return this.request<EdgeCustomer>('GET', `/customers/${id}`, { signal });
   }
 
   recentSales(signal?: AbortSignal) {

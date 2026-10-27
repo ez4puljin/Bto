@@ -2,8 +2,14 @@ import { Body, Controller, Get, HttpCode, Post, Query, UseGuards } from '@nestjs
 import { ApiOkResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../../common/auth/public.decorator';
 import { systemActor } from '../../identity';
-import type { SnapshotResponseWire } from '@tugeel/shared/pos';
+import { Decimal } from '@tugeel/shared/money';
+import type {
+  CreditCheckResponseWire,
+  CustomerFeedResponseWire,
+  SnapshotResponseWire,
+} from '@tugeel/shared/pos';
 import {
+  CreditCheckDto,
   HeartbeatDto,
   HeartbeatResponseDto,
   SnapshotQueryDto,
@@ -12,6 +18,7 @@ import {
 } from '../dto/pos.dto';
 import { CurrentEdge, EdgeTokenGuard } from '../guards/edge-token.guard';
 import { PosAcceptService } from '../services/pos-accept.service';
+import { PosCustomersService } from '../services/pos-customers.service';
 import { type EdgeNode, PosEdgeNodesService } from '../services/pos-edge-nodes.service';
 import { PosSettingsService } from '../services/pos-settings.service';
 import { PosSnapshotService } from '../services/pos-snapshot.service';
@@ -35,7 +42,33 @@ export class PosSyncController {
     private readonly nodes: PosEdgeNodesService,
     private readonly settings: PosSettingsService,
     private readonly snapshots: PosSnapshotService,
+    private readonly customers: PosCustomersService,
   ) {}
+
+  /**
+   * The customers a till may charge (ADR-0109), apart from the snapshot so a balance moving does
+   * not resend the catalog; `CustomerFeedResponseWire` of @tugeel/shared/pos.
+   */
+  @Get('customers')
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  async customerFeed(@Query() query: SnapshotQueryDto): Promise<CustomerFeedResponseWire> {
+    const feed = await this.customers.feed();
+    return query.since === feed.version
+      ? { changed: false, version: feed.version }
+      : { changed: true, feed };
+  }
+
+  /** The credit check before a till's credit sale, under the customer's lock; writes nothing. */
+  @Post('credit-check')
+  @HttpCode(200)
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  creditCheck(@Body() body: CreditCheckDto): Promise<CreditCheckResponseWire> {
+    return this.customers.check(
+      body.customerId,
+      new Decimal(body.amount),
+      new Decimal(body.pendingOnEdge),
+    );
+  }
 
   /**
    * What the edge sells from (ADR-0067): the whole snapshot, or only its version when `since`

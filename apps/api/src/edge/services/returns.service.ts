@@ -8,9 +8,11 @@ import {
   lineMoney,
   lineVat,
   posSaleNumber,
+  refundSplit,
   type SaleDocLineWire,
   type SaleDocWire,
   saleTotals,
+  type TenderWire,
   tillCodeLookKey,
   withinReturnWindow,
 } from '@tugeel/shared/pos';
@@ -76,6 +78,15 @@ export class EdgeReturnsService {
       total: sale.total.toFixed(2),
       windowDays,
       withinWindow: withinReturnWindow(soldDay, businessDate(), windowDays),
+      credit: sale.receipt.credit
+        ? {
+            customerName: sale.receipt.credit.customerName,
+            left: Decimal.max(
+              sale.creditAmount.minus(await this.creditTaken(this.db, sale.clientId)),
+              0,
+            ).toFixed(2),
+          }
+        : null,
       lines: sale.doc.lines.map((line, index) => {
         const shown = sale.receipt.lines[index];
         const left = new Decimal(line.qty).minus(taken.get(line.lineNo)?.qty ?? 0);
@@ -177,6 +188,43 @@ export class EdgeReturnsService {
         };
       });
       const totals = saleTotals(lines);
+      // ADR-0109 #6: a sale with credit is paid back off its customer's debt first, then in cash.
+      const split = sale.creditAmount.gt(0)
+        ? refundSplit({
+            saleCredit: sale.creditAmount,
+            creditRefunded: await this.creditTaken(tx, sale.clientId),
+            total: totals.total,
+          })
+        : { credit: new Decimal(0), cash: totals.total };
+      const tenders: TenderWire[] = [
+        ...(split.credit.gt(0)
+          ? [
+              {
+                kind: 'CREDIT' as const,
+                amount: split.credit.toFixed(2),
+                tendered: null,
+                terminalId: null,
+                rrn: null,
+                maskedPan: null,
+              },
+            ]
+          : []),
+        ...(split.cash.gt(0)
+          ? [
+              {
+                kind: 'CASH' as const,
+                amount: split.cash.toFixed(2),
+                tendered: null,
+                terminalId: null,
+                rrn: null,
+                maskedPan: null,
+              },
+            ]
+          : []),
+      ];
+      const customerId = split.credit.gt(0) ? sale.customerId : null;
+      // A sale with credit had no e-Barimt (owner 2026-10-27), so its return changes none.
+      const issues = this.ebarimt.enabled && sale.creditAmount.isZero();
       const soldAt = new Date();
       const day = businessDate(soldAt);
       const number = posSaleNumber(tillCode, day, await nextSequence(tx, `SALE:${tillCode}`, day));
@@ -195,11 +243,10 @@ export class EdgeReturnsService {
         customerName: null,
         consumerNo: null,
         refundsSaleClientId: sale.clientId,
+        customerId,
         lines,
-        // Returns are paid back in cash only (owner 2026-10-23).
-        tenders: [
-          { kind: 'CASH', amount, tendered: null, terminalId: null, rrn: null, maskedPan: null },
-        ],
+        // Returns are paid back in cash (owner 2026-10-23), a credit sale's off its debt first.
+        tenders,
         subtotal: totals.subtotal.toFixed(2),
         discountTotal: totals.discountTotal.toFixed(2),
         total: amount,
@@ -234,12 +281,20 @@ export class EdgeReturnsService {
         discountTotal: doc.discountTotal,
         total: amount,
         vatTotal: doc.vatTotal,
-        tenders: [{ kind: 'CASH', amount, tendered: null }],
+        tenders: tenders.map((tender) => ({
+          kind: tender.kind,
+          amount: tender.amount,
+          tendered: null,
+        })),
         change: '0.00',
+        credit:
+          split.credit.gt(0) && sale.receipt.credit
+            ? { ...sale.receipt.credit, amount: split.credit.toFixed(2) }
+            : null,
         title: loaded.snapshot.settings.receiptTitle ?? null,
         footer: loaded.snapshot.settings.receiptFooter ?? null,
         ebarimt:
-          this.ebarimt.enabled && saleFacts.mode === 'REAL'
+          issues && saleFacts.mode === 'REAL'
             ? {
                 ...this.ebarimt.pendingFacts(
                   saleFacts.receiptType ?? 'B2C',
@@ -260,18 +315,29 @@ export class EdgeReturnsService {
         number,
         soldAt,
         total: totals.total,
-        cashAmount: totals.total,
+        cashAmount: split.cash,
         cardAmount: new Decimal(0),
+        creditAmount: split.credit,
+        customerId,
         vatTotal: totals.vatTotal,
         doc,
         receipt,
       });
       await this.outbox.enqueue(tx, { kind: 'RETURN', clientId: request.clientId, sale: doc });
-      if (this.ebarimt.enabled) {
+      if (issues) {
         await this.ebarimt.enqueueReturn(tx, { clientId: request.clientId, tillCode }, sale);
       }
       return receipt;
     });
+  }
+
+  /** What the sale's earlier returns took off its customer's debt (ADR-0109). */
+  private async creditTaken(executor: EdgeDb | EdgeTx, saleClientId: string): Promise<Decimal> {
+    const rows = await executor
+      .select({ credit: edgeSales.creditAmount })
+      .from(edgeSales)
+      .where(and(eq(edgeSales.refundsClientId, saleClientId), eq(edgeSales.kind, 'RETURN')));
+    return rows.reduce((sum, row) => sum.plus(row.credit), new Decimal(0));
   }
 
   /** What the sale's earlier returns on this edge took back, by sold line. */

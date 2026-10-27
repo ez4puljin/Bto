@@ -194,6 +194,7 @@ function decodeSale(json: Json): SaleDoc {
     customerName: optStr(json.customerName),
     consumerNo: optStr(json.consumerNo),
     refundsSaleClientId: optStr(json.refundsSaleClientId),
+    customerId: optInt(json.customerId),
     lines: list(json.lines).map((raw) => {
       const line = asObject(raw);
       const basis = str(line.basis);
@@ -222,8 +223,8 @@ function decodeSale(json: Json): SaleDoc {
     tenders: list(json.tenders).map((raw) => {
       const tender = asObject(raw);
       const tenderKind = str(tender.kind);
-      if (tenderKind !== 'CASH' && tenderKind !== 'CARD') {
-        throw invalid('tenders.kind', 'enum', 'CASH or CARD');
+      if (tenderKind !== 'CASH' && tenderKind !== 'CARD' && tenderKind !== 'CREDIT') {
+        throw invalid('tenders.kind', 'enum', 'CASH, CARD or CREDIT');
       }
       return {
         kind: tenderKind,

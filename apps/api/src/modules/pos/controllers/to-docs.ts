@@ -53,6 +53,7 @@ export function toSaleDoc(dto: SaleDocDto): SaleDoc {
     customerName: orNull(dto.customerName),
     consumerNo: orNull(dto.consumerNo),
     refundsSaleClientId: orNull(dto.refundsSaleClientId),
+    customerId: orNull(dto.customerId),
     lines: dto.lines.map((line) => ({
       lineNo: line.lineNo,
       productId: line.productId,

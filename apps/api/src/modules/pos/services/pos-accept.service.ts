@@ -2,9 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import {
   CONSUMER_NO_PATTERN,
+  creditPart,
   lineMoney,
   lineVat,
   POS_LIMITS,
+  refundSplit,
   saleTotals,
   tendersTotal,
   withinReturnWindow,
@@ -22,7 +24,8 @@ import {
   TaxService,
   UnitConversionService,
 } from '../../catalog';
-import { type Actor, AuditService, UserNamesService } from '../../identity';
+import { PosCreditService } from '../../finance';
+import { type Actor, AuditService, OrgService, UserNamesService } from '../../identity';
 import {
   AdjustmentsService,
   BinsService,
@@ -31,6 +34,7 @@ import {
   StockQueryService,
   type SystemAdjustmentLine,
 } from '../../inventory';
+import { CustomersService, type LockedCustomer } from '../../partners';
 import { encodeEvent } from '../event-codec';
 import type {
   Accepted,
@@ -50,6 +54,7 @@ import {
   posTillDevices,
 } from '../schema';
 import { PosCashiersService } from './pos-cashiers.service';
+import { PosCustomersService } from './pos-customers.service';
 import type { EdgeNode } from './pos-edge-nodes.service';
 import { PosSettingsService } from './pos-settings.service';
 import { PosShiftsService } from './pos-shifts.service';
@@ -89,6 +94,10 @@ export class PosAcceptService {
     private readonly shifts: PosShiftsService,
     private readonly settings: PosSettingsService,
     private readonly voids: PosVoidsService,
+    private readonly org: OrgService,
+    private readonly customers: CustomersService,
+    private readonly credit: PosCustomersService,
+    private readonly books: PosCreditService,
   ) {}
 
   /**
@@ -180,6 +189,9 @@ export class PosAcceptService {
     await this.checkMoney(tx, doc, soldDay, products);
     const original =
       doc.kind === 'RETURN' ? await this.checkReturn(tx, node, doc, soldDay, settings) : null;
+    // ADR-0109: the customer row is locked after the shift and the refunded sale, before the shelf.
+    const credit = creditPart(doc.tenders);
+    const charged = await this.creditOf(tx, doc, credit, original?.sale ?? null);
 
     const [sale] = await tx
       .insert(posSales)
@@ -210,6 +222,9 @@ export class PosAcceptService {
         inactiveId: doc.ebarimt?.inactiveId ?? null,
         snapshotVersion: doc.snapshotVersion,
         note: doc.note,
+        customerId: doc.customerId,
+        creditTotal: credit,
+        creditExcess: charged?.excess ?? null,
       })
       .onConflictDoNothing({ target: [posSales.edgeNodeId, posSales.clientId] })
       .returning({ id: posSales.id, number: posSales.number })
@@ -312,6 +327,10 @@ export class PosAcceptService {
       docs: [{ docType: 'POS', docId: sale.id, external: true }],
       movements,
     });
+    const booked =
+      charged && credit.gt(0)
+        ? await this.bookCredit(tx, actor, node, doc, sale.id, lines, credit, original)
+        : null;
     await this.tills.touchSale(till.id, doc.soldAt, tx);
     await this.audit.record(tx, actor, {
       action: 'ACCEPT',
@@ -327,6 +346,15 @@ export class PosAcceptService {
         lines: lines.length,
         shortfall: shortfall?.number ?? null,
         refunds: original?.sale.number ?? null,
+        ...(charged
+          ? {
+              customerId: doc.customerId,
+              credit: credit.toFixed(MONEY_SCALE),
+              creditExcess: charged.excess?.toFixed(MONEY_SCALE) ?? null,
+              creditReason: charged.reason,
+              booked: booked?.number ?? null,
+            }
+          : {}),
       },
     });
     return { id: sale.id, number: sale.number, created: true };
@@ -408,6 +436,129 @@ export class PosAcceptService {
     return { id: row.id, number: till.code, created: true };
   }
 
+  /**
+   * A credit part's customer (ADR-0109 #7), locked. For a sale, the credit check, never a refusal:
+   * the till has sold it (offline perhaps), so a hold, an inactive customer or a passed limit is
+   * kept as the excess for the office to check. For a return, the sale's customer, and its debt
+   * taken back first, up to what the sale had on credit (owner 2026-10-27).
+   */
+  private async creditOf(
+    tx: Tx,
+    doc: SaleDoc,
+    credit: Decimal,
+    original: SaleRow | null,
+  ): Promise<{ customer: LockedCustomer; excess: Decimal | null; reason: string | null } | null> {
+    if (original && original.creditTotal.gt(0)) {
+      const [taken] = await tx
+        .select({ total: sql<string>`coalesce(sum(${posSales.creditTotal}), 0)` })
+        .from(posSales)
+        .where(eq(posSales.refundsSaleId, original.id));
+      const expected = refundSplit({
+        saleCredit: original.creditTotal,
+        creditRefunded: new Decimal(taken?.total ?? 0),
+        total: doc.total,
+      }).credit;
+      if (!expected.eq(credit)) {
+        throw new AppError('POS_TOTALS_MISMATCH', 'a credit sale is refunded off its debt first', {
+          lineNo: null,
+          field: 'credit',
+          expected: expected.toFixed(MONEY_SCALE),
+          got: credit.toFixed(MONEY_SCALE),
+        });
+      }
+    } else if (original && credit.gt(0)) {
+      throw invalid('tenders', 'credit', 'only a sale with credit is refunded to credit');
+    }
+    if (doc.customerId === null) return null;
+    if (original && original.customerId !== doc.customerId) {
+      throw invalid('customerId', 'sale', 'the customer of the refunded sale');
+    }
+    const customer = await this.customers.lockForUpdate(tx, doc.customerId);
+    if (original) return { customer, excess: null, reason: null };
+    const decision = await this.credit.decideInTx(tx, customer, credit);
+    if (decision.ok) return { customer, excess: null, reason: null };
+    return {
+      customer,
+      excess: decision.reason === 'LIMIT' && decision.excess.gt(0) ? decision.excess : credit,
+      reason: decision.reason,
+    };
+  }
+
+  /** The invoice of a credit sale, or the credit note of its return, in this transaction. */
+  private async bookCredit(
+    tx: Tx,
+    actor: Actor,
+    node: EdgeNode,
+    doc: SaleDoc,
+    saleId: number,
+    lines: readonly LineRow[],
+    credit: Decimal,
+    original: { sale: SaleRow; lines: Map<number, LineRow> } | null,
+  ): Promise<{ number: string }> {
+    const paid = (kind: 'CASH' | 'CARD') =>
+      doc.tenders
+        .filter((tender) => tender.kind === kind)
+        .reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
+    if (doc.kind === 'RETURN') {
+      if (!original?.sale.invoiceId) throw invalid('refundsSaleClientId', 'credit', 'no invoice');
+      const note = await this.books.creditReturnInTx(tx, actor, {
+        number: doc.number,
+        invoiceId: original.sale.invoiceId,
+        lines: doc.lines.map((line) => ({
+          soldLineNo: line.refundsLineNo ?? 0,
+          qty: line.qty,
+          total: line.total,
+          vatAmount: line.vatAmount,
+        })),
+        credit,
+        cash: paid('CASH'),
+      });
+      await tx
+        .update(posSales)
+        .set({ creditNoteId: note.creditNoteId, creditDocNumber: note.number })
+        .where(eq(posSales.id, saleId));
+      return note;
+    }
+    if (doc.customerId === null) throw new Error('a credit sale names its customer');
+    const invoice = await this.books.invoiceSaleInTx(tx, actor, {
+      number: doc.number,
+      customerId: doc.customerId,
+      branchId: await this.org.branchOfWarehouses([node.warehouseId], tx),
+      warehouseId: node.warehouseId,
+      lines: lines.map((line) => ({
+        lineNo: line.lineNo,
+        productId: line.productId,
+        productSku: line.productSku,
+        productName: line.productName,
+        productUnitId: line.productUnitId,
+        uomName: line.uomName,
+        qty: line.qty,
+        factorSnapshot: line.factorSnapshot,
+        qtyBase: line.qtyBase,
+        listPrice: line.listPrice,
+        unitPrice: line.unitPrice,
+        subtotal: line.subtotal,
+        discountAmount: line.discountAmount,
+        total: line.total,
+        vatType: line.vatType,
+        vatRatePct: line.vatRatePct,
+        vatAmount: line.vatAmount,
+      })),
+      subtotal: doc.subtotal,
+      discountTotal: doc.discountTotal,
+      total: doc.total,
+      vatTotal: doc.vatTotal,
+      credit,
+      cash: paid('CASH'),
+      card: paid('CARD'),
+    });
+    await tx
+      .update(posSales)
+      .set({ invoiceId: invoice.invoiceId, creditDocNumber: invoice.number })
+      .where(eq(posSales.id, saleId));
+    return invoice;
+  }
+
   private async saleByClientId(tx: Tx, nodeId: number, clientId: string): Promise<SaleRow | null> {
     const [row] = await tx
       .select()
@@ -464,6 +615,20 @@ export class PosAcceptService {
         }
       }
     });
+    const credits = doc.tenders.filter((tender) => tender.kind === 'CREDIT').length;
+    if (credits > 1) throw invalid('tenders', 'credit', 'at most one CREDIT tender');
+    if (credits > 0 !== (doc.customerId !== null)) {
+      throw invalid('customerId', 'credit', 'a CREDIT tender names its customer, and only it');
+    }
+    if (credits > 0) {
+      // Owner 2026-10-27 (ADR-0109 #4): a sale with credit gets no e-Barimt.
+      if (doc.receiptType !== 'B2C' || doc.customerTin !== null || doc.consumerNo !== null) {
+        throw invalid('receiptType', 'credit', 'a sale with credit has no e-Barimt');
+      }
+      if (doc.ebarimt !== null && doc.ebarimt.status !== 'NONE') {
+        throw invalid('ebarimt', 'credit', 'a sale with credit has no e-Barimt');
+      }
+    }
     doc.tenders.forEach((tender, index) => {
       if (!tender.amount.gt(0) || tender.amount.decimalPlaces() > MONEY_SCALE) {
         throw invalid(`tenders[${index}].amount`, 'money', 'a positive amount with 2 decimals');

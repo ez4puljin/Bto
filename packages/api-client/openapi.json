@@ -19974,6 +19974,24 @@
             }
           },
           {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "creditToCheck",
+            "required": false,
+            "in": "query",
+            "description": "Credit sales past their limit not checked yet",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "from",
             "required": false,
             "in": "query",
@@ -20064,6 +20082,62 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sales/{id}/credit-review": {
+      "post": {
+        "operationId": "PosSales_reviewCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCreditReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSaleDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Шалгасан» on a credit sale accepted past its customer's limit or hold (ADR-0109 #7).",
         "tags": [
           "pos"
         ]
@@ -20596,6 +20670,102 @@
         ],
         "tags": [
           "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/customers": {
+      "get": {
+        "operationId": "PosSync_customerFeed",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "The customers a till may charge (ADR-0109), apart from the snapshot so a balance moving does\nnot resend the catalog; `CustomerFeedResponseWire` of @tugeel/shared/pos.",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
+    "/api/v1/pos/sync/credit-check": {
+      "post": {
+        "operationId": "PosSync_creditCheck",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosCreditCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "The credit check before a till's credit sale, under the customer's lock; writes nothing.",
+        "tags": [
+          "pos-sync"
         ]
       }
     },
@@ -43462,6 +43632,16 @@
             "type": "string",
             "example": "0.00"
           },
+          "creditSales": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0109: sold on credit"
+          },
+          "creditRefunds": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0109: taken off customers’ debts"
+          },
           "salesTotal": {
             "type": "string",
             "example": "440000.00"
@@ -43529,6 +43709,8 @@
           "cashRefunds",
           "cardSales",
           "cardRefunds",
+          "creditSales",
+          "creditRefunds",
           "salesTotal",
           "returnsTotal",
           "salesVat",
@@ -43658,6 +43840,46 @@
             "type": "string",
             "example": "0.00"
           },
+          "creditAmount": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0109: the part on credit"
+          },
+          "creditCustomerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditCustomerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditCustomerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditDocNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "The invoice or the credit note"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditNoteId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditExcess": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the limit was passed by when accepted (the whole credit on a hold)"
+          },
+          "creditReviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "receiptType": {
             "enum": [
               "B2C",
@@ -43728,6 +43950,15 @@
           "vatTotal",
           "cashAmount",
           "cardAmount",
+          "creditAmount",
+          "creditCustomerId",
+          "creditCustomerCode",
+          "creditCustomerName",
+          "creditDocNumber",
+          "invoiceId",
+          "creditNoteId",
+          "creditExcess",
+          "creditReviewedAt",
           "receiptType",
           "customerTin",
           "customerName",
@@ -43896,7 +44127,8 @@
           "kind": {
             "enum": [
               "CASH",
-              "CARD"
+              "CARD",
+              "CREDIT"
             ],
             "type": "string"
           },
@@ -44107,6 +44339,46 @@
             "type": "string",
             "example": "0.00"
           },
+          "creditAmount": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0109: the part on credit"
+          },
+          "creditCustomerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditCustomerCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditCustomerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditDocNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "The invoice or the credit note"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditNoteId": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditExcess": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the limit was passed by when accepted (the whole credit on a hold)"
+          },
+          "creditReviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "receiptType": {
             "enum": [
               "B2C",
@@ -44180,6 +44452,14 @@
             "type": "string",
             "nullable": true
           },
+          "creditReviewedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "creditReviewNote": {
+            "type": "string",
+            "nullable": true
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -44225,6 +44505,15 @@
           "vatTotal",
           "cashAmount",
           "cardAmount",
+          "creditAmount",
+          "creditCustomerId",
+          "creditCustomerCode",
+          "creditCustomerName",
+          "creditDocNumber",
+          "invoiceId",
+          "creditNoteId",
+          "creditExcess",
+          "creditReviewedAt",
           "receiptType",
           "customerTin",
           "customerName",
@@ -44241,11 +44530,23 @@
           "inactiveId",
           "snapshotVersion",
           "note",
+          "creditReviewedByName",
+          "creditReviewNote",
           "lines",
           "tenders",
           "shortfalls",
           "returns"
         ]
+      },
+      "PosCreditReviewRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
       },
       "PosShortfallPage": {
         "type": "object",
@@ -44784,6 +45085,10 @@
           "receiptsToCheck": {
             "type": "number",
             "description": "Sales whose e-Barimt failed or went unanswered (ADR-0065)"
+          },
+          "creditToCheck": {
+            "type": "number",
+            "description": "Credit sales past their limit or hold, not checked (ADR-0109)"
           }
         },
         "required": [
@@ -44791,7 +45096,31 @@
           "shiftsToHandOver",
           "openShortfalls",
           "rejections",
-          "receiptsToCheck"
+          "receiptsToCheck",
+          "creditToCheck"
+        ]
+      },
+      "PosCreditCheckRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "example": "30000.00"
+          },
+          "pendingOnEdge": {
+            "type": "string",
+            "example": "0.00",
+            "description": "Credit sold on this edge, not replayed yet"
+          }
+        },
+        "required": [
+          "customerId",
+          "amount",
+          "pendingOnEdge"
         ]
       },
       "PosSaleDocLine": {
@@ -44891,7 +45220,8 @@
           "kind": {
             "enum": [
               "CASH",
-              "CARD"
+              "CARD",
+              "CREDIT"
             ],
             "type": "string"
           },
@@ -45031,6 +45361,12 @@
             "type": "string",
             "nullable": true,
             "format": "uuid"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "ADR-0109: the customer a CREDIT tender charges"
           },
           "lines": {
             "minItems": 1,
@@ -45527,7 +45863,8 @@
           "kind": {
             "enum": [
               "CASH",
-              "CARD"
+              "CARD",
+              "CREDIT"
             ],
             "type": "string"
           },
@@ -50138,6 +50475,9 @@
           "POS_SNAPSHOT_MISSING",
           "POS_SUPERVISOR_REQUIRED",
           "POS_PARKED_LIMIT",
+          "POS_BUYER_REQUIRED",
+          "POS_CUSTOMER_REQUIRED",
+          "POS_CREDIT_OFFLINE_OVER_LIMIT",
           "EBARIMT_LOOKUP_UNAVAILABLE",
           "EBARIMT_TAXPAYER_NOT_FOUND",
           "EBARIMT_RECEIPT_STATE_INVALID",

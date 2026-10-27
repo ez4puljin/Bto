@@ -4810,6 +4810,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/sales/{id}/credit-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Шалгасан» on a credit sale accepted past its customer's limit or hold (ADR-0109 #7). */
+        post: operations["PosSales_reviewCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pos/shortfalls": {
         parameters: {
             query?: never;
@@ -4932,6 +4949,43 @@ export interface paths {
         get: operations["PosAttention_attention"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The customers a till may charge (ADR-0109), apart from the snapshot so a balance moving does
+         *     not resend the catalog; `CustomerFeedResponseWire` of @tugeel/shared/pos.
+         */
+        get: operations["PosSync_customerFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/sync/credit-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The credit check before a till's credit sale, under the customer's lock; writes nothing. */
+        post: operations["PosSync_creditCheck"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11590,6 +11644,16 @@ export interface components {
             cardSales: string;
             /** @example 0.00 */
             cardRefunds: string;
+            /**
+             * @description ADR-0109: sold on credit
+             * @example 0.00
+             */
+            creditSales: string;
+            /**
+             * @description ADR-0109: taken off customers’ debts
+             * @example 0.00
+             */
+            creditRefunds: string;
             /** @example 440000.00 */
             salesTotal: string;
             /** @example 0.00 */
@@ -11654,6 +11718,22 @@ export interface components {
             cashAmount: string;
             /** @example 0.00 */
             cardAmount: string;
+            /**
+             * @description ADR-0109: the part on credit
+             * @example 0.00
+             */
+            creditAmount: string;
+            creditCustomerId: number | null;
+            creditCustomerCode: string | null;
+            creditCustomerName: string | null;
+            /** @description The invoice or the credit note */
+            creditDocNumber: string | null;
+            invoiceId: number | null;
+            creditNoteId: number | null;
+            /** @description What the limit was passed by when accepted (the whole credit on a hold) */
+            creditExcess: string | null;
+            /** Format: date-time */
+            creditReviewedAt: string | null;
             /** @enum {string} */
             receiptType: "B2C" | "B2B";
             customerTin: string | null;
@@ -11715,7 +11795,7 @@ export interface components {
             id: number;
             tenderNo: number;
             /** @enum {string} */
-            kind: "CASH" | "CARD";
+            kind: "CASH" | "CARD" | "CREDIT";
             /** @example 12000.00 */
             amount: string;
             /** @example 20000.00 */
@@ -11783,6 +11863,22 @@ export interface components {
             cashAmount: string;
             /** @example 0.00 */
             cardAmount: string;
+            /**
+             * @description ADR-0109: the part on credit
+             * @example 0.00
+             */
+            creditAmount: string;
+            creditCustomerId: number | null;
+            creditCustomerCode: string | null;
+            creditCustomerName: string | null;
+            /** @description The invoice or the credit note */
+            creditDocNumber: string | null;
+            invoiceId: number | null;
+            creditNoteId: number | null;
+            /** @description What the limit was passed by when accepted (the whole credit on a hold) */
+            creditExcess: string | null;
+            /** Format: date-time */
+            creditReviewedAt: string | null;
             /** @enum {string} */
             receiptType: "B2C" | "B2B";
             customerTin: string | null;
@@ -11802,10 +11898,15 @@ export interface components {
             inactiveId: string | null;
             snapshotVersion: string | null;
             note: string | null;
+            creditReviewedByName: string | null;
+            creditReviewNote: string | null;
             lines: components["schemas"]["PosSaleLine"][];
             tenders: components["schemas"]["PosTender"][];
             shortfalls: components["schemas"]["PosShortfall"][];
             returns: components["schemas"]["PosSaleReturn"][];
+        };
+        PosCreditReviewRequest: {
+            note?: string | null;
         };
         PosShortfallPage: {
             data: components["schemas"]["PosShortfall"][];
@@ -11950,6 +12051,18 @@ export interface components {
             rejections: number;
             /** @description Sales whose e-Barimt failed or went unanswered (ADR-0065) */
             receiptsToCheck: number;
+            /** @description Credit sales past their limit or hold, not checked (ADR-0109) */
+            creditToCheck: number;
+        };
+        PosCreditCheckRequest: {
+            customerId: number;
+            /** @example 30000.00 */
+            amount: string;
+            /**
+             * @description Credit sold on this edge, not replayed yet
+             * @example 0.00
+             */
+            pendingOnEdge: string;
         };
         PosSaleDocLine: {
             lineNo: number;
@@ -11981,7 +12094,7 @@ export interface components {
         };
         PosSaleDocTender: {
             /** @enum {string} */
-            kind: "CASH" | "CARD";
+            kind: "CASH" | "CARD" | "CREDIT";
             /** @example 12000 */
             amount: string;
             /** @example 20000 */
@@ -12023,6 +12136,8 @@ export interface components {
             consumerNo?: string | null;
             /** Format: uuid */
             refundsSaleClientId?: string | null;
+            /** @description ADR-0109: the customer a CREDIT tender charges */
+            customerId?: number | null;
             lines: components["schemas"]["PosSaleDocLine"][];
             tenders: components["schemas"]["PosSaleDocTender"][];
             /** @example 12000 */
@@ -12166,7 +12281,7 @@ export interface components {
         };
         PosDevTender: {
             /** @enum {string} */
-            kind: "CASH" | "CARD";
+            kind: "CASH" | "CARD" | "CREDIT";
             /** @example 12000 */
             amount: string;
             /** @example 20000 */
@@ -13442,7 +13557,7 @@ export interface components {
             data: components["schemas"]["SupplierEntry"][];
         };
         /** @enum {string} */
-        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
+        ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE";
         ProblemFieldError: {
             /** @example quantity */
             path: string;
@@ -25403,6 +25518,9 @@ export interface operations {
                 cashierUserId?: number;
                 kind?: "SALE" | "RETURN";
                 ebarimtStatus?: "NONE" | "PENDING" | "CONFIRMED" | "INDETERMINATE" | "ERROR" | "CANCELLED" | "UNCONFIRMED_RETURN";
+                customerId?: number;
+                /** @description Credit sales past their limit not checked yet */
+                creditToCheck?: boolean;
                 from?: string;
                 to?: string;
             };
@@ -25441,6 +25559,40 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSaleDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSales_reviewCredit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosCreditReviewRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -25738,6 +25890,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PosAttention"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSync_customerFeed: {
+        parameters: {
+            query?: {
+                since?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PosSync_creditCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PosCreditCheckRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description RFC 9457 problem details */

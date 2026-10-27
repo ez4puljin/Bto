@@ -147,7 +147,7 @@ describe('kiosk: e-Barimt and printing (ADR-0065)', () => {
     );
     const user = userEvent.setup();
     const pay = await payExact(user);
-    await user.click(within(pay).getByRole('button', { name: k.pay.buyer.open }));
+    await user.click(within(pay).getByRole('radio', { name: k.pay.receiptType.B2B }));
     await user.type(within(pay).getByLabelText(k.pay.buyer.number), '1234567{Enter}');
     expect(await within(pay).findByText(BUYER.name)).toBeInTheDocument();
     expect(edge.callsTo('POST /sales')).toHaveLength(0);
@@ -164,7 +164,7 @@ describe('kiosk: e-Barimt and printing (ADR-0065)', () => {
     );
     const user = userEvent.setup();
     const pay = await payExact(user);
-    await user.click(within(pay).getByRole('button', { name: k.pay.buyer.open }));
+    await user.click(within(pay).getByRole('radio', { name: k.pay.receiptType.B2B }));
     await user.type(within(pay).getByLabelText(k.pay.buyer.number), '1234567');
     await user.click(within(pay).getByRole('button', { name: k.pay.buyer.find }));
     expect(await within(pay).findByRole('alert')).toHaveTextContent(

@@ -11,6 +11,7 @@ import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { CentralClient, CentralError } from './central.client';
+import { CustomerStore } from './customer.store';
 import { OutboxService } from './outbox.service';
 import { SnapshotStore } from './snapshot.store';
 
@@ -49,6 +50,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     private readonly outbox: OutboxService,
     private readonly store: SnapshotStore,
     private readonly ebarimt: EbarimtService,
+    private readonly customers: CustomerStore,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -88,15 +90,31 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     this.timers.clear();
   }
 
-  /** Fetches the snapshot unless the centre says the edge already holds it. */
+  /**
+   * Fetches the snapshot unless the centre says the edge already holds it, then the customers a
+   * till may charge (ADR-0109) the same way; the answer is the snapshot's.
+   */
   async pullOnce(): Promise<'changed' | 'unchanged' | 'failed'> {
     try {
       const answer = await this.central.snapshot(this.store.version());
       await this.store.apply(answer.changed ? answer.snapshot : null);
       await this.noteContact(null);
+      await this.pullCustomersOnce();
       return answer.changed ? 'changed' : 'unchanged';
     } catch (error: unknown) {
       await this.noteContact(describe(error));
+      return 'failed';
+    }
+  }
+
+  /** The customer feed alone; a failure leaves the last one in force. */
+  async pullCustomersOnce(): Promise<'changed' | 'unchanged' | 'failed'> {
+    try {
+      const answer = await this.central.customers(this.customers.version());
+      await this.customers.apply(answer.changed ? answer.feed : null);
+      return answer.changed ? 'changed' : 'unchanged';
+    } catch (error: unknown) {
+      this.logger.warn({ error: describe(error) }, 'customer feed not pulled');
       return 'failed';
     }
   }

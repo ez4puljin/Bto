@@ -27,8 +27,10 @@ import {
 } from 'drizzle-orm/pg-core';
 import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { productUnits, products, VAT_TYPES } from '../catalog/schema';
+import { creditNotes, invoices } from '../finance/schema';
 import { users, warehouses } from '../identity/schema';
 import { adjustments } from '../inventory/schema';
+import { customers } from '../partners/schema';
 
 // The tables of the supermarket POS on the centre (docs/modules/pos.md, ADR-0063, ADR-0064). The
 // store's edge replays its documents here with the uuids the tills gave them; the centre is the
@@ -283,6 +285,13 @@ export const posShifts = pgTable(
     returnsVat: money('returns_vat')
       .notNull()
       .default(sql`0`),
+    /** ADR-0109: sold on credit, and taken back off customers' debts (the CREDIT tenders). */
+    creditSales: money('credit_sales')
+      .notNull()
+      .default(sql`0`),
+    creditRefunds: money('credit_refunds')
+      .notNull()
+      .default(sql`0`),
     /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
     journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
@@ -315,7 +324,7 @@ export const posShifts = pgTable(
     ),
     check(
       'pos_shifts_money',
-      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
+      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
     ),
     check('pos_shifts_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
@@ -366,6 +375,24 @@ export const posSales = pgTable(
     inactiveId: text('inactive_id'),
     snapshotVersion: text('snapshot_version'),
     note: text('note'),
+    /**
+     * ADR-0109: the customer a CREDIT tender charged (a sale) or whose debt a return reduced, the
+     * part on credit, the invoice of the sale or the credit note of the return, and what the
+     * customer's limit was passed by when the centre accepted it (an offline sale is never
+     * refused), with the office's «Шалгасан».
+     */
+    customerId: ref('customer_id').references(() => customers.id),
+    creditTotal: money('credit_total')
+      .notNull()
+      .default(sql`0`),
+    invoiceId: ref('invoice_id').references(() => invoices.id),
+    creditNoteId: ref('credit_note_id').references(() => creditNotes.id),
+    /** The invoice's or the credit note's number, as finance allocated it. */
+    creditDocNumber: text('credit_doc_number'),
+    creditExcess: money('credit_excess'),
+    creditReviewedAt: timestamp('credit_reviewed_at', { withTimezone: true }),
+    creditReviewedBy: userRef('credit_reviewed_by'),
+    creditReviewNote: text('credit_review_note'),
     /** When the centre accepted it; `sold_at` is when the till sold it. */
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -377,6 +404,12 @@ export const posSales = pgTable(
     index('pos_sales_sold_idx').on(t.soldAt, t.id),
     index('pos_sales_till_idx').on(t.tillId, t.soldAt),
     index('pos_sales_refunds_idx').on(t.refundsSaleId),
+    index('pos_sales_customer_idx').on(t.customerId, t.id),
+    uniqueIndex('pos_sales_invoice').on(t.invoiceId),
+    uniqueIndex('pos_sales_credit_note').on(t.creditNoteId),
+    index('pos_sales_credit_excess_idx')
+      .on(t.id)
+      .where(sql`${t.creditExcess} IS NOT NULL AND ${t.creditReviewedAt} IS NULL`),
     check('pos_sales_kind', inList(t.kind, SALE_KINDS)),
     check('pos_sales_number_shape', sql`length(${t.number}) BETWEEN 1 AND 40`),
     check('pos_sales_day', sql`${t.soldDay} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`),
@@ -396,6 +429,18 @@ export const posSales = pgTable(
       sql`${t.consumerNo} IS NULL OR ${t.consumerNo} ~ '^([0-9]{8}|11\\*{6})$'`,
     ),
     check('pos_sales_ebarimt_status', inList(t.ebarimtStatus, EBARIMT_STATUSES)),
+    check(
+      'pos_sales_credit',
+      sql`${t.creditTotal} >= 0 AND ${t.creditTotal} <= ${t.total} AND (${t.creditTotal} = 0 OR (${t.customerId} IS NOT NULL AND ${t.receiptType} = 'B2C' AND ${t.ebarimtStatus} = 'NONE'))`,
+    ),
+    check(
+      'pos_sales_credit_docs',
+      sql`(${t.invoiceId} IS NULL OR (${t.kind} = 'SALE' AND ${t.creditTotal} > 0)) AND (${t.creditNoteId} IS NULL OR (${t.kind} = 'RETURN' AND ${t.creditTotal} > 0))`,
+    ),
+    check(
+      'pos_sales_credit_review',
+      sql`(${t.creditExcess} IS NULL OR ${t.creditExcess} > 0) AND (${t.creditReviewedAt} IS NULL) = (${t.creditReviewedBy} IS NULL) AND (${t.creditReviewedAt} IS NULL OR ${t.creditExcess} IS NOT NULL) AND (${textLength(t.creditReviewNote, POS_LIMITS.maxNote)})`,
+    ),
     check('pos_sales_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
 );

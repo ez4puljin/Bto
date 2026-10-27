@@ -84,6 +84,18 @@ export interface CreditTerms {
   creditHold: boolean;
 }
 
+/** A customer as the till's feed carries it (ADR-0109). */
+export interface TillCustomer {
+  id: number;
+  code: string;
+  name: string;
+  tin: string | null;
+  regNo: string | null;
+  phone: string | null;
+  creditHold: boolean;
+  creditLimit: Decimal | null;
+}
+
 /** The customer row read under `lockForUpdate`: what an order confirmation decides on. */
 export interface LockedCustomer {
   id: number;
@@ -743,6 +755,27 @@ export class CustomersService implements OnModuleInit {
       .for('no key update');
     if (!row) throw notFound('customer', id);
     return row;
+  }
+
+  /**
+   * Every ACTIVE customer as the supermarket's tills may charge it (ADR-0109): who it is, its
+   * numbers for the search and its credit terms, by code.
+   */
+  async activeForTill(executor: Db | Tx = this.db): Promise<TillCustomer[]> {
+    return executor
+      .select({
+        id: customers.id,
+        code: customers.code,
+        name: customers.name,
+        tin: customers.tin,
+        regNo: customers.regNo,
+        phone: customers.phone,
+        creditHold: customers.creditHold,
+        creditLimit: customers.creditLimit,
+      })
+      .from(customers)
+      .where(eq(customers.status, 'ACTIVE'))
+      .orderBy(asc(customers.code), asc(customers.id));
   }
 
   /** The credit terms: limit, hold and the settlement group the due dates follow (ADR-0101). */

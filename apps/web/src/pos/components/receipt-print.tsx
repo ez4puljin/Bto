@@ -46,7 +46,27 @@ export function PrintProvider({ children }: { children: ReactNode }) {
       {createPortal(
         <div id={PRINT_ROOT_ID} aria-hidden={job === null} data-testid="receipt-print">
           <style>{PRINT_RULES}</style>
-          {job ? (
+          {job && job.printable.receipt.credit ? (
+            // A credit slip (ADR-0109): the customer's copy and the store's, signed, one sheet each.
+            <>
+              <div style={{ breakAfter: 'page' }}>
+                <ReceiptView
+                  receipt={job.printable.receipt}
+                  copy={job.printable.copy}
+                  paper
+                  label={t('posKiosk.print.sheet')}
+                  copyLabel={t('posKiosk.receipt.copyCustomer')}
+                />
+              </div>
+              <ReceiptView
+                receipt={job.printable.receipt}
+                copy={job.printable.copy}
+                paper
+                label={t('posKiosk.print.sheet')}
+                copyLabel={t('posKiosk.receipt.copyStore')}
+              />
+            </>
+          ) : job ? (
             <ReceiptView
               receipt={job.printable.receipt}
               print={job.printable.print}

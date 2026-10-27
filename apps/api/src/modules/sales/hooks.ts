@@ -15,9 +15,12 @@ import type { LockedCustomer } from '../partners';
 
 export interface CreditCheckInput {
   customer: LockedCustomer;
-  /** The order being confirmed or re-priced; its own total is never in `openOrders`. */
-  orderId: number;
-  /** The order's total, whole MNT. */
+  /**
+   * The order being confirmed or re-priced; its own total is never in `openOrders`. Null for a
+   * till's credit sale (ADR-0109), which is no order.
+   */
+  orderId: number | null;
+  /** The order's total, whole MNT (a till's credit part). */
   amount: Decimal;
   /** The customer's other confirmed orders not yet invoiced, summed by sales. */
   openOrders: Decimal;

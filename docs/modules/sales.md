@@ -88,7 +88,7 @@ AI views (ADR-0045):
 | `SalesAccessService.load(ctx)` | the caller's rights on pipelines and stages, and the SQL predicate every order read and action uses (ADR-0057 #2) |
 | `SalesBoardsService` | the board groups: `tree`, create, rename, archive |
 | `SalesPipelinesService` | pipelines and stages: `get`, `save` (whole, with the ordered stages), `copy`, `archive` / `unarchive`, `archiveStage`, `setSort`, `placementFor`, `lockStage(tx, stageId)` (the pipeline, then the stage, FOR SHARE), `stageRights`, `namesOf`, `printsOf` |
-| `SalesOrderQueryService` | reads for the screens: `cards`, `list`, `details(ids)` |
+| `SalesOrderQueryService` | reads for the screens: `cards`, `list`, `details(ids)`; ADR-0109: `openExposureInTx(tx, customerId, exceptOrderId?)` (the confirmed orders not yet invoiced, under the caller's customer lock: the order confirmation's credit check and the till's) and `openExposures(customerIds)` (the same sums without a lock, for the till's customer feed) |
 | `SalesSettingsService` | the number format, the channel defaults, `allocateNumber(tx)` |
 | `CREDIT_CHECKER`, `CreditChecker`, `CreditCheckInput`, `CreditDecision` | the hook finance binds (ADR-0060 #1, #2): `check(tx, { customer, orderId, amount, openOrders })` → ok, or refused with `reason` HOLD / OVERDUE / LIMIT and the amounts of the 409 `CREDIT_BLOCKED` |
 | `SALE_SINK`, `SaleSink`, `SaleSnapshot`, `SoldLine`, `SoldPart` | the hook finance binds (ADR-0060 #3): `onSold(tx, actor, snapshot)` invoices the delivered quantities and returns the invoice, or null when nothing was delivered |

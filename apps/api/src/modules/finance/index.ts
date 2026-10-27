@@ -44,6 +44,12 @@ export {
   type InvoiceSummary,
 } from './services/invoice-query.service';
 export { InvoicingService } from './services/invoicing.service';
+export {
+  type PosCreditLine,
+  type PosCreditReturn,
+  type PosCreditSale,
+  PosCreditService,
+} from './services/pos-credit.service';
 export { JournalRepostService, type RepostCounts } from './services/journal-repost.service';
 export {
   type JournalEntryDetail,

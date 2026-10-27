@@ -28,6 +28,8 @@ import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { TaxpayerClient } from '../ebarimt/taxpayer.client';
+import { CreditGate } from './credit-gate.service';
+import { CustomerStore } from './customer.store';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
@@ -41,7 +43,9 @@ const SEARCH_LIMIT = 30;
  * document and its outbox entry in one edge transaction under the till's own number. Payments are
  * taken as given (cash with change, card by hand). The e-Barimt (ADR-0065) is queued in the same
  * transaction and issued right after it (`EbarimtService.afterCommit`); a company's receipt needs
- * its TIN found by the online lookup first.
+ * its TIN found by the online lookup first. ADR-0109: the cashier chooses the receipt
+ * («Хувь хүн» or «Байгууллага») and the payment, a CREDIT part needing a registered customer and
+ * the credit check (`CreditGate`); a sale with credit gets no e-Barimt (owner 2026-10-27).
  */
 @Injectable()
 export class CheckoutService {
@@ -52,6 +56,8 @@ export class CheckoutService {
     private readonly outbox: OutboxService,
     private readonly ebarimt: EbarimtService,
     private readonly taxpayers: TaxpayerClient,
+    private readonly customers: CustomerStore,
+    private readonly credit: CreditGate,
   ) {}
 
   /**
@@ -182,9 +188,21 @@ export class CheckoutService {
     );
     const totals = saleTotals(lines);
     const tenders = this.tenders(request, totals.total);
+    const customer = tenders.credit.gt(0)
+      ? await this.creditCustomer(request, tenders.credit)
+      : null;
+    // A sale with credit has no e-Barimt; otherwise the cashier's choice, B2B with a found buyer.
+    const wanted = request.receiptType ?? (request.buyer ? 'B2B' : 'B2C');
+    if (!customer && wanted === 'B2B' && !request.buyer) {
+      throw new AppError('POS_BUYER_REQUIRED', 'a company receipt needs the buyer', {});
+    }
     // Offline there are no company receipts (owner 2026-10-26): the lookup refuses first.
-    const buyer = request.buyer ? await this.taxpayers.lookup(request.buyer.tin) : null;
+    const buyer =
+      !customer && wanted === 'B2B' && request.buyer
+        ? await this.taxpayers.lookup(request.buyer.tin)
+        : null;
     const receiptType = buyer ? 'B2B' : 'B2C';
+    const issues = this.ebarimt.enabled && !customer;
     const settings = loaded.snapshot.settings;
     return inEdgeTransaction(this.db, async (tx) => {
       const shift = await this.shifts.current(tillCode, tx);
@@ -210,6 +228,7 @@ export class CheckoutService {
         customerName: buyer?.name ?? null,
         consumerNo: null,
         refundsSaleClientId: null,
+        customerId: customer?.id ?? null,
         lines,
         tenders: tenders.wire,
         subtotal: totals.subtotal.toFixed(2),
@@ -218,7 +237,7 @@ export class CheckoutService {
         vatTotal: totals.vatTotal.toFixed(2),
         note: null,
         snapshotVersion: loaded.snapshot.version,
-        ebarimt: this.ebarimt.enabled
+        ebarimt: issues
           ? {
               status: 'PENDING',
               ddtd: null,
@@ -257,11 +276,19 @@ export class CheckoutService {
           tendered: tender.tendered,
         })),
         change: tenders.change.toFixed(2),
+        credit: customer
+          ? {
+              customerId: customer.id,
+              customerCode: customer.code,
+              customerName: customer.name,
+              amount: tenders.credit.toFixed(2),
+            }
+          : null,
         title: settings.receiptTitle ?? null,
         footer: settings.receiptFooter ?? null,
-        ebarimt: this.ebarimt.enabled
+        ebarimt: issues
           ? this.ebarimt.pendingFacts(receiptType, buyer?.tin ?? null, buyer?.name ?? null)
-          : { mode: 'TEST', ddtd: null },
+          : { mode: this.ebarimt.enabled ? 'REAL' : 'TEST', ddtd: null, status: 'NONE' },
       };
       await tx.insert(edgeSales).values({
         clientId: request.clientId,
@@ -273,12 +300,14 @@ export class CheckoutService {
         total: totals.total,
         cashAmount: tenders.cash,
         cardAmount: tenders.card,
+        creditAmount: tenders.credit,
+        customerId: customer?.id ?? null,
         vatTotal: totals.vatTotal,
         doc,
         receipt,
       });
       await this.outbox.enqueue(tx, { kind: 'SALE', clientId: request.clientId, sale: doc });
-      if (this.ebarimt.enabled) {
+      if (issues) {
         await this.ebarimt.enqueueSale(tx, {
           ownerClientId: request.clientId,
           tillCode,
@@ -337,16 +366,36 @@ export class CheckoutService {
     return { inputs, result };
   }
 
-  /** Cash and card as entered: their amounts must make the total; cash may exceed it (change). */
+  /**
+   * The customer a credit part charges (ADR-0109): named by the cashier, known to the feed, and
+   * let through by the credit check.
+   */
+  private async creditCustomer(request: EdgeSaleRequest, credit: Decimal) {
+    if (!request.customerId) {
+      throw new AppError('POS_CUSTOMER_REQUIRED', 'a sale on credit names its customer', {});
+    }
+    const customer = this.customers.get(request.customerId);
+    await this.credit.assert(customer.id, credit, request.acceptOverLimit === true);
+    return customer;
+  }
+
+  /**
+   * Cash, card and credit as entered: their amounts must make the total; cash may exceed it (the
+   * change). At most one CREDIT part (ADR-0109).
+   */
   private tenders(
     request: EdgeSaleRequest,
     total: Decimal,
-  ): { wire: TenderWire[]; cash: Decimal; card: Decimal; change: Decimal } {
+  ): { wire: TenderWire[]; cash: Decimal; card: Decimal; credit: Decimal; change: Decimal } {
     if (request.tenders.length === 0 || request.tenders.length > POS_LIMITS.maxTenders) {
       throw new AppError('VALIDATION_FAILED', 'a sale is paid by one to a few tenders');
     }
+    if (request.tenders.filter((tender) => tender.kind === 'CREDIT').length > 1) {
+      throw new AppError('VALIDATION_FAILED', 'a sale has at most one credit part');
+    }
     let cash = new Decimal(0);
     let card = new Decimal(0);
+    let credit = new Decimal(0);
     let tendered = new Decimal(0);
     const wire = request.tenders.map((tender): TenderWire => {
       const amount = new Decimal(tender.amount);
@@ -369,6 +418,17 @@ export class CheckoutService {
           maskedPan: null,
         };
       }
+      if (tender.kind === 'CREDIT') {
+        credit = credit.plus(amount);
+        return {
+          kind: 'CREDIT',
+          amount: amount.toFixed(2),
+          tendered: null,
+          terminalId: null,
+          rrn: null,
+          maskedPan: null,
+        };
+      }
       card = card.plus(amount);
       return {
         kind: 'CARD',
@@ -379,13 +439,21 @@ export class CheckoutService {
         maskedPan: null,
       };
     });
-    if (!cash.plus(card).eq(total)) {
+    const paid = cash.plus(card).plus(credit);
+    if (!paid.eq(total)) {
       throw new AppError('POS_TOTALS_MISMATCH', 'the tenders do not make the total', {
         total: total.toFixed(2),
-        paid: cash.plus(card).toFixed(2),
+        paid: paid.toFixed(2),
       });
     }
-    return { wire, cash, card, change: tendered.minus(cash) };
+    // A zero part is no tender (the centre wants every amount positive).
+    return {
+      wire: wire.filter((tender) => new Decimal(tender.amount).gt(0)),
+      cash,
+      card,
+      credit,
+      change: tendered.minus(cash),
+    };
   }
 
   private hit(loaded: LoadedSnapshot, product: SnapshotProduct): EdgeProductHit {

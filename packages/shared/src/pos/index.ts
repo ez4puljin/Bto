@@ -7,8 +7,11 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
  * the kiosk share. Messages live in mn.json under `pos`.
  */
 
-/** How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). */
-export const TENDER_KINDS = ['CASH', 'CARD'] as const;
+/**
+ * How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). CREDIT (ADR-0109) is the part a
+ * registered customer owes: the centre invoices it, and the sale carries no e-Barimt.
+ */
+export const TENDER_KINDS = ['CASH', 'CARD', 'CREDIT'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
 
 /** A sale, or a return that names the sale it takes goods back from. */
@@ -186,6 +189,29 @@ export function saleTotals(lines: readonly LineTotals[]): SaleTotals {
 
 export function tendersTotal(tenders: readonly { amount: DecimalInput }[]): Decimal {
   return tenders.reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
+}
+
+/** The part of a sale on credit (ADR-0109): the sum of its CREDIT tenders, at most one. */
+export function creditPart(
+  tenders: readonly { kind: TenderKind; amount: DecimalInput }[],
+): Decimal {
+  return tenders
+    .filter((tender) => tender.kind === 'CREDIT')
+    .reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
+}
+
+/**
+ * How a return of a sale with credit is paid back (owner 2026-10-27, ADR-0109 #6): off the
+ * customer's debt first, up to the sale's credit not yet taken back, the rest in cash.
+ */
+export function refundSplit(input: {
+  saleCredit: DecimalInput;
+  creditRefunded: DecimalInput;
+  total: DecimalInput;
+}): { credit: Decimal; cash: Decimal } {
+  const left = Decimal.max(new Decimal(input.saleCredit).minus(input.creditRefunded), 0);
+  const credit = Decimal.min(left, input.total);
+  return { credit, cash: new Decimal(input.total).minus(credit) };
 }
 
 export interface ShiftCash {

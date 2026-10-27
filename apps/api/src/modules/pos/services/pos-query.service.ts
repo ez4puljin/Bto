@@ -18,6 +18,7 @@ import { invalid, notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import type { VatType } from '../../catalog';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
+import { CustomersService } from '../../partners';
 import {
   posEdgeNodes,
   posSaleLines,
@@ -88,6 +89,16 @@ export interface SaleSummary {
   vatTotal: Decimal;
   cashAmount: Decimal;
   cardAmount: Decimal;
+  /** ADR-0109: the part on credit, its customer, the invoice or credit note, the excess. */
+  creditAmount: Decimal;
+  creditCustomerId: number | null;
+  creditCustomerCode: string | null;
+  creditCustomerName: string | null;
+  creditDocNumber: string | null;
+  invoiceId: number | null;
+  creditNoteId: number | null;
+  creditExcess: Decimal | null;
+  creditReviewedAt: Date | null;
   receiptType: ReceiptType;
   customerTin: string | null;
   customerName: string | null;
@@ -161,6 +172,8 @@ export interface SaleDetail extends SaleSummary {
   inactiveId: string | null;
   snapshotVersion: string | null;
   note: string | null;
+  creditReviewedByName: string | null;
+  creditReviewNote: string | null;
   lines: SaleLineView[];
   tenders: TenderView[];
   shortfalls: ShortfallView[];
@@ -176,6 +189,9 @@ export interface SaleQuery {
   cashierUserId?: number;
   kind?: SaleKind;
   ebarimtStatus?: EbarimtStatus;
+  /** ADR-0109: a customer's credit sales and returns; those past a limit not checked yet. */
+  customerId?: number;
+  creditToCheck?: boolean;
   from?: string;
   to?: string;
   cursor?: string;
@@ -210,6 +226,8 @@ export interface PosAttention {
   rejections: number;
   /** Sales whose e-Barimt failed or went unanswered on the edge (ADR-0065). */
   receiptsToCheck: number;
+  /** Credit sales accepted past their customer's limit or hold, not checked yet (ADR-0109). */
+  creditToCheck: number;
 }
 
 type ShiftRow = typeof posShifts.$inferSelect;
@@ -223,6 +241,7 @@ export class PosQueryService {
     private readonly names: UserNamesService,
     private readonly shifts: PosShiftsService,
     private readonly audit: AuditService,
+    private readonly customers: CustomersService,
   ) {}
 
   async listShifts(
@@ -270,6 +289,12 @@ export class PosQueryService {
     if (query.cashierUserId) filters.push(eq(posSales.cashierUserId, query.cashierUserId));
     if (query.kind) filters.push(eq(posSales.kind, query.kind));
     if (query.ebarimtStatus) filters.push(eq(posSales.ebarimtStatus, query.ebarimtStatus));
+    if (query.customerId) filters.push(eq(posSales.customerId, query.customerId));
+    if (query.creditToCheck) {
+      filters.push(
+        sql`${posSales.creditExcess} IS NOT NULL AND ${posSales.creditReviewedAt} IS NULL`,
+      );
+    }
     if (query.from) filters.push(sql`${posSales.soldDay} >= ${query.from}`);
     if (query.to) filters.push(sql`${posSales.soldDay} <= ${query.to}`);
     const q = query.q?.trim();
@@ -338,6 +363,11 @@ export class PosQueryService {
       inactiveId: row.inactiveId,
       snapshotVersion: row.snapshotVersion,
       note: row.note,
+      creditReviewedByName:
+        row.creditReviewedBy === null
+          ? null
+          : ((await this.names.namesOf([row.creditReviewedBy])).get(row.creditReviewedBy) ?? null),
+      creditReviewNote: row.creditReviewNote,
       lines: lines.map((line) => ({
         id: line.id,
         lineNo: line.lineNo,
@@ -375,6 +405,45 @@ export class PosQueryService {
       shortfalls,
       returns,
     };
+  }
+
+  /**
+   * The office checked a credit sale accepted past its customer's limit or hold (ADR-0109 #7):
+   * «Шалгасан» with a note; once.
+   */
+  async reviewCredit(ctx: AuthContext, id: number, note: string | null): Promise<SaleDetail> {
+    const trimmed = note?.trim() || null;
+    if (trimmed && trimmed.length > 300) throw invalid('note', 'length', 'at most 300 characters');
+    await inTransaction(this.db, async (tx) => {
+      const [row] = await tx
+        .select({
+          id: posSales.id,
+          creditExcess: posSales.creditExcess,
+          reviewedAt: posSales.creditReviewedAt,
+        })
+        .from(posSales)
+        .where(eq(posSales.id, id))
+        .for('update');
+      if (!row) throw notFound('pos_sale', id);
+      if (row.creditExcess === null) throw invalid('id', 'credit', 'nothing to check');
+      if (row.reviewedAt) return;
+      await tx
+        .update(posSales)
+        .set({
+          creditReviewedAt: sql`now()`,
+          creditReviewedBy: ctx.userId,
+          creditReviewNote: trimmed,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(posSales.id, id));
+      await this.audit.record(tx, ctx, {
+        action: 'CREDIT_REVIEW',
+        entity: 'pos_sales',
+        entityId: id,
+        after: { note: trimmed, creditExcess: row.creditExcess.toFixed(2) },
+      });
+    });
+    return this.getSale(id);
   }
 
   async listShortfalls(
@@ -488,8 +557,13 @@ export class PosQueryService {
       .select({ count: sql<string>`count(*)` })
       .from(posSales)
       .where(inArray(posSales.ebarimtStatus, ['ERROR', 'INDETERMINATE']));
+    const [credit] = await this.db
+      .select({ count: sql<string>`count(*)` })
+      .from(posSales)
+      .where(sql`${posSales.creditExcess} IS NOT NULL AND ${posSales.creditReviewedAt} IS NULL`);
     const int = (value: string | undefined) => Number.parseInt(value ?? '0', 10);
     return {
+      creditToCheck: int(credit?.count),
       openShifts: int(shifts?.open),
       shiftsToHandOver: int(shifts?.closed),
       openShortfalls: int(shortfalls?.count),
@@ -537,6 +611,8 @@ export class PosQueryService {
               returnsTotal: row.returnsTotal,
               salesVat: row.salesVat,
               returnsVat: row.returnsVat,
+              creditSales: row.creditSales,
+              creditRefunds: row.creditRefunds,
             };
       result.push({
         ...totals,
@@ -617,6 +693,13 @@ export class PosQueryService {
       .where(idIn(posTenders.saleId, ids))
       .groupBy(posTenders.saleId);
     const tenders = new Map(tenderSums.map((row) => [row.saleId, row]));
+    const charged = new Map(
+      (
+        await this.customers.getMany([
+          ...new Set(rows.flatMap((row) => (row.customerId === null ? [] : [row.customerId]))),
+        ])
+      ).map((customer) => [customer.id, customer]),
+    );
     const lineCounts = new Map(
       (
         await this.db
@@ -657,6 +740,17 @@ export class PosQueryService {
         vatTotal: row.vatTotal,
         cashAmount: new Decimal(tender?.cash ?? '0'),
         cardAmount: new Decimal(tender?.card ?? '0'),
+        creditAmount: row.creditTotal,
+        creditCustomerId: row.customerId,
+        creditCustomerCode:
+          row.customerId === null ? null : (charged.get(row.customerId)?.code ?? null),
+        creditCustomerName:
+          row.customerId === null ? null : (charged.get(row.customerId)?.name ?? null),
+        creditDocNumber: row.creditDocNumber,
+        invoiceId: row.invoiceId,
+        creditNoteId: row.creditNoteId,
+        creditExcess: row.creditExcess,
+        creditReviewedAt: row.creditReviewedAt,
         receiptType: row.receiptType,
         customerTin: row.customerTin,
         customerName: row.customerName,

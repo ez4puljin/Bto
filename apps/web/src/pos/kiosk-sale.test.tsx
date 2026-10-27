@@ -121,6 +121,7 @@ describe('kiosk: the sale screen', () => {
 
     await user.click(screen.getByRole('button', { name: k.sale.pay }));
     const pay = await screen.findByRole('dialog', { name: k.pay.title });
+    await user.click(within(pay).getByRole('radio', { name: k.pay.mode.MIXED }));
     await user.type(within(pay).getByPlaceholderText(k.pay.cardAmount), '2000');
     await user.click(within(pay).getByRole('button', { name: '10,000₮' }));
     expect(within(pay).getByRole('status')).toHaveTextContent('5,000₮');

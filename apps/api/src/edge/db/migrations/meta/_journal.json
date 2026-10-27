@@ -22,6 +22,13 @@
       "when": 1793007748762,
       "tag": "0002_ebarimt",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793083243338,
+      "tag": "0003_credit",
+      "breakpoints": true
     }
   ]
 }

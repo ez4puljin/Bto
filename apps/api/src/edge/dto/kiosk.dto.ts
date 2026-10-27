@@ -1,5 +1,7 @@
 import {
   POS_LIMITS,
+  RECEIPT_TYPES,
+  type ReceiptType,
   TENDER_KINDS,
   type TenderKind,
   VOID_REASONS,
@@ -83,6 +85,15 @@ export class SaleDto {
 
   /** A company's receipt (ADR-0065): the TIN the lookup answered. */
   @IsOptional() @ValidateNested() @Type(() => BuyerDto) buyer?: BuyerDto | null;
+
+  /** ADR-0109: «Хувь хүн» (B2C) or «Байгууллага» (B2B, with the buyer). */
+  @IsOptional() @IsIn(RECEIPT_TYPES) receiptType?: ReceiptType;
+
+  /** The customer a CREDIT tender charges. */
+  @IsOptional() @IsInt() @Min(1) customerId?: number | null;
+
+  /** The cashier went on after the offline warning on the customer's limit. */
+  @IsOptional() @IsBoolean() acceptOverLimit?: boolean;
 }
 
 export class BuyerDto {

@@ -154,10 +154,12 @@ function ShiftBody({ shift }: { shift: Shift }) {
             [t('pos.fields.salesTotal'), formatTugrik(shift.salesTotal)],
             [t('pos.fields.salesVat'), formatTugrik(shift.salesVat)],
             [t('pos.fields.cardSales'), formatTugrik(shift.cardSales)],
+            [t('pos.fields.creditSales'), formatTugrik(shift.creditSales)],
             [t('pos.fields.returnsCount'), formatCount(shift.returnsCount)],
             [t('pos.fields.returnsTotal'), formatTugrik(shift.returnsTotal)],
             [t('pos.fields.returnsVat'), formatTugrik(shift.returnsVat)],
             [t('pos.fields.cardRefunds'), formatTugrik(shift.cardRefunds)],
+            [t('pos.fields.creditRefunds'), formatTugrik(shift.creditRefunds)],
           ]}
         />
       </PanelSection>

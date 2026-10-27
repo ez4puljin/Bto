@@ -79,6 +79,8 @@ export const shiftDto = (shift: ShiftSummary): ShiftDto => ({
   cashRefunds: money(shift.cashRefunds),
   cardSales: money(shift.cardSales),
   cardRefunds: money(shift.cardRefunds),
+  creditSales: money(shift.creditSales),
+  creditRefunds: money(shift.creditRefunds),
   salesTotal: money(shift.salesTotal),
   returnsTotal: money(shift.returnsTotal),
   salesVat: money(shift.salesVat),
@@ -95,6 +97,9 @@ export const saleDto = (sale: SaleSummary): SaleDto => ({
   vatTotal: money(sale.vatTotal),
   cashAmount: money(sale.cashAmount),
   cardAmount: money(sale.cardAmount),
+  creditAmount: money(sale.creditAmount),
+  creditExcess: moneyOrNull(sale.creditExcess),
+  creditReviewedAt: isoOrNull(sale.creditReviewedAt),
   createdAt: iso(sale.createdAt),
 });
 
@@ -113,6 +118,8 @@ export const saleDetailDto = (sale: SaleDetail): SaleDetailDto => ({
   inactiveId: sale.inactiveId,
   snapshotVersion: sale.snapshotVersion,
   note: sale.note,
+  creditReviewedByName: sale.creditReviewedByName,
+  creditReviewNote: sale.creditReviewNote,
   lines: sale.lines.map((line) => ({
     ...line,
     qty: qty(line.qty),

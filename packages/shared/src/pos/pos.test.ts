@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cashVariance,
+  creditPart,
   expectedCash,
   handoverAmount,
   isPin,
@@ -12,6 +13,7 @@ import {
   parseEdgeToken,
   posSaleNumber,
   posShiftNumber,
+  refundSplit,
   saleTotals,
   tendersTotal,
   withinReturnWindow,
@@ -93,5 +95,29 @@ describe('edge tokens (ADR-0063 #6)', () => {
     });
     expect(parseEdgeToken('tgs_0_abcdefghijklmnopqrstuvwxyz012345')).toBeNull();
     expect(parseEdgeToken('Bearer x')).toBeNull();
+  });
+});
+
+describe('credit at the till (ADR-0109)', () => {
+  it('sums the credit part of the tenders', () => {
+    expect(
+      creditPart([
+        { kind: 'CASH', amount: '2000' },
+        { kind: 'CREDIT', amount: '5000.00' },
+      ]).toFixed(2),
+    ).toBe('5000.00');
+    expect(creditPart([{ kind: 'CARD', amount: '7000' }]).toFixed(2)).toBe('0.00');
+  });
+
+  it('pays a credit sale back off the debt first, the rest in cash', () => {
+    const split = (saleCredit: string, creditRefunded: string, total: string) => {
+      const result = refundSplit({ saleCredit, creditRefunded, total });
+      return [result.credit.toFixed(2), result.cash.toFixed(2)];
+    };
+    expect(split('2900', '0', '3900')).toEqual(['2900.00', '1000.00']);
+    expect(split('2900', '0', '1300')).toEqual(['1300.00', '0.00']);
+    expect(split('2900', '2600', '1300')).toEqual(['300.00', '1000.00']);
+    expect(split('2900', '2900', '1300')).toEqual(['0.00', '1300.00']);
+    expect(split('0', '0', '1300')).toEqual(['0.00', '1300.00']);
   });
 });

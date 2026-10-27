@@ -3,6 +3,7 @@ import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
+  CreditReviewDto,
   HandoverRequestDto,
   PosAttentionDto,
   RejectionListQueryDto,
@@ -103,6 +104,19 @@ export class PosSalesController {
   @ApiOkResponse({ type: SaleDetailDto })
   async get(@Param('id', ParseIntPipe) id: number): Promise<SaleDetailDto> {
     return saleDetailDto(await this.query.getSale(id));
+  }
+
+  /** «Шалгасан» on a credit sale accepted past its customer's limit or hold (ADR-0109 #7). */
+  @Post(':id/credit-review')
+  @HttpCode(200)
+  @RequirePermission('pos.manage')
+  @ApiOkResponse({ type: SaleDetailDto })
+  async reviewCredit(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CreditReviewDto,
+  ): Promise<SaleDetailDto> {
+    return saleDetailDto(await this.query.reviewCredit(ctx, id, body.note ?? null));
   }
 }
 
