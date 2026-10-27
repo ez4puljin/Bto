@@ -189,6 +189,8 @@ export const SALE: Schemas['PosSaleDetail'] = {
       id: 601,
       tenderNo: 1,
       kind: 'CASH',
+      paymentTypeId: null,
+      paymentTypeName: null,
       amount: '2600.00',
       tendered: '5000.00',
       terminalId: null,
