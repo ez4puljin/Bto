@@ -105,6 +105,7 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   // Neither MONEY nor RECEIVABLE: POS lines carry no money account and no party (ADR-0064).
   POS_CASH: key('POS_CASH'),
   CARD_CLEARING: key('CARD_CLEARING'),
+  TRANSFER_CLEARING: key('TRANSFER_CLEARING'),
   POS_SALES: key('POS_SALES'),
   CASH_VARIANCE: key('CASH_VARIANCE'),
   // Payables (F3, ADR-0091): the supplier's bill credits AP and debits the stock and the input VAT.

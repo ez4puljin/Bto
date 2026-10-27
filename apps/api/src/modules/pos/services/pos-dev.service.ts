@@ -117,6 +117,8 @@ export class PosDevService {
         lines,
         tenders: input.tenders.map((tender) => ({
           kind: tender.kind,
+          paymentTypeId: null,
+          paymentTypeName: null,
           amount: tender.amount,
           tendered: tender.kind === 'CASH' ? tender.tendered : null,
           terminalId: null,

@@ -5,6 +5,7 @@ import {
   POS_EVENT_KINDS,
   POS_LIMITS,
   POS_STATUSES,
+  DENOMINATIONS,
   type PosEventKind,
   type PosStatus,
   RECEIPT_TYPES,
@@ -216,6 +217,8 @@ export class TillDto {
   @ApiProperty() name: string;
   @ApiProperty({ type: String, nullable: true }) printerHost: string | null;
   @ApiProperty({ example: 9100 }) printerPort: number;
+  @ApiProperty({ type: String, nullable: true, description: 'ADR-0111: information only' })
+  printerName: string | null;
   @ApiProperty() drawerKick: boolean;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastSaleAt: string | null;
@@ -250,6 +253,12 @@ export class TillRequestDto {
   @Min(1)
   @Max(65_535)
   printerPort?: number;
+  @ApiPropertyOptional({ type: String, nullable: true, example: 'XP-80C (USB)' })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  printerName?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() drawerKick?: boolean;
 }
 
@@ -268,6 +277,12 @@ export class TillPatchDto {
   @MaxLength(253)
   printerHost?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(65_535) printerPort?: number;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxName)
+  printerName?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() drawerKick?: boolean;
   @ApiPropertyOptional({ enum: POS_STATUSES }) @IsOptional() @IsIn(POS_STATUSES) status?: PosStatus;
 }
@@ -313,6 +328,15 @@ export class CashierStatusDto {
 
 // ---------------------------------------------------------------- shifts
 
+@ApiSchema({ name: 'PosShiftPayment' })
+export class ShiftPaymentDto {
+  @ApiProperty({ type: Number, nullable: true }) paymentTypeId: number | null;
+  @ApiProperty({ type: String, nullable: true }) name: string | null;
+  @ApiProperty({ enum: TENDER_KINDS }) kind: TenderKind;
+  @ApiProperty({ example: '2515000.00' }) sales: string;
+  @ApiProperty({ example: '0.00' }) refunds: string;
+}
+
 @ApiSchema({ name: 'PosShift' })
 export class ShiftDto {
   @ApiProperty() id: number;
@@ -343,6 +367,10 @@ export class ShiftDto {
   @ApiProperty({ example: '0.00', description: 'ADR-0109: sold on credit' }) creditSales: string;
   @ApiProperty({ example: '0.00', description: 'ADR-0109: taken off customers’ debts' })
   creditRefunds: string;
+  @ApiProperty({ example: '0.00', description: 'ADR-0111: bank transfers' }) transferSales: string;
+  @ApiProperty({ example: '0.00' }) transferRefunds: string;
+  @ApiPropertyOptional({ type: () => [ShiftPaymentDto], description: 'On one shift’s read' })
+  payments?: ShiftPaymentDto[];
   @ApiProperty({ example: '440000.00' }) salesTotal: string;
   @ApiProperty({ example: '0.00' }) returnsTotal: string;
   @ApiProperty({ example: '40000.00' }) salesVat: string;
@@ -475,6 +503,9 @@ export class TenderDto {
   @ApiProperty() id: number;
   @ApiProperty() tenderNo: number;
   @ApiProperty({ enum: TENDER_KINDS }) kind: TenderKind;
+  @ApiProperty({ type: Number, nullable: true }) paymentTypeId: number | null;
+  @ApiProperty({ type: String, nullable: true, example: 'Khaanbank terminal' })
+  paymentTypeName: string | null;
   @ApiProperty({ example: '12000.00' }) amount: string;
   @ApiProperty({ type: String, nullable: true, example: '20000.00' }) tendered: string | null;
   @ApiProperty({ type: String, nullable: true }) terminalId: string | null;
@@ -634,6 +665,69 @@ export class PosAttentionDto {
   creditToCheck: number;
 }
 
+@ApiSchema({ name: 'PosDayCountRow' })
+export class DayCountRowDto {
+  @ApiProperty({ example: 20000 }) @IsIn([...DENOMINATIONS]) note: number;
+  @ApiProperty({ example: 12 }) @IsInt() @Min(0) @Max(POS_LIMITS.maxNoteCount) count: number;
+}
+
+@ApiSchema({ name: 'PosPaymentType' })
+export class PaymentTypeDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: 'Khaanbank terminal' }) name: string;
+  @ApiProperty({ enum: TENDER_KINDS }) kind: TenderKind;
+  @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
+  @ApiProperty() sort: number;
+}
+
+@ApiSchema({ name: 'PosPaymentTypeInput' })
+export class PaymentTypeInputDto {
+  @ApiProperty({ type: Number, nullable: true, description: 'Null adds a type' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  id: number | null;
+  @ApiProperty({ maxLength: POS_LIMITS.maxPaymentTypeName })
+  @Transform(trimmed)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(POS_LIMITS.maxPaymentTypeName)
+  name: string;
+  @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiProperty({ enum: POS_STATUSES }) @IsIn(POS_STATUSES) status: PosStatus;
+}
+
+@ApiSchema({ name: 'PosPaymentTypesRequest' })
+export class PaymentTypesRequestDto {
+  @ApiProperty({ type: [PaymentTypeInputDto], description: 'The whole list, in order' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POS_LIMITS.maxPaymentTypes)
+  @ValidateNested({ each: true })
+  @Type(() => PaymentTypeInputDto)
+  types: PaymentTypeInputDto[];
+}
+
+@ApiSchema({ name: 'PosDayCount' })
+export class DayCountDto {
+  @ApiProperty() id: number;
+  @ApiProperty() tillId: number;
+  @ApiProperty() tillCode: string;
+  @ApiProperty({ example: '2026-10-27' }) day: string;
+  @ApiProperty() cashierUserId: number;
+  @ApiProperty({ type: String, nullable: true }) cashierName: string | null;
+  @ApiProperty({ type: [DayCountRowDto] }) counts: DayCountRowDto[];
+  @ApiProperty({ example: '2515000.00' }) total: string;
+  @ApiProperty({ type: String, format: 'date-time' }) countedAt: string;
+}
+
+@ApiSchema({ name: 'PosDayCountsQuery' })
+export class DayCountsQueryDto {
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+}
+
 @ApiSchema({ name: 'PosCreditReviewRequest' })
 export class CreditReviewDto {
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
@@ -698,6 +792,17 @@ export class SaleDocLineDto {
 @ApiSchema({ name: 'PosSaleDocTender' })
 export class SaleDocTenderDto {
   @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'ADR-0111: the payment type' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  paymentTypeId?: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxPaymentTypeName)
+  paymentTypeName?: string | null;
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) amount: string;
   @ApiPropertyOptional({ type: String, nullable: true, example: '20000' })
   @IsOptional()
@@ -879,6 +984,23 @@ export class VoidDocLineDto {
   @ApiProperty({ example: '7000' }) @IsString() @Matches(MONEY) total: string;
 }
 
+/** ADR-0111: a till's banknote count for its day summary. */
+@ApiSchema({ name: 'PosDayCountDoc' })
+export class DayCountDocDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
+  @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
+  @ApiProperty({ example: '2026-10-27' }) @Matches(DATE) day: string;
+  @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
+  @ApiProperty({ type: [DayCountRowDto] })
+  @IsArray()
+  @ArrayMaxSize(DENOMINATIONS.length)
+  @ValidateNested({ each: true })
+  @Type(() => DayCountRowDto)
+  counts: DayCountRowDto[];
+  @ApiProperty({ example: '2515000.00' }) @Matches(MONEY) total: string;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() countedAt: string;
+}
+
 @ApiSchema({ name: 'PosVoidDoc' })
 export class VoidDocDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
@@ -942,6 +1064,11 @@ export class SyncEventDto {
   @ValidateNested()
   @Type(() => VoidDocDto)
   voided?: VoidDocDto;
+  @ApiPropertyOptional({ type: DayCountDocDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DayCountDocDto)
+  dayCount?: DayCountDocDto;
 }
 
 /** `GET /pos/sync/snapshot?since=`: the version the edge holds (ADR-0067). */

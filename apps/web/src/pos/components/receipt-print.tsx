@@ -1,9 +1,10 @@
-import type { EdgePrintableReceipt } from '@tugeel/shared/pos';
+import type { EdgeDaySummary, EdgePrintableReceipt } from '@tugeel/shared/pos';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PAGE_RULES } from '@/lib/print-format';
-import { PrintContext } from './print-context';
+import { DaySummarySlip, TestSlip } from './day-summary-slip';
+import { type PrintJob, PrintContext } from './print-context';
 import { ReceiptView } from './receipt';
 
 /** The printout's own element, beside the app: everything else is hidden while printing. */
@@ -21,14 +22,26 @@ const PRINT_RULES = `${PAGE_RULES.MM80}
   #${PRINT_ROOT_ID} { display: block; width: 72mm; margin: 0 auto; }
 }`;
 
-/** Holds the receipt being printed and the 80 mm sheet the browser prints. */
+/** Holds the job being printed (a receipt, the day's summary, a test slip) and its 80 mm sheet. */
 export function PrintProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const [job, setJob] = useState<{ printable: EdgePrintableReceipt; seq: number } | null>(null);
-  const print = useCallback(
-    (printable: EdgePrintableReceipt) =>
-      setJob((current) => ({ printable, seq: (current?.seq ?? 0) + 1 })),
+  const [job, setJob] = useState<{ job: PrintJob; seq: number } | null>(null);
+  const send = useCallback(
+    (next: PrintJob) => setJob((current) => ({ job: next, seq: (current?.seq ?? 0) + 1 })),
     [],
+  );
+  const print = useCallback(
+    (printable: EdgePrintableReceipt) => send({ kind: 'receipt', printable }),
+    [send],
+  );
+  const printDaySummary = useCallback(
+    (summary: EdgeDaySummary, printedAt: string) =>
+      send({ kind: 'daySummary', summary, printedAt }),
+    [send],
+  );
+  const printTest = useCallback(
+    (tillName: string, printedAt: string) => send({ kind: 'test', tillName, printedAt }),
+    [send],
   );
   useEffect(() => {
     if (!job) return;
@@ -39,41 +52,50 @@ export function PrintProvider({ children }: { children: ReactNode }) {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [job]);
-  const value = useMemo(() => ({ print }), [print]);
+  const value = useMemo(
+    () => ({ print, printDaySummary, printTest }),
+    [print, printDaySummary, printTest],
+  );
+  const current = job?.job ?? null;
+  const receipt = current?.kind === 'receipt' ? current.printable : null;
   return (
     <PrintContext.Provider value={value}>
       {children}
       {createPortal(
         <div id={PRINT_ROOT_ID} aria-hidden={job === null} data-testid="receipt-print">
           <style>{PRINT_RULES}</style>
-          {job && job.printable.receipt.credit ? (
+          {receipt?.receipt.credit ? (
             // A credit slip (ADR-0109): the customer's copy and the store's, signed, one sheet each.
             <>
               <div style={{ breakAfter: 'page' }}>
                 <ReceiptView
-                  receipt={job.printable.receipt}
-                  copy={job.printable.copy}
+                  receipt={receipt.receipt}
+                  copy={receipt.copy}
                   paper
                   label={t('posKiosk.print.sheet')}
                   copyLabel={t('posKiosk.receipt.copyCustomer')}
                 />
               </div>
               <ReceiptView
-                receipt={job.printable.receipt}
-                copy={job.printable.copy}
+                receipt={receipt.receipt}
+                copy={receipt.copy}
                 paper
                 label={t('posKiosk.print.sheet')}
                 copyLabel={t('posKiosk.receipt.copyStore')}
               />
             </>
-          ) : job ? (
+          ) : receipt ? (
             <ReceiptView
-              receipt={job.printable.receipt}
-              print={job.printable.print}
-              copy={job.printable.copy}
+              receipt={receipt.receipt}
+              print={receipt.print}
+              copy={receipt.copy}
               paper
               label={t('posKiosk.print.sheet')}
             />
+          ) : current?.kind === 'daySummary' ? (
+            <DaySummarySlip summary={current.summary} printedAt={current.printedAt} />
+          ) : current?.kind === 'test' ? (
+            <TestSlip tillName={current.tillName} printedAt={current.printedAt} />
           ) : null}
         </div>,
         document.body,

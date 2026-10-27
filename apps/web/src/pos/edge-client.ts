@@ -4,6 +4,8 @@ import {
   type EdgeBarcodeHit,
   type EdgeCartLine,
   type EdgeCustomer,
+  type EdgeDayCountRequest,
+  type EdgeDaySummary,
   type EdgeDeviceInfo,
   type EdgeDiscardParkedRequest,
   type EdgeEbarimtQueue,
@@ -24,6 +26,7 @@ import {
   type EdgeReceipt,
   type EdgeReturnRequest,
   type EdgeReturnSale,
+  type EdgeSaleListItem,
   type EdgeSaleRequest,
   type EdgeSession,
   type EdgeShiftCloseRequest,
@@ -281,6 +284,24 @@ export class EdgeClient {
 
   recentSales(signal?: AbortSignal) {
     return this.request<EdgeReceipt[]>('GET', '/sales/recent', { signal });
+  }
+
+  /** ADR-0111: this till's sales and returns of a day (`q` narrows by number), newest first. */
+  sales(day: string, q?: string, signal?: AbortSignal) {
+    const params = new URLSearchParams({ day });
+    if (q) params.set('q', q);
+    return this.request<EdgeSaleListItem[]>('GET', `/sales?${params.toString()}`, { signal });
+  }
+
+  /** ADR-0111: the till's day: money by payment type, the banknotes counted last. */
+  daySummary(day: string, signal?: AbortSignal) {
+    const query = new URLSearchParams({ day }).toString();
+    return this.request<EdgeDaySummary>('GET', `/day-summary?${query}`, { signal });
+  }
+
+  /** ADR-0111: records the banknotes handed over; the same `clientId` keeps the same count. */
+  countDay(body: EdgeDayCountRequest) {
+    return this.request<EdgeDaySummary>('POST', '/day-summary', { body });
   }
 
   quickButtons(signal?: AbortSignal) {

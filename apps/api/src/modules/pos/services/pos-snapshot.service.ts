@@ -10,6 +10,7 @@ import { UserNamesService } from '../../identity';
 import { DiscountProgramsService, PriceProfilesService, ProductPricesService } from '../../pricing';
 import { posCashiers, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
+import { PosPaymentTypesService } from './pos-payment-types.service';
 import { PosQuickButtonsService } from './pos-quick-buttons.service';
 import { PosSettingsService } from './pos-settings.service';
 
@@ -34,6 +35,7 @@ export class PosSnapshotService {
     private readonly names: UserNamesService,
     private readonly settings: PosSettingsService,
     private readonly quickButtons: PosQuickButtonsService,
+    private readonly paymentTypes: PosPaymentTypesService,
   ) {}
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
@@ -165,6 +167,7 @@ export class PosSnapshotService {
         })),
       programs,
       quickGroups: await this.quickButtons.forSnapshot(),
+      paymentTypes: await this.paymentTypes.forSnapshot(),
     };
     const version = createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 20);
     return { version, generatedAt: new Date().toISOString(), ...body };

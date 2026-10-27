@@ -22,6 +22,8 @@ import {
   PinRequestDto,
   PosSettingsDto,
   PosSettingsPatchDto,
+  PaymentTypeDto,
+  PaymentTypesRequestDto,
   QuickButtonsRequestDto,
   QuickGroupDto,
   TillDto,
@@ -31,6 +33,7 @@ import {
 } from '../dto/pos.dto';
 import { PosCashiersService } from '../services/pos-cashiers.service';
 import { PosEdgeNodesService } from '../services/pos-edge-nodes.service';
+import { PosPaymentTypesService } from '../services/pos-payment-types.service';
 import { PosQuickButtonsService } from '../services/pos-quick-buttons.service';
 import { PosSettingsService } from '../services/pos-settings.service';
 import { PosTillsService } from '../services/pos-tills.service';
@@ -230,5 +233,31 @@ export class PosQuickButtonsController {
     @Body() body: QuickButtonsRequestDto,
   ): Promise<QuickGroupDto[]> {
     return this.quickButtons.replace(ctx, body);
+  }
+}
+
+/** The ways to pay at the till (ADR-0111): named and ordered by the admin, saved as a whole list. */
+@ApiTags('pos')
+@Controller('pos/payment-types')
+export class PosPaymentTypesController {
+  constructor(private readonly paymentTypes: PosPaymentTypesService) {}
+
+  @Get()
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [PaymentTypeDto] })
+  list(): Promise<PaymentTypeDto[]> {
+    return this.paymentTypes.list();
+  }
+
+  @Put()
+  @RequirePermission(MANAGE)
+  @ApiOkResponse({ type: [PaymentTypeDto] })
+  replace(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: PaymentTypesRequestDto,
+  ): Promise<PaymentTypeDto[]> {
+    return this.paymentTypes.replace(ctx, {
+      types: body.types.map((type) => ({ ...type, id: type.id ?? null })),
+    });
   }
 }

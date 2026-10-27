@@ -1,4 +1,5 @@
 import {
+  DENOMINATIONS,
   POS_LIMITS,
   RECEIPT_TYPES,
   type ReceiptType,
@@ -62,6 +63,8 @@ export class QuoteDto {
 
 export class TenderDto {
   @IsIn(TENDER_KINDS) kind: TenderKind;
+  /** ADR-0111: the payment type chosen; the edge takes the kind from it. */
+  @IsOptional() @IsInt() @Min(1) paymentTypeId?: number | null;
   @Matches(MONEY) amount: string;
   @IsOptional() @Matches(MONEY) tendered?: string | null;
   @IsOptional() @IsString() @MaxLength(32) terminalId?: string | null;
@@ -102,7 +105,7 @@ export class BuyerDto {
 
 /** A company by its 7-digit registration number or its 11–14 digit TIN. */
 export class TaxpayerQueryDto {
-  @Matches(/^s*[0-9][0-9s-]{5,20}s*$/) no: string;
+  @Matches(/^ *[0-9][0-9 -]{5,20} *$/) no: string;
 }
 
 export class EbarimtResolveDto {
@@ -114,6 +117,26 @@ export class EbarimtResolveDto {
 
 export class EbarimtSendDataDto {
   @IsOptional() @ValidateNested() @Type(() => ApprovalDto) approval: ApprovalDto | null;
+}
+
+/** ADR-0111: a till's day (its history, its summary). */
+export class DayQueryDto {
+  @Matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) day: string;
+  @IsOptional() @IsString() @MaxLength(40) q?: string;
+}
+
+export class DayCountRowDto {
+  @IsInt() note: number;
+  @IsInt() @Min(0) count: number;
+}
+
+export class DayCountRequestDto {
+  @IsUUID() clientId: string;
+  @Matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) day: string;
+  @ArrayMaxSize(DENOMINATIONS.length)
+  @ValidateNested({ each: true })
+  @Type(() => DayCountRowDto)
+  counts: DayCountRowDto[];
 }
 
 export class SearchQueryDto {

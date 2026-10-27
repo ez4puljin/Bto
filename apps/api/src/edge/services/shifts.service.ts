@@ -9,13 +9,15 @@ import {
   posShiftNumber,
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales, edgeShifts } from '../db/schema';
 import { PrintableCache } from '../ebarimt/printable.cache';
 import { OutboxService } from './outbox.service';
+import { paymentTotalsOf } from './payment-totals';
 import { nextSequence } from './sequences';
+import { SnapshotStore } from './snapshot.store';
 
 type ShiftRow = typeof edgeShifts.$inferSelect;
 
@@ -30,6 +32,7 @@ export class EdgeShiftsService {
     @Inject(EDGE_DB) private readonly db: EdgeDb,
     private readonly outbox: OutboxService,
     private readonly cache: PrintableCache,
+    private readonly store: SnapshotStore,
   ) {}
 
   async current(tillCode: string, executor: EdgeDb | EdgeTx = this.db): Promise<ShiftRow | null> {
@@ -161,6 +164,7 @@ export class EdgeShiftsService {
         returns: sql<number>`count(*) FILTER (WHERE ${refund})::int`,
         refunds: sql<string>`coalesce(sum(${edgeSales.cashAmount}) FILTER (WHERE ${refund}), 0)::text`,
         credit: sql<string>`coalesce(sum(${edgeSales.creditAmount}) FILTER (WHERE ${sale}), 0)::text`,
+        transfer: sql<string>`coalesce(sum(${edgeSales.transferAmount}) FILTER (WHERE ${sale}), 0)::text`,
         creditRefunds: sql<string>`coalesce(sum(${edgeSales.creditAmount}) FILTER (WHERE ${refund}), 0)::text`,
       })
       .from(edgeSales)
@@ -188,6 +192,15 @@ export class EdgeShiftsService {
       cashRefunds: cashRefunds.toFixed(2),
       creditSales: new Decimal(totals?.credit ?? '0').toFixed(2),
       creditRefunds: new Decimal(totals?.creditRefunds ?? '0').toFixed(2),
+      transferSales: new Decimal(totals?.transfer ?? '0').toFixed(2),
+      payments: paymentTotalsOf(
+        await this.db
+          .select({ kind: edgeSales.kind, doc: edgeSales.doc })
+          .from(edgeSales)
+          .where(eq(edgeSales.shiftClientId, shift.clientId))
+          .orderBy(asc(edgeSales.soldAt)),
+        this.store.peek()?.snapshot.paymentTypes ?? [],
+      ),
       expectedCash: expected.toFixed(2),
       closedAt: shift.closedAt?.toISOString() ?? null,
       countedCash: shift.countedCash?.toFixed(2) ?? null,
