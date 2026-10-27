@@ -249,7 +249,7 @@ export function SaleScreen(props: {
         kind: 'VOUCHERS',
         items: (data.vouchers ?? []).map((voucher) => ({
           name: `${t(`posKiosk.vouchers.kinds.${voucher.kind}`)} · ${voucher.name} (${formatVoucherCode(voucher.code)})`,
-          qty: formatMnt(voucher.amount),
+          qty: voucher.amount,
           uomName: '₮',
         })),
         run: async (approval) => {
