@@ -9,9 +9,10 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
 
 /**
  * How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). CREDIT (ADR-0109) is the part a
- * registered customer owes: the centre invoices it, and the sale carries no e-Barimt.
+ * registered customer owes: the centre invoices it, and the sale carries no e-Barimt. VOUCHER
+ * (ADR-0110) is a partner voucher's part: the centre bills the partner its face value.
  */
-export const TENDER_KINDS = ['CASH', 'CARD', 'CREDIT'] as const;
+export const TENDER_KINDS = ['CASH', 'CARD', 'CREDIT', 'VOUCHER'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
 
 /** A sale, or a return that names the sale it takes goods back from. */
@@ -57,7 +58,8 @@ export type PosStatus = (typeof POS_STATUSES)[number];
 
 export const POS_LIMITS = {
   maxLines: 200,
-  maxTenders: 4,
+  /** Cash, card and credit, plus a sale's partner vouchers (ADR-0110: up to 20). */
+  maxTenders: 24,
   maxEventsPerBatch: 50,
   maxNote: 300,
   maxName: 120,
@@ -252,6 +254,9 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
   if (!match?.[1] || !match[2]) return null;
   return { nodeId: Number.parseInt(match[1], 10), secret: match[2] };
 }
+
+// The till's coupons and partner vouchers (ADR-0110).
+export * from './vouchers';
 
 // The store edge: sync, snapshot and kiosk shapes (ADR-0067).
 export * from './edge';

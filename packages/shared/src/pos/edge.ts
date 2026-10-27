@@ -20,6 +20,7 @@ import type {
   TenderKind,
   VoidReason,
 } from './index';
+import type { VoucherEffect, VoucherKind, VoucherRefusal } from './vouchers';
 
 /*
  * The store edge (ADR-0063, ADR-0067): what crosses the wire between the centre, the edge and the
@@ -55,6 +56,22 @@ export interface TenderWire {
   terminalId: string | null;
   rrn: string | null;
   maskedPan: string | null;
+  /** A VOUCHER tender's code (ADR-0110); absent or null otherwise. */
+  voucherCode?: string | null;
+}
+
+/**
+ * A code a till took on a sale (ADR-0110): a coupon's discount (inside the lines' discounts) or a
+ * partner voucher's payment (its VOUCHER tender), with the face value the partner is billed.
+ */
+export interface SaleVoucherWire {
+  voucherId: number;
+  code: string;
+  kind: VoucherKind;
+  /** A partner voucher's face value; a coupon's value as printed (percent or tugriks). */
+  face: string;
+  /** What it took off (a coupon) or paid (a partner voucher). */
+  amount: string;
 }
 
 export interface EbarimtFactsWire {
@@ -84,6 +101,8 @@ export interface SaleDocWire {
    * edge older than ADR-0109.
    */
   customerId?: number | null;
+  /** The coupons and partner vouchers the till took (ADR-0110); absent from an older edge. */
+  vouchers?: SaleVoucherWire[];
   lines: SaleDocLineWire[];
   tenders: TenderWire[];
   subtotal: string;
@@ -331,6 +350,35 @@ export type CustomerFeedResponseWire =
   { changed: true; feed: PosCustomerFeed } | { changed: false; version: string };
 
 /**
+ * A code the till may take (ADR-0110): an ISSUED code of an ACTIVE batch not yet past its last
+ * day, with its batch's terms and, for a partner voucher, the partner billed.
+ */
+export interface PosVoucherFacts {
+  id: number;
+  code: string;
+  kind: VoucherKind;
+  batchId: number;
+  batchNumber: string;
+  name: string;
+  effect: VoucherEffect;
+  value: string;
+  validFrom: string;
+  validTo: string;
+  customerId: number | null;
+  customerName: string | null;
+}
+
+/** The store's codes (`GET /api/v1/pos/sync/vouchers?since=`), apart from the snapshot. */
+export interface PosVoucherFeed {
+  version: string;
+  generatedAt: string;
+  vouchers: PosVoucherFacts[];
+}
+
+export type VoucherFeedResponseWire =
+  { changed: true; feed: PosVoucherFeed } | { changed: false; version: string };
+
+/**
  * `POST /api/v1/pos/sync/credit-check`: the centre's answer under the customer lock (ADR-0109 #7),
  * counting what this edge sold on credit and has not replayed yet.
  */
@@ -525,6 +573,8 @@ export interface EdgeShiftSummary {
   /** ADR-0109: sold on credit, and taken back off customers' debts; absent on older edges. */
   creditSales?: string;
   creditRefunds?: string;
+  /** ADR-0110: paid by partner vouchers; absent on older edges. */
+  voucherSales?: string;
   expectedCash: string;
   closedAt: string | null;
   countedCash: string | null;
@@ -596,6 +646,30 @@ export interface EdgeCartLine {
 
 export interface EdgeQuoteRequest {
   lines: EdgeCartLine[];
+  /** The coupons and partner vouchers scanned, in order (ADR-0110). */
+  codes?: string[];
+}
+
+/** A code as the till shows it (ADR-0110). */
+export interface EdgeVoucher {
+  code: string;
+  kind: VoucherKind;
+  name: string;
+  effect: VoucherEffect;
+  value: string;
+  partnerName: string | null;
+  validTo: string;
+}
+
+/** A code the till refused, with why. */
+export interface EdgeVoucherRefused {
+  code: string;
+  reason: VoucherRefusal;
+}
+
+/** A code on a quote: what a coupon took off or a partner voucher pays. */
+export interface EdgeQuotedVoucher extends EdgeVoucher {
+  amount: string;
 }
 
 export interface EdgeQuotedLine {
@@ -618,6 +692,10 @@ export interface EdgeQuoteResponse {
   discountTotal: string;
   total: string;
   vatTotal: string;
+  /** ADR-0110: the codes taken, what the partner vouchers pay and what is left to pay. */
+  vouchers?: EdgeQuotedVoucher[];
+  voucherTotal?: string;
+  due?: string;
 }
 
 export interface EdgeTenderInput {
@@ -646,6 +724,13 @@ export interface EdgeSaleRequest {
   customerId?: number | null;
   /** The cashier went on after the offline warning that the customer's limit is passed. */
   acceptOverLimit?: boolean;
+  /**
+   * The coupons and partner vouchers scanned, in order (ADR-0110). The edge derives the vouchers'
+   * tenders; the kiosk's tenders make what is left (the quote's `due`).
+   */
+  codes?: string[];
+  /** A supervisor's PIN, once for the sale's codes (required with codes). */
+  voucherApproval?: EdgeApproval | null;
 }
 
 /** A customer the till may sell to on credit (ADR-0109), from the edge's feed. */
@@ -734,6 +819,8 @@ export interface EdgeReturnSale {
   withinWindow: boolean;
   /** ADR-0109: a sale with credit — its customer and the credit not yet taken back. */
   credit?: { customerName: string; left: string } | null;
+  /** ADR-0110: a sale paid partly by vouchers gives back at most this (its cash and card left). */
+  refundable?: string | null;
   lines: EdgeReturnableLine[];
 }
 
@@ -776,6 +863,8 @@ export interface EdgeReceipt {
   vatTotal: string;
   tenders: { kind: TenderKind; amount: string; tendered: string | null }[];
   change: string;
+  /** ADR-0110: the coupons and partner vouchers taken (amount = what each took off or paid). */
+  vouchers?: { code: string; kind: VoucherKind; name: string; amount: string }[];
   /**
    * A sale with credit (ADR-0109): the customer it is charged to and how much; printed as a credit
    * slip in two copies, without VAT, QR or lottery. Absent or null otherwise.

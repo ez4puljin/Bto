@@ -160,6 +160,8 @@ export interface AppliedDiscount {
   value: Decimal;
   /** Tugriks a category or order program took off the line; null for a product program, whose effect is in the unit price. */
   amount: Decimal | null;
+  /** A till's coupon (ADR-0110): its code; programId is 0. */
+  code?: string;
 }
 
 const ZERO = new Decimal(0);
