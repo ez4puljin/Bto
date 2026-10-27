@@ -12,13 +12,13 @@ The kiosk prints each receipt with Chrome's own printing on the till's Windows P
    "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing --app=http://<store PC's LAN address>:7400
    ```
 
-   `--kiosk-printing` sends `window.print()` straight to the default printer. Chrome must be fully closed (also from the tray) before the shortcut is used, or the flag is ignored. `--kiosk` (full screen) may be added once the till is set up.
+   A till is paired per address: `http://localhost:7400` and `http://<LAN address>:7400` are two different devices to the browser, so keep the shortcut's address (a new address asks for a fresh pairing code from «Супермаркет → Касс»). `--kiosk-printing` sends `window.print()` straight to the default printer. Chrome must be fully closed (also from the tray) before the shortcut is used, or the flag is ignored. `--kiosk` (full screen) may be added once the till is set up.
 4. Without the flag, Chrome's print dialog opens on every receipt: pick the 80 mm printer, «Margins: None», and print. This is the fallback when the default printer is another one.
 5. Test: sell with the fake provider (the receipt says «ТУРШИЛТЫН БАРИМТ»), check that the Mongolian letters (Ө, Ү) and the QR code print sharp. The cash drawer is opened with its key; nothing is sent to it.
 
 ## The edge and the store PosAPI
 
-- `deploy/edge/.env` (from `.env.example`): `EBARIMT_PROVIDER=posapi`, `POSAPI_URL=http://<PosAPI PC>:7080`; `EBARIMT_LOOKUP_URL` stays `https://api.ebarimt.mn` (the company lookup; works only from Mongolian addresses). Then `pnpm edge:down` and `pnpm edge:up`.
+- `deploy/edge/.env` (from `.env.example`): `EBARIMT_PROVIDER=posapi`, `POSAPI_URL=http://<PosAPI PC>:7080`, `EBARIMT_BRANCH_NO=<the branch number the old till sends, e.g. 01>` (PosAPI refuses a receipt without it); `EBARIMT_LOOKUP_URL` stays `https://api.ebarimt.mn` (the company lookup; works only from Mongolian addresses). Then `pnpm edge:down` and `pnpm edge:up`.
 - Every receipt sent to a real PosAPI is registered with the tax office. Never point a test or a development edge at a real PosAPI without the owner's yes for each sale; returns cancel or replace receipts for real too.
 - Never change `posapi.ini`, restart PosService or install anything on the PosAPI PC from Bto's side; the PosAPI's operator (the vendor) activates a new PosAPI.
 - Check: `GET http://<PosAPI PC>:7080/rest/info` answers the version, `lastSentDate` and `leftLotteries` (read-only). The admin's «Супермаркет → Касс» shows the same facts from the edge's heartbeat, and the till's menu «e-Баримт» too.
