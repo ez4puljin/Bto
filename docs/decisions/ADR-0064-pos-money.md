@@ -6,7 +6,7 @@
 | Date | 2026-10-16 |
 | Deciders | Owner, Claude (Claude Code session) |
 | Amends | ADR-0060 (#5: `PaymentsService.recordInTx` joins `record`, so another module's transaction can carry a voucher; #7: the roles `POS_CASH`, `CARD_CLEARING`, `POS_SALES`, `CASH_VARIANCE`, the source `AUTO_POS_SHIFT` and the source document `POS_SHIFT`), architecture §5.8 and §5.13 |
-| Amended by | ADR-0071 (#2 to #4, mechanism only: the shift entry and the hand-over post through the intake contract in phase H2; the postings are unchanged); ADR-0072 (#4: the four POS roles become seeded posting rules; their accounts are control NONE with `drains`) |
+| Amended by | ADR-0071 (#2 to #4, mechanism only: the shift entry and the hand-over post through the intake contract in phase H2; the postings are unchanged); ADR-0072 (#4: the four POS roles become seeded posting rules; their accounts are control NONE with `drains`); ADR-0109 (#1, #2: a sale with a CREDIT tender is invoiced to its customer and its return credited, both left out of the shift's entry) |
 
 ## Context
 

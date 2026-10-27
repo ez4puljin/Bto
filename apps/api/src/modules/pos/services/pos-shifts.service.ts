@@ -37,7 +37,33 @@ export interface ShiftTotals {
   returnsTotal: Decimal;
   salesVat: Decimal;
   returnsVat: Decimal;
+  /** ADR-0109: the CREDIT tenders of the sales, and of the returns (taken off the debts). */
+  creditSales: Decimal;
+  creditRefunds: Decimal;
 }
+
+/**
+ * What the shift's credit sales and their returns booked on their own invoices and credit notes
+ * (ADR-0109): left out of the close's entry, which books the rest.
+ */
+export interface ShiftBooked {
+  salesTotal: Decimal;
+  salesVat: Decimal;
+  returnsTotal: Decimal;
+  returnsVat: Decimal;
+  /** Cash taken by the invoiced sales less cash paid back by the credited returns. */
+  cash: Decimal;
+  card: Decimal;
+}
+
+const NOTHING_BOOKED: ShiftBooked = {
+  salesTotal: new Decimal(0),
+  salesVat: new Decimal(0),
+  returnsTotal: new Decimal(0),
+  returnsVat: new Decimal(0),
+  cash: new Decimal(0),
+  card: new Decimal(0),
+};
 
 export interface HandoverInput {
   moneyAccountId: number | null;
@@ -170,6 +196,7 @@ export class PosShiftsService {
       throw invalid('note', 'length', `at most ${POS_LIMITS.maxNote} characters`);
     }
     const totals = await this.totals(row.id, tx);
+    const booked = await this.booked(row.id, tx);
     const expected = expectedCash({
       openingFloat: row.openingFloat,
       cashSales: totals.cashSales,
@@ -177,7 +204,16 @@ export class PosShiftsService {
     });
     const variance = cashVariance(doc.countedCash, expected);
     const closeDay = businessDate(doc.closedAt);
-    const entry = await this.bookClose(tx, actor, row, totals, doc.countedCash, variance, closeDay);
+    const entry = await this.bookClose(
+      tx,
+      actor,
+      row,
+      totals,
+      doc.countedCash,
+      variance,
+      closeDay,
+      booked,
+    );
     await tx
       .update(posShifts)
       .set({
@@ -198,6 +234,8 @@ export class PosShiftsService {
         returnsTotal: totals.returnsTotal,
         salesVat: totals.salesVat,
         returnsVat: totals.returnsVat,
+        creditSales: totals.creditSales,
+        creditRefunds: totals.creditRefunds,
         journalEntryId: entry?.id ?? null,
         journalNumber: entry?.number ?? null,
         updatedAt: sql`now()`,
@@ -298,7 +336,7 @@ export class PosShiftsService {
       })
       .from(posSales)
       .where(eq(posSales.shiftId, shiftId));
-    const tender = (kind: 'SALE' | 'RETURN', tenderKind: 'CASH' | 'CARD') =>
+    const tender = (kind: 'SALE' | 'RETURN', tenderKind: 'CASH' | 'CARD' | 'CREDIT') =>
       sql<string>`coalesce(sum(CASE WHEN ${posSales.kind} = ${kind} AND ${posTenders.kind} = ${tenderKind} THEN ${posTenders.amount} ELSE 0 END), 0)`;
     const [tenders] = await executor
       .select({
@@ -306,6 +344,8 @@ export class PosShiftsService {
         cashRefunds: tender('RETURN', 'CASH'),
         cardSales: tender('SALE', 'CARD'),
         cardRefunds: tender('RETURN', 'CARD'),
+        creditSales: tender('SALE', 'CREDIT'),
+        creditRefunds: tender('RETURN', 'CREDIT'),
       })
       .from(posTenders)
       .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
@@ -322,6 +362,40 @@ export class PosShiftsService {
       returnsTotal: money(header?.returnsTotal),
       salesVat: money(header?.salesVat),
       returnsVat: money(header?.returnsVat),
+      creditSales: money(tenders?.creditSales),
+      creditRefunds: money(tenders?.creditRefunds),
+    };
+  }
+
+  /** The part of the shift its credit sales and returns booked themselves (ADR-0109). */
+  async booked(shiftId: number, executor: Db | Tx = this.db): Promise<ShiftBooked> {
+    const own = sql`(${posSales.invoiceId} IS NOT NULL OR ${posSales.creditNoteId} IS NOT NULL)`;
+    const sale = (kind: 'SALE' | 'RETURN', column: 'total' | 'vat_total') =>
+      sql<string>`coalesce(sum(CASE WHEN ${posSales.kind} = ${kind} AND ${own} THEN ${sql.raw(`"pos_sales"."${column}"`)} ELSE 0 END), 0)`;
+    const [header] = await executor
+      .select({
+        salesTotal: sale('SALE', 'total'),
+        salesVat: sale('SALE', 'vat_total'),
+        returnsTotal: sale('RETURN', 'total'),
+        returnsVat: sale('RETURN', 'vat_total'),
+      })
+      .from(posSales)
+      .where(eq(posSales.shiftId, shiftId));
+    const paid = (tenderKind: 'CASH' | 'CARD') =>
+      sql<string>`coalesce(sum(CASE WHEN ${posTenders.kind} = ${tenderKind} AND ${own} THEN (CASE WHEN ${posSales.kind} = 'SALE' THEN ${posTenders.amount} ELSE -${posTenders.amount} END) ELSE 0 END), 0)`;
+    const [tenders] = await executor
+      .select({ cash: paid('CASH'), card: paid('CARD') })
+      .from(posTenders)
+      .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
+      .where(eq(posSales.shiftId, shiftId));
+    const money = (value: string | undefined) => new Decimal(value ?? '0');
+    return {
+      salesTotal: money(header?.salesTotal),
+      salesVat: money(header?.salesVat),
+      returnsTotal: money(header?.returnsTotal),
+      returnsVat: money(header?.returnsVat),
+      cash: money(tenders?.cash),
+      card: money(tenders?.card),
     };
   }
 
@@ -363,6 +437,7 @@ export class PosShiftsService {
       row.countedCash,
       row.variance,
       businessDate(row.closedAt),
+      await this.booked(row.id, tx),
     );
     if (!entry) return null;
     await tx
@@ -391,12 +466,14 @@ export class PosShiftsService {
     countedCash: Decimal,
     variance: Decimal,
     closeDay: string,
+    booked: ShiftBooked,
   ): Promise<{ id: number; number: string } | null> {
     const lines = shiftCloseLines({
       openingFloat: shift.openingFloat,
       countedCash,
       variance,
       totals,
+      booked,
     });
     if (lines.length === 0) return null;
     const till = await this.tills.get(shift.tillId, tx);
@@ -423,6 +500,9 @@ export class PosShiftsService {
  * SALES_RETURN and VAT_PAYABLE for the returns, Cr POS_SALES and VAT_PAYABLE for the sales, the
  * variance on CASH_VARIANCE; zero lines skipped, none at all when nothing moved. Also used by the
  * development re-post (`pnpm finance:repost-journal`, ADR-0089) from the totals kept on the shift.
+ * ADR-0109: what the credit sales and their returns booked on their own invoices and credit notes
+ * (their revenue, VAT, and the cash and card the till took or paid back for them) is left out;
+ * the counted cash, the expected cash and the variance are the drawer's, unchanged.
  */
 export function shiftCloseLines(input: {
   openingFloat: Decimal;
@@ -432,16 +512,25 @@ export function shiftCloseLines(input: {
     ShiftTotals,
     'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
   >;
+  booked?: ShiftBooked;
 }): JournalLineInput[] {
   const { totals } = input;
+  const booked = input.booked ?? NOTHING_BOOKED;
+  const salesTotal = totals.salesTotal.minus(booked.salesTotal);
+  const salesVat = totals.salesVat.minus(booked.salesVat);
+  const returnsTotal = totals.returnsTotal.minus(booked.returnsTotal);
+  const returnsVat = totals.returnsVat.minus(booked.returnsVat);
   const signed: { role: GlRole; amount: Decimal }[] = [
     // Positive = debit, negative = credit.
-    { role: 'POS_CASH', amount: input.countedCash.minus(input.openingFloat) },
-    { role: 'CARD_CLEARING', amount: totals.cardSales.minus(totals.cardRefunds) },
+    { role: 'POS_CASH', amount: input.countedCash.minus(input.openingFloat).minus(booked.cash) },
+    {
+      role: 'CARD_CLEARING',
+      amount: totals.cardSales.minus(totals.cardRefunds).minus(booked.card),
+    },
     { role: 'CASH_VARIANCE', amount: input.variance.negated() },
-    { role: 'SALES_RETURN', amount: totals.returnsTotal.minus(totals.returnsVat) },
-    { role: 'POS_SALES', amount: totals.salesTotal.minus(totals.salesVat).negated() },
-    { role: 'VAT_PAYABLE', amount: totals.returnsVat.minus(totals.salesVat) },
+    { role: 'SALES_RETURN', amount: returnsTotal.minus(returnsVat) },
+    { role: 'POS_SALES', amount: salesTotal.minus(salesVat).negated() },
+    { role: 'VAT_PAYABLE', amount: returnsVat.minus(salesVat) },
   ];
   return signed
     .filter((entry) => !entry.amount.isZero())

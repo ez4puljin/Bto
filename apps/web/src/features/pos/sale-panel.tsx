@@ -1,6 +1,7 @@
-import { Printer } from 'lucide-react';
+import { CircleCheck, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { useHasPermission } from '@/app/auth-context';
 import { ProblemAlert } from '@/components/problem-alert';
 import { FactChips, PanelSection, RecordSheet, TotalsGrid } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,8 @@ import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
-import { type SaleDetail, useSale } from './api';
+import { toast } from '@/lib/toast';
+import { type SaleDetail, usePosMutations, useSale } from './api';
 import { EbarimtBadge, SaleKindBadge } from './badges';
 
 /** One sale or return in the panel (`?sale=`): facts, totals, lines, tenders, shortfalls, returns. */
@@ -76,6 +78,53 @@ function PanelActions({ sale }: { sale: SaleDetail }) {
   );
 }
 
+/**
+ * A credit sale accepted past its customer's limit or hold (ADR-0109 #7, an offline sale is never
+ * refused): the excess, and «Шалгасан» for `pos.manage`.
+ */
+function CreditExcess({ sale }: { sale: SaleDetail }) {
+  const { t } = useTranslation();
+  const canManage = useHasPermission('pos.manage');
+  const { reviewCredit } = usePosMutations();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warning-soft px-4 py-3 text-warning">
+      <p className="text-sm">
+        <span className="font-semibold">{t('pos.fields.creditExcess')}</span>
+        {`: ${formatTugrik(sale.creditExcess ?? '0')}`}
+        {sale.creditReviewedAt ? (
+          <span className="block text-xs">
+            {[
+              t('pos.sales.creditReviewed', {
+                at: formatUbDateTime(Date.parse(sale.creditReviewedAt)),
+                by: sale.creditReviewedByName ?? '',
+              }),
+              sale.creditReviewNote,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        ) : null}
+      </p>
+      {canManage && !sale.creditReviewedAt ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={reviewCredit.isPending}
+          onClick={() =>
+            reviewCredit.mutate(
+              { id: sale.id, note: null },
+              { onSuccess: () => toast.success(t('pos.sales.creditReviewDone')) },
+            )
+          }
+        >
+          <CircleCheck />
+          {t('pos.sales.creditReview')}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function SaleBody({ sale }: { sale: SaleDetail }) {
   const { t } = useTranslation();
   const facts = [
@@ -117,6 +166,32 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
           },
         ]
       : []),
+    ...(sale.creditCustomerId !== null
+      ? [
+          {
+            label: t('pos.fields.creditCustomer'),
+            value: `${sale.creditCustomerCode ?? ''} · ${sale.creditCustomerName ?? ''}`,
+          },
+          ...(sale.creditDocNumber
+            ? [
+                {
+                  label: t('pos.fields.creditDoc'),
+                  value:
+                    sale.invoiceId !== null ? (
+                      <Link
+                        className="font-mono text-link underline-offset-2 hover:underline"
+                        to={`/finance/invoices?invoice=${sale.invoiceId}`}
+                      >
+                        {sale.creditDocNumber}
+                      </Link>
+                    ) : (
+                      sale.creditDocNumber
+                    ),
+                },
+              ]
+            : []),
+        ]
+      : []),
     { label: t('pos.fields.ddtd'), value: sale.ddtd ?? t('pos.sales.noReceipt') },
   ];
   return (
@@ -128,8 +203,12 @@ function SaleBody({ sale }: { sale: SaleDetail }) {
           [t('pos.fields.discount'), formatTugrik(sale.discountTotal)],
           [t('pos.fields.total'), formatTugrik(sale.total)],
           [t('pos.fields.vat'), formatTugrik(sale.vatTotal)],
+          ...(sale.creditAmount !== '0.00'
+            ? [[t('pos.fields.creditAmount'), formatTugrik(sale.creditAmount)] as [string, string]]
+            : []),
         ]}
       />
+      {sale.creditExcess !== null ? <CreditExcess sale={sale} /> : null}
       <PanelSection title={t('pos.sales.sections.lines')}>
         <div className="overflow-x-auto rounded-lg border border-border">
           <Table>

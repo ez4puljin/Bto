@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import type { Tx } from '../../../common/db/db.types';
 import { FinReader } from '../../../finance-core';
-import { BTO_SOURCE, customerRef } from '../../fin-bridge';
+import { BTO_SOURCE, customerRef, FinPartiesBridge } from '../../fin-bridge';
 import { systemActor } from '../../identity';
 import type { CreditCheckInput, CreditChecker, CreditDecision } from '../../sales';
 import { FinBooks } from './fin-books';
@@ -15,6 +15,8 @@ import { FinBooks } from './fin-books';
  * order pass it. An overdue amount never refuses (owner 2026-10-21, ADR-0101 #3): it only reminds,
  * and the refusal carries it for the message.
  */
+const CHUNK = 500;
+
 @Injectable()
 export class CreditControlService implements CreditChecker {
   private readonly actor = systemActor('finance:credit');
@@ -22,7 +24,36 @@ export class CreditControlService implements CreditChecker {
   constructor(
     private readonly reader: FinReader,
     private readonly books: FinBooks,
+    private readonly parties: FinPartiesBridge,
   ) {}
+
+  /**
+   * The net receivable of many customers at once, without a lock (the till's customer feed,
+   * ADR-0109): open debit less open credit on the receivable accounts; zero for one without items.
+   */
+  async netReceivables(customerIds: readonly number[]): Promise<Map<number, Decimal>> {
+    const result = new Map<number, Decimal>();
+    const company = await this.books.company();
+    for (let start = 0; start < customerIds.length; start += CHUNK) {
+      const parties = await this.parties.partiesOfCustomers(
+        customerIds.slice(start, start + CHUNK),
+      );
+      const customerOf = new Map(
+        [...parties].map(([customerId, partyId]) => [Number.parseInt(partyId, 10), customerId]),
+      );
+      if (customerOf.size === 0) continue;
+      const rows = await this.reader.partyBalances(this.books.source(this.actor), {
+        company,
+        partyIds: [...customerOf.keys()],
+        limit: customerOf.size,
+      });
+      for (const row of rows) {
+        const customerId = customerOf.get(row.partyId);
+        if (customerId !== undefined) result.set(customerId, row.net);
+      }
+    }
+    return result;
+  }
 
   async check(tx: Tx, input: CreditCheckInput): Promise<CreditDecision> {
     const { customer } = input;

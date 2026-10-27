@@ -56,6 +56,11 @@ export const EdgeEnvSchema = z.object({
   EDGE_TIMERS: z.stringbool().default(true),
   /** How often a non-empty outbox is pushed. */
   EDGE_PUSH_INTERVAL_MS: z.coerce.number().int().min(100).max(60_000).default(2_000),
+  /**
+   * ADR-0109: how long a credit sale waits for the centre's credit check before the till decides
+   * from the customers it pulled last (offline).
+   */
+  EDGE_CREDIT_CHECK_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(3_000),
 });
 
 export type EdgeEnv = z.infer<typeof EdgeEnvSchema>;

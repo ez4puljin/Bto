@@ -334,6 +334,16 @@ export function usePosMutations() {
         ),
       onSuccess: () => refresh(POS_KEYS.shortfalls, POS_KEYS.sales, ATTENTION_KEY),
     }),
+    reviewCredit: useMutation({
+      mutationFn: async ({ id, note }: { id: number; note: string | null }) =>
+        unwrap(
+          await api.POST('/api/v1/pos/sales/{id}/credit-review', {
+            params: { path: { id } },
+            body: { note },
+          }),
+        ),
+      onSuccess: () => refresh(POS_KEYS.sales, ATTENTION_KEY),
+    }),
     saveQuickButtons: useMutation({
       mutationFn: async (body: QuickButtonsRequest) =>
         unwrap(await api.PUT('/api/v1/pos/quick-buttons', { body })),

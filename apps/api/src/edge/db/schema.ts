@@ -2,6 +2,7 @@ import type { EbarimtPaymentCode, EbarimtTaxType } from '@tugeel/shared/mn';
 import type {
   EdgeCartLine,
   EdgeReceipt,
+  PosCustomerFeed,
   PosSnapshot,
   ReceiptType,
   SaleDocWire,
@@ -54,6 +55,10 @@ export const edgeState = pgTable(
     posapiLeftLotteries: integer('posapi_left_lotteries'),
     posapiCheckedAt: timestamp('posapi_checked_at', { withTimezone: true }),
     posapiError: text('posapi_error'),
+    /** ADR-0109: the customers a till may charge, as the centre's feed last answered. */
+    customersVersion: text('customers_version'),
+    customers: jsonValue('customers').$type<PosCustomerFeed | null>(),
+    customersPulledAt: timestamp('customers_pulled_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check('edge_state_single_row', sql`${t.id} = 1`)],
@@ -130,6 +135,11 @@ export const edgeSales = pgTable(
     /** The part paid in cash (change already given back) and by card. */
     cashAmount: money('cash_amount').notNull(),
     cardAmount: money('card_amount').notNull(),
+    /** ADR-0109: the part on credit (a return: taken off the debt) and its customer. */
+    creditAmount: money('credit_amount')
+      .notNull()
+      .default(sql`0`),
+    customerId: bigint('customer_id', { mode: 'number' }),
     vatTotal: money('vat_total').notNull(),
     doc: jsonValue('doc').$type<SaleDocWire>().notNull(),
     receipt: jsonValue('receipt').$type<EdgeReceipt>().notNull(),
@@ -140,6 +150,11 @@ export const edgeSales = pgTable(
     index('edge_sales_shift_idx').on(t.shiftClientId, t.soldAt),
     index('edge_sales_refunds_idx').on(t.refundsClientId),
     check('edge_sales_kind', sql`${t.kind} IN ('SALE', 'RETURN')`),
+    index('edge_sales_customer_idx').on(t.customerId),
+    check(
+      'edge_sales_credit',
+      sql`${t.creditAmount} >= 0 AND (${t.creditAmount} = 0 OR ${t.customerId} IS NOT NULL)`,
+    ),
   ],
 );
 

@@ -15,6 +15,7 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   lt,
@@ -217,6 +218,9 @@ const like = (value: string) => `%${value.replace(/[\\%_]/g, '\\$&')}%`;
 const int = (value: string | number): number =>
   typeof value === 'number' ? value : Number.parseInt(value, 10);
 
+/** The statuses whose total counts in a customer's credit exposure (ADR-0060 #2). */
+const OPEN_EXPOSURE: OrderStatus[] = ['CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED'];
+
 /**
  * The reads of the sales screens (ADR-0057): a pipeline's cards per stage, the order list, one
  * order or a batch for printing — always narrowed by `SalesAccessService`'s predicate.
@@ -232,6 +236,48 @@ export class SalesOrderQueryService {
     private readonly bins: BinsService,
     private readonly names: UserNamesService,
   ) {}
+
+  /**
+   * A customer's confirmed orders not yet invoiced (ADR-0060 #2): what counts in its credit
+   * exposure beside the ledger, but the order being checked. Read under the customer's lock by the
+   * order confirmation and the till's credit sales (ADR-0109).
+   */
+  async openExposureInTx(
+    tx: Tx,
+    customerId: number,
+    exceptOrderId: number | null = null,
+  ): Promise<Decimal> {
+    const [open] = await tx
+      .select({ total: sql<string>`coalesce(sum(${salesOrders.total}), 0)` })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.customerId, customerId),
+          inArray(salesOrders.status, OPEN_EXPOSURE),
+          ...(exceptOrderId === null ? [] : [sql`${salesOrders.id} <> ${exceptOrderId}`]),
+        ),
+      );
+    return new Decimal(open?.total ?? 0);
+  }
+
+  /** The same sums for many customers at once, without a lock (the till's customer feed). */
+  async openExposures(customerIds: readonly number[]): Promise<Map<number, Decimal>> {
+    if (customerIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        customerId: salesOrders.customerId,
+        total: sql<string>`coalesce(sum(${salesOrders.total}), 0)`,
+      })
+      .from(salesOrders)
+      .where(
+        and(
+          inArray(salesOrders.customerId, [...customerIds]),
+          inArray(salesOrders.status, OPEN_EXPOSURE),
+        ),
+      )
+      .groupBy(salesOrders.customerId);
+    return new Map(rows.map((row) => [row.customerId, new Decimal(row.total)]));
+  }
 
   /** One order the caller sees; 404 otherwise. */
   async get(ctx: Actor | AuthContext, id: number): Promise<OrderDetail> {

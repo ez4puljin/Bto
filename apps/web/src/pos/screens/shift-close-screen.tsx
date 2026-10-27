@@ -169,6 +169,12 @@ export function ShiftCloseScreen(props: {
                 <Figure label={t('pos.fields.salesCount')} value={formatCount(shift.salesCount)} />
                 <Figure label={t('pos.fields.cashSales')} value={formatTugrik(shift.cashSales)} />
                 <Figure label={t('pos.fields.cardSales')} value={formatTugrik(shift.cardSales)} />
+                {shift.creditSales && shift.creditSales !== '0.00' ? (
+                  <Figure
+                    label={t('posKiosk.z.creditSales')}
+                    value={formatTugrik(shift.creditSales)}
+                  />
+                ) : null}
                 <Figure label={t('pos.fields.salesTotal')} value={formatTugrik(shift.total)} />
                 {shift.returnsCount ? (
                   <Figure
@@ -329,12 +335,24 @@ export function ShiftSummaryScreen(props: {
             <Figure label={t('pos.fields.salesCount')} value={formatCount(summary.salesCount)} />
             <Figure label={t('pos.fields.cashSales')} value={formatTugrik(summary.cashSales)} />
             <Figure label={t('pos.fields.cardSales')} value={formatTugrik(summary.cardSales)} />
+            {summary.creditSales && summary.creditSales !== '0.00' ? (
+              <Figure
+                label={t('posKiosk.z.creditSales')}
+                value={formatTugrik(summary.creditSales)}
+              />
+            ) : null}
             <Figure label={t('pos.fields.salesTotal')} value={formatTugrik(summary.total)} />
             <Figure label={t('pos.fields.salesVat')} value={formatTugrik(summary.vatTotal)} />
             {summary.returnsCount ? (
               <Figure
                 label={t('posKiosk.z.returns', { count: summary.returnsCount })}
                 value={`−${formatTugrik(summary.cashRefunds)}`}
+              />
+            ) : null}
+            {summary.creditRefunds && summary.creditRefunds !== '0.00' ? (
+              <Figure
+                label={t('posKiosk.z.creditRefunds')}
+                value={`−${formatTugrik(summary.creditRefunds)}`}
               />
             ) : null}
             <Figure

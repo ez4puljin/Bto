@@ -38,6 +38,7 @@ import { ReportsService } from './services/reports.service';
 import { ArLedgerService } from './services/ar-ledger.service';
 import { CreditControlService } from './services/credit-control.service';
 import { CreditNotesService } from './services/credit-notes.service';
+import { PosCreditService } from './services/pos-credit.service';
 import { CustomerDebtsService } from './services/customer-debts.service';
 import { FinBooks } from './services/fin-books';
 import { FinanceSettingsService } from './services/finance-settings.service';
@@ -69,6 +70,7 @@ const SERVICES = [
   MoneyAccountsService,
   PaymentsService,
   CreditNotesService,
+  PosCreditService,
   ReceiptMoneyAccountsService,
   SupplierBillsService,
   StockBooksService,

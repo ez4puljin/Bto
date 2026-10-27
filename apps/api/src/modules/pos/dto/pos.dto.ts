@@ -340,6 +340,9 @@ export class ShiftDto {
   @ApiProperty({ example: '0.00' }) cashRefunds: string;
   @ApiProperty({ example: '120000.00' }) cardSales: string;
   @ApiProperty({ example: '0.00' }) cardRefunds: string;
+  @ApiProperty({ example: '0.00', description: 'ADR-0109: sold on credit' }) creditSales: string;
+  @ApiProperty({ example: '0.00', description: 'ADR-0109: taken off customers’ debts' })
+  creditRefunds: string;
   @ApiProperty({ example: '440000.00' }) salesTotal: string;
   @ApiProperty({ example: '0.00' }) returnsTotal: string;
   @ApiProperty({ example: '40000.00' }) salesVat: string;
@@ -412,6 +415,23 @@ export class SaleDto {
   @ApiProperty({ example: '1090.91' }) vatTotal: string;
   @ApiProperty({ example: '12000.00' }) cashAmount: string;
   @ApiProperty({ example: '0.00' }) cardAmount: string;
+  @ApiProperty({ example: '0.00', description: 'ADR-0109: the part on credit' })
+  creditAmount: string;
+  @ApiProperty({ type: Number, nullable: true }) creditCustomerId: number | null;
+  @ApiProperty({ type: String, nullable: true }) creditCustomerCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) creditCustomerName: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The invoice or the credit note' })
+  creditDocNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true }) invoiceId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) creditNoteId: number | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'What the limit was passed by when accepted (the whole credit on a hold)',
+  })
+  creditExcess: string | null;
+  @ApiProperty({ type: String, nullable: true, format: 'date-time' })
+  creditReviewedAt: string | null;
   @ApiProperty({ enum: RECEIPT_TYPES }) receiptType: ReceiptType;
   @ApiProperty({ type: String, nullable: true }) customerTin: string | null;
   @ApiProperty({ type: String, nullable: true }) customerName: string | null;
@@ -497,6 +517,8 @@ export class SaleDetailDto extends SaleDto {
   @ApiProperty({ type: String, nullable: true }) inactiveId: string | null;
   @ApiProperty({ type: String, nullable: true }) snapshotVersion: string | null;
   @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: String, nullable: true }) creditReviewedByName: string | null;
+  @ApiProperty({ type: String, nullable: true }) creditReviewNote: string | null;
   @ApiProperty({ type: [SaleLineDto] }) lines: SaleLineDto[];
   @ApiProperty({ type: [TenderDto] }) tenders: TenderDto[];
   @ApiProperty({ type: [ShortfallDto] }) shortfalls: ShortfallDto[];
@@ -520,6 +542,15 @@ export class SaleListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(EBARIMT_STATUSES)
   ebarimtStatus?: EbarimtStatus;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) customerId?: number;
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Credit sales past their limit not checked yet',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  creditToCheck?: boolean;
   @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
   @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
 }
@@ -599,6 +630,18 @@ export class PosAttentionDto {
   @ApiProperty() rejections: number;
   @ApiProperty({ description: 'Sales whose e-Barimt failed or went unanswered (ADR-0065)' })
   receiptsToCheck: number;
+  @ApiProperty({ description: 'Credit sales past their limit or hold, not checked (ADR-0109)' })
+  creditToCheck: number;
+}
+
+@ApiSchema({ name: 'PosCreditReviewRequest' })
+export class CreditReviewDto {
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxNote })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxNote)
+  note?: string | null;
 }
 
 // ---------------------------------------------------------------- sync (the edge's documents)
@@ -725,6 +768,15 @@ export class SaleDocDto {
   @IsOptional()
   @IsUUID()
   refundsSaleClientId?: string | null;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'ADR-0109: the customer a CREDIT tender charges',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  customerId?: number | null;
   @ApiProperty({ type: [SaleDocLineDto] })
   @IsArray()
   @ArrayMinSize(1)
@@ -895,6 +947,16 @@ export class SyncEventDto {
 /** `GET /pos/sync/snapshot?since=`: the version the edge holds (ADR-0067). */
 export class SnapshotQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(64) since?: string;
+}
+
+/** ADR-0109: the edge asks before a credit sale (the shape of CreditCheckRequestWire). */
+@ApiSchema({ name: 'PosCreditCheckRequest' })
+export class CreditCheckDto {
+  @ApiProperty() @IsInt() @Min(1) customerId: number;
+  @ApiProperty({ example: '30000.00' }) @Matches(MONEY) amount: string;
+  @ApiProperty({ example: '0.00', description: 'Credit sold on this edge, not replayed yet' })
+  @Matches(MONEY)
+  pendingOnEdge: string;
 }
 
 @ApiSchema({ name: 'PosSyncBatch' })

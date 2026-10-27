@@ -42,6 +42,7 @@ export {
   type LocatedCustomer,
   type LockedCustomer,
   type PartnerStatus,
+  type TillCustomer,
 } from './services/customers.service';
 export {
   type ProductSupplierLink,

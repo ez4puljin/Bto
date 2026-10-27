@@ -25,6 +25,8 @@ import { useReprint } from './print-context';
  * its TIN, a banner for a test receipt, a copy, a receipt still waiting or to be checked, the
  * number and time, a company buyer, the ДДТД, the lines, the totals with VAT, the tenders and the
  * change, the lottery and the QR code while the edge still holds them, the closing line.
+ * ADR-0109: a sale with credit prints as a credit slip — the customer, the part on credit, no VAT,
+ * QR or lottery (no e-Barimt), a line for the customer's signature, in two copies.
  */
 export function ReceiptView({
   receipt,
@@ -32,6 +34,7 @@ export function ReceiptView({
   copy = false,
   paper = false,
   label,
+  copyLabel,
 }: {
   receipt: EdgeReceipt;
   /** The lottery and the QR data: only in memory, only to draw this receipt. */
@@ -40,12 +43,15 @@ export function ReceiptView({
   /** The printed sheet: no frame, the printer's width. */
   paper?: boolean;
   label?: string;
+  /** Which of a credit slip's two copies this is. */
+  copyLabel?: string;
 }) {
   const { t } = useTranslation();
   const discount = new Decimal(receipt.discountTotal).gt(0);
   const refund = receipt.kind === 'RETURN';
   const facts = receipt.ebarimt;
-  const real = facts.mode === 'REAL';
+  const credit = receipt.credit ?? null;
+  const real = facts.mode === 'REAL' && credit === null;
   const waiting = real && (facts.status === 'PENDING' || facts.status === undefined);
   return (
     <article
@@ -72,7 +78,13 @@ export function ReceiptView({
             {t('posKiosk.receipt.copy')}
           </p>
         ) : null}
-        {facts.mode === 'TEST' ? (
+        {credit ? (
+          <p className="rounded-md border border-foreground px-2 py-1 font-sans text-sm font-semibold tracking-wide">
+            {t('posKiosk.receipt.creditSlip')}
+          </p>
+        ) : null}
+        {credit && copyLabel ? <p className="font-sans text-xs">{copyLabel}</p> : null}
+        {facts.mode === 'TEST' && credit === null ? (
           <p className="rounded-md bg-warning-soft px-2 py-1 font-sans text-xs font-semibold text-warning">
             {t('posKiosk.receipt.test')}
           </p>
@@ -98,6 +110,15 @@ export function ReceiptView({
         <dd className="text-right">{receipt.tillCode}</dd>
         <dt className="text-muted-foreground">{t('pos.fields.cashier')}</dt>
         <dd className="truncate text-right">{receipt.cashierName}</dd>
+        {credit ? (
+          <>
+            <dt className="text-muted-foreground">{t('posKiosk.receipt.creditCustomer')}</dt>
+            <dd className="text-right font-semibold">
+              {credit.customerName}
+              <span className="block font-normal">{credit.customerCode}</span>
+            </dd>
+          </>
+        ) : null}
         {facts.receiptType === 'B2B' && facts.customerTin ? (
           <>
             <dt className="text-muted-foreground">{t('posKiosk.receipt.buyer')}</dt>
@@ -144,15 +165,18 @@ export function ReceiptView({
         ) : null}
         <dt className="font-sans text-[15px] font-semibold">{t('pos.fields.total')}</dt>
         <dd className="text-right text-[15px] font-semibold">{formatTugrik(receipt.total)}</dd>
-        <dt className="text-muted-foreground">{t('posKiosk.receipt.vatIncluded')}</dt>
-        <dd className="text-right text-muted-foreground">{formatMnt(receipt.vatTotal)}</dd>
+        {credit ? null : (
+          <>
+            <dt className="text-muted-foreground">{t('posKiosk.receipt.vatIncluded')}</dt>
+            <dd className="text-right text-muted-foreground">{formatMnt(receipt.vatTotal)}</dd>
+          </>
+        )}
       </dl>
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 pt-3">
         {refund ? (
-          <>
-            <dt className="font-sans font-semibold">{t('posKiosk.receipt.refund')}</dt>
-            <dd className="text-right font-semibold">{formatTugrik(receipt.total)}</dd>
-          </>
+          receipt.tenders.map((tender, index) => (
+            <RefundRow key={index} kind={tender.kind} amount={tender.amount} />
+          ))
         ) : (
           <>
             {receipt.tenders.map((tender, index) => (
@@ -164,6 +188,12 @@ export function ReceiptView({
         )}
       </dl>
       {real ? <EbarimtBlock receipt={receipt} print={print} waiting={waiting} /> : null}
+      {credit ? (
+        <p className="border-t border-dashed border-input pt-6 font-sans text-xs">
+          {t('posKiosk.receipt.signature')}
+          <span className="block text-muted-foreground">{t('posKiosk.receipt.signatureHint')}</span>
+        </p>
+      ) : null}
       <p className="pt-3 text-center font-sans text-xs text-muted-foreground">
         {receipt.footer ?? t('posKiosk.receipt.thanks')}
       </p>
@@ -214,6 +244,19 @@ function EbarimtBlock({
       ) : null}
       {print?.qrData ? <QrCode data={print.qrData} label={t('posKiosk.receipt.qr')} /> : null}
     </section>
+  );
+}
+
+/** What a return paid back: off the customer's debt (a credit sale's) or in cash. */
+function RefundRow({ kind, amount }: { kind: string; amount: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <dt className="font-sans font-semibold">
+        {kind === 'CREDIT' ? t('posKiosk.receipt.creditRefund') : t('posKiosk.receipt.refund')}
+      </dt>
+      <dd className="text-right font-semibold">{formatTugrik(amount)}</dd>
+    </>
   );
 }
 

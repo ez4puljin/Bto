@@ -3,7 +3,9 @@ import { CatalogModule } from '../catalog';
 import { FinanceModule } from '../finance';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
+import { PartnersModule } from '../partners';
 import { PricingModule } from '../pricing';
+import { SalesModule } from '../sales';
 import {
   PosCashiersController,
   PosEdgeNodesController,
@@ -25,6 +27,7 @@ import { EdgeTokenGuard } from './guards/edge-token.guard';
 import { PinHasher } from './pin-hasher';
 import { PosAcceptService } from './services/pos-accept.service';
 import { PosCashiersService } from './services/pos-cashiers.service';
+import { PosCustomersService } from './services/pos-customers.service';
 import { PosDevService } from './services/pos-dev.service';
 import { PosEdgeNodesService } from './services/pos-edge-nodes.service';
 import { PosQueryService } from './services/pos-query.service';
@@ -45,6 +48,7 @@ const SERVICES = [
   PosShiftsService,
   PosVoidsService,
   PosQuickButtonsService,
+  PosCustomersService,
   PosAcceptService,
   PosReplayService,
   PosQueryService,
@@ -54,10 +58,19 @@ const SERVICES = [
 
 /**
  * The supermarket POS on the centre (docs/modules/pos.md, ADR-0063, ADR-0064): the store's edge
- * replays its documents here; stock goes through inventory, money through finance.
+ * replays its documents here; stock goes through inventory, money through finance; a credit sale
+ * (ADR-0109) locks its customer through partners and counts the open orders through sales.
  */
 @Module({
-  imports: [IdentityModule, CatalogModule, PricingModule, InventoryModule, FinanceModule],
+  imports: [
+    IdentityModule,
+    CatalogModule,
+    PricingModule,
+    InventoryModule,
+    FinanceModule,
+    PartnersModule,
+    SalesModule,
+  ],
   providers: [...SERVICES, EdgeTokenGuard],
   exports: SERVICES,
 })

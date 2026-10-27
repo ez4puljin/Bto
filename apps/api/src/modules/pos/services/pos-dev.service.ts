@@ -113,6 +113,7 @@ export class PosDevService {
         customerName: input.customerName,
         consumerNo: null,
         refundsSaleClientId: null,
+        customerId: null,
         lines,
         tenders: input.tenders.map((tender) => ({
           kind: tender.kind,

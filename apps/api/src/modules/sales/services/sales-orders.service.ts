@@ -736,21 +736,11 @@ export class SalesOrdersService implements OnModuleInit {
     amount: Decimal,
   ): Promise<void> {
     if (!this.creditChecker) return;
-    const [open] = await tx
-      .select({ total: sql<string>`coalesce(sum(${salesOrders.total}), 0)` })
-      .from(salesOrders)
-      .where(
-        and(
-          eq(salesOrders.customerId, customer.id),
-          inArray(salesOrders.status, ['CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED']),
-          sql`${salesOrders.id} <> ${orderId}`,
-        ),
-      );
     const decision = await this.creditChecker.check(tx, {
       customer,
       orderId,
       amount,
-      openOrders: new Decimal(open?.total ?? 0),
+      openOrders: await this.queries.openExposureInTx(tx, customer.id, orderId),
     });
     if (decision.ok) return;
     throw new AppError('CREDIT_BLOCKED', `the credit check refused: ${decision.reason}`, {

@@ -56,8 +56,9 @@ const MODULE_DEPS = {
   // ADR-0089: fin-bridge for the Finance Core's call contexts and the customers' parties.
   finance: ['identity', 'catalog', 'partners', 'inventory', 'sales', 'ebarimt', 'fin-bridge'],
   ebarimt: ['identity', 'catalog'],
-  // ADR-0063: the supermarket POS posts stock through inventory and money through finance.
-  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance'],
+  // ADR-0063: the supermarket POS posts stock through inventory and money through finance;
+  // ADR-0109: a credit sale locks its customer (partners) and counts its open orders (sales).
+  pos: ['identity', 'catalog', 'pricing', 'inventory', 'finance', 'partners', 'sales'],
   delivery: ['identity', 'partners', 'sales', 'inventory', 'finance', 'notifications'],
   procurement: ['identity', 'partners', 'catalog', 'inventory', 'finance'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.

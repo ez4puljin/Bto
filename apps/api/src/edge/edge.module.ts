@@ -14,6 +14,8 @@ import { TaxpayerClient } from './ebarimt/taxpayer.client';
 import { KioskGuard } from './guards/kiosk.guard';
 import { CentralClient } from './services/central.client';
 import { CheckoutService } from './services/checkout.service';
+import { CreditGate } from './services/credit-gate.service';
+import { CustomerStore } from './services/customer.store';
 import { DevicesService } from './services/devices.service';
 import { KioskAuthService } from './services/kiosk-auth.service';
 import { OutboxService } from './services/outbox.service';
@@ -70,6 +72,8 @@ export class EdgeModule {
       controllers: [KioskController],
       providers: [
         SnapshotStore,
+        CustomerStore,
+        CreditGate,
         CentralClient,
         OutboxService,
         SyncRunner,

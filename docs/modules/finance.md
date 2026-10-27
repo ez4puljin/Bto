@@ -84,7 +84,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | Export | Use |
 |---|---|
 | `FinanceModule` / `FinanceHttpModule` / `FinanceWorkerModule` | the services (+ the hook bindings `CREDIT_CHECKER` → `CreditControlService`, `SALE_SINK` → `InvoicingService`); the controllers (api); the nightly job (worker) |
-| `CreditControlService.check(tx, { customer, orderId, amount, openOrders })` | the sales hook: HOLD → OVERDUE → LIMIT → ok, with the amounts for the 409 |
+| `CreditControlService.check(tx, { customer, orderId, amount, openOrders })` (`orderId` null for a till's credit part, ADR-0109) | the sales hook: HOLD → OVERDUE → LIMIT → ok, with the amounts for the 409 |
 | `InvoicingService.onSold(tx, actor, snapshot)` / `void(ctx, id, reason)` | the sale hook (null when nothing was delivered); the void |
 | `InvoiceQueryService.list(ctx, query)` / `get(id)` / `openOf(customerId)` | reads |
 | `InvoiceQueryService.ofCustomer(customerId, id)` / `ofOrder(orderId)` / `openDueBetween(from, to)` | the customer app (ADR-0079 #7): one invoice of the store (404 for another's), a sold order's invoice, the open invoices the morning reminders look at |
@@ -93,6 +93,8 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 | `PAYMENT_LISTENER`, `PaymentListener`, `PaymentRecordedNotice` (`hooks.ts`) | the hook notifications binds (ADR-0082 #5): `recordInTx` tells it of every CUSTOMER_PAYMENT with a customer, after the ledger and the audit row, with the invoices `allocate` settled; never caught; finance resolves it through ModuleRef and does without it |
 | `PaymentsService.record(ctx, input)` / `recordInTx(tx, ctx, input)` / `void` / `list(ctx, query)` / `get` / `book(moneyAccountId, query)` | the vouchers and the cash book; `recordInTx` lets another module’s transaction carry a voucher (the POS hand-over, ADR-0064 #3) and answers `{ id, number }` |
 | `CreditNotesService.create(ctx, input)` / `list` / `get` | credit notes |
+| `PosCreditService.invoiceSaleInTx(tx, actor, sale)` / `creditReturnInTx(tx, actor, input)` | ADR-0109: a till's sale with credit as an invoice of its customer in the POS accept's transaction (no order; `order_number` = the till's number; `payment_method` CREDIT; Dr AR for the credit part, Dr POS_CASH / CARD_CLEARING for the paid part, Cr POS_SALES net, Cr VAT), and its return as a money-only credit note (Cr AR settling the invoice, Cr POS_CASH for the cash paid back) |
+| `CreditControlService.netReceivables(customerIds)` | ADR-0109: the net receivable of many customers without a lock (the till's customer feed) |
 | `JournalService.post(tx, actor, input)` / `reverse(tx, actor, id, …)` / `postManual(ctx, …)` / `reverseManual` / `list` / `get` / `numbersOf(ids)` / `accountLedger(accountId, query)` | the journal on the Finance Core (ADR-0089): a line names its account by `role`, `accountId` or `moneyAccountId`; automatic entries post as source BTO, manual ones as the staff member (source FIN); `post` throws 422 `JOURNAL_UNBALANCED`, a role without an active account 409 `ACCOUNT_ROLE_MISSING` |
 | `JournalRepostService.repost(actor)` | development only (`pnpm finance:repost-journal`, ADR-0089 #8): posts the entries of invoices, credit notes, vouchers and their voids again and writes the ids back; idempotent |
 | `GlAccountsService.list` / `listWithBalances(asOf)` / `byRole(role)` / `create` / `update` / `setRole` | the chart; `byRole` throws 409 `ACCOUNT_ROLE_MISSING` |

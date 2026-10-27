@@ -20,6 +20,7 @@ import type {
   EdgeHealth,
   EdgeLoginResponse,
   EdgeCartLine,
+  EdgeCustomer,
   EdgePairResponse,
   EdgeParkedBasket,
   EdgePrintableReceipt,
@@ -68,6 +69,7 @@ import {
   KioskGuard,
 } from '../guards/kiosk.guard';
 import { CheckoutService } from '../services/checkout.service';
+import { CustomerStore } from '../services/customer.store';
 import { DevicesService } from '../services/devices.service';
 import { KioskAuthService } from '../services/kiosk-auth.service';
 import { OutboxService } from '../services/outbox.service';
@@ -102,6 +104,7 @@ export class KioskController {
     private readonly returns: EdgeReturnsService,
     private readonly ebarimt: EbarimtService,
     private readonly taxpayers: TaxpayerClient,
+    private readonly customers: CustomerStore,
   ) {}
 
   @Get('health')
@@ -228,6 +231,17 @@ export class KioskController {
   async sell(@Kiosk() kiosk: KioskContext, @Body() body: SaleDto): Promise<EdgePrintableReceipt> {
     const receipt = await this.checkout.sell(kiosk.device.tillCode, cashierOf(kiosk), body);
     return this.ebarimt.afterCommit(kiosk.device.tillCode, receipt.clientId);
+  }
+
+  /** ADR-0109: the customers a sale on credit may charge, from the feed (offline too). */
+  @Get('customers')
+  findCustomers(@Query() query: SearchQueryDto): Promise<EdgeCustomer[]> {
+    return this.customers.find(query.q);
+  }
+
+  @Get('customers/:id')
+  customer(@Param('id', ParseIntPipe) id: number): Promise<EdgeCustomer> {
+    return this.customers.one(id);
   }
 
   @Get('sales/recent')

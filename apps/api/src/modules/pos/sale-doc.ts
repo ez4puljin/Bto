@@ -69,6 +69,8 @@ export interface SaleDoc {
   consumerNo: string | null;
   /** On a RETURN: the sale it takes goods back from. */
   refundsSaleClientId: string | null;
+  /** The registered customer a CREDIT tender charges (ADR-0109); null without credit. */
+  customerId: number | null;
   lines: SaleDocLine[];
   tenders: SaleDocTender[];
   subtotal: Decimal;

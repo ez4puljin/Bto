@@ -79,6 +79,11 @@ export interface SaleDocWire {
   customerName: string | null;
   consumerNo: string | null;
   refundsSaleClientId: string | null;
+  /**
+   * The registered customer a CREDIT tender charges (ADR-0109); null without credit. Absent from an
+   * edge older than ADR-0109.
+   */
+  customerId?: number | null;
   lines: SaleDocLineWire[];
   tenders: TenderWire[];
   subtotal: string;
@@ -298,6 +303,51 @@ export interface PosSnapshot {
   quickGroups?: SnapshotQuickGroup[];
 }
 
+/**
+ * A customer as the till may charge it (ADR-0109): who it is, whether credit is stopped, its limit
+ * (null: none set, so unlimited) and its exposure when the feed was built — the net receivable and
+ * the confirmed wholesale orders not yet invoiced.
+ */
+export interface PosCustomerStanding {
+  id: number;
+  code: string;
+  name: string;
+  tin: string | null;
+  regNo: string | null;
+  phone: string | null;
+  creditHold: boolean;
+  creditLimit: string | null;
+  exposure: string;
+}
+
+/** The store's customers (`GET /api/v1/pos/sync/customers?since=`), apart from the snapshot. */
+export interface PosCustomerFeed {
+  version: string;
+  generatedAt: string;
+  customers: PosCustomerStanding[];
+}
+
+export type CustomerFeedResponseWire =
+  { changed: true; feed: PosCustomerFeed } | { changed: false; version: string };
+
+/**
+ * `POST /api/v1/pos/sync/credit-check`: the centre's answer under the customer lock (ADR-0109 #7),
+ * counting what this edge sold on credit and has not replayed yet.
+ */
+export interface CreditCheckRequestWire {
+  customerId: number;
+  amount: string;
+  pendingOnEdge: string;
+}
+
+export interface CreditCheckResponseWire {
+  ok: boolean;
+  reason: 'HOLD' | 'LIMIT' | 'INACTIVE' | null;
+  exposure: string;
+  limit: string | null;
+  excess: string;
+}
+
 /** `GET /api/v1/pos/snapshot?since=`: the whole snapshot, or only its version when unchanged. */
 export type SnapshotResponseWire =
   { changed: true; snapshot: PosSnapshot } | { changed: false; version: string };
@@ -470,8 +520,11 @@ export interface EdgeShiftSummary {
   total: string;
   vatTotal: string;
   returnsCount: number;
-  /** Returns are refunded in cash only (owner 2026-10-23, ADR-0104). */
+  /** Returns are refunded in cash (owner 2026-10-23, ADR-0104), a credit sale's off its debt first. */
   cashRefunds: string;
+  /** ADR-0109: sold on credit, and taken back off customers' debts; absent on older edges. */
+  creditSales?: string;
+  creditRefunds?: string;
   expectedCash: string;
   closedAt: string | null;
   countedCash: string | null;
@@ -583,6 +636,29 @@ export interface EdgeSaleRequest {
   tenders: EdgeTenderInput[];
   /** A company's receipt (B2B, ADR-0065): its TIN as the lookup answered; absent for a citizen. */
   buyer?: { tin: string } | null;
+  /**
+   * The receipt the cashier chose (ADR-0109): «Хувь хүн» B2C or «Байгууллага» B2B (which needs the
+   * buyer). Absent from an older kiosk: B2B when a buyer is given. Ignored for a sale with credit,
+   * which gets no e-Barimt.
+   */
+  receiptType?: ReceiptType;
+  /** The registered customer a CREDIT tender charges (required with one). */
+  customerId?: number | null;
+  /** The cashier went on after the offline warning that the customer's limit is passed. */
+  acceptOverLimit?: boolean;
+}
+
+/** A customer the till may sell to on credit (ADR-0109), from the edge's feed. */
+export interface EdgeCustomer {
+  id: number;
+  code: string;
+  name: string;
+  tin: string | null;
+  phone: string | null;
+  creditHold: boolean;
+  creditLimit: string | null;
+  /** What is left of the limit as this edge knows it; null without a limit. */
+  available: string | null;
 }
 
 /** A supervisor's PIN typed at the till for a void or a return (ADR-0104). */
@@ -656,6 +732,8 @@ export interface EdgeReturnSale {
   total: string;
   windowDays: number;
   withinWindow: boolean;
+  /** ADR-0109: a sale with credit — its customer and the credit not yet taken back. */
+  credit?: { customerName: string; left: string } | null;
   lines: EdgeReturnableLine[];
 }
 
@@ -698,6 +776,16 @@ export interface EdgeReceipt {
   vatTotal: string;
   tenders: { kind: TenderKind; amount: string; tendered: string | null }[];
   change: string;
+  /**
+   * A sale with credit (ADR-0109): the customer it is charged to and how much; printed as a credit
+   * slip in two copies, without VAT, QR or lottery. Absent or null otherwise.
+   */
+  credit?: {
+    customerId: number;
+    customerCode: string;
+    customerName: string;
+    amount: string;
+  } | null;
   /** The store's heading and closing line from its settings (ADR-0065); absent on older receipts. */
   title?: string | null;
   footer?: string | null;
