@@ -16,7 +16,10 @@ describe('voucher codes (ADR-0110)', () => {
     expect(luhnDigit(coupon.slice(0, -1))).toBe(coupon.slice(-1));
     expect(parseVoucherCode(coupon)).toEqual({ code: coupon, kind: 'COUPON' });
     const partner = voucherCodeOf('PARTNER', '000000000042');
-    expect(parseVoucherCode(formatVoucherCode(partner))).toEqual({ code: partner, kind: 'PARTNER' });
+    expect(parseVoucherCode(formatVoucherCode(partner))).toEqual({
+      code: partner,
+      kind: 'PARTNER',
+    });
   });
 
   it('refuses a wrong check digit, a GTIN and short random parts', () => {

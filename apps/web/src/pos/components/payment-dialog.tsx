@@ -174,12 +174,12 @@ function PaymentForm(props: {
   const amountsValid =
     nothingDue ||
     (total.gt(0) &&
-    cashAmount !== null &&
-    cardAmount !== null &&
-    !cardOver &&
-    (credit
-      ? creditAmount.gt(0) && cashAmount.lte(total.minus(cardAmount))
-      : cashAmount.plus(cardAmount).gte(total)));
+      cashAmount !== null &&
+      cardAmount !== null &&
+      !cardOver &&
+      (credit
+        ? creditAmount.gt(0) && cashAmount.lte(total.minus(cardAmount))
+        : cashAmount.plus(cardAmount).gte(total)));
   const receiptValid = credit || receiptType === 'B2C' || buyer !== null;
   const customerValid = !credit || (customer !== null && !customer.creditHold);
   const valid = amountsValid && receiptValid && customerValid;
@@ -265,21 +265,23 @@ function PaymentForm(props: {
       ) : null}
 
       {nothingDue ? null : (
-      <Segmented
-        label={t('posKiosk.pay.mode.title')}
-        value={mode}
-        options={PAY_MODES.filter((value) => !(partnerPaid && value === 'CREDIT')).map((value) => ({
-          value,
-          label: t(`posKiosk.pay.mode.${value}`),
-          icon: MODE_ICONS[value],
-        }))}
-        onChange={(value) => {
-          setMode(value);
-          setCash('');
-          setCard('');
-          setOverLimit(null);
-        }}
-      />
+        <Segmented
+          label={t('posKiosk.pay.mode.title')}
+          value={mode}
+          options={PAY_MODES.filter((value) => !(partnerPaid && value === 'CREDIT')).map(
+            (value) => ({
+              value,
+              label: t(`posKiosk.pay.mode.${value}`),
+              icon: MODE_ICONS[value],
+            }),
+          )}
+          onChange={(value) => {
+            setMode(value);
+            setCash('');
+            setCard('');
+            setOverLimit(null);
+          }}
+        />
       )}
 
       {credit ? <CustomerSection customer={customer} onChange={setCustomer} /> : null}

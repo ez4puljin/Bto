@@ -740,7 +740,10 @@ export class SaleDocTenderDto {
 @ApiSchema({ name: 'PosSaleDocVoucher' })
 export class SaleDocVoucherDto {
   @ApiProperty() @IsInt() @Min(1) voucherId: number;
-  @ApiProperty({ example: '9910000000000001' }) @IsString() @Matches(VOUCHER_CODE_PATTERN) code: string;
+  @ApiProperty({ example: '9910000000000001' })
+  @IsString()
+  @Matches(VOUCHER_CODE_PATTERN)
+  code: string;
   @ApiProperty({ enum: VOUCHER_KINDS }) @IsIn(VOUCHER_KINDS) kind: VoucherKind;
   @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) face: string;
   @ApiProperty({ example: '42000' }) @IsString() @Matches(MONEY) amount: string;

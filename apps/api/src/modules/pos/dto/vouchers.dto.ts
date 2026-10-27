@@ -70,7 +70,10 @@ export class VoucherBatchRequestDto {
 }
 
 export class VoucherBatchListQueryDto extends PageQueryDto {
-  @ApiPropertyOptional({ enum: VOUCHER_KINDS }) @IsOptional() @IsIn(VOUCHER_KINDS) kind?: VoucherKind;
+  @ApiPropertyOptional({ enum: VOUCHER_KINDS })
+  @IsOptional()
+  @IsIn(VOUCHER_KINDS)
+  kind?: VoucherKind;
   @ApiPropertyOptional({ enum: VOUCHER_BATCH_STATUSES })
   @IsOptional()
   @IsIn(VOUCHER_BATCH_STATUSES)

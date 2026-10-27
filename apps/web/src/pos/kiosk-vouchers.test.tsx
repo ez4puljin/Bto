@@ -119,10 +119,16 @@ describe('kiosk: coupons and partner vouchers (ADR-0110)', () => {
     const { edge, user } = await openSale(2);
     await wedgeScan(COUPON);
     const dialog = await screen.findByRole('dialog', { name: k.vouchers.title });
-    await waitFor(() => expect(within(dialog).getByTestId('voucher-due')).toHaveTextContent('6,300₮'));
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('voucher-due')).toHaveTextContent('6,300₮'),
+    );
     await user.type(within(dialog).getByLabelText(k.vouchers.codeLabel), `${VOUCHER}{Enter}`);
-    await waitFor(() => expect(within(dialog).getByTestId('voucher-due')).toHaveTextContent('1,300₮'));
-    expect(within(dialog).getByText(formatVoucherCode(VOUCHER), { exact: false })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('voucher-due')).toHaveTextContent('1,300₮'),
+    );
+    expect(
+      within(dialog).getByText(formatVoucherCode(VOUCHER), { exact: false }),
+    ).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: k.vouchers.toPayment }));
     await approve(user);
 

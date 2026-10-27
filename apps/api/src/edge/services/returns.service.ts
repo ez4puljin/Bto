@@ -196,10 +196,14 @@ export class EdgeReturnsService {
       if (sale.voucherAmount.gt(0)) {
         const refundable = await this.voucherRefundable(tx, sale);
         if (totals.total.gt(refundable)) {
-          throw new AppError('POS_RETURN_VOUCHER_PART', `sale ${sale.number}: its voucher part stays`, {
-            number: sale.number,
-            refundable: refundable.toFixed(2),
-          });
+          throw new AppError(
+            'POS_RETURN_VOUCHER_PART',
+            `sale ${sale.number}: its voucher part stays`,
+            {
+              number: sale.number,
+              refundable: refundable.toFixed(2),
+            },
+          );
         }
       }
       // ADR-0109 #6: a sale with credit is paid back off its customer's debt first, then in cash.

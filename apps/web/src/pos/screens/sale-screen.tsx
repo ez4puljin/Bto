@@ -494,8 +494,7 @@ export function SaleScreen(props: {
         else if (event.key === 'F2') {
           if (current.cartEmpty) return;
           setDialog('vouchers');
-        }
-        else if (event.key === 'F7') setDialog('quick');
+        } else if (event.key === 'F7') setDialog('quick');
         else if (event.key === 'F8') setDialog('price');
         else if (event.key === 'F9') void current.park();
         else if (event.key === 'F10') setDialog('parked');

@@ -151,11 +151,7 @@ export class PosVouchersService {
       throw invalid('validTo', 'dates', 'the last day is not before the first');
     }
     if (input.validTo < businessDate()) throw invalid('validTo', 'past', 'a last day not past');
-    if (
-      !Number.isInteger(input.qty) ||
-      input.qty < 1 ||
-      input.qty > VOUCHER_LIMITS.maxBatchQty
-    ) {
+    if (!Number.isInteger(input.qty) || input.qty < 1 || input.qty > VOUCHER_LIMITS.maxBatchQty) {
       throw invalid('qty', 'count', `1 to ${VOUCHER_LIMITS.maxBatchQty} codes`);
     }
     const note = input.note?.trim() || null;
@@ -349,7 +345,9 @@ export class PosVouchersService {
         .for('update');
       if (!row) throw notFound('pos_sale_voucher', id);
       if (row.issue === null) {
-        throw new AppError('POS_VOUCHER_NOTHING_TO_CHECK', `use ${id} has nothing to check`, { id });
+        throw new AppError('POS_VOUCHER_NOTHING_TO_CHECK', `use ${id} has nothing to check`, {
+          id,
+        });
       }
       if (row.reviewedAt) return;
       await tx
@@ -476,7 +474,9 @@ export class PosVouchersService {
    */
   async lockForSaleInTx(tx: Tx, doc: SaleDoc, soldDay: string): Promise<LockedVouchers> {
     if (doc.vouchers.length === 0) return { uses: [] };
-    const ids = [...new Set(doc.vouchers.map((voucher) => voucher.voucherId))].sort((a, b) => a - b);
+    const ids = [...new Set(doc.vouchers.map((voucher) => voucher.voucherId))].sort(
+      (a, b) => a - b,
+    );
     const rows = await tx
       .select()
       .from(posVouchers)

@@ -289,7 +289,12 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
     if (step) applyToAmounts(program, step, everyPart);
   }
   for (const coupon of context.coupons ?? []) {
-    applyToAmounts(couponProgram(coupon), { threshold: ZERO, value: coupon.value }, everyPart, coupon.code);
+    applyToAmounts(
+      couponProgram(coupon),
+      { threshold: ZERO, value: coupon.value },
+      everyPart,
+      coupon.code,
+    );
   }
 
   let subtotal = ZERO;

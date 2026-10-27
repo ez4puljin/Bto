@@ -33,7 +33,10 @@ export function useVoucherAdd(): (
         return { ok: false, error: t('posKiosk.vouchers.refused.USED', { code: shown }) };
       }
       if (codes.length >= VOUCHER_LIMITS.maxPerSale) {
-        return { ok: false, error: t('posKiosk.vouchers.tooMany', { max: VOUCHER_LIMITS.maxPerSale }) };
+        return {
+          ok: false,
+          error: t('posKiosk.vouchers.tooMany', { max: VOUCHER_LIMITS.maxPerSale }),
+        };
       }
       try {
         await client.voucher(code);

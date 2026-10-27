@@ -189,13 +189,29 @@ describe('pos coupons and partner vouchers', () => {
       .post('/api/v1/pos/voucher-batches')
       .set(bearer(actors.admin))
       .set(idempotency())
-      .send({ kind: 'PARTNER', name: 'x', effect: 'AMOUNT', value: '1000', qty: 1, validFrom: today, validTo: today })
+      .send({
+        kind: 'PARTNER',
+        name: 'x',
+        effect: 'AMOUNT',
+        value: '1000',
+        qty: 1,
+        validFrom: today,
+        validTo: today,
+      })
       .expect(422);
     await api()
       .post('/api/v1/pos/voucher-batches')
       .set(bearer(actors.admin))
       .set(idempotency())
-      .send({ kind: 'COUPON', name: 'x', effect: 'PERCENT', value: '120', qty: 1, validFrom: today, validTo: today })
+      .send({
+        kind: 'COUPON',
+        name: 'x',
+        effect: 'PERCENT',
+        value: '120',
+        qty: 1,
+        validFrom: today,
+        validTo: today,
+      })
       .expect(422);
 
     expect(await sync.pullVouchersOnce()).toBe('changed');
@@ -204,7 +220,10 @@ describe('pos coupons and partner vouchers', () => {
       .body as EdgeVoucher;
     expect(found).toMatchObject({ kind: 'PARTNER', value: '5000.00', partnerName: partner.name });
     const notYet = await kiosk.get(`/vouchers/${codeOf(later, 0)}`).expect(422);
-    expect(notYet.body).toMatchObject({ code: 'POS_VOUCHER_INVALID', params: { reason: 'NOT_YET' } });
+    expect(notYet.body).toMatchObject({
+      code: 'POS_VOUCHER_INVALID',
+      params: { reason: 'NOT_YET' },
+    });
     const unknown = await kiosk.get('/vouchers/9910000000000000').expect(422);
     expect(unknown.body).toMatchObject({ params: { reason: 'UNKNOWN' } });
   });
@@ -212,7 +231,10 @@ describe('pos coupons and partner vouchers', () => {
   it('stacks coupons after the programs, each on what the last one left', async () => {
     const quote = (
       await kiosk
-        .post('/quote', { lines: lines('10'), codes: [codeOf(tenPercent, 2), codeOf(fiveHundred, 0)] })
+        .post('/quote', {
+          lines: lines('10'),
+          codes: [codeOf(tenPercent, 2), codeOf(fiveHundred, 0)],
+        })
         .expect(200)
     ).body as EdgeQuoteResponse;
     // 10 × 1 300 = 13 000; 10 % = 1 300; then 500.
@@ -310,7 +332,10 @@ describe('pos coupons and partner vouchers', () => {
     expect((third.body as EdgeQuoteResponse).due).toBe('0.00');
     // A second voucher with nothing left to pay is refused.
     const nothing = await kiosk
-      .post('/quote', { lines: lines('1'), codes: [codeOf(partnerBatch, 3), codeOf(partnerBatch, 4)] })
+      .post('/quote', {
+        lines: lines('1'),
+        codes: [codeOf(partnerBatch, 3), codeOf(partnerBatch, 4)],
+      })
       .expect(422);
     expect(nothing.body).toMatchObject({ params: { reason: 'NOTHING_DUE' } });
   });
@@ -332,7 +357,10 @@ describe('pos coupons and partner vouchers', () => {
     // The second sale left 900 of its last voucher unspent: the partner pays it all the same.
     expect((await finance.account('511040')).credit).toBe('900.00');
     const coupons = await batch(tenPercent.id);
-    expect(coupons.codes[0]).toMatchObject({ status: 'REDEEMED', saleNumber: mixed.receipt.number });
+    expect(coupons.codes[0]).toMatchObject({
+      status: 'REDEEMED',
+      saleNumber: mixed.receipt.number,
+    });
   });
 
   it('never pays back the vouchers’ part of a return', async () => {

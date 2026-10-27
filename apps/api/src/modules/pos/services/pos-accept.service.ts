@@ -614,10 +614,14 @@ export class PosAcceptService {
       refunded: new Decimal(earlier?.total ?? 0),
     });
     if (doc.total.gt(refundable)) {
-      throw new AppError('POS_RETURN_VOUCHER_PART', `sale ${original.number}: its voucher part is not refunded`, {
-        number: original.number,
-        refundable: refundable.toFixed(MONEY_SCALE),
-      });
+      throw new AppError(
+        'POS_RETURN_VOUCHER_PART',
+        `sale ${original.number}: its voucher part is not refunded`,
+        {
+          number: original.number,
+          refundable: refundable.toFixed(MONEY_SCALE),
+        },
+      );
     }
   }
 

@@ -567,9 +567,7 @@ export class PosQueryService {
     const [vouchers] = await this.db
       .select({ count: sql<string>`count(*)` })
       .from(posSaleVouchers)
-      .where(
-        sql`${posSaleVouchers.issue} IS NOT NULL AND ${posSaleVouchers.reviewedAt} IS NULL`,
-      );
+      .where(sql`${posSaleVouchers.issue} IS NOT NULL AND ${posSaleVouchers.reviewedAt} IS NULL`);
     const int = (value: string | undefined) => Number.parseInt(value ?? '0', 10);
     return {
       creditToCheck: int(credit?.count),
