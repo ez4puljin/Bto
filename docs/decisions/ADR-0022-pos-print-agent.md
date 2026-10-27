@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Proposed (to be accepted before delivery 9 starts) |
+| Status | Proposed (to be accepted before delivery 9 starts); for the supermarket's tills superseded by ADR-0065 (receipts printed from Chrome through the printer's Windows driver); stays planned for the label printer's phase 2 |
 | Date | 2026-10-09 |
 | Deciders | Owner, Claude (Claude Code session) |
 

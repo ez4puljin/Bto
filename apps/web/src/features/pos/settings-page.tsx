@@ -1,3 +1,4 @@
+import { CLASSIFICATION_CODE_PATTERN, DISTRICT_CODE_PATTERN } from '@tugeel/shared/mn';
 import { POS_LIMITS } from '@tugeel/shared/pos';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,10 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { type PosSettings, usePosMutations, usePosSettings } from './api';
 
-/** «Тохиргоо» of the supermarket (ADR-0063 #2): the store, the hand-over box, the rules. */
+/**
+ * «Тохиргоо» of the supermarket (ADR-0063 #2): the store, the hand-over box, the rules; the printed
+ * receipt's heading and closing line and the store's e-Barimt codes (ADR-0065).
+ */
 export function PosSettingsPage() {
   const { t } = useTranslation();
   const settings = usePosSettings();
@@ -49,6 +53,13 @@ function SettingsView({ settings }: { settings: PosSettings }) {
           label: t('pos.fields.supervisorRequired'),
           value: settings.supervisorRequired ? t('common.yes') : t('common.no'),
         },
+        { label: t('pos.fields.receiptTitle'), value: settings.receiptTitle },
+        { label: t('pos.fields.receiptFooter'), value: settings.receiptFooter },
+        { label: t('pos.fields.ebarimtDistrictCode'), value: settings.ebarimtDistrictCode },
+        {
+          label: t('pos.fields.ebarimtClassificationCode'),
+          value: settings.ebarimtClassificationCode,
+        },
       ]}
     />
   );
@@ -69,7 +80,16 @@ function SettingsForm({ settings, onClose }: { settings: PosSettings; onClose: (
     String(settings.snapshotIntervalSec),
   );
   const [supervisorRequired, setSupervisorRequired] = useState(settings.supervisorRequired);
+  const [receiptTitle, setReceiptTitle] = useState(settings.receiptTitle ?? '');
+  const [receiptFooter, setReceiptFooter] = useState(settings.receiptFooter ?? '');
+  const [districtCode, setDistrictCode] = useState(settings.ebarimtDistrictCode ?? '');
+  const [classificationCode, setClassificationCode] = useState(
+    settings.ebarimtClassificationCode ?? '',
+  );
   const [checked, setChecked] = useState(false);
+  const districtOk = districtCode === '' || DISTRICT_CODE_PATTERN.test(districtCode);
+  const classificationOk =
+    classificationCode === '' || CLASSIFICATION_CODE_PATTERN.test(classificationCode);
   const days = Number.parseInt(returnWindowDays, 10);
   const daysOk = Number.isInteger(days) && days >= 0 && days <= POS_LIMITS.maxReturnWindowDays;
   const seconds = Number.parseInt(snapshotIntervalSec, 10);
@@ -85,7 +105,7 @@ function SettingsForm({ settings, onClose }: { settings: PosSettings; onClose: (
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
-    if (!daysOk || !secondsOk) return;
+    if (!daysOk || !secondsOk || !districtOk || !classificationOk) return;
     void action
       .run(async () => {
         await mutations.saveSettings.mutateAsync({
@@ -94,6 +114,10 @@ function SettingsForm({ settings, onClose }: { settings: PosSettings; onClose: (
           returnWindowDays: days,
           snapshotIntervalSec: seconds,
           supervisorRequired,
+          receiptTitle: receiptTitle.trim() || null,
+          receiptFooter: receiptFooter.trim() || null,
+          ebarimtDistrictCode: districtCode || null,
+          ebarimtClassificationCode: classificationCode || null,
         });
         toast.success(t('pos.settings.saved'));
       })
@@ -179,6 +203,62 @@ function SettingsForm({ settings, onClose }: { settings: PosSettings; onClose: (
             id="pos-supervisor"
             checked={supervisorRequired}
             onCheckedChange={setSupervisorRequired}
+          />
+        </FormRow>
+      </FormSection>
+      <FormSection title={t('pos.settings.receipt')}>
+        <FormRow
+          label={t('pos.fields.receiptTitle')}
+          htmlFor="pos-receipt-title"
+          hint={t('pos.settings.receiptTitleHint')}
+        >
+          <Input
+            id="pos-receipt-title"
+            maxLength={POS_LIMITS.maxReceiptText}
+            value={receiptTitle}
+            onChange={(event) => setReceiptTitle(event.target.value)}
+          />
+        </FormRow>
+        <FormRow
+          label={t('pos.fields.receiptFooter')}
+          htmlFor="pos-receipt-footer"
+          hint={t('pos.settings.receiptFooterHint')}
+        >
+          <Input
+            id="pos-receipt-footer"
+            maxLength={POS_LIMITS.maxReceiptText}
+            value={receiptFooter}
+            onChange={(event) => setReceiptFooter(event.target.value)}
+          />
+        </FormRow>
+        <FormRow
+          label={t('pos.fields.ebarimtDistrictCode')}
+          htmlFor="pos-district"
+          hint={t('pos.settings.districtHint')}
+          error={checked && !districtOk ? 'validation.districtCode' : undefined}
+        >
+          <Input
+            id="pos-district"
+            inputMode="numeric"
+            maxLength={4}
+            className="w-32 font-mono"
+            value={districtCode}
+            onChange={(event) => setDistrictCode(event.target.value.trim())}
+          />
+        </FormRow>
+        <FormRow
+          label={t('pos.fields.ebarimtClassificationCode')}
+          htmlFor="pos-classification"
+          hint={t('pos.settings.classificationHint')}
+          error={checked && !classificationOk ? 'validation.classificationCode' : undefined}
+        >
+          <Input
+            id="pos-classification"
+            inputMode="numeric"
+            maxLength={7}
+            className="w-32 font-mono"
+            value={classificationCode}
+            onChange={(event) => setClassificationCode(event.target.value.trim())}
           />
         </FormRow>
       </FormSection>

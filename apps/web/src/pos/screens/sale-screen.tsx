@@ -5,8 +5,8 @@ import type {
   EdgeApproval,
   EdgeParkedBasket,
   EdgeProductHit,
+  EdgePrintableReceipt,
   EdgeQuotedLine,
-  EdgeReceipt,
   EdgeSession,
   VoidReason,
 } from '@tugeel/shared/pos';
@@ -15,6 +15,7 @@ import {
   Archive,
   ArchiveRestore,
   History,
+  ReceiptText,
   LayoutGrid,
   LockKeyhole,
   LogOut,
@@ -49,6 +50,7 @@ import { randomUuid } from '@/lib/uuid';
 import { type Cart, type CartLine, canDecrease } from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
+import { EbarimtDialog } from '../components/ebarimt-dialog';
 import { KioskHeader } from '../components/kiosk-header';
 import { KioskAlert } from '../components/layout';
 import { type PaymentAttempt, PaymentDialog } from '../components/payment-dialog';
@@ -56,6 +58,7 @@ import { ParkedDialog } from '../components/parked-dialog';
 import { PriceCheckDialog } from '../components/price-check-dialog';
 import { QuickDialog } from '../components/quick-dialog';
 import { ReceiptDialog } from '../components/receipt';
+import { usePrint } from '../components/print-context';
 import { RecentDialog } from '../components/recent-dialog';
 import { ReturnsDialog } from '../components/returns-dialog';
 import { SearchDialog } from '../components/search-dialog';
@@ -63,7 +66,7 @@ import { edgeProblemOf } from '../edge-client';
 import { useCredentials, useKiosk } from '../kiosk-context';
 import { isMinusKey, isPlusKey, keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
-import { kioskKeys, useParked, useQuote } from '../queries';
+import { kioskKeys, useHealth, useParked, useQuote } from '../queries';
 
 type Dialogs =
   | 'search'
@@ -75,6 +78,7 @@ type Dialogs =
   | 'price'
   | 'parked'
   | 'returns'
+  | 'ebarimt'
   | 'approval'
   | null;
 
@@ -107,7 +111,11 @@ export function SaleScreen(props: {
   const [scanError, setScanError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialogs>(null);
   const [attempt, setAttempt] = useState<PaymentAttempt | null>(null);
-  const [receipt, setReceipt] = useState<EdgeReceipt | null>(null);
+  const [receipt, setReceipt] = useState<EdgePrintableReceipt | null>(null);
+  const { print } = usePrint();
+  const health = useHealth();
+  const ebarimt = health.data?.ebarimt;
+  const ebarimtCount = ebarimt ? ebarimt.ready + ebarimt.attention : 0;
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const approvalRequired = props.session.approvalRequired ?? true;
@@ -184,12 +192,14 @@ export function SaleScreen(props: {
     setDialog('pay');
   }, [canPay, quote.data, cart.wire]);
 
-  const paid = (done: EdgeReceipt) => {
+  const paid = (done: EdgePrintableReceipt) => {
     pending.current = null;
     cart.clear();
     setScanError(null);
     setReceipt(done);
     setDialog('receipt');
+    // The receipt prints at once (ADR-0065): straight to the printer under --kiosk-printing.
+    print(done);
     void queryClient.invalidateQueries({ queryKey: kioskKeys.session(epoch) });
     void queryClient.invalidateQueries({ queryKey: kioskKeys.recent(epoch) });
   };
@@ -365,9 +375,10 @@ export function SaleScreen(props: {
     setDialog('approval');
   };
 
-  const returned = (done: EdgeReceipt) => {
+  const returned = (done: EdgePrintableReceipt) => {
     setReceipt(done);
     setDialog('receipt');
+    print(done);
     void queryClient.invalidateQueries({ queryKey: kioskKeys.session(epoch) });
     void queryClient.invalidateQueries({ queryKey: kioskKeys.recent(epoch) });
   };
@@ -452,10 +463,17 @@ export function SaleScreen(props: {
               <Button
                 variant="outline"
                 size="icon-lg"
+                className="relative"
                 aria-label={t('posKiosk.menu.label')}
                 title={t('posKiosk.menu.label')}
               >
                 <Menu />
+                {ebarimtCount > 0 ? (
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 size-3 rounded-full bg-warning ring-2 ring-background"
+                  />
+                ) : null}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onCloseAutoFocus={refocus}>
@@ -471,6 +489,20 @@ export function SaleScreen(props: {
                 <History />
                 {t('posKiosk.menu.recent')}
               </DropdownMenuItem>
+              {ebarimt?.provider === 'posapi' ? (
+                <DropdownMenuItem
+                  className="h-10 text-[15px]"
+                  onSelect={() => setDialog('ebarimt')}
+                >
+                  <ReceiptText />
+                  {t('posKiosk.menu.ebarimt')}
+                  {ebarimtCount > 0 ? (
+                    <span className="ml-auto rounded-full bg-warning-soft px-2 text-xs font-semibold text-warning">
+                      {ebarimtCount}
+                    </span>
+                  ) : null}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem className="h-10 text-[15px]" onSelect={props.onCloseShift}>
                 <LockKeyhole />
                 {t('posKiosk.menu.closeShift')}
@@ -688,12 +720,18 @@ export function SaleScreen(props: {
       />
       <ReceiptDialog
         open={dialog === 'receipt'}
-        receipt={receipt}
+        printable={receipt}
         contentRef={receiptContent}
         onClose={closeDialog}
         onCloseAutoFocus={refocus}
       />
       <RecentDialog open={dialog === 'recent'} onClose={closeDialog} onCloseAutoFocus={refocus} />
+      <EbarimtDialog
+        open={dialog === 'ebarimt'}
+        approvalRequired={approvalRequired}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
+      />
       <QuickDialog
         open={dialog === 'quick'}
         onClose={closeDialog}

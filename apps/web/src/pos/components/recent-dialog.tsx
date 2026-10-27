@@ -1,6 +1,6 @@
 import type { EdgeReceipt } from '@tugeel/shared/pos';
 import dayjs from 'dayjs';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { formatTugrik } from '@/lib/money';
 import { useProblemText } from '../messages';
 import { useRecentSales } from '../queries';
 import { KioskAlert } from './layout';
+import { useReprint } from './print-context';
 import { ReceiptView } from './receipt';
 
 /** «Сүүлийн баримтууд»: this shift's receipts, newest first; one opens on screen. */
@@ -42,15 +43,28 @@ function RecentPanel() {
   const { t } = useTranslation();
   const problemText = useProblemText();
   const recent = useRecentSales(true);
+  const reprint = useReprint();
   const [open, setOpen] = useState<EdgeReceipt | null>(null);
 
   if (open) {
     return (
       <div className="space-y-3">
-        <Button variant="ghost" className="h-10 px-2" onClick={() => setOpen(null)}>
-          <ChevronLeft />
-          {t('posKiosk.recent.backToList')}
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="ghost" className="h-10 px-2" onClick={() => setOpen(null)}>
+            <ChevronLeft />
+            {t('posKiosk.recent.backToList')}
+          </Button>
+          <Button
+            variant="outline"
+            className="h-10"
+            disabled={reprint.isPending}
+            onClick={() => reprint.mutate(open.clientId)}
+          >
+            <Printer />
+            {t('posKiosk.print.again')}
+          </Button>
+        </div>
+        {reprint.isError ? <KioskAlert>{problemText(reprint.error)}</KioskAlert> : null}
         <ReceiptView receipt={open} />
       </div>
     );

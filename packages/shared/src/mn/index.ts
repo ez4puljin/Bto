@@ -13,12 +13,33 @@ export {
   type ChartTemplateAccount,
 } from './chart';
 export {
+  buildPosapiReceipt,
+  CLASSIFICATION_CODE_PATTERN,
+  DDTD_PATTERN,
+  DISTRICT_CODE_PATTERN,
+  EBARIMT_BUILD_ERRORS,
   EBARIMT_PAYMENT_CODES,
   EBARIMT_STATUSES,
+  EBARIMT_TAX_TYPES,
+  EbarimtBuildError,
+  type EbarimtBuildErrorCode,
+  type EbarimtLineInput,
   type EbarimtPaymentCode,
+  type EbarimtReceiptInput,
   type EbarimtStatus,
+  type EbarimtTaxType,
+  POSAPI_DATE_PATTERN,
+  POSAPI_RECEIPT_TYPES,
+  POSAPI_RESULT_STATUSES,
+  type PosapiItem,
+  type PosapiReceiptRequest,
+  type PosapiReceiptType,
+  type PosapiResultStatus,
+  type PosapiSubReceipt,
+  posapiJson,
   RECEIPT_TYPES,
   type ReceiptType,
+  TAX_PRODUCT_CODE_PATTERN,
 } from './ebarimt';
 export { NUMBER_DEFAULTS, type NumberFormat } from './numbers';
 export {

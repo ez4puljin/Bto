@@ -29,6 +29,12 @@ export interface EdgeNode {
   backlog: number;
   clockSkewMs: number | null;
   snapshotVersion: string | null;
+  /** The store PosAPI as the edge last reported it (ADR-0065). */
+  posapiVersion: string | null;
+  posapiLastSent: string | null;
+  posapiLeftLotteries: number | null;
+  posapiCheckedAt: Date | null;
+  posapiError: string | null;
   status: PosStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +57,14 @@ export interface Heartbeat {
   backlog: number;
   clockSkewMs: number | null;
   snapshotVersion: string | null;
+  /** Absent: the edge said nothing of a PosAPI (fake provider, older edge); the row keeps its facts. */
+  posapi?: {
+    version: string | null;
+    lastSentDate: string | null;
+    leftLotteries: number | null;
+    checkedAt: Date;
+    error: string | null;
+  };
 }
 
 type NodeRow = typeof posEdgeNodes.$inferSelect;
@@ -175,6 +189,15 @@ export class PosEdgeNodesService {
         backlog: beat.backlog,
         clockSkewMs: beat.clockSkewMs,
         snapshotVersion: beat.snapshotVersion,
+        ...(beat.posapi
+          ? {
+              posapiVersion: beat.posapi.version,
+              posapiLastSent: beat.posapi.lastSentDate,
+              posapiLeftLotteries: beat.posapi.leftLotteries,
+              posapiCheckedAt: beat.posapi.checkedAt,
+              posapiError: beat.posapi.error,
+            }
+          : {}),
         lastSeenAt: sql`now()`,
         updatedAt: sql`now()`,
       })
@@ -223,6 +246,11 @@ export class PosEdgeNodesService {
       backlog: row.backlog,
       clockSkewMs: row.clockSkewMs,
       snapshotVersion: row.snapshotVersion,
+      posapiVersion: row.posapiVersion,
+      posapiLastSent: row.posapiLastSent,
+      posapiLeftLotteries: row.posapiLeftLotteries,
+      posapiCheckedAt: row.posapiCheckedAt,
+      posapiError: row.posapiError,
       status: row.status,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

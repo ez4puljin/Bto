@@ -19,9 +19,9 @@ import { useProblemText } from '../messages';
 import { useSupervisors } from '../queries';
 import { KioskAlert } from './layout';
 
-/** What a supervisor is asked to approve: a void (ADR-0104) or a return. */
+/** What a supervisor is asked to approve: a void (ADR-0104), a return, an e-Barimt step (ADR-0065). */
 export interface ApprovalRequest {
-  kind: VoidReason | 'RETURN';
+  kind: VoidReason | 'RETURN' | 'EBARIMT_ISSUED' | 'EBARIMT_RETRY' | 'EBARIMT_SEND';
   items: { name: string; qty: string; uomName: string }[];
   /** Sends the approval; a refusal (a wrong PIN) stays in the dialog. */
   run: (approval: EdgeApproval) => Promise<void>;
@@ -102,7 +102,12 @@ export function ApprovalForm({
         void submit();
       }}
     >
-      <ul className="space-y-1 rounded-lg bg-muted px-3 py-2 text-[15px]">
+      <ul
+        className={cn(
+          'space-y-1 rounded-lg bg-muted px-3 py-2 text-[15px]',
+          request.items.length === 0 && 'hidden',
+        )}
+      >
         {request.items.slice(0, SHOWN_ITEMS).map((item, index) => (
           <li key={index} className="truncate">
             {t('posKiosk.approval.item', {

@@ -18,6 +18,7 @@ import {
   json,
   MILK,
   MILK_BARCODE,
+  printable,
   storeRoutes,
   SUPERVISOR,
   TILL,
@@ -224,7 +225,7 @@ describe('kiosk: the till tools (ADR-0104)', () => {
   it('returns a sold item by its receipt number, paid back in cash', async () => {
     const edge = await openSale({
       'GET /returns/sale': () => json(RETURN_SALE),
-      'POST /returns': (call) => json(refundOf(call.body as EdgeReturnRequest)),
+      'POST /returns': (call) => json(printable(refundOf(call.body as EdgeReturnRequest))),
     });
     const user = userEvent.setup();
     await user.keyboard('{F4}');

@@ -40,7 +40,11 @@ services:
       EDGE_NODE_TOKEN: ${EDGE_NODE_TOKEN:?set EDGE_NODE_TOKEN in deploy/edge/.env}
       EDGE_JWT_SECRET: ${EDGE_JWT_SECRET:?set EDGE_JWT_SECRET in deploy/edge/.env}
       POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/edge/.env}
-      EBARIMT_PROVIDER: fake
+      # ADR-0065: fake (test receipts) or posapi (the store PosAPI on the LAN at POSAPI_URL).
+      EBARIMT_PROVIDER: ${EBARIMT_PROVIDER:-fake}
+      POSAPI_URL: ${POSAPI_URL:-}
+      EBARIMT_BRANCH_NO: ${EBARIMT_BRANCH_NO:-}
+      EBARIMT_LOOKUP_URL: ${EBARIMT_LOOKUP_URL:-https://api.ebarimt.mn}
       APP_VERSION: ${APP_VERSION:-local}
     # Lets the container reach the dev api on the owner's PC.
     extra_hosts: ['host.docker.internal:host-gateway']

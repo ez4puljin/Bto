@@ -35,6 +35,7 @@ export const kioskKeys = {
   quickButtons: (epoch: number) => ['kiosk', epoch, 'quick-buttons'] as const,
   supervisors: (epoch: number) => ['kiosk', epoch, 'supervisors'] as const,
   parked: (epoch: number) => ['kiosk', epoch, 'parked'] as const,
+  ebarimt: (epoch: number) => ['kiosk', epoch, 'ebarimt'] as const,
   search: (epoch: number, q: string) => ['kiosk', epoch, 'search', q] as const,
   quote: (epoch: number, lines: readonly EdgeCartLine[]) =>
     ['kiosk', epoch, 'quote', lines.map((line) => `${line.productUnitId}:${line.qty}`)] as const,
@@ -136,5 +137,18 @@ export function useParked() {
     queryKey: kioskKeys.parked(epoch),
     queryFn: ({ signal }) => client.parked(signal),
     staleTime: 0,
+  });
+}
+
+/** The store PosAPI's receipts that wait, failed or need checking, and PosAPI's facts (ADR-0065). */
+export function useEbarimtQueue(enabled: boolean) {
+  const { client } = useKiosk();
+  const { epoch } = useCredentials();
+  return useQuery({
+    queryKey: kioskKeys.ebarimt(epoch),
+    queryFn: ({ signal }) => client.ebarimtQueue(signal),
+    enabled,
+    staleTime: 0,
+    refetchInterval: enabled ? HEALTH_POLL_MS : false,
   });
 }

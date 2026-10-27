@@ -27,8 +27,31 @@ export const EdgeEnvSchema = z.object({
   EDGE_JWT_SECRET: z.string().min(32),
   /** The cashiers' PIN key, the same value as the centre's POS_PIN_PEPPER (or its AUTH_PEPPER). */
   POS_PIN_PEPPER: z.string().min(32),
-  /** fake: on-screen test receipts, nothing sent to the tax office (ADR-0067); posapi with ADR-0065. */
-  EBARIMT_PROVIDER: z.enum(['fake']).default('fake'),
+  /**
+   * fake: on-screen test receipts, nothing sent to the tax office (ADR-0067); posapi: real receipts
+   * from the store PosAPI at POSAPI_URL (ADR-0065).
+   */
+  EBARIMT_PROVIDER: z.enum(['fake', 'posapi']).default('fake'),
+  /** The store PosAPI 3.0 on the LAN, e.g. http://192.168.1.254:7080 (required for posapi). */
+  POSAPI_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.url({ protocol: /^http$/ }).optional(),
+  ),
+  /**
+   * The merchant's branch number PosAPI registered this store under (digits; the old till sends
+   * "01"); required with posapi: PosAPI refuses a receipt without it (2026-10-26).
+   */
+  EBARIMT_BRANCH_NO: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^[0-9]{1,6}$/)
+      .optional(),
+  ),
+  /** How long the till waits for PosAPI's answer before the receipt is left to be checked. */
+  POSAPI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(20_000),
+  /** The public taxpayer lookup (Mongolian addresses only) for a company's name at the till. */
+  EBARIMT_LOOKUP_URL: z.url({ protocol: /^https?$/ }).default('https://api.ebarimt.mn'),
   /** The sync timers; tests turn them off and drive pull, push and heartbeat by hand. */
   EDGE_TIMERS: z.stringbool().default(true),
   /** How often a non-empty outbox is pushed. */
@@ -47,6 +70,11 @@ export function parseEdgeEnv(raw: Record<string, unknown>): EdgeEnv {
   // dev centre's pepper is accepted here; the session key is the edge's own.
   if (data.NODE_ENV === 'production' && data.EDGE_JWT_SECRET.startsWith('dev-')) {
     throw new Error('Invalid environment (edge): EDGE_JWT_SECRET is a development placeholder');
+  }
+  if (data.EBARIMT_PROVIDER === 'posapi' && (!data.POSAPI_URL || !data.EBARIMT_BRANCH_NO)) {
+    throw new Error(
+      'Invalid environment (edge): EBARIMT_PROVIDER=posapi needs POSAPI_URL and EBARIMT_BRANCH_NO',
+    );
   }
   return data;
 }

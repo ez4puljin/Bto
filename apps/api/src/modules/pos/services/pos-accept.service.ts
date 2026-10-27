@@ -144,7 +144,7 @@ export class PosAcceptService {
       case 'SHIFT_CLOSED':
         return this.shifts.acceptClose(tx, actor, node, event.payload);
       case 'RECEIPT_STATUS':
-        return this.recordReceiptStatus(tx, node, event.payload);
+        return this.recordReceiptStatus(tx, actor, node, event.payload);
       case 'TILL_BOUND':
         return this.recordTillBound(tx, actor, node, event.payload);
       case 'VOID':
@@ -333,9 +333,19 @@ export class PosAcceptService {
   }
 
   /** The edge learnt more about a receipt (confirmed, cancelled, …) after it replayed the sale. */
-  async recordReceiptStatus(tx: Tx, node: EdgeNode, doc: ReceiptStatusDoc): Promise<Accepted> {
+  async recordReceiptStatus(
+    tx: Tx,
+    actor: Actor,
+    node: EdgeNode,
+    doc: ReceiptStatusDoc,
+  ): Promise<Accepted> {
     const [sale] = await tx
-      .select({ id: posSales.id, number: posSales.number, status: posSales.ebarimtStatus })
+      .select({
+        id: posSales.id,
+        number: posSales.number,
+        status: posSales.ebarimtStatus,
+        ddtd: posSales.ddtd,
+      })
       .from(posSales)
       .where(and(eq(posSales.edgeNodeId, node.id), eq(posSales.clientId, doc.saleClientId)))
       .for('update');
@@ -351,7 +361,22 @@ export class PosAcceptService {
         updatedAt: sql`now()`,
       })
       .where(eq(posSales.id, sale.id));
-    return { id: sale.id, number: sale.number, created: sale.status !== doc.ebarimt.status };
+    const changed = sale.status !== doc.ebarimt.status || sale.ddtd !== doc.ebarimt.ddtd;
+    if (changed) {
+      await this.audit.record(tx, actor, {
+        action: 'RECEIPT_STATUS',
+        entity: 'pos_sales',
+        entityId: sale.id,
+        before: { ebarimtStatus: sale.status, ddtd: sale.ddtd },
+        after: {
+          ebarimtStatus: doc.ebarimt.status,
+          ddtd: doc.ebarimt.ddtd,
+          posapiDate: doc.ebarimt.posapiDate,
+          inactiveId: doc.ebarimt.inactiveId,
+        },
+      });
+    }
+    return { id: sale.id, number: sale.number, created: changed };
   }
 
   /** A manager bound a browser to a till on the edge; the centre lists it. */

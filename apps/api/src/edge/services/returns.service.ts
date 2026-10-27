@@ -20,6 +20,7 @@ import { AppError, invalid } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales } from '../db/schema';
 import { KioskAuthService } from './kiosk-auth.service';
+import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
@@ -47,6 +48,7 @@ export class EdgeReturnsService {
     private readonly auth: KioskAuthService,
     private readonly shifts: EdgeShiftsService,
     private readonly outbox: OutboxService,
+    private readonly ebarimt: EbarimtService,
   ) {}
 
   /** A sale by its receipt number, «K1-…» typed on a Latin keyboard included. */
@@ -206,6 +208,8 @@ export class EdgeReturnsService {
         snapshotVersion: loaded.snapshot.version,
         ebarimt: null,
       };
+      // The return's own receipt facts are the change it makes to the sale's (ADR-0065).
+      const saleFacts = sale.receipt.ebarimt;
       const receipt: EdgeReceipt = {
         clientId: request.clientId,
         kind: 'RETURN',
@@ -232,7 +236,19 @@ export class EdgeReturnsService {
         vatTotal: doc.vatTotal,
         tenders: [{ kind: 'CASH', amount, tendered: null }],
         change: '0.00',
-        ebarimt: { mode: 'TEST', ddtd: null },
+        title: loaded.snapshot.settings.receiptTitle ?? null,
+        footer: loaded.snapshot.settings.receiptFooter ?? null,
+        ebarimt:
+          this.ebarimt.enabled && saleFacts.mode === 'REAL'
+            ? {
+                ...this.ebarimt.pendingFacts(
+                  saleFacts.receiptType ?? 'B2C',
+                  saleFacts.customerTin ?? null,
+                  saleFacts.customerName ?? null,
+                ),
+                inactiveId: saleFacts.ddtd,
+              }
+            : { mode: 'TEST', ddtd: null },
       };
       await tx.insert(edgeSales).values({
         clientId: request.clientId,
@@ -251,6 +267,9 @@ export class EdgeReturnsService {
         receipt,
       });
       await this.outbox.enqueue(tx, { kind: 'RETURN', clientId: request.clientId, sale: doc });
+      if (this.ebarimt.enabled) {
+        await this.ebarimt.enqueueReturn(tx, { clientId: request.clientId, tillCode }, sale);
+      }
       return receipt;
     });
   }

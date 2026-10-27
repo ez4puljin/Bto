@@ -17,6 +17,10 @@ export interface PosSettings {
   returnWindowDays: number;
   snapshotIntervalSec: number;
   supervisorRequired: boolean;
+  receiptTitle: string | null;
+  receiptFooter: string | null;
+  ebarimtDistrictCode: string | null;
+  ebarimtClassificationCode: string | null;
   updatedAt: Date | null;
 }
 
@@ -26,6 +30,10 @@ export interface PosSettingsPatch {
   returnWindowDays?: number;
   snapshotIntervalSec?: number;
   supervisorRequired?: boolean;
+  receiptTitle?: string | null;
+  receiptFooter?: string | null;
+  ebarimtDistrictCode?: string | null;
+  ebarimtClassificationCode?: string | null;
 }
 
 const DEFAULTS = {
@@ -34,6 +42,10 @@ const DEFAULTS = {
   returnWindowDays: POS_LIMITS.defaultReturnWindowDays,
   snapshotIntervalSec: POS_LIMITS.defaultSnapshotIntervalSec,
   supervisorRequired: true,
+  receiptTitle: null,
+  receiptFooter: null,
+  ebarimtDistrictCode: null,
+  ebarimtClassificationCode: null,
 } as const;
 
 /** The store's settings (ADR-0063 #2): one row, the shared defaults until the admin saves it. */
@@ -65,6 +77,10 @@ export class PosSettingsService {
       returnWindowDays: values.returnWindowDays,
       snapshotIntervalSec: values.snapshotIntervalSec,
       supervisorRequired: values.supervisorRequired,
+      receiptTitle: values.receiptTitle,
+      receiptFooter: values.receiptFooter,
+      ebarimtDistrictCode: values.ebarimtDistrictCode,
+      ebarimtClassificationCode: values.ebarimtClassificationCode,
       updatedAt: values.updatedAt,
     };
   }
@@ -82,6 +98,13 @@ export class PosSettingsService {
         returnWindowDays: patch.returnWindowDays ?? before.returnWindowDays,
         snapshotIntervalSec: patch.snapshotIntervalSec ?? before.snapshotIntervalSec,
         supervisorRequired: patch.supervisorRequired ?? before.supervisorRequired,
+        receiptTitle: keep(patch.receiptTitle, before.receiptTitle),
+        receiptFooter: keep(patch.receiptFooter, before.receiptFooter),
+        ebarimtDistrictCode: keep(patch.ebarimtDistrictCode, before.ebarimtDistrictCode),
+        ebarimtClassificationCode: keep(
+          patch.ebarimtClassificationCode,
+          before.ebarimtClassificationCode,
+        ),
       };
       if (next.storeWarehouseId !== null) {
         const warehouse = await this.org.getWarehouse(next.storeWarehouseId, tx);
@@ -114,10 +137,20 @@ export class PosSettingsService {
           returnWindowDays: before.returnWindowDays,
           snapshotIntervalSec: before.snapshotIntervalSec,
           supervisorRequired: before.supervisorRequired,
+          receiptTitle: before.receiptTitle,
+          receiptFooter: before.receiptFooter,
+          ebarimtDistrictCode: before.ebarimtDistrictCode,
+          ebarimtClassificationCode: before.ebarimtClassificationCode,
         },
         after: next,
       });
     });
     return this.get();
   }
+}
+
+/** A patched text: unchanged when absent, cleared when blank. */
+function keep(value: string | null | undefined, before: string | null): string | null {
+  if (value === undefined) return before;
+  return value === null || value.trim() === '' ? null : value.trim();
 }

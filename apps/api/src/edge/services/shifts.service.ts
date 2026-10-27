@@ -13,6 +13,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
 import { edgeSales, edgeShifts } from '../db/schema';
+import { PrintableCache } from '../ebarimt/printable.cache';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 
@@ -28,6 +29,7 @@ export class EdgeShiftsService {
   constructor(
     @Inject(EDGE_DB) private readonly db: EdgeDb,
     private readonly outbox: OutboxService,
+    private readonly cache: PrintableCache,
   ) {}
 
   async current(tillCode: string, executor: EdgeDb | EdgeTx = this.db): Promise<ShiftRow | null> {
@@ -140,6 +142,8 @@ export class EdgeShiftsService {
       });
       return closed;
     });
+    // The lottery and QR of this till's receipts are dropped with its shift (ADR-0065).
+    this.cache.forgetTill(tillCode);
     return this.summary(row);
   }
 

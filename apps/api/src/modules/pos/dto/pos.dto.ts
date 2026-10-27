@@ -20,6 +20,7 @@ import {
   VOID_REASONS,
   type VoidReason,
 } from '@tugeel/shared/pos';
+import { CLASSIFICATION_CODE_PATTERN, DISTRICT_CODE_PATTERN } from '@tugeel/shared/mn';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -72,6 +73,12 @@ export class PosSettingsDto {
   @ApiProperty({ example: 14 }) returnWindowDays: number;
   @ApiProperty({ example: 60 }) snapshotIntervalSec: number;
   @ApiProperty() supervisorRequired: boolean;
+  @ApiProperty({ type: String, nullable: true }) receiptTitle: string | null;
+  @ApiProperty({ type: String, nullable: true }) receiptFooter: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '0000' })
+  ebarimtDistrictCode: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '0000000' })
+  ebarimtClassificationCode: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
 }
 
@@ -103,6 +110,32 @@ export class PosSettingsPatchDto {
   @Max(POS_LIMITS.maxSnapshotIntervalSec)
   snapshotIntervalSec?: number;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() supervisorRequired?: boolean;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxReceiptText })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxReceiptText)
+  receiptTitle?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: POS_LIMITS.maxReceiptText })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(POS_LIMITS.maxReceiptText)
+  receiptFooter?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, pattern: DISTRICT_CODE_PATTERN.source })
+  @IsOptional()
+  @Transform(trimmed)
+  @Matches(DISTRICT_CODE_PATTERN)
+  ebarimtDistrictCode?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    pattern: CLASSIFICATION_CODE_PATTERN.source,
+  })
+  @IsOptional()
+  @Transform(trimmed)
+  @Matches(CLASSIFICATION_CODE_PATTERN)
+  ebarimtClassificationCode?: string | null;
 }
 
 // ---------------------------------------------------------------- edge nodes
@@ -124,6 +157,14 @@ export class EdgeNodeDto {
   @ApiProperty({ description: 'Documents the edge still has to replay' }) backlog: number;
   @ApiProperty({ type: Number, nullable: true }) clockSkewMs: number | null;
   @ApiProperty({ type: String, nullable: true }) snapshotVersion: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The store PosAPI (ADR-0065)' })
+  posapiVersion: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'PosAPI lastSentDate verbatim' })
+  posapiLastSent: string | null;
+  @ApiProperty({ type: Number, nullable: true }) posapiLeftLotteries: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  posapiCheckedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) posapiError: string | null;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt: string;
@@ -556,6 +597,8 @@ export class PosAttentionDto {
   @ApiProperty() shiftsToHandOver: number;
   @ApiProperty() openShortfalls: number;
   @ApiProperty() rejections: number;
+  @ApiProperty({ description: 'Sales whose e-Barimt failed or went unanswered (ADR-0065)' })
+  receiptsToCheck: number;
 }
 
 // ---------------------------------------------------------------- sync (the edge's documents)
@@ -899,6 +942,36 @@ export class HeartbeatDto {
   @IsString()
   @MaxLength(80)
   snapshotVersion?: string | null;
+  @ApiPropertyOptional({ type: () => PosapiInfoDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PosapiInfoDto)
+  posapi?: PosapiInfoDto | null;
+}
+
+@ApiSchema({ name: 'PosPosapiInfo' })
+export class PosapiInfoDto {
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  version?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '2026-10-26 16:27:07' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  lastSentDate?: string | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  leftLotteries?: number | null;
+  @ApiProperty({ type: String, format: 'date-time' }) @IsISO8601() checkedAt: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  error?: string | null;
 }
 
 @ApiSchema({ name: 'PosHeartbeatResponse' })

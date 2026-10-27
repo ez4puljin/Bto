@@ -278,6 +278,13 @@ describe('supermarket pages (ADR-0063 #8)', () => {
     const days = screen.getByLabelText(mn.pos.fields.returnWindowDays);
     await user.clear(days);
     await user.type(days, '7');
+    // ADR-0065: the store's district code is four digits; a wrong one is refused here.
+    const district = screen.getByLabelText(mn.pos.fields.ebarimtDistrictCode);
+    await user.type(district, '12');
+    await user.click(screen.getByRole('button', { name: mn.common.save }));
+    expect(await screen.findByText(mn.validation.districtCode)).toBeInTheDocument();
+    await user.type(district, '34');
+    await user.type(screen.getByLabelText(mn.pos.fields.receiptFooter), 'Баярлалаа!');
     await user.click(screen.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/pos/settings')).toHaveLength(1));
     expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/pos/settings')[0])).toEqual({
@@ -286,6 +293,10 @@ describe('supermarket pages (ADR-0063 #8)', () => {
       returnWindowDays: 7,
       snapshotIntervalSec: 60,
       supervisorRequired: true,
+      receiptTitle: 'Оргил супермаркет',
+      receiptFooter: 'Баярлалаа!',
+      ebarimtDistrictCode: '1234',
+      ebarimtClassificationCode: null,
     });
     expect(await screen.findByText(mn.pos.settings.saved)).toBeInTheDocument();
   });

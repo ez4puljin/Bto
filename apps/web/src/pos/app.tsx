@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next';
 import { i18n } from '@/lib/i18n';
 import { type Cart, useCart } from './cart';
 import { ErrorScreen, LoadingScreen } from './components/layout';
+import { PrintProvider } from './components/receipt-print';
 import { KioskContext, type KioskServices, useCredentials, useKiosk } from './kiosk-context';
 import { useProblemText } from './messages';
 import { useSession } from './queries';
@@ -23,7 +24,9 @@ export function KioskApp(props: { services: KioskServices; queryClient: QueryCli
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={props.queryClient}>
         <KioskContext.Provider value={props.services}>
-          <KioskRoot />
+          <PrintProvider>
+            <KioskRoot />
+          </PrintProvider>
         </KioskContext.Provider>
       </QueryClientProvider>
     </I18nextProvider>

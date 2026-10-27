@@ -83,6 +83,17 @@ export class PosSyncController {
       backlog: body.backlog,
       clockSkewMs: body.clockSkewMs ?? null,
       snapshotVersion: body.snapshotVersion ?? null,
+      ...(body.posapi
+        ? {
+            posapi: {
+              version: body.posapi.version ?? null,
+              lastSentDate: body.posapi.lastSentDate ?? null,
+              leftLotteries: body.posapi.leftLotteries ?? null,
+              checkedAt: new Date(body.posapi.checkedAt),
+              error: body.posapi.error ?? null,
+            },
+          }
+        : {}),
     });
     return {
       edgeNodeId: node.id,

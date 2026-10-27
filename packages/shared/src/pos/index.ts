@@ -68,6 +68,8 @@ export const POS_LIMITS = {
   maxQuickGroups: 12,
   maxQuickButtons: 60,
   maxQuickLabel: 40,
+  /** A printed receipt's heading or closing line (ADR-0065). */
+  maxReceiptText: 200,
   pairingCodeMinutes: 15,
   defaultReturnWindowDays: 14,
   maxReturnWindowDays: 365,

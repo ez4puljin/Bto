@@ -15,6 +15,13 @@
       "when": 1792767635570,
       "tag": "0001_till",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793007748762,
+      "tag": "0002_ebarimt",
+      "breakpoints": true
     }
   ]
 }

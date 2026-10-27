@@ -19,6 +19,11 @@ export const NODE: Schemas['PosEdgeNode'] = {
   backlog: 0,
   clockSkewMs: null,
   snapshotVersion: null,
+  posapiVersion: '3.2.50',
+  posapiLastSent: '2026-10-16 10:00:00',
+  posapiLeftLotteries: 12000,
+  posapiCheckedAt: STAMP,
+  posapiError: null,
   status: 'ACTIVE',
   createdAt: STAMP,
   updatedAt: STAMP,
@@ -205,6 +210,10 @@ export const POS_SETTINGS: Schemas['PosSettings'] = {
   returnWindowDays: 14,
   snapshotIntervalSec: 60,
   supervisorRequired: true,
+  receiptTitle: 'Оргил супермаркет',
+  receiptFooter: null,
+  ebarimtDistrictCode: null,
+  ebarimtClassificationCode: null,
   updatedAt: STAMP,
 };
 

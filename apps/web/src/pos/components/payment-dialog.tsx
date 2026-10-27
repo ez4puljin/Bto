@@ -2,12 +2,13 @@ import { useMutation } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import type {
   EdgeCartLine,
-  EdgeReceipt,
+  EdgePrintableReceipt,
   EdgeSaleRequest,
+  EdgeTaxpayer,
   EdgeTenderInput,
 } from '@tugeel/shared/pos';
 import { cn } from 'cn';
-import { Banknote, CreditCard } from 'lucide-react';
+import { Banknote, Building2, CreditCard, Search } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export function PaymentDialog(props: {
   /** Kept while the dialog fades out, so its content does not collapse. */
   attempt: PaymentAttempt | null;
   onClose: () => void;
-  onPaid: (receipt: EdgeReceipt) => void;
+  onPaid: (receipt: EdgePrintableReceipt) => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
   const { t } = useTranslation();
@@ -77,11 +78,12 @@ function ignoreScan(): void {
 function PaymentForm(props: {
   attempt: PaymentAttempt;
   onCancel: () => void;
-  onPaid: (receipt: EdgeReceipt) => void;
+  onPaid: (receipt: EdgePrintableReceipt) => void;
 }) {
   const { t } = useTranslation();
   const { client } = useKiosk();
   const problemText = useProblemText();
+  const [buyer, setBuyer] = useState<EdgeTaxpayer | null>(null);
   const [cash, setCash] = useState('');
   const [card, setCard] = useState('');
   const [terminalId, setTerminalId] = useState('');
@@ -130,7 +132,12 @@ function PaymentForm(props: {
         rrn: rrn.trim() || null,
       });
     }
-    sale.mutate({ clientId: props.attempt.clientId, lines: [...props.attempt.lines], tenders });
+    sale.mutate({
+      clientId: props.attempt.clientId,
+      lines: [...props.attempt.lines],
+      tenders,
+      buyer: buyer ? { tin: buyer.tin } : null,
+    });
   };
 
   return (
@@ -258,6 +265,8 @@ function PaymentForm(props: {
         </div>
       </section>
 
+      <BuyerSection buyer={buyer} onChange={setBuyer} />
+
       <div
         role="status"
         className={cn(
@@ -286,5 +295,98 @@ function PaymentForm(props: {
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/**
+ * A company's receipt (B2B, ADR-0065): its registration number or TIN, the name from the tax
+ * office's lookup; only online (owner 2026-10-26), otherwise the receipt is a citizen's.
+ */
+function BuyerSection(props: {
+  buyer: EdgeTaxpayer | null;
+  onChange: (buyer: EdgeTaxpayer | null) => void;
+}) {
+  const { t } = useTranslation();
+  const { client } = useKiosk();
+  const problemText = useProblemText();
+  const [open, setOpen] = useState(false);
+  const [no, setNo] = useState('');
+  const lookup = useMutation({
+    mutationFn: (value: string) => client.taxpayer(value),
+    onSuccess: props.onChange,
+  });
+  if (!open && !props.buyer) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onMouseDown={keepFocus}
+        className="h-11 justify-start gap-2 text-[15px]"
+        onClick={() => setOpen(true)}
+      >
+        <Building2 className="size-5" />
+        {t('posKiosk.pay.buyer.open')}
+      </Button>
+    );
+  }
+  return (
+    <section aria-labelledby="pay-buyer-title" className="space-y-2 rounded-xl bg-canvas p-3">
+      <h3 id="pay-buyer-title" className="flex items-center gap-2 text-[15px] font-semibold">
+        <Building2 aria-hidden className="size-5 text-primary" />
+        {t('posKiosk.pay.buyer.title')}
+      </h3>
+      {props.buyer ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0">
+            <span className="block truncate font-semibold">{props.buyer.name}</span>
+            <span className="block font-mono text-sm text-muted-foreground">
+              {t('posKiosk.receipt.buyerTin', { tin: props.buyer.tin })}
+            </span>
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10"
+            onClick={() => {
+              props.onChange(null);
+              setNo('');
+              setOpen(false);
+            }}
+          >
+            {t('posKiosk.pay.buyer.remove')}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Input
+            aria-label={t('posKiosk.pay.buyer.number')}
+            placeholder={t('posKiosk.pay.buyer.number')}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={20}
+            className="h-11 flex-1 font-mono"
+            value={no}
+            onChange={(event) => setNo(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              // Enter finds the company here; it never pays.
+              event.preventDefault();
+              if (no.trim()) lookup.mutate(no.trim());
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11 px-4"
+            disabled={!no.trim() || lookup.isPending}
+            onClick={() => lookup.mutate(no.trim())}
+          >
+            <Search />
+            {lookup.isPending ? t('posKiosk.pay.buyer.finding') : t('posKiosk.pay.buyer.find')}
+          </Button>
+        </div>
+      )}
+      {lookup.isError ? <KioskAlert>{problemText(lookup.error)}</KioskAlert> : null}
+    </section>
   );
 }

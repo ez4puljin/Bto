@@ -3,7 +3,7 @@ import type { Decimal } from '@tugeel/shared/money';
 import { and, asc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
-import { productBarcodes, products, productUnits, uoms, type VatType } from '../schema';
+import { categories, productBarcodes, products, productUnits, uoms, type VatType } from '../schema';
 import {
   type ProductDetail,
   type ProductQuery,
@@ -19,6 +19,9 @@ export interface PosCatalogueProduct {
   categoryId: number;
   vatType: VatType;
   cityTax: boolean | null;
+  /** e-Barimt (ADR-0065): its own classification code, else its nearest category's default. */
+  classificationCode: string | null;
+  taxProductCode: string | null;
   units: {
     unitId: number;
     uomId: number;
@@ -68,12 +71,38 @@ export class CatalogService {
         categoryId: products.categoryId,
         vatType: products.vatType,
         cityTax: products.cityTax,
+        ownClassificationCode: products.classificationCode,
+        taxProductCode: products.taxProductCode,
       })
       .from(products)
       .where(and(eq(products.status, 'ACTIVE'), isNotNull(products.saleReadyAt)))
       .orderBy(asc(products.id));
+    const categoryRows = await executor
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        code: categories.defaultClassificationCode,
+      })
+      .from(categories);
+    const categoryOf = new Map(categoryRows.map((row) => [row.id, row]));
+    const inherited = (categoryId: number): string | null => {
+      const seen = new Set<number>();
+      for (let at = categoryOf.get(categoryId); at && !seen.has(at.id);) {
+        if (at.code) return at.code;
+        seen.add(at.id);
+        at = at.parentId === null ? undefined : categoryOf.get(at.parentId);
+      }
+      return null;
+    };
     const byProduct = new Map<number, PosCatalogueProduct>(
-      rows.map((row) => [row.id, { ...row, units: [] }]),
+      rows.map(({ ownClassificationCode, ...row }) => [
+        row.id,
+        {
+          ...row,
+          classificationCode: ownClassificationCode ?? inherited(row.categoryId),
+          units: [],
+        },
+      ]),
     );
     const ids = rows.map((row) => row.id);
     const unitRows: {

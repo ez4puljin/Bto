@@ -90,6 +90,10 @@ export class PosSnapshotService {
         returnWindowDays: settings.returnWindowDays,
         snapshotIntervalSec: settings.snapshotIntervalSec,
         supervisorRequired: settings.supervisorRequired,
+        receiptTitle: settings.receiptTitle,
+        receiptFooter: settings.receiptFooter,
+        ebarimtDistrictCode: settings.ebarimtDistrictCode,
+        ebarimtClassificationCode: settings.ebarimtClassificationCode,
       },
       company: {
         name: null,
@@ -127,6 +131,9 @@ export class PosSnapshotService {
           name: product.name,
           categoryId: product.categoryId,
           vatRatePct: this.tax.ratesFor(product, company).vatRatePct.toFixed(2),
+          vatType: product.vatType,
+          taxProductCode: product.taxProductCode,
+          classificationCode: product.classificationCode,
           units: product.units.map((unit) => ({
             unitId: unit.unitId,
             uomId: unit.uomId,

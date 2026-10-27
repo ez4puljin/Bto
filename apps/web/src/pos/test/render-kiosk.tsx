@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
+import { vi } from 'vitest';
 import { KioskApp } from '../app';
 import {
   CASHIER_STORAGE_KEY,
@@ -11,7 +12,7 @@ import {
 import type { FakeEdge } from './fake-edge';
 
 /**
- * The kiosk against a fake edge. `device` stores a paired browser's token, `session` a signed-in
+ * The kiosk against a fake edge (`print` counts the receipts sent to the printer). `device` stores a paired browser's token, `session` a signed-in
  * cashier's (with `cashierId`), as a reload of the page would find them.
  */
 export function renderKiosk(
@@ -26,6 +27,8 @@ export function renderKiosk(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  // The receipt prints with the browser's own printing (ADR-0065); jsdom has no printer.
+  const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
   render(<KioskApp services={{ client, credentials }} queryClient={queryClient} />);
-  return { credentials, client, queryClient };
+  return { credentials, client, queryClient, print };
 }
