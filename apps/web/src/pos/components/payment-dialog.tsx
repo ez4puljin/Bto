@@ -1,9 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import type {
+  EdgeApproval,
   EdgeCartLine,
   EdgeCustomer,
   EdgePrintableReceipt,
+  EdgeQuotedVoucher,
   EdgeSaleRequest,
   EdgeTaxpayer,
   EdgeTenderInput,
@@ -46,8 +48,13 @@ import { KioskAlert } from './layout';
 export interface PaymentAttempt {
   /** Drawn once per payment attempt and sent again on a retry: the edge answers the same receipt. */
   clientId: string;
+  /** What is left to pay: the cart's total less what partner vouchers pay (ADR-0110). */
   total: string;
   lines: readonly EdgeCartLine[];
+  /** ADR-0110: the coupons and partner vouchers taken, and the supervisor's PIN for them. */
+  codes?: readonly string[];
+  vouchers?: readonly EdgeQuotedVoucher[];
+  voucherApproval?: EdgeApproval | null;
 }
 
 /** How the customer pays (ADR-0109): the cashier chooses it before the amounts. */
@@ -135,9 +142,13 @@ function PaymentForm(props: {
   });
 
   const total = new Decimal(props.attempt.total);
-  const credit = mode === 'CREDIT';
-  const takesCash = mode === 'CASH' || mode === 'MIXED' || credit;
-  const takesCard = mode === 'CARD' || mode === 'MIXED' || credit;
+  const vouchers = props.attempt.vouchers ?? [];
+  // ADR-0110: partner vouchers may pay it all (nothing left to tender), and never beside credit.
+  const nothingDue = total.isZero() && vouchers.length > 0;
+  const partnerPaid = vouchers.some((voucher) => voucher.kind === 'PARTNER');
+  const credit = mode === 'CREDIT' && !nothingDue;
+  const takesCash = !nothingDue && (mode === 'CASH' || mode === 'MIXED' || credit);
+  const takesCard = !nothingDue && (mode === 'CARD' || mode === 'MIXED' || credit);
   const cardAmount = mode === 'CARD' ? total : takesCard ? moneyOrZero(card) : new Decimal(0);
   const cashAmount = takesCash ? moneyOrZero(cash) : new Decimal(0);
   const cardOver = cardAmount !== null && cardAmount.gt(total);
@@ -161,13 +172,14 @@ function PaymentForm(props: {
       ? Decimal.max(cashDue.minus(cashAmount), 0)
       : null;
   const amountsValid =
-    total.gt(0) &&
+    nothingDue ||
+    (total.gt(0) &&
     cashAmount !== null &&
     cardAmount !== null &&
     !cardOver &&
     (credit
       ? creditAmount.gt(0) && cashAmount.lte(total.minus(cardAmount))
-      : cashAmount.plus(cardAmount).gte(total));
+      : cashAmount.plus(cardAmount).gte(total)));
   const receiptValid = credit || receiptType === 'B2C' || buyer !== null;
   const customerValid = !credit || (customer !== null && !customer.creditHold);
   const valid = amountsValid && receiptValid && customerValid;
@@ -201,6 +213,12 @@ function PaymentForm(props: {
       buyer: !credit && receiptType === 'B2B' && buyer ? { tin: buyer.tin } : null,
       customerId: credit ? (customer?.id ?? null) : null,
       ...(acceptOverLimit ? { acceptOverLimit: true } : {}),
+      ...(props.attempt.codes?.length
+        ? {
+            codes: [...props.attempt.codes],
+            voucherApproval: props.attempt.voucherApproval ?? null,
+          }
+        : {}),
     });
   };
   // The credit check's refusal in the till's words (the generic message speaks of an order).
@@ -226,17 +244,31 @@ function PaymentForm(props: {
     <form className="grid gap-4" onSubmit={submit} noValidate>
       <div className="flex items-baseline justify-between rounded-xl bg-canvas px-4 py-3">
         <span className="text-[15px] font-medium text-muted-foreground">
-          {t('posKiosk.pay.total')}
+          {vouchers.length > 0 ? t('posKiosk.vouchers.due') : t('posKiosk.pay.total')}
         </span>
         <span className="font-mono text-3xl font-semibold tracking-tight">
           {formatTugrik(props.attempt.total)}
         </span>
       </div>
 
+      {vouchers.length > 0 ? (
+        <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[15px]">
+          {vouchers.map((voucher) => (
+            <li key={voucher.code} className="flex items-baseline justify-between gap-3">
+              <span className="truncate text-muted-foreground">
+                {`${t(`posKiosk.vouchers.kinds.${voucher.kind}`)} · ${voucher.name}`}
+              </span>
+              <span className="font-mono">{`−${formatTugrik(voucher.amount)}`}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {nothingDue ? null : (
       <Segmented
         label={t('posKiosk.pay.mode.title')}
         value={mode}
-        options={PAY_MODES.map((value) => ({
+        options={PAY_MODES.filter((value) => !(partnerPaid && value === 'CREDIT')).map((value) => ({
           value,
           label: t(`posKiosk.pay.mode.${value}`),
           icon: MODE_ICONS[value],
@@ -248,6 +280,7 @@ function PaymentForm(props: {
           setOverLimit(null);
         }}
       />
+      )}
 
       {credit ? <CustomerSection customer={customer} onChange={setCustomer} /> : null}
 
@@ -427,7 +460,7 @@ function PaymentForm(props: {
             {formatTugrik(creditAmount.toFixed(2))}
           </span>
         </div>
-      ) : (
+      ) : nothingDue ? null : (
         <div
           role="status"
           className={cn(

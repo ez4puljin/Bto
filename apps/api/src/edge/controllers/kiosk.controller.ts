@@ -39,10 +39,12 @@ import type {
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
+import { AppError } from '../../common/errors/app-error';
 import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import {
+  ApprovalDto,
   DiscardParkedDto,
   EbarimtResolveDto,
   EbarimtSendDataDto,
@@ -268,6 +270,18 @@ export class KioskController {
   @Get('supervisors')
   supervisors(): EdgeSupervisor[] {
     return this.auth.supervisors();
+  }
+
+  /**
+   * ADR-0110: a supervisor's PIN checked before the payment (the sale's codes); the sale checks it
+   * again. A wrong PIN counts toward the lock like a sign-in.
+   */
+  @Post('approvals/check')
+  @HttpCode(200)
+  async checkApproval(@Body() body: ApprovalDto): Promise<{ approvedByName: string }> {
+    const approver = await this.auth.approve(body);
+    if (!approver) throw new AppError('POS_SUPERVISOR_REQUIRED', 'a supervisor approves this', {});
+    return { approvedByName: approver.fullName };
   }
 
   @Post('voids')

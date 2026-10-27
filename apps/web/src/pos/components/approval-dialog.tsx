@@ -19,9 +19,12 @@ import { useProblemText } from '../messages';
 import { useSupervisors } from '../queries';
 import { KioskAlert } from './layout';
 
-/** What a supervisor is asked to approve: a void (ADR-0104), a return, an e-Barimt step (ADR-0065). */
+/**
+ * What a supervisor is asked to approve: a void (ADR-0104), a return, an e-Barimt step (ADR-0065),
+ * a sale's coupons and partner vouchers (ADR-0110).
+ */
 export interface ApprovalRequest {
-  kind: VoidReason | 'RETURN' | 'EBARIMT_ISSUED' | 'EBARIMT_RETRY' | 'EBARIMT_SEND';
+  kind: VoidReason | 'RETURN' | 'EBARIMT_ISSUED' | 'EBARIMT_RETRY' | 'EBARIMT_SEND' | 'VOUCHERS';
   items: { name: string; qty: string; uomName: string }[];
   /** Sends the approval; a refusal (a wrong PIN) stays in the dialog. */
   run: (approval: EdgeApproval) => Promise<void>;
