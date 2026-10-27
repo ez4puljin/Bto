@@ -83,6 +83,7 @@ export const SHIFT: Schemas['PosShift'] = {
   cardRefunds: '0.00',
   creditSales: '0.00',
   creditRefunds: '0.00',
+  voucherSales: '0.00',
   salesTotal: '442600.00',
   returnsTotal: '1300.00',
   salesVat: '40236.36',

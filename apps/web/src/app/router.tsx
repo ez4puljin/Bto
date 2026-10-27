@@ -95,6 +95,8 @@ import { PosShiftsPage } from '@/features/pos/shifts-page';
 import { PosTestTillPage } from '@/features/pos/test-till-page';
 import { PosTillsPage } from '@/features/pos/tills-page';
 import { PosVoidsPage } from '@/features/pos/voids-page';
+import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
+import { PosVouchersPage } from '@/features/pos/vouchers-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
@@ -144,6 +146,18 @@ export const routes: RouteObject[] = [
       <RequireAuth>
         <RequirePermission permission="pos.read">
           <PosSalePrintPage />
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // A batch's coupon or voucher cards, or a partner's list of used vouchers (ADR-0110).
+    path: '/pos/vouchers/:id/print',
+    element: (
+      <RequireAuth>
+        <RequirePermission permission="pos.read">
+          <PosVoucherPrintPage />
         </RequirePermission>
       </RequireAuth>
     ),
@@ -581,6 +595,7 @@ function posRoutes(): RouteObject[] {
     { path: 'pos/shifts', handle: { width: 'wide' }, element: read(<PosShiftsPage />) },
     { path: 'pos/sales', handle: { width: 'wide' }, element: read(<PosSalesPage />) },
     { path: 'pos/voids', handle: { width: 'wide' }, element: read(<PosVoidsPage />) },
+    { path: 'pos/vouchers', handle: { width: 'wide' }, element: read(<PosVouchersPage />) },
     { path: 'pos/tills', handle: { width: 'wide' }, element: read(<PosTillsPage />) },
     { path: 'pos/cashiers', handle: { width: 'wide' }, element: read(<PosCashiersPage />) },
     {
