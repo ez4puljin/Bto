@@ -7,6 +7,7 @@ import type {
   CreditCheckResponseWire,
   CustomerFeedResponseWire,
   SnapshotResponseWire,
+  VoucherFeedResponseWire,
 } from '@tugeel/shared/pos';
 import {
   CreditCheckDto,
@@ -19,6 +20,7 @@ import {
 import { CurrentEdge, EdgeTokenGuard } from '../guards/edge-token.guard';
 import { PosAcceptService } from '../services/pos-accept.service';
 import { PosCustomersService } from '../services/pos-customers.service';
+import { PosVouchersService } from '../services/pos-vouchers.service';
 import { type EdgeNode, PosEdgeNodesService } from '../services/pos-edge-nodes.service';
 import { PosSettingsService } from '../services/pos-settings.service';
 import { PosSnapshotService } from '../services/pos-snapshot.service';
@@ -43,6 +45,7 @@ export class PosSyncController {
     private readonly settings: PosSettingsService,
     private readonly snapshots: PosSnapshotService,
     private readonly customers: PosCustomersService,
+    private readonly vouchers: PosVouchersService,
   ) {}
 
   /**
@@ -59,6 +62,19 @@ export class PosSyncController {
   }
 
   /** The credit check before a till's credit sale, under the customer's lock; writes nothing. */
+  /**
+   * The codes a till may take (ADR-0110), apart from the snapshot like the customers;
+   * `VoucherFeedResponseWire` of @tugeel/shared/pos.
+   */
+  @Get('vouchers')
+  @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })
+  async voucherFeed(@Query() query: SnapshotQueryDto): Promise<VoucherFeedResponseWire> {
+    const feed = await this.vouchers.feed();
+    return query.since === feed.version
+      ? { changed: false, version: feed.version }
+      : { changed: true, feed };
+  }
+
   @Post('credit-check')
   @HttpCode(200)
   @ApiOkResponse({ schema: { type: 'object', additionalProperties: true } })

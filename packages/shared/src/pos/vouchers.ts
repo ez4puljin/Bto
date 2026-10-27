@@ -135,3 +135,8 @@ export function voucherSaleRefundable(input: {
 }): Decimal {
   return Decimal.max(new Decimal(input.cashAndCardPaid).minus(input.refunded), 0);
 }
+
+/** A batch's number as the screens and the cards print it: `В-0007`. */
+export function voucherBatchNumber(id: number): string {
+  return `В-${String(id).padStart(4, '0')}`;
+}

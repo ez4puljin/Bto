@@ -337,6 +337,13 @@
       "when": 1793082988410,
       "tag": "0048_pos_credit",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793098039000,
+      "tag": "0049_pos_vouchers",
+      "breakpoints": true
     }
   ]
 }

@@ -45,6 +45,10 @@ export const CHART_ROLES = [
   'ISSUE_OTHER',
   // The year close (F6, ADR-0105): income and expense closed into it. Temporary code until D16.
   'RETAINED_EARNINGS',
+  // The till's partner vouchers (ADR-0110): what the vouchers paid until the partner's bill takes
+  // it over, and the unspent rest of a voucher the partner pays for. Temporary codes until D16.
+  'VOUCHER_CLEARING',
+  'VOUCHER_BREAKAGE',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -93,4 +97,7 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   { code: '730209', kind: 'EXPENSE', role: 'ISSUE_OTHER' },
   // The year close (F6, ADR-0105; a temporary code, TODO-VERIFY D16).
   { code: '340101', kind: 'EQUITY', role: 'RETAINED_EARNINGS' },
+  // The till's partner vouchers (ADR-0110; temporary codes, TODO-VERIFY D16).
+  { code: '120302', kind: 'ASSET', role: 'VOUCHER_CLEARING' },
+  { code: '511040', kind: 'INCOME', role: 'VOUCHER_BREAKAGE' },
 ];

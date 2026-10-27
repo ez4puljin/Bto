@@ -8,6 +8,12 @@ import {
   SHIFT_STATUSES,
   TENDER_KINDS,
   VOID_REASONS,
+  VOUCHER_BATCH_STATUSES,
+  VOUCHER_EFFECTS,
+  VOUCHER_ISSUES,
+  VOUCHER_KINDS,
+  VOUCHER_LIMITS,
+  VOUCHER_STATUSES,
 } from '@tugeel/shared/pos';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { type SQL, sql } from 'drizzle-orm';
@@ -16,6 +22,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   index,
   integer,
   pgTable,
@@ -292,6 +299,10 @@ export const posShifts = pgTable(
     creditRefunds: money('credit_refunds')
       .notNull()
       .default(sql`0`),
+    /** ADR-0110: paid by partner vouchers (the VOUCHER tenders of its sales). */
+    voucherSales: money('voucher_sales')
+      .notNull()
+      .default(sql`0`),
     /** The core's journal entry (`fin.journal_entries`, ADR-0089): a plain id. */
     journalEntryId: ref('journal_entry_id'),
     journalNumber: text('journal_number'),
@@ -324,7 +335,7 @@ export const posShifts = pgTable(
     ),
     check(
       'pos_shifts_money',
-      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
+      sql`${t.cashSales} >= 0 AND ${t.cashRefunds} >= 0 AND ${t.creditSales} >= 0 AND ${t.creditRefunds} >= 0 AND ${t.voucherSales} >= 0 AND ${t.cardSales} >= 0 AND ${t.cardRefunds} >= 0 AND ${t.salesTotal} >= 0 AND ${t.returnsTotal} >= 0 AND ${t.salesCount} >= 0 AND ${t.returnsCount} >= 0 AND (${t.countedCash} IS NULL OR ${t.countedCash} >= 0) AND (${t.floatKept} IS NULL OR ${t.floatKept} >= 0)`,
     ),
     check('pos_shifts_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
@@ -393,6 +404,10 @@ export const posSales = pgTable(
     creditReviewedAt: timestamp('credit_reviewed_at', { withTimezone: true }),
     creditReviewedBy: userRef('credit_reviewed_by'),
     creditReviewNote: text('credit_review_note'),
+    /** ADR-0110: what its partner vouchers paid (the VOUCHER tenders); never with credit. */
+    voucherTotal: money('voucher_total')
+      .notNull()
+      .default(sql`0`),
     /** When the centre accepted it; `sold_at` is when the till sold it. */
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -440,6 +455,10 @@ export const posSales = pgTable(
     check(
       'pos_sales_credit_review',
       sql`(${t.creditExcess} IS NULL OR ${t.creditExcess} > 0) AND (${t.creditReviewedAt} IS NULL) = (${t.creditReviewedBy} IS NULL) AND (${t.creditReviewedAt} IS NULL OR ${t.creditExcess} IS NOT NULL) AND (${textLength(t.creditReviewNote, POS_LIMITS.maxNote)})`,
+    ),
+    check(
+      'pos_sales_vouchers',
+      sql`${t.voucherTotal} >= 0 AND ${t.voucherTotal} <= ${t.total} AND (${t.voucherTotal} = 0 OR (${t.kind} = 'SALE' AND ${t.creditTotal} = 0))`,
     ),
     check('pos_sales_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
   ],
@@ -522,9 +541,12 @@ export const posTenders = pgTable(
     terminalId: text('terminal_id'),
     rrn: text('rrn'),
     maskedPan: text('masked_pan'),
+    /** A VOUCHER tender's code (ADR-0110). */
+    voucherId: ref('voucher_id').references((): AnyPgColumn => posVouchers.id),
   },
   (t) => [
     uniqueIndex('pos_tenders_sale_no').on(t.saleId, t.tenderNo),
+    check('pos_tenders_voucher', sql`(${t.kind} = 'VOUCHER') = (${t.voucherId} IS NOT NULL)`),
     check('pos_tenders_kind', inList(t.kind, TENDER_KINDS)),
     check('pos_tenders_amount', sql`${t.amount} > 0`),
     check(
@@ -708,5 +730,141 @@ export const posVoidLines = pgTable(
     index('pos_void_lines_product_idx').on(t.productId),
     check('pos_void_lines_qty', sql`${t.qty} > 0`),
     check('pos_void_lines_money', sql`${t.unitPrice} >= 0 AND ${t.total} >= 0`),
+  ],
+);
+
+/**
+ * A batch of the till's codes the admin created (ADR-0110): discount coupons (a percentage or
+ * tugriks off the basket) or a partner's vouchers (a face value the partner is billed in full),
+ * valid between two Ulaanbaatar days. Stopped, never deleted.
+ */
+export const posVoucherBatches = pgTable(
+  'pos_voucher_batches',
+  {
+    id: id(),
+    kind: text('kind', { enum: VOUCHER_KINDS }).notNull(),
+    name: text('name').notNull(),
+    effect: text('effect', { enum: VOUCHER_EFFECTS }).notNull(),
+    /** A percentage (0–100] or whole tugriks; a partner voucher's face value. */
+    value: money('value').notNull(),
+    /** The partner billed for its vouchers (PARTNER only). */
+    customerId: ref('customer_id').references(() => customers.id),
+    validFrom: date('valid_from').notNull(),
+    validTo: date('valid_to').notNull(),
+    qty: integer('qty').notNull(),
+    status: text('status', { enum: VOUCHER_BATCH_STATUSES }).notNull().default('ACTIVE'),
+    note: text('note'),
+    createdBy: userRef('created_by').notNull(),
+    createdAt: createdAt(),
+    stoppedAt: timestamp('stopped_at', { withTimezone: true }),
+    stoppedBy: userRef('stopped_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('pos_voucher_batches_created_idx').on(t.createdAt, t.id),
+    index('pos_voucher_batches_customer_idx').on(t.customerId),
+    check('pos_voucher_batches_kind', inList(t.kind, VOUCHER_KINDS)),
+    check('pos_voucher_batches_effect', inList(t.effect, VOUCHER_EFFECTS)),
+    check('pos_voucher_batches_status', inList(t.status, VOUCHER_BATCH_STATUSES)),
+    check(
+      'pos_voucher_batches_shape',
+      sql`(${t.kind} = 'PARTNER') = (${t.customerId} IS NOT NULL) AND (${t.kind} = 'COUPON' OR ${t.effect} = 'AMOUNT')`,
+    ),
+    check(
+      'pos_voucher_batches_value',
+      sql`(${t.effect} = 'PERCENT' AND ${t.value} > 0 AND ${t.value} <= 100) OR (${t.effect} = 'AMOUNT' AND ${t.value} > 0 AND ${t.value} = round(${t.value}) AND ${t.value} <= ${lim(VOUCHER_LIMITS.maxAmount)})`,
+    ),
+    check('pos_voucher_batches_dates', sql`${t.validTo} >= ${t.validFrom}`),
+    check(
+      'pos_voucher_batches_qty',
+      sql`${t.qty} BETWEEN 1 AND ${lim(VOUCHER_LIMITS.maxBatchQty)}`,
+    ),
+    check(
+      'pos_voucher_batches_name',
+      sql`length(${t.name}) BETWEEN 1 AND ${lim(VOUCHER_LIMITS.maxName)}`,
+    ),
+    check('pos_voucher_batches_note', sql`${textLength(t.note, POS_LIMITS.maxNote)}`),
+    check(
+      'pos_voucher_batches_stopped',
+      sql`(${t.status} = 'STOPPED') = (${t.stoppedAt} IS NOT NULL) AND (${t.stoppedAt} IS NULL) = (${t.stoppedBy} IS NULL)`,
+    ),
+  ],
+);
+
+/** One printed code of a batch: ISSUED until a till's sale takes it, then REDEEMED. */
+export const posVouchers = pgTable(
+  'pos_vouchers',
+  {
+    id: id(),
+    batchId: ref('batch_id')
+      .notNull()
+      .references(() => posVoucherBatches.id),
+    seq: integer('seq').notNull(),
+    code: text('code').notNull(),
+    status: text('status', { enum: VOUCHER_STATUSES }).notNull().default('ISSUED'),
+    /** The sale that took it first, when, and what it took off or paid. */
+    saleId: ref('sale_id').references((): AnyPgColumn => posSales.id),
+    redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
+    amount: money('amount'),
+  },
+  (t) => [
+    uniqueIndex('pos_vouchers_code').on(t.code),
+    uniqueIndex('pos_vouchers_batch_seq').on(t.batchId, t.seq),
+    index('pos_vouchers_sale_idx').on(t.saleId),
+    check('pos_vouchers_code_shape', sql`${t.code} ~ '^99[12][0-9]{13}$'`),
+    check('pos_vouchers_status', inList(t.status, VOUCHER_STATUSES)),
+    check(
+      'pos_vouchers_redeemed',
+      sql`(${t.status} = 'REDEEMED') = (${t.saleId} IS NOT NULL) AND (${t.saleId} IS NULL) = (${t.redeemedAt} IS NULL) AND (${t.saleId} IS NULL) = (${t.amount} IS NULL) AND (${t.amount} IS NULL OR ${t.amount} >= 0)`,
+    ),
+    check('pos_vouchers_seq', sql`${t.seq} >= 1`),
+  ],
+);
+
+/**
+ * A code a till's sale took (ADR-0110): what it took off or paid, the face value, and what the
+ * centre found wrong with it (a code used twice, stopped or past its dates: the sale is kept and
+ * the use listed for «Шалгасан»). A partner voucher names the partner's invoice.
+ */
+export const posSaleVouchers = pgTable(
+  'pos_sale_vouchers',
+  {
+    id: id(),
+    saleId: ref('sale_id')
+      .notNull()
+      .references(() => posSales.id),
+    voucherId: ref('voucher_id')
+      .notNull()
+      .references(() => posVouchers.id),
+    kind: text('kind', { enum: VOUCHER_KINDS }).notNull(),
+    code: text('code').notNull(),
+    face: money('face').notNull(),
+    amount: money('amount').notNull(),
+    issue: text('issue', { enum: VOUCHER_ISSUES }),
+    invoiceId: ref('invoice_id').references(() => invoices.id),
+    invoiceNumber: text('invoice_number'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewedBy: userRef('reviewed_by'),
+    reviewNote: text('review_note'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pos_sale_vouchers_sale_voucher').on(t.saleId, t.voucherId),
+    index('pos_sale_vouchers_voucher_idx').on(t.voucherId),
+    index('pos_sale_vouchers_invoice_idx').on(t.invoiceId),
+    index('pos_sale_vouchers_issue_idx')
+      .on(t.id)
+      .where(sql`${t.issue} IS NOT NULL AND ${t.reviewedAt} IS NULL`),
+    check('pos_sale_vouchers_kind', inList(t.kind, VOUCHER_KINDS)),
+    check('pos_sale_vouchers_issue', sql`${t.issue} IS NULL OR ${inList(t.issue, VOUCHER_ISSUES)}`),
+    check('pos_sale_vouchers_money', sql`${t.face} > 0 AND ${t.amount} >= 0`),
+    check(
+      'pos_sale_vouchers_invoice',
+      sql`(${t.invoiceId} IS NULL) = (${t.invoiceNumber} IS NULL) AND (${t.invoiceId} IS NULL OR ${t.kind} = 'PARTNER')`,
+    ),
+    check(
+      'pos_sale_vouchers_review',
+      sql`(${t.reviewedAt} IS NULL) = (${t.reviewedBy} IS NULL) AND (${t.reviewedAt} IS NULL OR ${t.issue} IS NOT NULL) AND (${textLength(t.reviewNote, POS_LIMITS.maxNote)})`,
+    ),
   ],
 );

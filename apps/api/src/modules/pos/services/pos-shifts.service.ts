@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { GlRole } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
-import { cashVariance, expectedCash, handoverAmount, POS_LIMITS } from '@tugeel/shared/pos';
+import {
+  cashVariance,
+  expectedCash,
+  handoverAmount,
+  POS_LIMITS,
+  type TenderKind,
+} from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -40,6 +46,8 @@ export interface ShiftTotals {
   /** ADR-0109: the CREDIT tenders of the sales, and of the returns (taken off the debts). */
   creditSales: Decimal;
   creditRefunds: Decimal;
+  /** ADR-0110: the VOUCHER tenders of the sales (a voucher's part is never refunded). */
+  voucherSales: Decimal;
 }
 
 /**
@@ -236,6 +244,7 @@ export class PosShiftsService {
         returnsVat: totals.returnsVat,
         creditSales: totals.creditSales,
         creditRefunds: totals.creditRefunds,
+        voucherSales: totals.voucherSales,
         journalEntryId: entry?.id ?? null,
         journalNumber: entry?.number ?? null,
         updatedAt: sql`now()`,
@@ -336,7 +345,7 @@ export class PosShiftsService {
       })
       .from(posSales)
       .where(eq(posSales.shiftId, shiftId));
-    const tender = (kind: 'SALE' | 'RETURN', tenderKind: 'CASH' | 'CARD' | 'CREDIT') =>
+    const tender = (kind: 'SALE' | 'RETURN', tenderKind: TenderKind) =>
       sql<string>`coalesce(sum(CASE WHEN ${posSales.kind} = ${kind} AND ${posTenders.kind} = ${tenderKind} THEN ${posTenders.amount} ELSE 0 END), 0)`;
     const [tenders] = await executor
       .select({
@@ -346,6 +355,7 @@ export class PosShiftsService {
         cardRefunds: tender('RETURN', 'CARD'),
         creditSales: tender('SALE', 'CREDIT'),
         creditRefunds: tender('RETURN', 'CREDIT'),
+        voucherSales: tender('SALE', 'VOUCHER'),
       })
       .from(posTenders)
       .innerJoin(posSales, eq(posSales.id, posTenders.saleId))
@@ -364,6 +374,7 @@ export class PosShiftsService {
       returnsVat: money(header?.returnsVat),
       creditSales: money(tenders?.creditSales),
       creditRefunds: money(tenders?.creditRefunds),
+      voucherSales: money(tenders?.voucherSales),
     };
   }
 
@@ -502,7 +513,8 @@ export class PosShiftsService {
  * development re-post (`pnpm finance:repost-journal`, ADR-0089) from the totals kept on the shift.
  * ADR-0109: what the credit sales and their returns booked on their own invoices and credit notes
  * (their revenue, VAT, and the cash and card the till took or paid back for them) is left out;
- * the counted cash, the expected cash and the variance are the drawer's, unchanged.
+ * the counted cash, the expected cash and the variance are the drawer's, unchanged. ADR-0110: Dr
+ * VOUCHER_CLEARING for what partner vouchers paid; each partner's bill credits it.
  */
 export function shiftCloseLines(input: {
   openingFloat: Decimal;
@@ -511,7 +523,8 @@ export function shiftCloseLines(input: {
   totals: Pick<
     ShiftTotals,
     'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
-  >;
+  > &
+    Partial<Pick<ShiftTotals, 'voucherSales'>>;
   booked?: ShiftBooked;
 }): JournalLineInput[] {
   const { totals } = input;
@@ -527,6 +540,7 @@ export function shiftCloseLines(input: {
       role: 'CARD_CLEARING',
       amount: totals.cardSales.minus(totals.cardRefunds).minus(booked.card),
     },
+    { role: 'VOUCHER_CLEARING', amount: totals.voucherSales ?? ZERO },
     { role: 'CASH_VARIANCE', amount: input.variance.negated() },
     { role: 'SALES_RETURN', amount: returnsTotal.minus(returnsVat) },
     { role: 'POS_SALES', amount: salesTotal.minus(salesVat).negated() },

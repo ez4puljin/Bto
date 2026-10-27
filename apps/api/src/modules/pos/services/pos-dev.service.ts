@@ -114,6 +114,7 @@ export class PosDevService {
         consumerNo: null,
         refundsSaleClientId: null,
         customerId: null,
+        vouchers: [],
         lines,
         tenders: input.tenders.map((tender) => ({
           kind: tender.kind,
@@ -122,6 +123,7 @@ export class PosDevService {
           terminalId: null,
           rrn: null,
           maskedPan: null,
+          voucherCode: null,
         })),
         subtotal: totals.subtotal,
         discountTotal: totals.discountTotal,

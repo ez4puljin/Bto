@@ -50,6 +50,10 @@ export {
   type PosCreditSale,
   PosCreditService,
 } from './services/pos-credit.service';
+export {
+  type PosVoucherCharge,
+  PosVoucherBillingService,
+} from './services/pos-voucher-billing.service';
 export { JournalRepostService, type RepostCounts } from './services/journal-repost.service';
 export {
   type JournalEntryDetail,
