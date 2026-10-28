@@ -41,7 +41,13 @@ function useShortAmount(): (value: number) => string {
 }
 
 /** The chart's frame: a fixed height, the full width, a start size for the first paint. */
-function Frame(props: { height: number; label: string; children: ReactNode; list: ReactNode }) {
+function Frame(props: {
+  height: number;
+  label: string;
+  children: ReactNode;
+  list: ReactNode;
+  legend?: ReactNode;
+}) {
   return (
     <figure aria-label={props.label} className="m-0">
       <div aria-hidden style={{ height: props.height }} className="w-full">
@@ -53,6 +59,7 @@ function Frame(props: { height: number; label: string; children: ReactNode; list
           {props.children}
         </ResponsiveContainer>
       </div>
+      {props.legend}
       {props.list}
     </figure>
   );
@@ -60,7 +67,7 @@ function Frame(props: { height: number; label: string; children: ReactNode; list
 
 function TooltipBox(props: { title: string; rows: readonly (readonly [string, string])[] }) {
   return (
-    <div className="rounded-lg bg-popover px-3 py-2 text-[12px] text-popover-foreground shadow-popover ring-1 ring-black/[0.06]">
+    <div className="rounded-lg bg-popover px-3 py-2 text-xs text-popover-foreground shadow-popover ring-1 ring-black/[0.06]">
       <p className="mb-1 font-semibold">{props.title}</p>
       {props.rows.map(([label, value]) => (
         <p key={label} className="flex justify-between gap-4">
@@ -94,6 +101,35 @@ export function TrendChart(props: { points: readonly TrendPoint[]; label: string
     <Frame
       height={260}
       label={props.label}
+      legend={
+        // The two lines named on the chart itself, not only in the tooltip (ADR-0113); the
+        // screen-reader list below already names them.
+        <div
+          aria-hidden
+          className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="18" height="6" className="shrink-0">
+              <line x1="0" y1="3" x2="18" y2="3" stroke="var(--chart-1)" strokeWidth="2.5" />
+            </svg>
+            {current}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="18" height="6" className="shrink-0">
+              <line
+                x1="0"
+                y1="3"
+                x2="18"
+                y2="3"
+                stroke="var(--muted-foreground)"
+                strokeWidth="1.5"
+                strokeDasharray="4 3"
+              />
+            </svg>
+            {lastYear}
+          </span>
+        </div>
+      }
       list={
         <ul className="sr-only">
           {props.points.map((point) => (
@@ -184,7 +220,7 @@ export function HorizontalBars(props: {
       height={height}
       label={props.label}
       list={
-        <ul className="sr-only">
+        <ul className="sr-only has-[a:focus-visible]:not-sr-only has-[a:focus-visible]:mt-2 has-[a:focus-visible]:flex has-[a:focus-visible]:flex-col has-[a:focus-visible]:gap-1 has-[a:focus-visible]:text-[13px]">
           {props.items.map((item) => {
             const text = [item.label, formatTugrik(item.value), item.extra]
               .filter(Boolean)
