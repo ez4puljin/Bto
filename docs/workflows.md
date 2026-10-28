@@ -121,8 +121,20 @@ Recorded with the owner on 2026-10-29. "Today" means Erkhet, erxes and paper. "T
 | Monthly count by warehouse, supplier or segment, in an app | Stocktakes are by bin, blind, with a scan route (ADR-0038). There is no scope by supplier or segment and no counting in the app. | partial |
 | Count result as a receivable on a party | The difference goes to loss and gain accounts through an adjustment. It is never charged to a person. | missing |
 
-### Open questions (TODO-VERIFY, owner)
+### Answers (owner, 2026-10-29, follow-up)
 
-- Where is the second supermarket, and does it have its own till and e-Barimt branch?
-- 6.4: are both the surplus and the shortage charged to a party? Who is the party (the warehouse's keeper, the counters)? At which price?
-- Write-offs and damage (question 4) are still to ask.
+- **The second supermarket** has its own sub-POS and till, but **no e-Barimt branch code of its own**. How its receipts are issued is still to settle (TODO-VERIFY).
+- **Counts** get an interview of their own, later.
+- **The order of work below is approved.**
+
+## 3. The order of work (approved by the owner, 2026-10-29)
+
+Work runs one slice at a time. Each slice is finished, and the owner walks it on the development environment, before the next one starts. The slices that cause the most errors today come first.
+
+1. **Purchase order → receipt.** The receipt is scanned against the expected quantities, with «ирээгүй» for goods that did not arrive. The accountant confirms the prices on every receipt. The confirmation creates the payable. Received stock is sellable without shelves. Butenorgil's «Захиалга» is the reference.
+2. **Transfers.** The supermarket requests from the app. The goods are received by scan, with the differences recorded. The keeper confirms.
+3. **Issues.** The accountant creates and the keeper confirms. The account and the party are chosen together. A correction takes effect once the keeper confirms it.
+4. **The picking app.** The assistant picks. The keeper of each warehouse confirms. The senior keeper prints once all have confirmed.
+5. **Counts.** These come after their own interview.
+
+Still open: write-offs and damage (question 4), and how the second supermarket issues e-Barimt receipts.
