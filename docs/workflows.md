@@ -60,6 +60,69 @@ Purchase order (Butenorgil's «Захиалга» as the reference) → draft re
 - Does the driver's fee go into the goods' cost? (accountant)
 - The ordering details in Butenorgil's «Захиалга» (statuses, brands, trucks, who does what): read from its code, then confirmed with the owner.
 
-## 2. Goods issue («Зарлага»)
+## 2. Stock out: issues, sales, transfers, counts
 
-To be recorded.
+Recorded with the owner on 2026-10-29. "Today" means Erkhet, erxes and paper. "To be" means what the owner wants Bto to do.
+
+### Answers
+
+**Kinds of issue**
+- **1.1** Every kind exists: wholesale sales, transfers to a supermarket, transfers between the Mörön warehouses, write-offs of damaged or expired goods, internal use, gifts and samples, returns to suppliers, and damage sold to the person at fault.
+- **1.2** Sales and transfers are by far the most frequent.
+- **1.3** An issue names an **account** (for example a meals expense account) **and a party** (for example the cook). The account report can then be filtered by account (all meals), by account and party (one driver's meals), or by the receivables account and party (the receivable sales charged to that cook). Account and party are always chosen together.
+
+**Wholesale sales leaving the warehouse**
+- **2.1** Sales reps take orders in the rep app, and customers send orders from the Bto300 app.
+- **2.2** A warehouse assistant picks and the warehouse keeper confirms the pick. This is on paper today. **To be:** picking in a Bto app by choosing the order (to be built).
+- **2.3** When stock is short, the order is reduced.
+- **2.4** The keeper hands the goods over after checking that the pick matches the order. An order often holds goods from several warehouses. When **every warehouse's keeper has confirmed**, the **senior warehouse keeper** («Агуулахын ахлах») prints the sales document.
+- **2.5** erxes syncs the sale to Erkhet automatically and at once. Sales left behind by a network or server problem are synced by hand.
+- **2.6** **Customer returns.** The receivables accountant notes the return and checks it on the camera, then makes the return against that customer's sale.
+
+**Supermarkets and transfers**
+- **3.1** Supermarket goods come from both the Mörön warehouses and directly from suppliers.
+- **3.2** The supermarket's seller sends the request through the sales rep app.
+- **3.3** **To be:** the supermarket receives in the app by scanning barcodes. Differences and goods with another barcode are recorded in the app, then confirmed finally. The warehouse keeper confirms as well.
+- **3.4** There are **5 warehouses and 2 supermarkets**.
+- **3.5** Kharkhorin runs its own Bto, so goods for Kharkhorin are sold to Kharkhorin as a customer.
+
+**Damage and write-offs**
+- **4** Skipped by the owner for now.
+
+**Approval and responsibility**
+- **5.1** The **accountant creates** an issue and the **warehouse keeper confirms** it finally.
+- **5.2** A keeper issues only from their own warehouse.
+- **5.3** A correction is sent as a change. When the keeper confirms it, the change takes effect at once.
+
+**Counts**
+- **6.1** A count runs every month. Usually it covers a whole warehouse. Sometimes it covers one supplier's goods, and any product segment can be counted.
+- **6.2** Counters use a counting app and scan barcodes to enter the quantities.
+- **6.3** Sales stop during a count.
+- **6.4** The count's final surplus and shortage become a **receivable on a party**.
+
+**Pain points**
+- **7.1** Receiving and transfers produce the most errors.
+- **7.2** Nothing must be kept unchanged.
+
+### In Bto today
+
+| Need | Bto | Fit |
+| --- | --- | --- |
+| Issue with account and party | A goods issue has an expense type (its account) and a recipient: user, customer, supplier or other (ADR-0081). Whether the expense line carries the recipient as the party for the account report is still to check. | partial |
+| Accountant creates, keeper confirms | One step: whoever holds `inventory.issues.manage` posts. | missing |
+| Correction confirmed by the keeper | A posted document is immutable, and a correction is a reversing document (architecture §12). A confirmed change can post the reversal and the new document for the user in one step. | differs |
+| Orders from the rep app and Bto300 | Built (ADR-0061, ADR-0079). | fits |
+| Assistant picks in an app, keeper confirms per warehouse, senior prints when all have confirmed | Picking is a stage on the web board with counts into STAGING (ADR-0056), with reservations per home warehouse (ADR-0055). There is no picking app, no confirmation per warehouse and no senior's step. | partial |
+| Short stock reduces the order | Backorders and pick by counts (ADR-0055 / ADR-0056). The exact behaviour is still to check. | partial |
+| Return against the customer's sale | A credit note against an invoice puts the goods into RETURNS (ADR-0060). | fits |
+| Supermarket request from the app, receive by scan with differences, keeper confirms | Transfers exist on the web: REQUEST / PUSH, then SHIPPED and RECEIVED (ADR-0035). They are not in the app, have no scan receiving and no differences step. | partial |
+| 5 warehouses and **2 supermarkets** | Bto's documents assume **one** supermarket branch (CLAUDE.md). A second store means a second till edge and its own e-Barimt branch. | differs |
+| Kharkhorin as a customer | Fits ADR-0084. | fits |
+| Monthly count by warehouse, supplier or segment, in an app | Stocktakes are by bin, blind, with a scan route (ADR-0038). There is no scope by supplier or segment and no counting in the app. | partial |
+| Count result as a receivable on a party | The difference goes to loss and gain accounts through an adjustment. It is never charged to a person. | missing |
+
+### Open questions (TODO-VERIFY, owner)
+
+- Where is the second supermarket, and does it have its own till and e-Barimt branch?
+- 6.4: are both the surplus and the shortage charged to a party? Who is the party (the warehouse's keeper, the counters)? At which price?
+- Write-offs and damage (question 4) are still to ask.
