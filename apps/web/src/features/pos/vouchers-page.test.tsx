@@ -156,11 +156,16 @@ describe('coupons and partner vouchers (ADR-0110)', () => {
     await user.selectOptions(dialog.getByLabelText(mn.pos.vouchers.fields.kind), 'PARTNER');
     // A partner voucher has no effect to choose: always its face value.
     expect(dialog.queryByLabelText(mn.pos.vouchers.fields.effect)).toBeNull();
-    await user.type(dialog.getByLabelText(mn.pos.vouchers.fields.name), 'Шинэ жилийн бэлэг');
+    // Pasted, not typed: the full run's parallel workers make long typing slow (no retries).
+    await user.click(dialog.getByLabelText(mn.pos.vouchers.fields.name));
+    await user.paste('Шинэ жилийн бэлэг');
     await user.type(await dialog.findByPlaceholderText(mn.partners.customerPicker.search), 'номин');
     await user.click(await dialog.findByRole('button', { name: /Номин дэлгүүр/ }));
-    await user.type(dialog.getByLabelText(mn.pos.vouchers.fields.faceValue), '50000');
-    await user.type(dialog.getByLabelText(mn.pos.vouchers.fields.qty), '20');
+    await user.click(dialog.getByLabelText(mn.pos.vouchers.fields.faceValue));
+    await user.paste('50000');
+    await user.clear(dialog.getByLabelText(mn.pos.vouchers.fields.qty));
+    await user.click(dialog.getByLabelText(mn.pos.vouchers.fields.qty));
+    await user.paste('20');
     await user.click(dialog.getByRole('button', { name: mn.pos.vouchers.dialog.submit }));
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/pos/voucher-batches')).toHaveLength(1),
@@ -180,7 +185,9 @@ describe('coupons and partner vouchers (ADR-0110)', () => {
       note: null,
     });
     // The new batch opens in the panel.
-    expect(await screen.findByRole('dialog', { name: panelName })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('dialog', { name: panelName }, { timeout: 5_000 }),
+    ).toBeInTheDocument();
   });
 
   it('stops an active batch after asking', async () => {
