@@ -138,3 +138,31 @@ Work runs one slice at a time. Each slice is finished, and the owner walks it on
 5. **Counts.** These come after their own interview.
 
 Still open: write-offs and damage (question 4), and how the second supermarket issues e-Barimt receipts.
+
+## 4. Slice 1 scope: purchase order → receipt (owner, 2026-10-29)
+
+The reference is Butenorgil's «Захиалга» (a read-only study). Recorded scope:
+
+**In**
+1. **Purchase orders.**
+   - The user picks suppliers (or brands) and types quantities per product in any of the product's units, for example boxes.
+   - Beside each line, from Bto's own data: stock, the minimum, recent sales, the last receipt price and the estimated cost.
+   - A printable order sheet per supplier.
+   - Saving sends only changed cells, so a stale page never overwrites a colleague's edits.
+2. **Who types quantities.** The brand's orderer (the staff member who orders that supplier), managers and senior staff (all suppliers), and warehouse keepers (only their own warehouse's products, while the supplier is in «Бэлдэж»).
+3. **Six statuses per supplier inside an order**: Бэлдэж → Илгээсэн → Замд → Ирсэн → Нягтлан шалгаж → Орлого авсан. The order shows the lowest of them.
+4. **On arrival, one draft receipt per supplier**, with the expected quantities and the last prices filled in.
+5. **Receiving.**
+   - A barcode scan jumps to the line and shows the expected quantity.
+   - The keeper corrects the quantity or marks «ирээгүй».
+   - The supplier's delivery note totals (pieces and amount) are typed and must match within 1₮. A photo of the note is optional.
+   - The keeper's confirmation brings the stock in, sellable at once without shelves.
+6. **The accountant's price check on every receipt.**
+   - The previous and the new price sit side by side, with differences highlighted.
+   - The accountant's confirmation creates the payable.
+   - Receipts without an order (the existing receipt window) go through the same check.
+
+**Out (later)**
+- Trucks and kg fill: the next slice.
+- The Erkhet export, the erxes price plans, the Kharkhorin company and Butenorgil's legacy supervisor screen: not needed.
+
