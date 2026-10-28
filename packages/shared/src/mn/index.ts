@@ -40,6 +40,7 @@ export {
   RECEIPT_TYPES,
   type ReceiptType,
   TAX_PRODUCT_CODE_PATTERN,
+  VOUCHER_PAYMENT_CODE,
 } from './ebarimt';
 export { NUMBER_DEFAULTS, type NumberFormat } from './numbers';
 export {

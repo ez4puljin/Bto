@@ -96,6 +96,29 @@ describe('pos guards', () => {
     expect(voidTriggers).toBe(tenderTriggers);
   });
 
+  it('never deletes a voucher batch, a code or a use (ADR-0110, migration 0049)', async () => {
+    for (const table of ['pos_voucher_batches', 'pos_vouchers', 'pos_sale_vouchers']) {
+      expect(await sqlStateOf(asApp.query(`DELETE FROM ${table}`))).toBe('42501');
+      expect(await sqlStateOf(asApp.query(`TRUNCATE ${table} CASCADE`))).toBe('42501');
+    }
+    // A code has the shape the tills scan; a VOUCHER tender names its code.
+    expect(
+      await sqlStateOf(
+        migrator.query(
+          `INSERT INTO pos_vouchers (batch_id, seq, code) VALUES (1, 1, '4607001771234')`,
+        ),
+      ),
+    ).toBe('23514');
+    expect(
+      await sqlStateOf(
+        migrator.query(
+          `INSERT INTO pos_tenders (sale_id, tender_no, kind, amount) VALUES ($1, 9, 'VOUCHER', 1)`,
+          [saleId],
+        ),
+      ),
+    ).toBe('23514');
+  });
+
   it('has no column for a lottery or a QR', async () => {
     const columns = await migrator.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns

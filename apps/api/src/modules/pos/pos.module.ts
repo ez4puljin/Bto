@@ -25,6 +25,10 @@ import {
   PosVoidsController,
 } from './controllers/pos-records.controller';
 import { PosSyncController } from './controllers/pos-sync.controller';
+import {
+  PosSaleVouchersController,
+  PosVoucherBatchesController,
+} from './controllers/pos-vouchers.controller';
 import { EdgeTokenGuard } from './guards/edge-token.guard';
 import { PinHasher } from './pin-hasher';
 import { PosAcceptService } from './services/pos-accept.service';
@@ -42,6 +46,7 @@ import { PosShiftsService } from './services/pos-shifts.service';
 import { PosSnapshotService } from './services/pos-snapshot.service';
 import { PosTillsService } from './services/pos-tills.service';
 import { PosVoidsService } from './services/pos-voids.service';
+import { PosVouchersService } from './services/pos-vouchers.service';
 
 const SERVICES = [
   PinHasher,
@@ -53,6 +58,7 @@ const SERVICES = [
   PosVoidsService,
   PosQuickButtonsService,
   PosCustomersService,
+  PosVouchersService,
   PosPaymentTypesService,
   PosDayCountsService,
   PosAcceptService,
@@ -96,6 +102,8 @@ export class PosModule {}
     PosRejectionsController,
     PosVoidsController,
     PosQuickButtonsController,
+    PosVoucherBatchesController,
+    PosSaleVouchersController,
     PosPaymentTypesController,
     PosAttentionController,
     PosDayCountsController,

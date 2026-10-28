@@ -1,9 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Decimal } from '@tugeel/shared/money';
 import type {
+  EdgeApproval,
   EdgeCartLine,
   EdgeCustomer,
   EdgePrintableReceipt,
+  EdgeQuotedVoucher,
   EdgeSaleRequest,
   EdgeTaxpayer,
   EdgeTenderInput,
@@ -20,6 +22,7 @@ import {
   HandCoins,
   Landmark,
   Search,
+  Ticket,
   TriangleAlert,
   User,
   UserRound,
@@ -50,8 +53,13 @@ import { KioskAlert } from './layout';
 export interface PaymentAttempt {
   /** Drawn once per payment attempt and sent again on a retry: the edge answers the same receipt. */
   clientId: string;
+  /** What is left to pay: the cart's total less what partner vouchers pay (ADR-0110). */
   total: string;
   lines: readonly EdgeCartLine[];
+  /** ADR-0110: the coupons and partner vouchers taken, and the supervisor's PIN for them. */
+  codes?: readonly string[];
+  vouchers?: readonly EdgeQuotedVoucher[];
+  voucherApproval?: EdgeApproval | null;
 }
 
 /** A way to pay as the till lists it; an edge older than ADR-0111 has kinds only (no id). */
@@ -119,6 +127,7 @@ const KIND_ICONS: Record<TenderKind, ReactNode> = {
   CARD: <CreditCard aria-hidden className="size-5" />,
   TRANSFER: <Landmark aria-hidden className="size-5" />,
   CREDIT: <HandCoins aria-hidden className="size-5" />,
+  VOUCHER: <Ticket aria-hidden className="size-5" />,
 };
 
 /** The till's types; an older edge sends none, so its kinds stand in for them. */
@@ -142,7 +151,10 @@ function PaymentForm(props: {
   const { t } = useTranslation();
   const { client } = useKiosk();
   const problemText = useProblemText();
-  const types = usePayTypes();
+  const vouchers = props.attempt.vouchers ?? [];
+  // ADR-0110: no credit beside a partner voucher; partner vouchers may leave nothing to pay.
+  const partnerPaid = vouchers.some((voucher) => voucher.kind === 'PARTNER');
+  const types = usePayTypes().filter((type) => !(partnerPaid && type.kind === 'CREDIT'));
   const [rows, setRows] = useState<PayRow[]>([]);
   const [nextKey, setNextKey] = useState(1);
   const [step, setStep] = useState<'rows' | 'receipt'>('rows');
@@ -165,6 +177,7 @@ function PaymentForm(props: {
   });
 
   const total = new Decimal(props.attempt.total);
+  const nothingDue = total.isZero() && vouchers.length > 0;
   const amounts = rows.map((row) => moneyOrZero(row.amount));
   const valid = amounts.every((amount) => amount !== null);
   const sumOf = (pick: (row: PayRow) => boolean) =>
@@ -182,9 +195,9 @@ function PaymentForm(props: {
   const nonCashOver = nonCash.gt(total);
   const cashDue = Decimal.max(total.minus(nonCash), 0);
   const change = !nonCashOver && cashGiven.gt(cashDue) ? cashGiven.minus(cashDue) : new Decimal(0);
-  const covered = valid && !nonCashOver && paid.gte(total) && total.gt(0);
+  const covered = valid && !nonCashOver && paid.gte(total) && (total.gt(0) || nothingDue);
   const creditReady = creditRow === null || (customer !== null && creditAmount.gt(0));
-  const ready = covered && creditReady && rows.length > 0;
+  const ready = covered && creditReady && (rows.length > 0 || nothingDue);
 
   const addRow = (type: PayType) => {
     if (type.kind === 'CREDIT' && creditRow) return;
@@ -247,6 +260,12 @@ function PaymentForm(props: {
       buyer: !creditRow && type === 'B2B' && buyer ? { tin: buyer.tin } : null,
       customerId: creditRow ? (customer?.id ?? null) : null,
       ...(acceptOverLimit ? { acceptOverLimit: true } : {}),
+      ...(props.attempt.codes?.length
+        ? {
+            codes: [...props.attempt.codes],
+            voucherApproval: props.attempt.voucherApproval ?? null,
+          }
+        : {}),
     });
   };
   // «Баримт хэвлэх»: with credit the slip prints at once; otherwise the receipt is chosen first.
@@ -287,8 +306,24 @@ function PaymentForm(props: {
 
   return (
     <form className="grid gap-4" onSubmit={submit} onKeyDown={onKeyDown} noValidate>
+      {vouchers.length > 0 ? (
+        <ul aria-label={t('posKiosk.vouchers.taken')} className="space-y-1 text-[15px]">
+          {vouchers.map((voucher) => (
+            <li key={voucher.code} className="flex items-baseline justify-between gap-3">
+              <span className="truncate text-muted-foreground">
+                {`${t(`posKiosk.vouchers.kinds.${voucher.kind}`)} · ${voucher.name}`}
+              </span>
+              <span className="font-mono">{`−${formatTugrik(voucher.amount)}`}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <dl className="grid grid-cols-3 gap-2">
-        <Figure label={t('posKiosk.pay.total')} value={formatTugrik(props.attempt.total)} strong />
+        <Figure
+          label={vouchers.length > 0 ? t('posKiosk.vouchers.due') : t('posKiosk.pay.total')}
+          value={formatTugrik(props.attempt.total)}
+          strong
+        />
         <Figure label={t('posKiosk.pay.rows.paid')} value={formatTugrik(paid.toFixed(2))} />
         <Figure
           label={change.gt(0) ? t('posKiosk.pay.change') : t('posKiosk.pay.rows.remaining')}
@@ -297,7 +332,11 @@ function PaymentForm(props: {
         />
       </dl>
 
-      {step === 'rows' ? (
+      {step === 'rows' && nothingDue ? (
+        <p className="rounded-xl bg-success-soft px-4 py-3 text-[15px] text-success">
+          {t('posKiosk.vouchers.allPaid')}
+        </p>
+      ) : step === 'rows' ? (
         <>
           {rows.length === 0 ? (
             <p className="rounded-xl bg-canvas px-4 py-3 text-[15px] text-muted-foreground">

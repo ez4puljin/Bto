@@ -46,6 +46,8 @@ export interface ShiftTotals {
   /** ADR-0109: the CREDIT tenders of the sales, and of the returns (taken off the debts). */
   creditSales: Decimal;
   creditRefunds: Decimal;
+  /** ADR-0110: the VOUCHER tenders of the sales (a voucher's part is never refunded). */
+  voucherSales: Decimal;
   /** ADR-0111: bank transfers taken at the till, and given back. */
   transferSales: Decimal;
   transferRefunds: Decimal;
@@ -256,6 +258,7 @@ export class PosShiftsService {
         returnsVat: totals.returnsVat,
         creditSales: totals.creditSales,
         creditRefunds: totals.creditRefunds,
+        voucherSales: totals.voucherSales,
         transferSales: totals.transferSales,
         transferRefunds: totals.transferRefunds,
         journalEntryId: entry?.id ?? null,
@@ -368,6 +371,7 @@ export class PosShiftsService {
         cardRefunds: tender('RETURN', 'CARD'),
         creditSales: tender('SALE', 'CREDIT'),
         creditRefunds: tender('RETURN', 'CREDIT'),
+        voucherSales: tender('SALE', 'VOUCHER'),
         transferSales: tender('SALE', 'TRANSFER'),
         transferRefunds: tender('RETURN', 'TRANSFER'),
       })
@@ -388,6 +392,7 @@ export class PosShiftsService {
       returnsVat: money(header?.returnsVat),
       creditSales: money(tenders?.creditSales),
       creditRefunds: money(tenders?.creditRefunds),
+      voucherSales: money(tenders?.voucherSales),
       transferSales: money(tenders?.transferSales),
       transferRefunds: money(tenders?.transferRefunds),
     };
@@ -554,7 +559,8 @@ export class PosShiftsService {
  * development re-post (`pnpm finance:repost-journal`, ADR-0089) from the totals kept on the shift.
  * ADR-0109: what the credit sales and their returns booked on their own invoices and credit notes
  * (their revenue, VAT, and the cash and card the till took or paid back for them) is left out;
- * the counted cash, the expected cash and the variance are the drawer's, unchanged.
+ * the counted cash, the expected cash and the variance are the drawer's, unchanged. ADR-0110: Dr
+ * VOUCHER_CLEARING for what partner vouchers paid; each partner's bill credits it.
  */
 export function shiftCloseLines(input: {
   openingFloat: Decimal;
@@ -564,7 +570,7 @@ export function shiftCloseLines(input: {
     ShiftTotals,
     'cardSales' | 'cardRefunds' | 'returnsTotal' | 'returnsVat' | 'salesTotal' | 'salesVat'
   > &
-    Partial<Pick<ShiftTotals, 'transferSales' | 'transferRefunds'>>;
+    Partial<Pick<ShiftTotals, 'voucherSales' | 'transferSales' | 'transferRefunds'>>;
   booked?: ShiftBooked;
 }): JournalLineInput[] {
   const { totals } = input;
@@ -580,6 +586,7 @@ export function shiftCloseLines(input: {
       role: 'CARD_CLEARING',
       amount: totals.cardSales.minus(totals.cardRefunds).minus(booked.card),
     },
+    { role: 'VOUCHER_CLEARING', amount: totals.voucherSales ?? ZERO },
     {
       role: 'TRANSFER_CLEARING',
       amount: (totals.transferSales ?? ZERO)

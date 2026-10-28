@@ -20637,6 +20637,355 @@
         ]
       }
     },
+    "/api/v1/pos/voucher-batches": {
+      "get": {
+        "operationId": "PosVoucherBatches_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COUPON",
+                "PARTNER"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "STOPPED"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "The name, or a code of the batch",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoucherBatchPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      },
+      "post": {
+        "operationId": "PosVoucherBatches_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosVoucherBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoucherBatchDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/voucher-batches/{id}": {
+      "get": {
+        "operationId": "PosVoucherBatches_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoucherBatchDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/voucher-batches/{id}/stop": {
+      "post": {
+        "operationId": "PosVoucherBatches_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoucherBatch"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Stops the batch: its unused codes leave the tills at their next pull.",
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sale-vouchers": {
+      "get": {
+        "operationId": "PosSaleVouchers_list",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "toCheck",
+            "required": false,
+            "in": "query",
+            "description": "Only the uses the office has to check",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PosVoucherUse"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
+    "/api/v1/pos/sale-vouchers/{id}/review": {
+      "post": {
+        "operationId": "PosSaleVouchers_review",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosVoucherReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosVoucherUse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pos"
+        ]
+      }
+    },
     "/api/v1/pos/payment-types": {
       "get": {
         "operationId": "PosPaymentTypes_list",
@@ -20874,6 +21223,54 @@
         ]
       }
     },
+    "/api/v1/pos/sync/vouchers": {
+      "get": {
+        "operationId": "PosSync_voucherFeed",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "edge-token": []
+          }
+        ],
+        "summary": "The credit check before a till's credit sale, under the customer's lock; writes nothing.",
+        "tags": [
+          "pos-sync"
+        ]
+      }
+    },
     "/api/v1/pos/sync/credit-check": {
       "post": {
         "operationId": "PosSync_creditCheck",
@@ -20916,7 +21313,6 @@
             "edge-token": []
           }
         ],
-        "summary": "The credit check before a till's credit sale, under the customer's lock; writes nothing.",
         "tags": [
           "pos-sync"
         ]
@@ -40759,7 +41155,9 @@
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
               "ISSUE_OTHER",
-              "RETAINED_EARNINGS"
+              "RETAINED_EARNINGS",
+              "VOUCHER_CLEARING",
+              "VOUCHER_BREAKAGE"
             ],
             "type": "string"
           },
@@ -40900,7 +41298,9 @@
               "ISSUE_WRITE_OFF",
               "ISSUE_TRANSFER_OUT",
               "ISSUE_OTHER",
-              "RETAINED_EARNINGS"
+              "RETAINED_EARNINGS",
+              "VOUCHER_CLEARING",
+              "VOUCHER_BREAKAGE"
             ],
             "type": "string",
             "description": "null takes the role away"
@@ -43724,7 +44124,8 @@
               "CASH",
               "CARD",
               "TRANSFER",
-              "CREDIT"
+              "CREDIT",
+              "VOUCHER"
             ],
             "type": "string"
           },
@@ -43851,6 +44252,11 @@
             "example": "0.00",
             "description": "ADR-0109: taken off customers’ debts"
           },
+          "voucherSales": {
+            "type": "string",
+            "example": "0.00",
+            "description": "ADR-0110: paid by partner vouchers"
+          },
           "transferSales": {
             "type": "string",
             "example": "0.00",
@@ -43936,6 +44342,7 @@
           "cardRefunds",
           "creditSales",
           "creditRefunds",
+          "voucherSales",
           "transferSales",
           "transferRefunds",
           "salesTotal",
@@ -44356,7 +44763,8 @@
               "CASH",
               "CARD",
               "TRANSFER",
-              "CREDIT"
+              "CREDIT",
+              "VOUCHER"
             ],
             "type": "string"
           },
@@ -45308,6 +45716,450 @@
           "groups"
         ]
       },
+      "PosVoucherBatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "В-0001"
+          },
+          "kind": {
+            "enum": [
+              "COUPON",
+              "PARTNER"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "example": "10.00"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-11-01"
+          },
+          "validTo": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "qty": {
+            "type": "number"
+          },
+          "redeemed": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "STOPPED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stoppedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "kind",
+          "name",
+          "effect",
+          "value",
+          "customerId",
+          "customerName",
+          "validFrom",
+          "validTo",
+          "qty",
+          "redeemed",
+          "status",
+          "note",
+          "createdAt",
+          "createdByName",
+          "stoppedAt"
+        ]
+      },
+      "PosVoucherBatchPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoucherBatch"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PosVoucherBatchRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "COUPON",
+              "PARTNER"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Шинэ жилийн купон"
+          },
+          "effect": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string",
+            "description": "A partner voucher is AMOUNT"
+          },
+          "value": {
+            "type": "string",
+            "example": "10",
+            "description": "A percentage (0–100] or whole tugriks"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The partner (PARTNER only)"
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-11-01"
+          },
+          "validTo": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "qty": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "effect",
+          "value",
+          "validFrom",
+          "validTo",
+          "qty"
+        ]
+      },
+      "PosVoucherCode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "seq": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "9912345678901234"
+          },
+          "status": {
+            "enum": [
+              "ISSUED",
+              "REDEEMED"
+            ],
+            "type": "string"
+          },
+          "saleId": {
+            "type": "number",
+            "nullable": true
+          },
+          "saleNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "redeemedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true,
+            "example": "42000.00"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "code",
+          "status",
+          "saleId",
+          "saleNumber",
+          "redeemedAt",
+          "amount"
+        ]
+      },
+      "PosVoucherUse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "saleId": {
+            "type": "number"
+          },
+          "saleNumber": {
+            "type": "string"
+          },
+          "soldAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voucherId": {
+            "type": "number"
+          },
+          "batchId": {
+            "type": "number"
+          },
+          "batchNumber": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "COUPON",
+              "PARTNER"
+            ],
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "face": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "amount": {
+            "type": "string",
+            "example": "42000.00"
+          },
+          "issue": {
+            "nullable": true,
+            "enum": [
+              "UNKNOWN",
+              "USED",
+              "NOT_YET",
+              "EXPIRED",
+              "STOPPED"
+            ],
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "number",
+            "nullable": true
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "saleNumber",
+          "soldAt",
+          "voucherId",
+          "batchId",
+          "batchNumber",
+          "kind",
+          "code",
+          "face",
+          "amount",
+          "issue",
+          "invoiceId",
+          "invoiceNumber",
+          "reviewedAt",
+          "reviewNote"
+        ]
+      },
+      "PosVoucherBatchDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "number": {
+            "type": "string",
+            "example": "В-0001"
+          },
+          "kind": {
+            "enum": [
+              "COUPON",
+              "PARTNER"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "effect": {
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "example": "10.00"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "validFrom": {
+            "type": "string",
+            "example": "2026-11-01"
+          },
+          "validTo": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "qty": {
+            "type": "number"
+          },
+          "redeemed": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "STOPPED"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "stoppedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoucherCode"
+            }
+          },
+          "uses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosVoucherUse"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "kind",
+          "name",
+          "effect",
+          "value",
+          "customerId",
+          "customerName",
+          "validFrom",
+          "validTo",
+          "qty",
+          "redeemed",
+          "status",
+          "note",
+          "createdAt",
+          "createdByName",
+          "stoppedAt",
+          "codes",
+          "uses"
+        ]
+      },
+      "PosVoucherReviewRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        }
+      },
       "PosPaymentType": {
         "type": "object",
         "properties": {
@@ -45422,6 +46274,10 @@
           "creditToCheck": {
             "type": "number",
             "description": "Credit sales past their limit or hold, not checked (ADR-0109)"
+          },
+          "vouchersToCheck": {
+            "type": "number",
+            "description": "Codes used twice, stopped or out of date, not checked (ADR-0110)"
           }
         },
         "required": [
@@ -45430,7 +46286,8 @@
           "openShortfalls",
           "rejections",
           "receiptsToCheck",
-          "creditToCheck"
+          "creditToCheck",
+          "vouchersToCheck"
         ]
       },
       "PosDayCountRow": {
@@ -45633,7 +46490,8 @@
               "CASH",
               "CARD",
               "TRANSFER",
-              "CREDIT"
+              "CREDIT",
+              "VOUCHER"
             ],
             "type": "string"
           },
@@ -45671,10 +46529,50 @@
             "type": "string",
             "nullable": true,
             "maxLength": 40
+          },
+          "voucherCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "ADR-0110: a VOUCHER tender"
           }
         },
         "required": [
           "kind",
+          "amount"
+        ]
+      },
+      "PosSaleDocVoucher": {
+        "type": "object",
+        "properties": {
+          "voucherId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "example": "9910000000000001"
+          },
+          "kind": {
+            "enum": [
+              "COUPON",
+              "PARTNER"
+            ],
+            "type": "string"
+          },
+          "face": {
+            "type": "string",
+            "example": "50000"
+          },
+          "amount": {
+            "type": "string",
+            "example": "42000"
+          }
+        },
+        "required": [
+          "voucherId",
+          "code",
+          "kind",
+          "face",
           "amount"
         ]
       },
@@ -45803,6 +46701,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PosSaleDocTender"
+            }
+          },
+          "vouchers": {
+            "description": "ADR-0110: the codes taken",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PosSaleDocVoucher"
             }
           },
           "subtotal": {
@@ -50951,6 +51856,11 @@
           "POS_BUYER_REQUIRED",
           "POS_CUSTOMER_REQUIRED",
           "POS_CREDIT_OFFLINE_OVER_LIMIT",
+          "POS_VOUCHER_INVALID",
+          "POS_VOUCHER_USED",
+          "POS_VOUCHER_WITH_CREDIT",
+          "POS_RETURN_VOUCHER_PART",
+          "POS_VOUCHER_NOTHING_TO_CHECK",
           "EBARIMT_LOOKUP_UNAVAILABLE",
           "EBARIMT_TAXPAYER_NOT_FOUND",
           "EBARIMT_RECEIPT_STATE_INVALID",

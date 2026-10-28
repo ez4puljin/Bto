@@ -1,4 +1,4 @@
-import { POS_LIMITS, TENDER_KINDS, type TenderKind } from '@tugeel/shared/pos';
+import { PAYMENT_TYPE_KINDS, POS_LIMITS, type PaymentTypeKind } from '@tugeel/shared/pos';
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +19,7 @@ interface Draft {
   key: string;
   id: number | null;
   name: string;
-  kind: TenderKind;
+  kind: PaymentTypeKind;
   active: boolean;
 }
 
@@ -123,9 +123,9 @@ function PaymentTypesForm({ types, onClose }: { types: PaymentType[]; onClose: (
               className="w-40"
               value={row.kind}
               disabled={row.id !== null}
-              onChange={(event) => update(row.key, { kind: event.target.value as TenderKind })}
+              onChange={(event) => update(row.key, { kind: event.target.value as PaymentTypeKind })}
             >
-              {TENDER_KINDS.map((kind) => (
+              {PAYMENT_TYPE_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
                   {t(`pos.tenderKinds.${kind}`)}
                 </option>

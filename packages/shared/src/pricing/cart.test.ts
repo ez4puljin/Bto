@@ -392,3 +392,30 @@ describe('the price table of a product', () => {
     ]);
   });
 });
+
+describe('the till coupons (ADR-0110)', () => {
+  it('takes coupons off after the order programs, each on what the earlier ones left', () => {
+    const order = program({ id: 1, scope: 'ORDER', effect: 'AMOUNT', steps: steps([0, 1000]) });
+    const result = resolveQuote([line(COLA, colaPcs, 25), line(WATER, waterPcs, 7)], {
+      ...context([order]),
+      coupons: [
+        { code: '9910000000000001', name: 'Арав', effect: 'PERCENT', value: d(10) },
+        { code: '9910000000000002', name: 'Мянга', effect: 'AMOUNT', value: d(1000) },
+      ],
+    });
+    // 30,350 after the order program; 10 % per part (3,035), then 1,000 split by amount.
+    expect(result.discountTotal.toFixed()).toBe('5035');
+    expect(result.total.toFixed()).toBe('26315');
+    const codes = priced(result, 1).parts[0]?.applied.map((entry) => entry.code ?? null);
+    expect(codes).toEqual([null, '9910000000000001', '9910000000000002']);
+  });
+
+  it('never takes more than the cart comes to', () => {
+    const result = resolveQuote([line(WATER, waterPcs, 2)], {
+      ...context(),
+      coupons: [{ code: '9910000000000003', name: 'Их', effect: 'AMOUNT', value: d(5000) }],
+    });
+    expect(result.total.toFixed()).toBe('0');
+    expect(result.discountTotal.toFixed()).toBe('1600');
+  });
+});

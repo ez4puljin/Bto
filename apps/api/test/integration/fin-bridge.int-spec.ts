@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(32);
+    expect(keys).toHaveLength(34);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -437,6 +437,40 @@ describe('fin-bridge', () => {
       expect(await count(`fin.accounts WHERE code = '340101' AND kind = 'EQUITY'`)).toBe(1);
       expect(await count(`fin.posting_rules WHERE posting_key = 'RETAINED_EARNINGS'`)).toBe(1);
       expect(await count(`fin.document_types WHERE code = 'FIN.YEAR_CLOSE'`)).toBe(1);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it('replays the partner vouchers’ accounts (0049_pos_vouchers data section)', async () => {
+    const file = join(__dirname, '../../src/db/migrations/0049_pos_vouchers.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(text.indexOf('-- pos_vouchers_data:begin'), text.indexOf('-- pos_vouchers_data:end'))
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    await admin.query('BEGIN');
+    try {
+      // A database of before ADR-0110: no voucher accounts, keys or rules.
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(
+        `DELETE FROM fin.posting_rules WHERE posting_key IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
+      );
+      await admin.query(
+        `DELETE FROM fin.posting_keys WHERE code IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
+      );
+      await admin.query(`DELETE FROM fin.accounts WHERE code IN ('120303', '511040')`);
+      await admin.query('SET LOCAL session_replication_role = origin');
+      for (const statement of statements) await admin.query(statement);
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.accounts WHERE code = '120303' AND kind = 'ASSET'`)).toBe(1);
+      expect(await count(`fin.accounts WHERE code = '511040' AND kind = 'INCOME'`)).toBe(1);
+      expect(
+        await count(
+          `fin.posting_rules WHERE posting_key IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
+        ),
+      ).toBe(2);
     } finally {
       await admin.query('ROLLBACK');
     }

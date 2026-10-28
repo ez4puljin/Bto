@@ -7,33 +7,44 @@ import {
   type EdgeCashier,
   type EdgeProductHit,
   type EdgeQuickGroup,
+  type EdgeQuotedVoucher,
   type EdgeQuoteResponse,
   type EdgeReceipt,
   type EdgeSaleRequest,
   lineVat,
   POS_LIMITS,
+  type PosVoucherFacts,
   posSaleNumber,
   type SaleDocWire,
   saleDocLinesOf,
   saleTotals,
   type SnapshotProduct,
+  type SaleVoucherWire,
   type TenderWire,
+  voucherPayments,
 } from '@tugeel/shared/pos';
-import { type QuoteLineInput, type QuoteResult, resolveQuote } from '@tugeel/shared/pricing';
+import {
+  type QuoteCoupon,
+  type QuoteLineInput,
+  type QuoteResult,
+  resolveQuote,
+} from '@tugeel/shared/pricing';
 import { matchesQuery, matchesStrictly, queryTerms } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
 import { and, desc, eq } from 'drizzle-orm';
 import { AppError, invalid, notFound } from '../../common/errors/app-error';
-import { EDGE_DB, type EdgeDb, inEdgeTransaction } from '../db/edge-db';
-import { edgeSales } from '../db/schema';
+import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
+import { edgeSales, edgeVoucherUses } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import { CreditGate } from './credit-gate.service';
 import { CustomerStore } from './customer.store';
+import { KioskAuthService } from './kiosk-auth.service';
 import { OutboxService } from './outbox.service';
 import { nextSequence } from './sequences';
 import { EdgeShiftsService } from './shifts.service';
 import { type LoadedSnapshot, SnapshotStore } from './snapshot.store';
+import { refused, VoucherStore, viewOf } from './voucher.store';
 
 const SEARCH_LIMIT = 30;
 
@@ -58,6 +69,8 @@ export class CheckoutService {
     private readonly taxpayers: TaxpayerClient,
     private readonly customers: CustomerStore,
     private readonly credit: CreditGate,
+    private readonly vouchers: VoucherStore,
+    private readonly auth: KioskAuthService,
   ) {}
 
   /**
@@ -124,8 +137,24 @@ export class CheckoutService {
   }
 
   quote(lines: readonly EdgeCartLine[]): EdgeQuoteResponse {
+    return this.quoteOf(lines, []);
+  }
+
+  /** ADR-0110: the quote with the coupons and partner vouchers scanned, each checked first. */
+  async quoteWithCodes(
+    lines: readonly EdgeCartLine[],
+    codes: readonly string[],
+  ): Promise<EdgeQuoteResponse> {
+    return this.quoteOf(lines, await this.vouchers.resolve(codes));
+  }
+
+  private quoteOf(
+    lines: readonly EdgeCartLine[],
+    facts: readonly PosVoucherFacts[],
+  ): EdgeQuoteResponse {
     const loaded = this.store.get();
-    const { inputs, result } = this.price(loaded, lines);
+    const { inputs, result } = this.price(loaded, lines, couponsOf(facts));
+    const vouchers = codesTaken(facts, result);
     const vat = inputs.map((input, index) => {
       const line = result.lines[index];
       return line?.priced
@@ -157,6 +186,9 @@ export class CheckoutService {
       discountTotal: result.discountTotal.toFixed(2),
       total: result.total.toFixed(2),
       vatTotal: vat.reduce((sum, value) => sum.plus(value), new Decimal(0)).toFixed(2),
+      vouchers: vouchers.quoted,
+      voucherTotal: vouchers.paid.toFixed(2),
+      due: result.total.minus(vouchers.paid).toFixed(2),
     };
   }
 
@@ -172,7 +204,12 @@ export class CheckoutService {
       .where(eq(edgeSales.clientId, request.clientId));
     if (existing) return existing.receipt;
     const loaded = this.store.get();
-    const { inputs, result } = this.price(loaded, request.lines);
+    const codes = request.codes ?? [];
+    // ADR-0110: a supervisor's PIN once for the sale's codes (owner 2026-10-27), always.
+    const approver = codes.length > 0 ? await this.voucherApprover(request) : null;
+    const facts = await this.vouchers.resolve(codes);
+    const { inputs, result } = this.price(loaded, request.lines, couponsOf(facts));
+    const taken = codesTaken(facts, result);
     result.lines.forEach((line, index) => {
       if (!line.priced) {
         const productId = inputs[index]?.productId ?? null;
@@ -187,7 +224,10 @@ export class CheckoutService {
       lineVat,
     );
     const totals = saleTotals(lines);
-    const tenders = this.tenders(loaded, request, totals.total);
+    const tenders = this.tenders(loaded, request, totals.total.minus(taken.paid), taken.wire);
+    if (tenders.credit.gt(0) && taken.paid.gt(0)) {
+      throw new AppError('POS_VOUCHER_WITH_CREDIT', 'a partner voucher and credit together', {});
+    }
     const customer = tenders.credit.gt(0)
       ? await this.creditCustomer(request, tenders.credit)
       : null;
@@ -220,7 +260,7 @@ export class CheckoutService {
         tillCode,
         shiftClientId: shift.clientId,
         cashierUserId: cashier.userId,
-        approvedByUserId: null,
+        approvedByUserId: approver?.userId ?? null,
         number,
         soldAt: soldAt.toISOString(),
         receiptType,
@@ -229,6 +269,7 @@ export class CheckoutService {
         consumerNo: null,
         refundsSaleClientId: null,
         customerId: customer?.id ?? null,
+        vouchers: taken.doc,
         lines,
         tenders: tenders.wire,
         subtotal: totals.subtotal.toFixed(2),
@@ -277,6 +318,12 @@ export class CheckoutService {
           name: tender.paymentTypeName ?? null,
         })),
         change: tenders.change.toFixed(2),
+        vouchers: taken.quoted.map((voucher) => ({
+          code: voucher.code,
+          kind: voucher.kind,
+          name: voucher.name,
+          amount: voucher.amount,
+        })),
         credit: customer
           ? {
               customerId: customer.id,
@@ -304,10 +351,12 @@ export class CheckoutService {
         creditAmount: tenders.credit,
         transferAmount: tenders.transfer,
         customerId: customer?.id ?? null,
+        voucherAmount: taken.paid,
         vatTotal: totals.vatTotal,
         doc,
         receipt,
       });
+      if (codes.length > 0) await this.takeCodes(tx, request.clientId, codes, taken.doc);
       await this.outbox.enqueue(tx, { kind: 'SALE', clientId: request.clientId, sale: doc });
       if (issues) {
         await this.ebarimt.enqueueSale(tx, {
@@ -319,6 +368,7 @@ export class CheckoutService {
           lines: this.ebarimt.linesOf(doc, loaded),
           cash: tenders.cash,
           card: tenders.card,
+          voucher: taken.paid,
           transfer: tenders.transfer,
           total: totals.total,
           vatTotal: totals.vatTotal,
@@ -343,6 +393,7 @@ export class CheckoutService {
   private price(
     loaded: LoadedSnapshot,
     lines: readonly EdgeCartLine[],
+    coupons: readonly QuoteCoupon[] = [],
   ): { inputs: QuoteLineInput[]; result: QuoteResult } {
     if (lines.length === 0 || lines.length > POS_LIMITS.maxLines) {
       throw new AppError('VALIDATION_FAILED', `a cart has 1 to ${POS_LIMITS.maxLines} lines`);
@@ -365,8 +416,49 @@ export class CheckoutService {
       list: 'RETAIL',
       products: loaded.quote.products,
       programs: loaded.quote.programs,
+      coupons,
     });
     return { inputs, result };
+  }
+
+  /** The supervisor who approved the sale's codes: required for every sale with one. */
+  private async voucherApprover(request: EdgeSaleRequest) {
+    if (!request.voucherApproval) {
+      throw new AppError('POS_SUPERVISOR_REQUIRED', 'a supervisor approves the codes', {});
+    }
+    return this.auth.approve(request.voucherApproval);
+  }
+
+  /**
+   * The sale's codes, taken inside its transaction: read again (a code another till took meanwhile
+   * is refused) and one use row each, whose key holds the code against a second sale.
+   */
+  private async takeCodes(
+    tx: EdgeTx,
+    clientId: string,
+    codes: readonly string[],
+    taken: readonly SaleVoucherWire[],
+  ): Promise<void> {
+    await this.vouchers.resolve(codes, tx);
+    const uses = await tx
+      .insert(edgeVoucherUses)
+      .values(
+        taken.map((voucher) => ({
+          code: voucher.code,
+          voucherId: voucher.voucherId,
+          kind: voucher.kind,
+          saleClientId: clientId,
+          amount: new Decimal(voucher.amount),
+        })),
+      )
+      .onConflictDoNothing()
+      .returning({ code: edgeVoucherUses.code });
+    const missing = taken.find((voucher) => !uses.some((use) => use.code === voucher.code));
+    if (missing) {
+      throw new AppError('POS_VOUCHER_USED', `code ${missing.code} was used meanwhile`, {
+        code: missing.code,
+      });
+    }
   }
 
   /**
@@ -391,6 +483,7 @@ export class CheckoutService {
     loaded: LoadedSnapshot,
     request: EdgeSaleRequest,
     total: Decimal,
+    vouchers: readonly TenderWire[] = [],
   ): {
     wire: TenderWire[];
     cash: Decimal;
@@ -399,8 +492,13 @@ export class CheckoutService {
     credit: Decimal;
     change: Decimal;
   } {
-    if (request.tenders.length === 0 || request.tenders.length > POS_LIMITS.maxTenders) {
+    // ADR-0110: nothing to tender when partner vouchers pay the whole sale.
+    const none = request.tenders.length === 0 && total.isZero() && vouchers.length > 0;
+    if (!none && (request.tenders.length === 0 || request.tenders.length > POS_LIMITS.maxTenders)) {
       throw new AppError('VALIDATION_FAILED', 'a sale is paid by one to a few tenders');
+    }
+    if (request.tenders.some((tender) => tender.kind === 'VOUCHER')) {
+      throw new AppError('VALIDATION_FAILED', 'the edge makes the voucher tenders from the codes');
     }
     const types = loaded.snapshot.paymentTypes ?? [];
     const sums = {
@@ -408,6 +506,7 @@ export class CheckoutService {
       CARD: new Decimal(0),
       TRANSFER: new Decimal(0),
       CREDIT: new Decimal(0),
+      VOUCHER: new Decimal(0),
     };
     let tendered = new Decimal(0);
     const wire = request.tenders.map((tender, index): TenderWire => {
@@ -463,7 +562,7 @@ export class CheckoutService {
     }
     // A zero part is no tender (the centre wants every amount positive).
     return {
-      wire: wire.filter((tender) => new Decimal(tender.amount).gt(0)),
+      wire: [...wire.filter((tender) => new Decimal(tender.amount).gt(0)), ...vouchers],
       cash: sums.CASH,
       card: sums.CARD,
       transfer: sums.TRANSFER,
@@ -495,4 +594,80 @@ export class CheckoutService {
   private vatRate(loaded: LoadedSnapshot, productId: number): Decimal {
     return loaded.vatRates.get(productId) ?? new Decimal(0);
   }
+}
+
+/** The coupons among a sale's codes, as the resolver takes them (ADR-0110). */
+function couponsOf(facts: readonly PosVoucherFacts[]): QuoteCoupon[] {
+  return facts
+    .filter((facts) => facts.kind === 'COUPON')
+    .map((coupon) => ({
+      code: coupon.code,
+      name: coupon.name,
+      effect: coupon.effect,
+      value: new Decimal(coupon.value),
+    }));
+}
+
+/**
+ * What each code of a priced cart does, in the order scanned: a coupon what it took off the lines,
+ * a partner voucher what it pays of the total (its face value or what is left); a partner voucher
+ * with nothing left to pay is refused.
+ */
+function codesTaken(
+  facts: readonly PosVoucherFacts[],
+  result: QuoteResult,
+): {
+  quoted: EdgeQuotedVoucher[];
+  doc: SaleVoucherWire[];
+  wire: TenderWire[];
+  paid: Decimal;
+} {
+  const partners = facts.filter((one) => one.kind === 'PARTNER');
+  const payments = voucherPayments(
+    result.total,
+    partners.map((partner) => partner.value),
+  );
+  const paidBy = new Map(partners.map((partner, index) => [partner.code, payments.amounts[index]]));
+  const quoted: EdgeQuotedVoucher[] = [];
+  const doc: SaleVoucherWire[] = [];
+  const wire: TenderWire[] = [];
+  for (const one of facts) {
+    let amount: Decimal;
+    if (one.kind === 'COUPON') {
+      amount = result.lines.reduce(
+        (sum, line) =>
+          line.priced
+            ? line.parts.reduce(
+                (partSum, part) =>
+                  part.applied
+                    .filter((applied) => applied.code === one.code)
+                    .reduce((appliedSum, applied) => appliedSum.plus(applied.amount ?? 0), partSum),
+                sum,
+              )
+            : sum,
+        new Decimal(0),
+      );
+    } else {
+      amount = paidBy.get(one.code) ?? new Decimal(0);
+      if (!amount.gt(0)) throw refused(one.code, 'NOTHING_DUE');
+      wire.push({
+        kind: 'VOUCHER',
+        amount: amount.toFixed(2),
+        tendered: null,
+        terminalId: null,
+        rrn: null,
+        maskedPan: null,
+        voucherCode: one.code,
+      });
+    }
+    quoted.push({ ...viewOf(one), amount: amount.toFixed(2) });
+    doc.push({
+      voucherId: one.id,
+      code: one.code,
+      kind: one.kind,
+      face: one.value,
+      amount: amount.toFixed(2),
+    });
+  }
+  return { quoted, doc, wire, paid: payments.paid };
 }

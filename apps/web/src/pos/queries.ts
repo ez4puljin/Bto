@@ -47,8 +47,14 @@ export const kioskKeys = {
   parked: (epoch: number) => ['kiosk', epoch, 'parked'] as const,
   ebarimt: (epoch: number) => ['kiosk', epoch, 'ebarimt'] as const,
   search: (epoch: number, q: string) => ['kiosk', epoch, 'search', q] as const,
-  quote: (epoch: number, lines: readonly EdgeCartLine[]) =>
-    ['kiosk', epoch, 'quote', lines.map((line) => `${line.productUnitId}:${line.qty}`)] as const,
+  quote: (epoch: number, lines: readonly EdgeCartLine[], codes: readonly string[] = []) =>
+    [
+      'kiosk',
+      epoch,
+      'quote',
+      lines.map((line) => `${line.productUnitId}:${line.qty}`),
+      [...codes],
+    ] as const,
 };
 
 export function useHealth() {
@@ -128,12 +134,14 @@ export function useProductSearch(q: string) {
 }
 
 /** The edge's prices for the cart, asked again on every change; the screen never computes them. */
-export function useQuote(lines: readonly EdgeCartLine[]) {
+/** The cart's quote, with the coupons and partner vouchers taken (ADR-0110). */
+export function useQuote(lines: readonly EdgeCartLine[], codes: readonly string[] = []) {
   const { client } = useKiosk();
   const { epoch } = useCredentials();
   return useQuery({
-    queryKey: kioskKeys.quote(epoch, lines),
-    queryFn: ({ signal }) => client.quote({ lines: [...lines] }, signal),
+    queryKey: kioskKeys.quote(epoch, lines, codes),
+    queryFn: ({ signal }) =>
+      client.quote({ lines: [...lines], ...(codes.length ? { codes: [...codes] } : {}) }, signal),
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 0,

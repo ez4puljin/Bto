@@ -1,5 +1,11 @@
 import { Decimal } from '@tugeel/shared/money';
-import { type PosEventKind, VOID_REASONS, type VoidReason } from '@tugeel/shared/pos';
+import {
+  type PosEventKind,
+  TENDER_KINDS,
+  type TenderKind,
+  VOID_REASONS,
+  type VoidReason,
+} from '@tugeel/shared/pos';
 import { invalid } from '../../common/errors/app-error';
 import type {
   DayCountDoc,
@@ -91,6 +97,11 @@ function encodeSale(doc: SaleDoc): Json {
       ...tender,
       amount: money(tender.amount),
       tendered: tender.tendered === null ? null : money(tender.tendered),
+    })),
+    vouchers: doc.vouchers.map((voucher) => ({
+      ...voucher,
+      face: money(voucher.face),
+      amount: money(voucher.amount),
     })),
   };
 }
@@ -247,16 +258,11 @@ function decodeSale(json: Json): SaleDoc {
     tenders: list(json.tenders).map((raw) => {
       const tender = asObject(raw);
       const tenderKind = str(tender.kind);
-      if (
-        tenderKind !== 'CASH' &&
-        tenderKind !== 'CARD' &&
-        tenderKind !== 'TRANSFER' &&
-        tenderKind !== 'CREDIT'
-      ) {
-        throw invalid('tenders.kind', 'enum', 'CASH, CARD, TRANSFER or CREDIT');
+      if (!(TENDER_KINDS as readonly string[]).includes(tenderKind)) {
+        throw invalid('tenders.kind', 'enum', 'CASH, CARD, TRANSFER, CREDIT or VOUCHER');
       }
       return {
-        kind: tenderKind,
+        kind: tenderKind as TenderKind,
         paymentTypeId: optInt(tender.paymentTypeId),
         paymentTypeName: optStr(tender.paymentTypeName),
         amount: dec(tender.amount),
@@ -265,6 +271,21 @@ function decodeSale(json: Json): SaleDoc {
         terminalId: optStr(tender.terminalId),
         rrn: optStr(tender.rrn),
         maskedPan: optStr(tender.maskedPan),
+        voucherCode: optStr(tender.voucherCode),
+      };
+    }),
+    vouchers: (Array.isArray(json.vouchers) ? json.vouchers : []).map((raw) => {
+      const voucher = asObject(raw);
+      const voucherKind = str(voucher.kind);
+      if (voucherKind !== 'COUPON' && voucherKind !== 'PARTNER') {
+        throw invalid('vouchers.kind', 'enum', 'COUPON or PARTNER');
+      }
+      return {
+        voucherId: int(voucher.voucherId),
+        code: str(voucher.code),
+        kind: voucherKind,
+        face: dec(voucher.face),
+        amount: dec(voucher.amount),
       };
     }),
     subtotal: dec(json.subtotal),

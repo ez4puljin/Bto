@@ -106,6 +106,7 @@ export {
   posQuickButtons,
   posQuickGroups,
   posSaleLines,
+  posSaleVouchers,
   posSales,
   posSettings,
   posShifts,
@@ -116,6 +117,8 @@ export {
   posTills,
   posVoidLines,
   posVoids,
+  posVoucherBatches,
+  posVouchers,
 } from '../modules/pos/schema';
 export {
   appNoticeCustomerReads,

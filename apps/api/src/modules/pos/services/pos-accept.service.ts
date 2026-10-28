@@ -9,6 +9,7 @@ import {
   refundSplit,
   saleTotals,
   tendersTotal,
+  voucherSaleRefundable,
   withinReturnWindow,
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
@@ -62,6 +63,7 @@ import { PosSettingsService } from './pos-settings.service';
 import { PosShiftsService } from './pos-shifts.service';
 import { PosTillsService } from './pos-tills.service';
 import { PosVoidsService } from './pos-voids.service';
+import { PosVouchersService } from './pos-vouchers.service';
 
 type SaleRow = typeof posSales.$inferSelect;
 type LineRow = typeof posSaleLines.$inferSelect;
@@ -100,6 +102,7 @@ export class PosAcceptService {
     private readonly customers: CustomersService,
     private readonly credit: PosCustomersService,
     private readonly books: PosCreditService,
+    private readonly vouchers: PosVouchersService,
     private readonly paymentTypes: PosPaymentTypesService,
     private readonly dayCounts: PosDayCountsService,
   ) {}
@@ -199,6 +202,13 @@ export class PosAcceptService {
     // ADR-0109: the customer row is locked after the shift and the refunded sale, before the shelf.
     const credit = creditPart(doc.tenders);
     const charged = await this.creditOf(tx, doc, credit, original?.sale ?? null);
+    // ADR-0110: a sale's codes and the partners they bill, locked after the customer, before the shelf.
+    const locked = await this.vouchers.lockForSaleInTx(tx, doc, soldDay);
+    if (original) await this.checkVoucherRefund(tx, doc, original.sale);
+    const voucherTotal = doc.tenders
+      .filter((tender) => tender.kind === 'VOUCHER')
+      .reduce((sum, tender) => sum.plus(tender.amount), new Decimal(0));
+    const voucherIds = new Map(doc.vouchers.map((voucher) => [voucher.code, voucher.voucherId]));
 
     const [sale] = await tx
       .insert(posSales)
@@ -232,6 +242,7 @@ export class PosAcceptService {
         customerId: doc.customerId,
         creditTotal: credit,
         creditExcess: charged?.excess ?? null,
+        voucherTotal,
       })
       .onConflictDoNothing({ target: [posSales.edgeNodeId, posSales.clientId] })
       .returning({ id: posSales.id, number: posSales.number })
@@ -298,6 +309,8 @@ export class PosAcceptService {
         terminalId: tender.terminalId,
         rrn: tender.rrn,
         maskedPan: tender.maskedPan,
+        voucherId:
+          tender.kind === 'VOUCHER' ? (voucherIds.get(tender.voucherCode ?? '') ?? null) : null,
       })),
     );
     if (original) await this.takeBack(tx, original.lines, doc.lines);
@@ -341,6 +354,21 @@ export class PosAcceptService {
       charged && credit.gt(0)
         ? await this.bookCredit(tx, actor, node, doc, sale.id, lines, credit, original)
         : null;
+    const billed =
+      locked.uses.length > 0
+        ? await this.vouchers.recordInTx(
+            tx,
+            actor,
+            {
+              id: sale.id,
+              number: doc.number,
+              branchId: locked.uses.some((use) => use.kind === 'PARTNER')
+                ? await this.org.branchOfWarehouses([node.warehouseId], tx)
+                : null,
+            },
+            locked,
+          )
+        : null;
     await this.tills.touchSale(till.id, doc.soldAt, tx);
     await this.audit.record(tx, actor, {
       action: 'ACCEPT',
@@ -363,6 +391,17 @@ export class PosAcceptService {
               creditExcess: charged.excess?.toFixed(MONEY_SCALE) ?? null,
               creditReason: charged.reason,
               booked: booked?.number ?? null,
+            }
+          : {}),
+        ...(locked.uses.length > 0
+          ? {
+              vouchers: locked.uses.map((use) => ({
+                code: use.code,
+                kind: use.kind,
+                amount: use.amount.toFixed(MONEY_SCALE),
+                issue: use.issue,
+              })),
+              voucherInvoices: billed?.invoices ?? [],
             }
           : {}),
       },
@@ -596,6 +635,33 @@ export class PosAcceptService {
     return invoice;
   }
 
+  /**
+   * A return of a sale partly paid by partner vouchers gives back only what was paid in cash or by
+   * card (owner 2026-10-27, ADR-0110 #4): with the earlier returns, at most the sale's total less
+   * its vouchers' part.
+   */
+  private async checkVoucherRefund(tx: Tx, doc: SaleDoc, original: SaleRow): Promise<void> {
+    if (!original.voucherTotal.gt(0)) return;
+    const [earlier] = await tx
+      .select({ total: sql<string>`coalesce(sum(${posSales.total}), 0)` })
+      .from(posSales)
+      .where(eq(posSales.refundsSaleId, original.id));
+    const refundable = voucherSaleRefundable({
+      cashAndCardPaid: original.total.minus(original.voucherTotal),
+      refunded: new Decimal(earlier?.total ?? 0),
+    });
+    if (doc.total.gt(refundable)) {
+      throw new AppError(
+        'POS_RETURN_VOUCHER_PART',
+        `sale ${original.number}: its voucher part is not refunded`,
+        {
+          number: original.number,
+          refundable: refundable.toFixed(MONEY_SCALE),
+        },
+      );
+    }
+  }
+
   private async saleByClientId(tx: Tx, nodeId: number, clientId: string): Promise<SaleRow | null> {
     const [row] = await tx
       .select()
@@ -652,6 +718,7 @@ export class PosAcceptService {
         }
       }
     });
+    this.vouchers.checkShape(doc);
     const credits = doc.tenders.filter((tender) => tender.kind === 'CREDIT').length;
     if (credits > 1) throw invalid('tenders', 'credit', 'at most one CREDIT tender');
     if (credits > 0 !== (doc.customerId !== null)) {

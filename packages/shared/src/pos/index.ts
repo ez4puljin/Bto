@@ -10,10 +10,15 @@ import { Decimal, type DecimalInput, toMoney } from '../money';
 /**
  * How a sale is paid at the till; no QPay (ADR-0080, SPEC §6.6 #4). CREDIT (ADR-0109) is the part a
  * registered customer owes: the centre invoices it, and the sale carries no e-Barimt. TRANSFER
- * (ADR-0111) is a bank transfer the cashier saw arrive in the store's account.
+ * (ADR-0111) is a bank transfer the cashier saw arrive in the store's account. VOUCHER (ADR-0110)
+ * is a partner voucher's part: the centre bills the partner its face value.
  */
-export const TENDER_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'] as const;
+export const TENDER_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT', 'VOUCHER'] as const;
 export type TenderKind = (typeof TENDER_KINDS)[number];
+
+/** The kinds an admin's payment type may have (ADR-0111); VOUCHER comes only from a scanned code. */
+export const PAYMENT_TYPE_KINDS = ['CASH', 'CARD', 'TRANSFER', 'CREDIT'] as const;
+export type PaymentTypeKind = (typeof PAYMENT_TYPE_KINDS)[number];
 
 /**
  * The till's banknotes for the day summary's count (owner 2026-10-27, ADR-0111), largest first;
@@ -78,7 +83,8 @@ export type PosStatus = (typeof POS_STATUSES)[number];
 
 export const POS_LIMITS = {
   maxLines: 200,
-  maxTenders: 4,
+  /** Cash, card and credit, plus a sale's partner vouchers (ADR-0110: up to 20). */
+  maxTenders: 24,
   maxEventsPerBatch: 50,
   maxNote: 300,
   maxName: 120,
@@ -277,6 +283,9 @@ export function parseEdgeToken(value: string): { nodeId: number; secret: string 
   if (!match?.[1] || !match[2]) return null;
   return { nodeId: Number.parseInt(match[1], 10), secret: match[2] };
 }
+
+// The till's coupons and partner vouchers (ADR-0110).
+export * from './vouchers';
 
 // The store edge: sync, snapshot and kiosk shapes (ADR-0067).
 export * from './edge';

@@ -21,6 +21,7 @@ import type {
   EdgeLoginResponse,
   EdgeCartLine,
   EdgeCustomer,
+  EdgeVoucher,
   EdgeDaySummary,
   EdgePairResponse,
   EdgeParkedBasket,
@@ -40,10 +41,12 @@ import type {
 } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { eq } from 'drizzle-orm';
+import { AppError } from '../../common/errors/app-error';
 import { EdgeConfig } from '../config/edge-env';
 import { EDGE_DB, type EdgeDb } from '../db/edge-db';
 import { edgeState } from '../db/schema';
 import {
+  ApprovalDto,
   DiscardParkedDto,
   EbarimtResolveDto,
   EbarimtSendDataDto,
@@ -74,6 +77,7 @@ import {
 } from '../guards/kiosk.guard';
 import { CheckoutService } from '../services/checkout.service';
 import { CustomerStore } from '../services/customer.store';
+import { VoucherStore } from '../services/voucher.store';
 import { TillRecordsService } from '../services/till-records.service';
 import { DevicesService } from '../services/devices.service';
 import { KioskAuthService } from '../services/kiosk-auth.service';
@@ -110,6 +114,7 @@ export class KioskController {
     private readonly ebarimt: EbarimtService,
     private readonly taxpayers: TaxpayerClient,
     private readonly customers: CustomerStore,
+    private readonly vouchers: VoucherStore,
     private readonly records: TillRecordsService,
   ) {}
 
@@ -229,8 +234,14 @@ export class KioskController {
 
   @Post('quote')
   @HttpCode(200)
-  quote(@Body() body: QuoteDto): EdgeQuoteResponse {
-    return this.checkout.quote(body.lines);
+  quote(@Body() body: QuoteDto): Promise<EdgeQuoteResponse> {
+    return this.checkout.quoteWithCodes(body.lines, body.codes ?? []);
+  }
+
+  /** ADR-0110: a scanned or typed coupon or partner voucher, as the till may take it today. */
+  @Get('vouchers/:code')
+  voucher(@Param('code') code: string): Promise<EdgeVoucher> {
+    return this.vouchers.check(code);
   }
 
   @Post('sales')
@@ -287,6 +298,18 @@ export class KioskController {
   @Get('supervisors')
   supervisors(): EdgeSupervisor[] {
     return this.auth.supervisors();
+  }
+
+  /**
+   * ADR-0110: a supervisor's PIN checked before the payment (the sale's codes); the sale checks it
+   * again. A wrong PIN counts toward the lock like a sign-in.
+   */
+  @Post('approvals/check')
+  @HttpCode(200)
+  async checkApproval(@Body() body: ApprovalDto): Promise<{ approvedByName: string }> {
+    const approver = await this.auth.approve(body);
+    if (!approver) throw new AppError('POS_SUPERVISOR_REQUIRED', 'a supervisor approves this', {});
+    return { approvedByName: approver.fullName };
   }
 
   @Post('voids')

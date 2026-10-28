@@ -8,6 +8,7 @@ export type {
   SaleDoc,
   SaleDocLine,
   SaleDocTender,
+  SaleDocVoucher,
   ShiftCloseDoc,
   ShiftOpenDoc,
   SyncEvent,
@@ -48,3 +49,10 @@ export {
   PosVoidsService,
   type VoidSummary,
 } from './services/pos-voids.service';
+export {
+  PosVouchersService,
+  type VoucherBatchInput,
+  type VoucherBatchView,
+  type VoucherCodeView,
+  type VoucherUseView,
+} from './services/pos-vouchers.service';

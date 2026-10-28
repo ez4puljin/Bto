@@ -2,7 +2,7 @@ import { Decimal } from '@tugeel/shared/money';
 import type { EdgePrintableReceipt, EdgePrintSecrets, EdgeReceipt } from '@tugeel/shared/pos';
 import { cn } from 'cn';
 import { CircleCheck, Printer } from 'lucide-react';
-import { type Ref, useRef } from 'react';
+import { Fragment, type Ref, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -163,6 +163,16 @@ export function ReceiptView({
             <dd className="text-right">{`−${formatMnt(receipt.discountTotal)}`}</dd>
           </>
         ) : null}
+        {(receipt.vouchers ?? [])
+          .filter((voucher) => voucher.kind === 'COUPON')
+          .map((voucher) => (
+            <Fragment key={voucher.code}>
+              <dt className="text-muted-foreground">
+                {`${t('posKiosk.vouchers.kinds.COUPON')}: ${voucher.name}`}
+              </dt>
+              <dd className="text-right text-muted-foreground">{`−${formatMnt(voucher.amount)}`}</dd>
+            </Fragment>
+          ))}
         <dt className="font-sans text-[15px] font-semibold">{t('pos.fields.total')}</dt>
         <dd className="text-right text-[15px] font-semibold">{formatTugrik(receipt.total)}</dd>
         {credit ? null : (

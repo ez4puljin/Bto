@@ -58,6 +58,19 @@ export interface QuoteContext {
   products: ReadonlyMap<number, QuoteProduct>;
   /** Programs in force on the quote date in the quoted channel. */
   programs: readonly QuoteProgram[];
+  /** The till's discount coupons (ADR-0110), applied last, in the order they were scanned. */
+  coupons?: readonly QuoteCoupon[];
+}
+
+/**
+ * A discount coupon scanned at the till (ADR-0110): a percentage or tugriks off what the cart comes
+ * to after every program, each coupon on the amount the earlier ones left.
+ */
+export interface QuoteCoupon {
+  code: string;
+  name: string;
+  effect: 'PERCENT' | 'AMOUNT';
+  value: Decimal;
 }
 
 /**
@@ -237,7 +250,8 @@ interface PartState {
  * 3. category programs, reached by the boxes counted or the amount of the category's parts after
  *    step 2; a percentage comes off each part (whole MNT), an amount is split over the parts in
  *    proportion to their amounts;
- * 4. order programs, reached by the cart's amount after step 3, applied the same way.
+ * 4. order programs, reached by the cart's amount after step 3, applied the same way;
+ * 5. the till's coupons (ADR-0110), each on the amounts the earlier steps and coupons left.
  * Within a stage every program is measured on the stage's starting amounts, then PERCENT programs
  * and AMOUNT programs apply in that order, each by id. A line without price terms is left out of
  * the amounts but its quantity still counts.
@@ -273,6 +287,14 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
   for (const program of stageOrder(context.programs, 'ORDER')) {
     const step = reachedStep(program.steps, orderAmount);
     if (step) applyToAmounts(program, step, everyPart);
+  }
+  for (const coupon of context.coupons ?? []) {
+    applyToAmounts(
+      couponProgram(coupon),
+      { threshold: ZERO, value: coupon.value },
+      everyPart,
+      coupon.code,
+    );
   }
 
   let subtotal = ZERO;
@@ -375,6 +397,7 @@ function applyToAmounts(
   program: QuoteProgram,
   step: DiscountStep,
   members: readonly PartState[],
+  code?: string,
 ): void {
   const priced = members.filter((state) => state.amount.gt(0));
   if (priced.length === 0) return;
@@ -392,8 +415,25 @@ function applyToAmounts(
     const cut = cuts[index] ?? ZERO;
     if (cut.isZero()) continue;
     state.amount = state.amount.minus(cut);
-    state.applied.push(appliedOf(program, step, cut));
+    const applied = appliedOf(program, step, cut);
+    state.applied.push(code === undefined ? applied : { ...applied, code });
   }
+}
+
+/** A coupon as an order program with one step from zero; its applied entries carry its code. */
+function couponProgram(coupon: QuoteCoupon): QuoteProgram {
+  return {
+    id: 0,
+    name: coupon.name,
+    scope: 'ORDER',
+    measure: 'AMOUNT',
+    effect: coupon.effect,
+    productId: null,
+    productUnitId: null,
+    categoryIds: null,
+    countUomId: null,
+    steps: [{ threshold: ZERO, value: coupon.value }],
+  };
 }
 
 /** A category's lines counted in the program's unit of measure: each box is 1, pieces in boxes. */

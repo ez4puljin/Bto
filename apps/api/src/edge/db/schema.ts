@@ -4,12 +4,14 @@ import type {
   EdgeReceipt,
   PosCustomerFeed,
   PosSnapshot,
+  PosVoucherFeed,
   ReceiptType,
   SaleDocWire,
   SaleKind,
   SyncEventWire,
   VoidDocWire,
   VoidReason,
+  VoucherKind,
 } from '@tugeel/shared/pos';
 import { sql } from 'drizzle-orm';
 import {
@@ -59,6 +61,10 @@ export const edgeState = pgTable(
     customersVersion: text('customers_version'),
     customers: jsonValue('customers').$type<PosCustomerFeed | null>(),
     customersPulledAt: timestamp('customers_pulled_at', { withTimezone: true }),
+    /** ADR-0110: the coupons and partner vouchers a till may take, as the centre's feed answered. */
+    vouchersVersion: text('vouchers_version'),
+    vouchers: jsonValue('vouchers').$type<PosVoucherFeed | null>(),
+    vouchersPulledAt: timestamp('vouchers_pulled_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check('edge_state_single_row', sql`${t.id} = 1`)],
@@ -144,6 +150,10 @@ export const edgeSales = pgTable(
       .notNull()
       .default(sql`0`),
     customerId: bigint('customer_id', { mode: 'number' }),
+    /** ADR-0110: the part partner vouchers paid (never refunded). */
+    voucherAmount: money('voucher_amount')
+      .notNull()
+      .default(sql`0`),
     vatTotal: money('vat_total').notNull(),
     doc: jsonValue('doc').$type<SaleDocWire>().notNull(),
     receipt: jsonValue('receipt').$type<EdgeReceipt>().notNull(),
@@ -307,6 +317,29 @@ export const edgeReceipts = pgTable(
     check('edge_receipts_type', sql`${t.receiptType} IN ('B2C', 'B2B')`),
     check('edge_receipts_cancel_target', sql`${t.op} = 'ISSUE' OR ${t.targetClientId} IS NOT NULL`),
     check('edge_receipts_issue_lines', sql`${t.op} = 'CANCEL' OR ${t.lines} IS NOT NULL`),
+  ],
+);
+
+/**
+ * A code a till took (ADR-0110): one row per code, so no two sales of this store take the same
+ * code, offline too; the centre learns of it with the sale.
+ */
+export const edgeVoucherUses = pgTable(
+  'edge_voucher_uses',
+  {
+    code: text('code').primaryKey(),
+    voucherId: bigint('voucher_id', { mode: 'number' }).notNull(),
+    kind: text('kind').$type<VoucherKind>().notNull(),
+    saleClientId: uuid('sale_client_id')
+      .notNull()
+      .references(() => edgeSales.clientId),
+    amount: money('amount').notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('edge_voucher_uses_sale_idx').on(t.saleClientId),
+    check('edge_voucher_uses_kind', sql`${t.kind} IN ('COUPON', 'PARTNER')`),
+    check('edge_voucher_uses_amount', sql`${t.amount} >= 0`),
   ],
 );
 

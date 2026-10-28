@@ -3,6 +3,7 @@ import {
   EDGE_DEVICE_HEADER,
   type EdgeBarcodeHit,
   type EdgeCartLine,
+  type EdgeApproval,
   type EdgeCustomer,
   type EdgeDayCountRequest,
   type EdgeDaySummary,
@@ -36,6 +37,7 @@ import {
   type EdgeTaxpayer,
   type EdgeVoidRequest,
   type EdgeVoidResponse,
+  type EdgeVoucher,
 } from '@tugeel/shared/pos';
 
 /** The bound browser's credential (ADR-0067): kept across restarts of the till PC. */
@@ -270,6 +272,16 @@ export class EdgeClient {
 
   sale(body: EdgeSaleRequest) {
     return this.request<EdgePrintableReceipt>('POST', '/sales', { body });
+  }
+
+  /** ADR-0110: a supervisor's PIN checked before the payment of a sale with codes. */
+  checkApproval(body: EdgeApproval) {
+    return this.request<{ approvedByName: string }>('POST', '/approvals/check', { body });
+  }
+
+  /** ADR-0110: a scanned or typed coupon or partner voucher, as the till may take it today. */
+  voucher(code: string, signal?: AbortSignal) {
+    return this.request<EdgeVoucher>('GET', `/vouchers/${encodeURIComponent(code)}`, { signal });
   }
 
   /** ADR-0109: the customers a sale on credit may charge (the edge's feed, offline too). */

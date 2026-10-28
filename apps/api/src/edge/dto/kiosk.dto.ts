@@ -7,6 +7,7 @@ import {
   type TenderKind,
   VOID_REASONS,
   type VoidReason,
+  VOUCHER_LIMITS,
 } from '@tugeel/shared/pos';
 import { Type } from 'class-transformer';
 import {
@@ -59,6 +60,13 @@ export class QuoteDto {
   @ValidateNested({ each: true })
   @Type(() => CartLineDto)
   lines: CartLineDto[];
+
+  /** ADR-0110: the coupons and partner vouchers scanned, in order. */
+  @IsOptional()
+  @ArrayMaxSize(VOUCHER_LIMITS.maxPerSale)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  codes?: string[];
 }
 
 export class TenderDto {
@@ -80,7 +88,7 @@ export class SaleDto {
   @Type(() => CartLineDto)
   lines: CartLineDto[];
 
-  @ArrayMinSize(1)
+  /** Empty only when partner vouchers pay the whole sale (ADR-0110). */
   @ArrayMaxSize(POS_LIMITS.maxTenders)
   @ValidateNested({ each: true })
   @Type(() => TenderDto)
@@ -97,6 +105,19 @@ export class SaleDto {
 
   /** The cashier went on after the offline warning on the customer's limit. */
   @IsOptional() @IsBoolean() acceptOverLimit?: boolean;
+
+  /** ADR-0110: the coupons and partner vouchers scanned, in order. */
+  @IsOptional()
+  @ArrayMaxSize(VOUCHER_LIMITS.maxPerSale)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  codes?: string[];
+
+  /** A supervisor's PIN, once for the sale's codes. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ApprovalDto)
+  voucherApproval?: ApprovalDto | null;
 }
 
 export class BuyerDto {

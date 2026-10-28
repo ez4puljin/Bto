@@ -7,6 +7,7 @@ import type {
   SnapshotResponseWire,
   SyncEventWire,
   SyncResponseWire,
+  VoucherFeedResponseWire,
 } from '@tugeel/shared/pos';
 import { EdgeConfig } from '../config/edge-env';
 
@@ -44,6 +45,12 @@ export class CentralClient {
   customers(since: string | null): Promise<CustomerFeedResponseWire> {
     const query = since ? `?since=${encodeURIComponent(since)}` : '';
     return this.call<CustomerFeedResponseWire>('GET', `/customers${query}`);
+  }
+
+  /** ADR-0110: the codes a till may take, or only the version when `since` names it. */
+  vouchers(since: string | null): Promise<VoucherFeedResponseWire> {
+    const query = since ? `?since=${encodeURIComponent(since)}` : '';
+    return this.call<VoucherFeedResponseWire>('GET', `/vouchers${query}`);
   }
 
   /** The centre's credit check before a credit sale; a short wait, the till decides otherwise. */

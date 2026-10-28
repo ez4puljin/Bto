@@ -81,6 +81,7 @@ export const shiftDto = ({ payments, ...shift }: ShiftSummary): ShiftDto => ({
   cardRefunds: money(shift.cardRefunds),
   creditSales: money(shift.creditSales),
   creditRefunds: money(shift.creditRefunds),
+  voucherSales: money(shift.voucherSales),
   transferSales: money(shift.transferSales),
   transferRefunds: money(shift.transferRefunds),
   ...(payments

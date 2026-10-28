@@ -7,6 +7,7 @@ import type {
   SyncResult,
   TenderKind,
   VoidReason,
+  VoucherKind,
 } from '@tugeel/shared/pos';
 import type { PriceBasis } from '@tugeel/shared/pricing';
 import type { ProblemParams } from '../../common/errors/app-error';
@@ -46,6 +47,17 @@ export interface SaleDocTender {
   terminalId: string | null;
   rrn: string | null;
   maskedPan: string | null;
+  /** A VOUCHER tender's code (ADR-0110). */
+  voucherCode: string | null;
+}
+
+/** A code the till took (ADR-0110): a coupon's discount or a partner voucher's payment. */
+export interface SaleDocVoucher {
+  voucherId: number;
+  code: string;
+  kind: VoucherKind;
+  face: Decimal;
+  amount: Decimal;
 }
 
 /** What the edge knows of the e-Barimt receipt; never the lottery or the QR (ADR-0065). */
@@ -74,6 +86,8 @@ export interface SaleDoc {
   refundsSaleClientId: string | null;
   /** The registered customer a CREDIT tender charges (ADR-0109); null without credit. */
   customerId: number | null;
+  /** The coupons and partner vouchers the till took (ADR-0110). */
+  vouchers: SaleDocVoucher[];
   lines: SaleDocLine[];
   tenders: SaleDocTender[];
   subtotal: Decimal;

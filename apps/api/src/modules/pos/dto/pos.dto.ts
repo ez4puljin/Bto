@@ -16,10 +16,16 @@ import {
   type ShiftStatus,
   SYNC_RESULTS,
   type SyncResult,
+  PAYMENT_TYPE_KINDS,
+  type PaymentTypeKind,
   TENDER_KINDS,
   type TenderKind,
   VOID_REASONS,
   type VoidReason,
+  VOUCHER_CODE_PATTERN,
+  VOUCHER_KINDS,
+  VOUCHER_LIMITS,
+  type VoucherKind,
 } from '@tugeel/shared/pos';
 import { CLASSIFICATION_CODE_PATTERN, DISTRICT_CODE_PATTERN } from '@tugeel/shared/mn';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
@@ -367,6 +373,8 @@ export class ShiftDto {
   @ApiProperty({ example: '0.00', description: 'ADR-0109: sold on credit' }) creditSales: string;
   @ApiProperty({ example: '0.00', description: 'ADR-0109: taken off customers’ debts' })
   creditRefunds: string;
+  @ApiProperty({ example: '0.00', description: 'ADR-0110: paid by partner vouchers' })
+  voucherSales: string;
   @ApiProperty({ example: '0.00', description: 'ADR-0111: bank transfers' }) transferSales: string;
   @ApiProperty({ example: '0.00' }) transferRefunds: string;
   @ApiPropertyOptional({ type: () => [ShiftPaymentDto], description: 'On one shift’s read' })
@@ -663,6 +671,8 @@ export class PosAttentionDto {
   receiptsToCheck: number;
   @ApiProperty({ description: 'Credit sales past their limit or hold, not checked (ADR-0109)' })
   creditToCheck: number;
+  @ApiProperty({ description: 'Codes used twice, stopped or out of date, not checked (ADR-0110)' })
+  vouchersToCheck: number;
 }
 
 @ApiSchema({ name: 'PosDayCountRow' })
@@ -675,7 +685,7 @@ export class DayCountRowDto {
 export class PaymentTypeDto {
   @ApiProperty() id: number;
   @ApiProperty({ example: 'Khaanbank terminal' }) name: string;
-  @ApiProperty({ enum: TENDER_KINDS }) kind: TenderKind;
+  @ApiProperty({ enum: PAYMENT_TYPE_KINDS }) kind: PaymentTypeKind;
   @ApiProperty({ enum: POS_STATUSES }) status: PosStatus;
   @ApiProperty() sort: number;
 }
@@ -693,7 +703,7 @@ export class PaymentTypeInputDto {
   @MinLength(1)
   @MaxLength(POS_LIMITS.maxPaymentTypeName)
   name: string;
-  @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiProperty({ enum: PAYMENT_TYPE_KINDS }) @IsIn(PAYMENT_TYPE_KINDS) kind: PaymentTypeKind;
   @ApiProperty({ enum: POS_STATUSES }) @IsIn(POS_STATUSES) status: PosStatus;
 }
 
@@ -827,6 +837,23 @@ export class SaleDocTenderDto {
   @IsString()
   @MaxLength(POS_LIMITS.maxCardField)
   maskedPan?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'ADR-0110: a VOUCHER tender' })
+  @IsOptional()
+  @IsString()
+  @Matches(VOUCHER_CODE_PATTERN)
+  voucherCode?: string | null;
+}
+
+@ApiSchema({ name: 'PosSaleDocVoucher' })
+export class SaleDocVoucherDto {
+  @ApiProperty() @IsInt() @Min(1) voucherId: number;
+  @ApiProperty({ example: '9910000000000001' })
+  @IsString()
+  @Matches(VOUCHER_CODE_PATTERN)
+  code: string;
+  @ApiProperty({ enum: VOUCHER_KINDS }) @IsIn(VOUCHER_KINDS) kind: VoucherKind;
+  @ApiProperty({ example: '50000' }) @IsString() @Matches(MONEY) face: string;
+  @ApiProperty({ example: '42000' }) @IsString() @Matches(MONEY) amount: string;
 }
 
 @ApiSchema({ name: 'PosSaleDoc' })
@@ -896,6 +923,13 @@ export class SaleDocDto {
   @ValidateNested({ each: true })
   @Type(() => SaleDocTenderDto)
   tenders: SaleDocTenderDto[];
+  @ApiPropertyOptional({ type: [SaleDocVoucherDto], description: 'ADR-0110: the codes taken' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(VOUCHER_LIMITS.maxPerSale)
+  @ValidateNested({ each: true })
+  @Type(() => SaleDocVoucherDto)
+  vouchers?: SaleDocVoucherDto[];
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) subtotal: string;
   @ApiProperty({ example: '0' }) @IsString() @Matches(MONEY) discountTotal: string;
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) total: string;
@@ -1188,7 +1222,7 @@ export class DevSaleLineDto {
 
 @ApiSchema({ name: 'PosDevTender' })
 export class DevTenderDto {
-  @ApiProperty({ enum: TENDER_KINDS }) @IsIn(TENDER_KINDS) kind: TenderKind;
+  @ApiProperty({ enum: PAYMENT_TYPE_KINDS }) @IsIn(PAYMENT_TYPE_KINDS) kind: PaymentTypeKind;
   @ApiProperty({ example: '12000' }) @IsString() @Matches(MONEY) amount: string;
   @ApiPropertyOptional({ type: String, nullable: true, example: '20000' })
   @IsOptional()

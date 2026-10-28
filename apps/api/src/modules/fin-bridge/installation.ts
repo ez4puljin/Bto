@@ -126,6 +126,10 @@ export const POSTING_KEY_OF_ROLE: Readonly<Record<GlRole, PostingKeySpec>> = {
   ISSUE_OTHER: key('ISSUE_OTHER'),
   // The year close (F6, ADR-0105): the profit or loss of a year closes into it.
   RETAINED_EARNINGS: key('RETAINED_EARNINGS'),
+  // The till's partner vouchers (ADR-0110): the shift's close debits the clearing, the partner's
+  // bill credits it and the unspent rest.
+  VOUCHER_CLEARING: key('VOUCHER_CLEARING'),
+  VOUCHER_BREAKAGE: key('VOUCHER_BREAKAGE'),
 };
 
 /** The key of a typed journal line: the accountant names the account (F2, ADR-0090). */

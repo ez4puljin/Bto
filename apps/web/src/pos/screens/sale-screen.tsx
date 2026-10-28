@@ -1,14 +1,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { cleanBarcode } from '@tugeel/shared/gtin';
 import { Decimal } from '@tugeel/shared/money';
-import type {
-  EdgeApproval,
-  EdgeParkedBasket,
-  EdgeProductHit,
-  EdgePrintableReceipt,
-  EdgeQuotedLine,
-  EdgeSession,
-  VoidReason,
+import {
+  type EdgeApproval,
+  type EdgeParkedBasket,
+  type EdgeProductHit,
+  type EdgePrintableReceipt,
+  type EdgeQuotedLine,
+  type EdgeQuoteResponse,
+  type EdgeSession,
+  formatVoucherCode,
+  parseVoucherCode,
+  type VoidReason,
 } from '@tugeel/shared/pos';
 import { cn } from 'cn';
 import {
@@ -25,6 +28,7 @@ import {
   ScanBarcode,
   Search,
   Tag,
+  Ticket,
   Undo2,
   X,
 } from 'lucide-react';
@@ -65,11 +69,13 @@ import { ReceiptDialog } from '../components/receipt';
 import { usePrint } from '../components/print-context';
 import { ReturnsDialog } from '../components/returns-dialog';
 import { SearchDialog } from '../components/search-dialog';
+import { VoucherDialog } from '../components/voucher-dialog';
 import { edgeProblemOf } from '../edge-client';
 import { useCredentials, useKiosk } from '../kiosk-context';
 import { isMinusKey, isPlusKey, keepFocus, typeDigits } from '../keys';
 import { useProblemText } from '../messages';
 import { kioskKeys, useHealth, useParked, useQuote } from '../queries';
+import { useVoucherAdd } from '../vouchers';
 
 type Dialogs =
   | 'search'
@@ -84,10 +90,14 @@ type Dialogs =
   | 'returns'
   | 'ebarimt'
   | 'approval'
+  | 'vouchers'
   | null;
 
-/** The keys of the till's tools (ADR-0104); F12 would open the browser's tools, F6 its bar. */
-const TOOL_KEYS = new Set(['F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F12']);
+/**
+ * The keys of the till's tools (ADR-0104); F12 would open the browser's tools, F6 its bar. F2: the
+ * coupons and partner vouchers (ADR-0110).
+ */
+const TOOL_KEYS = new Set(['F2', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'F12']);
 
 /**
  * The till's main screen (Erxes-like): the scanner always adds to the cart, «Бараа хайх (F6)»
@@ -127,7 +137,14 @@ export function SaleScreen(props: {
   // One client id per payment attempt of one cart: a retry after a timeout sends the same id.
   const pending = useRef<{ key: string; clientId: string } | null>(null);
 
-  const quote = useQuote(cart.wire);
+  // ADR-0110: the coupons and partner vouchers taken, in the order scanned; gone with the cart.
+  const [codes, setCodes] = useState<string[]>([]);
+  const addCode = useVoucherAdd();
+  const quote = useQuote(cart.wire, codes);
+  const empty = cart.lines.length === 0;
+  useEffect(() => {
+    if (empty) setCodes([]);
+  }, [empty]);
   const quoted = useMemo(
     () =>
       new Map<number, EdgeQuotedLine>(
@@ -160,6 +177,21 @@ export function SaleScreen(props: {
 
   const scan = useCallback(
     async (text: string) => {
+      // A coupon or a partner voucher scanned at the till opens its dialog with the code taken.
+      const voucher = parseVoucherCode(text);
+      if (voucher) {
+        if (cart.lines.length === 0) {
+          setScanError(t('posKiosk.vouchers.cartFirst'));
+          return;
+        }
+        const result = await addCode(cart.wire, codes, voucher.code);
+        if (result.ok) {
+          setCodes(result.codes);
+          setScanError(null);
+          setDialog('vouchers');
+        } else setScanError(result.error);
+        return;
+      }
       const code = cleanBarcode(text);
       if (!code) return;
       try {
@@ -172,7 +204,7 @@ export function SaleScreen(props: {
         );
       }
     },
-    [client, addProduct, t, problemText],
+    [client, addProduct, t, problemText, addCode, cart.lines.length, cart.wire, codes],
   );
   const onScan = useCallback((code: string) => void scan(code), [scan]);
 
@@ -188,16 +220,55 @@ export function SaleScreen(props: {
     { root: receiptContent },
   );
 
-  const openPayment = useCallback(() => {
-    if (!canPay || !quote.data) return;
-    const key = JSON.stringify(cart.wire);
-    if (pending.current?.key !== key) pending.current = { key, clientId: randomUuid() };
-    setAttempt({ clientId: pending.current.clientId, total: quote.data.total, lines: cart.wire });
-    setDialog('pay');
-  }, [canPay, quote.data, cart.wire]);
+  const startPayment = useCallback(
+    (data: EdgeQuoteResponse, given: EdgeApproval | null) => {
+      const key = JSON.stringify([cart.wire, codes]);
+      if (pending.current?.key !== key) pending.current = { key, clientId: randomUuid() };
+      setAttempt({
+        clientId: pending.current.clientId,
+        total: data.due ?? data.total,
+        lines: cart.wire,
+        codes,
+        vouchers: data.vouchers ?? [],
+        voucherApproval: given,
+      });
+      setDialog('pay');
+    },
+    [cart.wire, codes],
+  );
+
+  /**
+   * «Төлбөр (F12)»: with coupons or partner vouchers taken, a supervisor's PIN first (once for the
+   * sale, ADR-0110), then the payment for what is left.
+   */
+  const openPayment = useCallback(
+    (given?: EdgeQuoteResponse) => {
+      const data = given ?? quote.data;
+      if (!canPay || !data) return;
+      if (codes.length === 0) {
+        startPayment(data, null);
+        return;
+      }
+      setApproval({
+        kind: 'VOUCHERS',
+        items: (data.vouchers ?? []).map((voucher) => ({
+          name: `${t(`posKiosk.vouchers.kinds.${voucher.kind}`)} · ${voucher.name} (${formatVoucherCode(voucher.code)})`,
+          qty: voucher.amount,
+          uomName: '₮',
+        })),
+        run: async (approval) => {
+          await client.checkApproval(approval);
+          startPayment(data, approval);
+        },
+      });
+      setDialog('approval');
+    },
+    [canPay, quote.data, codes, startPayment, t, client],
+  );
 
   const paid = (done: EdgePrintableReceipt) => {
     pending.current = null;
+    setCodes([]);
     cart.clear();
     setScanError(null);
     setReceipt(done);
@@ -288,6 +359,7 @@ export function SaleScreen(props: {
   );
 
   const clearSale = useCallback(() => {
+    setCodes([]);
     cart.clear();
     pending.current = null;
     setScanError(null);
@@ -411,9 +483,9 @@ export function SaleScreen(props: {
     [cart, stepLine, removeLine],
   );
 
-  const keys = useRef({ dialog, openPayment, cartKey, park });
+  const keys = useRef({ dialog, openPayment, cartKey, park, cartEmpty: empty });
   useEffect(() => {
-    keys.current = { dialog, openPayment, cartKey, park };
+    keys.current = { dialog, openPayment, cartKey, park, cartEmpty: empty };
   });
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
@@ -423,7 +495,10 @@ export function SaleScreen(props: {
         if (current.dialog !== null) return;
         setNotice(null);
         if (event.key === 'F6') setDialog('search');
-        else if (event.key === 'F7') setDialog('quick');
+        else if (event.key === 'F2') {
+          if (current.cartEmpty) return;
+          setDialog('vouchers');
+        } else if (event.key === 'F7') setDialog('quick');
         else if (event.key === 'F8') setDialog('price');
         else if (event.key === 'F9') void current.park();
         else if (event.key === 'F10') setDialog('parked');
@@ -637,6 +712,18 @@ export function SaleScreen(props: {
                   </div>
                 </>
               ) : null}
+              {totals && new Decimal(totals.voucherTotal ?? 0).gt(0) ? (
+                <>
+                  <div className="flex justify-between text-success">
+                    <dt>{t('posKiosk.vouchers.voucherTotal')}</dt>
+                    <dd className="font-mono">{`−${formatMnt(totals.voucherTotal ?? '0')}₮`}</dd>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <dt>{t('posKiosk.vouchers.due')}</dt>
+                    <dd className="font-mono">{formatTugrik(totals.due ?? totals.total)}</dd>
+                  </div>
+                </>
+              ) : null}
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">{t('posKiosk.sale.vat')}</dt>
                 <dd className="font-mono">{formatTugrik(totals?.vatTotal ?? '0')}</dd>
@@ -694,6 +781,19 @@ export function SaleScreen(props: {
               <ArchiveRestore />
               {t('posKiosk.sale.parked', { count: parked.data?.length ?? 0 })}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="col-span-2 h-11"
+              disabled={cart.lines.length === 0}
+              onMouseDown={keepFocus}
+              onClick={() => setDialog('vouchers')}
+            >
+              <Ticket />
+              {codes.length > 0
+                ? t('posKiosk.vouchers.buttonCount', { count: codes.length })
+                : t('posKiosk.vouchers.button')}
+            </Button>
           </div>
           <div className="mt-auto flex flex-col gap-3">
             <Button
@@ -712,7 +812,7 @@ export function SaleScreen(props: {
               className="h-16 text-xl font-semibold"
               disabled={!canPay}
               onMouseDown={keepFocus}
-              onClick={openPayment}
+              onClick={() => openPayment()}
             >
               {t('posKiosk.sale.pay')}
             </Button>
@@ -728,6 +828,15 @@ export function SaleScreen(props: {
           addProduct(product, unitId);
           closeDialog();
         }}
+      />
+      <VoucherDialog
+        open={dialog === 'vouchers'}
+        lines={cart.wire}
+        codes={codes}
+        onCodes={setCodes}
+        onPay={(data) => openPayment(data)}
+        onClose={closeDialog}
+        onCloseAutoFocus={refocus}
       />
       <PaymentDialog
         open={dialog === 'pay'}

@@ -3,7 +3,7 @@ import {
   POS_LIMITS,
   type PosStatus,
   type SnapshotPaymentType,
-  type TenderKind,
+  type PaymentTypeKind,
 } from '@tugeel/shared/pos';
 import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -16,14 +16,14 @@ import { posPaymentTypes } from '../schema';
 export interface PaymentType {
   id: number;
   name: string;
-  kind: TenderKind;
+  kind: PaymentTypeKind;
   status: PosStatus;
   sort: number;
 }
 
 export interface PaymentTypesInput {
   /** The whole list in the till's order: a row with an id keeps it, one without adds a type. */
-  types: { id: number | null; name: string; kind: TenderKind; status: PosStatus }[];
+  types: { id: number | null; name: string; kind: PaymentTypeKind; status: PosStatus }[];
 }
 
 /**
@@ -34,7 +34,7 @@ export interface PaymentTypesInput {
  * active CASH type is needed (returns pay back in cash).
  */
 /** The owner's first types (2026-10-27), as migration 0050 seeds them for an existing database. */
-const FIRST_TYPES: readonly { name: string; kind: TenderKind }[] = [
+const FIRST_TYPES: readonly { name: string; kind: PaymentTypeKind }[] = [
   { name: 'Бэлэн', kind: 'CASH' },
   { name: 'Khaanbank terminal', kind: 'CARD' },
   { name: 'Шилжүүлэг', kind: 'TRANSFER' },
@@ -102,7 +102,7 @@ export class PosPaymentTypesService implements OnApplicationBootstrap {
     }
     const names = new Set<string>();
     const ids = new Set<number>();
-    const activeOf = (kind: TenderKind) =>
+    const activeOf = (kind: PaymentTypeKind) =>
       input.types.filter((type) => type.kind === kind && type.status === 'ACTIVE').length;
     input.types.forEach((type, index) => {
       const name = type.name.trim();
