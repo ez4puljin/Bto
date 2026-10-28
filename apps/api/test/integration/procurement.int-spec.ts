@@ -113,8 +113,7 @@ describe('purchase orders and receiving', () => {
       .set(idempotency())
       .send({ to });
   const receipt = async (token: string, id: number) =>
-    (await http().get(`/api/v1/receipts/${id}`).set(bearer(token)).expect(200))
-      .body as ReceiptJson;
+    (await http().get(`/api/v1/receipts/${id}`).set(bearer(token)).expect(200)).body as ReceiptJson;
   const lineOf = (detail: ReceiptJson, productId: number) => {
     const line = detail.lines.find((row) => row.productId === productId);
     if (!line) throw new Error(`no line of ${productId}`);
@@ -280,9 +279,17 @@ describe('purchase orders and receiving', () => {
     const box = unitOf(juice, 'BOX').id;
     // The orderer types juice in boxes; keeper 2 types salt (their warehouse) but not flour.
     expect(
-      (await save(orderer, id, supplierA, [
-        { productId: juice.id, productUnitId: box, qty: '5', previousUnitId: null, previousQty: null },
-      ]).expect(200)).body,
+      (
+        await save(orderer, id, supplierA, [
+          {
+            productId: juice.id,
+            productUnitId: box,
+            qty: '5',
+            previousUnitId: null,
+            previousQty: null,
+          },
+        ]).expect(200)
+      ).body,
     ).toEqual({ applied: 1, conflicts: [], refused: [] });
     expect(
       (
@@ -308,7 +315,13 @@ describe('purchase orders and receiving', () => {
     expect(
       (
         await save(manager, id, supplierA, [
-          { productId: juice.id, productUnitId: box, qty: '9', previousUnitId: null, previousQty: null },
+          {
+            productId: juice.id,
+            productUnitId: box,
+            qty: '9',
+            previousUnitId: null,
+            previousQty: null,
+          },
           {
             productId: flour.id,
             productUnitId: unitOf(flour, 'PCS').id,
@@ -360,10 +373,7 @@ describe('purchase orders and receiving', () => {
       docUnitPrice: '14400.00',
     });
     // The order's draft is cancelled only through the order.
-    await http()
-      .post(`/api/v1/receipts/${receiptId}/cancel`)
-      .set(bearer(admin))
-      .expect(409);
+    await http().post(`/api/v1/receipts/${receiptId}/cancel`).set(bearer(admin)).expect(409);
 
     // Keeper 1 checks their lines; keeper 2 has not counted salt yet.
     await count(keeper1, lineOf(draft, juice.id).id, '4').expect(200);
@@ -388,9 +398,9 @@ describe('purchase orders and receiving', () => {
       .send({ productUnitId: unitOf(soap, 'PCS').id, enteredQty: '6' })
       .expect(201);
     // The note says 83 pieces; 48 + 35 + 6 = 89 are counted.
-    expect(
-      ((await confirm(keeper2, receiptId).expect(422)).body as { code: string }).code,
-    ).toBe('RECEIPT_NOTE_QTY_MISMATCH');
+    expect(((await confirm(keeper2, receiptId).expect(422)).body as { code: string }).code).toBe(
+      'RECEIPT_NOTE_QTY_MISMATCH',
+    );
     await http()
       .patch(`/api/v1/receipts/${receiptId}`)
       .set(bearer(keeper2))
@@ -430,12 +440,14 @@ describe('purchase orders and receiving', () => {
     // 57,600 + 3,000 = 60,600 against a note of 57,600: refused beyond 1₮.
     expect(
       (
-        (await http()
-          .put(`/api/v1/receipts/${receiptId}/costs`)
-          .set(bearer(accountant))
-          .set(idempotency())
-          .send(prices('3000'))
-          .expect(422)).body as { code: string }
+        (
+          await http()
+            .put(`/api/v1/receipts/${receiptId}/costs`)
+            .set(bearer(accountant))
+            .set(idempotency())
+            .send(prices('3000'))
+            .expect(422)
+        ).body as { code: string }
       ).code,
     ).toBe('RECEIPT_NOTE_AMOUNT_MISMATCH');
     // The accountant corrects the note's total (off by 0.50₮, within the tolerance).

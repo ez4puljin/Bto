@@ -165,7 +165,10 @@ export class ReceiptsController {
   ): Promise<ReceiptDetailDto> {
     const { noteTotalQty, noteTotalAmount, ...rest } = body;
     return detail(ctx)(
-      await this.receipts.update(ctx, id, { ...rest, ...noteTotals({ noteTotalQty, noteTotalAmount }) }),
+      await this.receipts.update(ctx, id, {
+        ...rest,
+        ...noteTotals({ noteTotalQty, noteTotalAmount }),
+      }),
     );
   }
 

@@ -238,7 +238,11 @@ export class GridPageDto {
 @ApiSchema({ name: 'PurchaseOrderGridChange' })
 export class GridChangeDto {
   @ApiProperty() @IsInt() @Min(1) productId: number;
-  @ApiProperty({ type: Number, nullable: true, description: 'The unit now (null with no quantity)' })
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The unit now (null with no quantity)',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -356,4 +360,3 @@ export class OrdererCandidateDto {
   @ApiProperty() id: number;
   @ApiProperty() fullName: string;
 }
-

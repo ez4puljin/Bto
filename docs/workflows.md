@@ -166,3 +166,40 @@ The reference is Butenorgil's «Захиалга» (a read-only study). Recorded
 - Trucks and kg fill: the next slice.
 - The Erkhet export, the erxes price plans, the Kharkhorin company and Butenorgil's legacy supervisor screen: not needed.
 
+
+### Answers (owner, 2026-10-29, slice 1 rounds)
+
+Four short rounds before the build. Each choice below was the proposal, unless a different choice is noted.
+
+**Ordering**
+1. **Grouping.** Orders are grouped by **supplier**. Brands are not used.
+2. **Suppliers per order.** One order holds **several suppliers**, and each supplier has its own status. The order shows the lowest of them.
+3. **Orderer.** Each supplier has **one orderer**, a staff member set by a manager. One person may order from many suppliers.
+4. **Products in the grid.** The grid lists the supplier's **main** products.
+5. **The "recent sales" column.** It counts **every outflow from the warehouse**: wholesale sales plus transfers to supermarkets, less returns. The owner chose to show **last month** only.
+
+**Statuses and editing**
+6. **Partial arrival.** It **closes the line**: what did not arrive drops out of the order and goes on a later one. There are no backorders.
+7. **Who moves the statuses.** The orderer or a manager moves Бэлдэж → Илгээсэн → Замд → Ирсэн. «Ирсэн» makes the draft receipt. The keepers' confirmation sets «Нягтлан шалгаж», and the accountant's price confirmation sets «Орлого авсан».
+8. **Changing quantities after sending.** Possible **until «Ирсэн»** for the orderer and managers. Keepers may change them only in «Бэлдэж».
+
+**Receiving and checks**
+9. **The delivery note's totals.** The **pieces** are checked at the keeper's confirmation, and the **amount** at the accountant's, within 1₮. **Every receipt** carries both totals, including the receipt window and the Excel import.
+10. **Goods not on the order.** The keeper **adds a line** for them, marked «Захиалгад байхгүй».
+11. **A supplier's goods in two warehouses.** **Each warehouse's keeper confirms their own lines.** It stays one receipt, with one number and one payable. The stock comes in at the **last** confirmation.
+12. **The arrived quantity starts empty.** Every line is checked, or marked «ирээгүй», before the confirmation.
+
+**Menu**
+13. **Where the orders sit.** In a «Татан авалт» group inside «Агуулах».
+
+**Built 2026-10-29** as ADR-0115 with migration `0052_procurement` (`docs/modules/procurement.md`). The owner walks it on the development environment:
+- an order with two suppliers;
+- the orderer's and a keeper's quantities;
+- the printed sheet;
+- «Ирсэн»;
+- the receiving screen with a scanner;
+- each keeper's confirmation;
+- the accountant's price check;
+- the payable.
+
+The trucks and the kg fill come in the next slice.

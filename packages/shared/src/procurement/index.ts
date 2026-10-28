@@ -23,7 +23,11 @@ export type PoSupplierStatus = (typeof PO_SUPPLIER_STATUSES)[number];
 export const PO_MANUAL_STATUSES = ['PREPARING', 'SENT', 'IN_TRANSIT', 'ARRIVED'] as const;
 
 /** Quantities may change up to «Замд» (owner 2026-10-29); from «Ирсэн» the receipt counts. */
-export const PO_EDITABLE_STATUSES: readonly PoSupplierStatus[] = ['PREPARING', 'SENT', 'IN_TRANSIT'];
+export const PO_EDITABLE_STATUSES: readonly PoSupplierStatus[] = [
+  'PREPARING',
+  'SENT',
+  'IN_TRANSIT',
+];
 
 export function poStatusRank(status: PoSupplierStatus): number {
   return PO_SUPPLIER_STATUSES.indexOf(status);

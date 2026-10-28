@@ -310,14 +310,18 @@ export class PurchaseOrderGridService {
       }[];
     }[]
   > {
-    const [order] = await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, orderId));
+    const [order] = await this.db
+      .select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, orderId));
     if (!order) throw notFound('purchase order', orderId);
     const rows = await this.db
       .select()
       .from(purchaseOrderSuppliers)
       .where(eq(purchaseOrderSuppliers.orderId, orderId))
       .orderBy(purchaseOrderSuppliers.id);
-    const chosen = supplierId === undefined ? rows : rows.filter((row) => row.supplierId === supplierId);
+    const chosen =
+      supplierId === undefined ? rows : rows.filter((row) => row.supplierId === supplierId);
     if (supplierId !== undefined && chosen.length === 0) {
       throw notFound('purchase order supplier', supplierId);
     }
@@ -396,9 +400,7 @@ export class PurchaseOrderGridService {
     for (const productId of productIds) {
       const home = homes.get(productId);
       const balance = (balances.get(productId) ?? []).find((row) => row.warehouseId === home);
-      const level = levels.find(
-        (row) => row.productId === productId && row.warehouseId === home,
-      );
+      const level = levels.find((row) => row.productId === productId && row.warehouseId === home);
       facts.set(productId, {
         onHand: balance?.onHand ?? new Decimal(0),
         minQty: level?.minQty ?? null,
@@ -424,7 +426,9 @@ export class PurchaseOrderGridService {
     const facts = await this.homeFacts(productIds, homes);
     const outflow = await this.stock.outflowOf(productIds, outflowFrom, outflowTo);
     const prices = ctx.permissions.has(PRICES)
-      ? new Map((await this.receipts.lastPrices(productIds)).map((price) => [price.productId, price]))
+      ? new Map(
+          (await this.receipts.lastPrices(productIds)).map((price) => [price.productId, price]),
+        )
       : null;
     const warehouseNames = await this.warehouseNames([...new Set(homes.values())]);
     return productIds.flatMap((productId) => {
@@ -456,9 +460,10 @@ export class PurchaseOrderGridService {
               : (outflow.get(productId)?.get(home) ?? new Decimal(0)),
           lastBasePrice: price?.basePrice ?? null,
           lastPriceDate: price?.date ?? null,
-          line: line ? { productUnitId: line.productUnitId, qty: line.qty, qtyBase: line.qtyBase } : null,
-          editable:
-            right !== null && home !== undefined && (right.all || canWriteHome(ctx, home)),
+          line: line
+            ? { productUnitId: line.productUnitId, qty: line.qty, qtyBase: line.qtyBase }
+            : null,
+          editable: right !== null && home !== undefined && (right.all || canWriteHome(ctx, home)),
         },
       ];
     });

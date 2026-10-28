@@ -13,12 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
-import {
-  type AuthContext,
-  CurrentUser,
-  Idempotent,
-  RequirePermission,
-} from '../../identity';
+import { type AuthContext, CurrentUser, Idempotent, RequirePermission } from '../../identity';
 import {
   AddSuppliersDto,
   CreatePurchaseOrderDto,

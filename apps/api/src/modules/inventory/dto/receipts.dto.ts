@@ -413,7 +413,8 @@ export class UpdateReceiptDto extends ReceiptHeaderFieldsDto {
   @ApiPropertyOptional({
     type: Number,
     nullable: true,
-    description: 'An uploaded photo of the delivery note (kind inventory.receipt_note); null removes',
+    description:
+      'An uploaded photo of the delivery note (kind inventory.receipt_note); null removes',
   })
   @IsOptional()
   @IsInt()

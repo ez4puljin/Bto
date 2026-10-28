@@ -166,7 +166,11 @@ export class PurchaseOrdersService {
     });
   }
 
-  update(ctx: AuthContext, id: number, patch: { note?: string | null }): Promise<PurchaseOrderDetail> {
+  update(
+    ctx: AuthContext,
+    id: number,
+    patch: { note?: string | null },
+  ): Promise<PurchaseOrderDetail> {
     assertManage(ctx);
     return inTransaction(this.db, async (tx) => {
       const order = await this.lockOrder(tx, id);
@@ -300,7 +304,8 @@ export class PurchaseOrdersService {
           status: supplier.status,
         });
       }
-      let receiptId: number | null = back && supplier.status === 'ARRIVED' ? null : supplier.receiptId;
+      let receiptId: number | null =
+        back && supplier.status === 'ARRIVED' ? null : supplier.receiptId;
       if (!back) {
         const lineCount = await this.lineCount(tx, supplier.id);
         if (lineCount === 0) {
@@ -329,7 +334,11 @@ export class PurchaseOrdersService {
     });
   }
 
-  async get(ctx: AuthContext, id: number, executor: Db | Tx = this.db): Promise<PurchaseOrderDetail> {
+  async get(
+    ctx: AuthContext,
+    id: number,
+    executor: Db | Tx = this.db,
+  ): Promise<PurchaseOrderDetail> {
     const [order] = await executor.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
     if (!order) throw notFound('purchase order', id);
     const rows = await executor
@@ -338,9 +347,12 @@ export class PurchaseOrdersService {
       .where(eq(purchaseOrderSuppliers.orderId, id))
       .orderBy(purchaseOrderSuppliers.id);
     const suppliers = new Map(
-      (await this.suppliers.getMany(rows.map((row) => row.supplierId), executor)).map(
-        (supplier) => [supplier.id, supplier],
-      ),
+      (
+        await this.suppliers.getMany(
+          rows.map((row) => row.supplierId),
+          executor,
+        )
+      ).map((supplier) => [supplier.id, supplier]),
     );
     const orderers = new Map(
       rows.length === 0
@@ -384,13 +396,17 @@ export class PurchaseOrdersService {
           ]),
         )
       : null;
-    const names = await this.userNames.namesOf(
-      [...orderers.values(), ...(order.createdBy === null ? [] : [order.createdBy])],
-    );
+    const names = await this.userNames.namesOf([
+      ...orderers.values(),
+      ...(order.createdBy === null ? [] : [order.createdBy]),
+    ]);
     const receiptNumbers = new Map<number, string | null>();
     for (const row of rows) {
       if (row.receiptId !== null) {
-        receiptNumbers.set(row.receiptId, (await this.receipts.get(row.receiptId, executor)).number);
+        receiptNumbers.set(
+          row.receiptId,
+          (await this.receipts.get(row.receiptId, executor)).number,
+        );
       }
     }
     const zero = new Decimal(0);
@@ -423,18 +439,19 @@ export class PurchaseOrdersService {
               return weight ? sum.plus(weight.times(line.qtyBase)) : sum;
             }, zero),
             estimatedCost: prices
-              ? own.reduce((sum, line) => {
-                  const price = prices.get(line.productId);
-                  return price ? sum.plus(price.times(line.qtyBase)) : sum;
-                }, zero).toDecimalPlaces(2)
+              ? own
+                  .reduce((sum, line) => {
+                    const price = prices.get(line.productId);
+                    return price ? sum.plus(price.times(line.qtyBase)) : sum;
+                  }, zero)
+                  .toDecimalPlaces(2)
               : null,
             receiptId: row.receiptId,
-            receiptNumber: row.receiptId === null ? null : (receiptNumbers.get(row.receiptId) ?? null),
+            receiptNumber:
+              row.receiptId === null ? null : (receiptNumbers.get(row.receiptId) ?? null),
             canEdit: editRight(ctx, row.status, ordererId) !== null,
-            canMoveNext:
-              nextPoStatus(row.status) !== null && mayMove(ctx, ordererId, false),
-            canMoveBack:
-              previousPoStatus(row.status) !== null && mayMove(ctx, ordererId, true),
+            canMoveNext: nextPoStatus(row.status) !== null && mayMove(ctx, ordererId, false),
+            canMoveBack: previousPoStatus(row.status) !== null && mayMove(ctx, ordererId, true),
           };
         })
         .sort((a, b) => a.supplierName.localeCompare(b.supplierName)),
