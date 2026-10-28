@@ -240,7 +240,7 @@ export function CustomersPage() {
           />
         ))}
       </FilterBar>
-      <ProblemAlert problem={problemFromError(customers.error)} />
+      <ProblemAlert problem={problemFromError(customers.error)} onRetry={customers.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

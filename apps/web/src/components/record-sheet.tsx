@@ -84,7 +84,7 @@ export function FactChips({ facts }: { facts: { label: string; value: ReactNode 
 export function PanelSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </h3>
       {children}

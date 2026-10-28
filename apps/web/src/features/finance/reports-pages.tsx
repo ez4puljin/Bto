@@ -601,7 +601,9 @@ export function YearCloseCard() {
             )
           ) : null}
         </div>
-        {confirm === null ? <ProblemAlert problem={problemFromError(status.error)} /> : null}
+        {confirm === null ? (
+          <ProblemAlert problem={problemFromError(status.error)} onRetry={status.refetch} />
+        ) : null}
       </CardContent>
       <ConfirmDialog
         open={confirm !== null}

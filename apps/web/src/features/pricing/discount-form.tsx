@@ -474,7 +474,7 @@ function ProductUnitFields(props: {
         });
   return (
     <>
-      <ProblemAlert problem={problemFromError(product.error)} />
+      <ProblemAlert problem={problemFromError(product.error)} onRetry={product.refetch} />
       <FormRow label={t('pricing.programs.fields.productUnit')} htmlFor="program-unit">
         <NativeSelect
           id="program-unit"

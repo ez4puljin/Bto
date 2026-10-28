@@ -35,7 +35,7 @@ export function CompanyPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('company.title')} description={t('company.hint')} />
-      <ProblemAlert problem={problemFromError(company.error)} />
+      <ProblemAlert problem={problemFromError(company.error)} onRetry={company.refetch} />
       {company.data ? (
         <>
           <DetailCard

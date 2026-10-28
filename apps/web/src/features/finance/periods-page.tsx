@@ -83,7 +83,7 @@ export function PeriodsPage() {
         title={t('finance.periods.title')}
         description={t('finance.periods.description')}
       />
-      <ProblemAlert problem={problemFromError(periods.error)} />
+      <ProblemAlert problem={problemFromError(periods.error)} onRetry={periods.refetch} />
       {canClose ? (
         <Card className="mb-3 gap-2">
           <CardHeader>

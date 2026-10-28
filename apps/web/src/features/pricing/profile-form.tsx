@@ -340,7 +340,7 @@ export function ProfileValuesDialog(props: { profile: PriceProfile | null; onClo
                 <ProfileExample values={example} layout="list" />
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     {t('pricing.profiles.example', { price: formatMnt(EXAMPLE_PRICE.toFixed(0)) })}
                   </h3>
                   <p className="text-[13px] text-muted-foreground">
@@ -470,7 +470,7 @@ export function ProfileExample({
   if (layout === 'list') {
     return (
       <section aria-label={title} className="flex flex-col gap-2">
-        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {title}
         </h3>
         <ul className="divide-y divide-border/80 rounded-lg bg-background shadow-control ring-1 ring-black/[0.04]">
@@ -493,7 +493,7 @@ export function ProfileExample({
 
   return (
     <section aria-label={title} className="flex flex-col gap-1.5">
-      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </h3>
       <Table>

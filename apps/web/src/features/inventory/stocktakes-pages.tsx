@@ -150,7 +150,7 @@ export function StocktakesPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(stocktakes.error)} />
+      <ProblemAlert problem={problemFromError(stocktakes.error)} onRetry={stocktakes.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

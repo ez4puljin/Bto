@@ -184,7 +184,7 @@ function PanelBody({
           {detail ? <PanelActions order={detail} /> : null}
         </div>
       </SheetHeader>
-      <ProblemAlert problem={problemFromError(order.error)} />
+      <ProblemAlert problem={problemFromError(order.error)} onRetry={order.refetch} />
       {detail ? (
         <Tabs
           value={current}

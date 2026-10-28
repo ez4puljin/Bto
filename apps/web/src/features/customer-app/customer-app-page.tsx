@@ -106,7 +106,7 @@ function BannersCard() {
         <CardDescription>{t('customerApp.banners.cardDescription')}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(banners.error)} />
+        <ProblemAlert problem={problemFromError(banners.error)} onRetry={banners.refetch} />
         {banners.isSuccess ? (
           <p className="text-sm">
             {t('customerApp.banners.runningCount', { n: formatCount(running) })}
@@ -181,7 +181,7 @@ function ContactsCard() {
       </CardHeader>
       {/* The table runs to the card's edges, so its first column lines up with the title. */}
       <CardContent className={rows.length ? 'flex flex-col gap-3 px-0' : 'flex flex-col gap-3'}>
-        <ProblemAlert problem={problemFromError(contacts.error)} />
+        <ProblemAlert problem={problemFromError(contacts.error)} onRetry={contacts.refetch} />
         <ProblemAlert problem={action.problem} />
         {contacts.isPending ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
@@ -401,7 +401,7 @@ function OrdersCard() {
         <CardTitle>{t('customerApp.orders.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(attention.error)} />
+        <ProblemAlert problem={problemFromError(attention.error)} onRetry={attention.refetch} />
         {attention.isPending ? (
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : null}

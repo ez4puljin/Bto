@@ -78,7 +78,7 @@ export function DateFilter(props: {
   return (
     <label
       data-active={props.value ? 'true' : undefined}
-      className="group inline-flex h-8 items-center gap-2 rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/25 hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
+      className="group inline-flex h-8 items-center gap-2 rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
     >
       <span className="text-muted-foreground group-data-[active=true]:text-secondary-foreground">
         {props.label}
@@ -107,6 +107,7 @@ export function FilterChip(props: {
         variant="ghost"
         className="rounded-full text-secondary-foreground hover:bg-secondary-hover"
         aria-label={props.clearLabel}
+        title={props.clearLabel}
         onClick={props.onClear}
       >
         <X />
@@ -142,7 +143,7 @@ export function SegmentedControl<T extends string>(props: {
             role="tab"
             aria-selected={selected}
             className={cn(
-              'h-7 rounded-[8px] px-3 text-[13px] font-medium transition-[color,background-color,box-shadow] outline-none focus-visible:ring-3 focus-visible:ring-ring/30',
+              'h-7 rounded-[8px] px-3 text-[13px] font-medium transition-[color,background-color,box-shadow] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               selected
                 ? 'bg-background text-foreground shadow-control'
                 : 'text-muted-foreground hover:text-foreground',
@@ -427,7 +428,7 @@ export function LoadMore(props: {
         variant="ghost"
         size="sm"
         className="text-link"
-        disabled={props.query.isFetchingNextPage}
+        pending={props.query.isFetchingNextPage}
         onClick={() => void props.query.fetchNextPage()}
       >
         {t('common.loadMore')}

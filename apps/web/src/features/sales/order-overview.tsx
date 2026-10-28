@@ -219,7 +219,7 @@ function StageProgress({
                   disabled={here || !stage.canMove || busy}
                   onClick={() => move(stage)}
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-default',
+                    'flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-default',
                     done || here
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border bg-background text-muted-foreground enabled:hover:border-primary/60',

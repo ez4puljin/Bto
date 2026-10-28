@@ -148,7 +148,7 @@ export function PosLoyaltyMembersPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(members.error)} />
+      <ProblemAlert problem={problemFromError(members.error)} onRetry={members.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -485,7 +485,7 @@ function MemberPanel({ memberId, onClose }: { memberId: number | null; onClose: 
       }
       actions={detail ? <PanelActions member={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(member.error)} />
+      <ProblemAlert problem={problemFromError(member.error)} onRetry={member.refetch} />
       {detail ? (
         <div className="flex flex-col gap-5">
           <MemberDetailsCard member={detail} />
@@ -943,7 +943,7 @@ function EntriesSection({ memberId }: { memberId: number }) {
   const rows = entries.data?.pages.flatMap((page) => page.data) ?? [];
   return (
     <PanelSection title={t('posLoyalty.sections.entries')}>
-      <ProblemAlert problem={problemFromError(entries.error)} />
+      <ProblemAlert problem={problemFromError(entries.error)} onRetry={entries.refetch} />
       <div className="overflow-x-auto rounded-lg border border-border">
         <Table>
           <TableHeader>

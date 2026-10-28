@@ -61,7 +61,8 @@ export function ConfirmDialog(props: {
           <Button
             ref={confirm}
             variant={variant}
-            disabled={props.pending || props.disabled}
+            pending={props.pending}
+            disabled={props.disabled}
             onClick={props.onConfirm}
           >
             {props.confirmLabel}

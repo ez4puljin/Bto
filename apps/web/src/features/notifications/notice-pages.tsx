@@ -73,7 +73,7 @@ export function AppNoticesPage() {
           </Button>
         }
       />
-      <ProblemAlert problem={problemFromError(notices.error)} />
+      <ProblemAlert problem={problemFromError(notices.error)} onRetry={notices.refetch} />
       <ListCard>
         <Table>
           <TableHeader>

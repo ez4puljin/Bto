@@ -77,7 +77,7 @@ export function BarcodeLookupPage() {
       {latest ? <ScanResult entry={latest} /> : null}
       {older.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <h2 className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <h2 className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {t('scan.recent')}
           </h2>
           <ListCard>

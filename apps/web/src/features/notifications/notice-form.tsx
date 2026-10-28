@@ -377,7 +377,7 @@ function PhonePreview(props: {
   const { t } = useTranslation();
   return (
     <section aria-label={t('notifications.preview.title')} className="flex flex-col gap-2">
-      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         {t('notifications.preview.title')}
       </h3>
       <div className="flex min-h-[480px] items-center justify-center rounded-[36px] border-[6px] border-foreground/85 bg-foreground/45 p-4">

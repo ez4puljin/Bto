@@ -67,7 +67,7 @@ export function CustomerBalancesPage() {
           onCheckedChange={(checked) => setParam('overdue', checked ? '1' : undefined)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(balances.error)} />
+      <ProblemAlert problem={problemFromError(balances.error)} onRetry={balances.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

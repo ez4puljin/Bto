@@ -18,7 +18,7 @@ export function DateRangeFilter(props: {
       role="group"
       aria-label={props.label}
       data-active={active ? 'true' : undefined}
-      className="group inline-flex h-8 max-w-full items-center gap-1 rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/25 hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
+      className="group inline-flex h-8 max-w-full items-center gap-1 rounded-full border border-border bg-background pl-3 text-[13px] font-medium shadow-control focus-within:border-ring focus-within:ring-1 focus-within:ring-ring hover:bg-accent data-[active=true]:border-transparent data-[active=true]:bg-secondary data-[active=true]:text-secondary-foreground"
     >
       <span className="mr-1 text-muted-foreground group-data-[active=true]:text-secondary-foreground">
         {props.label}

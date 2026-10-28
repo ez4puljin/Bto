@@ -320,7 +320,7 @@ function DocumentsSheet(props: {
             ]}
           />
           <PanelSection title={t(`${columns}.title`)}>
-            <ProblemAlert problem={problemFromError(documents.error)} />
+            <ProblemAlert problem={problemFromError(documents.error)} onRetry={documents.refetch} />
             {documents.data?.more ? (
               <p className="text-[13px] text-muted-foreground">{t(`${columns}.more`)}</p>
             ) : null}

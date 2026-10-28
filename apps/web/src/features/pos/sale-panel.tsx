@@ -56,7 +56,7 @@ export function SalePanel({ saleId, onClose }: { saleId: number | null; onClose:
       }
       actions={detail ? <PanelActions sale={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(sale.error)} />
+      <ProblemAlert problem={problemFromError(sale.error)} onRetry={sale.refetch} />
       {detail ? <SaleBody sale={detail} /> : null}
     </RecordSheet>
   );

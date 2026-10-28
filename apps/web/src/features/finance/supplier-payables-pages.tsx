@@ -65,7 +65,7 @@ export function SupplierBalancesPage() {
           }}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(balances.error)} />
+      <ProblemAlert problem={problemFromError(balances.error)} onRetry={balances.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -185,7 +185,7 @@ export function SupplierLedgerPage() {
             </span>
           ) : null}
         </FilterBar>
-        <ProblemAlert problem={problemFromError(ledger.error)} />
+        <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
         <ListCard scroll>
           <Table>
             <TableHeader>

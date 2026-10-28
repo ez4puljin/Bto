@@ -117,7 +117,7 @@ export function UsersPage() {
           onChange={(event) => setSearch(event.target.value)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(users.error)} />
+      <ProblemAlert problem={problemFromError(users.error)} onRetry={users.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

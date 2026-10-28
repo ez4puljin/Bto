@@ -209,7 +209,7 @@ function AllocationForm({ party, onClose }: { party: AllocationParty; onClose: (
         <DialogDescription>{texts.intro}</DialogDescription>
       </DialogHeader>
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <ProblemAlert problem={problemFromError(items.error)} />
+        <ProblemAlert problem={problemFromError(items.error)} onRetry={items.refetch} />
         <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
           <legend className="px-1 text-sm font-semibold">{texts.credits}</legend>
           {items.isPending ? (

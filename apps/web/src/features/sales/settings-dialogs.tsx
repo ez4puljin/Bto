@@ -307,7 +307,7 @@ export function ChannelsDialog({ boards }: { boards: readonly SalesBoard[] }) {
         <DialogTitle>{t('sales.channelsDialog.title')}</DialogTitle>
         <DialogDescription>{t('sales.channelsDialog.description')}</DialogDescription>
       </DialogHeader>
-      <ProblemAlert problem={problemFromError(channels.error)} />
+      <ProblemAlert problem={problemFromError(channels.error)} onRetry={channels.refetch} />
       <div className="flex flex-col gap-3">
         {CHANNELS.map((channel) => (
           <ChannelRow

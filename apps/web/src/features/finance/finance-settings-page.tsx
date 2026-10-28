@@ -79,7 +79,7 @@ export function FinanceSettingsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('finance.settings.title')} />
-      <ProblemAlert problem={problemFromError(numbering.error)} />
+      <ProblemAlert problem={problemFromError(numbering.error)} onRetry={numbering.refetch} />
       {numbering.data ? (
         <DetailCard
           title={t('finance.settings.numbering')}
@@ -102,7 +102,10 @@ export function FinanceSettingsPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <ProblemAlert problem={problemFromError(moneyAccounts.error)} />
+          <ProblemAlert
+            problem={problemFromError(moneyAccounts.error)}
+            onRetry={moneyAccounts.refetch}
+          />
           <Table>
             <TableHeader>
               <TableRow>

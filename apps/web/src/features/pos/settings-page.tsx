@@ -29,7 +29,7 @@ export function PosSettingsPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <PageHeader title={t('pos.settings.title')} description={t('pos.settings.description')} />
-      <ProblemAlert problem={problemFromError(settings.error)} />
+      <ProblemAlert problem={problemFromError(settings.error)} onRetry={settings.refetch} />
       {settings.data ? (
         <DetailCard
           title={t('pos.settings.section')}

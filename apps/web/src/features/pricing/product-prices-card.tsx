@@ -56,7 +56,7 @@ export function ProductPricesCard({ productId, pending }: { productId: number; p
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ProblemAlert problem={problemFromError(prices.error)} />
+        <ProblemAlert problem={problemFromError(prices.error)} onRetry={prices.refetch} />
         {pending ? (
           <div className="flex flex-col gap-3 rounded-xl bg-warning-soft px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-warning">{t('pricing.saleReady.pendingNote')}</p>

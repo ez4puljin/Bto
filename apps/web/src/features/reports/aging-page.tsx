@@ -215,7 +215,7 @@ function AgingSheet(props: { row: AgingRow | null; partyId: number | null; onClo
             ]}
           />
         ) : null}
-        <ProblemAlert problem={problemFromError(items.error)} />
+        <ProblemAlert problem={problemFromError(items.error)} onRetry={items.refetch} />
         {items.data && items.data.data.length === 0 ? (
           <EmptyState title={t(`${columns}.empty`)} />
         ) : (

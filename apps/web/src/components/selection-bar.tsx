@@ -14,7 +14,7 @@ export function SelectionBar(props: { count: number; onClear: () => void; childr
     <div
       role="region"
       aria-label={t('common.selection')}
-      className="sticky bottom-4 z-20 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-card ring-1 ring-black/[0.06] print:hidden"
+      className="sticky bottom-4 z-20 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl bg-background/95 px-3 py-2 shadow-popover backdrop-blur-md ring-1 ring-black/[0.06] print:hidden"
     >
       <span className="px-1 text-sm font-medium tabular-nums">
         {t('common.selected', { count: props.count })}

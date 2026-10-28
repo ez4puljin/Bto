@@ -124,7 +124,7 @@ export function BannersPage() {
           onChange={setView}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(banners.error)} />
+      <ProblemAlert problem={problemFromError(banners.error)} onRetry={banners.refetch} />
       {archiving ? null : <ProblemAlert problem={action.problem} />}
       <ListCard scroll>
         <Table>

@@ -45,7 +45,7 @@ export function ShiftPanel({ shiftId, onClose }: { shiftId: number | null; onClo
       badges={detail ? <ShiftStatusBadge status={detail.status} /> : null}
       actions={detail ? <PanelActions shift={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(shift.error)} />
+      <ProblemAlert problem={problemFromError(shift.error)} onRetry={shift.refetch} />
       {detail ? <ShiftBody shift={detail} /> : null}
     </RecordSheet>
   );

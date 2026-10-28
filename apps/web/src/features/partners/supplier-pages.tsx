@@ -150,7 +150,7 @@ export function SuppliersPage() {
           onChange={(id) => setParam('segment', id ? String(id) : '')}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(suppliers.error)} />
+      <ProblemAlert problem={problemFromError(suppliers.error)} onRetry={suppliers.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -211,7 +211,7 @@ export function SupplierCreatePage() {
   return (
     <div className="max-w-3xl">
       <PageHeader title={t('partners.supplier.newTitle')} />
-      <ProblemAlert problem={problemFromError(nextCode.error)} />
+      <ProblemAlert problem={problemFromError(nextCode.error)} onRetry={nextCode.refetch} />
       {nextCode.isPending ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : (
@@ -321,7 +321,7 @@ function SupplierProductsCard({ supplierId }: { supplierId: number }) {
         <CardTitle>{t('partners.supplier.products')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <ProblemAlert problem={problemFromError(products.error)} />
+        <ProblemAlert problem={problemFromError(products.error)} onRetry={products.refetch} />
         {!products.isPending && rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('partners.supplier.productsEmpty')}</p>
         ) : null}

@@ -100,7 +100,7 @@ export function PosShiftsPage() {
           onChange={(value) => setParam('to', value)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(shifts.error)} />
+      <ProblemAlert problem={problemFromError(shifts.error)} onRetry={shifts.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

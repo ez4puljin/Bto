@@ -255,7 +255,7 @@ function Tile(props: {
       aria-pressed={props.pressed ?? false}
       className={cn(
         tile,
-        'cursor-pointer ring-black/[0.06] transition-[box-shadow,background-color] outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/30 aria-pressed:bg-secondary aria-pressed:ring-2 aria-pressed:ring-primary',
+        'cursor-pointer ring-black/[0.06] transition-[box-shadow,background-color] outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-pressed:bg-secondary aria-pressed:ring-2 aria-pressed:ring-primary',
       )}
       onClick={props.onClick}
     >

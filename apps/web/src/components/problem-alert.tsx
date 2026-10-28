@@ -1,6 +1,7 @@
 import type { ProblemDetails } from '@tugeel/api-client';
 import { useTranslation } from 'react-i18next';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { formatMnt } from '@/lib/money';
 
 const CREDIT_KEYS = {
@@ -12,9 +13,16 @@ const money = (value: unknown) => (typeof value === 'string' ? formatMnt(value) 
 
 /**
  * The Mongolian message for an API error code (ADR-0011: `errors.<CODE>`). The credit refusal
- * (ADR-0060 #2) gets one line per reason with its amounts formatted.
+ * (ADR-0060 #2) gets one line per reason with its amounts formatted. `onRetry` (a failed load,
+ * ADR-0113) adds «Дахин оролдох» at the alert's end.
  */
-export function ProblemAlert({ problem }: { problem: ProblemDetails | null | undefined }) {
+export function ProblemAlert({
+  problem,
+  onRetry,
+}: {
+  problem: ProblemDetails | null | undefined;
+  onRetry?: () => unknown;
+}) {
   const { t } = useTranslation();
   if (!problem) return null;
   const params = problem.params ?? {};
@@ -37,6 +45,19 @@ export function ProblemAlert({ problem }: { problem: ProblemDetails | null | und
             })
           : t(`errors.${problem.code}`, params)}
       </AlertDescription>
+      {onRetry ? (
+        <AlertAction>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10"
+            onClick={() => void onRetry()}
+          >
+            {t('common.retry')}
+          </Button>
+        </AlertAction>
+      ) : null}
     </Alert>
   );
 }

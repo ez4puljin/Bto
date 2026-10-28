@@ -250,7 +250,7 @@ export function MovementsPage() {
           {t('inventory.movements.binNotFound', { code: missingBin })}
         </p>
       ) : null}
-      <ProblemAlert problem={problemFromError(movements.error)} />
+      <ProblemAlert problem={problemFromError(movements.error)} onRetry={movements.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>

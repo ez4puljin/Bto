@@ -2,7 +2,8 @@
  * Tugeel design tokens (ADR-0042, docs/ui.md): an Apple-like light theme on Tailwind 4 + shadcn/ui
  * radix-nova. Inter Variable covers Mongolian Ө/Ү (cyrillic-ext), ₮ and №. Text is 14px on a 16px
  * root, so rem spacing keeps its size. Colours: #0071E3 fills buttons and focus rings; blue TEXT
- * uses --link (#0066CC), which keeps 4.5:1 on white and on the canvas.
+ * uses --link (#0066CC), which keeps 4.5:1 on white and on the canvas. ADR-0113: secondary text,
+ * field borders and the switch darkened to WCAG AA (4.5:1 text, 3:1 boundaries).
  */
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -27,7 +28,7 @@
   --secondary-hover: #dce8f8;
   --secondary-foreground: #0066cc;
   --muted: #f2f2f7;
-  --muted-foreground: #6e6e73;
+  --muted-foreground: #636366;
   --accent: #f0f0f5;
   --accent-foreground: #1d1d1f;
   --link: #0066cc;
@@ -39,9 +40,9 @@
   --warning-soft: #fff1de;
   --info-soft: #e8f0fb;
   --fill: #e8e8ed;
-  --toggle: #34c759;
+  --toggle: #248a3d;
   --border: #e5e5ea;
-  --input: #c7c7cc;
+  --input: #8e8e93;
   --ring: #0071e3;
   --chart-1: #0071e3;
   --chart-2: #34c759;
@@ -130,6 +131,27 @@
   body {
     @apply bg-canvas text-sm text-foreground font-sans;
   }
+  /* Things that act get the pointer (Tailwind 4's preflight leaves buttons on the arrow). */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  [role='menuitem'],
+  [role='option'],
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+  /* Reduced motion (ADR-0113): animations and transitions end at once; the login map stops too. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
   a:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -214,7 +236,7 @@
   /* A native <select> drawn like the inputs, with its own chevron (NativeSelect). */
   .native-select {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23636366' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 0.6rem center;
     background-repeat: no-repeat;
     background-size: 1rem;

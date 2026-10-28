@@ -169,7 +169,7 @@ export function PaymentsPage() {
           onTo={(value) => setParam('to', value)}
         />
       </FilterBar>
-      <ProblemAlert problem={problemFromError(payments.error)} />
+      <ProblemAlert problem={problemFromError(payments.error)} onRetry={payments.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
@@ -278,7 +278,7 @@ export function PaymentPanel({
       }
       actions={detail ? <PaymentActions payment={detail} /> : null}
     >
-      <ProblemAlert problem={problemFromError(payment.error)} />
+      <ProblemAlert problem={problemFromError(payment.error)} onRetry={payment.refetch} />
       {detail ? <PaymentBody payment={detail} /> : null}
     </RecordSheet>
   );

@@ -205,7 +205,7 @@ export function TransfersPage() {
           ))}
         </NativeSelect>
       </FilterBar>
-      <ProblemAlert problem={problemFromError(transfers.error)} />
+      <ProblemAlert problem={problemFromError(transfers.error)} onRetry={transfers.refetch} />
       <ListCard scroll>
         <Table>
           <TableHeader>
